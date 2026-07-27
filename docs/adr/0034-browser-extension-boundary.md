@@ -1,0 +1,3 @@
+# Fronteira segura da extensão CorreTop Assistant
+
+O CorreTop Assistant será um plugin contextual do WhatsApp Web, não uma automação de mensagens. O CRM permanece a fonte de verdade: a extensão recebe uma sessão curta e revogável por dispositivo e envia somente o telefone visível ou uma ação explícita; tenant, unidade, permissões, dados do lead e regras de status são derivados e validados no backend. Escolhemos um gateway próprio e respostas minimizadas (`FOUND`, `FORBIDDEN`, `NOT_FOUND`) para impedir enumeração e vazamento entre carteiras, enquanto a inserção no compositor continua deliberadamente separada do envio.

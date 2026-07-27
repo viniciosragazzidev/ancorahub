@@ -27,6 +27,7 @@ export type ChangeLeadStatusInput = {
   leadId: string;
   newStatus: string;
   motivoPerda?: string | null;
+  expectedVersion?: number;
 };
 
 export type ChangeLeadStatusResult = {
@@ -45,6 +46,7 @@ const changeStatusInput = z.object({
     { message: "Status inválido." },
   ),
   motivoPerda: z.string().optional().nullable(),
+  expectedVersion: z.number().int().positive().optional(),
 });
 
 // ─── Serviço principal ────────────────────────────────────────────────
@@ -93,9 +95,10 @@ async function assertCanReopen(context: TenantContext) {
 
 export async function changeLeadStatus(
   rawInput: ChangeLeadStatusInput,
+  contextOverride?: TenantContext,
 ): Promise<ChangeLeadStatusResult> {
   const input = changeStatusInput.parse(rawInput);
-  const context = await getRequiredTenantContext();
+  const context = contextOverride ?? await getRequiredTenantContext();
   const db = getDatabase();
 
   // Buscar o lead
@@ -106,6 +109,7 @@ export async function changeLeadStatus(
       corretorId: schema.leads.corretorId,
       branchId: schema.leads.branchId,
       status: schema.leads.status,
+      version: schema.leads.version,
       nome: schema.leads.nome,
     })
     .from(schema.leads)
@@ -118,6 +122,9 @@ export async function changeLeadStatus(
 
   const previousStatus = lead.status;
   const newStatus = input.newStatus;
+  if (input.expectedVersion !== undefined && input.expectedVersion !== lead.version) {
+    throw new Error("CONFLICT_VERSION");
+  }
 
   // ─── Validações de transição ─────────────────────────────────────────
 
@@ -161,14 +168,17 @@ export async function changeLeadStatus(
 
   await db.transaction(async (tx) => {
     // Atualizar lead
-    await tx
+    const updated = await tx
       .update(schema.leads)
       .set({
         status: newStatus as LeadStatus,
         stageEnteredAt: now,
         motivoPerda,
+        version: lead.version + 1,
       })
-      .where(eq(schema.leads.id, lead.id));
+      .where(and(eq(schema.leads.id, lead.id), ...(input.expectedVersion === undefined ? [] : [eq(schema.leads.version, input.expectedVersion)])))
+      .returning({ id: schema.leads.id });
+    if (updated.length !== 1) throw new Error("CONFLICT_VERSION");
 
     // Criar interação na timeline
     const interactionContent = isReopening

@@ -1,0 +1,10 @@
+import type { ResolveState } from "../shared/types";
+
+export function mountPanel(onResolve: (phone: string) => void, onInsert: (text: string) => void) {
+  const host = document.createElement("aside"); host.id = "corretop-assistant-panel";
+  const shadow = host.attachShadow({ mode: "closed" });
+  shadow.innerHTML = `<style>:host{all:initial;position:fixed;right:0;top:0;bottom:0;width:380px;z-index:2147483647;font-family:Inter,system-ui,sans-serif}.panel{height:100%;box-sizing:border-box;background:#fff;color:#17212b;border-left:1px solid #e4e7eb;box-shadow:-8px 0 24px #17212b18;padding:20px;overflow:auto}.muted{color:#697586;font-size:13px}.btn{border:1px solid #d4dae1;border-radius:8px;background:#fff;padding:9px 12px;cursor:pointer}.primary{background:#176b5d;color:#fff;border-color:#176b5d}.suggestion{border:1px solid #e4e7eb;border-radius:10px;padding:12px;margin:10px 0}.hidden{display:none}</style><section class="panel"><header><strong>CorreTop Assistant</strong><p class="muted">Contexto seguro do atendimento</p></header><div id="state" class="muted">Inicializando…</div><div id="content"></div></section>`;
+  document.body.appendChild(host);
+  const state = shadow.getElementById("state")!; const content = shadow.getElementById("content")!;
+  return { host, render(value: ResolveState) { state.textContent = value.message ?? ({ INITIALIZING: "Inicializando…", NO_CONVERSATION: "Abra uma conversa no WhatsApp Web.", UNIDENTIFIED: "Não foi possível identificar esta conversa automaticamente.", LOADING: "Consultando o CRM…", OFFLINE: "CRM indisponível. Tente novamente.", ERROR: "Não foi possível carregar o contexto.", SESSION_EXPIRED: "Sessão expirada. Reconecte a extensão." } as Record<string, string>)[value.status] ?? ""; content.innerHTML = value.lead ? `<h3>${String(value.lead.name ?? "Lead")}</h3><p class="muted">${String((value.lead.currentStatus as { label?: string } | undefined)?.label ?? "")}</p><button class="btn primary" data-action="suggest">Sugerir resposta</button><div id="suggestions"></div>` : ""; }, onInsert };
+}

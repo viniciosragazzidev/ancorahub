@@ -62,19 +62,19 @@ export type QuickReplyResolution = {
 };
 
 const defaultTemplates: Record<string, QuickReplyTemplate> = {
-  "human.already_assigned": { ruleKey: "human.already_assigned", templateKey: "human.already_assigned", body: "Recebi sua mensagem. O corretor responsÃ¡vel jÃ¡ foi avisado e continuarÃ¡ seu atendimento por aqui.", active: true },
-  "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor responsÃ¡vel.", active: true },
-  "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "OlÃ¡ novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
-  "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "OlÃ¡! Vou fazer algumas perguntas rÃ¡pidas para preparar seu atendimento.", active: true },
+  "human.already_assigned": { ruleKey: "human.already_assigned", templateKey: "human.already_assigned", body: "Recebi sua mensagem. O corretor responsável já foi avisado e continuará seu atendimento por aqui.", active: true },
+  "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor responsável.", active: true },
+  "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Olá novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
+  "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento.", active: true },
   "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: "Certo. Vou encaminhar seu atendimento para um corretor.", active: true },
-  "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Entendido. Registrei sua solicitaÃ§Ã£o e o atendimento automÃ¡tico serÃ¡ interrompido.", active: true },
+  "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Entendido. Registrei sua solicitação e o atendimento automático será interrompido.", active: true },
   "wrong_number.confirmed": { ruleKey: "wrong_number.confirmed", templateKey: "wrong_number.confirmed", body: "Entendido. Vou interromper este atendimento e sinalizar o contato para a equipe.", active: true },
-  "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi o arquivo. O corretor responsÃ¡vel foi avisado para verificar.", active: true },
+  "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi o arquivo. O corretor responsável foi avisado para verificar.", active: true },
   "message.unclear": { ruleKey: "message.unclear", templateKey: "message.unclear", body: "Recebi sua mensagem. Se preferir, posso encaminhar seu atendimento para um corretor.", active: true },
-  "callback.requested": { ruleKey: "callback.requested", templateKey: "callback.requested", body: "Certo. Vou avisar o corretor para retornar o contato assim que possÃ­vel.", active: true },
-  "urgent.requested": { ruleKey: "urgent.requested", templateKey: "urgent.requested", body: "Entendi a urgÃªncia. Vou sinalizar o corretor responsÃ¡vel agora.", active: true },
+  "callback.requested": { ruleKey: "callback.requested", templateKey: "callback.requested", body: "Certo. Vou avisar o corretor para retornar o contato assim que possível.", active: true },
+  "urgent.requested": { ruleKey: "urgent.requested", templateKey: "urgent.requested", body: "Entendi a urgência. Vou sinalizar o corretor responsável agora.", active: true },
   "goodbye.confirmed": { ruleKey: "goodbye.confirmed", templateKey: "goodbye.confirmed", body: "Tudo bem. Quando precisar, estaremos por aqui.", active: true },
-  "thanks.confirmed": { ruleKey: "thanks.confirmed", templateKey: "thanks.confirmed", body: "Por nada! O corretor continua Ã  disposiÃ§Ã£o.", active: true },
+  "thanks.confirmed": { ruleKey: "thanks.confirmed", templateKey: "thanks.confirmed", body: "Por nada! O corretor continua Ã  disposição.", active: true },
 };
 
 export function normalizeQuickReplyText(value: string | null | undefined) {

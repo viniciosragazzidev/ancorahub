@@ -355,6 +355,7 @@ export const leads = pgTable(
     tipo: text("tipo").notNull().default("PF"),
     status: leadStatus("status").notNull().default("new"),
     qualificationStatus: text("qualification_status").notNull().default("pending"),
+    version: integer("version").notNull().default(1),
     distributionStatus: text("distribution_status").notNull().default("unassigned"),
     distributionOrigin: text("distribution_origin"),
     queueId: text("queue_id"),
@@ -1366,6 +1367,59 @@ export const aiConversations = pgTable(
     index("ai_conversations_tenant_lead_idx").on(table.tenantId, table.leadId),
     index("ai_conversations_assigned_user_idx").on(table.assignedUserId),
   ],
+);
+
+/** Short-lived authorization grants created by an authenticated CRM session. */
+export const extensionAuthCodes = pgTable(
+  "extension_auth_codes",
+  {
+    id: text("id").primaryKey(),
+    codeHash: text("code_hash").notNull().unique(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [index("extension_auth_codes_expiry_idx").on(table.expiresAt)],
+);
+
+/** Hashed, revocable browser-extension sessions. The raw token never leaves the exchange response. */
+export const extensionSessions = pgTable(
+  "extension_sessions",
+  {
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull().unique(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    deviceId: text("device_id").notNull(),
+    extensionVersion: text("extension_version").notNull(),
+    permissions: jsonb("permissions").notNull().default([]),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    index("extension_sessions_user_idx").on(table.userId, table.revokedAt),
+    index("extension_sessions_tenant_idx").on(table.tenantId, table.revokedAt),
+  ],
+);
+
+export const extensionSettings = pgTable(
+  "extension_settings",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    minimumVersion: text("minimum_version").notNull().default("0.1.0"),
+    allowInsert: boolean("allow_insert").notNull().default(true),
+    maxSuggestions: integer("max_suggestions").notNull().default(3),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("extension_settings_tenant_unique").on(table.tenantId)],
 );
 
 export const aiQuickReplyTemplates = pgTable(

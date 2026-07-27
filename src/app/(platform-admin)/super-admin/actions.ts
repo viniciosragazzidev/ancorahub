@@ -396,6 +396,15 @@ export async function updateQuickReplySettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateExtensionGlobalSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("extensionEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_browser_extension_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_browser_extension_global_settings", targetType: "system_settings", targetId: "browser_extension", metadata: { enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateLeadManagementActionsSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const db = getDatabase();

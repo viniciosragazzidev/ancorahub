@@ -1,6 +1,6 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export default async function SuperAdminSettingsPage() {
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
     "feature_ai_quick_reply_enabled",
+    "feature_browser_extension_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -57,6 +58,7 @@ export default async function SuperAdminSettingsPage() {
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
+  const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -383,6 +385,11 @@ export default async function SuperAdminSettingsPage() {
 
             </form>
           </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>CorreTop Assistant</CardTitle><CardDescription>Kill switch global da extensão contextual. Desativar bloqueia novas consultas sem revogar dados históricos ou sessões já registradas.</CardDescription></CardHeader>
+          <CardContent><form action={updateExtensionGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="extensionEnabled" value="true" defaultChecked={browserExtensionEnabled} className="size-4" /><span><span className="font-medium">Extensão habilitada globalmente</span><span className="block text-xs text-muted-foreground">O Diretor ainda controla a ativação por tenant.</span></span></label><Button type="submit">Salvar extensão</Button></form></CardContent>
         </Card>
         <Card className="border-border bg-card shadow-none">
           <CardHeader><CardTitle>Qualificação automática no WhatsApp</CardTitle><CardDescription>Usa o mesmo motor de IA e o canal oficial da Meta para fazer perguntas iniciais. Desativar interrompe novas sessões sem apagar histórico.</CardDescription></CardHeader>

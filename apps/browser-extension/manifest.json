@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "CorreTop Assistant",
+  "version": "0.1.0",
+  "description": "Painel contextual do CorreTop para o WhatsApp Web.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://web.whatsapp.com/*", "https://corretop.vercel.app/*"],
+  "background": { "service_worker": "background-service-worker.js" },
+  "action": { "default_title": "CorreTop Assistant", "default_popup": "popup/index.html" },
+  "content_scripts": [{ "matches": ["https://web.whatsapp.com/*"], "js": ["content-index.js"], "run_at": "document_idle" }],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" }
+}

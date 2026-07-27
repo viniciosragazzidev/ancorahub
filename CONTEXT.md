@@ -26,3 +26,10 @@
 - **Canal Meta Cloud**: canal empresarial conectado por Embedded Signup; seu token é cifrado no servidor e nunca é devolvido ao navegador.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
 - **Atendimento externo temporário**: enquanto o chat interno não estiver operacional, o Corretor inicia o atendimento auditado no CorreTop e é direcionado ao WhatsApp pessoal pelo número autorizado do lead. A interface não apresenta mensagens como se estivessem sincronizadas.
+
+## Extensão CorreTop Assistant
+
+- **CorreTop Assistant**: painel contextual privado do CRM que acompanha somente a conversa aberta no WhatsApp Web; não é um disparador nem uma caixa de entrada paralela.
+- **Sessão da extensão**: vínculo revogável por dispositivo, derivado de uma autorização temporária iniciada no CRM; nunca aceita tenant, unidade ou permissões enviados pelo navegador como autoridade.
+- **Lead acessível**: lead cuja visibilidade foi confirmada pelo backend para o tenant, unidade, carteira e papel do corretor; telefone sozinho nunca concede acesso.
+- **Sugestão de resposta**: texto gerado ou selecionado pelo backend a partir do contexto autorizado, que pode ser inserido no compositor sem executar o envio.
