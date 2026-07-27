@@ -8,6 +8,7 @@ import {
   createEmptyMemory,
   type ConversationMemory,
 } from "./memory";
+import { createSafeFallbackResponse } from "./ai-response-schema";
 import {
   createDefaultGuardrailPipeline,
   runGuardrailPipeline,
@@ -475,8 +476,57 @@ export async function processInboundAiResponse({
     });
     // Guardrail bloqueou — não enviamos a resposta, mas NÃO matamos a conversa.
     // A próxima mensagem do usuário tentará novamente com contexto atualizado.
+    const safeFallback = createSafeFallbackResponse(
+      updatedMemory.customerName?.value,
+      buildMemoryContext(updatedMemory),
+    );
+    const fallbackMessageId = `ai_msg_guardrail_fallback_${crypto.randomUUID()}`;
+    await db.insert(schema.whatsappMessages).values({
+      id: fallbackMessageId,
+      tenantId,
+      leadId,
+      communicationChannelId: communicationChannelId ?? null,
+      conversationId: conversation.id,
+      senderRole: "assistant",
+      provider: "meta",
+      phone,
+      direction: "outbound",
+      body: safeFallback.message,
+      sentAt: new Date(),
+    });
+
+    let fallbackDeliveryStatus = "failed";
+    try {
+      const channel = await getPreferredMetaCloudChannel({ tenantId });
+      if (channel) {
+        const sent = await sendMetaCloudChannelText({ channel, to: phone, body: safeFallback.message });
+        await db.update(schema.whatsappMessages)
+          .set({ providerStatus: "sent", messageId: sent.messageId })
+          .where(and(eq(schema.whatsappMessages.id, fallbackMessageId), eq(schema.whatsappMessages.tenantId, tenantId)));
+        fallbackDeliveryStatus = "sent";
+        console.info("[ai-wpp] guardrail_fallback.sent", { tenantId, leadId, conversationId: conversation.id, code: pipelineResult.code });
+      } else {
+        console.warn("[ai-wpp] guardrail_fallback.skipped_no_channel", { tenantId, leadId, conversationId: conversation.id });
+      }
+    } catch (sendError) {
+      const error = sendError instanceof Error ? sendError.message.slice(0, 240) : "unknown_error";
+      await db.update(schema.whatsappMessages)
+        .set({ providerStatus: "failed" })
+        .where(and(eq(schema.whatsappMessages.id, fallbackMessageId), eq(schema.whatsappMessages.tenantId, tenantId)));
+      console.error("[ai-wpp] guardrail_fallback.failed", { tenantId, leadId, conversationId: conversation.id, error });
+    }
+
+    await transitionConversationState({
+      tenantId,
+      conversationId: conversation.id,
+      newStatus: "WAITING_CUSTOMER",
+      reason: `Guardrail ${pipelineResult.code} substituído por fallback seguro`,
+    });
+
     return {
-      status: "blocked",
+      status: "guardrail_fallback_sent",
+      deliveryStatus: fallbackDeliveryStatus,
+      reply: safeFallback.message,
       error: `Resposta bloqueada pelo guardrail ${pipelineResult.blockedBy}: ${pipelineResult.reason}`,
     };
   }
