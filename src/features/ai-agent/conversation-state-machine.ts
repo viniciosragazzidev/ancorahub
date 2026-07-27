@@ -15,6 +15,7 @@ import {
   runGuardrailPipeline,
 } from "./guardrails";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
+import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 
 export type ConversationStatus =
   | "NEW"
@@ -96,6 +97,7 @@ async function _runEnsure() {
     sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS last_processed_message_id text`,
     sql`ALTER TABLE ai_attendance_logs ADD COLUMN IF NOT EXISTS source_message_id text`,
     sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS memory jsonb`,
+    sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS qualification_status text NOT NULL DEFAULT 'pending'`,
     sql`ALTER TYPE availability_status ADD VALUE IF NOT EXISTS 'offline'`,
   ];
 
@@ -393,6 +395,9 @@ export async function processInboundAiResponse({
       aiResult.structured.questionAsked = null;
     }
   }
+  const qualificationStatus = isCoreQualificationComplete(updatedMemory)
+    ? deriveLeadQualificationStatus(updatedMemory)
+    : undefined;
 
   console.info("[ai-wpp] ai.completed", {
     tenantId,
@@ -674,6 +679,10 @@ export async function processInboundAiResponse({
       } else if (val === "individual" || val === "familiar") {
         leadUpdates.tipo = "PF";
       }
+    }
+
+    if (qualificationStatus) {
+      leadUpdates.qualificationStatus = qualificationStatus;
     }
 
     if (Object.keys(leadUpdates).length > 0) {

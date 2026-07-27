@@ -13,7 +13,7 @@ import { BulkReassignDialog } from "@/components/ui/bulk-reassign-dialog";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
-import { LeadStatusBadge } from "@/components/status-badges";
+import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -47,6 +47,7 @@ export type LeadWorkspaceItem = {
   nome: string;
   telefone: string;
   status: string;
+  qualificationStatus: string;
   distributionStatus?: string;
   origem: string;
   sourceCampaign: string | null;
@@ -220,9 +221,10 @@ export function LeadsWorkspace({
                       <span className={`mt-1 block truncate text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
                         {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
                       </span>
-                      <span className="mt-2 flex items-center gap-2">
-                        <LeadStatusBadge status={lead.status} />
-                        <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
+                        <span className="mt-2 flex items-center gap-2">
+                          <LeadStatusBadge status={lead.status} />
+                          <LeadQualificationBadge status={lead.qualificationStatus} />
+                          <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
                       </span>
                       <span className="mt-1 flex items-center gap-2">
                         <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="truncate text-xs" />
@@ -251,6 +253,7 @@ export function LeadsWorkspace({
                     </TableHead>
                     <TableHead className="pl-0">Lead</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Qualificação</TableHead>
                     <TableHead className="hidden md:table-cell">Saúde</TableHead>
                     <TableHead className="hidden md:table-cell">Responsável</TableHead>
                     <TableHead className="hidden lg:table-cell">Entrada</TableHead>
@@ -287,6 +290,9 @@ export function LeadsWorkspace({
                       </TableCell>
                       <TableCell>
                         <LeadStatusBadge status={lead.status} />
+                      </TableCell>
+                      <TableCell>
+                        <LeadQualificationBadge status={lead.qualificationStatus} />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         <LeadHealthBadge
@@ -372,9 +378,10 @@ export function LeadsWorkspace({
                           {shouldMask(selectedLead) ? "••••-••••" : (contextRole === "broker" && selectedLead.status === "distributed" ? maskPhone(selectedLead.telefone) : selectedLead.telefone)}
                         </p>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <LeadStatusBadge status={selectedLead.status} />
-                        <LeadHealthBadge
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <LeadStatusBadge status={selectedLead.status} />
+                          <LeadQualificationBadge status={selectedLead.qualificationStatus} />
+                          <LeadHealthBadge
                           health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
                         />
                       </div>

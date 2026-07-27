@@ -78,6 +78,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       nome: schema.leads.nome,
       telefone: schema.leads.telefone,
       status: schema.leads.status,
+      qualificationStatus: schema.leads.qualificationStatus,
       distributionStatus: schema.leads.distributionStatus,
       origem: schema.leads.origem,
       sourceCampaign: schema.leads.sourceCampaign,

@@ -354,6 +354,7 @@ export const leads = pgTable(
     origem: leadOrigin("origem").notNull().default("manual"),
     tipo: text("tipo").notNull().default("PF"),
     status: leadStatus("status").notNull().default("new"),
+    qualificationStatus: text("qualification_status").notNull().default("pending"),
     distributionStatus: text("distribution_status").notNull().default("unassigned"),
     distributionOrigin: text("distribution_origin"),
     queueId: text("queue_id"),

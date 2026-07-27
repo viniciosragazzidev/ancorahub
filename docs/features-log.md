@@ -20,6 +20,13 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Solicitações explícitas como “Atendente” e “Falar com atendente” acionam
   transferência determinística, mesmo se o modelo retornar JSON incorreto.
 
+## 27/07/2026 - Status de qualificação no lead
+
+- Leads passaram a persistir `qualification_status` (`pending`, `qualified`,
+  `hot`, `warm`, `cold`) ao concluir o ciclo de seis perguntas.
+- A tabela `/leads` ganhou a coluna Qualificação com badge semântico; o status
+  de pipeline continua separado do resultado comercial da qualificação.
+
 ## 27/07/2026 - Sistema visual DesignTeste (preview)
 
 - Tokens Vendria Light mapeados para o tema semantico: canvas quente, card branco,

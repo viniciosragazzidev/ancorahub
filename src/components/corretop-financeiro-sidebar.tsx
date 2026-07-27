@@ -31,7 +31,7 @@ const goalsItems: SidebarItem[] = [
 ];
 const reportsItems: SidebarItem[] = [
   { label: "Relatórios", icon: ChartBar, url: "/financeiro/relatorios", permission: "ver_relatorios_financeiros" },
-  { label: "Exportar Dados", icon: FileArrowDown, url: "/financeiro/exportar", permission: "exportar_relatorios" },
+  { label: "Exportar Dados", icon: FileArrowDown as typeof ChartLineUp, url: "/financeiro/exportar", permission: "exportar_relatorios" },
   { label: "Cronograma de Repasses", icon: Target, url: "/financeiro/cronograma", permission: "ver_cronograma_repasses" },
 ];
 const settingsItems: SidebarItem[] = [{ label: "Configurações", icon: Gear, url: "/financeiro/configuracoes", permission: "gerenciar_financeiro" }];
