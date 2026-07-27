@@ -1,0 +1,35 @@
+O redesign completo dos dashboards para **Diretor**, **Gestor** e **Corretor** foi executado com sucesso!
+
+### 🎯 Resumo das Melhorias Implementadas
+
+1. **Fundação Visual e Design System Moderno (`src/components/dashboard/`)**:
+   - **`MetricCardTinted`**: Cards de métricas com fundos suaves (tints semânticos em azul, verde, amarelo, vermelho e roxo), tendência percentual, badges e microinterações de hover/foco.
+   - **`FunnelHorizontal`**: Funil comercial horizontal compacto com barras proporcionais, retenção percentual entre etapas e suporte a filtragem por clique.
+   - **`PriorityActionPanel`**: Painel de alta prioridade ("Precisa da sua atenção") com gravidades (crítico, atenção, info), badges e botões diretos de ação rápida.
+   - **`AgendaSidePanel`**: Painel lateral estilo agenda/calendário com mini-tabs (Todos, Reuniões, Tarefas) e compromissos estilizados em fundos suaves.
+   - **`DashboardHeaderCompact`**: Header compacto com saudação contextual, escopo/unidade, seletor de período (Hoje, 7d, 30d) e atualização em tempo real.
+
+2. **Dashboard do Diretor (`DirectorDashboard`)**:
+   - KPIs estratégicos (Leads Ativos, Leads Críticos, Conversões e Equipe Ativa).
+   - Banner de destaque para o **Plantão ao Vivo** com botão de abertura do módulo.
+   - Layout em grid de 12 colunas (8 cols principais + 4 cols no painel lateral de pendências estratégicas).
+   - Tabs contextuais para Desempenho por Filial (ranking com progress bars), Gargalos & Riscos e Status do Sistema.
+
+3. **Dashboard do Gestor (`ManagerDashboard`)**:
+   - Métricas operacionais da unidade (Aguardando Contato, Em Atendimento, SLA Médio e Corretores Ativos).
+   - Fila prioritária da filial ("Precisa da sua atenção") com ações imediatas para cobrar equipe e atribuir leads sem responsável.
+   - Painel de distribuição com progress bars e toggle de distribuição automática.
+   - Agenda do Gestor no painel lateral com alinhamentos, revisões de SLA e fechamento de plantão.
+
+4. **Dashboard do Corretor (`BrokerDashboard`)**:
+   - Banner de destaque **Próxima Ação Prioritária** com acesso em 1 clique ao lead mais urgente da fila.
+   - Cards rápidos de atendimento (Conversas Aguardando, Tarefas Hoje, Leads Ativos e Conversões do Mês).
+   - Minha Fila de Atendimento compacta com status e telefone mascarado.
+   - Meu Desempenho & Metas com tempo médio de resposta e progresso da meta individual.
+   - Agenda do Corretor no painel lateral com retornos agendados e envios de proposta.
+
+5. **Novas Rotas e Proteção de Acesso**:
+   - Ponto de entrada modularizado em `noc-dashboard-content.tsx`.
+   - Rotas dedicadas `/diretor`, `/gestor` e `/corretor` com validação de perfil e multi-tenancy estrito no servidor.
+
+Você pode conferir a documentação detalhada da execução no arquivo [walkthrough.md](file:///C:/Users/kyper/.gemini/antigravity/brain/cf58e69a-79e1-48c5-aab5-9942608a2b4a/walkthrough.md).

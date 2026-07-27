@@ -1,0 +1,36 @@
+services:
+  openwa:
+    image: ghcr.io/rmyndharis/openwa:latest
+    container_name: corretop_openwa
+    restart: unless-stopped
+    ports:
+      - "${OPENWA_PORT:-2785}:2785"
+    environment:
+      PORT: 2785
+      NODE_ENV: production
+      AUTO_START_SESSIONS: "true"
+      DATABASE_TYPE: sqlite
+      DATABASE_NAME: ./data/openwa.sqlite
+      DATABASE_SYNCHRONIZE: "true"
+      DATABASE_LOGGING: "false"
+      ENGINE_TYPE: whatsapp-web.js
+      SESSION_DATA_PATH: ./data/sessions
+      PUPPETEER_HEADLESS: "true"
+      PUPPETEER_ARGS: --no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage
+      STORAGE_TYPE: local
+      STORAGE_LOCAL_PATH: ./data/media
+      REDIS_ENABLED: "false"
+      REDIS_BUILTIN: "false"
+      QUEUE_ENABLED: "false"
+      CACHE_ENABLED: "false"
+      POSTGRES_BUILTIN: "false"
+      MINIO_BUILTIN: "false"
+      API_MASTER_KEY: ${OPENWA_API_KEY}
+      # Local development only: permit the container to deliver webhooks to
+      # the Next.js host through host.docker.internal.
+      SSRF_ALLOWED_HOSTS: host.docker.internal
+    volumes:
+      - openwa_data:/app/data
+
+volumes:
+  openwa_data:

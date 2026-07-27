@@ -1,0 +1,196 @@
+{
+  "generatedAt": "2026-07-15T18:54:34.310Z",
+  "admin": {
+    "name": "Vinícios CorreTop",
+    "email": "vinicios@corretop.com",
+    "password": "21509399"
+  },
+  "tenant": {
+    "name": "Corretora Vértice Saúde",
+    "slug": "corretora-vertice-saude",
+    "legalName": "Vértice Saúde Corretora Ltda.",
+    "cnpj": "41817056000170"
+  },
+  "branches": [
+    {
+      "name": "Matriz São Paulo",
+      "code": "sp",
+      "manager": {
+        "name": "Gestor Matriz São Paulo",
+        "email": "gestor.sp@corretop.com",
+        "password": "Gestor@2026-sp"
+      },
+      "brokers": [
+        {
+          "name": "Corretor Matriz São Paulo 01",
+          "email": "corretor.sp01@corretop.com",
+          "password": "Corretor@2026-sp-01"
+        },
+        {
+          "name": "Corretor Matriz São Paulo 02",
+          "email": "corretor.sp02@corretop.com",
+          "password": "Corretor@2026-sp-02"
+        },
+        {
+          "name": "Corretor Matriz São Paulo 03",
+          "email": "corretor.sp03@corretop.com",
+          "password": "Corretor@2026-sp-03"
+        },
+        {
+          "name": "Corretor Matriz São Paulo 04",
+          "email": "corretor.sp04@corretop.com",
+          "password": "Corretor@2026-sp-04"
+        },
+        {
+          "name": "Corretor Matriz São Paulo 05",
+          "email": "corretor.sp05@corretop.com",
+          "password": "Corretor@2026-sp-05"
+        }
+      ]
+    },
+    {
+      "name": "Filial Rio de Janeiro",
+      "code": "rj",
+      "manager": {
+        "name": "Gestor Filial Rio de Janeiro",
+        "email": "gestor.rj@corretop.com",
+        "password": "Gestor@2026-rj"
+      },
+      "brokers": [
+        {
+          "name": "Corretor Filial Rio de Janeiro 01",
+          "email": "corretor.rj01@corretop.com",
+          "password": "Corretor@2026-rj-01"
+        },
+        {
+          "name": "Corretor Filial Rio de Janeiro 02",
+          "email": "corretor.rj02@corretop.com",
+          "password": "Corretor@2026-rj-02"
+        },
+        {
+          "name": "Corretor Filial Rio de Janeiro 03",
+          "email": "corretor.rj03@corretop.com",
+          "password": "Corretor@2026-rj-03"
+        },
+        {
+          "name": "Corretor Filial Rio de Janeiro 04",
+          "email": "corretor.rj04@corretop.com",
+          "password": "Corretor@2026-rj-04"
+        },
+        {
+          "name": "Corretor Filial Rio de Janeiro 05",
+          "email": "corretor.rj05@corretop.com",
+          "password": "Corretor@2026-rj-05"
+        }
+      ]
+    },
+    {
+      "name": "Filial Belo Horizonte",
+      "code": "bh",
+      "manager": {
+        "name": "Gestor Filial Belo Horizonte",
+        "email": "gestor.bh@corretop.com",
+        "password": "Gestor@2026-bh"
+      },
+      "brokers": [
+        {
+          "name": "Corretor Filial Belo Horizonte 01",
+          "email": "corretor.bh01@corretop.com",
+          "password": "Corretor@2026-bh-01"
+        },
+        {
+          "name": "Corretor Filial Belo Horizonte 02",
+          "email": "corretor.bh02@corretop.com",
+          "password": "Corretor@2026-bh-02"
+        },
+        {
+          "name": "Corretor Filial Belo Horizonte 03",
+          "email": "corretor.bh03@corretop.com",
+          "password": "Corretor@2026-bh-03"
+        },
+        {
+          "name": "Corretor Filial Belo Horizonte 04",
+          "email": "corretor.bh04@corretop.com",
+          "password": "Corretor@2026-bh-04"
+        },
+        {
+          "name": "Corretor Filial Belo Horizonte 05",
+          "email": "corretor.bh05@corretop.com",
+          "password": "Corretor@2026-bh-05"
+        }
+      ]
+    },
+    {
+      "name": "Filial Curitiba",
+      "code": "ctba",
+      "manager": {
+        "name": "Gestor Filial Curitiba",
+        "email": "gestor.ctba@corretop.com",
+        "password": "Gestor@2026-ctba"
+      },
+      "brokers": [
+        {
+          "name": "Corretor Filial Curitiba 01",
+          "email": "corretor.ctba01@corretop.com",
+          "password": "Corretor@2026-ctba-01"
+        },
+        {
+          "name": "Corretor Filial Curitiba 02",
+          "email": "corretor.ctba02@corretop.com",
+          "password": "Corretor@2026-ctba-02"
+        },
+        {
+          "name": "Corretor Filial Curitiba 03",
+          "email": "corretor.ctba03@corretop.com",
+          "password": "Corretor@2026-ctba-03"
+        },
+        {
+          "name": "Corretor Filial Curitiba 04",
+          "email": "corretor.ctba04@corretop.com",
+          "password": "Corretor@2026-ctba-04"
+        },
+        {
+          "name": "Corretor Filial Curitiba 05",
+          "email": "corretor.ctba05@corretop.com",
+          "password": "Corretor@2026-ctba-05"
+        }
+      ]
+    },
+    {
+      "name": "Filial Porto Alegre",
+      "code": "poa",
+      "manager": {
+        "name": "Gestor Filial Porto Alegre",
+        "email": "gestor.poa@corretop.com",
+        "password": "Gestor@2026-poa"
+      },
+      "brokers": [
+        {
+          "name": "Corretor Filial Porto Alegre 01",
+          "email": "corretor.poa01@corretop.com",
+          "password": "Corretor@2026-poa-01"
+        },
+        {
+          "name": "Corretor Filial Porto Alegre 02",
+          "email": "corretor.poa02@corretop.com",
+          "password": "Corretor@2026-poa-02"
+        },
+        {
+          "name": "Corretor Filial Porto Alegre 03",
+          "email": "corretor.poa03@corretop.com",
+          "password": "Corretor@2026-poa-03"
+        },
+        {
+          "name": "Corretor Filial Porto Alegre 04",
+          "email": "corretor.poa04@corretop.com",
+          "password": "Corretor@2026-poa-04"
+        },
+        {
+          "name": "Corretor Filial Porto Alegre 05",
+          "email": "corretor.poa05@corretop.com",
+          "password": "Corretor@2026-poa-05"
+        }
+      ]
+    }
+  ]
+}

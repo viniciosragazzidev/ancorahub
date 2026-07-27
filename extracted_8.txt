@@ -1,0 +1,53 @@
+<USER_REQUEST>
+## Error Type
+Build Error
+
+## Error Message
+You're importing a module that depends on "next/headers". This API is only available in Server Components in the App Router, but you are using it in the Pages Router.
+
+## Build Output
+./src/shared/auth/session.ts:3:1
+You're importing a module that depends on "next/headers". This API is only available in Server Components in the App Router, but you are using it in the Pages Router.
+    Learn more: https://nextjs.org/docs/app/building-your-application/rendering/server-components
+  1 | import "server-only";
+  2 |
+> 3 | import { headers } from "next/headers";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAuth } from "./index";
+  5 | import { AuthenticationError } from "./errors";
+  6 |
+
+Ecmascript file had an error
+
+Import traces:
+  Server Component:
+    ./src/shared/auth/session.ts
+    ./src/shared/auth/tenant-context.ts
+    ./src/app/(dashboard)/layout.tsx
+
+  Client Component Browser:
+    ./src/shared/auth/session.ts [Client Component Browser]
+    ./src/shared/auth/tenant-context.ts [Client Component Browser]
+    ./src/features/leads/queries.ts [Client Component Browser]
+    ./src/components/next-urgent-lead-button.tsx [Client Component Browser]
+    ./src/app/(dashboard)/dashboard/_components/broker-dashboard.tsx [Client Component Browser]
+    ./src/app/(dashboard)/dashboard/_components/noc-dashboard-content.tsx [Client Component Browser]
+    ./src/app/(dashboard)/dashboard/_components/noc-dashboard-content.tsx [Server Component]
+    ./src/app/(dashboard)/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/shared/auth/session.ts [Client Component SSR]
+    ./src/shared/auth/tenant-context.ts [Client Component SSR]
+    ./src/features/leads/queries.ts [Client Component SSR]
+    ./src/components/next-urgent-lead-button.tsx [Client Component SSR]
+    ./src/app/(dashboard)/dashboard/_components/broker-dashboard.tsx [Client Component SSR]
+    ./src/app/(dashboard)/dashboard/_components/noc-dashboard-content.tsx [Client Component SSR]
+    ./src/app/(dashboard)/dashboard/_components/noc-dashboard-content.tsx [Server Component]
+    ./src/app/(dashboard)/dashboard/page.tsx [Server Component]
+
+Next.js version: 16.2.10 (Turbopack)
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-26T16:57:44-03:00.
+</ADDITIONAL_METADATA>

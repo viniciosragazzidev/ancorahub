@@ -1,0 +1,2 @@
+CREATE TYPE "public"."availability_status" AS ENUM('available', 'paused');--> statement-breakpoint
+ALTER TABLE "tenant_memberships" ADD COLUMN "availability_status" "availability_status" DEFAULT 'available' NOT NULL;

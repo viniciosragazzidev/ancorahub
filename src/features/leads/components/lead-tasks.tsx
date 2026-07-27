@@ -1,0 +1,34 @@
+"use client";
+
+import { startTransition, useActionState, useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { CheckCircle, Clock, ListChecks, Plus, Users } from "@/components/huge-icons";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { createLeadTaskAction, toggleLeadTaskAction, type LeadTaskState } from "@/features/leads/task-actions";
+
+type LeadTask = { id: string; title: string; description: string | null; dueAt: string | null; completedAt: string | null; priority: "low" | "normal" | "urgent" };
+type Assignee = { id: string; name: string };
+
+export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks: LeadTask[]; assignees: Assignee[] }) {
+  const [open, setOpen] = useState(false);
+  const [priority, setPriority] = useState<LeadTask["priority"]>("normal");
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>(assignees.slice(0, 1).map((assignee) => assignee.id));
+  const [state, action, pending] = useActionState<LeadTaskState, FormData>(createLeadTaskAction, {});
+
+  useEffect(() => {
+    if (state.error) toast.error(state.error);
+    if (state.success) { toast.success("Tarefa criada."); setOpen(false); setPriority("normal"); setSelectedAssignees(assignees.slice(0, 1).map((assignee) => assignee.id)); }
+  }, [assignees, state.error, state.success]);
+
+  function toggle(taskId: string) { startTransition(async () => { const result = await toggleLeadTaskAction(taskId); if (result.error) toast.error(result.error); }); }
+  function toggleAssignee(assigneeId: string, checked: boolean) { setSelectedAssignees((current) => { if (!checked) return current.filter((id) => id !== assigneeId); if (priority !== "urgent") return [assigneeId]; return [...current, assigneeId]; }); }
+
+  return <Card className="border-border bg-card shadow-none"><CardHeader className="flex-row items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><ListChecks className="size-5 text-primary" />Tarefas</CardTitle><CardDescription>Próximos passos atribuídos a este atendimento.</CardDescription></div><Dialog open={open} onOpenChange={setOpen}><DialogTrigger render={<Button size="sm"><Plus /> Nova tarefa</Button>} /><DialogPopup className="sm:max-w-xl"><DialogHeader><DialogTitle>Nova tarefa</DialogTitle><DialogDescription>Registre um próximo passo objetivo para este lead.</DialogDescription></DialogHeader><form action={action} className="grid gap-4"><input name="leadId" type="hidden" value={leadId} /><div className="grid gap-2"><Label htmlFor="task-title">Título</Label><Input id="task-title" maxLength={160} name="title" placeholder="Ex.: Retornar para confirmar interesse" required /></div><div className="grid gap-2"><Label htmlFor="task-description">Descrição <span className="text-muted-foreground">(opcional)</span></Label><Textarea id="task-description" maxLength={1000} name="description" placeholder="Contexto que ajuda o corretor a executar a tarefa." /></div><div className="grid gap-2"><Label htmlFor="task-due">Prazo <span className="text-muted-foreground">(opcional)</span></Label><Input id="task-due" name="dueAt" type="datetime-local" /></div><div className="grid gap-2"><Label htmlFor="task-priority">Prioridade</Label><select className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm" id="task-priority" name="priority" onChange={(event) => { const next = event.target.value as LeadTask["priority"]; setPriority(next); if (next !== "urgent") setSelectedAssignees((current) => current.slice(0, 1)); }} value={priority}><option value="low">Baixa</option><option value="normal">Normal</option><option value="urgent">Urgente</option></select></div><div className="grid gap-2"><Label className="flex items-center gap-2"><Users className="size-4" /> Responsáveis</Label><p className="text-xs text-muted-foreground">{priority === "urgent" ? "Tarefas urgentes podem ter mais de um corretor." : "Tarefas comuns possuem um único responsável."}</p><div className="grid gap-2 rounded-lg border border-border p-3">{assignees.map((assignee) => <label className="flex items-center gap-2 text-sm" key={assignee.id}><Checkbox checked={selectedAssignees.includes(assignee.id)} onCheckedChange={(checked) => toggleAssignee(assignee.id, Boolean(checked))} /><span>{assignee.name}</span></label>)}{!assignees.length ? <p className="text-sm text-muted-foreground">Não há corretores ativos disponíveis para este lead.</p> : null}</div>{selectedAssignees.map((assigneeId) => <input key={assigneeId} name="assigneeIds" type="hidden" value={assigneeId} />)}</div><DialogFooter><DialogClose render={<Button disabled={pending} type="button" variant="outline">Cancelar</Button>} /><Button disabled={pending || !selectedAssignees.length} type="submit">{pending ? "Criando..." : "Criar tarefa"}</Button></DialogFooter></form></DialogPopup></Dialog></CardHeader><CardContent className="space-y-2">{tasks.length ? tasks.map((task) => <div key={task.id} className="flex gap-3 rounded-lg border border-border p-3"><Checkbox aria-label={`Concluir ${task.title}`} checked={Boolean(task.completedAt)} onCheckedChange={() => toggle(task.id)} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className={task.completedAt ? "text-sm font-medium line-through text-muted-foreground" : "text-sm font-medium"}>{task.title}</p><span className={task.priority === "urgent" ? "rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive" : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"}>{task.priority === "urgent" ? "Urgente" : task.priority === "low" ? "Baixa" : "Normal"}</span></div>{task.description ? <p className="mt-1 text-sm text-muted-foreground">{task.description}</p> : null}{task.dueAt ? <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground"><Clock className="size-3.5" />{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(task.dueAt))}</p> : null}</div>{task.completedAt ? <CheckCircle className="size-5 text-emerald-500" /> : null}</div>) : <div className="rounded-lg border border-dashed border-border px-4 py-7 text-center"><ListChecks className="mx-auto size-5 text-muted-foreground" /><p className="mt-2 text-sm font-medium">Nenhuma tarefa pendente</p><p className="mt-1 text-xs text-muted-foreground">Crie um próximo passo para dar continuidade ao atendimento.</p></div>}</CardContent></Card>;
+}

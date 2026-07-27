@@ -1,0 +1,23 @@
+
+> corretop@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.70:3000
+- Environments: .env.local
+✓ Ready in 1091ms
+
+○ Compiling /conversas ...
+ GET /conversas 500 in 24.5s (next.js: 23.9s, proxy.ts: 494ms, application-code: 35ms)
+ GET /conversas 500 in 24.5s (next.js: 23.9s, proxy.ts: 494ms, application-code: 36ms)
+ GET /conversas 500 in 1879ms (next.js: 1825ms, proxy.ts: 23ms, application-code: 31ms)
+ GET /conversas 500 in 1880ms (next.js: 1825ms, proxy.ts: 23ms, application-code: 32ms)
+ GET /conversas 500 in 1030ms (next.js: 1006ms, proxy.ts: 6ms, application-code: 19ms)
+ GET /conversas 500 in 1031ms (next.js: 1006ms, proxy.ts: 6ms, application-code: 19ms)
+ GET /conversas 500 in 538ms (next.js: 516ms, proxy.ts: 7ms, application-code: 15ms)
+ GET /conversas 500 in 538ms (next.js: 516ms, proxy.ts: 7ms, application-code: 15ms)
+ GET /conversas 500 in 498ms (next.js: 481ms, proxy.ts: 4ms, application-code: 13ms)
+ GET /conversas 500 in 499ms (next.js: 481ms, proxy.ts: 4ms, application-code: 13ms)
+ GET /conversas 500 in 549ms (next.js: 523ms, proxy.ts: 5ms, application-code: 21ms)
+ GET /conversas 500 in 550ms (next.js: 523ms, proxy.ts: 5ms, application-code: 21ms)

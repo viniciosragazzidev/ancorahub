@@ -1,0 +1,19 @@
+Realizei uma auditoria completa na estrutura atual dos dashboards e elaborei o plano detalhado de redesign no documento [implementation_plan.md](file:///C:/Users/kyper/.gemini/antigravity/brain/cf58e69a-79e1-48c5-aab5-9942608a2b4a/implementation_plan.md).
+
+### Diagnóstico Resumido
+1. **Estrutura Monolítica e Rolagem Extensa**: As visões de Diretor, Gestor e Corretor compartilham um único arquivo monolítico (`noc-dashboard-content.tsx` com ~1230 linhas) com cartões brancos idênticos, gráficos de área gigantes e blocos duplicados de métricas no topo e rodapé.
+2. **Ruído Técnico**: Informações de parâmetros do tenant e status do sistema estão misturadas aos indicadores comerciais da operação.
+3. **Falta de Hierarquia por Papel**:
+   - **Diretor**: Ausência de funil horizontal sintético e ranking de filiais compacto na primeira dobra.
+   - **Gestor**: Ausência de fila de atenção ("Precisa da sua atenção") com ações diretas, monitor de carga da equipe e métricas de SLA.
+   - **Corretor**: Ausência do card em destaque para a "Próxima Ação" prioritária e agenda lateral integrada.
+
+---
+
+### Visão Geral da Solução Proposta
+- **Layout Modular em Grid Assegurado de 12 Colunas**: 8 colunas para fluxo principal de indicadores/funil + 4 colunas para painel lateral de ações/agenda.
+- **Densidade Compacta (Sem Scroll Desnecessário em Desktop)**: Toda a informação Nível 1 (ações imediatas e pendências) e Nível 2 (desempenho e conversões) visível sem rolagem.
+- **Cores Semânticas com Tint de Fundo Suave**: Inspirado no visual de SaaS moderno (referência), com cards coloridos suaves (Primary, Amber/Warning, Emerald/Success, Rose/Danger, Purple/Accent).
+- **Tabs Contextuais**: Informações Nível 3 (análise profunda por filial, funil completo, marketing) isoladas em tabs que só carregam sob demanda.
+
+Por favor, revise o documento [implementation_plan.md](file:///C:/Users/kyper/.gemini/antigravity/brain/cf58e69a-79e1-48c5-aab5-9942608a2b4a/implementation_plan.md) e me informe se posso proceder com a execução da Fase 2 em diante.

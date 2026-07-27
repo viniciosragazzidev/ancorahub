@@ -1,0 +1,222 @@
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\server\\pages-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\static\development\_buildManifest.js.tmp.jqgx6fux9so'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\static\\development\\_buildManifest.js.tmp.jqgx6fux9so'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\server\pages-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\server\\pages-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json',
+  page: '/conversas'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}
+Error: ENOENT: no such file or directory, open 'C:\Users\kyper\Desktop\Kyper\Projects\corretopV2\corretop\.next\dev\routes-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kyper\\Desktop\\Kyper\\Projects\\corretopV2\\corretop\\.next\\dev\\routes-manifest.json'
+}

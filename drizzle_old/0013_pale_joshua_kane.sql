@@ -1,0 +1,1 @@
+ALTER TABLE "lead_webhook_credentials" ADD COLUMN "source" text DEFAULT 'webhook' NOT NULL;

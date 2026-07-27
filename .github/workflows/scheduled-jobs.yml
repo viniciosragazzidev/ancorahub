@@ -1,0 +1,32 @@
+name: CorreTop scheduled jobs
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Os crons foram movidos para crons nativos do Vercel Pro (vercel.json).
+# Mantido apenas para execução manual via workflow_dispatch.
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run lead SLA sweep
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://corretop.vercel.app/api/internal/sla
+
+  reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run notification reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://corretop.vercel.app/api/internal/reminders

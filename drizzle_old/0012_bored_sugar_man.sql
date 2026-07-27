@@ -1,0 +1,3 @@
+ALTER TABLE "lead_webhook_credentials" ADD COLUMN "branch_id" text;--> statement-breakpoint
+ALTER TABLE "lead_webhook_credentials" ADD CONSTRAINT "lead_webhook_credentials_branch_id_branches_id_fk" FOREIGN KEY ("branch_id") REFERENCES "public"."branches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "lead_webhook_credentials_branch_id_idx" ON "lead_webhook_credentials" USING btree ("branch_id");

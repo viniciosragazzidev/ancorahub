@@ -1,0 +1,2 @@
+ALTER TABLE "tenant_memberships"
+  ADD COLUMN IF NOT EXISTS "job_title" text NOT NULL DEFAULT 'broker';
