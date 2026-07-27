@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
-import { generateAiResponse, detectLanguage } from "./service";
+import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
 import {
   extractFieldsFromMessage,
@@ -16,6 +16,7 @@ import {
 } from "./guardrails";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
+import { sendOpenWaText } from "@/lib/integrations/openwa";
 
 export type ConversationStatus =
   | "NEW"
@@ -25,6 +26,26 @@ export type ConversationStatus =
   | "HUMAN_ACTIVE"
   | "CLOSED"
   | "FAILED";
+
+type AiTransport = "meta" | "openwa";
+
+async function sendAiOutbound(input: {
+  tenantId: string;
+  phone: string;
+  body: string;
+  transport: AiTransport;
+  openWaSessionId?: string | null;
+}) {
+  if (input.transport === "openwa") {
+    if (!input.openWaSessionId) return { status: "failed" as const, messageId: null };
+    const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
+    return { status: "sent" as const, messageId: sent.messageId ?? null };
+  }
+  const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
+  if (!channel) return { status: "skipped_no_channel" as const, messageId: null };
+  const sent = await sendMetaCloudChannelText({ channel, to: input.phone, body: input.body });
+  return { status: "sent" as const, messageId: sent.messageId };
+}
 
 let tablesEnsured = false;
 // Promise de lock para evitar execuções paralelas durante o build
@@ -231,6 +252,8 @@ export async function processInboundAiResponse({
   communicationChannelId,
   providerMessageId,
   whatsappMessageId,
+  transport = "meta",
+  openWaSessionId,
 }: {
   tenantId: string;
   leadId: string;
@@ -239,6 +262,8 @@ export async function processInboundAiResponse({
   communicationChannelId?: string | null;
   providerMessageId?: string | null;
   whatsappMessageId?: string | null;
+  transport?: AiTransport;
+  openWaSessionId?: string | null;
 }) {
   const db = getDatabase();
 
@@ -356,6 +381,37 @@ export async function processInboundAiResponse({
   const updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
   const memoryContext = buildMemoryContext(updatedMemory);
 
+  if (detectHumanTransferRequest(userMessageBody)) {
+    const handoffMessage = "Claro. Vou encaminhar seu atendimento para um corretor da equipe agora.";
+    const messageId = `ai_msg_handoff_${crypto.randomUUID()}`;
+    await db.insert(schema.whatsappMessages).values({
+      id: messageId,
+      tenantId,
+      leadId,
+      communicationChannelId: communicationChannelId ?? null,
+      conversationId: conversation.id,
+      senderRole: "assistant",
+      provider: transport,
+      phone,
+      direction: "outbound",
+      body: handoffMessage,
+      sentAt: new Date(),
+    });
+    let deliveryStatus = "failed";
+    try {
+      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId });
+      deliveryStatus = sent.status;
+      if (sent.messageId) {
+        await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId })
+          .where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
+      }
+    } catch (error) {
+      console.error("[ai-wpp] handoff.failed", { tenantId, leadId, transport, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+    }
+    await transitionConversationState({ tenantId, conversationId: conversation.id, newStatus: "WAITING_HUMAN", reason: "Solicitação explícita de atendimento humano" });
+    return { status: "transferred_to_human", deliveryStatus, reply: handoffMessage };
+  }
+
   // 7. Detectar idioma da mensagem do usuário
   const detectedLanguage = detectLanguage(userMessageBody);
 
@@ -424,7 +480,7 @@ export async function processInboundAiResponse({
         communicationChannelId: communicationChannelId ?? null,
         conversationId: conversation.id,
         senderRole: "assistant",
-        provider: "meta",
+        provider: transport,
         phone,
         direction: "outbound",
         body: fallbackMessage,
@@ -436,16 +492,11 @@ export async function processInboundAiResponse({
 
     // 2. Send fallback message to WhatsApp
     try {
-      const channel = await getPreferredMetaCloudChannel({ tenantId });
-      if (channel) {
-        await sendMetaCloudChannelText({
-          channel,
-          to: phone,
-          body: fallbackMessage,
-        });
+      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId });
+      if (sent.status === "sent") {
         console.info("[ai-wpp] fallback.sent", { tenantId, leadId, phone });
       } else {
-        console.warn("[ai-wpp] fallback.skipped_no_channel", { tenantId, leadId });
+        console.warn("[ai-wpp] fallback.skipped_no_channel", { tenantId, leadId, transport });
       }
     } catch (sendError) {
       console.error("[ai-agent] Falha ao enviar mensagem de fallback no WhatsApp:", sendError);
@@ -509,7 +560,7 @@ export async function processInboundAiResponse({
       communicationChannelId: communicationChannelId ?? null,
       conversationId: conversation.id,
       senderRole: "assistant",
-      provider: "meta",
+      provider: transport,
       phone,
       direction: "outbound",
       body: safeFallback.message,
@@ -518,16 +569,15 @@ export async function processInboundAiResponse({
 
     let fallbackDeliveryStatus = "failed";
     try {
-      const channel = await getPreferredMetaCloudChannel({ tenantId });
-      if (channel) {
-        const sent = await sendMetaCloudChannelText({ channel, to: phone, body: safeFallback.message });
+      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId });
+      if (sent.status === "sent") {
         await db.update(schema.whatsappMessages)
-          .set({ providerStatus: "sent", messageId: sent.messageId })
+          .set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
           .where(and(eq(schema.whatsappMessages.id, fallbackMessageId), eq(schema.whatsappMessages.tenantId, tenantId)));
         fallbackDeliveryStatus = "sent";
         console.info("[ai-wpp] guardrail_fallback.sent", { tenantId, leadId, conversationId: conversation.id, code: pipelineResult.code });
       } else {
-        console.warn("[ai-wpp] guardrail_fallback.skipped_no_channel", { tenantId, leadId, conversationId: conversation.id });
+        console.warn("[ai-wpp] guardrail_fallback.skipped_no_channel", { tenantId, leadId, conversationId: conversation.id, transport });
       }
     } catch (sendError) {
       const error = sendError instanceof Error ? sendError.message.slice(0, 240) : "unknown_error";
@@ -712,7 +762,7 @@ export async function processInboundAiResponse({
     communicationChannelId: communicationChannelId ?? null,
     conversationId: conversation.id,
     senderRole: "assistant",
-    provider: "meta",
+    provider: transport,
     phone,
     direction: "outbound",
     body: aiResult.content,
@@ -722,18 +772,13 @@ export async function processInboundAiResponse({
   // 8. Tentar enviar mensagem de saída pelo provedor da Meta se canal ativo
   let deliveryStatus = "failed";
   try {
-    const channel = await getPreferredMetaCloudChannel({ tenantId });
-    if (channel) {
-      const sent = await sendMetaCloudChannelText({
-        channel,
-        to: phone,
-        body: aiResult.content,
-      });
-      await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
+    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId });
+    if (sent.status === "sent") {
+      await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       deliveryStatus = "sent";
       console.info("[ai-wpp] outbound.sent", { tenantId, leadId, conversationId: conversation.id, messageId: sent.messageId });
     } else {
-      console.warn("[ai-wpp] outbound.skipped", { tenantId, leadId, reason: "no_active_meta_channel" });
+      console.warn("[ai-wpp] outbound.skipped", { tenantId, leadId, reason: "no_active_channel", transport });
     }
   } catch (sendError) {
     const error = sendError instanceof Error ? sendError.message.slice(0, 240) : "unknown_error";

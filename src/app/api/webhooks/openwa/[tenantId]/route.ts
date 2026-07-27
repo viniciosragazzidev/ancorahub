@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
 import { getOpenWaContact, normalizeOpenWaStatus } from "@/lib/integrations/openwa";
+import { processInboundAiResponse } from "@/features/ai-agent/conversation-state-machine";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string } };
 
@@ -54,7 +55,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
   const client = clients.find((item) => samePhone(item.phone));
   if (!lead && !client) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
-  await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: event.id ?? event.messageId ?? null, phone, direction: event.direction === "outgoing" || event.fromMe === true ? "outgoing" : "incoming", body, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+  const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
+  const providerMessageId = event.id ?? event.messageId ?? null;
+  await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+  if (!isOutgoing && lead?.id && connection.userId) {
+    try {
+      const aiResult = await processInboundAiResponse({
+        tenantId,
+        leadId: lead.id,
+        phone,
+        userMessageBody: body,
+        providerMessageId,
+        transport: "openwa",
+        openWaSessionId: effectiveSessionId,
+      });
+      console.info("[openwa-ai] inbound.completed", { tenantId, leadId: lead.id, status: aiResult.status });
+    } catch (error) {
+      console.error("[openwa-ai] inbound.failed", { tenantId, leadId: lead.id, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+    }
+  }
   if (lead?.id) revalidatePath(`/leads/${lead.id}`);
   console.info("[OpenWA] mensagem persistida", JSON.stringify({ hasLead: Boolean(lead), hasClient: Boolean(client), direction: event.direction === "outgoing" || event.fromMe === true ? "outgoing" : "incoming" }));
   return NextResponse.json({ accepted: true, persisted: true });
