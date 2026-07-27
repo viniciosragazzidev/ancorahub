@@ -11,4 +11,19 @@ describe("conversation memory", () => {
     expect(updated.numberOfLives).toMatchObject({ value: "3", confidence: 1, sourceMessageId: "msg-3" });
     expect(updated.collectedFields).toContain("numberOfLives");
   });
+
+  it("understands pessoa física as an individual plan", () => {
+    const updated = extractFieldsFromMessage(
+      "Pessoa física",
+      createEmptyMemory(),
+      "msg-plan-type",
+    );
+
+    expect(updated.planType).toMatchObject({
+      value: "individual",
+      confidence: 1,
+      sourceMessageId: "msg-plan-type",
+    });
+    expect(updated.collectedFields).toContain("planType");
+  });
 });

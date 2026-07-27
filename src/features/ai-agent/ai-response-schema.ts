@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+export { createSafeFallbackResponse } from "./fallback-response";
 
 /**
  * Detected customer intent, used by guardrails to validate state transitions
@@ -125,7 +126,7 @@ export function validateAiResponse(
  * Serves as a safe fallback when the AI produces invalid or unparseable JSON.
  * Never leaves the customer without a reply.
  */
-export function createSafeFallbackResponse(
+function createLegacySafeFallbackResponse(
   customerName?: string | null,
   memoryContext?: string,
 ): AiStructuredResponse {

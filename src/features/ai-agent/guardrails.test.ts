@@ -33,4 +33,19 @@ describe("RepeatedQuestionGuard recovery", () => {
     expect(fallback.message).toBeTruthy();
     expect(fallback.message).not.toContain("Qual é o seu nome?");
   });
+
+  it("advances to the next missing field with the current memory format", () => {
+    const memory = createEmptyMemory();
+    memory.collectedFields = ["customerName", "planType"];
+    memory.customerName = { value: "Maria Silva", confidence: 1 };
+    memory.planType = { value: "individual", confidence: 1 };
+
+    const fallback = createSafeFallbackResponse(
+      memory.customerName.value,
+      buildMemoryContext(memory),
+    );
+
+    expect(fallback.message).toMatch(/cidade/i);
+    expect(fallback.questionAsked?.field).toBe("city");
+  });
 });
