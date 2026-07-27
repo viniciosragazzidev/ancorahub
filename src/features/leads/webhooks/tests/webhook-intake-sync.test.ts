@@ -133,6 +133,21 @@ describe("createLeadFromWebhookSync", () => {
     expect(inserted(state.schema.leads)).toEqual([expect.objectContaining({ branchId: "default-branch" })]);
   });
 
+  it("rejects the lead with BRANCH_NOT_FOUND when no branch can be resolved", async () => {
+    state.resolveWebhookBranch.mockResolvedValue(null);
+
+    const result = await createLeadFromWebhookSync({ ...input, branchId: null, payload });
+
+    expect(result).toMatchObject({ success: false, code: "BRANCH_NOT_FOUND" });
+    expect(state.resolveWebhookBranch).toHaveBeenCalledWith("tenant-a", null);
+    // No lead should be inserted
+    expect(inserted(state.schema.leads)).toHaveLength(0);
+    // A rejected delivery should be registered
+    expect(inserted(state.schema.webhookDeliveries)).toEqual([
+      expect.objectContaining({ status: "rejected", errorCode: "BRANCH_NOT_FOUND" }),
+    ]);
+  });
+
   it("returns a replay without creating a second lead", async () => {
     state.resolveLeadWebhookIdempotency.mockResolvedValue({ status: "replay", leadId: "lead-existing" });
 

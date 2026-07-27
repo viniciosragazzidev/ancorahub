@@ -89,9 +89,11 @@ export async function createLeadFromWebhookSync(
   const normalizedEmail = normalizeLeadEmail(data.email);
 
   // ── Step 4: Resolve branch ─────────────────────────────────────────
-  let branchId: string | null = null;
+  let branchId: string;
   try {
-    branchId = input.branchId ?? await resolveWebhookBranch(tenantId, null);
+    const resolved = input.branchId ?? await resolveWebhookBranch(tenantId, null);
+    if (!resolved) throw new WebhookBranchNotFoundError();
+    branchId = resolved;
   } catch (error) {
     if (error instanceof WebhookBranchNotFoundError) {
       const deliveryId = randomUUID();

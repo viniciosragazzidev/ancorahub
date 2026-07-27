@@ -54,6 +54,9 @@ export async function bulkReassignLeadsAction(
         );
         if (result.status === "assigned") {
           successCount++;
+          if (result.notificationWarnings?.length) {
+            lastError = `Notificação: ${result.notificationWarnings.join("; ")}`;
+          }
         } else {
           errorCount++;
           lastError = result.reason;
@@ -71,10 +74,9 @@ export async function bulkReassignLeadsAction(
     revalidatePath("/leads");
 
     if (errorCount === 0) {
-      return {
-        success: true,
-        message: `${successCount} lead${successCount === 1 ? "" : "s"} reatribuído${successCount === 1 ? "" : "s"} com sucesso.`,
-      };
+      const base = `${successCount} lead${successCount === 1 ? "" : "s"} reatribuído${successCount === 1 ? "" : "s"} com sucesso.`;
+      const message = lastError ? `${base} ${lastError}` : base;
+      return { success: true, message };
     }
 
     if (successCount > 0) {

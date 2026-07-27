@@ -20,6 +20,19 @@ export default async function LeadDistributionPage() {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
 
+  // Managers must have a branch assigned to access distribution
+  if (context.role === "manager" && !context.branchId) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
+        <main className="flex min-h-full flex-col items-center justify-center gap-4 bg-background p-12 text-center">
+          <p className="text-sm font-semibold text-foreground">Unidade não definida</p>
+          <p className="text-xs text-muted-foreground">Seu acesso como gestor não está vinculado a nenhuma unidade. Fale com o diretor para ajustar seu cadastro.</p>
+        </main>
+      </>
+    );
+  }
+
   const db = getDatabase();
 
   // Fetch branches with their distribution flags

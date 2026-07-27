@@ -9,6 +9,6 @@ export type LeadRoutingResult =
   | { status: "conflict"; code: string };
 
 export type LeadAssignmentResult =
-  | { status: "assigned"; leadId: string; brokerId: string; strategy: AssignmentStrategy }
+  | { status: "assigned"; leadId: string; brokerId: string; strategy: AssignmentStrategy; notificationWarnings?: string[] }
   | { status: "queued"; leadId: string; reason: string }
   | { status: "conflict"; leadId: string; reason: string };

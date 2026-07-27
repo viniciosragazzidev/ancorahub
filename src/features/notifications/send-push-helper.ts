@@ -168,66 +168,94 @@ export async function notifyNewLead(
   branchId: string | null,
   corretorId: string | null,
   leadName: string
-) {
+): Promise<{ notificationError?: string } | void> {
+  let whatsappError: string | undefined;
+  let pushError: string | undefined;
+
   if (corretorId) {
-    await createLeadOffersForBrokers({
-      tenantId,
-      leadId,
-      brokerIds: [corretorId],
-      requestedBy: null,
-    }).catch((err) => console.error("[notifyNewLead] WhatsApp lead offer error:", err));
+    try {
+      await createLeadOffersForBrokers({
+        tenantId,
+        leadId,
+        brokerIds: [corretorId],
+        requestedBy: null,
+      });
+    } catch (err) {
+      whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("[notifyNewLead] WhatsApp lead offer error:", err);
+    }
   }
 
-  if (!(await isNotificationCapabilityEnabled("lead_assignment"))) return;
+  try {
+    if (!(await isNotificationCapabilityEnabled("lead_assignment"))) {
+      if (whatsappError) return { notificationError: `WhatsApp: ${whatsappError}` };
+      return;
+    }
+  } catch (err) {
+    pushError = err instanceof Error ? err.message : "Erro ao verificar capabilities";
+    console.error("[notifyNewLead] Capability check error:", err);
+  }
 
-  const recipients = await getDatabase()
-    .select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role })
-    .from(schema.tenantMemberships)
-    .where(
-      and(
-        eq(schema.tenantMemberships.tenantId, tenantId),
-        eq(schema.tenantMemberships.status, "active"),
-        or(
-          eq(schema.tenantMemberships.role, "director"),
-          branchId
-            ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, branchId))
-            : eq(schema.tenantMemberships.role, "manager")
-        )
-      )
-    );
+  if (!pushError) {
+    try {
+      const recipients = await getDatabase()
+        .select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role })
+        .from(schema.tenantMemberships)
+        .where(
+          and(
+            eq(schema.tenantMemberships.tenantId, tenantId),
+            eq(schema.tenantMemberships.status, "active"),
+            or(
+              eq(schema.tenantMemberships.role, "director"),
+              branchId
+                ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, branchId))
+                : eq(schema.tenantMemberships.role, "manager")
+            )
+          )
+        );
 
-  const targets = [
-    ...(corretorId ? [{ userId: corretorId, role: "broker" as const }] : []),
-    ...recipients.filter((recipient) => recipient.userId !== corretorId),
-  ];
+      const targets = [
+        ...(corretorId ? [{ userId: corretorId, role: "broker" as const }] : []),
+        ...recipients.filter((recipient) => recipient.userId !== corretorId),
+      ];
 
-  await Promise.all(
-    targets.map((target) => {
-      const isDirector = target.role === "director";
-      const isBroker = target.role === "broker";
-      return publishNotification({
-        capability: "lead_assignment",
-        tenantId,
-        recipientUserId: target.userId,
-        leadId,
-        type: "agent.lead_assigned",
-        title: isBroker ? "Novo lead atribuído" : isDirector ? "Novo lead na corretora" : "Novo lead na unidade",
-        message: isBroker
-          ? `Você recebeu o lead ${leadName} para atender.`
-          : corretorId
-          ? `"${leadName}" chegou e foi distribuído.`
-          : `"${leadName}" chegou e está aguardando distribuição.`,
-        pushTitle: isBroker ? "Novo Lead Atribuído! ⚡" : isDirector ? "Novo Lead na Corretora! 🏢" : "Novo Lead na Unidade! 📍",
-        pushBody: isBroker
-          ? `O lead "${leadName}" foi distribuído para você.`
-          : corretorId
-          ? `"${leadName}" chegou e foi distribuído.`
-          : `"${leadName}" está aguardando distribuição.`,
-        url: `/leads/${leadId}`,
-        tag: "corretop-leads",
-      });
-    })
-  );
+      await Promise.all(
+        targets.map((target) => {
+          const isDirector = target.role === "director";
+          const isBroker = target.role === "broker";
+          return publishNotification({
+            capability: "lead_assignment",
+            tenantId,
+            recipientUserId: target.userId,
+            leadId,
+            type: "agent.lead_assigned",
+            title: isBroker ? "Novo lead atribuído" : isDirector ? "Novo lead na corretora" : "Novo lead na unidade",
+            message: isBroker
+              ? `Você recebeu o lead ${leadName} para atender.`
+              : corretorId
+              ? `"${leadName}" chegou e foi distribuído.`
+              : `"${leadName}" chegou e está aguardando distribuição.`,
+            pushTitle: isBroker ? "Novo Lead Atribuído! ⚡" : isDirector ? "Novo Lead na Corretora! 🏢" : "Novo Lead na Unidade! 📍",
+            pushBody: isBroker
+              ? `O lead "${leadName}" foi distribuído para você.`
+              : corretorId
+              ? `"${leadName}" chegou e foi distribuído.`
+              : `"${leadName}" está aguardando distribuição.`,
+            url: `/leads/${leadId}`,
+            tag: "corretop-leads",
+          });
+        })
+      );
+    } catch (err) {
+      pushError = err instanceof Error ? err.message : "Erro ao enviar push notifications";
+      console.error("[notifyNewLead] Push notification error:", err);
+    }
+  }
+
+  const errors: string[] = [];
+  if (whatsappError) errors.push(`WhatsApp: ${whatsappError}`);
+  if (pushError) errors.push(`Push: ${pushError}`);
+  if (errors.length) return { notificationError: errors.join("; ") };
 }
 
 /**

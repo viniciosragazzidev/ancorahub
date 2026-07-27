@@ -4,25 +4,33 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { ArrowRight, ChatCircleText } from "@/components/huge-icons";
+import { ArrowRight, Buildings, ChatCircleText } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
+import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
 
 type Broker = { id: string; name: string; branchId: string | null };
+type Branch = { id: string; name: string };
 type ManagementMode = "reassign" | "investigate";
 
 export function LeadDrawerManagementActions({
   leadId,
   brokers,
+  branches,
+  leadBranchId,
+  contextRole,
   currentStatus,
   currentOwner,
   onSuccess,
 }: {
   leadId: string;
   brokers: Broker[];
+  branches?: Branch[];
+  leadBranchId?: string | null;
+  contextRole?: string;
   currentStatus: string;
   currentOwner: string | null;
   onSuccess?: () => void;
@@ -32,9 +40,14 @@ export function LeadDrawerManagementActions({
   const [brokerId, setBrokerId] = useState("");
   const [reason, setReason] = useState("");
   const [isAssuming, setIsAssuming] = useState(false);
+  const [assignBranchId, setAssignBranchId] = useState("");
 
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
+  const [routeState, routeAction, routePending] = useActionState(
+    routeLeadToBranchAction,
+    {},
+  );
 
   useEffect(() => {
     if (reassignState.success) {
@@ -54,7 +67,18 @@ export function LeadDrawerManagementActions({
     if (assumeState.error) toast.error(assumeState.error);
   }, [assumeState, router, onSuccess]);
 
+  useEffect(() => {
+    if (routeState.success) {
+      toast.success(routeState.message ?? "Lead enviado para a unidade.");
+      router.refresh();
+      if (onSuccess) onSuccess();
+    }
+    if (routeState.error) toast.error(routeState.error);
+  }, [routeState, router, onSuccess]);
+
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
+  const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
+  const needsBranch = !leadBranchId && branches && branches.length > 0 && isDirectorOrManager;
 
   const handleAssumeMessaging = async () => {
     try {
@@ -80,6 +104,42 @@ export function LeadDrawerManagementActions({
 
   return (
     <div className="space-y-4 pt-2">
+      {/* Atribuir unidade */}
+      {needsBranch && (
+        <div className="rounded-lg border border-primary/20 bg-primary/[0.02] p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Buildings className="size-4 text-primary" />
+            <p className="text-xs font-semibold text-foreground">Lead sem unidade</p>
+          </div>
+          <p className="text-xs text-muted-foreground leading-normal">
+            Este lead ainda não foi atribuído a nenhuma unidade. Selecione uma filial para enviá-lo à fila de distribuição.
+          </p>
+          <form action={routeAction} className="flex items-center gap-2">
+            <input name="leadId" type="hidden" value={leadId} />
+            <Select name="branchId" onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
+              <SelectTrigger className="h-9 flex-1 text-xs" aria-label="Selecionar unidade">
+                <SelectValue placeholder="Selecione a unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id} className="text-xs">{branch.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              disabled={!assignBranchId || routePending}
+              type="submit"
+              variant="default"
+              className="h-9 gap-1 text-xs shrink-0"
+            >
+              {routePending ? "Enviando..." : "Enviar"}
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </form>
+        </div>
+      )}
+
       {/* Seção de assumir atendimento se já estiver ativo */}
       {activeStatus && (
         <div className="rounded-lg border border-primary/25 bg-primary/[0.02] p-3 space-y-2">

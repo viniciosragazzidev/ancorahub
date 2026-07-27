@@ -11,7 +11,7 @@ import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-
 
 export type CreateLeadFromWebhookInput = {
   tenantId: string;
-  branchId: string | null;
+  branchId: string;
   credentialId: string;
   createdByUserId: string;
   normalized: NormalizedLeadData;
@@ -42,7 +42,7 @@ export async function createLeadFromWebhook(
     externalId: normalized.externalId,
     webhookCredentialId: credentialId,
     status: "new",
-    distributionStatus: branchId ? "queued" : "unassigned",
+    distributionStatus: "queued",
     consentimentoLgpd: false,
     createdAt: now,
   });
@@ -67,7 +67,7 @@ export async function createLeadFromWebhook(
 async function backgroundTasks(input: {
   leadId: string;
   tenantId: string;
-  branchId: string | null;
+  branchId: string;
   credentialId: string;
   createdByUserId: string;
   deliveryId: string;
@@ -86,7 +86,7 @@ async function backgroundTasks(input: {
     .set({
       corretorId,
       status: assigned ? "distributed" : "new",
-      distributionStatus: assigned ? "assigned" : branchId ? "queued" : "unassigned",
+      distributionStatus: assigned ? "assigned" : "queued",
       assignmentSource: assigned ? "automatic" : null,
       assignmentStrategy: assigned ? "capacity" : null,
       distributionUpdatedAt: new Date(),

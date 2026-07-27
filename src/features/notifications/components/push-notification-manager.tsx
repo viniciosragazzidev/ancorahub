@@ -179,11 +179,10 @@ export function PushNotificationManager({
     return (
       <motion.div
         layout
-        className="overflow-hidden"
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       >
         {showBanner && (
-          <div className="mx-4 my-3 flex items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
+          <div className="mx-4 mb-3 mt-3 flex items-center gap-3 rounded-lg border border-border/80 bg-card px-3 py-3">
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
               <BellRinging className="size-4" />
             </span>

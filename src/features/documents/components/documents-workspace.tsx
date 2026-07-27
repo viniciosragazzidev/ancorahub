@@ -226,11 +226,13 @@ export function DocumentsWorkspace({
                     <TableHeader className="bg-muted/40">
                       <TableRow>
                         {role !== "broker" && <TableHead className="w-10">
-                          <Checkbox
-                            aria-label="Selecionar todos"
-                            checked={multiSelect.isAllSelected}
-                            onCheckedChange={multiSelect.selectAll}
-                          />
+                          <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                            <Checkbox
+                              aria-label="Selecionar todos"
+                              checked={multiSelect.isAllSelected}
+                              onCheckedChange={multiSelect.selectAll}
+                            />
+                          </div>
                         </TableHead>}
                         <TableHead>Lead</TableHead>
                         <TableHead>Documento</TableHead>
@@ -248,11 +250,13 @@ export function DocumentsWorkspace({
                           className="data-[selected]:bg-primary/[0.04]"
                         >
                           {role !== "broker" && <TableCell>
-                            <Checkbox
-                              aria-label={`Selecionar ${doc.leadNome}`}
-                              checked={multiSelect.isSelected(doc.id)}
-                              onCheckedChange={() => multiSelect.toggle(doc.id)}
-                            />
+                            <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                              <Checkbox
+                                aria-label={`Selecionar ${doc.leadNome}`}
+                                checked={multiSelect.isSelected(doc.id)}
+                                onCheckedChange={() => multiSelect.toggle(doc.id)}
+                              />
+                            </div>
                           </TableCell>}
                           <TableCell className="font-medium">
                             <a href={`/leads/${doc.leadId}`} className="text-primary hover:underline">

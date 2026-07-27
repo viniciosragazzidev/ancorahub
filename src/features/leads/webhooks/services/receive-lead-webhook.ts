@@ -119,9 +119,11 @@ export async function receiveLeadWebhook(
     }
 
     // ?? Step 6: Resolve branch ????????????????????????????????????????
-    let branchId: string | null = null;
+    let branchId: string;
     try {
-      branchId = credentialBranchId ?? await resolveWebhookBranch(tenantId, normalized.branchExternalId);
+      const resolved = credentialBranchId ?? await resolveWebhookBranch(tenantId, normalized.branchExternalId);
+      if (!resolved) throw new WebhookBranchNotFoundError();
+      branchId = resolved;
     } catch (error) {
       if (error instanceof WebhookBranchNotFoundError) {
         // Register rejected delivery

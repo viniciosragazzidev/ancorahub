@@ -45,8 +45,10 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "reatribuiu_lead" });
     });
 
-    // Trigger push notifications in background
-    await notifyNewLead(lead.id, lead.tenantId, lead.branchId, input.brokerId, lead.nome).catch(console.error);
+    // Trigger push notifications (best-effort; warnings logged but don't block reassign)
+    notifyNewLead(lead.id, lead.tenantId, lead.branchId, input.brokerId, lead.nome).then((result) => {
+      if (result?.notificationError) console.warn("[reassignLeadAction] Notification warning:", result.notificationError);
+    }).catch(console.error);
     // Notify the previous broker that the lead was reassigned
     if (lead.corretorId && lead.corretorId !== input.brokerId) {
       void notifyLeadReassigned(lead.id, lead.tenantId, lead.corretorId, lead.nome).catch(console.error);

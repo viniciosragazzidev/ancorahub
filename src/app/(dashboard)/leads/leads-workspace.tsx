@@ -94,6 +94,7 @@ export function LeadsWorkspace({
   slaFirstContactMinutes = 15,
   slaStagnantDays = 3,
   brokers = [],
+  branches = [],
 }: {
   leads: LeadWorkspaceItem[];
   contextRole: string;
@@ -102,6 +103,7 @@ export function LeadsWorkspace({
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
+  branches?: Array<{ id: string; name: string }>;
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const leadsIds = useMemo(() => leads.map((l) => l.id), [leads]);
@@ -258,21 +260,21 @@ export function LeadsWorkspace({
                   {leads.map((lead) => (
                     <TableRow
                       key={lead.id}
-                      className="cursor-pointer group/row"
+                      className="cursor-pointer group/row data-[selected]:bg-muted/40 data-[active]:bg-muted/15"
                       data-selected={multiSelect.isSelected(lead.id) || undefined}
+                      data-active={lead.status !== "converted" && lead.status !== "lost" || undefined}
                       onClick={() => setSelectedLead(lead)}
                     >
                       <TableCell className="w-10 pl-4">
-                        <Checkbox
-                          aria-label={`Selecionar ${lead.nome}`}
-                          checked={multiSelect.isSelected(lead.id)}
-                          onCheckedChange={() => {
-                            multiSelect.toggle(lead.id);
-                          }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                          }}
-                        />
+                        <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                          <Checkbox
+                            aria-label={`Selecionar ${lead.nome}`}
+                            checked={multiSelect.isSelected(lead.id)}
+                            onCheckedChange={() => {
+                              multiSelect.toggle(lead.id);
+                            }}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="pl-0">
                         <p className={`font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
@@ -416,6 +418,9 @@ export function LeadsWorkspace({
                       <LeadDrawerManagementActions
                         leadId={selectedLead.id}
                         brokers={filteredBrokers}
+                        branches={branches}
+                        leadBranchId={selectedLead.branchId}
+                        contextRole={contextRole}
                         currentStatus={selectedLead.status}
                         currentOwner={selectedLead.corretorNome}
                         onSuccess={() => setSelectedLead(null)}

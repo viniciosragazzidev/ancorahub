@@ -190,6 +190,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             slaFirstContactMinutes={slaFirstContactMinutes}
             slaStagnantDays={slaStagnantDays}
             brokers={brokers}
+            branches={branches}
           />
         ) : (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border p-12 text-center bg-card/40">

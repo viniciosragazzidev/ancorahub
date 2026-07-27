@@ -96,18 +96,22 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     {
       id: "select",
       header: () => (
-        <Checkbox
-          aria-label="Selecionar todos"
-          checked={multiSelect.isAllSelected}
-          onCheckedChange={multiSelect.selectAll}
-        />
+        <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+          <Checkbox
+            aria-label="Selecionar todos"
+            checked={multiSelect.isAllSelected}
+            onCheckedChange={multiSelect.selectAll}
+          />
+        </div>
       ),
       cell: ({ row }) => (
-        <Checkbox
-          aria-label={`Selecionar ${row.original.name ?? "membro"}`}
-          checked={multiSelect.isSelected(row.original.id)}
-          onCheckedChange={() => multiSelect.toggle(row.original.id)}
-        />
+        <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+          <Checkbox
+            aria-label={`Selecionar ${row.original.name ?? "membro"}`}
+            checked={multiSelect.isSelected(row.original.id)}
+            onCheckedChange={() => multiSelect.toggle(row.original.id)}
+          />
+        </div>
       ),
       enableSorting: false,
       enableHiding: false,
@@ -254,6 +258,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
           showColumnToggle={true}
           showPagination={true}
           pageSize={10}
+          getRowClassName={(member) => member.status === "active" ? "bg-muted/15" : undefined}
         />
       </CardContent>
     </Card>

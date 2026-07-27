@@ -202,10 +202,14 @@ export async function routeLeadToBranchAndAssignBroker(
     return true;
   });
 
-  if (assigned) await notifyNewLead(leadId, context.tenantId, branchId, brokerId, lead.nome).catch(console.error);
+  const notificationWarnings: string[] = [];
+  if (assigned) {
+    const notifyResult = await notifyNewLead(leadId, context.tenantId, branchId, brokerId, lead.nome).catch(() => undefined);
+    if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
+  }
 
   return assigned
-    ? { status: "assigned", leadId, brokerId, strategy: "manual" }
+    ? { status: "assigned", leadId, brokerId, strategy: "manual", notificationWarnings: notificationWarnings.length ? notificationWarnings : undefined }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 
@@ -233,8 +237,14 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.assigned" });
     return true;
   });
-  if (assigned) await notifyNewLead(leadId, context.tenantId, lead.branchId, brokerId, lead.nome).catch(console.error);
-  return assigned ? { status: "assigned", leadId, brokerId, strategy: "manual" } : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
+  const notificationWarnings: string[] = [];
+  if (assigned) {
+    const notifyResult = await notifyNewLead(leadId, context.tenantId, lead.branchId, brokerId, lead.nome).catch(() => undefined);
+    if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
+  }
+  return assigned
+    ? { status: "assigned", leadId, brokerId, strategy: "manual", notificationWarnings: notificationWarnings.length ? notificationWarnings : undefined }
+    : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 
 export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null): Promise<LeadAssignmentResult> {

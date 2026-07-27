@@ -87,6 +87,7 @@ export function SalesWorkspace({
           aria-label="Selecionar todos"
           checked={multiSelect.isAllSelected}
           onCheckedChange={multiSelect.selectAll}
+          onClick={(event) => event.stopPropagation()}
         />
       ),
       cell: ({ row }) => (
@@ -94,6 +95,7 @@ export function SalesWorkspace({
           aria-label={`Selecionar venda ${row.original.leadName}`}
           checked={multiSelect.isSelected(row.original.id)}
           onCheckedChange={() => multiSelect.toggle(row.original.id)}
+          onClick={(event) => event.stopPropagation()}
         />
       ),
       enableSorting: false,
@@ -259,6 +261,7 @@ export function SalesWorkspace({
         showColumnToggle={true}
         showPagination={true}
         pageSize={10}
+        getRowClassName={(sale) => sale.status === "active" ? "bg-muted/15" : undefined}
         headerSlot={
           <div className="flex items-center gap-2">
             <select

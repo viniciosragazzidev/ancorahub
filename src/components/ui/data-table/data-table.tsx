@@ -15,6 +15,7 @@ import {
 } from "@tanstack/react-table";
 import { Search } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { MagnifyingGlass } from "@/components/huge-icons";
@@ -39,6 +40,7 @@ interface DataTableProps<TData, TValue> {
   emptyState?: React.ReactNode;
   headerSlot?: React.ReactNode;
   pageSize?: number;
+  getRowClassName?: (row: TData) => string | undefined;
 }
 
 export function DataTable<TData, TValue>({
@@ -51,6 +53,7 @@ export function DataTable<TData, TValue>({
   emptyState,
   headerSlot,
   pageSize = 10,
+  getRowClassName,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -147,7 +150,7 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="group/row h-14 border-b border-border hover:bg-muted/40 transition-colors"
+                    className={cn("group/row h-14 border-b border-border hover:bg-muted/40 transition-colors", getRowClassName?.(row.original))}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="px-6 py-3.5 text-xs font-normal text-foreground">
