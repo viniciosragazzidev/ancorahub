@@ -104,19 +104,19 @@ function GoalCard({
     >
       {/* Edit Drawer */}
       <Drawer open={editOpen} onOpenChange={setEditOpen} swipeDirection="right">
-        <DrawerContent className="max-w-md">
-          <DrawerHeader className="border-b border-border pb-4">
+        <DrawerContent className="w-full sm:max-w-xl border-l border-border/40 bg-background/95 backdrop-blur-2xl">
+          <DrawerHeader className="border-b border-border/40 pb-6 pt-8 px-8">
             <div className="flex items-center justify-between">
               <div>
-                <DrawerTitle>Editar meta</DrawerTitle>
-                <DrawerDescription className="mt-0.5">{goal.name}</DrawerDescription>
+                <DrawerTitle className="text-2xl font-bold tracking-tight">Editar meta</DrawerTitle>
+                <DrawerDescription className="mt-1.5 text-base">{goal.name}</DrawerDescription>
               </div>
-              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
-                <X className="size-4" />
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" className="rounded-full hover:bg-muted" />}>
+                <X className="size-5" />
               </DrawerClose>
             </div>
           </DrawerHeader>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-8">
             <GoalForm goal={goal} teamMembers={teamMembers} branches={branches} onDone={() => setEditOpen(false)} />
           </div>
         </DrawerContent>
@@ -278,19 +278,19 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
 
       {/* Create Drawer */}
       <Drawer open={createOpen} onOpenChange={setCreateOpen} swipeDirection="right">
-        <DrawerContent className="max-w-md">
-          <DrawerHeader className="border-b border-border pb-4">
+        <DrawerContent className="w-full sm:max-w-xl border-l border-border/40 bg-background/95 backdrop-blur-2xl">
+          <DrawerHeader className="border-b border-border/40 pb-6 pt-8 px-8">
             <div className="flex items-center justify-between">
               <div>
-                <DrawerTitle>Nova meta comercial</DrawerTitle>
-                <DrawerDescription className="mt-0.5">Defina escopo, tipo, valor e período.</DrawerDescription>
+                <DrawerTitle className="text-2xl font-bold tracking-tight">Nova meta comercial</DrawerTitle>
+                <DrawerDescription className="mt-1.5 text-base">Defina escopo, tipo, valor e período.</DrawerDescription>
               </div>
-              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
-                <X className="size-4" />
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" className="rounded-full hover:bg-muted" />}>
+                <X className="size-5" />
               </DrawerClose>
             </div>
           </DrawerHeader>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-8">
             <GoalForm
               teamMembers={teamMembers}
               branches={branches}

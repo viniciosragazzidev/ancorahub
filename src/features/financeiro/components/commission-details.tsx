@@ -136,22 +136,22 @@ export function CommissionDetails({ data }: Props) {
 
       {/* Drawer: Filters & Actions */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} swipeDirection="right">
-        <DrawerContent className="max-w-sm">
-          <DrawerHeader className="border-b border-border pb-4">
+        <DrawerContent className="w-full sm:max-w-xl border-l border-border/40 bg-background/95 backdrop-blur-2xl">
+          <DrawerHeader className="border-b border-border/40 pb-6 pt-8 px-8">
             <div className="flex items-center justify-between">
               <div>
-                <DrawerTitle>Filtros e Ações</DrawerTitle>
-                <DrawerDescription className="mt-0.5">
+                <DrawerTitle className="text-2xl font-bold tracking-tight">Filtros e Ações</DrawerTitle>
+                <DrawerDescription className="mt-1.5 text-base">
                   Refine a visualização ou exporte relatórios.
                 </DrawerDescription>
               </div>
-              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
-                <X className="size-4" />
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" className="rounded-full hover:bg-muted" />}>
+                <X className="size-5" />
               </DrawerClose>
             </div>
           </DrawerHeader>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <div className="flex-1 overflow-y-auto p-8 space-y-8">
             <div className="space-y-3">
               <label className="text-sm font-medium">Agrupar visão por</label>
               <Select value={view} onValueChange={(v) => setView(v as "sales" | "brokers")}>
@@ -181,17 +181,17 @@ export function CommissionDetails({ data }: Props) {
               </div>
             )}
 
-            <div className="space-y-3 border-t border-border pt-4">
+            <div className="space-y-3 border-t border-border/60 pt-6">
               <label className="text-sm font-medium">Ações disponíveis</label>
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full h-12 text-base font-medium justify-start transition-transform duration-300 active:scale-[0.98] hover:-translate-y-0.5 shadow-sm group"
                 onClick={() => {
                   toast.success("Exportação iniciada, o download começará em breve.");
                   setDrawerOpen(false);
                 }}
               >
-                <FileArrowDown className="mr-2 size-4" />
+                <FileArrowDown className="mr-3 size-5 text-muted-foreground transition-transform group-hover:scale-110" />
                 Exportar Relatório (.csv)
               </Button>
             </div>

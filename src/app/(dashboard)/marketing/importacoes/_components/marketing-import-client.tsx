@@ -99,29 +99,29 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
     <>
       {/* Import Drawer */}
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} swipeDirection="right">
-        <DrawerContent className="max-w-md">
-          <DrawerHeader className="border-b border-border pb-4">
+        <DrawerContent className="w-full sm:max-w-xl border-l border-border/40 bg-background/95 backdrop-blur-2xl">
+          <DrawerHeader className="border-b border-border/40 pb-6 pt-8 px-8">
             <div className="flex items-center justify-between">
               <div>
-                <DrawerTitle>Nova importação</DrawerTitle>
-                <DrawerDescription className="mt-0.5">Faça upload da planilha Meta Ads (.xlsx, .xls, .csv)</DrawerDescription>
+                <DrawerTitle className="text-2xl font-bold tracking-tight">Nova importação</DrawerTitle>
+                <DrawerDescription className="mt-1.5 text-base">Faça upload da planilha Meta Ads (.xlsx, .xls, .csv)</DrawerDescription>
               </div>
-              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
-                <X className="size-4" />
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" className="rounded-full hover:bg-muted" />}>
+                <X className="size-5" />
               </DrawerClose>
             </div>
           </DrawerHeader>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-8 space-y-8">
             {/* Drop Zone */}
             <div
-              className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
-                dragOver ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"
+              className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-12 text-center transition-all duration-500 ease-out ${
+                dragOver ? "border-primary bg-primary/5 scale-[1.02]" : "border-border/60 bg-muted/30 hover:border-muted-foreground/40 hover:bg-muted/50"
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
             >
-              <FileArrowDown className="mb-3 size-10 text-muted-foreground" />
+              <FileArrowDown className="mb-4 size-12 text-muted-foreground/60 transition-transform duration-500 group-hover:scale-110 group-hover:text-foreground" />
               {file ? (
                 <div>
                   <p className="font-medium">{file.name}</p>
@@ -185,7 +185,7 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
             <Button
               onClick={handleSubmit}
               disabled={busy || !file || (canChooseBranch && !branchId)}
-              className="w-full"
+              className="w-full h-12 text-base font-medium transition-transform duration-300 active:scale-[0.98] hover:-translate-y-0.5 shadow-sm"
             >
               {busy ? "Importando..." : "Importar leads"}
             </Button>
