@@ -267,6 +267,13 @@
       "when": 1785099600000,
       "tag": "0085_ai_attendance_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1785162000000,
+      "tag": "0086_lead_qualification_status",
+      "breakpoints": true
     }
   ]
 }
