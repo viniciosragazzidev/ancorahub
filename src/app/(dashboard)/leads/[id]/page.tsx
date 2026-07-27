@@ -19,6 +19,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { StartServiceButton } from "./start-service-button";
 import { SupervisionPanel } from "./supervision-panel";
 import { CotarButton } from "./cotar-button";
+import { isExternalQuoteConfigured } from "@/features/quotes/external-quote-config";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -186,7 +187,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   <StartServiceButton leadId={lead.id} />
                 )}
                 {lead.status !== "distributed" && (
-                  <CotarButton />
+                  <CotarButton leadId={lead.id} configured={isExternalQuoteConfigured()} />
                 )}
                 <Badge className={slaUrgent ? "border-warning/30 bg-warning/[0.08] text-warning" : "border-border/80"} variant="outline">
                   {lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento"}
@@ -466,4 +467,3 @@ function maskEmail(email: string) {
   if (!local || !domain) return "••••";
   return `${local.slice(0, 1)}${"•".repeat(Math.max(2, local.length - 1))}@${domain}`;
 }
-
