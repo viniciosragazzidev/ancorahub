@@ -74,6 +74,7 @@ export default async function SalesPage() {
             createdAt: s.createdAt.toISOString(),
           }))}
           totalRevenue={totalRevenue}
+          currentRole={context.role}
         />
       </main>
     </>

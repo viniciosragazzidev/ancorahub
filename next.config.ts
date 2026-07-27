@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep browser assets and Server Actions from different deploys from being
-  // mixed during a rolling Vercel release. Vercel exposes the commit SHA at
-  // build time; local builds use the explicit Next override or a stable value.
-  deploymentId: (process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_DEPLOYMENT_ID ?? "local").slice(0, 32),
   experimental: {
     viewTransition: true,
   },

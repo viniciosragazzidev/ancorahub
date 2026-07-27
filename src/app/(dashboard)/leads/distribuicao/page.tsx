@@ -168,6 +168,7 @@ export default async function LeadDistributionPage() {
           </CardContent>
         </Card>
         <DistributionInbox
+          role={context.role}
           branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
           brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId, availabilityStatus: broker.availabilityStatus, activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0 }))}
           leads={unassignedLeads.map((lead) => ({ ...lead, createdAt: lead.createdAt.toISOString() }))}

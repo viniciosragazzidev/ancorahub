@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { routeLeadToBranch, assignLeadToBroker, processQueuedLead } from "./service";
+import { routeLeadToBranch, assignLeadToBroker, processQueuedLead, routeLeadToBranchAndAssignBroker } from "./service";
 import { enqueueLeadDistributionJob } from "./jobs";
 
 export type DistributionActionState = { success?: boolean; message?: string; error?: string; processed?: number; conflicts?: number };
@@ -27,6 +27,27 @@ export async function assignLeadToBrokerAction(_previous: DistributionActionStat
   const parsed = z.object({ leadId, brokerId, reason: z.string().trim().min(3).max(200).optional() }).safeParse({ leadId: formData.get("leadId"), brokerId: formData.get("brokerId"), reason: String(formData.get("reason") ?? "") || undefined });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
   try { const result = await assignLeadToBroker(await getRequiredTenantContext(), parsed.data.leadId, parsed.data.brokerId, undefined, parsed.data.reason); if (result.status !== "assigned") return { error: result.reason }; refreshDistribution(); return { success: true, message: "Lead atribuído ao corretor." }; } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível atribuir o lead." }; }
+}
+
+export async function routeAndAssignLeadAction(_previous: DistributionActionState, formData: FormData): Promise<DistributionActionState> {
+  const parsed = z.object({ leadId, branchId, brokerId, reason: z.string().trim().min(3).max(200).optional() }).safeParse({
+    leadId: formData.get("leadId"),
+    branchId: formData.get("branchId"),
+    brokerId: formData.get("brokerId"),
+    reason: String(formData.get("reason") ?? "") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { error: "Apenas Diretores podem rotear e atribuir em uma única operação." };
+    const result = await routeLeadToBranchAndAssignBroker(context, parsed.data.leadId, parsed.data.branchId, parsed.data.brokerId, parsed.data.reason);
+    if (result.status !== "assigned") return { error: result.reason };
+    await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
+    refreshDistribution();
+    return { success: true, message: "Lead roteado para unidade e atribuído ao corretor." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível processar a operação." };
+  }
 }
 
 export async function distributeLeadAutomaticallyAction(_previous: DistributionActionState, formData: FormData): Promise<DistributionActionState> {

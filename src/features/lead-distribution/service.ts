@@ -102,6 +102,113 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   return updated ? { status: "routed", branchId, queueId, strategy: "manual" } : { status: "conflict", code: "LEAD_ALREADY_ASSIGNED" };
 }
 
+export async function routeLeadToBranchAndAssignBroker(
+  context: TenantContext,
+  leadId: string,
+  branchId: string,
+  brokerId: string,
+  reason = "Roteamento e atribuição pelo diretor",
+): Promise<LeadAssignmentResult> {
+  if (context.role !== "director") throw new AuthorizationError("Apenas Diretores podem rotear e atribuir em uma única operação.");
+  const db = getDatabase();
+
+  // 1. Verify branch
+  const [branch] = await db
+    .select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status })
+    .from(schema.branches)
+    .where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId)))
+    .limit(1);
+  if (!branch || branch.status !== "active" || !branch.acceptingLeads)
+    return { status: "conflict", leadId, reason: "A unidade não pode receber leads agora." };
+
+  // 2. Get lead
+  const [lead] = await db
+    .select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+    .limit(1);
+  if (!lead) return { status: "conflict", leadId, reason: "Lead não encontrado." };
+  if (lead.corretorId) return { status: "conflict", leadId, reason: "Este lead já possui um corretor." };
+
+  // 3. Verify broker belongs to the target branch
+  const [broker] = await db
+    .select({ id: schema.user.id })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, brokerId),
+        eq(schema.tenantMemberships.branchId, branchId),
+        eq(schema.tenantMemberships.role, "broker"),
+        eq(schema.tenantMemberships.status, "active"),
+        eq(schema.tenantMemberships.availabilityStatus, "available"),
+        eq(schema.user.active, true),
+        eq(schema.user.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };
+
+  // 4. Ensure default queue
+  const queueId = await ensureDefaultQueue(context.tenantId, branchId, context.userId);
+
+  // 5. Combined transaction: route + assign
+  const assigned = await db.transaction(async (tx) => {
+    const result = await tx
+      .update(schema.leads)
+      .set({
+        branchId,
+        queueId,
+        corretorId: brokerId,
+        status: "distributed",
+        distributionStatus: "assigned",
+        distributionOrigin: "parent",
+        unitAssignedAt: new Date(),
+        assignedAt: new Date(),
+        assignmentSource: "manual_director",
+        assignmentStrategy: "manual",
+        distributionUpdatedAt: new Date(),
+      })
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId)))
+      .returning({ id: schema.leads.id });
+
+    if (!result.length) return false;
+
+    await tx.insert(schema.leadDistributionEvents).values({
+      id: randomUUID(),
+      tenantId: context.tenantId,
+      leadId,
+      fromBranchId: lead.branchId,
+      toBranchId: branchId,
+      toQueueId: queueId,
+      previousOwnerId: lead.corretorId,
+      newOwnerId: brokerId,
+      action: "routed_and_assigned",
+      source: "manual_director",
+      strategy: "manual",
+      reason,
+      actorId: context.userId,
+      createdAt: new Date(),
+    });
+    await tx.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "lead_distribution",
+      entidadeId: leadId,
+      acao: "lead.routed_and_assigned",
+    });
+
+    return true;
+  });
+
+  if (assigned) await notifyNewLead(leadId, context.tenantId, branchId, brokerId, lead.nome).catch(console.error);
+
+  return assigned
+    ? { status: "assigned", leadId, brokerId, strategy: "manual" }
+    : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
+}
+
 export async function assignLeadToBroker(context: TenantContext, leadId: string, brokerId: string, source?: AssignmentSource, reason = "Atribuição manual", excludeBrokerId?: string | null): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem atribuir leads.");
   const db = getDatabase();

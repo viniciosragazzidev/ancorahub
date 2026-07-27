@@ -2,9 +2,16 @@
 
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
-import { ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SquaresFour, UserList, WhatsappLogo } from "@/components/huge-icons";
+import { ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SquaresFour, UserList, WhatsappLogo, X } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SelectionToolbar } from "@/components/ui/selection-toolbar";
+import { BulkStatusDialog } from "@/components/ui/bulk-status-dialog";
+import { BulkReassignDialog } from "@/components/ui/bulk-reassign-dialog";
+import { useMultiSelect } from "@/hooks/use-multi-select";
+import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
@@ -97,6 +104,8 @@ export function LeadsWorkspace({
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const leadsIds = useMemo(() => leads.map((l) => l.id), [leads]);
+  const multiSelect = useMultiSelect(leadsIds);
   const isMarketing = contextJobTitle === "marketing";
   const shouldMask = (lead: LeadWorkspaceItem) => {
     return isMarketing && lead.branchId !== contextBranchId;
@@ -115,6 +124,36 @@ export function LeadsWorkspace({
 
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
+
+  const selectionActions = useMemo(() => (
+    <>
+      {(contextRole === "director" || contextRole === "manager") && (
+        <>
+          <BulkStatusDialog
+            leadIds={multiSelect.selectedIds}
+            role={contextRole}
+            bulkStatusAction={bulkChangeLeadStatusAction}
+          />
+          <BulkReassignDialog
+            leadIds={multiSelect.selectedIds}
+            brokers={brokers}
+          />
+        </>
+      )}
+      {contextRole === "broker" && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={multiSelect.count === 0}
+          onClick={() => {
+            toast("Funcionalidade em desenvolvimento.");
+          }}
+        >
+          Iniciar atendimento
+        </Button>
+      )}
+    </>
+  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers]);
 
   const unworkedCount = useMemo(() => leads.filter((l) => l.status === "new").length, [leads]);
   const unassignedCount = useMemo(() => leads.filter((l) => !l.corretorId).length, [leads]);
@@ -190,10 +229,24 @@ export function LeadsWorkspace({
                   </button>
                 ))}
               </div>
+              <SelectionToolbar
+                selectedCount={multiSelect.count}
+                totalCount={leads.length}
+                onClear={multiSelect.clear}
+              >
+                {selectionActions}
+              </SelectionToolbar>
               <Table className="max-[559px]:hidden">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-5">Lead</TableHead>
+                    <TableHead className="w-10 pl-4">
+                      <Checkbox
+                        aria-label="Selecionar todos"
+                        checked={multiSelect.isAllSelected}
+                        onCheckedChange={multiSelect.selectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="pl-0">Lead</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="hidden md:table-cell">Saúde</TableHead>
                     <TableHead className="hidden md:table-cell">Responsável</TableHead>
@@ -205,10 +258,23 @@ export function LeadsWorkspace({
                   {leads.map((lead) => (
                     <TableRow
                       key={lead.id}
-                      className="cursor-pointer"
+                      className="cursor-pointer group/row"
+                      data-selected={multiSelect.isSelected(lead.id) || undefined}
                       onClick={() => setSelectedLead(lead)}
                     >
-                      <TableCell className="pl-5">
+                      <TableCell className="w-10 pl-4">
+                        <Checkbox
+                          aria-label={`Selecionar ${lead.nome}`}
+                          checked={multiSelect.isSelected(lead.id)}
+                          onCheckedChange={() => {
+                            multiSelect.toggle(lead.id);
+                          }}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="pl-0">
                         <p className={`font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
                           {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
                         </p>
@@ -251,6 +317,13 @@ export function LeadsWorkspace({
         </TabsContent>
 
         <TabsContent value="kanban" className="mt-4 min-h-0 min-w-0 flex-1 overflow-hidden">
+          <SelectionToolbar
+            selectedCount={multiSelect.count}
+            totalCount={leads.length}
+            onClear={multiSelect.clear}
+          >
+            {selectionActions}
+          </SelectionToolbar>
           <ScrollArea className="h-full w-full" aria-label="Funil de leads em Kanban">
             <div className="flex min-w-max items-start gap-4 pr-4">
               {kanbanStatuses.map((status) => (
@@ -259,6 +332,8 @@ export function LeadsWorkspace({
                   leads={groupedLeads[status] ?? []}
                   onOpen={setSelectedLead}
                   status={status}
+                  isSelected={multiSelect.isSelected}
+                  onToggle={multiSelect.toggle}
                   slaFirstContactMinutes={slaFirstContactMinutes}
                   slaStagnantDays={slaStagnantDays}
                 />
@@ -408,12 +483,16 @@ function KanbanColumn({
   leads,
   onOpen,
   status,
+  isSelected,
+  onToggle,
   slaFirstContactMinutes = 15,
   slaStagnantDays = 3,
 }: {
   leads: LeadWorkspaceItem[];
   onOpen: (lead: LeadWorkspaceItem) => void;
   status: string;
+  isSelected: (id: string) => boolean;
+  onToggle: (id: string) => void;
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
 }) {
@@ -436,7 +515,7 @@ function KanbanColumn({
 
       <div className="mt-3 space-y-3">
         {leads.map((lead) => (
-          <KanbanLeadCard key={lead.id} lead={lead} onOpen={onOpen} slaFirstContactMinutes={slaFirstContactMinutes} slaStagnantDays={slaStagnantDays} />
+          <KanbanLeadCard key={lead.id} lead={lead} onOpen={onOpen} isSelected={isSelected} onToggle={onToggle} slaFirstContactMinutes={slaFirstContactMinutes} slaStagnantDays={slaStagnantDays} />
         ))}
         {!leads.length ? (
           <div className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-8 text-center">
@@ -451,41 +530,67 @@ function KanbanColumn({
 function KanbanLeadCard({
   lead,
   onOpen,
+  isSelected,
+  onToggle,
   slaFirstContactMinutes = 15,
   slaStagnantDays = 3,
 }: {
   lead: LeadWorkspaceItem;
   onOpen: (lead: LeadWorkspaceItem) => void;
+  isSelected: (id: string) => boolean;
+  onToggle: (id: string) => void;
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
 }) {
+  const selected = isSelected(lead.id);
+
   return (
-    <button
-      className="group w-full rounded-xl border border-border bg-card p-4 text-left shadow-sm outline-none transition-colors hover:border-primary/30 hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring"
-      onClick={() => onOpen(lead)}
-      type="button"
+    <div
+      className={`group w-full rounded-xl border bg-card text-left shadow-sm outline-none transition-all duration-150 ${
+        selected
+          ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
+          : "border-border hover:border-primary/30 hover:bg-muted/30"
+      }`}
     >
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="line-clamp-2 break-words font-medium leading-5 text-foreground">
-            {lead.nome}
-          </p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
-            <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-xs" />
-          </p>
+      {/* Checkbox row */}
+      <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5">
+        <Checkbox
+          aria-label={`Selecionar ${lead.nome}`}
+          checked={selected}
+          onCheckedChange={() => onToggle(lead.id)}
+          onClick={(event) => event.stopPropagation()}
+        />
+        <ArrowUpRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+      </div>
+
+      {/* Card body */}
+      <button
+        className="w-full p-4 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
+        onClick={() => onOpen(lead)}
+        type="button"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="line-clamp-2 break-words font-medium leading-5 text-foreground">
+              {lead.nome}
+            </p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-xs" />
+            </p>
+          </div>
         </div>
-        <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-      </div>                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <LeadStatusBadge status={lead.status} />
-                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
-                            {lead.tipo}
-                          </span>
-                          <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
-                        </div>
-                        <span className="shrink-0 text-xs text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
-                      </div>
-    </button>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <LeadStatusBadge status={lead.status} />
+            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+              {lead.tipo}
+            </span>
+            <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
+          </div>
+          <span className="shrink-0 text-xs text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
+        </div>
+      </button>
+    </div>
   );
 }
 

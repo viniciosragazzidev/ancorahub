@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -9,6 +9,8 @@ import {
   XCircle,
   Eye,
 } from "@/components/huge-icons";
+import { SelectionToolbar } from "@/components/ui/selection-toolbar";
+import { useMultiSelect } from "@/hooks/use-multi-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -85,7 +87,8 @@ export function DocumentsWorkspace({
   const [requirements, setRequirements] = useState(initialRequirements);
   const [pendingDocs, setPendingDocs] = useState(initialPendingDocs);
 
-  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const pendingIds = useMemo(() => pendingDocs.map((d) => d.id), [pendingDocs]);
+  const multiSelect = useMultiSelect(pendingIds);
   const [reqState, reqFormAction, reqPending] = useActionState(createRequirementAction, {});
   const [, startTransition] = useTransition();
 
@@ -128,33 +131,22 @@ export function DocumentsWorkspace({
   };
 
   const handleBulkReview = (status: "approved" | "rejected") => {
-    if (selectedDocs.length === 0) return;
+    const ids = multiSelect.selectedIds;
+    if (ids.length === 0) return;
     startTransition(async () => {
       try {
-        const res = await bulkReviewDocumentsAction(selectedDocs, status);
+        const res = await bulkReviewDocumentsAction(ids, status);
         if (res.error) toast.error(res.error);
         else {
-          toast.success(`Processamento em lote concluído (${selectedDocs.length} itens).`);
-          setPendingDocs((current) => current.filter((d) => !selectedDocs.includes(d.id)));
-          setSelectedDocs([]);
+          toast.success(`Processamento em lote concluído (${ids.length} itens).`);
+          setPendingDocs((current) => current.filter((d) => !ids.includes(d.id)));
+          multiSelect.clear();
         }
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
         else toast.error("Não foi possível atualizar os documentos. Tente novamente.");
       }
     });
-  };
-
-  const toggleSelectDoc = (id: string) => {
-    setSelectedDocs((curr) => (curr.includes(id) ? curr.filter((x) => x !== id) : [...curr, id]));
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedDocs.length === pendingDocs.length) {
-      setSelectedDocs([]);
-    } else {
-      setSelectedDocs(pendingDocs.map((d) => d.id));
-    }
   };
 
   return (
@@ -186,20 +178,32 @@ export function DocumentsWorkspace({
 
       {activeTab === "queue" && (
         <div className="space-y-4">
-          {role !== "broker" && selectedDocs.length > 0 && (
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-primary/5 border-primary/20">
-              <span className="text-xs font-medium">
-                {selectedDocs.length} documento(s) selecionado(s)
-              </span>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="text-emerald-500 hover:text-emerald-600 border-emerald-500/20" onClick={() => handleBulkReview("approved")}>
-                  <CheckCircle className="size-4 mr-1" /> Aprovar selecionados
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleBulkReview("rejected")}>
-                  <XCircle className="size-4 mr-1" /> Rejeitar selecionados
-                </Button>
-              </div>
-            </div>
+          {role !== "broker" && (
+            <SelectionToolbar
+              selectedCount={multiSelect.count}
+              totalCount={pendingDocs.length}
+              onClear={multiSelect.clear}
+            >
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-emerald-500 hover:text-emerald-600 border-emerald-500/20"
+                disabled={multiSelect.count === 0}
+                onClick={() => handleBulkReview("approved")}
+              >
+                <CheckCircle className="size-4" />
+                Aprovar
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={multiSelect.count === 0}
+                onClick={() => handleBulkReview("rejected")}
+              >
+                <XCircle className="size-4" />
+                Rejeitar
+              </Button>
+            </SelectionToolbar>
           )}
 
           <Card className="border-border bg-card shadow-none">
@@ -223,8 +227,9 @@ export function DocumentsWorkspace({
                       <TableRow>
                         {role !== "broker" && <TableHead className="w-10">
                           <Checkbox
-                            checked={selectedDocs.length === pendingDocs.length && pendingDocs.length > 0}
-                            onCheckedChange={toggleSelectAll}
+                            aria-label="Selecionar todos"
+                            checked={multiSelect.isAllSelected}
+                            onCheckedChange={multiSelect.selectAll}
                           />
                         </TableHead>}
                         <TableHead>Lead</TableHead>
@@ -237,11 +242,16 @@ export function DocumentsWorkspace({
                     </TableHeader>
                     <TableBody>
                       {pendingDocs.map((doc) => (
-                        <TableRow key={doc.id}>
+                        <TableRow
+                          key={doc.id}
+                          data-selected={multiSelect.isSelected(doc.id) || undefined}
+                          className="data-[selected]:bg-primary/[0.04]"
+                        >
                           {role !== "broker" && <TableCell>
                             <Checkbox
-                              checked={selectedDocs.includes(doc.id)}
-                              onCheckedChange={() => toggleSelectDoc(doc.id)}
+                              aria-label={`Selecionar ${doc.leadNome}`}
+                              checked={multiSelect.isSelected(doc.id)}
+                              onCheckedChange={() => multiSelect.toggle(doc.id)}
                             />
                           </TableCell>}
                           <TableCell className="font-medium">

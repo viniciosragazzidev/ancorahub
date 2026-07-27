@@ -25,7 +25,7 @@ type PendingInvite = {
   name: string | null;
 };
 
-export type TeamActionState = { success?: boolean; error?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
+export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
 const memberRole = z.enum(["manager", "broker"]);
 const memberJobTitle = z.enum(schema.teamJobTitleValues);
@@ -149,6 +149,112 @@ export async function updateTeamMemberAction(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o membro.";
     return { success: false, error: message };
+  }
+}
+
+export async function bulkToggleTeamMemberStatusAction(
+  _prev: TeamActionState,
+  formData: FormData,
+): Promise<TeamActionState> {
+  const memberIds = formData.getAll("memberIds") as string[];
+  const targetStatus = formData.get("targetStatus") as string;
+
+  if (!memberIds.length) return { error: "Nenhum membro selecionado." };
+  if (!targetStatus || !["active", "disabled"].includes(targetStatus)) {
+    return { error: "Status inválido." };
+  }
+
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+
+    const nextActive = targetStatus === "active";
+    let updatedCount = 0;
+    let errorMessages: string[] = [];
+
+    for (const memberId of memberIds) {
+      try {
+        const [member] = await db
+          .select({
+            membershipId: schema.tenantMemberships.id,
+            userId: schema.user.id,
+            role: schema.tenantMemberships.role,
+            branchId: schema.tenantMemberships.branchId,
+            status: schema.user.status,
+          })
+          .from(schema.tenantMemberships)
+          .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+          .where(
+            and(
+              eq(schema.tenantMemberships.id, memberId),
+              eq(schema.tenantMemberships.tenantId, context.tenantId),
+            ),
+          )
+          .limit(1);
+
+        if (!member) {
+          errorMessages.push(`Membro ${memberId} não encontrado.`);
+          continue;
+        }
+
+        requireCanManageMember(context, {
+          role: member.role,
+          branchId: member.branchId,
+          userId: member.userId,
+        });
+
+        await db.transaction(async (tx) => {
+          await tx.update(schema.user).set({
+            active: nextActive,
+            status: nextActive ? "active" : "disabled",
+            updatedAt: new Date(),
+          }).where(eq(schema.user.id, member.userId));
+
+          await tx.update(schema.tenantMemberships).set({
+            status: nextActive ? "active" : "inactive",
+            updatedAt: new Date(),
+          }).where(eq(schema.tenantMemberships.id, member.membershipId));
+
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId: context.userId,
+            entidade: "tenant_membership",
+            entidadeId: member.membershipId,
+            acao: nextActive ? "reativou_membro" : "desativou_membro",
+          });
+
+          if (!nextActive) {
+            await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+          }
+        });
+
+        updatedCount++;
+      } catch (error) {
+        errorMessages.push(error instanceof Error ? error.message : "Erro desconhecido");
+      }
+    }
+
+    revalidatePath("/equipe");
+
+    if (errorMessages.length === 0) {
+      return {
+        success: true,
+        message: `${updatedCount} membro${updatedCount === 1 ? "" : "s"} ${nextActive ? "ativado" : "desativado"}${updatedCount === 1 ? "" : "s"} com sucesso.`,
+      };
+    }
+
+    if (updatedCount > 0) {
+      return {
+        success: true,
+        message: `${updatedCount} atualizado${updatedCount === 1 ? "" : "s"}, ${errorMessages.length} erro${errorMessages.length === 1 ? "" : "s"}. ${errorMessages[0]}`,
+      };
+    }
+
+    return { error: `Nenhum membro atualizado. ${errorMessages[0] ?? ""}` };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Erro ao atualizar membros em lote.",
+    };
   }
 }
 

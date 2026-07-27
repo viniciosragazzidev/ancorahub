@@ -1,14 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
-import { UsersThree } from "@/components/huge-icons";
+import { CheckCircle, UsersThree, XCircle } from "@/components/huge-icons";
 
 import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { useMultiSelect } from "@/hooks/use-multi-select";
+import { bulkToggleTeamMemberStatusAction } from "./actions";
 import { TeamMemberActions } from "./member-actions";
 
 type BranchOption = { id: string; name: string };
@@ -34,6 +40,13 @@ type Props = {
 
 export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId }: Props) {
   const [branchFilter, setBranchFilter] = useState("all");
+  const memberIds = useMemo(() => members.map((m) => m.id), [members]);
+  const multiSelect = useMultiSelect(memberIds);
+  const clearSelection = multiSelect.clear;
+  const [bulkState, bulkFormAction, bulkPending] = useActionState(
+    bulkToggleTeamMemberStatusAction,
+    {},
+  );
   const [statusOverrides, setStatusOverrides] = useState<Record<string, TeamMember["status"]>>({});
 
   const handleStatusChange = useCallback((memberId: string, status: TeamMember["status"] | null) => {
@@ -66,9 +79,39 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     [branchFilter, displayedMembers],
   );
 
+  // Bulk action feedback
+  useEffect(() => {
+    if (bulkState.success) {
+      toast.success(bulkState.message ?? "Operação concluída.");
+      clearSelection();
+    }
+    if (bulkState.error) {
+      toast.error(bulkState.error);
+    }
+  }, [bulkState.success, bulkState.error, bulkState.message, clearSelection]);
+
   const activeCount = displayedMembers.filter((member) => member.status === "active").length;
 
   const columns: ColumnDef<TeamMember>[] = [
+    {
+      id: "select",
+      header: () => (
+        <Checkbox
+          aria-label="Selecionar todos"
+          checked={multiSelect.isAllSelected}
+          onCheckedChange={multiSelect.selectAll}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          aria-label={`Selecionar ${row.original.name ?? "membro"}`}
+          checked={multiSelect.isSelected(row.original.id)}
+          onCheckedChange={() => multiSelect.toggle(row.original.id)}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "name",
       header: ({ column }) => (
@@ -164,6 +207,45 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        <div className="px-4 pt-3 pb-0">
+          <SelectionToolbar
+            selectedCount={multiSelect.count}
+            totalCount={visibleMembers.length}
+            onClear={multiSelect.clear}
+          >
+            {(currentRole === "director" || currentRole === "manager") && (
+              <form action={bulkFormAction} className="flex items-center gap-2">
+                {multiSelect.selectedIds.map((id) => (
+                  <input key={id} name="memberIds" type="hidden" value={id} />
+                ))}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-emerald-500 hover:text-emerald-600 border-emerald-500/20"
+                  disabled={bulkPending || multiSelect.count === 0}
+                  name="targetStatus"
+                  value="active"
+                  type="submit"
+                >
+                  <CheckCircle className="size-4" />
+                  Ativar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive border-destructive/20"
+                  disabled={bulkPending || multiSelect.count === 0}
+                  name="targetStatus"
+                  value="disabled"
+                  type="submit"
+                >
+                  <XCircle className="size-4" />
+                  Desativar
+                </Button>
+              </form>
+            )}
+          </SelectionToolbar>
+        </div>
         <DataTable
           columns={columns}
           data={visibleMembers}
