@@ -16,31 +16,5 @@
       "path": "/api/internal/jobs/whatsapp",
       "schedule": "1-59/2 * * * *"
     }
-  ],
-  "services": {
-    "frontend": {
-      "root": ".",
-      "framework": "nextjs"
-    },
-    "whatsapp-api": {
-      "root": "services/whatsapp-api",
-      "entrypoint": "src/app.ts"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/whatsapp-api(/.*)?",
-      "destination": {
-        "type": "service",
-        "service": "whatsapp-api"
-      }
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "type": "service",
-        "service": "frontend"
-      }
-    }
   ]
 }
