@@ -29,6 +29,15 @@ export type AiAgentResponse = {
   detectedLanguage?: string;
 };
 
+/** Explicit handoff intent must not depend on the model's structured output. */
+export function detectHumanTransferRequest(text: string): boolean {
+  const normalized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  if (normalized === "atendente" || normalized === "humano") return true;
+  return /\b(falar|conversar|chamar|preciso|quero|transferir|transfira|atendimento)\b/.test(normalized) &&
+    /\b(atendente|humano|pessoa|corretor|consultor)\b/.test(normalized) &&
+    !/pessoa\s+fisica|pessoa\s+juridica/.test(normalized);
+}
+
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
 const LEGACY_OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet";
@@ -184,6 +193,7 @@ export async function generateAiResponse({
   tenantName?: string | null;
 }): Promise<AiAgentResponse> {
   const startTime = Date.now();
+  const explicitHumanRequest = detectHumanTransferRequest(messages[messages.length - 1]?.content ?? "");
   let apiKey = process.env.OPENROUTER_API_KEY || "";
   if (!apiKey && (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL)) {
     try {
@@ -213,13 +223,13 @@ export async function generateAiResponse({
   if (!apiKey) {
     // Fallback gracioso caso a chave OpenRouter não esteja configurada
     const lastUserMsg = messages[messages.length - 1]?.content.toLowerCase() || "";
-    const isQuotationOrHuman = lastUserMsg.includes("cotação") || lastUserMsg.includes("humano") || lastUserMsg.includes("atendente");
+    const isQuotationOrHuman = explicitHumanRequest || lastUserMsg.includes("cotação") || lastUserMsg.includes("humano") || lastUserMsg.includes("atendente");
     const fallback = createSafeFallbackResponse(leadName, memoryContext);
 
     return {
       success: true,
       content: isQuotationOrHuman
-        ? "Olá! Recebi sua mensagem. Estou direcionando seu atendimento para um de nossos especialistas comerciais. [SOLICITOU_HUMANO]"
+        ? "Entendi. Vou encaminhar seu atendimento para um corretor da equipe agora."
         : fallback.message,
       structured: fallback,
       modelUsed: "fallback-rule-engine",
@@ -422,12 +432,15 @@ export async function generateAiResponse({
     }
 
     const shouldTransferToHuman =
+      explicitHumanRequest ||
       structured.shouldTransfer ||
       finalContent.includes("[SOLICITOU_HUMANO]") ||
       finalContent.toLowerCase().includes("atendente") ||
       finalContent.toLowerCase().includes("especialista");
 
-    const cleanedContent = finalContent.replace("[SOLICITOU_HUMANO]", "").trim();
+    const cleanedContent = (explicitHumanRequest
+      ? "Entendi. Vou encaminhar seu atendimento para um corretor da equipe agora."
+      : finalContent.replace("[SOLICITOU_HUMANO]", "")).trim();
 
     return {
       success: true,

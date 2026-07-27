@@ -13,6 +13,13 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 - Cobertura regressiva adicionada para o fluxo de resposta curta e recuperação
   após pergunta repetida.
 
+## 27/07/2026 - Respostas naturais e transferência humana
+
+- Respostas de cidade sem preposição e listas de idades familiares agora são
+  normalizadas a partir da pergunta pendente, sem repetir a etapa.
+- Solicitações explícitas como “Atendente” e “Falar com atendente” acionam
+  transferência determinística, mesmo se o modelo retornar JSON incorreto.
+
 ## 27/07/2026 - Sistema visual DesignTeste (preview)
 
 - Tokens Vendria Light mapeados para o tema semantico: canvas quente, card branco,

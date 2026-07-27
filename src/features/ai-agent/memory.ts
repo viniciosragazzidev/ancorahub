@@ -109,6 +109,32 @@ const INTENT_PATTERNS = [
   /(?:cotação|preço|valor|quanto custa|orçamento)/i,
 ];
 
+const qualificationOrder: Array<keyof ConversationMemory> = [
+  "customerName", "planType", "numberOfLives", "age", "city", "email",
+  "companyHasCnpj", "intent",
+];
+const fieldsByKey = new Map(COLLECTIBLE_FIELDS.map((field) => [field.key, field]));
+COLLECTIBLE_FIELDS.splice(
+  0,
+  COLLECTIBLE_FIELDS.length,
+  ...qualificationOrder.flatMap((key) => {
+    const field = fieldsByKey.get(key);
+    return field ? [field] : [];
+  }),
+);
+
+export const CORE_QUALIFICATION_FIELDS: Array<"customerName" | "planType" | "numberOfLives" | "age" | "city" | "email"> = [
+  "customerName", "planType", "numberOfLives", "age", "city", "email",
+];
+
+export function isCoreQualificationComplete(memory: ConversationMemory): boolean {
+  return CORE_QUALIFICATION_FIELDS.every((field) => Boolean(memory[field]?.value));
+}
+
+function normalizeForMatching(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 /**
  * Extract fields from a user message, updating existing memory.
  * Returns the merged memory with any new fields.
@@ -147,7 +173,7 @@ export function extractFieldsFromMessage(
 
   // If no full name, check if message is just "first name" (single word + context)
   if (!memory.customerName && trimmed.length > 0) {
-    const isJustName = /^[A-ZÀ-Ú][a-zà-ú]+$/.test(trimmed) && trimmed.length >= 2;
+    const isJustName = /^[A-ZÀ-Ú][a-zà-ú]+$/.test(trimmed) && trimmed.length >= 2 && !commonWords.has(trimmed.toLowerCase());
     if (isJustName) {
       // Only treat as name if message is short (likely first interaction)
       memory.customerFirstName = {
@@ -172,6 +198,13 @@ export function extractFieldsFromMessage(
           break;
         }
       }
+    }
+
+    const asksForCity = normalizeForMatching(memory.lastQuestionAsked ?? "").includes("cidade");
+    const bareCity = trimmed.replace(/,\s*[A-Za-z]{2}\s*$/, "").trim();
+    if (!memory.city && asksForCity && /^[\p{L}][\p{L} .'-]{2,59}$/u.test(bareCity) && !commonWords.has(normalizeForMatching(bareCity))) {
+      memory.city = { value: bareCity, confidence: 1, sourceMessageId };
+      addCollectedField(memory, "city");
     }
   }
 
@@ -219,7 +252,15 @@ export function extractFieldsFromMessage(
 
   // Age extraction
   if (!memory.age) {
+    const previousQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
+    const asksForAge = previousQuestion.includes("idade") || previousQuestion.includes("quantos anos");
+    const ageValues = trimmed.match(/\d{1,3}/g)?.map(Number).filter((age) => age > 0 && age < 150) ?? [];
+    if (asksForAge && ageValues.length > 0) {
+      memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
+      addCollectedField(memory, "age");
+    }
     for (const pattern of AGE_PATTERNS) {
+      if (memory.age) break;
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const age = parseInt(match[1], 10);

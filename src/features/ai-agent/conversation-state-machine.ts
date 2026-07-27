@@ -6,6 +6,7 @@ import {
   extractFieldsFromMessage,
   buildMemoryContext,
   createEmptyMemory,
+  isCoreQualificationComplete,
   type ConversationMemory,
 } from "./memory";
 import { createSafeFallbackResponse } from "./ai-response-schema";
@@ -377,6 +378,21 @@ export async function processInboundAiResponse({
     tenantConfig,
     tenantName: tenantInfo?.name,
   });
+
+  // Once the six core fields are present, qualification is complete. The
+  // handoff is deterministic so an incorrect model question cannot reopen the
+  // questionnaire after the e-mail was received.
+  if (isCoreQualificationComplete(updatedMemory)) {
+    const handoffMessage = "Obrigado! Já tenho os dados necessários. Vou encaminhar seu atendimento para um corretor da equipe agora.";
+    aiResult.content = handoffMessage;
+    aiResult.shouldTransferToHuman = true;
+    aiResult.transferReason = "Qualificação concluída";
+    if (aiResult.structured) {
+      aiResult.structured.message = handoffMessage;
+      aiResult.structured.shouldTransfer = true;
+      aiResult.structured.questionAsked = null;
+    }
+  }
 
   console.info("[ai-wpp] ai.completed", {
     tenantId,

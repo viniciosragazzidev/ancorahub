@@ -6,7 +6,7 @@ const { getSystemSetting } = vi.hoisted(() => ({
 
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting }));
 
-import { generateAiResponse } from "./service";
+import { detectHumanTransferRequest, generateAiResponse } from "./service";
 
 describe("OpenRouter WhatsApp AI integration", () => {
   afterEach(() => {
@@ -32,4 +32,11 @@ describe("OpenRouter WhatsApp AI integration", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).model).toBe("openrouter/auto");
   });
+
+  it.each(["Atendente", "Falar com atendente", "quero falar com uma pessoa"]) (
+    "recognizes a deterministic human handoff request: %s",
+    (message) => {
+      expect(detectHumanTransferRequest(message)).toBe(true);
+    },
+  );
 });

@@ -36,9 +36,11 @@ describe("RepeatedQuestionGuard recovery", () => {
 
   it("advances to the next missing field with the current memory format", () => {
     const memory = createEmptyMemory();
-    memory.collectedFields = ["customerName", "planType"];
+    memory.collectedFields = ["customerName", "planType", "numberOfLives", "age"];
     memory.customerName = { value: "Maria Silva", confidence: 1 };
     memory.planType = { value: "individual", confidence: 1 };
+    memory.numberOfLives = { value: "3", confidence: 1 };
+    memory.age = { value: "35", confidence: 1 };
 
     const fallback = createSafeFallbackResponse(
       memory.customerName.value,
