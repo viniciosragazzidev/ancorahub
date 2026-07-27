@@ -8,8 +8,8 @@ vi.mock("server-only", () => ({}));
 
 // Mock motion/react to avoid animation complexity in tests
 vi.mock("motion/react", () => ({
-  motion: {
-    div: "div",
-  },
+  motion: new Proxy({}, { get: (_target, property) => String(property) }),
   AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
+  useAnimation: () => ({ start: vi.fn(), stop: vi.fn(), set: vi.fn() }),
+  useReducedMotion: () => false,
 }));
