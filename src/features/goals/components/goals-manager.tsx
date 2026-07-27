@@ -9,6 +9,7 @@ import {
   Power,
   Target,
   Trash,
+  X,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { toast } from "sonner";
@@ -17,6 +18,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+} from "@/components/ui/drawer";
 import {
   deleteGoalAction,
   recalculateGoalProgressAction,
@@ -75,7 +84,7 @@ function GoalCard({
     recalculateGoalProgressAction,
     {},
   );
-  const [editing, setEditing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const pct = goal.progressPercentage
     ? Math.min(100, Math.max(0, parseFloat(goal.progressPercentage)))
@@ -87,31 +96,32 @@ function GoalCard({
     pct >= 30 ? "bg-amber-500" :
     "bg-rose-500";
 
-  if (editing) {
-    return (
-      <Card className="border-primary/20 bg-primary/[0.03] shadow-none">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <h4 className="font-medium">Editar: {goal.name}</h4>
-              <p className="text-xs text-muted-foreground mt-0.5">Altere os dados da meta.</p>
-            </div>
-            <Button size="icon-sm" variant="ghost" onClick={() => setEditing(false)} aria-label="Cancelar">
-              <Trash className="size-4" />
-            </Button>
-          </div>
-          <GoalForm goal={goal} teamMembers={teamMembers} branches={branches} onDone={() => setEditing(false)} />
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
     >
+      {/* Edit Drawer */}
+      <Drawer open={editOpen} onOpenChange={setEditOpen} swipeDirection="right">
+        <DrawerContent className="max-w-md">
+          <DrawerHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <DrawerTitle>Editar meta</DrawerTitle>
+                <DrawerDescription className="mt-0.5">{goal.name}</DrawerDescription>
+              </div>
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
+                <X className="size-4" />
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto p-4">
+            <GoalForm goal={goal} teamMembers={teamMembers} branches={branches} onDone={() => setEditOpen(false)} />
+          </div>
+        </DrawerContent>
+      </Drawer>
+
       <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
         <CardContent className="p-4 sm:p-5">
           {/* Header */}
@@ -149,7 +159,7 @@ function GoalCard({
                   <Power className="size-4" />
                 </Button>
               </form>
-              <Button size="icon-sm" variant="ghost" onClick={() => setEditing(true)} aria-label="Editar">
+              <Button size="icon-sm" variant="ghost" onClick={() => setEditOpen(true)} aria-label="Editar">
                 <PencilSimple className="size-4" />
               </Button>
               <form action={deleteAction}>
@@ -205,7 +215,7 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
   const [filterScope, setFilterScope] = useState<string>("all");
-  const [showCreate, setShowCreate] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const normalizedQuery = search
     .trim()
@@ -266,6 +276,30 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
         ))}
       </motion.div>
 
+      {/* Create Drawer */}
+      <Drawer open={createOpen} onOpenChange={setCreateOpen} swipeDirection="right">
+        <DrawerContent className="max-w-md">
+          <DrawerHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <DrawerTitle>Nova meta comercial</DrawerTitle>
+                <DrawerDescription className="mt-0.5">Defina escopo, tipo, valor e período.</DrawerDescription>
+              </div>
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
+                <X className="size-4" />
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto p-4">
+            <GoalForm
+              teamMembers={teamMembers}
+              branches={branches}
+              onDone={() => setCreateOpen(false)}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
+
       {/* Create trigger */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -274,36 +308,10 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
             Defina metas de desempenho para corretores, equipes, filiais ou toda a corretora.
           </p>
         </div>
-        {!showCreate && (
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="size-4" /> Nova meta
-          </Button>
-        )}
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="size-4" /> Nova meta
+        </Button>
       </div>
-
-      {/* Create form inline */}
-      {showCreate && (
-        <Card className="border-primary/20 bg-primary/[0.03] shadow-none">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h4 className="font-medium">Nova meta comercial</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Defina o escopo, tipo, valor e período da meta.
-                </p>
-              </div>
-              <Button size="icon-sm" variant="ghost" onClick={() => setShowCreate(false)} aria-label="Cancelar">
-                <Trash className="size-4" />
-              </Button>
-            </div>
-            <GoalForm
-              teamMembers={teamMembers}
-              branches={branches}
-              onDone={() => setShowCreate(false)}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -342,18 +350,18 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
       </div>
 
       {/* Goals list / empty states */}
-      {goals.length === 0 && !showCreate ? (
+      {goals.length === 0 ? (
         <EmptyState
           icon={Target}
           title="Nenhuma meta cadastrada"
           description="Crie a primeira meta para acompanhar o desempenho comercial da sua equipe."
           action={
-            <Button onClick={() => setShowCreate(true)} variant="outline">
+            <Button onClick={() => setCreateOpen(true)} variant="outline">
               <Plus className="size-4" /> Criar primeira meta
             </Button>
           }
         />
-      ) : visibleGoals.length === 0 && !showCreate ? (
+      ) : visibleGoals.length === 0 ? (
         <EmptyState
           title="Nenhuma meta encontrada"
           description="Ajuste a busca ou os filtros para ver outros resultados."

@@ -2,11 +2,19 @@
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileArrowDown, CheckCircle, XCircle, Clock } from "@/components/huge-icons";
+import { FileArrowDown, CheckCircle, XCircle, Clock, X, Plus } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+} from "@/components/ui/drawer";
 import { uploadMetaLeadsAction, type ImportHistoryItem } from "@/features/marketing-import/actions";
 
 type Branch = { id: string; name: string };
@@ -34,6 +42,7 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
     errors: Array<{ row: number; message: string }>;
   } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const canChooseBranch = role === "director" || isCentralMarketing;
 
@@ -87,18 +96,23 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-      {/* Left Column - Upload */}
-      <div className="grid gap-6">
-        {/* Upload Card */}
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Importar Planilha Meta</CardTitle>
-            <CardDescription>
-              Formatos aceitos: .xlsx, .xls, .csv — Máximo 10 MB
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
+    <>
+      {/* Import Drawer */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} swipeDirection="right">
+        <DrawerContent className="max-w-md">
+          <DrawerHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <DrawerTitle>Nova importação</DrawerTitle>
+                <DrawerDescription className="mt-0.5">Faça upload da planilha Meta Ads (.xlsx, .xls, .csv)</DrawerDescription>
+              </div>
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
+                <X className="size-4" />
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Drop Zone */}
             <div
               className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
                 dragOver ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"
@@ -216,89 +230,106 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
-        {/* Last Import Info */}
-        {lastImport && (
+      {/* Main Content */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        {/* Left column */}
+        <div className="grid gap-6">
+          {/* Action Card */}
           <Card className="border-border bg-card shadow-none">
             <CardHeader>
-              <CardTitle className="text-base">Última importação</CardTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Importar Planilha Meta</CardTitle>
+                  <CardDescription className="mt-1">
+                    Formatos aceitos: .xlsx, .xls, .csv — Máximo 10 MB
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setDrawerOpen(true)}>
+                  <Plus className="size-4" /> Nova importação
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="grid gap-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Data</span>
-                <span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(lastImport.createdAt))}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Arquivo</span>
-                <span className="truncate max-w-[200px] text-right">{lastImport.fileName}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Responsável</span>
-                <span>{lastImport.userName ?? "—"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Resultado</span>
-                <span>
-                  {lastImport.importedCount} importados · {lastImport.duplicateCount} duplicados · {lastImport.invalidCount} inválidos
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <Badge variant={lastImport.status === "completed" ? "default" : "destructive"}>
-                  {statusLabel(lastImport.status)}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Right Column - History */}
-      <Card className="h-fit border-border bg-card shadow-none">
-        <CardHeader>
-          <CardTitle>Histórico de importações</CardTitle>
-          <CardDescription>Últimas 50 importações realizadas.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {history.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              <FileArrowDown className="mx-auto mb-2 size-8 text-muted-foreground/50" />
-              Nenhuma importação realizada ainda.
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {history.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 px-5 py-3">
-                  <div className="mt-0.5 shrink-0">{statusIcon(item.status)}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{item.fileName}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(item.createdAt))}
-                      {item.userName ? ` · ${item.userName}` : ""}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[11px] text-emerald-400">
-                        {item.importedCount} importados
-                      </span>
-                      <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-400">
-                        {item.duplicateCount} dup.
-                      </span>
-                      <span className="rounded-md bg-red-500/10 px-1.5 py-0.5 text-[11px] text-red-400">
-                        {item.invalidCount} invál.
-                      </span>
-                    </div>
-                  </div>
-                  <Badge variant={item.status === "completed" ? "default" : "destructive"} className="shrink-0">
-                    {statusLabel(item.status)}
+            {lastImport && (
+              <CardContent className="grid gap-2 text-sm border-t border-border pt-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">ÚLTIMA IMPORTAÇÃO</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Data</span>
+                  <span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(lastImport.createdAt))}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Arquivo</span>
+                  <span className="truncate max-w-[200px] text-right">{lastImport.fileName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Responsável</span>
+                  <span>{lastImport.userName ?? "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Resultado</span>
+                  <span>
+                    {lastImport.importedCount} importados · {lastImport.duplicateCount} dup. · {lastImport.invalidCount} inválidos
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <Badge variant={lastImport.status === "completed" ? "default" : "destructive"}>
+                    {statusLabel(lastImport.status)}
                   </Badge>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+              </CardContent>
+            )}
+          </Card>
+        </div>
+
+        {/* Right Column - History */}
+        <Card className="h-fit border-border bg-card shadow-none">
+          <CardHeader>
+            <CardTitle>Histórico de importações</CardTitle>
+            <CardDescription>Últimas 50 importações realizadas.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {history.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                <FileArrowDown className="mx-auto mb-2 size-8 text-muted-foreground/50" />
+                Nenhuma importação realizada ainda.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {history.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 px-5 py-3">
+                    <div className="mt-0.5 shrink-0">{statusIcon(item.status)}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{item.fileName}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(item.createdAt))}
+                        {item.userName ? ` · ${item.userName}` : ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[11px] text-emerald-400">
+                          {item.importedCount} importados
+                        </span>
+                        <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] text-amber-400">
+                          {item.duplicateCount} dup.
+                        </span>
+                        <span className="rounded-md bg-red-500/10 px-1.5 py-0.5 text-[11px] text-red-400">
+                          {item.invalidCount} invál.
+                        </span>
+                      </div>
+                    </div>
+                    <Badge variant={item.status === "completed" ? "default" : "destructive"} className="shrink-0">
+                      {statusLabel(item.status)}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

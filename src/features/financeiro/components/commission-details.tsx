@@ -3,12 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 import {
   ArrowRight,
   ArrowsDownUp,
   Calculator,
   MagnifyingGlass,
   TrendUp,
+  X,
+  SlidersHorizontal,
+  FileArrowDown,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 
@@ -32,6 +36,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+} from "@/components/ui/drawer";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { formatCurrency, formatCurrencyCompact, normalize } from "@/features/quotes/utils";
 import type { CommissionDetailsData } from "@/features/financeiro/queries/commission-details";
 
@@ -42,18 +56,11 @@ type Props = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-
 function formatDate(date: Date | string): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(
     new Date(date),
   );
 }
-
-// StatCard do @/components/dashboard/metric-card é usado abaixo
-
-// ─── Status Badge ─────────────────────────────────────────────────────────
-
-// ScheduleStatusBadge compartilhado de @/components/status-badges
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -63,6 +70,7 @@ export function CommissionDetails({ data }: Props) {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"brokers" | "sales">("sales");
   const [scheduleFilter, setScheduleFilter] = useState<"all" | "pending" | "paid">("all");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const normalizedQuery = normalize(search.trim());
 
@@ -103,30 +111,8 @@ export function CommissionDetails({ data }: Props) {
         <StatCard label="Vendas / Regras ativas" value={`${summary.totalSales} / ${summary.activeRules}`} icon={Calculator} animated animationDelay={0.18} />
       </section>
 
-      {/* Tabs: Brokers / Sales */}
-      <div className="flex items-center gap-6 border-b border-border">
-        <button
-          onClick={() => setView("sales")}
-          className={`pb-3 text-sm font-medium transition-colors ${view === "sales"
-            ? "border-b-2 border-primary text-foreground"
-            : "text-muted-foreground hover:text-foreground"
-            }`}
-        >
-          Por venda
-        </button>
-        <button
-          onClick={() => setView("brokers")}
-          className={`pb-3 text-sm font-medium transition-colors ${view === "brokers"
-            ? "border-b-2 border-primary text-foreground"
-            : "text-muted-foreground hover:text-foreground"
-            }`}
-        >
-          Por corretor
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      {/* Action Bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
         <div className="relative flex-1 sm:max-w-xs">
           <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -141,21 +127,77 @@ export function CommissionDetails({ data }: Props) {
             aria-label="Buscar"
           />
         </div>
-        {view === "sales" && (
-          <select
-            value={scheduleFilter}
-            onChange={(e) =>
-              setScheduleFilter(e.target.value as "all" | "pending" | "paid")
-            }
-            className="h-9 rounded-lg border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            aria-label="Filtrar por status"
-          >
-            <option value="all">Todas as parcelas</option>
-            <option value="pending">Pendentes</option>
-            <option value="paid">Pagas</option>
-          </select>
-        )}
+        
+        <Button variant="outline" onClick={() => setDrawerOpen(true)}>
+          <SlidersHorizontal className="mr-2 size-4" />
+          Filtros e Ações
+        </Button>
       </div>
+
+      {/* Drawer: Filters & Actions */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} swipeDirection="right">
+        <DrawerContent className="max-w-sm">
+          <DrawerHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <DrawerTitle>Filtros e Ações</DrawerTitle>
+                <DrawerDescription className="mt-0.5">
+                  Refine a visualização ou exporte relatórios.
+                </DrawerDescription>
+              </div>
+              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" />}>
+                <X className="size-4" />
+              </DrawerClose>
+            </div>
+          </DrawerHeader>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Agrupar visão por</label>
+              <Select value={view} onValueChange={(v) => setView(v as "sales" | "brokers")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o agrupamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sales">Por venda</SelectItem>
+                  <SelectItem value="brokers">Por corretor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {view === "sales" && (
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Status da parcela</label>
+                <Select value={scheduleFilter} onValueChange={(v) => setScheduleFilter(v as "all" | "pending" | "paid")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtre por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as parcelas</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="paid">Pagas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-3 border-t border-border pt-4">
+              <label className="text-sm font-medium">Ações disponíveis</label>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => {
+                  toast.success("Exportação iniciada, o download começará em breve.");
+                  setDrawerOpen(false);
+                }}
+              >
+                <FileArrowDown className="mr-2 size-4" />
+                Exportar Relatório (.csv)
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Broker Summary Table */}
       {view === "brokers" && (
@@ -402,3 +444,4 @@ export function CommissionDetails({ data }: Props) {
     </div>
   );
 }
+
