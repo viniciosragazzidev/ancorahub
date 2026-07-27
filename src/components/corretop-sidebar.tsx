@@ -190,15 +190,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <SidebarMenuButton size="lg" tooltip={userName}>
-                  <UserAvatar seed={userName} name={userName} size="sm" className="size-7 shrink-0" />
-                  <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                    <span className="truncate font-medium">{userName}</span>
-                    <span className="truncate text-xs text-sidebar-foreground/55">{userRole}</span>
-                  </span>
-                  <SignOut className="ml-auto size-4 shrink-0 text-sidebar-foreground/55 group-data-[collapsible=icon]:hidden" />
-                </SidebarMenuButton>
+              <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip={userName} />}>
+                <UserAvatar seed={userName} name={userName} size="sm" className="size-7 shrink-0" />
+                <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                  <span className="truncate font-medium">{userName}</span>
+                  <span className="truncate text-xs text-sidebar-foreground/55">{userRole}</span>
+                </span>
+                <SignOut className="ml-auto size-4 shrink-0 text-sidebar-foreground/55 group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-[var(--sidebar-width)]">
                 <DropdownMenuGroup>
