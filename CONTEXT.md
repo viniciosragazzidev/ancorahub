@@ -20,6 +20,8 @@
 
 ## Canais de comunicação
 
+- **Agente de atendimento**: capacidade governada que conduz uma conversa com um lead pelo canal autorizado, preserva seu estado e pode solicitar ações CRM somente por ferramentas validadas. Na primeira entrega, ele só responde após mensagem inbound no WhatsApp oficial.
+- **Sessão de atendimento automatizado**: estado persistido, único por tenant, lead e canal, que registra os campos coletados, perguntas pendentes e o ponto seguro de retomada de uma conversa do agente.
 - **Canal de comunicação**: identidade operacional de um provedor associada a um tenant e, opcionalmente, a uma unidade. Para WhatsApp oficial, a chave externa é o `phone_number_id` da Meta.
 - **Canal Meta Cloud**: canal empresarial conectado por Embedded Signup; seu token é cifrado no servidor e nunca é devolvido ao navegador.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.

@@ -260,6 +260,13 @@
       "when": 1784913500000,
       "tag": "0084_ai_agent_tenant_config_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1785099600000,
+      "tag": "0085_ai_attendance_persistence",
+      "breakpoints": true
     }
   ]
 }

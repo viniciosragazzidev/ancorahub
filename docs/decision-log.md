@@ -9,7 +9,7 @@ para ADR se aplicável.
 
 ## DEC-051 - Centro de configurações de IA em duas camadas
 
-**Estado:** Aceita  
+**Estado:** Aceita
 **Data:** 2026-07-23
 
 As configurações que alteram a experiência da corretora ficam em uma aba amigável,
@@ -21,7 +21,7 @@ do Super-admin. Editor de fluxo, RAG, A/B e rollback são etapas posteriores.
 
 ## DEC-052 - Proteção contra saturação de conexões do banco
 
-**Estado:** Aceita  
+**Estado:** Aceita
 **Data:** 2026-07-23
 
 O cliente de banco mantém um limite pequeno por processo (padrão de uma conexão em
@@ -31,6 +31,30 @@ maior para permitir os workers de geração. O proxy usa uma cache de cinco segu
 somente para a consulta de identidade da sessão; permissões e dados de negócio
 continuam sempre sendo consultados e validados no servidor. O objetivo é evitar que
 prefetch/navegação de duas máquinas consuma o limite do projeto Supabase.
+
+## DEC-053 - Início seguro do agente de atendimento
+
+**Estado:** Aceita
+**Data:** 2026-07-27
+
+Na primeira entrega do agente de atendimento, respostas automáticas só podem ser
+enviadas após uma mensagem inbound no canal oficial do WhatsApp. Um lead recebido por
+landing page pode ter a sessão preparada e uma próxima ação criada para o corretor,
+mas não recebe mensagem automática até que exista consentimento aplicável e um template
+Meta aprovado. A regra é reversível por tenant e pela capacidade global, e seus bloqueios
+e transições devem ser auditados.
+
+## DEC-054 - Autonomia limitada do agente no CRM
+
+**Estado:** Aceita
+**Data:** 2026-07-27
+
+No MVP, o agente pode executar automaticamente apenas operações de baixo risco,
+idempotentes e previamente autorizadas: preencher campos permitidos, adicionar tags e
+criar ou atualizar tarefas de retorno. Alterar status, responsável ou encaminhar uma
+conversa para uma fila humana exige confirmação explícita de um corretor autorizado.
+Toda intenção, confirmação, execução, recusa e falha é auditada. A permissão depende da
+capacidade global, da configuração do tenant e do registro individual da ferramenta.
 
 > DEC-041 — Documentos são opcionais e podem ser vinculados ao lead, cliente, titular ou dependente. O checklist orienta o atendimento, mas nunca bloqueia distribuição, conversão ou pós-venda. Arquivos usam armazenamento privado, acesso temporário autorizado, auditoria e exclusão lógica.
 

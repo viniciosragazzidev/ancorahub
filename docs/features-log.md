@@ -249,3 +249,15 @@ por categoria e com documentação local.
 * **Validação**: type-check, 118 testes e build de produção concluídos. O lint
   global continua incluindo artefatos gerados em `.vercel/output` e pendências
   anteriores do código; não foram alterados como parte desta reorganização.
+
+## 11. Atendimento inteligente persistente e seguro
+
+* **Persistência**: a migration `0085_ai_attendance_persistence` passa a ser a fonte
+  versionada para conversas, logs técnicos e proveniência de mensagens. O webhook não
+  cria mais tabelas durante o atendimento.
+* **Segurança**: as ações de assumir, devolver, encerrar e reiniciar conversa obtêm
+  tenant e usuário exclusivamente da sessão, validam carteira/filial no servidor e
+  registram auditoria sem conteúdo da conversa.
+* **Qualidade**: 144 testes Vitest, type-check, build de produção e dois fluxos
+  Playwright públicos passaram. O cenário Playwright autenticado para a configuração
+  do Diretor exige credenciais sintéticas de E2E no ambiente de execução.

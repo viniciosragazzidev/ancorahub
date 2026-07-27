@@ -122,7 +122,6 @@ export async function getOrCreateAiConversation({
   clientId?: string | null;
   communicationChannelId?: string | null;
 }) {
-  await ensureAiTablesExist();
   const db = getDatabase();
 
   if (!leadId && !clientId) {

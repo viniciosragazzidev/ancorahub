@@ -156,9 +156,6 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           });
         }
 
-        const { ensureAiTablesExist } = await import("@/features/ai-agent/conversation-state-machine");
-        await ensureAiTablesExist();
-
         await db.insert(schema.whatsappMessages).values({
           id: randomUUID(),
           tenantId: channel.tenantId,

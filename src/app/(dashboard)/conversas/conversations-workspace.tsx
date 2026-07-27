@@ -496,7 +496,7 @@ function ConversationHeader({
   async function handleTakeover() {
     if (!tenantId || !client.aiConversation?.id || !userId) return;
     setIsPending(true);
-    await takeoverConversationAction({ tenantId, conversationId: client.aiConversation.id, userId });
+    await takeoverConversationAction(client.aiConversation.id);
     setIsPending(false);
     router.refresh();
   }
@@ -504,7 +504,7 @@ function ConversationHeader({
   async function handleReturnToAi() {
     if (!tenantId || !client.aiConversation?.id) return;
     setIsPending(true);
-    await returnConversationToAiAction({ tenantId, conversationId: client.aiConversation.id });
+    await returnConversationToAiAction(client.aiConversation.id);
     setIsPending(false);
     router.refresh();
   }
@@ -513,7 +513,7 @@ function ConversationHeader({
     if (!tenantId || !client.aiConversation?.id) return;
     if (!confirm("Tem certeza que deseja resetar a qualificação da inteligência artificial e limpar a memória deste lead? O robô de IA iniciará a conversa do zero.")) return;
     setIsPending(true);
-    await resetAiConversationAction({ tenantId, conversationId: client.aiConversation.id });
+    await resetAiConversationAction(client.aiConversation.id);
     setIsPending(false);
     router.refresh();
   }
