@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
 import { getOpenWaContact, normalizeOpenWaStatus } from "@/lib/integrations/openwa";
 import { processInboundAiResponse } from "@/features/ai-agent/conversation-state-machine";
+import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string } };
 
@@ -52,10 +53,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   ]);
   const samePhone = (value: string) => { const candidate = value.replace(/\D/g, ""); return candidate === phone || candidate.endsWith(phone) || phone.endsWith(candidate) || candidate.slice(-11) === phone.slice(-11); };
   const matchingLeads = leads.filter((item) => samePhone(item.phone));
-  const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
-  const client = clients.find((item) => samePhone(item.phone));
-  if (!lead && !client) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
+  let lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
+  const client = clients.find((item) => samePhone(item.phone));
+  if (!lead && !client && !isOutgoing) {
+    const leadId = randomUUID();
+    await db.insert(schema.leads).values({ id: leadId, tenantId, nome: `Lead WhatsApp (${phone.slice(-4)})`, telefone: phone, origem: "webhook", status: "new", serviceStartedAt: new Date() });
+    lead = { id: leadId, phone, status: "new" };
+    await enqueueLeadDistributionJob({ tenantId, leadId });
+    console.info("[OpenWA] novo lead criado", { tenantId, leadId });
+  }
+  if (!lead && !client) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
   const providerMessageId = event.id ?? event.messageId ?? null;
   await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
   if (!isOutgoing && lead?.id && connection.userId) {
