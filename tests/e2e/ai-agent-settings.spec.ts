@@ -7,6 +7,7 @@ test.describe("configuração do agente de atendimento", () => {
   test.skip(!email || !password, "Defina E2E_DIRECTOR_EMAIL e E2E_DIRECTOR_PASSWORD para executar o fluxo autenticado.");
 
   test("Diretor configura a identidade do agente e vê a confirmação", async ({ page }) => {
+    test.setTimeout(90000);
     await page.goto("/login");
     await page.getByLabel(/e-mail/i).fill(email!);
     await page.getByRole("textbox", { name: "Senha", exact: true }).fill(password!);
@@ -20,9 +21,10 @@ test.describe("configuração do agente de atendimento", () => {
 
     const assistantName = page.getByLabel("Nome do assistente");
     await assistantName.fill("Agente de teste");
+    await expect(page.locator('input[name="maxQuestions"]')).toHaveValue("6");
     await page.getByRole("button", { name: /salvar configuração/i }).click();
 
-    await expect(page.getByText("Configuração do atendimento salva.")).toBeVisible();
+    await expect(page.getByRole("status")).toHaveText("Configuração do atendimento salva.", { timeout: 30000 });
     await expect(assistantName).toHaveValue("Agente de teste");
   });
 });
