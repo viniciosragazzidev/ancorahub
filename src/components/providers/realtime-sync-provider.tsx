@@ -52,6 +52,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
   const [isOnline, setIsOnline] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
+  const shellStartedAtRef = useRef(Date.now());
 
   /** Se o usuário está digitando em um campo de formulário, pula o refresh */
   const isFormElementFocused = useCallback(() => {
@@ -178,6 +179,60 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
       });
     return () => { void supabase.removeChannel(channel); };
   }, [tenantId, userId, role, branchId, router, notifyNewLead, syncClientState]);
+
+  // Reconcile recent assignment notifications as a fallback for browsers that
+  // miss a Supabase Realtime frame while the push still arrives successfully.
+  useEffect(() => {
+    if (role !== "broker") return;
+    let cancelled = false;
+
+    const reconcile = async () => {
+      try {
+        const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as {
+          notifications?: Array<{
+            id?: string;
+            title?: string;
+            message?: string;
+            type?: string;
+            readAt?: string | null;
+            createdAt?: string;
+            leadId?: string | null;
+          }>;
+        };
+        if (cancelled) return;
+
+        const graceWindowStart = shellStartedAtRef.current - 30_000;
+        for (const notification of payload.notifications ?? []) {
+          const createdAt = notification.createdAt ? Date.parse(notification.createdAt) : NaN;
+          if (!notification.id || !notification.leadId || notification.readAt || !Number.isFinite(createdAt) || createdAt < graceWindowStart) continue;
+          if (!isAssignedLeadNotification({
+            tenant_id: tenantId,
+            recipient_user_id: userId,
+            type: notification.type,
+            lead_id: notification.leadId,
+          }, tenantId, userId)) continue;
+          setIncomingLeads((state) => enqueueIncomingLead(state, {
+            notificationId: notification.id!,
+            leadId: notification.leadId!,
+            title: notification.title ?? "Novo lead atribuído",
+            message: notification.message ?? "Você recebeu um novo lead para atender.",
+            createdAt: notification.createdAt!,
+          }));
+        }
+      } catch {
+        // Realtime remains the primary path; polling is best-effort recovery.
+      }
+    };
+
+    void reconcile();
+    const interval = window.setInterval(() => void reconcile(), 4_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [role, tenantId, userId]);
 
   return (
     <>

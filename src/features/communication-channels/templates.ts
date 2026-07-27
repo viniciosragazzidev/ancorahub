@@ -4,7 +4,7 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
   brokerInvitation: { name: "broker_first_access", language: "pt_BR" },
   taskReminder: { name: "corretop_lembrete_tarefa", language: "pt_BR" },
   clientNotice: { name: "corretop_aviso_cliente", language: "pt_BR" },
-  newLeadAssignment: { name: "new_lead_assignment", language: "pt_BR" },
+  newLeadAssignment: { name: "novo_lead_", language: "pt_BR" },
   leadAssignmentConfirmed: { name: "lead_assignment_confirmed", language: "pt_BR" },
   leadAssignmentUnavailable: { name: "lead_assignment_unavailable", language: "pt_BR" },
   leadAssignmentExpired: { name: "lead_assignment_expired", language: "pt_BR" },

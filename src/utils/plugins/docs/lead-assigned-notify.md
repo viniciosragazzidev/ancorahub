@@ -10,7 +10,7 @@ corretor, telefone e escopo são resolvidos no servidor.
 ## Canais
 
 - `push`: cria a notificação no CRM e entrega nas inscrições Web Push do usuário.
-- `whatsapp`: enfileira o template `new_lead_assignment`, processa a fila e usa
+- `whatsapp`: enfileira o template aprovado `novo_lead_`, processa a fila e usa
   o fallback de texto quando o template não está disponível.
 
 ## Controle operacional

@@ -90,7 +90,7 @@ export async function createLeadOffersForBrokers(input: {
     const idempotencyKey = `lead-offer:${input.leadId}:${broker.id}:${now.getTime()}`;
     const brokerName = broker.name || "Corretor(a)";
 
-    // Enqueue offer template: new_lead_assignment
+    // Enqueue approved offer template: novo_lead_
     // Variables: {{nome_corretor}}, {{empresa}}, {{tipo_lead}}, {{unidade}}, {{tempo_resposta}}.
     // The lead id is reserved for the text fallback link.
     const outbound = await enqueueMetaTemplateMessage({
