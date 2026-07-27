@@ -409,7 +409,7 @@ export const aiQualificationConfigs = pgTable(
     useEmojis: boolean("use_emojis").notNull().default(false),
     formOfAddress: text("form_of_address").notNull().default("voce"),
     maxConversationMinutes: integer("max_conversation_minutes").notNull().default(30),
-    maxQuestions: integer("max_questions").notNull().default(4),
+    maxQuestions: integer("max_questions").notNull().default(6),
     objectives: jsonb("objectives").notNull().default(["understand_need", "route_to_broker"]),
     businessContext: text("business_context"),
     businessHoursStart: text("business_hours_start"),

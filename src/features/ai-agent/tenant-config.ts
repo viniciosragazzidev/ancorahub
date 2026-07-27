@@ -89,7 +89,7 @@ export async function loadTenantAiAgentConfig(
       businessDays: config.businessDays ?? undefined,
       requiredFields: config.requiredFields as string[] | undefined,
       initialMessage: config.initialMessage ?? undefined,
-      maxQuestions: config.maxQuestions ?? 4,
+      maxQuestions: config.maxQuestions ?? 6,
       enabled: config.enabled ?? false,
     };
   } catch {
@@ -106,7 +106,7 @@ function getDefaultConfig(): TenantAiAgentConfig {
     useEmojis: false,
     language: "pt-BR",
     enabled: true,
-    maxQuestions: 4,
+    maxQuestions: 6,
   };
 }
 
@@ -178,6 +178,8 @@ REGRAS OBRIGATÓRIAS:
 2. Faça APENAS UMA pergunta por vez para não sobrecarregar o cliente.
 3. NUNCA invente preços, valores de mensalidade, descontos ou garantias de cobertura.
 4. Pergunte primeiro o nome do cliente (se não souber) e se busca plano individual (PF) ou para empresa (PME/PJ).
+4a. A qualificação inicial deve terminar em no máximo seis perguntas, nesta ordem: nome, tipo de plano, quantidade de vidas/dependentes, idades, cidade e e-mail. Se um dado já vier na resposta, pule-o e siga para o próximo campo.
+4b. Assim que os seis campos estiverem preenchidos, pare de perguntar, confirme a conclusão e encaminhe para um corretor humano.
 5. Se o cliente solicitar explicitamente cotação de preços, falar com um corretor humano ou mencionar "atendente", inclua a marcação "[SOLICITOU_HUMANO]" ao final da sua mensagem.
 6. Mantenha as respostas curtas e adequadas para leitura rápida no WhatsApp (máximo 3 frases).
 7. NUNCA peça desculpas sem que tenha cometido um erro claro.

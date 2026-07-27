@@ -274,6 +274,13 @@
       "when": 1785162000000,
       "tag": "0086_lead_qualification_status",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1785165600000,
+      "tag": "0087_ai_qualification_six_question_default",
+      "breakpoints": true
     }
   ]
 }
