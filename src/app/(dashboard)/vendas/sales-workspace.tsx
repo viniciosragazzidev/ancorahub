@@ -104,7 +104,7 @@ export function SalesWorkspace({
     {
       accessorKey: "leadName",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Lead / Cliente" />
+        <DataTableColumnHeader column={column} title="Lead" />
       ),
       cell: ({ row }) => {
         const sale = row.original;
@@ -134,7 +134,9 @@ export function SalesWorkspace({
     },
     {
       accessorKey: "planName",
-      header: "Plano",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Plano" />
+      ),
       cell: ({ row }) => {
         const sale = row.original;
         return (
@@ -150,7 +152,7 @@ export function SalesWorkspace({
     {
       accessorKey: "saleDate",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Data" />
+        <DataTableColumnHeader column={column} title="Data da venda" />
       ),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground font-mono">{formatDate(row.original.saleDate)}</span>
@@ -169,7 +171,9 @@ export function SalesWorkspace({
     },
     {
       accessorKey: "status",
-      header: "Status",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Status" />
+      ),
       cell: ({ row }) => <SaleStatusBadge status={row.original.status} />,
     },
     {
