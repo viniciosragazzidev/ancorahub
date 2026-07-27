@@ -76,6 +76,8 @@ const CITY_PATTERNS = [
 ];
 
 const PLAN_TYPE_PATTERNS = [
+  /\bpessoa\s+f(?:ísica|fisica)\b/i,
+  /\bpessoa\s+j(?:urídica|uridica)\b/i,
   /\b(?:individual|PF|para mim|sou eu|só para mim)\b/i,
   /\b(?:familiar|para família|para minha família)\b/i,
   /\b(?:empresarial|PME|PJ|para empresa|para minha empresa|coletivo)\b/i,
@@ -178,8 +180,12 @@ export function extractFieldsFromMessage(
     for (const pattern of PLAN_TYPE_PATTERNS) {
       if (pattern.test(trimmed)) {
         const value =
-          /individual|PF|para mim|sou eu|só para mim/i.test(trimmed)
+          /pessoa\s+f(?:ísica|fisica)/i.test(trimmed)
             ? "individual"
+            : /pessoa\s+j(?:urídica|uridica)/i.test(trimmed)
+              ? "empresarial"
+              : /individual|PF|para mim|sou eu|só para mim/i.test(trimmed)
+                ? "individual"
             : /familiar|para família|para minha família/i.test(trimmed)
               ? "familiar"
               : "empresarial";

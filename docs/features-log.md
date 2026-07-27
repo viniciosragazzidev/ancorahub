@@ -4,6 +4,15 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 ---
 
+## 27/07/2026 - Continuidade da qualificação do agente
+
+- O extrator passou a reconhecer respostas naturais como `Pessoa física` e
+  `Pessoa jurídica` como tipo de plano.
+- O fallback de guardrail agora entende o formato atual e o legado da memória
+  e avança para o próximo campo, evitando reiniciar com mensagens genéricas.
+- Cobertura regressiva adicionada para o fluxo de resposta curta e recuperação
+  após pergunta repetida.
+
 ## 27/07/2026 - Sistema visual DesignTeste (preview)
 
 - Tokens Vendria Light mapeados para o tema semantico: canvas quente, card branco,
