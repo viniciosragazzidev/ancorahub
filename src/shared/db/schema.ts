@@ -1351,6 +1351,13 @@ export const aiConversations = pgTable(
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
     transferredAt: timestamp("transferred_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    automationState: text("automation_state").notNull().default("AI_ACTIVE"),
+    quickReplyLastTemplate: text("quick_reply_last_template"),
+    quickReplyLastSentAt: timestamp("quick_reply_last_sent_at", { withTimezone: true }),
+    quickReplyWaitWindowStartedAt: timestamp("quick_reply_wait_window_started_at", { withTimezone: true }),
+    quickReplyWaitResponseCount: integer("quick_reply_wait_response_count").notNull().default(0),
+    optOutAt: timestamp("opt_out_at", { withTimezone: true }),
+    wrongNumberAt: timestamp("wrong_number_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },
@@ -1358,6 +1365,47 @@ export const aiConversations = pgTable(
     index("ai_conversations_tenant_status_idx").on(table.tenantId, table.status),
     index("ai_conversations_tenant_lead_idx").on(table.tenantId, table.leadId),
     index("ai_conversations_assigned_user_idx").on(table.assignedUserId),
+  ],
+);
+
+export const aiQuickReplyTemplates = pgTable(
+  "ai_quick_reply_templates",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    ruleKey: text("rule_key").notNull(),
+    templateKey: text("template_key").notNull(),
+    body: text("body").notNull(),
+    active: boolean("active").notNull().default(true),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("ai_quick_reply_templates_tenant_rule_unique").on(table.tenantId, table.ruleKey),
+    index("ai_quick_reply_templates_tenant_active_idx").on(table.tenantId, table.active),
+  ],
+);
+
+export const aiQuickReplyEvents = pgTable(
+  "ai_quick_reply_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id").references(() => aiConversations.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    sourceMessageId: text("source_message_id"),
+    intent: text("intent").notNull(),
+    ruleKey: text("rule_key").notNull(),
+    templateKey: text("template_key"),
+    outcome: text("outcome").notNull(),
+    estimatedTokensSaved: integer("estimated_tokens_saved").notNull().default(0),
+    notifiedUserId: text("notified_user_id").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+  },
+  (table) => [
+    index("ai_quick_reply_events_tenant_created_idx").on(table.tenantId, table.createdAt),
+    index("ai_quick_reply_events_conversation_idx").on(table.conversationId, table.createdAt),
   ],
 );
 

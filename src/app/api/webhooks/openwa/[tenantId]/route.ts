@@ -7,7 +7,7 @@ import { getOpenWaContact, normalizeOpenWaStatus } from "@/lib/integrations/open
 import { processInboundAiResponse } from "@/features/ai-agent/conversation-state-machine";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 
-type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string } };
+type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId } = await params;
@@ -46,7 +46,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   }
   const phone = String(address ?? "").replace(/\D/g, "");
   const body = String(event.body ?? event.text ?? event.content?.body ?? event.content?.text ?? event.message?.body ?? event.message?.text ?? "").trim();
-  if (!phone || !body) { console.info("[OpenWA] mensagem descartada: payload sem telefone ou corpo"); return NextResponse.json({ accepted: true, discarded: true }); }
+  const rawMessageKind = String(event.type ?? event.message?.type ?? "").toLowerCase();
+  const messageKind = (["audio", "image", "document", "video", "sticker"] as const).includes(rawMessageKind as "audio" | "image" | "document" | "video" | "sticker") ? rawMessageKind as "audio" | "image" | "document" | "video" | "sticker" : "text";
+  if (!phone) { console.info("[OpenWA] mensagem descartada: payload sem telefone"); return NextResponse.json({ accepted: true, discarded: true }); }
   const [leads, clients] = await Promise.all([
     db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(eq(schema.leads.tenantId, tenantId)),
     db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, tenantId)),
@@ -65,7 +67,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   }
   if (!lead && !client) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
   const providerMessageId = event.id ?? event.messageId ?? null;
-  await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+  await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body: body || `[${messageKind}]`, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
   if (!isOutgoing && lead?.id && connection.userId) {
     try {
       const aiResult = await processInboundAiResponse({
@@ -73,6 +75,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         leadId: lead.id,
         phone,
         userMessageBody: body,
+        messageKind,
         providerMessageId,
         transport: "openwa",
         openWaSessionId: effectiveSessionId,

@@ -384,6 +384,18 @@ export async function updateAiWhatsAppQualificationSettingsAction(formData: Form
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateQuickReplySettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("quickReplyEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_ai_quick_reply_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_ai_quick_reply_settings",
+    targetType: "system_settings", targetId: "ai_quick_reply", metadata: { enabled }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateLeadManagementActionsSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const db = getDatabase();

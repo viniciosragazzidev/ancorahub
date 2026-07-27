@@ -1,6 +1,6 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_lead_management_actions_enabled",
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
+    "feature_ai_quick_reply_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -55,6 +56,7 @@ export default async function SuperAdminSettingsPage() {
 
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
+  const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -385,6 +387,10 @@ export default async function SuperAdminSettingsPage() {
         <Card className="border-border bg-card shadow-none">
           <CardHeader><CardTitle>Qualificação automática no WhatsApp</CardTitle><CardDescription>Usa o mesmo motor de IA e o canal oficial da Meta para fazer perguntas iniciais. Desativar interrompe novas sessões sem apagar histórico.</CardDescription></CardHeader>
           <CardContent><form action={updateAiWhatsAppQualificationSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="aiWhatsAppQualificationEnabled" value="true" defaultChecked={aiWhatsAppQualificationEnabled} className="size-4" /><span><span className="font-medium">Iniciar qualificação para novos leads</span><span className="block text-xs text-muted-foreground">Requer Motor de IA e canal Meta Cloud ativos. O atendimento humano pode assumir a qualquer momento.</span></span></label><Button type="submit" variant="outline">Salvar qualificação</Button></form></CardContent>
+        </Card>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Quick Reply determinístico</CardTitle><CardDescription>Resolve saudações, mídia, opt-out e solicitações humanas antes de chamar a IA. O estado e o cooldown são persistidos.</CardDescription></CardHeader>
+          <CardContent><form action={updateQuickReplySettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="quickReplyEnabled" value="true" defaultChecked={aiQuickReplyEnabled} className="size-4" /><span><span className="font-medium">Quick Reply habilitado</span><span className="block text-xs text-muted-foreground">Desative sem apagar eventos, métricas ou templates por tenant.</span></span></label><Button type="submit" variant="outline">Salvar Quick Reply</Button></form></CardContent>
         </Card>
       </main>
     </>

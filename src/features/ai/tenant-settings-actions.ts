@@ -45,6 +45,7 @@ export async function getTenantAiSettings() {
 
 export async function updateTenantAiSettingsAction(_prev: { success: boolean; error?: string }, formData: FormData) {
   try {
+    console.info("[ai-settings] update.start");
     const context = await getRequiredTenantContext();
     if (!allowed(context)) return { success: false, error: "Apenas o Diretor pode alterar o atendimento inteligente." };
     const parsed = settingsSchema.safeParse({
@@ -70,8 +71,10 @@ export async function updateTenantAiSettingsAction(_prev: { success: boolean; er
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "ai_qualification_config", entidadeId: context.tenantId, acao: "ai_settings.updated" });
     });
     revalidatePath("/settings");
+    console.info("[ai-settings] update.success", { tenantId: context.tenantId });
     return { success: true };
   } catch (error) {
+    console.error("[ai-settings] update.failed", error instanceof Error ? error.message : "unknown_error");
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a configuração." };
   }
 }

@@ -101,6 +101,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         if (!eventId) continue;
 
         // Extract button response text/payload or standard text body
+        const messageKind = (["audio", "image", "document", "video", "sticker"] as const).includes(message.type as "audio" | "image" | "document" | "video" | "sticker") ? message.type as "audio" | "image" | "document" | "video" | "sticker" : "text";
         let text = message.type === "text" ? message.text?.body?.trim() ?? "" : "";
         let buttonText: string | undefined;
         let buttonPayload: string | undefined;
@@ -132,7 +133,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }
         }
 
-        if (!text) { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
+        if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         const phone = normalizePhone(message.from);
         const [leads, clients] = await Promise.all([
           db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(eq(schema.leads.tenantId, channel.tenantId)),
@@ -167,11 +168,11 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           messageId: message.id,
           phone,
           direction: "incoming",
-          body: text,
+          body: text || `[${messageKind}]`,
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
 
-        if (activeLeadId && text) {
+        if (activeLeadId) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
           try {
             const aiResult = await processInboundAiResponse({
@@ -179,6 +180,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
               leadId: activeLeadId,
               phone: message.from,
               userMessageBody: text,
+              messageKind,
               communicationChannelId: channel.id,
               providerMessageId: message.id,
             });

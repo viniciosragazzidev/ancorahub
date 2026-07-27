@@ -121,6 +121,13 @@ export async function resetAiConversationAction(conversationId: string): Promise
         pausedByUserId: null,
         transferredAt: null,
         closedAt: null,
+        automationState: "AI_ACTIVE",
+        quickReplyLastTemplate: null,
+        quickReplyLastSentAt: null,
+        quickReplyWaitWindowStartedAt: null,
+        quickReplyWaitResponseCount: 0,
+        optOutAt: null,
+        wrongNumberAt: null,
         updatedAt: new Date(),
       }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, context.tenantId)));
     });

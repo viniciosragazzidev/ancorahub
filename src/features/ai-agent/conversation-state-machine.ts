@@ -17,6 +17,9 @@ import {
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
+import { publishNotification } from "@/features/notifications/send-push-helper";
+import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 export type ConversationStatus =
   | "NEW"
@@ -24,6 +27,7 @@ export type ConversationStatus =
   | "WAITING_CUSTOMER"
   | "WAITING_HUMAN"
   | "HUMAN_ACTIVE"
+  | "PAUSED"
   | "CLOSED"
   | "FAILED";
 
@@ -81,6 +85,13 @@ async function _runEnsure() {
       last_activity_at timestamp WITH TIME ZONE DEFAULT now(),
       transferred_at timestamp WITH TIME ZONE,
       closed_at timestamp WITH TIME ZONE,
+      automation_state text NOT NULL DEFAULT 'AI_ACTIVE',
+      quick_reply_last_template text,
+      quick_reply_last_sent_at timestamp WITH TIME ZONE,
+      quick_reply_wait_window_started_at timestamp WITH TIME ZONE,
+      quick_reply_wait_response_count integer NOT NULL DEFAULT 0,
+      opt_out_at timestamp WITH TIME ZONE,
+      wrong_number_at timestamp WITH TIME ZONE,
       created_at timestamp WITH TIME ZONE DEFAULT now(),
       updated_at timestamp WITH TIME ZONE DEFAULT now()
     )`,
@@ -118,6 +129,17 @@ async function _runEnsure() {
     sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS last_processed_message_id text`,
     sql`ALTER TABLE ai_attendance_logs ADD COLUMN IF NOT EXISTS source_message_id text`,
     sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS memory jsonb`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS automation_state text NOT NULL DEFAULT 'AI_ACTIVE'`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS quick_reply_last_template text`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS quick_reply_last_sent_at timestamp WITH TIME ZONE`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS quick_reply_wait_window_started_at timestamp WITH TIME ZONE`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS quick_reply_wait_response_count integer NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS opt_out_at timestamp WITH TIME ZONE`,
+    sql`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS wrong_number_at timestamp WITH TIME ZONE`,
+    sql`CREATE TABLE IF NOT EXISTS ai_quick_reply_templates (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, rule_key text NOT NULL, template_key text NOT NULL, body text NOT NULL, active boolean NOT NULL DEFAULT true, updated_by text, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS ai_quick_reply_templates_tenant_rule_unique ON ai_quick_reply_templates (tenant_id, rule_key)`,
+    sql`CREATE TABLE IF NOT EXISTS ai_quick_reply_events (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, conversation_id text, lead_id text, source_message_id text, intent text NOT NULL, rule_key text NOT NULL, template_key text, outcome text NOT NULL, estimated_tokens_saved integer NOT NULL DEFAULT 0, notified_user_id text, created_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE INDEX IF NOT EXISTS ai_quick_reply_events_tenant_created_idx ON ai_quick_reply_events (tenant_id, created_at)`,
     sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS qualification_status text NOT NULL DEFAULT 'pending'`,
     sql`ALTER TYPE availability_status ADD VALUE IF NOT EXISTS 'offline'`,
   ];
@@ -218,6 +240,7 @@ export async function transitionConversationState({
 
   const updates: Record<string, unknown> = {
     status: newStatus,
+    automationState: newStatus === "HUMAN_ACTIVE" ? "HUMAN_IN_PROGRESS" : newStatus === "WAITING_HUMAN" ? "WAITING_HUMAN" : newStatus === "CLOSED" ? "CLOSED" : newStatus === "PAUSED" ? "PAUSED" : "AI_ACTIVE",
     lastActivityAt: now,
     updatedAt: now,
     lockVersion: sql`${schema.aiConversations.lockVersion} + 1`,
@@ -249,6 +272,7 @@ export async function processInboundAiResponse({
   leadId,
   phone,
   userMessageBody,
+  messageKind = "text",
   communicationChannelId,
   providerMessageId,
   whatsappMessageId,
@@ -259,6 +283,7 @@ export async function processInboundAiResponse({
   leadId: string;
   phone: string;
   userMessageBody: string;
+  messageKind?: QuickReplyMessageKind;
   communicationChannelId?: string | null;
   providerMessageId?: string | null;
   whatsappMessageId?: string | null;
@@ -288,10 +313,17 @@ export async function processInboundAiResponse({
       .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.messageId, sourceIdentifier)));
   }
 
+  // 2. Quick Reply idempotency and closed-state gate run before AI.
+  if (conversation.status === "PAUSED") return { status: "ignored_PAUSED" };
+  if (sourceIdentifier) {
+    const [quickReplyEvent] = await db.select({ id: schema.aiQuickReplyEvents.id }).from(schema.aiQuickReplyEvents).where(and(eq(schema.aiQuickReplyEvents.tenantId, tenantId), eq(schema.aiQuickReplyEvents.sourceMessageId, sourceIdentifier), eq(schema.aiQuickReplyEvents.conversationId, conversation.id))).limit(1);
+    if (quickReplyEvent || conversation.lastProcessedMessageId === sourceIdentifier) return { status: "ignored_duplicate" };
+  }
+
   // 2. Verificar se a IA pode responder
   if (conversation.status === "HUMAN_ACTIVE") {
     console.log(`[ai-agent] Conversa ${conversation.id} está em HUMAN_ACTIVE. Atendimento assumido por humano. IA em silêncio.`);
-    return { status: "ignored_human_active" };
+    // Quick Reply below may send a deterministic acknowledgement, but never invokes AI.
   }
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
@@ -323,7 +355,7 @@ export async function processInboundAiResponse({
   const [claimed] = await db
     .update(schema.aiConversations)
     .set({
-      status: "AI_ACTIVE",
+      status: conversation.status === "HUMAN_ACTIVE" ? "HUMAN_ACTIVE" : "AI_ACTIVE",
       lockVersion: sql`${schema.aiConversations.lockVersion} + 1`,
       lastActivityAt: new Date(),
       updatedAt: new Date(),
@@ -368,6 +400,58 @@ export async function processInboundAiResponse({
   }));
   const historyAlreadyContainsCurrentMessage = Boolean(sourceIdentifier) && pastMessages.some((message) => message.messageId === sourceIdentifier);
 
+  // 5. Quick Reply gate: deterministic, tenant-template based, and before AI.
+  const currentMemory: ConversationMemory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
+  const hasPriorMessages = pastMessages.some((message) => !sourceIdentifier || message.messageId !== sourceIdentifier);
+  const automationState: ConversationAutomationState = conversation.status === "HUMAN_ACTIVE" ? "HUMAN_IN_PROGRESS" : conversation.status === "WAITING_HUMAN" ? "WAITING_HUMAN" : "AI_ACTIVE";
+  const quickReplyEnabled = (await getSystemSetting("feature_ai_quick_reply_enabled")) !== "false";
+  const quickReply = quickReplyEnabled ? resolveQuickReply({
+    body: userMessageBody,
+    messageKind,
+    conversationState: automationState,
+    isNewConversation: conversation.status === "NEW" && !hasPriorMessages,
+    hasPriorMessages,
+    hasPendingQuestion: Boolean(currentMemory.lastQuestionAsked),
+    cooldown: { lastTemplateKey: conversation.quickReplyLastTemplate, lastSentAt: conversation.quickReplyLastSentAt, waitWindowStartedAt: conversation.quickReplyWaitWindowStartedAt, waitResponseCount: conversation.quickReplyWaitResponseCount },
+  }) : { resolved: false as const, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
+  if (quickReply.resolved) {
+    const templates = await loadQuickReplyTemplates(tenantId);
+    const template = quickReply.templateKey ? templates[quickReply.templateKey] : undefined;
+    const now = new Date();
+    const suppressed = Boolean(quickReply.suppressReason);
+    let deliveryStatus = suppressed ? "suppressed_cooldown" : "disabled_template";
+    let messageId: string | null = null;
+    if (!suppressed && template?.active) {
+      messageId = `quick_reply_${crypto.randomUUID()}`;
+      await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: template.body, sentAt: now });
+      try {
+        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId });
+        deliveryStatus = sent.status;
+        if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
+      } catch (error) {
+        deliveryStatus = "failed";
+        await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
+        console.error("[quick-reply] outbound.failed", { tenantId, leadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+      }
+    }
+    const [leadOwner] = await db.select({ corretorId: schema.leads.corretorId }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
+    let notifiedUserId: string | null = null;
+    if (quickReply.notifyHuman && leadOwner?.corretorId) {
+      notifiedUserId = leadOwner.corretorId;
+      await publishNotification({ capability: "quick_reply_human", tenantId, recipientUserId: leadOwner.corretorId, leadId, type: "quick_reply_human", title: "Nova mensagem no atendimento", message: suppressed ? "O lead enviou nova mensagem; a resposta foi suprimida pelo cooldown." : "O lead enviou uma mensagem e o atendimento foi sinalizado.", pushTitle: "Mensagem de lead", pushBody: "Verifique o atendimento no CorreTop.", url: `/leads/${leadId}`, tag: `quick-reply-${leadId}` });
+    }
+    const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < 30 * 60 * 1000;
+    const isWaitRule = quickReply.ruleKey === "waiting_human" || quickReply.ruleKey === "waiting_response";
+    const waitCount = isWaitRule && !suppressed ? (waitWindowActive ? conversation.quickReplyWaitResponseCount + 1 : 1) : conversation.quickReplyWaitResponseCount;
+    const nextState = quickReply.nextState ?? automationState;
+    await db.update(schema.aiConversations).set({ automationState: nextState, status: nextState === "PAUSED" ? "PAUSED" : nextState === "WAITING_HUMAN" ? "WAITING_HUMAN" : conversation.status === "HUMAN_ACTIVE" ? "HUMAN_ACTIVE" : "WAITING_CUSTOMER", quickReplyLastTemplate: suppressed ? conversation.quickReplyLastTemplate : quickReply.templateKey, quickReplyLastSentAt: suppressed ? conversation.quickReplyLastSentAt : now, quickReplyWaitWindowStartedAt: quickReply.ruleKey === "waiting_human" && !waitWindowActive ? now : conversation.quickReplyWaitWindowStartedAt, quickReplyWaitResponseCount: waitCount, optOutAt: quickReply.intent === "OPT_OUT" ? now : undefined, wrongNumberAt: quickReply.intent === "WRONG_NUMBER" ? now : undefined, lastProcessedMessageId: sourceIdentifier ?? conversation.lastProcessedMessageId, lastActivityAt: now, updatedAt: now }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)));
+    await db.insert(schema.aiQuickReplyEvents).values({ id: crypto.randomUUID(), tenantId, conversationId: conversation.id, leadId, sourceMessageId: sourceIdentifier ?? null, intent: quickReply.intent ?? "EMPTY_OR_UNCLEAR", ruleKey: quickReply.ruleKey ?? "unknown", templateKey: quickReply.templateKey, outcome: deliveryStatus, estimatedTokensSaved: 450, notifiedUserId });
+    console.info("[quick-reply] resolved", { tenantId, leadId, conversationId: conversation.id, intent: quickReply.intent, rule: quickReply.ruleKey, template: quickReply.templateKey, outcome: deliveryStatus, notified: Boolean(notifiedUserId) });
+    return { status: suppressed ? "quick_reply_suppressed" : "quick_reply_replied", deliveryStatus, reply: suppressed ? undefined : template?.body };
+  }
+  if (conversation.status === "WAITING_HUMAN") return { status: "ignored_waiting_human" };
+  if (conversation.status === "HUMAN_ACTIVE") return { status: "ignored_human_active" };
+
   // Buscar dados do lead para contextualizar a IA
   const [lead] = await db
     .select({ nome: schema.leads.nome, tipo: schema.leads.tipo })
@@ -376,8 +460,6 @@ export async function processInboundAiResponse({
     .limit(1);
 
   // 6. Extrair campos estruturados da mensagem e atualizar memória
-  const currentMemory: ConversationMemory =
-    (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
   const updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
   const memoryContext = buildMemoryContext(updatedMemory);
 

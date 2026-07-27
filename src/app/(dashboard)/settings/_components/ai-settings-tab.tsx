@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { updateTenantAiSettingsAction, type AiTenantSettings } from "@/features/ai/tenant-settings-actions";
 
 export function AiSettingsTab({ settings, canEdit }: { settings: Partial<AiTenantSettings> | null; canEdit: boolean }) {
+  const [saved, setSaved] = useState(false);
   const [state, formAction, pending] = useActionState(async (prev: { success: boolean; error?: string }, data: FormData) => {
     const result = await updateTenantAiSettingsAction(prev, data);
+    setSaved(result.success);
     if (result.success) toast.success("Configuração do atendimento salva."); else toast.error(result.error ?? "Não foi possível salvar.");
     return result;
   }, { success: false });
@@ -30,5 +32,5 @@ export function AiSettingsTab({ settings, canEdit }: { settings: Partial<AiTenan
     <div><p className="mb-2 text-sm font-medium">Campos obrigatórios para qualificação</p>{(() => {const rf = new Set((settings?.requiredFields as string[] | undefined) ?? []); return <div className="grid gap-2 sm:grid-cols-2">{[['customerName','Nome completo'],['city','Cidade'],['planType','Tipo de plano'],['numberOfLives','Número de vidas'],['age','Idade'],['email','E-mail']].map(([key,label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" name="requiredFields" value={key} defaultChecked={rf.has(key)} disabled={!canEdit} /> {label}</label>)}</div>;})()}</div>
     <div><p className="mb-2 text-sm font-medium">Objetivos do atendimento</p><div className="grid gap-2 sm:grid-cols-2">{[['understand_need','Entender a necessidade'],['qualify_budget','Conhecer faixa de investimento'],['route_to_broker','Encaminhar para um corretor'],['schedule_follow_up','Agendar retorno']].map(([key,label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" name="objectives" value={key} defaultChecked={objectives.has(key)} disabled={!canEdit} /> {label}</label>)}</div></div>
     <div className="flex items-center justify-between border-t pt-4"><p className="text-xs text-muted-foreground">Versão {settings?.version ?? 1}. O Super-admin pode desativar esta capacidade globalmente.</p>{canEdit && <Button type="submit" disabled={pending}>{pending ? "Salvando…" : "Salvar configuração"}</Button>}</div>{state.error && <p className="text-sm text-destructive">{state.error}</p>}
-  </form>{state.success && <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">Configuração do atendimento salva.</p>}</CardContent></Card>;
+  </form>{(saved || state.success) && <p role="status" className="text-sm text-emerald-600 dark:text-emerald-400">Configuração do atendimento salva.</p>}</CardContent></Card>;
 }
