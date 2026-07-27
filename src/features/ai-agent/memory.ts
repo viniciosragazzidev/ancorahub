@@ -192,7 +192,13 @@ export function extractFieldsFromMessage(
 
   // Number of lives
   if (!memory.numberOfLives) {
+    const bareNumber = trimmed.match(/^([1-9]\d?)$/);
+    if (bareNumber && /quantas vidas|quantas pessoas|quantidade de pessoas|n[úu]mero de vidas/i.test(memory.lastQuestionAsked ?? "")) {
+      memory.numberOfLives = { value: bareNumber[1], confidence: 1, sourceMessageId };
+      addCollectedField(memory, "numberOfLives");
+    }
     for (const pattern of NUMBER_OF_LIVES_PATTERNS) {
+      if (memory.numberOfLives) break;
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const num = parseInt(match[1], 10);

@@ -352,8 +352,84 @@ export async function deleteTeamMemberAction(
 
     if (member) {
       requireCanManageMember(context, { role: member.role, branchId: member.branchId, userId: member.userId });
+
+      // ── Buscar leads atribuídos ao corretor antes de excluí-lo ──────────
+      const assignedLeads = await db
+        .select({ id: schema.leads.id, branchId: schema.leads.branchId })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.tenantId, context.tenantId),
+            eq(schema.leads.corretorId, member.userId),
+          ),
+        );
+
       const [profile] = await db.select({ id: schema.brokerProfiles.id }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, member.userId))).limit(1);
+
       await db.transaction(async (tx) => {
+        // ── Desatribuir leads e registrar histórico ────────────────────────
+        if (assignedLeads.length > 0) {
+          const now = new Date();
+          await tx
+            .update(schema.leads)
+            .set({
+              corretorId: null,
+              distributionStatus: "returned_to_queue",
+              assignedAt: null,
+              distributionUpdatedAt: now,
+            })
+            .where(
+              and(
+                eq(schema.leads.tenantId, context.tenantId),
+                eq(schema.leads.corretorId, member.userId),
+              ),
+            );
+
+          for (const lead of assignedLeads) {
+            await tx.insert(schema.leadInteractions).values({
+              id: randomUUID(),
+              leadId: lead.id,
+              userId: context.userId,
+              tipo: "system_alert",
+              conteudo: "Um corretor foi excluído e este lead foi devolvido à fila da unidade para reatribuição manual.",
+            });
+
+            await tx.insert(schema.leadDistributionEvents).values({
+              id: randomUUID(),
+              tenantId: context.tenantId,
+              leadId: lead.id,
+              fromBranchId: lead.branchId,
+              toBranchId: lead.branchId,
+              previousOwnerId: member.userId,
+              newOwnerId: null,
+              action: "returned_to_queue",
+              source: "redistribution",
+              strategy: "manual",
+              reason: "Corretor excluído",
+              actorId: context.userId,
+              createdAt: now,
+            });
+
+            await tx.insert(schema.auditLogs).values({
+              id: randomUUID(),
+              userId: context.userId,
+              entidade: "lead",
+              entidadeId: lead.id,
+              acao: "lead.returned_to_queue",
+            });
+          }
+        }
+
+        // ── Registrar auditoria da exclusão do membro ──────────────────────
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "tenant_membership",
+          entidadeId: member.membershipId,
+          acao: "excluiu_membro",
+        });
+
+        // ── Excluir o membro (mesma lógica anterior) ───────────────────────
         if (profile) await tx.delete(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id)));
         if (profile) await tx.delete(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, context.tenantId)));
         await tx.delete(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, member.membershipId), eq(schema.tenantMemberships.tenantId, context.tenantId)));
@@ -370,6 +446,7 @@ export async function deleteTeamMemberAction(
     }
 
     revalidatePath("/equipe");
+    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao excluir o membro.";

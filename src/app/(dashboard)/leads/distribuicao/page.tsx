@@ -84,7 +84,7 @@ export default async function LeadDistributionPage() {
     db
       .select({ id: schema.leads.id, name: schema.leads.nome, phone: schema.leads.telefone, branchId: schema.leads.branchId, distributionStatus: schema.leads.distributionStatus, createdAt: schema.leads.createdAt })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.distributionStatus, ["unassigned", "queued"]), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
       .orderBy(schema.leads.createdAt)
       .limit(100),
     db

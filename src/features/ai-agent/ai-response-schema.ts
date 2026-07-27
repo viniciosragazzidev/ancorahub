@@ -127,15 +127,32 @@ export function validateAiResponse(
  */
 export function createSafeFallbackResponse(
   customerName?: string | null,
+  memoryContext?: string,
 ): AiStructuredResponse {
+  const pendingLine = memoryContext?.split("DADOS AINDA NECESSÁRIOS:")[1]?.split("\n").find((line) => line.trim().startsWith("-"));
+  const pendingField = pendingLine?.replace(/^\s*-\s*/, "").trim().toLowerCase();
+  const name = customerName?.split(" ")[0];
+  const prefix = name ? `Perfeito, ${name}. ` : "Perfeito. ";
+  const followUps: Record<string, { message: string; field: string }> = {
+    "nome completo": { message: "Como você prefere ser chamado(a)?", field: "customerName" },
+    cidade: { message: "Em qual cidade você mora?", field: "city" },
+    "tipo de plano": { message: "O plano seria individual, familiar ou empresarial?", field: "planType" },
+    "n° de vidas": { message: "Quantas pessoas serão incluídas no plano?", field: "numberOfLives" },
+    idade: { message: "Qual é a idade da pessoa que será incluída?", field: "age" },
+    "e-mail": { message: "Qual e-mail podemos usar para continuar o atendimento?", field: "email" },
+  };
+  const followUp = pendingField ? followUps[pendingField] : undefined;
   return {
-    message: customerName
+    message: followUp
+      ? `${prefix}${followUp.message}`
+      : customerName
       ? `${customerName}, recebi sua mensagem. Pode me contar um pouco mais sobre o que você está procurando?`
       : "Recebi sua mensagem! Pode me contar um pouco mais sobre o que você está procurando?",
     language: "pt-BR",
     detectedIntent: "collecting_info",
     shouldTransfer: false,
     shouldWait: true,
+    questionAsked: followUp ? { field: followUp.field, text: followUp.message } : undefined,
     confidence: 0.5,
   };
 }

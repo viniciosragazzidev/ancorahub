@@ -6,6 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { createClient } from "@/utils/supabase/client";
+import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
+import {
+  createIncomingLeadQueueState,
+  enqueueIncomingLead,
+  isAssignedLeadNotification,
+  resolveIncomingLead,
+  type IncomingLead,
+} from "@/components/notifications/incoming-lead-queue";
 
 interface RealtimeSyncProviderProps {
   children: React.ReactNode;
@@ -32,6 +40,7 @@ interface NotificationRow {
   type: string;
   title: string;
   message: string;
+  created_at?: string;
 }
 
 export function RealtimeSyncProvider({ children, tenantId, userId, role, branchId }: RealtimeSyncProviderProps) {
@@ -42,6 +51,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
   const broadcastRef = useRef<BroadcastChannel | null>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
 
   /** Se o usuário está digitando em um campo de formulário, pula o refresh */
   const isFormElementFocused = useCallback(() => {
@@ -84,6 +94,9 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
     const hasNoBranch = !lead.branch_id;
     const canNotify = isAssignedToMe || isUnassigned || hasNoBranch || role === "director" || (role === "manager" && isInMyBranch);
     if (!canNotify) return;
+    // The assignment notification is the authoritative visual for brokers.
+    // Skip this raw lead-row toast to avoid two alerts for the same lead.
+    if (role === "broker" && isAssignedToMe) return;
     playSoundRef.current?.("success");
     const description = isAssignedToMe
       ? `O lead "${lead.nome}" foi distribuído para você.`
@@ -98,6 +111,16 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
       duration: 10_000,
     });
   }, [userId, branchId, role, router]);
+
+  const resolveIncoming = useCallback((item: IncomingLead, reason: "open" | "dismiss") => {
+    setIncomingLeads((state) => resolveIncomingLead(state, item.notificationId));
+    void fetch("/api/internal/mark-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: item.notificationId }),
+    }).catch(() => undefined);
+    void reason;
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -119,6 +142,19 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${userId}` }, (payload) => {
         const notification = payload.new as NotificationRow | null;
         if (!notification || notification.tenant_id !== tenantId) return;
+        if (role === "broker" && isAssignedLeadNotification(notification, tenantId, userId)) {
+          const item: IncomingLead = {
+            notificationId: notification.id,
+            leadId: notification.lead_id,
+            title: notification.title,
+            message: notification.message,
+            createdAt: notification.created_at ?? new Date().toISOString(),
+          };
+          setIncomingLeads((state) => enqueueIncomingLead(state, item));
+          playSoundRef.current?.("success");
+          syncClientState("notification.lead_assigned");
+          return;
+        }
         playSoundRef.current?.("success");
         toast.success(notification.title, { description: notification.message, action: notification.lead_id ? { label: "Abrir", onClick: () => router.push(`/leads/${notification.lead_id}`) } : undefined });
         syncClientState("notification.insert");
@@ -145,6 +181,13 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
 
   return (
     <>
+      {role === "broker" ? (
+        <IncomingLeadCard
+          item={incomingLeads.queue[0] ?? null}
+          queuedCount={Math.max(0, incomingLeads.queue.length - 1)}
+          onResolve={resolveIncoming}
+        />
+      ) : null}
       {!isOnline ? <div role="status" className="fixed inset-x-0 bottom-3 z-[70] mx-auto w-fit rounded-full border border-warning/30 bg-card px-3 py-1.5 text-xs text-warning shadow-lg">Conexão perdida · as alterações serão sincronizadas assim que voltar</div> : null}
       <div data-local-first-sync={lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined}>{children}</div>
     </>

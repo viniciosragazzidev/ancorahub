@@ -214,7 +214,7 @@ export async function generateAiResponse({
     // Fallback gracioso caso a chave OpenRouter não esteja configurada
     const lastUserMsg = messages[messages.length - 1]?.content.toLowerCase() || "";
     const isQuotationOrHuman = lastUserMsg.includes("cotação") || lastUserMsg.includes("humano") || lastUserMsg.includes("atendente");
-    const fallback = createSafeFallbackResponse(leadName);
+    const fallback = createSafeFallbackResponse(leadName, memoryContext);
 
     return {
       success: true,
@@ -348,10 +348,10 @@ export async function generateAiResponse({
             message: e.message,
           })),
         });
-        structured = createSafeFallbackResponse(leadName);
+        structured = createSafeFallbackResponse(leadName, memoryContext);
       }
     } else {
-      structured = createSafeFallbackResponse(leadName);
+      structured = createSafeFallbackResponse(leadName, memoryContext);
     }
 
     const finalContent = structured.message;

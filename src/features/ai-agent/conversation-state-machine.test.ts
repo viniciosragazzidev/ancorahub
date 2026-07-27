@@ -24,4 +24,20 @@ describe("ai-agent service & state machine", () => {
     expect(result.shouldTransferToHuman).toBe(false);
     expect(result.content).toContain("Carlos");
   });
+
+  it("continues the qualification after a short answer instead of restarting the greeting fallback", async () => {
+    const result = await generateAiResponse({
+      tenantId: "tenant-test",
+      leadName: "Vinícius",
+      memoryContext: "DADOS JÁ COLETADOS:\n- Cidade: Nova Iguaçu\n- Tipo de plano: individual\n- N° de vidas: 3\nDADOS AINDA NECESSÁRIOS:\n- Idade",
+      messages: [
+        { role: "assistant", content: "Certo, Vinícius. Quantas vidas seriam para este plano?" },
+        { role: "user", content: "3" },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.content).toMatch(/idade/i);
+    expect(result.content).not.toMatch(/recebi sua mensagem|o que você está procurando/i);
+  });
 });

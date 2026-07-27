@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BrokerQueueClient } from "./_components/queue-client";
+import { BrokerAvailabilityButton } from "./_components/broker-availability";
 import { ChatCircleText, ClipboardText, ListChecks, Target } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -25,6 +26,19 @@ export const dynamic = "force-dynamic";
 export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+
+  // ─── Availability Status ───
+  const [membership] = await db
+    .select({ availabilityStatus: schema.tenantMemberships.availabilityStatus })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, context.userId),
+      ),
+    )
+    .limit(1);
+  const availabilityStatus = membership?.availabilityStatus ?? "available";
 
   // ─── Leads ───
   const leads = await db
@@ -222,6 +236,7 @@ export default async function MinhaFilaPage() {
         title="Minha fila"
         rightSlot={
           <div className="flex items-center gap-2">
+            <BrokerAvailabilityButton initialStatus={availabilityStatus} />
             {overdueTasksCount > 0 && (
               <Badge variant="destructive" className="gap-1.5 rounded-md text-xs">
                 {overdueTasksCount} tarefa{overdueTasksCount > 1 ? "s" : ""} vencida{overdueTasksCount > 1 ? "s" : ""}

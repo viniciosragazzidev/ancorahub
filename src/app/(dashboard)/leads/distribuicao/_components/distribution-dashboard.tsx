@@ -108,7 +108,7 @@ function BrokerAvailabilityToggle({ broker }: { broker: BrokerItem }) {
 
 function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"all" | "available" | "paused">("all");
+  const [status, setStatus] = useState<"all" | "available" | "paused" | "offline">("all");
   const [branch, setBranch] = useState("all");
   const [page, setPage] = useState(1);
   const pageSize = 25;
@@ -146,6 +146,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
             <option value="all">Todos os status</option>
             <option value="available">Recebendo leads</option>
             <option value="paused">Pausados</option>
+            <option value="offline">Offline</option>
           </select>
         </div>
       </CardHeader>
@@ -175,7 +176,19 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
                       <p className="truncate font-mono text-[10px] text-muted-foreground/70" title={broker.id}>ID {broker.id.slice(0, 12)}…</p>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{broker.branchName ?? "Sem filial"}</TableCell>
-                    <TableCell><Badge variant={broker.availabilityStatus === "available" ? "outline" : "secondary"} className={broker.availabilityStatus === "available" ? "border-emerald-500/35 text-emerald-600 dark:text-emerald-400" : ""}>{broker.availabilityStatus === "available" ? "Recebendo" : "Pausado"}</Badge></TableCell>
+                    <TableCell><Badge variant={broker.availabilityStatus === "available" ? "outline" : "secondary"} className={
+                      broker.availabilityStatus === "available"
+                        ? "border-emerald-500/35 text-emerald-600 dark:text-emerald-400"
+                        : broker.availabilityStatus === "offline"
+                          ? "border-rose-500/35 text-rose-600 dark:text-rose-400"
+                          : ""
+                    }>
+                      {broker.availabilityStatus === "available"
+                        ? "Recebendo"
+                        : broker.availabilityStatus === "offline"
+                          ? "Offline"
+                          : "Pausado"}
+                    </Badge></TableCell>
                     <TableCell className="text-right font-mono text-sm tabular-nums">{broker.activeLeads}</TableCell>
                     <TableCell className="pr-4 text-right"><BrokerAvailabilityToggle broker={broker} /></TableCell>
                   </TableRow>

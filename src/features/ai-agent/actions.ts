@@ -108,18 +108,22 @@ export async function closeConversationAction(conversationId: string): Promise<C
 export async function resetAiConversationAction(conversationId: string): Promise<ConversationActionResult> {
   try {
     const { context, db, conversation } = await authorizeConversation(parseConversationId(conversationId));
-    await db.update(schema.aiConversations).set({
-      status: "NEW",
-      memory: null,
-      lastProcessedMessageId: null,
-      transferReason: null,
-      qualificationSummary: null,
-      assignedUserId: null,
-      pausedByUserId: null,
-      transferredAt: null,
-      closedAt: null,
-      updatedAt: new Date(),
-    }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, context.tenantId)));
+    await db.transaction(async (tx) => {
+      await tx.update(schema.whatsappMessages).set({ conversationId: null })
+        .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.conversationId, conversation.id)));
+      await tx.update(schema.aiConversations).set({
+        status: "NEW",
+        memory: null,
+        lastProcessedMessageId: null,
+        transferReason: null,
+        qualificationSummary: null,
+        assignedUserId: null,
+        pausedByUserId: null,
+        transferredAt: null,
+        closedAt: null,
+        updatedAt: new Date(),
+      }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, context.tenantId)));
+    });
     await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.reset" });
     revalidatePath("/conversas");
     return { success: true };

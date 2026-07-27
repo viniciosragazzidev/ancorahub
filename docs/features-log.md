@@ -261,3 +261,25 @@ por categoria e com documentação local.
 * **Qualidade**: 144 testes Vitest, type-check, build de produção e dois fluxos
   Playwright públicos passaram. O cenário Playwright autenticado para a configuração
   do Diretor exige credenciais sintéticas de E2E no ambiente de execução.
+
+### 11.1 Continuidade natural e reset de contexto
+
+* **Fallback contextual**: quando o modelo estiver indisponível ou não entregar o
+  schema esperado, o agente avança para o próximo campo pendente em vez de reiniciar
+  com uma saudação genérica.
+* **Resposta curta**: uma resposta isolada como `3` passa a ser registrada como número
+  de vidas quando responde à pergunta anterior correspondente.
+* **Reset verificável**: o reset preserva as mensagens para auditoria, mas remove sua
+  associação ao contexto da conversa. A próxima entrada cria contexto novo e não
+  reutiliza o histórico anterior.
+
+## 12. Recebimento de leads com expectativa operacional
+
+* **Experiência**: o corretor recebe um card persistente e acessível quando a
+  notificação `agent.lead_assigned` chega, com CTA `Atender agora` e dismiss.
+* **Realtime**: o `RealtimeSyncProvider` é a fonte visual única, filtra tenant,
+  destinatário e cargo, deduplica por notificação e elimina o toast duplicado do
+  evento bruto de criação do lead.
+* **Motion**: a entrada usa spring curto e pulso único; `prefers-reduced-motion`
+  reduz a transição a uma troca de opacidade. A fila mantém até três eventos.
+* **Validação**: testes unitários da fila, type-check e build de produção passaram.

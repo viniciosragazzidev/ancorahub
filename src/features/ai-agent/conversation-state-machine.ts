@@ -252,6 +252,13 @@ export async function processInboundAiResponse({
     communicationChannelId,
   });
 
+  const sourceIdentifier = providerMessageId || whatsappMessageId;
+  if (sourceIdentifier) {
+    await db.update(schema.whatsappMessages)
+      .set({ conversationId: conversation.id })
+      .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.messageId, sourceIdentifier)));
+  }
+
   // 2. Verificar se a IA pode responder
   if (conversation.status === "HUMAN_ACTIVE") {
     console.log(`[ai-agent] Conversa ${conversation.id} está em HUMAN_ACTIVE. Atendimento assumido por humano. IA em silêncio.`);
@@ -264,7 +271,6 @@ export async function processInboundAiResponse({
   }
 
   // 3. Idempotency — skip if this message was already processed
-  const sourceIdentifier = providerMessageId || whatsappMessageId;
   if (sourceIdentifier) {
     const [existingLog] = await db
       .select({ id: schema.aiAttendanceLogs.id })
@@ -310,6 +316,7 @@ export async function processInboundAiResponse({
   // 5. Buscar histórico de mensagens recentes do lead
   const pastMessages = await db
     .select({
+      messageId: schema.whatsappMessages.messageId,
       body: schema.whatsappMessages.body,
       direction: schema.whatsappMessages.direction,
       senderRole: schema.whatsappMessages.senderRole,
@@ -320,6 +327,7 @@ export async function processInboundAiResponse({
       and(
         eq(schema.whatsappMessages.tenantId, tenantId),
         eq(schema.whatsappMessages.leadId, leadId),
+        eq(schema.whatsappMessages.conversationId, conversation.id),
       ),
     )
     .orderBy(desc(schema.whatsappMessages.sentAt))
@@ -329,6 +337,7 @@ export async function processInboundAiResponse({
     role: (m.senderRole === "assistant" || m.direction === "outbound" ? "assistant" : "user") as "user" | "assistant",
     content: m.body,
   }));
+  const historyAlreadyContainsCurrentMessage = Boolean(sourceIdentifier) && pastMessages.some((message) => message.messageId === sourceIdentifier);
 
   // Buscar dados do lead para contextualizar a IA
   const [lead] = await db
@@ -361,7 +370,7 @@ export async function processInboundAiResponse({
     tenantId,
     leadName: lead?.nome,
     leadType: lead?.tipo,
-    messages: [...formattedHistory, { role: "user", content: userMessageBody }],
+    messages: historyAlreadyContainsCurrentMessage ? formattedHistory : [...formattedHistory, { role: "user", content: userMessageBody }],
     preferredLanguage: detectedLanguage,
     memoryContext,
     tenantConfig,
@@ -551,6 +560,9 @@ export async function processInboundAiResponse({
     }
   }
 
+  // Persist the question in the same turn so a short next reply such as "3" can be interpreted safely.
+  updatedMemory.lastQuestionAsked = aiResult.content;
+
   // Persist detected language, memory, and last processed message ID
   try {
     await db.update(schema.aiConversations)
@@ -655,8 +667,6 @@ export async function processInboundAiResponse({
   }
 
   // 9. Atualizar estado final da conversa
-  // Update memory with the last question asked (for future repeat checks)
-  updatedMemory.lastQuestionAsked = aiResult.content;
 
   if (aiResult.shouldTransferToHuman) {
     await transitionConversationState({
