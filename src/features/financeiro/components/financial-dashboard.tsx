@@ -142,7 +142,7 @@ function SummaryCard({
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function FinancialDashboard({ data, role }: Props) {
-  const { summary, recentSales, pendingSchedules, activeGoals, monthlyTrend } =
+  const { summary, recentSales, pendingSchedules, activeGoals, monthlyTrend, chargebackQueue } =
     data;
 
   const chartData = monthlyTrend.map((m) => ({
@@ -674,6 +674,30 @@ export function FinancialDashboard({ data, role }: Props) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {(role === "director" || role === "manager") && (
+        <Card className="border-amber-500/30 bg-card shadow-none">
+          <CardHeader>
+            <CardTitle>Fila de chargeback</CardTitle>
+            <CardDescription>
+              {chargebackQueue.length ? `${chargebackQueue.length} cancelamento(s) aguardando revisão` : "Nenhum chargeback pendente"}
+            </CardDescription>
+          </CardHeader>
+          {chargebackQueue.length > 0 && (
+            <CardContent className="space-y-2">
+              {chargebackQueue.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-4 rounded-lg border border-border/40 bg-muted/20 p-3 text-sm">
+                  <div className="min-w-0">
+                    <Link href={`/leads/${item.leadId}`} className="font-medium hover:text-primary">{item.leadName}</Link>
+                    <p className="truncate text-xs text-muted-foreground">{item.reason ?? "Sem motivo informado"}</p>
+                  </div>
+                  <span className="shrink-0 font-semibold tabular-nums">{formatCurrency(item.amount)}</span>
+                </div>
+              ))}
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

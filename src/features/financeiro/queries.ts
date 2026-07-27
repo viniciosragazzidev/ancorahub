@@ -52,6 +52,14 @@ export type FinancialDashboardData = {
     revenue: string;
     commissions: string;
   }>;
+  chargebackQueue: Array<{
+    id: string;
+    leadId: string;
+    leadName: string;
+    cancellationDate: string | null;
+    reason: string | null;
+    amount: string;
+  }>;
 };
 
 // ─── Query ──────────────────────────────────────────────────────────────────
@@ -228,6 +236,28 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     .orderBy(desc(schema.goals.createdAt))
     .limit(5);
 
+  const chargebackQueue = await db
+    .select({
+      id: schema.activeCustomers.id,
+      leadId: schema.activeCustomers.leadId,
+      leadName: schema.leads.nome,
+      cancellationDate: schema.activeCustomers.cancellationDate,
+      reason: schema.activeCustomers.cancellationReason,
+      amount: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)`,
+    })
+    .from(schema.activeCustomers)
+    .innerJoin(schema.leads, eq(schema.activeCustomers.leadId, schema.leads.id))
+    .innerJoin(schema.commissionSchedule, eq(schema.activeCustomers.saleId, schema.commissionSchedule.saleId))
+    .where(and(
+      eq(schema.activeCustomers.tenantId, context.tenantId),
+      eq(schema.commissionSchedule.status, "chargeback_pending"),
+      ...(context.role === "broker" ? [eq(schema.activeCustomers.brokerId, context.userId)] : []),
+      ...(context.role === "manager" && context.branchId ? [eq(schema.activeCustomers.branchId, context.branchId)] : []),
+    ))
+    .groupBy(schema.activeCustomers.id, schema.activeCustomers.leadId, schema.leads.nome, schema.activeCustomers.cancellationDate, schema.activeCustomers.cancellationReason)
+    .orderBy(desc(schema.activeCustomers.cancellationDate))
+    .limit(10);
+
   // ── Monthly trend (last 6 months) ──
   const monthlyTrend: Array<{ month: string; revenue: string; commissions: string }> = [];
   for (let i = 5; i >= 0; i--) {
@@ -286,5 +316,6 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     pendingSchedules,
     activeGoals: activeGoalRecords,
     monthlyTrend,
+    chargebackQueue,
   };
 }
