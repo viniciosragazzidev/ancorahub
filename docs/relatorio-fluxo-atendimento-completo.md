@@ -74,7 +74,7 @@
 | Geração de comissão | ✅ Pronto | Cronograma de parcelas gerado na conversão |
 | Criação de cliente ativo | ✅ Pronto | `activeCustomers` + `clients` criados na transação |
 | Notificação de conversão | ✅ Pronto | Push + in-app notification |
-| Cálculo de cotação por linha (UI) | ❌ **Pendente** | O QuoteBuilder existe, mas o rateio por beneficiário na UI não está conectado ao fluxo de venda |
+| Cálculo de cotação por linha (UI) | ↗ **Externo** | O produto agora abre um cotador externo configurável (`EXTERNAL_QUOTE_APP_URL`) e audita o acesso; o contrato/URL do fornecedor ainda precisa ser informado |
 | Materialização checklist por beneficiário | ❌ **Pendente** | Checklist de documentos por beneficiário não está 100% materializado |
 
 ### 1.6 Cliente → Pós-venda
@@ -120,8 +120,8 @@ Transições validadas em `VALID_TRANSITIONS`. ✅
 
 | # | Gap | Impacto | Arquivos envolvidos |
 |---|-----|---------|---------------------|
-| G4 | **Cálculo de cotação por linha na UI** não conectado ao fluxo de venda | O QuoteBuilder gera cotações com itens por beneficiário, mas o rateio detalhado não persiste no registro de venda | `src/features/leads/components/quote-builder/` |
-| G5 | **Fila de cancelamentos no financeiro** | Não há visão dedicada para gestor/diretor revisar cancelamentos pendentes de chargeback | `src/features/post-sale/actions.ts` (cancelActiveCustomerAction existe, mas sem UI de fila) |
+| G4 | **Contrato do cotador externo** | A URL do fornecedor e o contrato de retorno ainda dependem da operação externa | `docs/external-quote-integration.md` |
+| G5 | **Checklist E2E autenticado** | O ciclo principal está coberto por testes unitários/integração; a execução autenticada depende das credenciais E2E do ambiente | `tests/e2e/` |
 | G6 | **Materialização completa do checklist por beneficiário** | Checklist de documentos por beneficiário existe no banco mas a UI de acompanhamento por beneficiário não está completa | `src/features/documents/` |
 | G7 | **NOC por unidade** está `partial` | Saúde operacional por filial com SLA, fila sem corretor, capacidade e atalhos | `src/features/noc/` |
 
