@@ -116,7 +116,14 @@ export default async function CustomersPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        <section>
+          <p className="text-xs font-medium text-primary uppercase tracking-wider font-mono">PÓS-VENDA & CARTEIRA</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Carteira de Clientes</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Acompanhe clientes convertidos, informações de contato, corretores responsáveis e datas de renovação de contrato.
+          </p>
+        </section>
         <ClientesList clients={clients} metrics={metrics} />
       </main>
     </>
