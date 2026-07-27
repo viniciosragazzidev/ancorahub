@@ -37,58 +37,57 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --font-sans: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Geist", var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
-  --font-heading: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Bricolage Grotesque", "Geist", var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
   --radius: var(--radius-md);
-  --radius-sm: 0.5rem;
+  --radius-sm: 0.7rem;
   --radius-md: 0.875rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1rem;
+  --radius-lg: 1.225rem;
+  --radius-xl: 1.575rem;
 }
 
 :root {
   color-scheme: light;
-  --surface-base: #F4F4F2;
-  --surface-card: #EFEFEF;
-  --surface-secondary: #EBEBE9;
-  --surface-elevated: #F2F2F0;
-  --surface-overlay: #F2F2F0;
-  --background: #F4F4F2;
-  --foreground: #191919;
-  --card: #EFEFEF;
-  --card-foreground: #191919;
-  --popover: #F2F2F0;
-  --popover-foreground: #191919;
-  --primary: #191919;
-  --primary-foreground: #F4F4F2;
-  --secondary: #EBEBE9;
-  --secondary-foreground: #191919;
-  --accent: #15A46B;
+  --surface-base: #fcfbf8;
+  --surface-card: #ffffff;
+  --surface-secondary: #f1ebff;
+  --surface-elevated: #ffffff;
+  --surface-overlay: #ffffff;
+  --background: #fcfbf8;
+  --foreground: #241a2d;
+  --card: #ffffff;
+  --card-foreground: #241a2d;
+  --popover: #ffffff;
+  --popover-foreground: #241a2d;
+  --primary: #5708d2;
+  --primary-foreground: #ffffff;
+  --secondary: #f1ebff;
+  --secondary-foreground: #241a2d;
+  --accent: #c1eb04;
   --accent-foreground: #FFFFFF;
-  --muted: #EBEBE9;
-  --muted-foreground: #6E6E73;
-  --muted-text: #9B9B9B;
+  --muted: #f1ebff;
+  --muted-foreground: #6b6178;
+  --muted-text: #8f839b;
   --warning: #D97706;
   --warning-foreground: #FFFFFF;
   --success: #16A34A;
   --success-foreground: #FFFFFF;
   --destructive: #DC2626;
-  --border: #E2E2DF;
-  --border-strong: #D4D4D0;
-  --input: #EFEFEF;
-  --ring: #191919;
-  --sidebar: #F4F4F2;
-  --sidebar-foreground: #191919;
-  --sidebar-primary: #191919;
-  --sidebar-primary-foreground: #F4F4F2;
-  --sidebar-accent: #EBEBE9;
-  --sidebar-accent-foreground: #191919;
-  --sidebar-warning: #EBEBE9;
-  --sidebar-warning-foreground: #191919;
-  --sidebar-border: #E2E2DF;
-  --sidebar-ring: #191919;
-  --sidebar-ring: #000000;
+  --border: #e7dff1;
+  --border-strong: #ddd2eb;
+  --input: #ffffff;
+  --ring: #5708d2;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #241a2d;
+  --sidebar-primary: #5708d2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1ebff;
+  --sidebar-accent-foreground: #241a2d;
+  --sidebar-warning: #f1ebff;
+  --sidebar-warning-foreground: #5708d2;
+  --sidebar-border: #e7dff1;
+  --sidebar-ring: #5708d2;
   --ct-blue: #0f172a;
   --ct-blue-strong: #000000;
   --font-sans: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
@@ -302,7 +301,16 @@
   --chart-4: #8b5cf6;
   --chart-5: #f59e0b;
   --dashboard-canvas: #f6f7f9;
-  --radius: 0.75rem;
+  --radius: 0.875rem;
+  --radius-sm: 0.7rem;
+  --radius-lg: 1.225rem;
+  --radius-xl: 1.575rem;
+  --brand-purple: #5708d2;
+  --brand-lime: #c1eb04;
+  --surface-warm: #fcfbf8;
+  --surface-lavender: #f1ebff;
+  --border-lavender: #e7dff1;
+  --input-border: #ddd2eb;
 }
 
 .dark {
@@ -377,7 +385,18 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+[data-slot="card"] {
+  border-color: var(--border-lavender);
 }
 
 @layer base {
@@ -973,4 +992,4 @@ html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header)
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
+}

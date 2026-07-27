@@ -4,6 +4,15 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 ---
 
+## 27/07/2026 - Sistema visual DesignTeste (preview)
+
+- Tokens Vendria Light mapeados para o tema semantico: canvas quente, card branco,
+  borda lavanda, roxo de acao e lima de destaque.
+- Button, Card, Input e Badge alinhados a escala compartilhada de espacamento,
+  raio e tipografia do DesignTeste.
+- Dark mode, navegacao, contratos e densidade operacional preservados; roadmap
+  registra o escopo como `partial` para a proxima onda de superficies.
+
 ## 10. NOC por unidade
 
 O NOC passou a expor uma primeira camada de saude operacional por filial, usando apenas dados reais e escopados pelo contexto autenticado.
