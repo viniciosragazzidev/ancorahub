@@ -295,6 +295,20 @@
       "when": 1785172800000,
       "tag": "0089_browser_extension_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1785259200000,
+      "tag": "0090_agent_training_center",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1785262800000,
+      "tag": "0091_intelligent_qualification_distribution",
+      "breakpoints": true
     }
   ]
 }
