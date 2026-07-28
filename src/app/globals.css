@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 
 html {
-  font-size: 110%;
+  font-size: 105%;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -978,7 +978,8 @@ html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header)
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
+}

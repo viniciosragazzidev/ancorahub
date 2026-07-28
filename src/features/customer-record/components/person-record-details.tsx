@@ -7,6 +7,9 @@ type Dependent = { id: string; name: string; birthDate: string; relationship: st
 type FormDataInfo = {
   dependentes?: string | null;
   mediaIdades?: string | null;
+  razaoSocial?: string | null;
+  cnpj?: string | null;
+  funcionarios?: string | null;
 };
 
 export function PersonRecordDetails({
@@ -55,6 +58,29 @@ export function PersonRecordDetails({
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Média de idades</p>
                 <p className="mt-1 text-sm font-semibold">{formData.mediaIdades} anos</p>
+              </div>
+            )}
+          </div>
+        )}
+        {/* ── Informações adicionais do formulário (PME) ──────────── */}
+        {(formData?.razaoSocial || formData?.cnpj || formData?.funcionarios) && (
+          <div className="grid grid-cols-3 gap-2">
+            {formData.razaoSocial && (
+              <div className="col-span-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Razão social</p>
+                <p className="mt-1 text-sm font-semibold truncate">{formData.razaoSocial}</p>
+              </div>
+            )}
+            {formData.cnpj && (
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">CNPJ</p>
+                <p className="mt-1 text-sm font-semibold">{formData.cnpj}</p>
+              </div>
+            )}
+            {formData.funcionarios && (
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Funcionários</p>
+                <p className="mt-1 text-sm font-semibold">{formData.funcionarios}</p>
               </div>
             )}
           </div>
