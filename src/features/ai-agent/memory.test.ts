@@ -43,6 +43,19 @@ describe("conversation memory", () => {
     expect(updated.collectedFields).toContain("age");
   });
 
+  it("captures only the average age for a PME group", () => {
+    const memory = {
+      ...createEmptyMemory(),
+      planType: { value: "empresarial", confidence: 1 as const },
+      numberOfLives: { value: "18", confidence: 1 as const },
+      lastQuestionAsked: "Para dimensionar as opções para a empresa, qual é a média aproximada de idade do grupo?",
+    };
+    const updated = extractFieldsFromMessage("36 anos", memory, "msg-average-age");
+
+    expect(updated.averageAge).toMatchObject({ value: "36", confidence: 1, sourceMessageId: "msg-average-age" });
+    expect(updated.age).toBeUndefined();
+  });
+
   it("keeps the six-question qualification order and detects completion", () => {
     expect(COLLECTIBLE_FIELDS.slice(0, 6).map((field) => field.key)).toEqual([
       "customerName", "planType", "numberOfLives", "age", "city", "email",
@@ -55,6 +68,19 @@ describe("conversation memory", () => {
       age: { value: "13, 33, 36", confidence: 1 as const },
       city: { value: "Nova Iguaçu", confidence: 1 as const },
       email: { value: "maria@example.com", confidence: 1 as const },
+    };
+    expect(isCoreQualificationComplete(memory)).toBe(true);
+  });
+
+  it("uses average age instead of individual ages to complete a PME qualification", () => {
+    const memory = {
+      ...createEmptyMemory(),
+      customerName: { value: "Empresa Exemplo", confidence: 1 as const },
+      planType: { value: "empresarial", confidence: 1 as const },
+      numberOfLives: { value: "18", confidence: 1 as const },
+      averageAge: { value: "36", confidence: 1 as const },
+      city: { value: "São Paulo", confidence: 1 as const },
+      email: { value: "rh@exemplo.com", confidence: 1 as const },
     };
     expect(isCoreQualificationComplete(memory)).toBe(true);
   });

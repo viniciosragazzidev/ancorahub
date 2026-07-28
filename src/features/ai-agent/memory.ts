@@ -34,6 +34,8 @@ export type ConversationMemory = {
   planType?: MemoryField;
   numberOfLives?: MemoryField;
   companyHasCnpj?: MemoryField;
+  /** Aggregate workforce age for PME; never replaces individual ages for PF. */
+  averageAge?: MemoryField;
   intent?: MemoryField;
   objections?: MemoryField;
   /** Ordered list of field keys that have been collected */
@@ -128,7 +130,11 @@ export const CORE_QUALIFICATION_FIELDS: Array<"customerName" | "planType" | "num
 ];
 
 export function isCoreQualificationComplete(memory: ConversationMemory): boolean {
-  return CORE_QUALIFICATION_FIELDS.every((field) => Boolean(memory[field]?.value));
+  return CORE_QUALIFICATION_FIELDS.every((field) =>
+    field === "age" && memory.planType?.value === "empresarial"
+      ? Boolean(memory.averageAge?.value)
+      : Boolean(memory[field]?.value),
+  );
 }
 
 function normalizeForMatching(value: string) {
@@ -254,13 +260,18 @@ export function extractFieldsFromMessage(
   if (!memory.age) {
     const previousQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
     const asksForAge = previousQuestion.includes("idade") || previousQuestion.includes("quantos anos");
+    const asksForAverageAge = (previousQuestion.includes("media") && previousQuestion.includes("idade")) || previousQuestion.includes("faixa etaria");
     const ageValues = trimmed.match(/\d{1,3}/g)?.map(Number).filter((age) => age > 0 && age < 150) ?? [];
     if (asksForAge && ageValues.length > 0) {
-      memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
+      if (memory.planType?.value === "empresarial" && asksForAverageAge) {
+        memory.averageAge = { value: String(ageValues[0]), confidence: 1, sourceMessageId };
+      } else {
+        memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
+      }
       addCollectedField(memory, "age");
     }
     for (const pattern of AGE_PATTERNS) {
-      if (memory.age) break;
+      if (memory.age || memory.averageAge) break;
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const age = parseInt(match[1], 10);
@@ -395,13 +406,16 @@ export function buildMemoryContext(memory: ConversationMemory): string {
   if (memory.city?.value) parts.push(`- Cidade: ${memory.city.value}`);
   if (memory.planType?.value) parts.push(`- Tipo de plano: ${memory.planType.value}`);
   if (memory.numberOfLives?.value) parts.push(`- N° de vidas: ${memory.numberOfLives.value}`);
-  if (memory.age?.value) parts.push(`- Idade: ${memory.age.value}`);
+  if (memory.planType?.value === "empresarial" && memory.averageAge?.value) parts.push(`- Média de idade do grupo: ${memory.averageAge.value} anos`);
+  else if (memory.age?.value) parts.push(`- Idades: ${memory.age.value}`);
   if (memory.email?.value) parts.push(`- E-mail: ${memory.email.value}`);
   if (memory.intent?.value) parts.push(`- Intenção: ${memory.intent.value}`);
 
   if (memory.collectedFields.length > 0) {
     const missingFields = COLLECTIBLE_FIELDS.filter(
-      (f) => !memory.collectedFields.includes(f.key),
+      (f) => f.key === "age" && memory.planType?.value === "empresarial"
+        ? !memory.averageAge?.value
+        : !memory.collectedFields.includes(f.key),
     );
     if (missingFields.length > 0) {
       parts.push("");
@@ -415,6 +429,7 @@ export function buildMemoryContext(memory: ConversationMemory): string {
   parts.push("- NUNCA pergunte novamente informações que já estão em DADOS COLETADOS.");
   parts.push("- Se uma informação foi fornecida, use-a na resposta. Ex: 'Certo, Carlos...'");
   parts.push("- Faça apenas UMA pergunta por vez, sobre a próxima informação necessária.");
+  if (memory.planType?.value === "empresarial") parts.push("- Para PME, pergunte a média aproximada de idade do grupo; não peça idades individuais.");
   parts.push("- Se todos os dados essenciais foram coletados, encerre a coleta.");
 
   return parts.join("\n");

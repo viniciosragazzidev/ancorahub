@@ -18,6 +18,7 @@ export function createSafeFallbackResponse(
     ? lines.slice(markerIndex + 1).find((line) => line.trim().startsWith("-"))
     : undefined;
   const label = normalize(pending?.replace(/^\s*-\s*/, "").trim() ?? "");
+  const isPme = lines.some((line) => normalize(line).includes("tipo de plano: empresarial"));
   const next = label.includes("nome")
     ? { field: "customerName", message: "Como você prefere ser chamado(a)?" }
     : label.includes("cidade")
@@ -27,7 +28,9 @@ export function createSafeFallbackResponse(
         : label.includes("vidas") || label.includes("pessoas")
           ? { field: "numberOfLives", message: "Quantas pessoas serão incluídas no plano?" }
           : label.includes("idade")
-            ? { field: "age", message: "Qual é a idade da pessoa que será incluída?" }
+            ? isPme
+              ? { field: "age", message: "Para dimensionar as opções para a empresa, qual é a média aproximada de idade do grupo?" }
+              : { field: "age", message: "Quais são as idades das pessoas que serão incluídas?" }
             : label.includes("e-mail") || label.includes("email")
               ? { field: "email", message: "Qual e-mail podemos usar para continuar o atendimento?" }
               : undefined;

@@ -48,7 +48,10 @@ export function leadMatchesQualificationEntryRules(lead: LeadEligibilityInput, p
 
 export function evaluateQualification(memory: ConversationMemory, policy: AgentBehaviorPolicy, reason?: "human_requested" | "not_interested") : QualificationEvaluation {
   const required = policy.requiredFields;
-  const completedFields = required.filter((field) => Boolean((memory[memoryFieldByPolicyField[field]] as { value?: string } | undefined)?.value));
+  const completedFields = required.filter((field) => {
+    if (field === "age" && memory.planType?.value === "empresarial") return Boolean(memory.averageAge?.value);
+    return Boolean((memory[memoryFieldByPolicyField[field]] as { value?: string } | undefined)?.value);
+  });
   const missingFields = required.filter((field) => !completedFields.includes(field));
   const weightedTotal = required.reduce((total, field) => total + (policy.qualification.fieldWeights[field] ?? 1), 0);
   const weightedCompleted = completedFields.reduce((total, field) => total + (policy.qualification.fieldWeights[field] ?? 1), 0);
@@ -92,7 +95,17 @@ export async function persistQualificationEvaluation(input: {
       qualificationStatus: result.qualificationStatus,
       qualificationProfileKey: input.policy.qualification.profileKey,
       qualificationCompletedAt: result.state === "QUALIFIED" ? now : null,
-      qualificationDetails: { completedFields: result.completedFields, missingFields: result.missingFields, profileKey: input.policy.qualification.profileKey },
+      qualificationDetails: {
+        completedFields: result.completedFields,
+        missingFields: result.missingFields,
+        profileKey: input.policy.qualification.profileKey,
+        planType: input.memory.planType?.value ?? null,
+        numberOfLives: input.memory.numberOfLives?.value ?? null,
+        individualAges: input.memory.planType?.value === "empresarial" ? null : input.memory.age?.value ?? null,
+        averageAge: input.memory.planType?.value === "empresarial" ? input.memory.averageAge?.value ?? null : null,
+        city: input.memory.city?.value ?? null,
+        email: input.memory.email?.value ?? null,
+      },
       updatedAt: now,
     }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
     if (auditActor?.userId) await tx.insert(schema.auditLogs).values({

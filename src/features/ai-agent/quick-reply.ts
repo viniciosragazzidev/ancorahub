@@ -143,12 +143,11 @@ export const quickReplyRules: QuickReplyRule[] = [
   { key: "waiting_response", intent: "WAITING_FOR_RESPONSE", templateKey: "human.waiting_reminder", priority: 74, resolve: (input) => isWaiting(normalizeQuickReplyText(input.body)) },
   { key: "urgent", intent: "URGENT_REQUEST", templateKey: "urgent.requested", priority: 70, resolve: (input) => isUrgent(normalizeQuickReplyText(input.body)) },
   { key: "callback", intent: "REQUEST_CALLBACK", templateKey: "callback.requested", priority: 65, resolve: (input) => isCallback(normalizeQuickReplyText(input.body)) },
-  { key: "greeting_returning", intent: "GREETING", templateKey: "conversation.returning_lead", priority: 60, resolve: (input) => parseGreeting(input.body) && (input.hasPriorMessages || !input.isNewConversation) },
-  { key: "greeting_initial", intent: "GREETING", templateKey: "greeting.initial", priority: 59, resolve: (input) => parseGreeting(input.body) && input.isNewConversation },
-  { key: "thanks", intent: "THANKS", templateKey: "thanks.confirmed", priority: 50, resolve: (input) => parseThanks(input.body) },
-  { key: "goodbye", intent: "GOODBYE", templateKey: "goodbye.confirmed", priority: 45, resolve: (input) => isGoodbye(normalizeQuickReplyText(input.body)) },
-  { key: "confirmation", intent: "CONFIRMATION", templateKey: "message.unclear", priority: 40, resolve: (input) => parseBooleanReply(input.body) === true },
-  { key: "negation", intent: "NEGATION", templateKey: "message.unclear", priority: 39, resolve: (input) => parseBooleanReply(input.body) === false },
+  // During AI qualification, greetings and short confirmations can be the
+  // customer's answer to the persisted question. They must reach extraction
+  // and the next-field resolver, never replace the flow with a generic reply.
+  { key: "thanks", intent: "THANKS", templateKey: "thanks.confirmed", priority: 50, resolve: (input) => !input.hasPendingQuestion && input.conversationState !== "AI_ACTIVE" && parseThanks(input.body) },
+  { key: "goodbye", intent: "GOODBYE", templateKey: "goodbye.confirmed", priority: 45, resolve: (input) => !input.hasPendingQuestion && input.conversationState !== "AI_ACTIVE" && isGoodbye(normalizeQuickReplyText(input.body)) },
   { key: "empty_or_unclear", intent: "EMPTY_OR_UNCLEAR", templateKey: "message.unclear", priority: 1, resolve: (input) => normalizeQuickReplyText(input.body).length === 0 },
 ];
 

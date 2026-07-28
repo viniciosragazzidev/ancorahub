@@ -74,6 +74,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       sourceCampaign: schema.leads.sourceCampaign,
       tipo: schema.leads.tipo,
       status: schema.leads.status,
+      qualificationDetails: schema.leads.qualificationDetails,
       corretorId: schema.leads.corretorId,
       branchId: schema.leads.branchId,
       planId: schema.leads.planId,
@@ -97,6 +98,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     .limit(1);
 
   if (!lead) notFound();
+  const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
   const slaMinutes = Number((await getDatabase().select({ minutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1))[0]?.minutes ?? 15);
   const elapsedMinutes = Math.max(0, Math.round((getCurrentTimestamp() - lead.stageEnteredAt.getTime()) / 60000));
   const remainingMinutes = Math.max(0, slaMinutes - elapsedMinutes);
@@ -294,6 +296,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
                 Esta é a etapa atual. As próximas etapas são liberadas conforme o status do lead avança.
               </div>
+              {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges) && (
+                <Card className="border-border bg-card shadow-none">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Dados da qualificação</CardTitle>
+                    <CardDescription>Dados coletados pelo agente, separados entre atendimento individual e empresarial.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+                    <div><p className="text-xs text-muted-foreground">Vidas</p><p className="mt-1 font-medium">{qualificationDetails.numberOfLives ?? "Não informado"}</p></div>
+                    {lead.tipo === "PME" ? (
+                      <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
+                    ) : (
+                      <div><p className="text-xs text-muted-foreground">Idades informadas</p><p className="mt-1 font-medium">{qualificationDetails.individualAges ?? "Não informadas"}</p></div>
+                    )}
+                    <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{lead.tipo === "PME" ? "Empresa / PME" : "Pessoa física"}</p></div>
+                  </CardContent>
+                </Card>
+              )}
               <div className="grid gap-4 lg:grid-cols-2">
                 <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} />
                 <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
@@ -466,4 +485,15 @@ function maskEmail(email: string) {
   const [local, domain] = email.split("@");
   if (!local || !domain) return "••••";
   return `${local.slice(0, 1)}${"•".repeat(Math.max(2, local.length - 1))}@${domain}`;
+}
+
+function readQualificationDetails(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {} as Record<string, string | null>;
+  const details = value as Record<string, unknown>;
+  const read = (key: string) => typeof details[key] === "string" ? details[key] : null;
+  return {
+    numberOfLives: read("numberOfLives"),
+    averageAge: read("averageAge"),
+    individualAges: read("individualAges"),
+  };
 }

@@ -17,4 +17,14 @@ describe("qualification engine", () => {
     expect(leadMatchesQualificationEntryRules({ origem: "meta", sourceCampaign: null, tipo: "PF", branchId: null }, policy)).toBe(true);
     expect(leadMatchesQualificationEntryRules({ origem: "manual", sourceCampaign: null, tipo: "PF", branchId: null }, policy)).toBe(false);
   });
+  it("treats the PME average age as the required age field", () => {
+    const pmePolicy: AgentBehaviorPolicy = { ...policy, requiredFields: ["planType", "numberOfLives", "age"] };
+    const result = evaluateQualification({
+      planType: { value: "empresarial", confidence: 1 },
+      numberOfLives: { value: "18", confidence: 1 },
+      averageAge: { value: "36", confidence: 1 },
+      collectedFields: ["planType", "numberOfLives", "age"],
+    }, pmePolicy);
+    expect(result).toMatchObject({ state: "QUALIFIED", missingFields: [] });
+  });
 });

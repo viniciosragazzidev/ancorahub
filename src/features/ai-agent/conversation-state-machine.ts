@@ -787,8 +787,11 @@ export async function processInboundAiResponse({
           addField("numberOfLives");
         }
       } else if (field === "age") {
-        if (!updatedMemory.age || confidence >= (updatedMemory.age.confidence ?? 0)) {
-          updatedMemory.age = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+        const isPme = updatedMemory.planType?.value === "empresarial";
+        const currentAgeValue = isPme ? updatedMemory.averageAge : updatedMemory.age;
+        if (!currentAgeValue || confidence >= (currentAgeValue.confidence ?? 0)) {
+          if (isPme) updatedMemory.averageAge = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
+          else updatedMemory.age = { value, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
           addField("age");
         }
       } else if (field === "companyHasCnpj") {
