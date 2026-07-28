@@ -10,6 +10,38 @@ export interface WhatsAppWebAdapter {
 const normalize = (value: string) => value.replace(/\D/g, "");
 const phonePattern = /\+?\d[\d ()-]{7,}/;
 
+function phoneFromReactState(element: Element | null) {
+  if (!element) return undefined;
+  const keys = Object.getOwnPropertyNames(element).filter((key) => key.startsWith("__reactFiber$") || key.startsWith("__reactProps$"));
+  const visited = new WeakSet<object>();
+  let inspected = 0;
+
+  const visit = (value: unknown, key = "", depth = 0): string | undefined => {
+    if (inspected >= 180 || depth > 5 || value == null) return undefined;
+    if (typeof value === "string") {
+      const isChatIdentifier = /@(c\.us|s\.whatsapp\.net)$/i.test(value);
+      const isPhoneField = /(serialized|jid|phone|user)/i.test(key);
+      const digits = normalize(value);
+      return (isChatIdentifier || isPhoneField) && digits.length >= 8 ? `+${digits}` : undefined;
+    }
+    if (typeof value !== "object") return undefined;
+    if (visited.has(value)) return undefined;
+    visited.add(value);
+    inspected += 1;
+    for (const childKey of Object.keys(value).slice(0, 32)) {
+      const phone = visit((value as Record<string, unknown>)[childKey], childKey, depth + 1);
+      if (phone) return phone;
+    }
+    return undefined;
+  };
+
+  for (const key of keys) {
+    const phone = visit((element as unknown as Record<string, unknown>)[key]);
+    if (phone) return phone;
+  }
+  return undefined;
+}
+
 function phoneFromElement(element: Element | null) {
   if (!element) return undefined;
   const explicit = element.querySelector<HTMLElement>("[data-phone], [data-jid], a[href^='tel:']");
@@ -20,6 +52,13 @@ function phoneFromElement(element: Element | null) {
     ?? element.textContent?.match(phonePattern)?.[0];
   const digits = candidate ? normalize(candidate) : "";
   return digits.length >= 8 ? `+${digits}` : undefined;
+}
+
+function phoneFromContactSidebar(displayName?: string) {
+  const drawer = document.querySelector('[data-testid="drawer-right"]');
+  const contactName = drawer?.querySelector<HTMLElement>('[data-testid="contact-info-subtitle"]')?.textContent?.trim();
+  if (displayName && contactName && displayName.localeCompare(contactName, "pt-BR", { sensitivity: "base" }) !== 0) return undefined;
+  return phoneFromElement(drawer);
 }
 
 export class DefaultWhatsAppWebAdapter implements WhatsAppWebAdapter {
@@ -33,7 +72,11 @@ export class DefaultWhatsAppWebAdapter implements WhatsAppWebAdapter {
     // The number is only read when WhatsApp already exposes it in the conversation or
     // in the contact drawer opened by the user. The extension never clicks to reveal it.
     const phone = phoneFromElement(header)
-      ?? phoneFromElement(document.querySelector('[data-testid="conversation-info-header"]'));
+      ?? phoneFromElement(document.querySelector('[data-testid="conversation-info-header"]'))
+      ?? phoneFromContactSidebar(displayName)
+      // WhatsApp's current header often renders only the contact name. This stays scoped
+      // to the active header's React node and extracts only that chat identifier.
+      ?? phoneFromReactState(header);
     return { displayName, phone, stableIdentifier: phone ? normalize(phone) : undefined };
   }
   observeConversationChange(callback: () => void) {

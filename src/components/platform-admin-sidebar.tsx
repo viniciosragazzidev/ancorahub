@@ -50,7 +50,7 @@ export function PlatformAdminSidebar() {
   }
 
   return (
-    <Sidebar collapsible="none" variant="sidebar">
+    <Sidebar variant="sidebar">
       <SidebarHeader className="border-b border-sidebar-border/50 py-3.5 pl-5 pr-4">
         <SidebarMenu>
           <SidebarMenuItem>
