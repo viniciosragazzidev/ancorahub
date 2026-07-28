@@ -39,6 +39,11 @@ test.describe("Fluxos Core CorreTop E2E", () => {
     await expect(page).toHaveURL(/\/conversas$/);
     await expect(page.getByRole("main").first()).toBeVisible();
 
+    await page.goto("/leads/distribuicao/plantao");
+    await expect(page).toHaveURL(/\/leads\/distribuicao\/plantao$/);
+    await expect(page.getByRole("heading", { name: "Plantões", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Novo plantão", exact: true })).toBeVisible();
+
     await page.goto("/financeiro");
     await expect(page).toHaveURL(/\/financeiro$/);
     await expect(page.getByText("Financeiro", { exact: true }).first()).toBeVisible();

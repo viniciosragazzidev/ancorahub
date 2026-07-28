@@ -44,6 +44,12 @@ export function isValidDutyWindow(dayOfWeek: number, startsAt: string, endsAt: s
   return dayOfWeek >= 0 && dayOfWeek <= 6 && /^([01]\d|2[0-3]):[0-5]\d$/.test(startsAt) && /^([01]\d|2[0-3]):[0-5]\d$/.test(endsAt) && startsAt < endsAt;
 }
 
+export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number) {
+  const assigned = Math.max(0, Math.trunc(assignedBrokers));
+  const minimum = Math.max(1, Math.trunc(minimumBrokers));
+  return { assigned, minimum, missing: Math.max(0, minimum - assigned), covered: assigned >= minimum };
+}
+
 export function isDeferredDistributionReason(reason: string) {
   const normalized = reason.toLocaleLowerCase("pt-BR");
   return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacidade") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada");

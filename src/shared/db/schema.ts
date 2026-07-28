@@ -628,6 +628,7 @@ export const unitDutySchedules = pgTable(
     startsAt: text("starts_at").notNull(),
     endsAt: text("ends_at").notNull(),
     priority: integer("priority").notNull().default(100),
+    minimumBrokers: integer("minimum_brokers").notNull().default(1),
     status: text("status").notNull().default("active"),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),

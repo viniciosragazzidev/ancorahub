@@ -314,6 +314,42 @@ o Super-admin pode desligar as capacidades sem apagar histórico. Ao assumir, o 
 pausa a automação e não oferece envio de mensagens; somente Diretor ou Gestor pode
 retomar a IA.
 
+## DEC-059 — Fila geral central para leads sem unidade resolvida
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+Um lead aceito cujo canal ou regra de entrada não determine uma unidade entra na
+fila geral central do tenant, sem atribuição automática a corretor. O Diretor é
+responsável por encaminhá-lo para uma unidade; após esse encaminhamento, o Gestor
+pode direcioná-lo dentro do escopo da própria unidade. Essa ordem preserva o
+isolamento entre unidades e evita que um Gestor visualize uma fila central de
+outra unidade. Cada encaminhamento deve manter o motivo e o ator em auditoria.
+
+## DEC-060 — Titularidade operacional de exceções de intake e outbox
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O Diretor é o dono primário das exceções centrais de intake, distribuição e
+outbox. O Gestor atua apenas sobre exceções de leads de sua unidade. O prazo
+operacional inicial é de até 30 minutos para uma exceção P0 e até o fim do dia
+útil para uma P1; o alerta e qualquer reprocessamento permanecem auditados e
+idempotentes.
+
+## DEC-061 — Cobertura mínima e arquivamento de plantões
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+Plantões permanecem regras semanais recorrentes por unidade e fila. Cada regra define
+um mínimo de corretores escalados, com valor inicial de um. A cobertura inferior ao
+mínimo cria uma pendência operacional visível, mas não bloqueia a distribuição aos
+corretores já elegíveis. A remoção de um plantão é arquivamento reversível: a regra
+sai da seleção de distribuição, as atribuições ativas ligadas a ela são inativadas e
+o histórico permanece disponível para auditoria. Exceções por data não fazem parte
+desta versão.
+
 ## DEC-057 — Liberação global auditável do Centro de Treinamento
 
 **Estado:** Aceita

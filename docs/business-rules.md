@@ -45,6 +45,10 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-027 | Reabertura e reatribuição são decisões de Gestor/Diretor e preservam histórico. | Reabertura → lead volta ao fluxo com evento de auditoria/timeline. | RF196 |
 | BR-028 | Estouro de SLA remove o corretor responsável antes de redistribuir. | Lead do Diretor tenta outro corretor elegível da unidade e, sem elegível, retorna à fila central da corretora mãe; lead do Gestor retorna à fila da própria unidade para distribuição manual. | DEC-027 |
 | BR-029 | Notificação operacional é um evento coordenado. | Capacidade ativa → cria notificação in-app para Realtime/toast e tenta push; capacidade desativada pelo Super-admin → nenhum canal é emitido, com auditoria da alteração. | DEC-028 |
+| BR-029C | Lead sem unidade resolvida entra na fila geral central do tenant, sem atribuição automática. | Diretor encaminha para uma unidade; Gestor direciona somente após o lead entrar em sua unidade; cada ação é auditada. | DEC-059 |
+| BR-029D | Exceções de intake/outbox possuem dono operacional e SLA inicial. | Diretor trata exceções centrais; Gestor trata apenas a própria unidade; P0 em até 30 min e P1 até o fim do dia útil. | DEC-060 |
+| BR-029E | Plantão tem cobertura mínima configurável e não bloqueia a distribuição quando incompleto. | Escalados abaixo do mínimo → alerta operacional; corretores elegíveis já escalados continuam concorrendo à distribuição. | DEC-061 |
+| BR-029F | Remover plantão significa arquivar, nunca apagar o histórico. | Arquivamento → regra e atribuições ativas saem da operação; restauração reativa somente a regra e mantém auditoria. | DEC-061 |
 
 ## Cotação, documentos e venda
 

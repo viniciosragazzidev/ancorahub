@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, isValidDutyWindow, rankBrokers } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isValidDutyWindow, rankBrokers } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -28,6 +28,11 @@ describe("lead distribution domain", () => {
     expect(isValidDutyWindow(1, "09:00", "18:00")).toBe(true);
     expect(isValidDutyWindow(1, "18:00", "09:00")).toBe(false);
     expect(isValidDutyWindow(8, "09:00", "18:00")).toBe(false);
+  });
+
+  it("reports a real coverage gap without changing eligibility", () => {
+    expect(getDutyCoverage(1, 2)).toEqual({ assigned: 1, minimum: 2, missing: 1, covered: false });
+    expect(getDutyCoverage(3, 2)).toEqual({ assigned: 3, minimum: 2, missing: 0, covered: true });
   });
 
   it("always ranks active duty before performance, then uses a deterministic fallback", () => {
