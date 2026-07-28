@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDistributionJobConfig, getLeadDistributionJobHealth } from "@/features/lead-distribution/jobs";
+import { getLeadEffectOutboxHealth } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { retryLeadEffectAction } from "@/features/lead-distribution/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +76,8 @@ export default async function LeadDistributionPage() {
     newLeadCounts,
     jobHealth,
     jobConfig,
+    effectHealth,
+    failedEffects,
   ] = await Promise.all([
     db
       .select({ id: schema.user.id, name: schema.user.name, email: schema.user.email, branchId: schema.tenantMemberships.branchId, branchName: schema.branches.name, availabilityStatus: schema.tenantMemberships.availabilityStatus })
@@ -114,6 +118,11 @@ export default async function LeadDistributionPage() {
       .groupBy(schema.leads.branchId),
     getLeadDistributionJobHealth(context.tenantId),
     getDistributionJobConfig(),
+    getLeadEffectOutboxHealth(context.tenantId),
+    db.select({ id: schema.leadEffectOutbox.id, leadId: schema.leadEffectOutbox.leadId, type: schema.leadEffectOutbox.type, attemptCount: schema.leadEffectOutbox.attemptCount, lastErrorCode: schema.leadEffectOutbox.lastErrorCode, lastErrorMessage: schema.leadEffectOutbox.lastErrorMessage, leadName: schema.leads.nome, branchId: schema.leads.branchId })
+      .from(schema.leadEffectOutbox).innerJoin(schema.leads, eq(schema.leadEffectOutbox.leadId, schema.leads.id))
+      .where(and(eq(schema.leadEffectOutbox.tenantId, context.tenantId), eq(schema.leadEffectOutbox.status, "failed"), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+      .orderBy(schema.leadEffectOutbox.updatedAt).limit(20),
   ]);
 
   const activeBrokerLeadsMap = new Map(activeBrokerLeads.map((entry) => [entry.brokerId, Number(entry.count)]));
@@ -178,6 +187,13 @@ export default async function LeadDistributionPage() {
             <div><p className="text-xs text-muted-foreground">Em processamento</p><p className="mt-1 text-lg font-semibold">{jobHealth.processing}</p></div>
             <div><p className="text-xs text-muted-foreground">Exceções</p><p className="mt-1 text-lg font-semibold">{jobHealth.failed}</p></div>
             <div><p className="text-xs text-muted-foreground">Próximo passo</p><p className="mt-1 text-sm font-medium">{jobHealth.failed > 0 ? "Revisar exceções com o Diretor" : jobHealth.pending + jobHealth.retrying > 0 ? "O motor tentará distribuir" : "Nenhuma pendência automática"}</p></div>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0"><div><CardTitle>Efeitos pendentes do intake</CardTitle><CardDescription>Distribuição e notificações confirmadas após o recebimento do lead.</CardDescription></div><Badge variant={effectHealth.failed > 0 ? "warning" : "success"}>{effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}</Badge></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid gap-3 sm:grid-cols-4"><div><p className="text-xs text-muted-foreground">Aguardando</p><p className="mt-1 text-lg font-semibold">{effectHealth.pending + effectHealth.retrying}</p></div><div><p className="text-xs text-muted-foreground">Processando</p><p className="mt-1 text-lg font-semibold">{effectHealth.processing}</p></div><div><p className="text-xs text-muted-foreground">Exceções</p><p className="mt-1 text-lg font-semibold">{effectHealth.failed}</p></div><div><p className="text-xs text-muted-foreground">Concluídos</p><p className="mt-1 text-lg font-semibold">{effectHealth.completed}</p></div></div>
+            {failedEffects.length > 0 ? <div className="space-y-2 border-t border-border pt-3">{failedEffects.map((effect) => <div key={effect.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="font-medium">{effect.leadName} · {effect.type}</p><p className="mt-1 text-xs text-muted-foreground">{effect.lastErrorCode ?? "Falha de processamento"} · tentativa {effect.attemptCount} · {effect.lastErrorMessage ?? "Sem detalhe adicional"}</p></div><form action={retryLeadEffectAction}><input type="hidden" name="effectId" value={effect.id} /><Button type="submit" size="sm" variant="outline">Reprocessar</Button></form></div>)}</div> : <p className="border-t border-border pt-3 text-sm text-muted-foreground">Nenhuma exceção pendente.</p>}
           </CardContent>
         </Card>
         <DistributionInbox

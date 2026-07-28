@@ -374,6 +374,7 @@ export const leads = pgTable(
     serviceStartedBy: text("service_started_by").references(() => user.id),
     stageEnteredAt: timestamp("stage_entered_at", { withTimezone: true }).notNull().defaultNow(),
     consentimentoLgpd: boolean("consentimento_lgpd").notNull().default(false),
+    formData: jsonb("form_data").notNull().default({}),
     motivoPerda: text("motivo_perda"),
     externalId: text("external_id"),
     capturedAt: timestamp("captured_at", { withTimezone: true }),

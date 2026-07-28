@@ -8,6 +8,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, rankBrokers, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { notifyNewLead } from "@/features/notifications/send-push-helper";
+import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -253,10 +254,19 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     }
     await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: lead.branchId, fromQueueId: lead.queueId, toQueueId: lead.queueId, previousOwnerId: lead.corretorId, newOwnerId: brokerId, action: "assigned", source: source ?? "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: new Date() });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.assigned" });
+    if (source === "automatic") {
+      await enqueueLeadEffectTx(tx, {
+        tenantId: context.tenantId,
+        leadId,
+        type: "NOTIFY_LEAD_ASSIGNED",
+        idempotencyKey: `lead-assigned:${leadId}:${brokerId}`,
+        payload: { branchId: lead.branchId, brokerId, leadName: lead.nome },
+      });
+    }
     return true;
   });
   const notificationWarnings: string[] = [];
-  if (assigned) {
+  if (assigned && source !== "automatic") {
     const notifyResult = await notifyNewLead(leadId, context.tenantId, lead.branchId, brokerId, lead.nome).catch(() => undefined);
     if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
   }

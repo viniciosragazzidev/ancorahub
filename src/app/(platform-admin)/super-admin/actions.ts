@@ -23,6 +23,7 @@ import { setSystemSetting } from "@/features/system-settings/queries";
 import { notificationCapabilities, notificationCapabilitySettingKey } from "@/features/notifications/catalog";
 import { resetPlatformUserRouteOnboarding } from "@/features/onboarding/route-onboarding-service";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
+import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 function boundedDistributionSetting(value: FormDataEntryValue | null, fallback: number, min: number, max: number) {
   const parsed = Number(value);
@@ -173,6 +174,33 @@ export async function createTenantAction(_: TenantCreateActionState, formData: F
     if (error instanceof TenantCnpjAlreadyExistsError) return { error: error.message };
     throw error;
   }
+}
+
+export async function updateLeadEffectOutboxSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const now = new Date();
+  const values = {
+    enabled: formData.get("enabled") === "true" ? "true" : "false",
+    maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 8, 1, 20),
+    retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
+    leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
+  };
+  await Promise.all([
+    setSystemSetting("feature_lead_intake_outbox_enabled", values.enabled, now),
+    setSystemSetting("lead_intake_outbox_max_attempts", values.maxAttempts, now),
+    setSystemSetting("lead_intake_outbox_retry_base_seconds", values.retryBaseSeconds, now),
+    setSystemSetting("lead_intake_outbox_lease_seconds", values.leaseSeconds, now),
+  ]);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.settings_updated", targetType: "system_settings", targetId: "lead_effect_outbox", metadata: values, createdAt: now });
+  revalidatePath("/super-admin/settings");
+}
+
+export async function runLeadEffectOutboxAction() {
+  const admin = await getRequiredPlatformAdmin();
+  const result = await runLeadEffectOutboxProcessor();
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.run_requested", targetType: "lead_effect_outbox", targetId: "global", metadata: result, createdAt: new Date() });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/leads/distribuicao");
 }
 
 export async function setTenantStatusAction(formData: FormData) {

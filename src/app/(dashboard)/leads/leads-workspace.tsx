@@ -252,6 +252,7 @@ export function LeadsWorkspace({
                       />
                     </TableHead>
                     <TableHead className="pl-0">Lead</TableHead>
+                    <TableHead>Tipo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Qualificação</TableHead>
                     <TableHead className="hidden md:table-cell">Saúde</TableHead>
@@ -287,6 +288,11 @@ export function LeadsWorkspace({
                         <p className={`text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
                           {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
                         </p>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+                          {lead.tipo}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <LeadStatusBadge status={lead.status} />
@@ -426,7 +432,11 @@ export function LeadsWorkspace({
                           }
                         />
                         <DetailRow label="Responsável" value={[selectedLead.corretorNome ?? "Aguardando distribuição", selectedLead.branchName ?? "Sem unidade"].join(" · ")} />
-                        <DetailRow label="Tipo" value={selectedLead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"} />
+                        <DetailRow label="Tipo" value={
+                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${selectedLead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+                            {selectedLead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
+                          </span>
+                        } />
                         <DetailRow label="Origem" value={selectedLead.sourceCampaign || (selectedLead.origem === "manual" ? "Manual" : "Webhook")} />
                         <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
                       </dl>

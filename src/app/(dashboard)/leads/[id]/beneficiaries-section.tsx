@@ -114,7 +114,7 @@ export function BeneficiariesSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="overflow-hidden rounded-lg border border-border">
+        <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
           {isCompletingHolder ? (
             <div className="flex items-start justify-between gap-3 bg-muted/30 px-3 py-3 text-sm">
               <div className="min-w-0">

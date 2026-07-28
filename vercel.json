@@ -14,6 +14,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/internal/jobs/lead-effects",
+      "schedule": "1-59/2 * * * *"
+    },
+    {
       "path": "/api/internal/jobs/whatsapp",
       "schedule": "1-59/2 * * * *"
     }

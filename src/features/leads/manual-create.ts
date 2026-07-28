@@ -11,6 +11,11 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { chooseAvailableBroker } from "./assignment";
 
+const formDataSchema = z.object({
+  dependentes: z.string().optional().nullable(),
+  mediaIdades: z.string().optional().nullable(),
+});
+
 const leadInput = z.object({
   nome: z.string().trim().min(2, "Informe o nome do lead.").max(120),
   telefone: z.string().trim().transform((value) => value.replace(/\D/g, "")).refine((value) => /^(?:55)?(?:[1-9]{2})9\d{8}$/.test(value), "Informe um celular brasileiro válido."),
@@ -19,6 +24,14 @@ const leadInput = z.object({
   tipo: z.enum(["PF", "PME"]).default("PF"),
   consentimentoLgpd: z.literal("true", { message: "O consentimento LGPD é obrigatório." }),
   duplicateConfirmed: z.literal("true").optional(),
+  formData: z.string().optional().transform((value) => {
+    if (!value) return {};
+    try {
+      return formDataSchema.parse(JSON.parse(value));
+    } catch {
+      return {};
+    }
+  }),
 });
 
 export type DuplicateLeadNotice = { id: string; nome: string; createdAt: Date; corretorNome: string | null };
@@ -62,7 +75,26 @@ export async function createManualLead(rawInput: unknown) {
   const corretorId = context.role === "broker" ? context.userId : await chooseAvailableBroker(context.tenantId, context.branchId);
   const leadId = randomUUID();
   const assigned = Boolean(corretorId);
-  await db.insert(schema.leads).values({ id: leadId, tenantId: context.tenantId, branchId: context.branchId, corretorId, planId: input.planoInteresseId || null, nome: input.nome, telefone, email: input.email || null, origem: "manual", tipo: input.tipo, status: assigned ? "distributed" : "new", distributionStatus: assigned ? "assigned" : "queued", assignmentSource: assigned ? "automatic" : null, assignmentStrategy: assigned ? "capacity" : null, distributionUpdatedAt: new Date(), assignedAt: assigned ? new Date() : null, consentimentoLgpd: true });
+  await db.insert(schema.leads).values({
+    id: leadId,
+    tenantId: context.tenantId,
+    branchId: context.branchId,
+    corretorId,
+    planId: input.planoInteresseId || null,
+    nome: input.nome,
+    telefone,
+    email: input.email || null,
+    origem: "manual",
+    tipo: input.tipo,
+    status: assigned ? "distributed" : "new",
+    distributionStatus: assigned ? "assigned" : "queued",
+    assignmentSource: assigned ? "automatic" : null,
+    assignmentStrategy: assigned ? "capacity" : null,
+    distributionUpdatedAt: new Date(),
+    assignedAt: assigned ? new Date() : null,
+    consentimentoLgpd: true,
+    formData: input.formData,
+  });
   await db.insert(schema.leadInteractions).values({ id: randomUUID(), leadId, userId: context.userId, tipo: assigned ? "system_alert" : "note", conteudo: assigned ? "Lead criado e distribuído automaticamente para um corretor disponível." : "Lead criado manualmente; aguardando corretor disponível." });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: leadId, acao: "criou" });
   

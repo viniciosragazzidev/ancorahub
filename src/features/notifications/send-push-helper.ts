@@ -170,8 +170,8 @@ export async function notifyNewLead(
   tenantId: string,
   branchId: string | null,
   corretorId: string | null,
-  leadName: string
-  , idempotencyPrefix?: string
+  leadName: string,
+  idempotencyPrefix?: string,
 ): Promise<{ notificationError?: string } | void> {
   let whatsappError: string | undefined;
   let pushError: string | undefined;

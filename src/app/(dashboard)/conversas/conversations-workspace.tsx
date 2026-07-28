@@ -346,10 +346,6 @@ export function ConversationsWorkspace({
             <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
           </div>
 
-          <Button className="ml-auto" render={<Link href="/leads" />} size="sm" variant="outline">
-            <UserList />
-            Ver leads
-          </Button>
         </div>
       </header>
 

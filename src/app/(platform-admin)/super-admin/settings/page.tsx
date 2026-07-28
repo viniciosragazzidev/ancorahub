@@ -1,6 +1,6 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,10 @@ export default async function SuperAdminSettingsPage() {
     "lead_distribution_jobs_retry_base_seconds",
     "lead_distribution_jobs_lease_seconds",
     "lead_distribution_jobs_recovery_minutes",
+    "feature_lead_intake_outbox_enabled",
+    "lead_intake_outbox_max_attempts",
+    "lead_intake_outbox_retry_base_seconds",
+    "lead_intake_outbox_lease_seconds",
     "feature_lead_management_actions_enabled",
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
@@ -56,6 +60,10 @@ export default async function SuperAdminSettingsPage() {
   const distributionRetryBaseSeconds = settingMap.get("lead_distribution_jobs_retry_base_seconds") ?? "60";
   const distributionLeaseSeconds = settingMap.get("lead_distribution_jobs_lease_seconds") ?? "120";
   const distributionRecoveryMinutes = settingMap.get("lead_distribution_jobs_recovery_minutes") ?? "5";
+  const leadEffectOutboxEnabled = settingMap.get("feature_lead_intake_outbox_enabled") !== "false";
+  const leadEffectOutboxMaxAttempts = settingMap.get("lead_intake_outbox_max_attempts") ?? "8";
+  const leadEffectOutboxRetryBaseSeconds = settingMap.get("lead_intake_outbox_retry_base_seconds") ?? "60";
+  const leadEffectOutboxLeaseSeconds = settingMap.get("lead_intake_outbox_lease_seconds") ?? "120";
 
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
@@ -388,6 +396,20 @@ export default async function SuperAdminSettingsPage() {
               </div>
 
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Outbox do recebimento de leads</CardTitle><CardDescription>Garante que distribuição e notificações sejam executadas após o commit do lead. Desativar pausa novas tentativas sem apagar a fila ou os erros auditáveis.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            <form action={updateLeadEffectOutboxSettingsAction} className="grid gap-4 lg:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm lg:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={leadEffectOutboxEnabled} className="size-4" /><span><span className="font-medium">Outbox de efeitos habilitada</span><span className="block text-xs text-muted-foreground">Kill switch global para notificações e distribuição disparadas pelo intake.</span></span></label>
+              <label className="grid gap-1 text-xs font-medium">Tentativas máximas<Input name="maxAttempts" min={1} max={20} type="number" defaultValue={leadEffectOutboxMaxAttempts} /></label>
+              <label className="grid gap-1 text-xs font-medium">Retry inicial (segundos)<Input name="retryBaseSeconds" min={15} max={3600} type="number" defaultValue={leadEffectOutboxRetryBaseSeconds} /></label>
+              <label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" min={30} max={900} type="number" defaultValue={leadEffectOutboxLeaseSeconds} /></label>
+              <div className="flex items-end"><Button type="submit">Salvar outbox</Button></div>
+            </form>
+            <form action={runLeadEffectOutboxAction} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">Executa uma passagem segura pelos efeitos pendentes e registra a intervenção na auditoria.</p><Button type="submit" variant="outline">Processar efeitos agora</Button></form>
           </CardContent>
         </Card>
 

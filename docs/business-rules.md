@@ -1,6 +1,8 @@
 # Catálogo de Regras de Negócio
 
 > **BR-029A — Distribuição automática recuperável e idempotente:** lead em fila gera trabalho persistente; o executor revalida elegibilidade e atribui somente se o lead continua sem owner. Lease vencido ou falha transitória devolve o trabalho à fila com motivo; falha definitiva fica visível e auditável para intervenção humana. Origem: DEC-038.
+>
+> **BR-029B — Intake confirmado com efeitos duráveis:** uma entrega autenticada só retorna sucesso após o commit de lead, auditoria, timeline, evento de fila e efeitos idempotentes pendentes. Falha de distribuição ou notificação não remove o lead; o efeito usa retry e, ao esgotar, vira exceção auditável e alertada. Origem: DEC-058.
 
 **Estado:** base de implementação · **Fonte:** `CorreTop_Documento_Requisitos.md` ·
 **Convenção:** uma regra deve ter identificador, gatilho, resultado observável e

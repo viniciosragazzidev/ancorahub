@@ -74,6 +74,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       sourceCampaign: schema.leads.sourceCampaign,
       tipo: schema.leads.tipo,
       status: schema.leads.status,
+      formData: schema.leads.formData,
       qualificationDetails: schema.leads.qualificationDetails,
       corretorId: schema.leads.corretorId,
       branchId: schema.leads.branchId,
@@ -99,6 +100,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   if (!lead) notFound();
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
+  const formData = readFormData(lead.formData);
   const slaMinutes = Number((await getDatabase().select({ minutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1))[0]?.minutes ?? 15);
   const elapsedMinutes = Math.max(0, Math.round((getCurrentTimestamp() - lead.stageEnteredAt.getTime()) / 60000));
   const remainingMinutes = Math.max(0, slaMinutes - elapsedMinutes);
@@ -313,6 +315,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </CardContent>
                 </Card>
               )}
+              {/* ── Dados adicionais do formulário (PF / PME) ──────────────── */}
+              {(formData.dependentes || formData.mediaIdades) && lead.tipo === "PF" && (
+                <Card className="border-border bg-card shadow-none">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Dados informados no cadastro</CardTitle>
+                    <CardDescription>Informações adicionais coletadas durante a criação do lead.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+                    {formData.dependentes && (
+                      <div><p className="text-xs text-muted-foreground">Dependentes</p><p className="mt-1 font-medium">{formData.dependentes}</p></div>
+                    )}
+                    {formData.mediaIdades && (
+                      <div><p className="text-xs text-muted-foreground">Média de idades</p><p className="mt-1 font-medium">{formData.mediaIdades} anos</p></div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
               <div className="grid gap-4 lg:grid-cols-2">
                 <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} />
                 <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
@@ -495,5 +514,14 @@ function readQualificationDetails(value: unknown) {
     numberOfLives: read("numberOfLives"),
     averageAge: read("averageAge"),
     individualAges: read("individualAges"),
+  };
+}
+
+function readFormData(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {} as Record<string, string | null>;
+  const data = value as Record<string, unknown>;
+  return {
+    dependentes: typeof data.dependentes === "string" ? data.dependentes : null,
+    mediaIdades: typeof data.mediaIdades === "string" ? data.mediaIdades : null,
   };
 }

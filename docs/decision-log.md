@@ -1,5 +1,7 @@
 # Registro de Decisões de Produto e Arquitetura
 
+> **DEC-058 — Intake transacional e outbox de efeitos (aceita em 2026-07-28):** o webhook confirma um lead somente após gravar, na mesma transação, a entrega idempotente, o lead, a timeline, auditoria, evento de distribuição e efeitos pendentes. Distribuição e notificações são executadas fora da requisição por outbox com lease, retry e dead-letter; falha externa não recria o lead nem apaga o trabalho. O Super-admin controla o processador e toda exceção permanece rastreável.
+>
 > **DEC-038 — Processamento resiliente da distribuição (aceita em 2026-07-20):** a distribuição automática usa fila persistente no PostgreSQL e executores idempotentes por rota interna protegida. Locks possuem lease recuperável, falhas transitórias usam backoff configurável e parâmetros iniciais conservadores (lote 25, lease 2 minutos, máximo 8 tentativas) são reversíveis e auditáveis pelo Super-admin. A regra comercial já existente de capacidade, round-robin e SLA não é alterada.
 
 Use este registro para decisões que alteram comportamento, escopo, custo, risco ou

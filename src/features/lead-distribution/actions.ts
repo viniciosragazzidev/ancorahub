@@ -8,6 +8,7 @@ import { routeLeadToBranch, assignLeadToBroker, processQueuedLead, routeLeadToBr
 import { enqueueLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
+import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 export type DistributionActionState = { success?: boolean; message?: string; error?: string; processed?: number; conflicts?: number };
 const leadId = z.string().uuid();
@@ -43,6 +44,21 @@ function refreshDistribution() {
   revalidatePath("/leads");
   revalidatePath("/leads/distribuicao");
   revalidatePath("/dashboard");
+}
+
+export async function retryLeadEffectAction(formData: FormData) {
+  const parsed = z.string().uuid().safeParse(formData.get("effectId"));
+  if (!parsed.success) throw new Error("Efeito inválido.");
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão para reprocessar efeitos.");
+  const [effect] = await getDatabase().select({ id: schema.leadEffectOutbox.id, branchId: schema.leads.branchId })
+    .from(schema.leadEffectOutbox).innerJoin(schema.leads, eq(schema.leadEffectOutbox.leadId, schema.leads.id))
+    .where(and(eq(schema.leadEffectOutbox.id, parsed.data), eq(schema.leadEffectOutbox.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  if (!effect || (context.role === "manager" && effect.branchId !== context.branchId)) throw new Error("Efeito não encontrado no seu escopo.");
+  const retried = await retryLeadEffectForTenant({ tenantId: context.tenantId, effectId: effect.id });
+  if (!retried) throw new Error("Este efeito não está disponível para reprocessamento.");
+  await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_effect_outbox", entidadeId: effect.id, acao: "lead_effect.retry_requested" });
+  refreshDistribution();
 }
 
 export async function routeLeadToBranchAction(_previous: DistributionActionState, formData: FormData): Promise<DistributionActionState> {
