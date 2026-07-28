@@ -1152,10 +1152,15 @@ export const notifications = pgTable(
     type: text("type").notNull(),
     title: text("title").notNull(),
     message: text("message").notNull(),
+    idempotencyKey: text("idempotency_key"),
     readAt: timestamp("read_at", { withTimezone: true }),
     createdAt,
   },
-  (table) => [index("notifications_recipient_created_idx").on(table.recipientUserId, table.createdAt), index("notifications_tenant_idx").on(table.tenantId)],
+  (table) => [
+    index("notifications_recipient_created_idx").on(table.recipientUserId, table.createdAt),
+    index("notifications_tenant_idx").on(table.tenantId),
+    uniqueIndex("notifications_tenant_idempotency_unique").on(table.tenantId, table.idempotencyKey).where(sql`${table.idempotencyKey} IS NOT NULL`),
+  ],
 );
 
 export const routeOnboardingProgress = pgTable(
@@ -1412,6 +1417,44 @@ export const aiConversations = pgTable(
     index("ai_conversations_tenant_lead_idx").on(table.tenantId, table.leadId),
     index("ai_conversations_assigned_user_idx").on(table.assignedUserId),
     index("ai_conversations_behavior_version_idx").on(table.tenantId, table.behaviorVersionId),
+  ],
+);
+
+/**
+ * Durable side effects emitted by lead intake and distribution. The aggregate
+ * state and this record are committed together; workers may then retry without
+ * replaying the webhook or changing lead ownership twice.
+ */
+export const leadEffectOutbox = pgTable(
+  "lead_effect_outbox",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    // Declared without a Drizzle relation because webhook_deliveries is defined
+    // later in this schema; the database migration still enforces the FK.
+    webhookDeliveryId: text("webhook_delivery_id"),
+    type: text("type").notNull(),
+    status: text("status").notNull().default("pending"),
+    payload: jsonb("payload").notNull().default({}),
+    idempotencyKey: text("idempotency_key").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(8),
+    runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lockedBy: text("locked_by"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    lastErrorMessage: text("last_error_message"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("lead_effect_outbox_tenant_idempotency_unique").on(table.tenantId, table.idempotencyKey),
+    index("lead_effect_outbox_due_idx").on(table.status, table.runAfter),
+    index("lead_effect_outbox_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt),
   ],
 );
 

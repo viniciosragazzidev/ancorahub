@@ -2,12 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-:root {
-  --zoom-factor: 1.1;
-}
-
 html {
-  zoom: var(--zoom-factor);
+  font-size: 110%;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -371,49 +367,15 @@ html {
   color: var(--success) !important;
 }
 
-/* Compensar altura dos elementos fixed para o zoom — evita que o footer
-   do sidebar (perfil do usuário) e o rodapé do conteúdo principal fiquem
-   cortados pelo overflow: hidden no body.                                        */
-[data-slot="sidebar-container"] {
-  height: calc(100svh / var(--zoom-factor, 1)) !important;
-}
-[data-slot="sidebar-inset"] {
-  height: calc(100dvh / var(--zoom-factor, 1)) !important;
-}
 
-/* Compensar altura dos side-sheets (ex.: detalhes do lead) para o zoom.
-   Com zoom:1.1, h-[calc(100dvh-1rem)] renderiza 110% da viewport,
-   cortando botoes inferiores. Dividimos pelo fator de zoom para
-   que o tamanho visual coincida com a viewport.                   */
-[data-slot="sheet-content"][data-side="right"],
-[data-slot="sheet-content"][data-side="left"] {
-  height: calc((100dvh - 1rem) / var(--zoom-factor, 1)) !important;
-  max-height: calc((100dvh - 1rem) / var(--zoom-factor, 1)) !important;
-}
-@media (min-width: 640px) {
-  [data-slot="sheet-content"][data-side="right"],
-  [data-slot="sheet-content"][data-side="left"] {
-    height: calc((100dvh - 1.5rem) / var(--zoom-factor, 1)) !important;
-    max-height: calc((100dvh - 1.5rem) / var(--zoom-factor, 1)) !important;
-  }
-}
-/* Mobile — sheet vira bottom drawer com altura diferente */
-@media (max-width: 559px) {
-  [data-slot="sheet-content"][data-side="right"],
-  [data-slot="sheet-content"][data-side="left"] {
-    height: calc(min(92dvh, 48rem) / var(--zoom-factor, 1)) !important;
-    max-height: calc(min(92dvh, 48rem) / var(--zoom-factor, 1)) !important;
-  }
-}
 
 * {
   box-sizing: border-box;
 }
 
 html {
-  /* zoom no html afeta position:fixed/sticky — overflow:hidden no html
-     interfere com o scroll container, cortando o sticky header. O body
-     assume o controle do overflow para evitar scroll duplo do documento. */
+  /* font-size: 110% escala textos e componentes rem sem quebrar
+     elementos position:fixed/sticky, ao contrário do zoom.       */
   min-height: 100%;
 }
 

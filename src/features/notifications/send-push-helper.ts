@@ -141,9 +141,10 @@ export async function publishNotification(input: {
   pushBody?: string;
   url?: string;
   tag?: string;
+  idempotencyKey?: string;
 }) {
   if (!(await isNotificationCapabilityEnabled(input.capability))) return false;
-  await getDatabase().insert(schema.notifications).values({
+  const inserted = await getDatabase().insert(schema.notifications).values({
     id: randomUUID(),
     tenantId: input.tenantId,
     recipientUserId: input.recipientUserId,
@@ -151,8 +152,10 @@ export async function publishNotification(input: {
     type: input.type,
     title: input.title,
     message: input.message,
+    idempotencyKey: input.idempotencyKey ?? null,
     createdAt: new Date(),
-  });
+  }).onConflictDoNothing().returning({ id: schema.notifications.id });
+  if (!inserted.length) return true;
   await sendNotificationToUser(input.recipientUserId, {
     title: input.pushTitle ?? input.title,
     body: input.pushBody ?? input.message,
@@ -168,6 +171,7 @@ export async function notifyNewLead(
   branchId: string | null,
   corretorId: string | null,
   leadName: string
+  , idempotencyPrefix?: string
 ): Promise<{ notificationError?: string } | void> {
   let whatsappError: string | undefined;
   let pushError: string | undefined;
@@ -242,7 +246,8 @@ export async function notifyNewLead(
               ? `"${leadName}" chegou e foi distribuído.`
               : `"${leadName}" está aguardando distribuição.`,
             url: `/leads/${leadId}`,
-            tag: "corretop-leads",
+          tag: "corretop-leads",
+            idempotencyKey: idempotencyPrefix ? `${idempotencyPrefix}:${target.userId}` : undefined,
           });
         })
       );
@@ -261,7 +266,7 @@ export async function notifyNewLead(
 /**
  * Notify managers and directors about a new lead arrival (pre-distribution).
  */
-export async function notifyLeadArrived(leadId: string, tenantId: string, branchId: string | null, leadName: string) {
+export async function notifyLeadArrived(leadId: string, tenantId: string, branchId: string | null, leadName: string, idempotencyPrefix?: string) {
   if (!(await isNotificationCapabilityEnabled("lead_arrived"))) return;
 
   const recipients = await getDatabase()
@@ -296,6 +301,7 @@ export async function notifyLeadArrived(leadId: string, tenantId: string, branch
         pushBody: `"${leadName}" acabou de chegar no sistema.`,
         url: `/leads/${leadId}`,
         tag: "corretop-leads",
+        idempotencyKey: idempotencyPrefix ? `${idempotencyPrefix}:${recipient.userId}` : undefined,
       })
     )
   );
