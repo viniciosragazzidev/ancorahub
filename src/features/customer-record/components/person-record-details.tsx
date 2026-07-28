@@ -4,6 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Dependent = { id: string; name: string; birthDate: string; relationship: string; isHolder: boolean };
 
+type FormDataInfo = {
+  dependentes?: string | null;
+  mediaIdades?: string | null;
+};
+
 export function PersonRecordDetails({
   kind,
   createdAt,
@@ -11,6 +16,7 @@ export function PersonRecordDetails({
   consentimentoLgpd,
   dependents,
   documentCount,
+  formData,
 }: {
   kind: "lead" | "client";
   createdAt: Date;
@@ -18,6 +24,7 @@ export function PersonRecordDetails({
   consentimentoLgpd: boolean;
   dependents: Dependent[];
   documentCount: number;
+  formData?: FormDataInfo | null;
 }) {
   return (
     <Card className="border-border bg-card shadow-sm">
@@ -35,6 +42,23 @@ export function PersonRecordDetails({
           <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-muted-foreground"><CalendarBlank className="size-3.5" /> Aniversário</span><span className="font-medium">{birthDate ? new Intl.DateTimeFormat("pt-BR").format(new Date(`${birthDate}T00:00:00`)) : "Ainda não informado"}</span></div>
           <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-muted-foreground"><CheckCircle className="size-3.5" /> Consentimento LGPD</span><Badge variant={consentimentoLgpd ? "success" : "outline"}>{consentimentoLgpd ? "Registrado" : "Pendente"}</Badge></div>
         </div>
+        {/* ── Informações adicionais do formulário (PF) ───────────── */}
+        {(formData?.dependentes || formData?.mediaIdades) && (
+          <div className="grid grid-cols-2 gap-2">
+            {formData.dependentes && (
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Dependentes (form.)</p>
+                <p className="mt-1 text-sm font-semibold">{formData.dependentes}</p>
+              </div>
+            )}
+            {formData.mediaIdades && (
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Média de idades</p>
+                <p className="mt-1 text-sm font-semibold">{formData.mediaIdades} anos</p>
+              </div>
+            )}
+          </div>
+        )}
         <div className="border-t border-border/50 pt-3">
           <div className="mb-2 flex items-center justify-between"><p className="flex items-center gap-2 text-xs font-semibold"><UserList className="size-4 text-primary" /> Dependentes</p><Badge variant="outline" className="text-[10px]">{dependents.length}</Badge></div>
           {dependents.length ? <div className="space-y-2">{dependents.map((dependent) => <div className="flex items-center justify-between rounded-lg bg-muted/20 px-3 py-2 text-xs" key={dependent.id}><span className="font-medium">{dependent.name}{dependent.isHolder ? " · Titular" : ""}</span><span className="text-muted-foreground">{dependent.relationship}</span></div>)}</div> : <p className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-xs text-muted-foreground">Nenhum dependente cadastrado.</p>}

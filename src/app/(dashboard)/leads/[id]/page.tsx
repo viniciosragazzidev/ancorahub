@@ -352,7 +352,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Card>
               )}
               <div className="grid gap-4 lg:grid-cols-2">
-                <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} />
+                <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
                 <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
               </div>
               <LeadChat phone={canSeePersonalData ? lead.telefone : null} />
