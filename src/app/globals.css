@@ -373,7 +373,7 @@ html {
 
 /* Compensar altura dos elementos fixed para o zoom — evita que o footer
    do sidebar (perfil do usuário) e o rodapé do conteúdo principal fiquem
-   cortados pelo overflow: hidden no html.                                        */
+   cortados pelo overflow: hidden no body.                                        */
 [data-slot="sidebar-container"] {
   height: calc(100svh / var(--zoom-factor, 1)) !important;
 }
@@ -385,14 +385,16 @@ html {
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
+  /* zoom no html afeta position:fixed/sticky — overflow:hidden no html
+     interfere com o scroll container, cortando o sticky header. O body
+     assume o controle do overflow para evitar scroll duplo do documento. */
   min-height: 100%;
-  overflow: hidden;
-  font-size: 14px;
 }
 
 body {
+  height: 100dvh;
+  overflow: hidden;
   margin: 0;
   background: var(--background);
   color: var(--foreground);

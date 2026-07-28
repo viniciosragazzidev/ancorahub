@@ -34,9 +34,14 @@ describe("QuickReplyResolver", () => {
     expect(resolveQuickReply({ body: "atendente", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false })).toMatchObject({ intent: "REQUEST_HUMAN", nextState: "WAITING_HUMAN" });
   });
 
-  it("uses returning-lead template instead of first greeting", () => {
+  it("does not interrupt a pending qualification question with a greeting", () => {
     const result = resolveQuickReply({ body: "Oi", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: true });
-    expect(result.templateKey).toBe("conversation.returning_lead");
+    expect(result).toMatchObject({ resolved: false, templateKey: null });
+  });
+
+  it("does not replace a pending boolean answer with a generic template", () => {
+    const result = resolveQuickReply({ body: "sim", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: true });
+    expect(result).toMatchObject({ resolved: false, templateKey: null });
   });
 
   it("handles media and suppresses duplicate waiting replies after cooldown", () => {
