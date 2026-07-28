@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run build:extension && node scripts/package-browser-extension.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "node scripts/check-encoding.mjs && eslint",
