@@ -316,7 +316,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Card>
               )}
               {/* ── Dados adicionais do formulário (PF / PME) ──────────────── */}
-              {(formData.dependentes || formData.mediaIdades) && lead.tipo === "PF" && (
+              {(lead.tipo === "PF" && (formData.dependentes || formData.mediaIdades)) && (
                 <Card className="border-border bg-card shadow-none">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm">Dados informados no cadastro</CardTitle>
@@ -328,6 +328,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     )}
                     {formData.mediaIdades && (
                       <div><p className="text-xs text-muted-foreground">Média de idades</p><p className="mt-1 font-medium">{formData.mediaIdades} anos</p></div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+              {(lead.tipo === "PME" && (formData.razaoSocial || formData.cnpj || formData.funcionarios)) && (
+                <Card className="border-border bg-card shadow-none">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Dados da empresa (PME)</CardTitle>
+                    <CardDescription>Informações da pessoa jurídica contratante.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+                    {formData.razaoSocial && (
+                      <div><p className="text-xs text-muted-foreground">Razão social</p><p className="mt-1 font-medium">{formData.razaoSocial}</p></div>
+                    )}
+                    {formData.cnpj && (
+                      <div><p className="text-xs text-muted-foreground">CNPJ</p><p className="mt-1 font-medium">{formData.cnpj}</p></div>
+                    )}
+                    {formData.funcionarios && (
+                      <div><p className="text-xs text-muted-foreground">Funcionários</p><p className="mt-1 font-medium">{formData.funcionarios}</p></div>
                     )}
                   </CardContent>
                 </Card>
@@ -523,5 +542,8 @@ function readFormData(value: unknown) {
   return {
     dependentes: typeof data.dependentes === "string" ? data.dependentes : null,
     mediaIdades: typeof data.mediaIdades === "string" ? data.mediaIdades : null,
+    razaoSocial: typeof data.razaoSocial === "string" ? data.razaoSocial : null,
+    cnpj: typeof data.cnpj === "string" ? data.cnpj : null,
+    funcionarios: typeof data.funcionarios === "string" ? data.funcionarios : null,
   };
 }

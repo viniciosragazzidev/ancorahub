@@ -31,6 +31,9 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
   const [tipo, setTipo] = useState("PF");
   const [dependentes, setDependentes] = useState("");
   const [mediaIdades, setMediaIdades] = useState("");
+  const [razaoSocial, setRazaoSocial] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [funcionarios, setFuncionarios] = useState("");
 
   const groups = groupPlansByCarrier(plans);
 
@@ -114,12 +117,47 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
         </div>
       )}
 
-      {/* ── PME-specific fields (placeholder para futura implementação) ─────── */}
+      {/* ── PME-specific fields ─────────────────────────────────────────────── */}
       {tipo === "PME" && (
         <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
-            <p className="text-sm font-semibold">Dados para PME</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Campos específicos para pessoa jurídica serão adicionados em breve.</p>
+            <p className="text-sm font-semibold">Dados da empresa (PME)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Informações sobre a pessoa jurídica contratante.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5 col-span-2">
+              <Label htmlFor="lead-razao-social">Razão social</Label>
+              <Input
+                id="lead-razao-social"
+                name="razaoSocial"
+                placeholder="Ex.: Empresa Exemplo Ltda."
+                value={razaoSocial}
+                onChange={(e) => setRazaoSocial(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lead-cnpj">CNPJ</Label>
+              <Input
+                id="lead-cnpj"
+                name="cnpj"
+                placeholder="00.000.000/0001-00"
+                value={cnpj}
+                onChange={(e) => setCnpj(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lead-funcionarios">Número de funcionários</Label>
+              <Input
+                id="lead-funcionarios"
+                name="funcionarios"
+                type="number"
+                min={0}
+                max={99999}
+                placeholder="Ex.: 50"
+                value={funcionarios}
+                onChange={(e) => setFuncionarios(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -154,7 +192,13 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       <CardDescription>Tenant, filial, origem e atribuição são definidos com segurança no servidor.</CardDescription>
 
       {/* Hidden fields to pass form_data as JSON */}
-      <input type="hidden" name="formData" value={JSON.stringify({ dependentes: dependentes || null, mediaIdades: mediaIdades || null })} />
+      <input type="hidden" name="formData" value={JSON.stringify({
+        dependentes: dependentes || null,
+        mediaIdades: mediaIdades || null,
+        razaoSocial: razaoSocial || null,
+        cnpj: cnpj || null,
+        funcionarios: funcionarios || null,
+      })} />
     </form>
   );
 }

@@ -14,6 +14,9 @@ import { chooseAvailableBroker } from "./assignment";
 const formDataSchema = z.object({
   dependentes: z.string().optional().nullable(),
   mediaIdades: z.string().optional().nullable(),
+  razaoSocial: z.string().optional().nullable(),
+  cnpj: z.string().optional().nullable(),
+  funcionarios: z.string().optional().nullable(),
 });
 
 const leadInput = z.object({
