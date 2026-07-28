@@ -27,7 +27,7 @@ export function mountPanel(
 ): MountedPanel | null {
   const attachButton = document.querySelector<HTMLButtonElement>('button[aria-label="Anexar"]');
   const attachSlot = attachButton?.closest("span");
-  if (!attachSlot) return null;
+  if (!attachButton || !attachSlot) return null;
 
   const host = document.createElement("span");
   host.id = "ancorahub-assistant-menu";
@@ -35,9 +35,9 @@ export function mountPanel(
   host.hidden = true;
   const shadow = host.attachShadow({ mode: "closed" });
   shadow.innerHTML = `<style>
-    :host{--dropdown-open-dur:250ms;--dropdown-close-dur:150ms;--dropdown-pre-scale:.97;--dropdown-closing-scale:.99;--dropdown-ease:cubic-bezier(.22,1,.36,1);display:inline-block;position:relative;font-family:Inter,ui-sans-serif,system-ui,sans-serif}:host([hidden]){display:none}.trigger{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#54656f;cursor:pointer}.trigger:hover,.trigger:focus-visible{background:#f0f2f5;color:#176b5d;outline:0}.anchor{font-size:18px;font-weight:800;line-height:1}.t-dropdown{position:absolute;z-index:2;bottom:44px;left:-4px;width:264px;overflow:hidden;border:1px solid #e4e8eb;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(11,20,26,.2);transform-origin:bottom left;transform:scale(var(--dropdown-pre-scale));opacity:0;pointer-events:none;transition:transform var(--dropdown-open-dur) var(--dropdown-ease),opacity var(--dropdown-open-dur) var(--dropdown-ease);will-change:transform,opacity}.t-dropdown.is-open{transform:scale(1);opacity:1;pointer-events:auto}.t-dropdown.is-closing{transform:scale(var(--dropdown-closing-scale));opacity:0;pointer-events:none;transition:transform var(--dropdown-close-dur) var(--dropdown-ease),opacity var(--dropdown-close-dur) var(--dropdown-ease)}.head{display:flex;align-items:center;gap:9px;padding:12px 12px 8px}.mark{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#e5f7ef;color:#176b5d;font-size:11px;font-weight:800}.identity{min-width:0;flex:1}.identity strong{display:block;overflow:hidden;color:#111b21;font-size:13px;text-overflow:ellipsis;white-space:nowrap}.identity span{display:block;margin-top:2px;color:#667781;font-size:11px}.close{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#667781;font-size:20px;cursor:pointer}.close:hover,.close:focus-visible{background:#f0f2f5;color:#111b21;outline:0}.body{padding:0 6px 8px}.next{margin:0;padding:7px 12px 9px;color:#667781;font-size:11px}.next strong{display:block;margin-top:3px;overflow:hidden;color:#25323a;font-size:12px;text-overflow:ellipsis;white-space:nowrap}.actions{display:grid}.action,.suggestion{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:#fff;color:#25323a;font:inherit;font-size:13px;text-align:left;cursor:pointer}.action:hover,.action:focus-visible,.suggestion:hover,.suggestion:focus-visible{background:#f5f6f6;color:#111b21;outline:0}.action .item-icon{display:grid;place-items:center;width:20px;color:#176b5d;font-size:16px}.suggestions{display:grid;gap:2px;margin:4px 0}.suggestion{min-height:38px;padding:8px 12px 8px 44px;color:#42515a;font-size:12px;line-height:1.35}.hint{margin:7px 12px 3px;color:#667781;font-size:10px;line-height:1.35}.loading{margin:8px 12px;color:#667781;font-size:11px}@media (prefers-reduced-motion:reduce){.t-dropdown{transition:none!important}}
-  </style><button class="trigger" type="button" aria-label="Abrir AncoraHub Assistant" aria-expanded="false"><span class="anchor" aria-hidden="true">⚓</span></button><section class="t-dropdown" data-origin="bottom-left" aria-label="Ações do AncoraHub Assistant"><div id="content"></div></section>`;
-  attachSlot.after(host);
+    :host{--dropdown-open-dur:250ms;--dropdown-close-dur:150ms;--dropdown-pre-scale:.97;--dropdown-closing-scale:.99;--dropdown-ease:cubic-bezier(.22,1,.36,1);display:inline-flex;position:relative;flex:0 0 auto;vertical-align:middle;font-family:Inter,ui-sans-serif,system-ui,sans-serif}:host([hidden]){display:none}.trigger{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#111b21;cursor:pointer}.trigger:hover,.trigger:focus-visible{background:#f0f2f5;color:#000;outline:0}.anchor{display:block;width:19px;height:19px}.t-dropdown{position:absolute;z-index:2;bottom:44px;left:-4px;width:264px;overflow:hidden;border:1px solid #e4e8eb;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(11,20,26,.2);transform-origin:bottom left;transform:scale(var(--dropdown-pre-scale));opacity:0;pointer-events:none;transition:transform var(--dropdown-open-dur) var(--dropdown-ease),opacity var(--dropdown-open-dur) var(--dropdown-ease);will-change:transform,opacity}.t-dropdown.is-open{transform:scale(1);opacity:1;pointer-events:auto}.t-dropdown.is-closing{transform:scale(var(--dropdown-closing-scale));opacity:0;pointer-events:none;transition:transform var(--dropdown-close-dur) var(--dropdown-ease),opacity var(--dropdown-close-dur) var(--dropdown-ease)}.head{display:flex;align-items:center;gap:9px;padding:12px 12px 8px}.mark{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#e5f7ef;color:#176b5d;font-size:11px;font-weight:800}.identity{min-width:0;flex:1}.identity strong{display:block;overflow:hidden;color:#111b21;font-size:13px;text-overflow:ellipsis;white-space:nowrap}.identity span{display:block;margin-top:2px;color:#667781;font-size:11px}.close{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#667781;font-size:20px;cursor:pointer}.close:hover,.close:focus-visible{background:#f0f2f5;color:#111b21;outline:0}.body{padding:0 6px 8px}.next{margin:0;padding:7px 12px 9px;color:#667781;font-size:11px}.next strong{display:block;margin-top:3px;overflow:hidden;color:#25323a;font-size:12px;text-overflow:ellipsis;white-space:nowrap}.actions{display:grid}.action,.suggestion{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:#fff;color:#25323a;font:inherit;font-size:13px;text-align:left;cursor:pointer}.action:hover,.action:focus-visible,.suggestion:hover,.suggestion:focus-visible{background:#f5f6f6;color:#111b21;outline:0}.action .item-icon{display:grid;place-items:center;width:20px;color:#176b5d;font-size:16px}.suggestions{display:grid;gap:2px;margin:4px 0}.suggestion{min-height:38px;padding:8px 12px 8px 44px;color:#42515a;font-size:12px;line-height:1.35}.hint{margin:7px 12px 3px;color:#667781;font-size:10px;line-height:1.35}.loading{margin:8px 12px;color:#667781;font-size:11px}@media (prefers-reduced-motion:reduce){.t-dropdown{transition:none!important}}
+  </style><button class="trigger" type="button" aria-label="Abrir AncoraHub Assistant" aria-expanded="false"><svg class="anchor" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M14.5 5.5C14.5 6.88071 13.3807 8 12 8C10.6193 8 9.5 6.88071 9.5 5.5C9.5 4.11929 10.6193 3 12 3C13.3807 3 14.5 4.11929 14.5 5.5Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M12 8V21" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M5 13L3 12C3 16.9706 7.02944 21 12 21C16.9706 21 21 16.9706 21 12L19 13" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/></svg></button><section class="t-dropdown" data-origin="bottom-left" aria-label="Ações do AncoraHub Assistant"><div id="content"></div></section>`;
+  attachButton.after(host);
 
   const trigger = shadow.querySelector<HTMLButtonElement>(".trigger")!;
   const dropdown = shadow.querySelector<HTMLElement>(".t-dropdown")!;
@@ -57,9 +57,11 @@ export function mountPanel(
     trigger.setAttribute("aria-expanded", "false");
     closeTimer = window.setTimeout(() => dropdown.classList.remove("is-closing"), 150);
   };
-  trigger.addEventListener("click", () => dropdown.classList.contains("is-open") ? close() : open());
+  trigger.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); dropdown.classList.contains("is-open") ? close() : open(); });
 
   shadow.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     const target = (event.target as Element).closest<HTMLElement>("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
@@ -68,6 +70,7 @@ export function mountPanel(
     if (action === "insert" && target.dataset.text) return void onInsertText(target.dataset.text).then(close);
     if (action === "quick-reply" && target.dataset.leadId && target.dataset.version) {
       const goal = target.dataset.goal as QuickReplyGoal;
+      const originalMarkup = target.innerHTML;
       target.setAttribute("disabled", "true");
       target.textContent = "Preparando…";
       void onQuickReply(target.dataset.leadId, Number(target.dataset.version), goal)
@@ -76,9 +79,10 @@ export function mountPanel(
           const existing = content.querySelector(".suggestions");
           if (existing) existing.innerHTML = list || "<p class=\"loading\">Não foi possível preparar uma sugestão agora.</p>";
         })
-        .catch(() => { target.removeAttribute("disabled"); target.textContent = "Tentar novamente"; });
+        .catch(() => { target.removeAttribute("disabled"); target.innerHTML = originalMarkup; });
     }
   });
+  shadow.addEventListener("pointerdown", (event) => { event.stopPropagation(); });
 
   return {
     hide() { host.hidden = true; close(); },
