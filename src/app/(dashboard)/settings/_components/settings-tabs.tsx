@@ -17,7 +17,7 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
     { id: "empresa", label: "Empresa", icon: Building06Icon },
     { id: "unidade", label: "Unidade", icon: Store01Icon },
     { id: "atendimento", label: "Atendimento", icon: Message01Icon },
-    { id: "ia", label: "Atendimento inteligente", icon: Message01Icon },
+    { id: "ia", label: "Treinamento do agente", icon: Message01Icon },
     { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
     { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
     { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },

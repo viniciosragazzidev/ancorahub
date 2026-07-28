@@ -222,7 +222,7 @@ export default function PublicSpreadsheetPage() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-background p-4 lg:p-8">
+    <div className="h-dvh overflow-y-auto overscroll-contain bg-background p-4 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-4">
         {/* Header */}
         <div>

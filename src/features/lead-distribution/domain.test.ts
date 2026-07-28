@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseBroker, isValidDutyWindow } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, isValidDutyWindow, rankBrokers } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -28,5 +28,17 @@ describe("lead distribution domain", () => {
     expect(isValidDutyWindow(1, "09:00", "18:00")).toBe(true);
     expect(isValidDutyWindow(1, "18:00", "09:00")).toBe(false);
     expect(isValidDutyWindow(8, "09:00", "18:00")).toBe(false);
+  });
+
+  it("always ranks active duty before performance, then uses a deterministic fallback", () => {
+    const ranked = rankBrokers([
+      { id: "high", createdAt: new Date("2026-01-01"), activeLeads: 1, capacity: null, onDuty: false, conversionRate: 1, slaRate: 1, manualPriority: 1, idleSince: new Date("2026-01-01"), rankingScore: 100 },
+      { id: "duty", createdAt: new Date("2026-01-02"), activeLeads: 3, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+    ], defaultIntelligentDistributionPolicy);
+    expect(ranked.map((broker) => broker.id)).toEqual(["duty", "high"]);
+  });
+
+  it("calculates an explainable weighted broker score", () => {
+    expect(calculateBrokerRankingScore({ conversionRate: 1, slaRate: 1, manualPriority: 0 }, defaultIntelligentDistributionPolicy)).toBe(80);
   });
 });

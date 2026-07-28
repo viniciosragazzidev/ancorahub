@@ -9,6 +9,7 @@ import { chooseAvailableBroker } from "@/features/leads/assignment";
 import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-push-helper";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { lpFormPayloadSchema } from "../schemas/lp-form-payload.schema";
 import {
   hashNormalizedWebhookPayload,
@@ -130,7 +131,8 @@ export async function createLeadFromWebhookSync(
   // ── Step 7: Distribute FIRST (synchronous round-robin) ─────────────
   // This MUST happen before the INSERT so the lead is born with corretor_id set.
   // The Realtime event then fires with the correct corretor_id.
-  const corretorId = await chooseAvailableBroker(tenantId, branchId, undefined, credentialId);
+  const qualificationEngineEnabled = await getSystemSetting("feature_qualification_engine_enabled").then((value) => value === "true").catch(() => false);
+  const corretorId = qualificationEngineEnabled ? null : await chooseAvailableBroker(tenantId, branchId, undefined, credentialId);
   const assigned = Boolean(corretorId);
 
   // ── Step 8: Create lead + beneficiary in a single transaction ──────
@@ -190,21 +192,19 @@ export async function createLeadFromWebhookSync(
   });
 
   // ── Step 10: Enqueue distribution job if lead was queued ───────────
-  if (!assigned && branchId) {
-    await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => {});
-  }
-
   // ── Step 11: Push notifications (synchronous) ───────────────────────
-  await Promise.all([
-    notifyLeadArrived(leadId, tenantId, branchId, normalizedName),
-    notifyNewLead(leadId, tenantId, branchId, corretorId, normalizedName),
-  ]);
+  await notifyLeadArrived(leadId, tenantId, branchId, normalizedName);
+  if (corretorId) await notifyNewLead(leadId, tenantId, branchId, corretorId, normalizedName);
 
   // The assistant is deliberately best-effort: a disabled/misconfigured AI or
   // WhatsApp channel must never make the lead webhook fail.
-  await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId }).catch((error) => {
+  const qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId }).catch((error) => {
     console.error("[ai-qualification] start deferred", { tenantId, leadId, error: error instanceof Error ? error.message : "unknown" });
+    return { started: false as const, reason: "failed" as const };
   });
+  if (!assigned && branchId && (!qualificationEngineEnabled || !qualificationStart.started)) {
+    await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => {});
+  }
 
   return { success: true, leadId, duplicate: false };
 }

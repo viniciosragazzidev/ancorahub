@@ -23,7 +23,7 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="h-dvh overflow-y-auto overscroll-contain bg-background text-foreground">
       <header className="border-b bg-background/95">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link aria-label="Voltar à página inicial do CorreTop" className="flex items-center" href="/"><CorreTopLogo className="h-7 w-28 object-contain object-left" /></Link>

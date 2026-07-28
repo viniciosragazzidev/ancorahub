@@ -2,6 +2,38 @@ import type { AssignmentStrategy } from "./types";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
 
+export type IntelligentDistributionPolicy = {
+  excludedBrokerIds: string[];
+  excludedBranchIds: string[];
+  ranking: { enabled: boolean; conversionWeight: number; slaWeight: number; manualPriorityWeight: number };
+};
+
+export type RankedBroker = EligibleBroker & { onDuty: boolean; conversionRate: number; slaRate: number; manualPriority: number; idleSince: Date | null; rankingScore: number };
+
+export const defaultIntelligentDistributionPolicy: IntelligentDistributionPolicy = {
+  excludedBrokerIds: [], excludedBranchIds: [],
+  ranking: { enabled: true, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 },
+};
+
+export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy): RankedBroker[] {
+  return brokers
+    .filter((broker) => !policy.excludedBrokerIds.includes(broker.id) && (broker.capacity === null || broker.activeLeads < broker.capacity))
+    .sort((a, b) => {
+      if (Number(b.onDuty) !== Number(a.onDuty)) return Number(b.onDuty) - Number(a.onDuty);
+      if (policy.ranking.enabled && b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore;
+      if (a.activeLeads !== b.activeLeads) return a.activeLeads - b.activeLeads;
+      const aIdle = a.idleSince?.getTime() ?? Number.POSITIVE_INFINITY;
+      const bIdle = b.idleSince?.getTime() ?? Number.POSITIVE_INFINITY;
+      if (aIdle !== bIdle) return aIdle - bIdle;
+      return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+    });
+}
+
+export function calculateBrokerRankingScore(input: Pick<RankedBroker, "conversionRate" | "slaRate" | "manualPriority">, policy: IntelligentDistributionPolicy) {
+  const weights = policy.ranking;
+  return Math.round(input.conversionRate * weights.conversionWeight + input.slaRate * weights.slaWeight + input.manualPriority * weights.manualPriorityWeight);
+}
+
 export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStrategy): EligibleBroker | null {
   const eligible = brokers.filter((broker) => broker.capacity === null || broker.activeLeads < broker.capacity);
   if (!eligible.length) return null;

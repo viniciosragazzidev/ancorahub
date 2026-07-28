@@ -5,6 +5,7 @@ import { loadTenantAiAgentConfig } from "./tenant-config";
 import {
   extractFieldsFromMessage,
   buildMemoryContext,
+  COLLECTIBLE_FIELDS,
   createEmptyMemory,
   isCoreQualificationComplete,
   type ConversationMemory,
@@ -20,6 +21,9 @@ import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
+import { evaluateQualification, persistQualificationEvaluation } from "@/features/qualification-engine/service";
+import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 
 export type ConversationStatus =
   | "NEW"
@@ -196,6 +200,7 @@ export async function getOrCreateAiConversation({
   const id = `conv_${crypto.randomUUID()}`;
   const now = new Date();
 
+  const behavior = await resolvePublishedAgentBehavior(tenantId);
   await db.insert(schema.aiConversations).values({
     id,
     tenantId,
@@ -208,6 +213,7 @@ export async function getOrCreateAiConversation({
     startedAt: now,
     lastActivityAt: now,
     lockVersion: 1,
+    behaviorVersionId: behavior.versionId,
   });
 
   const [created] = await db
@@ -217,6 +223,29 @@ export async function getOrCreateAiConversation({
     .limit(1);
 
   return created;
+}
+
+export async function startQualificationConversationForLead(input: { tenantId: string; leadId: string; actorUserId: string }) {
+  if ((await getSystemSetting("feature_qualification_engine_enabled")) !== "true") return { started: false as const, reason: "disabled" as const };
+  const db = getDatabase();
+  const [lead] = await db.select({ id: schema.leads.id, telefone: schema.leads.telefone, origem: schema.leads.origem, sourceCampaign: schema.leads.sourceCampaign, tipo: schema.leads.tipo, branchId: schema.leads.branchId, nome: schema.leads.nome })
+    .from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
+  if (!lead?.telefone) return { started: false as const, reason: "missing_phone" as const };
+  const behavior = await resolvePublishedAgentBehavior(input.tenantId);
+  const { leadMatchesQualificationEntryRules } = await import("@/features/qualification-engine/service");
+  if (!leadMatchesQualificationEntryRules({ origem: lead.origem, sourceCampaign: lead.sourceCampaign, tipo: lead.tipo, branchId: lead.branchId }, behavior.policy)) return { started: false as const, reason: "not_eligible" as const };
+  const conversation = await getOrCreateAiConversation({ tenantId: input.tenantId, leadId: input.leadId });
+  if (!["NEW", "AI_ACTIVE"].includes(conversation.status)) return { started: false as const, reason: "already_started" as const };
+  const firstField = behavior.policy.requiredFields[0];
+  const firstQuestion = COLLECTIBLE_FIELDS.find((field) => field.key === firstField)?.promptLabel ?? "nome";
+  const body = `Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento. Para começar, qual é o seu ${firstQuestion}?`;
+  const messageId = `ai_msg_start_${crypto.randomUUID()}`;
+  await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, senderRole: "assistant", provider: "meta", phone: lead.telefone, direction: "outbound", body, sentAt: new Date() });
+  const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body, transport: "meta" }).catch(() => ({ status: "failed" as const, messageId: null }));
+  await db.update(schema.whatsappMessages).set({ providerStatus: sent.status === "sent" ? "sent" : "failed", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", behaviorVersionId: behavior.versionId, memory: { ...createEmptyMemory(), lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+  await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, actorUserId: input.actorUserId, policy: behavior.policy, memory: createEmptyMemory() });
+  return { started: true as const, conversationId: conversation.id };
 }
 
 export async function transitionConversationState({
@@ -305,6 +334,11 @@ export async function processInboundAiResponse({
     leadId,
     communicationChannelId,
   });
+  const behavior = await resolvePublishedAgentBehavior(tenantId, conversation.behaviorVersionId);
+  if (!conversation.behaviorVersionId && behavior.versionId) {
+    await db.update(schema.aiConversations).set({ behaviorVersionId: behavior.versionId, updatedAt: new Date() })
+      .where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)));
+  }
 
   const sourceIdentifier = providerMessageId || whatsappMessageId;
   if (sourceIdentifier) {
@@ -462,6 +496,7 @@ export async function processInboundAiResponse({
   // 6. Extrair campos estruturados da mensagem e atualizar memória
   const updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
   const memoryContext = buildMemoryContext(updatedMemory);
+  const qualification = evaluateQualification(updatedMemory, behavior.policy);
 
   if (detectHumanTransferRequest(userMessageBody)) {
     const handoffMessage = "Claro. Vou encaminhar seu atendimento para um corretor da equipe agora.";
@@ -491,6 +526,11 @@ export async function processInboundAiResponse({
       console.error("[ai-wpp] handoff.failed", { tenantId, leadId, transport, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
     }
     await transitionConversationState({ tenantId, conversationId: conversation.id, newStatus: "WAITING_HUMAN", reason: "Solicitação explícita de atendimento humano" });
+    const humanQualification = await persistQualificationEvaluation({ tenantId, leadId, conversationId: conversation.id, actorUserId: null, policy: behavior.policy, memory: updatedMemory, reason: "human_requested" });
+    if ((await getSystemSetting("feature_distribution_by_qualification_enabled")) === "true") {
+      await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
+    }
+    console.info("[qualification] human_requested", { tenantId, leadId, conversationId: conversation.id, state: humanQualification.state, score: humanQualification.score });
     return { status: "transferred_to_human", deliveryStatus, reply: handoffMessage };
   }
 
@@ -522,7 +562,7 @@ export async function processInboundAiResponse({
   // Once the six core fields are present, qualification is complete. The
   // handoff is deterministic so an incorrect model question cannot reopen the
   // questionnaire after the e-mail was received.
-  if (isCoreQualificationComplete(updatedMemory)) {
+  if (qualification.missingFields.length === 0) {
     const handoffMessage = "Obrigado! Já tenho os dados necessários. Vou encaminhar seu atendimento para um corretor da equipe agora.";
     aiResult.content = handoffMessage;
     aiResult.shouldTransferToHuman = true;
@@ -533,9 +573,7 @@ export async function processInboundAiResponse({
       aiResult.structured.questionAsked = null;
     }
   }
-  const qualificationStatus = isCoreQualificationComplete(updatedMemory)
-    ? deriveLeadQualificationStatus(updatedMemory)
-    : undefined;
+  const qualificationStatus = qualification.state === "QUALIFIED" ? qualification.qualificationStatus : undefined;
 
   console.info("[ai-wpp] ai.completed", {
     tenantId,
@@ -833,6 +871,11 @@ export async function processInboundAiResponse({
     }
   } catch (leadUpdateErr) {
     console.error("[ai-agent] Failed to update lead details from memory in database:", leadUpdateErr);
+  }
+
+  const persistedQualification = await persistQualificationEvaluation({ tenantId, leadId, conversationId: conversation.id, actorUserId: null, policy: behavior.policy, memory: updatedMemory });
+  if (persistedQualification.state === "QUALIFIED" && (await getSystemSetting("feature_distribution_by_qualification_enabled")) === "true") {
+    await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
   }
 
   // 7. Salvar mensagem da IA no banco

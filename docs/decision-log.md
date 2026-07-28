@@ -17,6 +17,13 @@ isolada por tenant, editável pelo Diretor, validada no servidor, versionada e a
 Provedor, modelo, credenciais, prompt técnico e ativação global permanecem no painel
 do Super-admin. Editor de fluxo, RAG, A/B e rollback são etapas posteriores.
 
+## DEC-055 - Comportamento versionado do Agente de Atendimento
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O comportamento comercial do agente é um artefato imutável por tenant. O Diretor cria rascunho, executa cenários críticos e publica uma única versão ativa; rollback altera apenas novas conversas. Prompt técnico, modelo, embeddings, capacidade global e rollout permanecem exclusivos do Super-admin. Enquanto a recuperação documental não estiver disponível, o agente não pode afirmar preço, carência, cobertura, rede, promoção ou condição comercial.
+
 ## Decididas
 
 ## DEC-052 - Proteção contra saturação de conexões do banco
@@ -290,3 +297,17 @@ lead, guarda apenas respostas operacionais, não solicita documentos/segredos e 
 ser transferida ao atendimento humano. O envio usa o mesmo outbox idempotente do
 WhatsApp; texto fora da janela da Meta pode ser rejeitado até que um template inicial
 seja aprovado. Desativar a capacidade interrompe novas sessões sem apagar histórico.
+## DEC-056 — Qualificação como porta de distribuição inteligente
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O Qualification Engine é a única autoridade para o estado, score e resultado da
+qualificação. A IA somente propõe ou extrai dados; o servidor valida os campos do
+perfil publicado, persiste o resultado e registra auditoria. Quando a capacidade
+estiver ativa, leads concluídos ou que solicitarem humano entram na fila de
+distribuição por job idempotente. A política prioriza plantão ativo, ranking
+configurável, menor carga e tempo sem novo lead. O Diretor pode excluir corretores;
+o Super-admin pode desligar as capacidades sem apagar histórico. Ao assumir, o CRM
+pausa a automação e não oferece envio de mensagens; somente Diretor ou Gestor pode
+retomar a IA.

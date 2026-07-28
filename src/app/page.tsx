@@ -95,9 +95,11 @@ function Nav() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const scrollContainer = document.querySelector(".h-dvh.overflow-y-auto") as HTMLElement | null;
+    if (!scrollContainer) return;
+    const onScroll = () => setScrolled(scrollContainer.scrollTop > 40);
+    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
+    return () => scrollContainer.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
@@ -698,7 +700,7 @@ function Footer() {
 
 export default function LandingPage() {
   return (
-    <>
+    <div className="h-dvh overflow-y-auto overscroll-contain">
       <Nav />
       <Hero />
       <StatsBar />
@@ -707,6 +709,6 @@ export default function LandingPage() {
       <Testimonials />
       <CtaSection />
       <Footer />
-    </>
+    </div>
   );
 }

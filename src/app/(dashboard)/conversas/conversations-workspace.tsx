@@ -410,30 +410,7 @@ export function ConversationsWorkspace({
                 role={role}
               />
               <ConversationHistory client={selected} />
-              {selected.aiConversation?.status === "HUMAN_ACTIVE" && selected.aiConversation?.assignedUserId === userId ? (
-                <ChatInput
-                  leadId={selected.id}
-                  onMessageSent={(newMsg) => {
-                    setConversations((prev) =>
-                      prev.map((c) => {
-                        if (c.id !== selected.id) return c;
-                        if (c.messages.some((m) => m.id === newMsg.id)) return c;
-                        return {
-                          ...c,
-                          messages: [...c.messages, newMsg],
-                          latestMessage: {
-                            body: newMsg.body,
-                            direction: newMsg.direction,
-                            sentAt: newMsg.sentAt,
-                          },
-                        };
-                      }),
-                    );
-                  }}
-                />
-              ) : (
-                <ConversationChannelNotice phone={selected.telefone} />
-              )}
+              <ConversationChannelNotice phone={selected.telefone} />
             </>
           ) : (
             <EmptyConversation />
@@ -578,7 +555,7 @@ function ConversationHeader({
                   onClick={handleTakeover}
                   size="sm"
                 >
-                  Assumir Atendimento
+                  Assumir e pausar automação
                 </Button>
               ) : null
             )
@@ -589,7 +566,7 @@ function ConversationHeader({
               onClick={handleTakeover}
               size="sm"
             >
-              Assumir Atendimento
+              Assumir e pausar automação
             </Button>
           )
         )}

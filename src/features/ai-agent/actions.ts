@@ -62,11 +62,11 @@ export async function takeoverConversationAction(conversationId: string): Promis
       tenantId: context.tenantId,
       conversationId: conversation.id,
       newStatus: "HUMAN_ACTIVE",
-      reason: "Atendimento assumido manualmente por corretor",
+      reason: "Automação pausada manualmente; continuidade ocorre fora do CRM",
       assignedUserId: context.userId,
       pausedByUserId: context.userId,
     });
-    await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.taken_over" });
+    await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.automation_paused" });
     revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
@@ -77,15 +77,16 @@ export async function takeoverConversationAction(conversationId: string): Promis
 export async function returnConversationToAiAction(conversationId: string): Promise<ConversationActionResult> {
   try {
     const { context, conversation } = await authorizeConversation(parseConversationId(conversationId));
+    if (context.role !== "director" && context.role !== "manager") return { success: false, error: "Apenas Diretor ou Gestor podem retomar a automação." };
     await transitionConversationState({
       tenantId: context.tenantId,
       conversationId: conversation.id,
       newStatus: "WAITING_CUSTOMER",
-      reason: "Atendimento devolvido para IA",
+      reason: "Automação retomada por gestor autorizado",
       assignedUserId: null,
       pausedByUserId: null,
     });
-    await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.returned_to_ai" });
+    await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.automation_resumed" });
     revalidatePath("/conversas");
     return { success: true };
   } catch (error) {

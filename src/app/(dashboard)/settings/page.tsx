@@ -14,9 +14,9 @@ import { SettingsTabs, type TabId } from "./_components/settings-tabs";
 import { UnitTab } from "./_components/unit-tab";
 import { FeedbackTab } from "./_components/feedback-tab";
 import { getIntegrationsData } from "./integrations-actions";
-import { AiSettingsTab } from "./_components/ai-settings-tab";
-import { getTenantAiSettings } from "@/features/ai/tenant-settings-actions";
-import type { AiTenantSettings } from "@/features/ai/tenant-settings-actions";
+import { AgentTrainingTab } from "./_components/agent-training-tab";
+import { DistributionPolicyPanel } from "./_components/distribution-policy-panel";
+import { getAgentTrainingCenter } from "@/features/agent-training/actions";
 import { ExtensionTab } from "./extension/extension-tab";
 
 export default async function SettingsPage() {
@@ -39,7 +39,7 @@ export default async function SettingsPage() {
   }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
   const integrations = context.role === "director" ? await getIntegrationsData() : null;
-  const aiSettings = context.role === "director" ? await getTenantAiSettings() : null;
+  const agentTraining = context.role === "director" ? await getAgentTrainingCenter() : null;
   const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
@@ -61,5 +61,5 @@ export default async function SettingsPage() {
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
   const extension = <ExtensionTab />;
 
-  return <><DashboardHeader breadcrumb="Configurações" title="Configurações" /><div className="flex flex-1 flex-col gap-6 p-4 lg:p-6"><SettingsTabs account={account} company={context.role === "director" ? company : undefined} unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />} atendimento={atendimento} ai={aiSettings ? <AiSettingsTab settings={aiSettings.settings as Partial<AiTenantSettings> | null} canEdit={aiSettings.canEdit} /> : undefined} whatsapp={whatsapp} integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined} security={<SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} />} extension={extension} tabIds={tabIds} /></div></>;
+  return <><DashboardHeader breadcrumb="Configurações" title="Configurações" /><div className="flex flex-1 flex-col gap-6 p-4 lg:p-6"><SettingsTabs account={account} company={context.role === "director" ? company : undefined} unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />} atendimento={atendimento} ai={agentTraining ? <div className="grid gap-6"><AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} /><DistributionPolicyPanel brokers={agentTraining.brokers} canEdit={agentTraining.canEdit} policy={agentTraining.distributionPolicy} /></div> : undefined} whatsapp={whatsapp} integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined} security={<SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} />} extension={extension} tabIds={tabIds} /></div></>;
 }

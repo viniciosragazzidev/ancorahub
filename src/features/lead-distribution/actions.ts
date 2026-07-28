@@ -1,15 +1,43 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { routeLeadToBranch, assignLeadToBroker, processQueuedLead, routeLeadToBranchAndAssignBroker } from "./service";
 import { enqueueLeadDistributionJob } from "./jobs";
+import { getDatabase, schema } from "@/shared/db";
+import { randomUUID } from "node:crypto";
 
 export type DistributionActionState = { success?: boolean; message?: string; error?: string; processed?: number; conflicts?: number };
 const leadId = z.string().uuid();
 const branchId = z.string().uuid();
 const brokerId = z.string().uuid();
+
+const distributionPolicySchema = z.object({
+  excludedBrokerIds: z.array(z.string().uuid()).default([]),
+  excludedBranchIds: z.array(z.string().uuid()).default([]),
+  ranking: z.object({ enabled: z.boolean(), conversionWeight: z.number().int().min(0).max(100), slaWeight: z.number().int().min(0).max(100), manualPriorityWeight: z.number().int().min(0).max(100) }),
+});
+
+export async function saveDistributionPolicyAction(input: unknown): Promise<{ success: boolean; error?: string }> {
+  const parsed = distributionPolicySchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Revise as regras de distribuição." };
+  const total = parsed.data.ranking.conversionWeight + parsed.data.ranking.slaWeight + parsed.data.ranking.manualPriorityWeight;
+  if (total > 100) return { success: false, error: "Os pesos do ranking não podem ultrapassar 100." };
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { success: false, error: "Apenas o Diretor pode alterar a política de distribuição." };
+    const db = getDatabase();
+    const now = new Date();
+    const [existing] = await db.select({ id: schema.leadDistributionPolicies.id, version: schema.leadDistributionPolicies.version }).from(schema.leadDistributionPolicies).where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), isNull(schema.leadDistributionPolicies.queueId))).limit(1);
+    if (existing) await db.update(schema.leadDistributionPolicies).set({ policy: parsed.data, version: existing.version + 1, updatedBy: context.userId, updatedAt: now }).where(eq(schema.leadDistributionPolicies.id, existing.id));
+    else await db.insert(schema.leadDistributionPolicies).values({ id: randomUUID(), tenantId: context.tenantId, enabled: true, policy: parsed.data, updatedBy: context.userId, createdAt: now, updatedAt: now });
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution_policy", entidadeId: existing?.id ?? context.tenantId, acao: "distribution_policy.updated" });
+    refreshDistribution();
+    return { success: true };
+  } catch (error) { return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a política." }; }
+}
 
 function refreshDistribution() {
   revalidatePath("/leads");

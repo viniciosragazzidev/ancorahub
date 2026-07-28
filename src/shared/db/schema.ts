@@ -355,6 +355,11 @@ export const leads = pgTable(
     tipo: text("tipo").notNull().default("PF"),
     status: leadStatus("status").notNull().default("new"),
     qualificationStatus: text("qualification_status").notNull().default("pending"),
+    qualificationState: text("qualification_state").notNull().default("NOT_STARTED"),
+    qualificationScore: integer("qualification_score").notNull().default(0),
+    qualificationDetails: jsonb("qualification_details").notNull().default({}),
+    qualificationProfileKey: text("qualification_profile_key"),
+    qualificationCompletedAt: timestamp("qualification_completed_at", { withTimezone: true }),
     version: integer("version").notNull().default(1),
     distributionStatus: text("distribution_status").notNull().default("unassigned"),
     distributionOrigin: text("distribution_origin"),
@@ -384,6 +389,7 @@ export const leads = pgTable(
   (table) => [
     index("leads_tenant_branch_status_idx").on(table.tenantId, table.branchId, table.status),
     index("leads_tenant_distribution_status_idx").on(table.tenantId, table.distributionStatus),
+    index("leads_tenant_qualification_state_idx").on(table.tenantId, table.qualificationState),
     index("leads_branch_queue_distribution_idx").on(table.branchId, table.queueId, table.distributionStatus),
     index("leads_corretor_status_idx").on(table.corretorId, table.status),
     index("leads_webhook_credential_idx").on(table.webhookCredentialId),
@@ -453,6 +459,44 @@ export const aiQualificationSessions = pgTable(
     uniqueIndex("ai_qualification_sessions_tenant_lead_unique").on(table.tenantId, table.leadId),
     index("ai_qualification_sessions_tenant_status_idx").on(table.tenantId, table.status),
   ],
+);
+
+export const agentBehaviorVersions = pgTable(
+  "agent_behavior_versions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    status: text("status").notNull().default("DRAFT"),
+    policy: jsonb("policy").notNull(),
+    validation: jsonb("validation").notNull().default({}),
+    summary: text("summary"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedBy: text("published_by").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("agent_behavior_versions_tenant_version_unique").on(table.tenantId, table.versionNumber),
+    index("agent_behavior_versions_tenant_status_idx").on(table.tenantId, table.status),
+  ],
+);
+
+export const agentTrainingSimulations = pgTable(
+  "agent_training_simulations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    behaviorVersionId: text("behavior_version_id").notNull().references(() => agentBehaviorVersions.id, { onDelete: "cascade" }),
+    scenarioKey: text("scenario_key").notNull(),
+    status: text("status").notNull(),
+    result: jsonb("result").notNull().default({}),
+    review: text("review"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+  },
+  (table) => [index("agent_training_simulations_version_idx").on(table.tenantId, table.behaviorVersionId, table.scenarioKey)],
 );
 
 export const leadBeneficiaries = pgTable(
@@ -1359,6 +1403,7 @@ export const aiConversations = pgTable(
     quickReplyWaitResponseCount: integer("quick_reply_wait_response_count").notNull().default(0),
     optOutAt: timestamp("opt_out_at", { withTimezone: true }),
     wrongNumberAt: timestamp("wrong_number_at", { withTimezone: true }),
+    behaviorVersionId: text("behavior_version_id").references(() => agentBehaviorVersions.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
   },
@@ -1366,6 +1411,28 @@ export const aiConversations = pgTable(
     index("ai_conversations_tenant_status_idx").on(table.tenantId, table.status),
     index("ai_conversations_tenant_lead_idx").on(table.tenantId, table.leadId),
     index("ai_conversations_assigned_user_idx").on(table.assignedUserId),
+    index("ai_conversations_behavior_version_idx").on(table.tenantId, table.behaviorVersionId),
+  ],
+);
+
+/** Versioned, tenant-owned policy used only by the automatic assignment engine. */
+export const leadDistributionPolicies = pgTable(
+  "lead_distribution_policies",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
+    profileKey: text("profile_key"),
+    enabled: boolean("enabled").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    policy: jsonb("policy").notNull().default({}),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("lead_distribution_policies_tenant_idx").on(table.tenantId, table.queueId),
+    uniqueIndex("lead_distribution_policies_scope_unique").on(table.tenantId, table.queueId, table.profileKey),
   ],
 );
 

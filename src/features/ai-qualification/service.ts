@@ -8,6 +8,7 @@ import { aiComplete } from "@/features/ai/engine";
 import { processMetaOutboundBatch, enqueueMetaTextMessage } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { startQualificationConversationForLead } from "@/features/ai-agent/conversation-state-machine";
 
 const questions = [
   { key: "city", prompt: "Para começar, em qual cidade você pretende contratar o plano?" },
@@ -52,6 +53,9 @@ async function getOrCreateConfig(tenantId: string) {
 }
 
 export async function startAiQualificationForLead(input: { tenantId: string; leadId: string; actorUserId: string }) {
+  if ((await getSystemSetting("feature_qualification_engine_enabled")) === "true") {
+    return startQualificationConversationForLead(input);
+  }
   const db = getDatabase();
   const config = await getOrCreateConfig(input.tenantId);
   const globalEnabled = await qualificationEnabled();
