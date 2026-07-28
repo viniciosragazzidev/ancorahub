@@ -1,0 +1,7 @@
+{
+  "name": "pre-task-context",
+  "purpose": "Fornecer descoberta de contexto antes de uma alteração.",
+  "command": "npm run agent:context -- --task \"<objetivo>\"",
+  "requiredOutput": ["contexto nível 0", "módulos selecionados", "leituras adicionais"],
+  "failureMode": "Se um contrato aplicável não existir, registrar a lacuna antes de implementar."
+}

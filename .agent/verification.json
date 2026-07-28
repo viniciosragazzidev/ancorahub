@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "fast": ["agent:docs", "type-check", "test"],
+  "full": ["agent:docs", "agent:changed", "agent:architecture", "agent:security", "agent:performance", "lint", "type-check", "test", "build"],
+  "diagnosticChecks": ["agent:architecture", "agent:security", "agent:performance"],
+  "blockingChecks": ["agent:docs", "type-check", "test", "build"]
+}

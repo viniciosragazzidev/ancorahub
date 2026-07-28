@@ -1,43 +1,52 @@
 import { eq } from "drizzle-orm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { updateExtensionSettingsAction } from "@/features/browser-extension/actions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { updateExtensionSettingsAction } from "@/features/browser-extension/actions";
 import { ExtensionConnectCard } from "./extension-connect-card";
+import { ExtensionHelpDialog } from "./extension-help-dialog";
 
 export async function ExtensionTab() {
   const context = await getRequiredTenantContext();
-  const [settings] = await getDatabase().select({ enabled: schema.extensionSettings.enabled, minimumVersion: schema.extensionSettings.minimumVersion }).from(schema.extensionSettings).where(eq(schema.extensionSettings.tenantId, context.tenantId)).limit(1);
+  const [settings] = await getDatabase()
+    .select({ enabled: schema.extensionSettings.enabled, minimumVersion: schema.extensionSettings.minimumVersion })
+    .from(schema.extensionSettings)
+    .where(eq(schema.extensionSettings.tenantId, context.tenantId))
+    .limit(1);
   const canConfigure = context.role === "director";
+
   return (
     <Card className="max-w-2xl border-border bg-card shadow-none">
       <CardHeader>
         <CardTitle>Atendimento contextual no WhatsApp Web</CardTitle>
-        <CardDescription>Baixe a extensão pelo CRM, instale no navegador e conecte com um código temporário. Ela nunca envia mensagens automaticamente.</CardDescription>
+        <CardDescription>
+          Conecte o seu navegador ao CRM para abrir rapidamente o lead certo durante o atendimento. A extensão nunca envia mensagens automaticamente.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Button render={<a href="/downloads/corretop-assistant.zip" download>Baixar CorreTop Assistant</a>}>
-          Baixar extensão
-        </Button>
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-          <li>Baixe e extraia o arquivo.</li>
-          <li>Abra <span className="font-medium">chrome://extensions</span> e ative o modo desenvolvedor.</li>
-          <li>Clique em &ldquo;Carregar sem compactação&rdquo; e selecione a pasta extraída.</li>
-          <li>Volte aqui, gere o código e conecte no popup da extensão.</li>
-        </ol>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button render={<a href="/downloads/corretop-assistant.zip" download>Baixar CorreTop Assistant</a>}>
+            Baixar extensão
+          </Button>
+          <ExtensionHelpDialog />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Após baixar, extraia o arquivo e adicione a pasta em <span className="font-medium text-foreground">chrome://extensions</span>. Quando a publicação na Chrome Web Store estiver disponível, a instalação poderá ser feita em um clique.
+        </p>
         <p className="text-sm text-muted-foreground">Versão mínima: {settings?.minimumVersion ?? "0.1.0"}</p>
         {canConfigure ? (
-          <form action={updateExtensionSettingsAction} className="flex items-center gap-3">
+          <form action={updateExtensionSettingsAction} className="flex flex-wrap items-center gap-3">
             <input type="hidden" name="enabled" value={settings?.enabled ? "false" : "true"} />
-            <Button type="submit">{settings?.enabled ? "Desativar extensão" : "Habilitar extensão"}</Button>
-            <span className="text-sm">{settings?.enabled ? "Ativa para a empresa" : "Desativada pela empresa"}</span>
+            <Button type="submit">{settings?.enabled ? "Desativar extensão para a empresa" : "Habilitar extensão para a empresa"}</Button>
+            <span className="text-sm text-muted-foreground">{settings?.enabled ? "Ativa para a empresa" : "Desativada pela empresa"}</span>
           </form>
         ) : (
-          <p className="text-sm text-muted-foreground">A disponibilidade da extensão é definida pelo Diretor da empresa.</p>
+          <p className="text-sm text-muted-foreground">A disponibilidade é definida pelo Diretor. Quando habilitada, você pode instalar e conectar o seu navegador nesta tela.</p>
         )}
         <ExtensionConnectCard />
-        <p className="text-xs text-muted-foreground">A extensão funciona apenas no WhatsApp Web, com escopo autorizado pelo servidor e sessão revogável por dispositivo.</p>
+        <p className="text-xs text-muted-foreground">O painel só é exibido no WhatsApp Web para leads atribuídos ao seu usuário e à sua unidade. A sessão é revogável por dispositivo.</p>
       </CardContent>
     </Card>
   );

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "mode": "progressive",
+  "reportsDirectory": "reports/agent",
+  "requiredContext": [
+    "AGENTS.md",
+    "docs/agent/PROJECT_CONTEXT.md",
+    "docs/agent/DEVELOPMENT_RULES.md",
+    "docs/agent/DEFINITION_OF_DONE.md"
+  ],
+  "completion": {
+    "requireImplementationRecordForMultiFileWork": true,
+    "requireBuildForCodeChanges": true,
+    "requireRoadmapUpdateForFeatures": true
+  }
+}

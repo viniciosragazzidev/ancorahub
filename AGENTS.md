@@ -32,3 +32,17 @@ Regras inegociáveis:
   compartilhado; primeiro evolua a variante do componente-base.
 - **Controle pelo Super-Admin e Auditabilidade**: Todas as implementações daqui para frente devem ser auditáveis (gerar logs de auditoria apropriados), editáveis (parâmetros configuráveis) e passíveis de serem ativadas/desativadas pelo super-admin a qualquer momento.
 
+## Engineering Harness
+
+`docs/agent/README.md` é a porta de entrada operacional para tarefas de engenharia.
+Antes de editar, carregue o contexto mínimo indicado por `npm run agent:context --
+--task "<objetivo>"`; carregue documentos de módulo somente quando a mudança os
+atingir. Use `npm run agent:verify -- --level fast` durante ciclos curtos e `--level
+full` antes de encerrar. Não declare conclusão sem evidência registrada em
+`reports/agent/verification/` e sem atualizar o registro de implementação aplicável.
+
+O harness é deliberadamente progressivo: suas verificações arquiteturais, de segurança
+e desempenho começam diagnósticas. Uma nova regressão crítica deve ser corrigida ou
+justificada no registro da implementação; não use o diagnóstico para ignorar dívida
+preexistente nem para bloquear indiscriminadamente o trabalho em produção.
+

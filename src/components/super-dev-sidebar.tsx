@@ -130,7 +130,7 @@ export function SuperDevSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar" rail>
+    <Sidebar collapsible="none" variant="sidebar">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

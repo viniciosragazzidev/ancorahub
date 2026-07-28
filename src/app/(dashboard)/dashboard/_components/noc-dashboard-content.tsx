@@ -516,63 +516,11 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
         </motion.div>
       </section>
 
-      {/* Branches Performance */}
+      {/* ActivityFeed + Gargalos Operacionais */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        <Card className="rounded-xl border-border/70 bg-card shadow-none lg:col-span-4 flex flex-col">
-          <CardHeader>
-            <CardTitle>Desempenho por Filial</CardTitle>
-            <CardDescription>
-              Leads, ativos e conversão por unidade
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="min-h-0 flex-1 p-0">
-            <ScrollArea className="h-full max-h-[340px] px-6 pb-6">
-              <div className="space-y-4">
-                {data.branches.map((branch, i) => (
-                  <motion.div
-                    key={branch.name}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.3) }}
-                    className="rounded-lg border border-border/40 bg-muted/20 p-3"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {branch.name}
-                      </span>
-                      <Badge variant="outline" className="rounded-md text-xs">
-                        {branch.conversion}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span>{branch.leads} leads</span>
-                      <span>·</span>
-                      <span>{branch.activeLeads} ativos</span>
-                      <span>·</span>
-                      <span>{branch.conversion} conversão</span>
-                    </div>
-                    <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-chart-5 transition-all duration-700"
-                        style={{
-                          width: `${branch.leads > 0
-                            ? (branch.activeLeads / branch.leads) * 100
-                            : 0
-                            }%`,
-                        }}
-                      />
-                    </div>
-                  </motion.div>
-                ))}
-                {data.branches.length === 0 && (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    Nenhuma filial cadastrada.
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-4">
+          <ActivityFeed activities={activities} />
+        </div>
 
         {/* Bottleneck Cards */}
         <Card className="rounded-xl border-border/70 bg-card shadow-none lg:col-span-3">
@@ -633,11 +581,8 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
         </Card>
       </section>
 
-      {/* Activity Feed */}
-      <ActivityFeed activities={activities} />
-
-      {/* Bottom Stats Bar */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: 'Leads totais', value: totalLeads, color: 'text-chart-1' },
           { label: 'Conversões', value: totalConverted, color: 'text-chart-5' },
@@ -658,6 +603,63 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           </motion.div>
         ))}
       </div>
+
+      {/* Desempenho por Filial */}
+      <Card className="rounded-xl border-border/70 bg-card shadow-none flex flex-col">
+        <CardHeader>
+          <CardTitle>Desempenho por Filial</CardTitle>
+          <CardDescription>
+            Leads, ativos e conversão por unidade
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="min-h-0 flex-1 p-0">
+          <div className="max-h-[500px] overflow-y-auto px-6 pb-6">
+            <div className="space-y-4">
+              {data.branches.map((branch, i) => (
+                <motion.div
+                  key={branch.name}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.3) }}
+                  className="rounded-lg border border-border/40 bg-muted/20 p-3"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {branch.name}
+                    </span>
+                    <Badge variant="outline" className="rounded-md text-xs">
+                      {branch.conversion}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>{branch.leads} leads</span>
+                    <span>·</span>
+                    <span>{branch.activeLeads} ativos</span>
+                    <span>·</span>
+                    <span>{branch.conversion} conversão</span>
+                  </div>
+                  <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-chart-5 transition-all duration-700"
+                      style={{
+                        width: `${branch.leads > 0
+                          ? (branch.activeLeads / branch.leads) * 100
+                          : 0
+                          }%`,
+                      }}
+                    />
+                  </div>
+                </motion.div>
+              ))}
+              {data.branches.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nenhuma filial cadastrada.
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -864,30 +866,30 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
         </Card>
       </section>
 
-      {/* Activity Feed */}
-      <ActivityFeed activities={activities} />
-
-      {/* Bottom Stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Leads totais', value: data.leadsTotal, color: 'text-chart-1' },
-          { label: 'Leads novos', value: data.newLeads, color: 'text-chart-3' },
-          { label: 'Corretores ativos', value: data.activeMembers, color: 'text-chart-5' },
-          { label: 'Em atendimento', value: data.inContact, color: 'text-chart-4' },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
-            className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
-          >
-            <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
-              {stat.value}
-            </p>
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-          </motion.div>
-        ))}
+      {/* Activity Feed + Stats */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+        <ActivityFeed activities={activities} />
+        <div className="grid grid-cols-2 gap-3 content-start">
+          {[
+            { label: 'Leads totais', value: data.leadsTotal, color: 'text-chart-1' },
+            { label: 'Leads novos', value: data.newLeads, color: 'text-chart-3' },
+            { label: 'Corretores ativos', value: data.activeMembers, color: 'text-chart-5' },
+            { label: 'Em atendimento', value: data.inContact, color: 'text-chart-4' },
+          ].map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
+              className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
+            >
+              <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
+                {stat.value}
+              </p>
+              <p className="text-xs text-muted-foreground">{stat.label}</p>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -961,71 +963,68 @@ const activities = [
         </div>
       </section>
 
-      {/* Leads & Activity Grid */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        <Card className="rounded-xl border-border/70 bg-card shadow-none lg:col-span-4">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Minha Carteira de Leads</CardTitle>
-                <CardDescription>Leads sob sua responsabilidade</CardDescription>
+      {/* Leads */}
+      <Card className="rounded-xl border-border/70 bg-card shadow-none">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Minha Carteira de Leads</CardTitle>
+              <CardDescription>Leads sob sua responsabilidade</CardDescription>
+            </div>
+            <Button render={<Link href="/leads" />} size="sm" variant="outline" className="text-xs h-8">
+              Ver Todos
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y divide-border/40">
+            {data.leads.slice(0, 5).map((lead) => (
+              <div key={lead.id} className="flex items-center justify-between px-6 py-3 hover:bg-muted/20 transition-colors">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{lead.name}</p>
+                  <p className="text-xs text-muted-foreground">{lead.phone} • {lead.source || "Manual"}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="text-xs uppercase font-mono">{lead.status}</Badge>
+                  <Button render={<Link href={`/conversas?leadId=${lead.id}`} />} size="sm" variant="ghost" className="h-7 text-xs">
+                    Atender
+                  </Button>
+                </div>
               </div>
-              <Button render={<Link href="/leads" />} size="sm" variant="outline" className="text-xs h-8">
-                Ver Todos
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-border/40">
-              {data.leads.slice(0, 5).map((lead) => (
-                <div key={lead.id} className="flex items-center justify-between px-6 py-3 hover:bg-muted/20 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{lead.name}</p>
-                    <p className="text-xs text-muted-foreground">{lead.phone} • {lead.source || "Manual"}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="text-xs uppercase font-mono">{lead.status}</Badge>
-                    <Button render={<Link href={`/conversas?leadId=${lead.id}`} />} size="sm" variant="ghost" className="h-7 text-xs">
-                      Atender
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {data.leads.length === 0 && (
-                <div className="p-8 text-center text-xs text-muted-foreground">
-                  Nenhum lead atribuído no momento.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            ))}
+            {data.leads.length === 0 && (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                Nenhum lead atribuído no momento.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="lg:col-span-3">
-          <ActivityFeed activities={activities} />
+      {/* Activity Feed + Stats */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+        <ActivityFeed activities={activities} />
+        <div className="grid grid-cols-2 gap-3 content-start">
+          {[
+            { label: 'Leads totais', value: data.totals.all, color: 'text-chart-1' },
+            { label: 'Em atendimento', value: data.totals.active, color: 'text-chart-3' },
+            { label: 'Conversões', value: data.totals.converted, color: 'text-chart-5' },
+            { label: 'Perdidos', value: data.totals.lost, color: 'text-chart-4' },
+          ].map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
+              className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
+            >
+              <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
+                {stat.value}
+              </p>
+              <p className="text-xs text-muted-foreground">{stat.label}</p>
+            </motion.div>
+          ))}
         </div>
-      </section>
-
-      {/* Bottom Stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Leads totais', value: data.totals.all, color: 'text-chart-1' },
-          { label: 'Em atendimento', value: data.totals.active, color: 'text-chart-3' },
-          { label: 'Conversões', value: data.totals.converted, color: 'text-chart-5' },
-          { label: 'Perdidos', value: data.totals.lost, color: 'text-chart-4' },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
-            className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
-          >
-            <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
-              {stat.value}
-            </p>
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-          </motion.div>
-        ))}
       </div>
     </div>
   );

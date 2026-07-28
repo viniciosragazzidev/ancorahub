@@ -40,7 +40,7 @@ export default async function SettingsPage() {
 
   const integrations = context.role === "director" ? await getIntegrationsData() : null;
   const aiSettings = context.role === "director" ? await getTenantAiSettings() : null;
-  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca"];
+  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
 
@@ -59,7 +59,7 @@ export default async function SettingsPage() {
   const whatsapp = <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>WhatsApp pessoal de atendimento</CardTitle><CardDescription>Conecte somente o número usado por você. A conexão é isolada por usuário e não altera a identidade da corretora.</CardDescription></CardHeader><CardContent><Button render={<a href="/settings/whatsapp" />}><WhatsappLogo /> Configurar meu WhatsApp</Button></CardContent></Card>;
   const account = <AccountTab name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} />;
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
-  const extension = context.role === "director" || context.role === "manager" ? <ExtensionTab /> : undefined;
+  const extension = <ExtensionTab />;
 
   return <><DashboardHeader breadcrumb="Configurações" title="Configurações" /><div className="flex flex-1 flex-col gap-6 p-4 lg:p-6"><SettingsTabs account={account} company={context.role === "director" ? company : undefined} unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />} atendimento={atendimento} ai={aiSettings ? <AiSettingsTab settings={aiSettings.settings as Partial<AiTenantSettings> | null} canEdit={aiSettings.canEdit} /> : undefined} whatsapp={whatsapp} integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined} security={<SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} />} extension={extension} tabIds={tabIds} /></div></>;
 }

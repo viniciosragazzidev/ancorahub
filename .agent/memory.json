@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "durableLocations": ["CONTEXT.md", "docs/decision-log.md", "docs/architecture/decisions", "docs/implementations/completed", "docs/agent/KNOWN_ISSUES.md"],
+  "ephemeralLocation": "reports/agent",
+  "rules": [
+    "Record durable facts, decisions and recurring failures; do not store secrets or personal data.",
+    "Implementation records must reference validation commands and outcomes.",
+    "Known issues remain until a later record proves resolution."
+  ]
+}

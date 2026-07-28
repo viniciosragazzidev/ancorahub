@@ -33,3 +33,9 @@
 - **Sessão da extensão**: vínculo revogável por dispositivo, derivado de uma autorização temporária iniciada no CRM; nunca aceita tenant, unidade ou permissões enviados pelo navegador como autoridade.
 - **Lead acessível**: lead cuja visibilidade foi confirmada pelo backend para o tenant, unidade, carteira e papel do corretor; telefone sozinho nunca concede acesso.
 - **Sugestão de resposta**: texto gerado ou selecionado pelo backend a partir do contexto autorizado, que pode ser inserido no compositor sem executar o envio.
+
+## Engenharia
+
+- **Engineering Harness**: contrato versionado que orienta descoberta de contexto, execução limitada, verificação e registro de evidências para mudanças no CorreTop.
+- **Gate de aceite**: conjunto proporcional de verificações objetivas que precisa passar antes de uma mudança ser considerada concluída.
+- **Registro de implementação**: evidência durável que relaciona objetivo, escopo, decisões, validações, riscos e rollback de uma entrega técnica.

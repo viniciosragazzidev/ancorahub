@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "default": "least-privilege",
+  "allowedWithoutExplicitApproval": ["read", "search", "type-check", "unit-test", "lint", "build-context", "diagnostic-report"],
+  "requiresExplicitApproval": ["dependency-change", "production-deploy", "database-production-migration", "external-account", "secret-creation", "public-webhook"],
+  "prohibited": ["client-authoritative-tenant", "secret-in-client", "destructive-cleanup", "unverified-completion"]
+}

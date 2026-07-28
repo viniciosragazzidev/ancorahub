@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "baseline": [
+    "AGENTS.md",
+    "docs/agent/PROJECT_CONTEXT.md",
+    "docs/agent/DEVELOPMENT_RULES.md",
+    "docs/agent/DEFINITION_OF_DONE.md"
+  ],
+  "domains": [
+    {
+      "id": "leads",
+      "keywords": ["lead", "funil", "qualificação", "qualificacao", "carteira", "tarefa", "timeline"],
+      "paths": ["src/features/leads", "src/app/(dashboard)/leads"],
+      "documents": ["docs/architecture/modules/leads.md", "docs/business-rules.md", "docs/decision-log.md"]
+    },
+    {
+      "id": "ai-agent",
+      "keywords": ["ia", "ai", "whatsapp", "quick reply", "qualificação", "qualificacao", "handoff"],
+      "paths": ["src/features/ai-agent", "src/features/ai-qualification"],
+      "documents": ["docs/architecture/modules/ai-agent.md", "docs/agent/SECURITY_RULES.md", "docs/decision-log.md"]
+    },
+    {
+      "id": "communication",
+      "keywords": ["meta", "outbox", "template", "canal", "webhook", "whatsapp", "notificação", "notificacao"],
+      "paths": ["src/features/communication-channels", "src/features/notifications", "services/whatsapp-api"],
+      "documents": ["docs/architecture/modules/communication.md", "docs/agent/SECURITY_RULES.md", "docs/decision-log.md"]
+    },
+    {
+      "id": "browser-extension",
+      "keywords": ["extensão", "extensao", "assistant", "whatsapp web", "mv3"],
+      "paths": ["apps/browser-extension", "src/features/browser-extension", "src/app/api/extension"],
+      "documents": ["docs/architecture/modules/browser-extension.md", "docs/agent/SECURITY_RULES.md"]
+    },
+    {
+      "id": "frontend",
+      "keywords": ["ui", "sidebar", "design", "tela", "componente", "acessibilidade", "motion"],
+      "paths": ["src/components", "src/app"],
+      "documents": ["DESIGN.md", "docs/ui-foundation.md", "docs/ux-audit-2026-07-13.md"]
+    },
+    {
+      "id": "database-security",
+      "keywords": ["banco", "drizzle", "tenant", "permissão", "permissao", "lgpd", "migração", "migracao"],
+      "paths": ["src/shared/db", "drizzle", "src/features"],
+      "documents": ["docs/agent/SECURITY_RULES.md", "docs/business-rules.md", "docs/decision-log.md"]
+    }
+  ]
+}

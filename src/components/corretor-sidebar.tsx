@@ -112,7 +112,7 @@ export function CorretorSidebar() {
   });
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar">
+    <Sidebar collapsible="none" variant="sidebar">
       <SidebarHeader className="border-b border-sidebar-border/50 p-3">
         <SidebarMenu>
           <SidebarMenuItem>

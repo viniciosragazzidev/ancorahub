@@ -1,19 +1,52 @@
 import { DefaultWhatsAppWebAdapter } from "./whatsapp-adapter";
-import { mountPanel } from "./panel-mount";
+import { mountPanel, type MountedPanel } from "./panel-mount";
+import type { ResolveState } from "../shared/types";
 
 const adapter = new DefaultWhatsAppWebAdapter();
 const api = (path: string, body: unknown) => new Promise<{ ok: boolean; body: Record<string, unknown> }>((resolve) => chrome.runtime.sendMessage({ type: "API_REQUEST", payload: { path, method: "POST", body } }, resolve));
-const panel = mountPanel(() => undefined, (text) => void adapter.insertComposerText(text));
+let panel: MountedPanel | null = null;
 let lastPhone = "";
-async function sync() {
-  if (!adapter.isReady()) return panel.render({ status: "INITIALIZING" });
-  const conversation = await adapter.getActiveConversation();
-  if (!conversation) return panel.render({ status: "NO_CONVERSATION" });
-  if (!conversation.phone) return panel.render({ status: "UNIDENTIFIED" });
-  if (conversation.phone === lastPhone) return;
-  lastPhone = conversation.phone; panel.render({ status: "LOADING" });
-  const result = await api("/api/extension/leads/resolve", { phone: conversation.phone });
-  if (!result.ok) return panel.render({ status: result.body.error === "SESSION_EXPIRED" ? "SESSION_EXPIRED" : "OFFLINE" });
-  panel.render(result.body as never);
+let lastResolved: ResolveState | null = null;
+let requestVersion = 0;
+
+function getPanel() {
+  panel ??= mountPanel((leadId) => window.open(`https://corretop.vercel.app/leads/${encodeURIComponent(leadId)}`, "_blank", "noopener,noreferrer"));
+  return panel;
 }
-void sync(); adapter.observeConversationChange(() => void sync());
+
+function hidePanel() {
+  getPanel()?.hide();
+}
+
+async function sync() {
+  if (!adapter.isReady()) {
+    lastPhone = "";
+    lastResolved = null;
+    return hidePanel();
+  }
+  const conversation = await adapter.getActiveConversation();
+  if (!conversation?.phone) {
+    lastPhone = "";
+    lastResolved = null;
+    return hidePanel();
+  }
+  if (conversation.phone === lastPhone) {
+    if (lastResolved) getPanel()?.renderLead(lastResolved);
+    return;
+  }
+  lastPhone = conversation.phone;
+  const version = ++requestVersion;
+  const result = await api("/api/extension/leads/resolve", { phone: conversation.phone });
+  if (version !== requestVersion || conversation.phone !== lastPhone) return;
+  const state = result.body as ResolveState;
+  if (!result.ok || state.status !== "FOUND" || !state.lead) {
+    lastResolved = null;
+    return hidePanel();
+  }
+  lastResolved = state;
+  getPanel()?.renderLead(state);
+}
+
+void sync();
+adapter.observeConversationChange(() => void sync());
+window.setInterval(() => void sync(), 1500);

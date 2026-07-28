@@ -6,10 +6,12 @@ import type { TenantContext } from "@/shared/auth/types";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { maskPhone, normalizePhone } from "./schemas";
 
-function canSeeLead(context: TenantContext, lead: { corretorId: string | null; branchId: string | null }) {
-  if (context.role === "director") return true;
-  if (lead.corretorId === context.userId) return true;
-  return context.role === "manager" && Boolean(context.branchId && lead.branchId === context.branchId);
+export function isExtensionLeadVisibleForUser(context: Pick<TenantContext, "userId" | "branchId">, lead: { corretorId: string | null; branchId: string | null }) {
+  return Boolean(
+    context.branchId
+    && lead.branchId === context.branchId
+    && lead.corretorId === context.userId,
+  );
 }
 
 export async function resolveLeadForExtension(context: TenantContext, phone: string) {
@@ -23,7 +25,7 @@ export async function resolveLeadForExtension(context: TenantContext, phone: str
     corretorId: schema.leads.corretorId, corretorName: schema.user.name,
   }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') = ${normalized}`)).limit(1);
   if (!lead) return { status: "NOT_FOUND" as const };
-  if (!canSeeLead(context, lead)) return { status: "FORBIDDEN" as const };
+  if (!isExtensionLeadVisibleForUser(context, lead)) return { status: "FORBIDDEN" as const };
   const [nextTask] = await db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt }).from(schema.leadTasks).where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.leadId, lead.id), isNull(schema.leadTasks.completedAt), or(eq(schema.leadTasks.assignedTo, context.userId), eq(schema.leadTasks.assignedTo, lead.corretorId ?? context.userId)))).orderBy(sql`${schema.leadTasks.dueAt} asc nulls last`).limit(1);
   return {
     status: "FOUND" as const,
@@ -42,6 +44,6 @@ export async function resolveLeadForExtension(context: TenantContext, phone: str
 
 export async function getLeadForExtension(context: TenantContext, leadId: string) {
   const [lead] = await getDatabase().select({ id: schema.leads.id, tenantId: schema.leads.tenantId, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId, status: schema.leads.status, version: schema.leads.version }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
-  if (!lead || !canSeeLead(context, lead)) return null;
+  if (!lead || !isExtensionLeadVisibleForUser(context, lead)) return null;
   return lead;
 }

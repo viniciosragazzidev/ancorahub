@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ImplementationRecord",
+  "type": "object",
+  "required": ["title", "objective", "scope", "validations", "risks", "rollback"],
+  "properties": {
+    "title": { "type": "string", "minLength": 8 },
+    "objective": { "type": "string", "minLength": 20 },
+    "scope": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "validations": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "rollback": { "type": "string", "minLength": 8 }
+  },
+  "additionalProperties": false
+}
