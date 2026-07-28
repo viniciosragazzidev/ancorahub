@@ -49,7 +49,6 @@ import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { cn } from "@/lib/utils";
 import {
   takeoverConversationAction,
-  returnConversationToAiAction,
   closeConversationAction,
   resetAiConversationAction,
 } from "@/features/ai-agent/actions";
@@ -474,14 +473,6 @@ function ConversationHeader({
     router.refresh();
   }
 
-  async function handleReturnToAi() {
-    if (!tenantId || !client.aiConversation?.id) return;
-    setIsPending(true);
-    await returnConversationToAiAction(client.aiConversation.id);
-    setIsPending(false);
-    router.refresh();
-  }
-
   async function handleResetChat() {
     if (!tenantId || !client.aiConversation?.id) return;
     if (!confirm("Tem certeza que deseja resetar a qualificação da inteligência artificial e limpar a memória deste lead? O robô de IA iniciará a conversa do zero.")) return;
@@ -533,28 +524,16 @@ function ConversationHeader({
         )}
         {client.aiConversation?.id && (
           isHumanActive ? (
-            isAssignedToMe ? (
+            !isAssignedToMe && (role === "director" || role === "manager") ? (
               <Button
-                className="h-8 text-xs gap-1.5"
+                className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
                 disabled={isPending}
-                onClick={handleReturnToAi}
+                onClick={handleTakeover}
                 size="sm"
-                variant="outline"
               >
-                Devolver para IA
+                Assumir e pausar automação
               </Button>
-            ) : (
-              (role === "director" || role === "manager") ? (
-                <Button
-                  className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
-                  disabled={isPending}
-                  onClick={handleTakeover}
-                  size="sm"
-                >
-                  Assumir e pausar automação
-                </Button>
-              ) : null
-            )
+            ) : null
           ) : (
             <Button
               className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"

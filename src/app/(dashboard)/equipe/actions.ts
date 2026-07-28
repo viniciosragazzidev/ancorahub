@@ -170,7 +170,7 @@ export async function bulkToggleTeamMemberStatusAction(
 
     const nextActive = targetStatus === "active";
     let updatedCount = 0;
-    let errorMessages: string[] = [];
+    const errorMessages: string[] = [];
 
     for (const memberId of memberIds) {
       try {
@@ -683,7 +683,7 @@ export async function importBrokersAction(
 
     const db = getDatabase();
     let imported = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     await db.transaction(async (tx) => {
       for (let i = 1; i < lines.length; i++) {
