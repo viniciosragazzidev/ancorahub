@@ -1,12 +1,13 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
 
 export default async function SuperAdminSettingsPage() {
   const settings = await getSystemSettings([
@@ -27,6 +28,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_ai_whatsapp_qualification_enabled",
     "feature_ai_quick_reply_enabled",
     "feature_browser_extension_enabled",
+    "feature_agent_training_center_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -59,6 +61,7 @@ export default async function SuperAdminSettingsPage() {
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
+  const agentTrainingCenterEnabled = settingMap.get("feature_agent_training_center_enabled") === "true";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -85,6 +88,7 @@ export default async function SuperAdminSettingsPage() {
           </div>
         </section>
 
+        <SuperAdminSettingsTabs>
         <Card className="border-border bg-card shadow-none">
           <CardHeader>
             <CardTitle>Configuração do Servidor</CardTitle>
@@ -391,6 +395,7 @@ export default async function SuperAdminSettingsPage() {
           <CardHeader><CardTitle>CorreTop Assistant</CardTitle><CardDescription>Kill switch global da extensão contextual. Desativar bloqueia novas consultas sem revogar dados históricos ou sessões já registradas.</CardDescription></CardHeader>
           <CardContent><form action={updateExtensionGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="extensionEnabled" value="true" defaultChecked={browserExtensionEnabled} className="size-4" /><span><span className="font-medium">Extensão habilitada globalmente</span><span className="block text-xs text-muted-foreground">O Diretor ainda controla a ativação por tenant.</span></span></label><Button type="submit">Salvar extensão</Button></form></CardContent>
         </Card>
+
         <Card className="border-border bg-card shadow-none">
           <CardHeader><CardTitle>Qualificação automática no WhatsApp</CardTitle><CardDescription>Usa o mesmo motor de IA e o canal oficial da Meta para fazer perguntas iniciais. Desativar interrompe novas sessões sem apagar histórico.</CardDescription></CardHeader>
           <CardContent><form action={updateAiWhatsAppQualificationSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="aiWhatsAppQualificationEnabled" value="true" defaultChecked={aiWhatsAppQualificationEnabled} className="size-4" /><span><span className="font-medium">Iniciar qualificação para novos leads</span><span className="block text-xs text-muted-foreground">Requer Motor de IA e canal Meta Cloud ativos. O atendimento humano pode assumir a qualquer momento.</span></span></label><Button type="submit" variant="outline">Salvar qualificação</Button></form></CardContent>
@@ -399,6 +404,22 @@ export default async function SuperAdminSettingsPage() {
           <CardHeader><CardTitle>Quick Reply determinístico</CardTitle><CardDescription>Resolve saudações, mídia, opt-out e solicitações humanas antes de chamar a IA. O estado e o cooldown são persistidos.</CardDescription></CardHeader>
           <CardContent><form action={updateQuickReplySettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="quickReplyEnabled" value="true" defaultChecked={aiQuickReplyEnabled} className="size-4" /><span><span className="font-medium">Quick Reply habilitado</span><span className="block text-xs text-muted-foreground">Desative sem apagar eventos, métricas ou templates por tenant.</span></span></label><Button type="submit" variant="outline">Salvar Quick Reply</Button></form></CardContent>
         </Card>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader>
+            <CardTitle>Centro de Treinamento do Agente</CardTitle>
+            <CardDescription>Libera o piloto para Diretores criarem, validarem e publicarem versões de comportamento. Desativar preserva histórico, rascunhos e auditoria; apenas bloqueia novos acessos.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={updateAgentTrainingCenterSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="agentTrainingCenterEnabled" value="true" defaultChecked={agentTrainingCenterEnabled} className="size-4" />
+                <span><span className="font-medium">Liberar Centro de Treinamento globalmente</span><span className="block text-xs text-muted-foreground">Quando ativo, o Diretor ainda opera exclusivamente dentro do próprio tenant.</span></span>
+              </label>
+              <Button type="submit" variant={agentTrainingCenterEnabled ? "outline" : "default"}>{agentTrainingCenterEnabled ? "Salvar controle" : "Liberar piloto"}</Button>
+            </form>
+          </CardContent>
+        </Card>
+        </SuperAdminSettingsTabs>
       </main>
     </>
   );

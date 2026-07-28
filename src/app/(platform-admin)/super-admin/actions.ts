@@ -396,6 +396,26 @@ export async function updateQuickReplySettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateAgentTrainingCenterSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("agentTrainingCenterEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+
+  await setSystemSetting("feature_agent_training_center_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "agent_training_center.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "agent_training_center",
+    metadata: { enabled },
+    createdAt: now,
+  });
+
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/settings");
+}
+
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("extensionEnabled") === "true" ? "true" : "false";

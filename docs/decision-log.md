@@ -311,3 +311,15 @@ configurável, menor carga e tempo sem novo lead. O Diretor pode excluir correto
 o Super-admin pode desligar as capacidades sem apagar histórico. Ao assumir, o CRM
 pausa a automação e não oferece envio de mensagens; somente Diretor ou Gestor pode
 retomar a IA.
+
+## DEC-057 — Liberação global auditável do Centro de Treinamento
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O Centro de Treinamento do Agente permanece desativado por padrão e só pode ser
+liberado pelo Super-admin em **Configurações da Plataforma → IA e treinamento**.
+A alteração atualiza `feature_agent_training_center_enabled`, registra o ator e o
+valor na auditoria de plataforma e invalida as telas de configuração. A liberação
+global não concede escopo extra: Diretores continuam restritos ao próprio tenant e
+ao fluxo de versões publicado.
