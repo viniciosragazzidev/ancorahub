@@ -9,5 +9,12 @@ chrome.runtime.onMessage.addListener((message: { type?: string; payload?: Record
     })().catch(() => sendResponse({ ok: false, status: 0, body: { error: "OFFLINE" } }));
     return true;
   }
+  if (message.type === "OPEN_CRM_LEAD") {
+    const leadId = String(message.payload?.leadId ?? "");
+    if (!/^[a-zA-Z0-9-]{8,128}$/.test(leadId)) return false;
+    chrome.tabs.create({ url: `${API_BASE}/leads/${encodeURIComponent(leadId)}` });
+    sendResponse({ ok: true });
+    return false;
+  }
   return false;
 });
