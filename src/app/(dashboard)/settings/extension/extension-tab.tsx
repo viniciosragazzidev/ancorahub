@@ -27,7 +27,7 @@ export async function ExtensionTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button render={<a href="/downloads/corretop-assistant.zip" download>Baixar CorreTop Assistant</a>}>
+          <Button render={<a href="/downloads/ancorahub-assistant.zip" download>Baixar AncoraHub Assistant</a>}>
             Baixar extensão
           </Button>
           <ExtensionHelpDialog />

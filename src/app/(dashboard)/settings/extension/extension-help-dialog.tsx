@@ -16,13 +16,13 @@ import {
 export function ExtensionHelpDialog() {
   return (
     <Dialog>
-      <DialogTrigger render={<Button variant="outline" size="sm" aria-label="Como funciona o CorreTop Assistant" />}>
+      <DialogTrigger render={<Button variant="outline" size="sm" aria-label="Como funciona o AncoraHub Assistant" />}>
         ? Como funciona
       </DialogTrigger>
       <DialogPopup>
         <DialogPanel>
           <DialogHeader>
-            <DialogTitle>CorreTop Assistant no WhatsApp Web</DialogTitle>
+            <DialogTitle>AncoraHub Assistant no WhatsApp Web</DialogTitle>
             <DialogDescription>Um apoio contextual para o seu atendimento — nunca um disparador automático.</DialogDescription>
           </DialogHeader>
           <ol className="mt-5 space-y-4 text-sm text-muted-foreground">

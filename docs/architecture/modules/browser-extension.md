@@ -1,4 +1,4 @@
-# Módulo CorreTop Assistant
+# Módulo AncoraHub Assistant
 
 A extensão MV3 é um consumidor contextual do CRM no WhatsApp Web. Detecta apenas a conversa aberta, envia telefone normalizado e recebe um resumo minimizado quando o backend autoriza tenant, unidade e atribuição individual. A interface só é montada para um lead atribuído ao usuário autenticado na mesma unidade; `FORBIDDEN`, `NOT_FOUND` e conversa sem número não exibem painel nem mensagem na página. Inserir texto nunca envia mensagem.
 

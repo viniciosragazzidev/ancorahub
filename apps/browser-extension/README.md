@@ -1,4 +1,4 @@
-# CorreTop Assistant
+# AncoraHub Assistant
 
 Workspace MV3 do MVP. O content script é limitado a `web.whatsapp.com`, monta o painel em Shadow DOM e só envia ao gateway o telefone normalizado da conversa ativa. A decisão de acesso permanece no backend.
 

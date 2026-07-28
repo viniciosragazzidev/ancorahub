@@ -14,18 +14,23 @@ export function isExtensionLeadVisibleForUser(context: Pick<TenantContext, "user
   );
 }
 
+export function selectVisibleExtensionLead<T extends { corretorId: string | null; branchId: string | null }>(context: Pick<TenantContext, "userId" | "branchId">, candidates: T[]) {
+  return candidates.find((lead) => isExtensionLeadVisibleForUser(context, lead));
+}
+
 export async function resolveLeadForExtension(context: TenantContext, phone: string) {
   const normalized = normalizePhone(phone).replace(/\D/g, "");
   if (!normalized) return { status: "NOT_FOUND" as const };
   const db = getDatabase();
-  const [lead] = await db.select({
+  const candidates = await db.select({
     id: schema.leads.id, tenantId: schema.leads.tenantId, nome: schema.leads.nome, telefone: schema.leads.telefone,
     status: schema.leads.status, version: schema.leads.version, qualificationStatus: schema.leads.qualificationStatus, origem: schema.leads.origem,
     sourceCampaign: schema.leads.sourceCampaign, branchId: schema.leads.branchId, branchName: schema.branches.name,
     corretorId: schema.leads.corretorId, corretorName: schema.user.name,
-  }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') = ${normalized}`)).limit(1);
-  if (!lead) return { status: "NOT_FOUND" as const };
-  if (!isExtensionLeadVisibleForUser(context, lead)) return { status: "FORBIDDEN" as const };
+  }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') = ${normalized}`));
+  if (!candidates.length) return { status: "NOT_FOUND" as const };
+  const lead = selectVisibleExtensionLead(context, candidates);
+  if (!lead) return { status: "FORBIDDEN" as const };
   const [nextTask] = await db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt }).from(schema.leadTasks).where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.leadId, lead.id), isNull(schema.leadTasks.completedAt), or(eq(schema.leadTasks.assignedTo, context.userId), eq(schema.leadTasks.assignedTo, lead.corretorId ?? context.userId)))).orderBy(sql`${schema.leadTasks.dueAt} asc nulls last`).limit(1);
   return {
     status: "FOUND" as const,

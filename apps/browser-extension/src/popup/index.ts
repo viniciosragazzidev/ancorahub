@@ -12,7 +12,7 @@ function request(path: string, method = "GET", body?: unknown) {
 }
 
 async function showConnected() {
-  render(`<div class="heading"><span class="mark">C</span><h1>CorreTop Assistant</h1></div><p class="status">Conectada neste navegador.</p><p class="muted">O painel só aparece em conversas de leads atribuídos a você e à sua unidade.</p><button class="secondary" id="disconnect">Desconectar extensão</button>`);
+  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="status">Conectada neste navegador.</p><p class="muted">O painel só aparece em conversas de leads atribuídos a você e à sua unidade.</p><button class="secondary" id="disconnect">Desconectar extensão</button>`);
   document.querySelector("#disconnect")!.addEventListener("click", async () => {
     const button = document.querySelector<HTMLButtonElement>("#disconnect")!;
     button.disabled = true;
@@ -29,7 +29,7 @@ async function showConnected() {
 }
 
 function showDisconnected(message?: string) {
-  render(`<div class="heading"><span class="mark">C</span><h1>CorreTop Assistant</h1></div><p class="muted">Conecte usando o código temporário gerado no CRM.</p><input id="code" placeholder="Código temporário" autocomplete="one-time-code"><button id="connect">Conectar</button><p class="muted" id="status">${message ?? ""}</p>`);
+  render(`<div class="heading"><span class="mark">A</span><h1>AncoraHub Assistant</h1></div><p class="muted">Conecte usando o código temporário gerado no CRM.</p><input id="code" placeholder="Código temporário" autocomplete="one-time-code"><button id="connect">Conectar</button><p class="muted" id="status">${message ?? ""}</p>`);
   document.querySelector("#connect")!.addEventListener("click", async () => {
     const status = document.querySelector("#status")!;
     const code = (document.querySelector("#code") as HTMLInputElement).value.trim();

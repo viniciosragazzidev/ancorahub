@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const source = join(root, "apps", "browser-extension", "dist");
 const outputDir = join(root, "public", "downloads");
-const output = join(outputDir, "corretop-assistant.zip");
+const output = join(outputDir, "ancorahub-assistant.zip");
 
 function crc32(buffer) {
   let crc = 0xffffffff;

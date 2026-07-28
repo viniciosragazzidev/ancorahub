@@ -11,6 +11,8 @@ O WhatsApp Web atual mostra apenas o nome no cabeçalho da conversa. Como a exte
 - Um sidebar de perfil de conversa anterior não é usado quando o nome não coincide com o cabeçalho atual.
 - O popup consulta a sessão existente. Para sessão válida, exibe “Conectada neste navegador” e disponibiliza desconexão remota; em falha de revogação, preserva o token local.
 - A extensão foi versionada como `0.1.1`.
+- Quando há leads duplicados para o mesmo telefone no tenant, a resolução seleciona o lead visível para a sessão antes de retornar `FORBIDDEN`; isso evita que um registro de outra carteira oculte um lead autorizado.
+- A extensão é apresentada como **AncoraHub Assistant** no popup, painel, manifesto, instalação e download.
 
 ## Validações
 
