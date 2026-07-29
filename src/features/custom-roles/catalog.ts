@@ -40,7 +40,12 @@ const labels: Partial<Record<PermissionKey, [string, string, string]>> = {
 
 export const capabilityCatalog: CapabilityDefinition[] = (Object.keys(labels) as PermissionKey[]).map((key) => {
   const [label, description, category] = labels[key] ?? [key, "Capacidade operacional.", "Outros"];
-  return { key, label, description, category, delegable: !blocked.has(key), scopes: key.startsWith("acessar_financeiro") || category === "Financeiro" || category === "Marketing" ? ["none", "tenant"] : ["own", "branch"] };
+  const scopes = key.startsWith("acessar_financeiro") || category === "Financeiro"
+    ? ["none", "tenant"] as const
+    : category === "Marketing"
+      ? ["branch", "tenant"] as const
+      : ["own", "branch"] as const;
+  return { key, label, description, category, delegable: !blocked.has(key), scopes };
 });
 
 export function getAssignableCapabilities(scope: CustomRoleScope) {

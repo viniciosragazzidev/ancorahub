@@ -69,9 +69,9 @@ export async function provisionDefaultMarketingRole(input: { tenantId: string; a
   const id = randomUUID();
   const now = new Date();
   await db.transaction(async (tx) => {
-    await tx.insert(schema.customRoles).values({ id, tenantId: input.tenantId, name: "Marketing", description: "Acesso restrito às integrações e importações de marketing.", color: "blue", icon: "megaphone", scope: "none", status: "active", version: 1, createdBy: input.actorUserId, createdAt: now, updatedAt: now }).onConflictDoNothing();
+    await tx.insert(schema.customRoles).values({ id, tenantId: input.tenantId, name: "Marketing", description: "Acesso restrito às integrações e importações de marketing.", color: "blue", icon: "megaphone", scope: "tenant", status: "active", version: 1, createdBy: input.actorUserId, createdAt: now, updatedAt: now }).onConflictDoNothing();
     await tx.insert(schema.customRolePermissions).values({ id: randomUUID(), customRoleId: id, permissionKey: "ver_importacoes_meta", createdAt: now }).onConflictDoNothing();
-    await tx.insert(schema.customRoleEvents).values({ id: randomUUID(), tenantId: input.tenantId, customRoleId: id, actorUserId: input.actorUserId, action: "custom_role.default_marketing_created", version: 1, snapshot: { permissions: ["ver_importacoes_meta"], scope: "none" }, createdAt: now });
+    await tx.insert(schema.customRoleEvents).values({ id: randomUUID(), tenantId: input.tenantId, customRoleId: id, actorUserId: input.actorUserId, action: "custom_role.default_marketing_created", version: 1, snapshot: { permissions: ["ver_importacoes_meta"], scope: "tenant" }, createdAt: now });
   });
   return id;
 }

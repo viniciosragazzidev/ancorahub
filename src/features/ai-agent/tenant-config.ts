@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 
 export type TenantAiAgentConfig = {
-  /** The display name of the AI assistant (e.g. "Ana", "Assistente CorreTop") */
+  /** The display name of the AI assistant (e.g. "Ana", "Assistente Âncora Corretora") */
   assistantName: string;
 
   /** Conversational tone */
@@ -77,7 +77,7 @@ export async function loadTenantAiAgentConfig(
     }
 
     return {
-      assistantName: config.assistantName || "Assistente CorreTop",
+      assistantName: config.assistantName || "Assistente Âncora Corretora",
       tone: (config.tone as TenantAiAgentConfig["tone"]) || "friendly",
       formOfAddress: (config.formOfAddress as TenantAiAgentConfig["formOfAddress"]) || "voce",
       useEmojis: config.useEmojis ?? false,
@@ -100,7 +100,7 @@ export async function loadTenantAiAgentConfig(
 
 function getDefaultConfig(): TenantAiAgentConfig {
   return {
-    assistantName: "Assistente CorreTop",
+    assistantName: "Assistente Âncora Corretora",
     tone: "friendly",
     formOfAddress: "voce",
     useEmojis: false,
@@ -163,7 +163,7 @@ export function buildAgentSystemPrompt(
   config: TenantAiAgentConfig,
   tenantName?: string | null,
 ): string {
-  const companyName = tenantName || "CorreTop";
+  const companyName = tenantName || "Âncora Corretora";
   const formalityBlock = buildFormalityInstruction(
     config.formOfAddress,
     config.useEmojis,

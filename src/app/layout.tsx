@@ -45,7 +45,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const theme = (await cookies()).get("corretop-theme")?.value === "dark" ? "dark" : "light";
+  const theme = (await cookies()).get("ancora-theme")?.value === "dark" ? "dark" : "light";
   // Motion is enabled by default. The system setting check was removed from
   // the root layout because a database query here blocks ALL page rendering,
   // including the public landing page. If the database is slow or unreachable

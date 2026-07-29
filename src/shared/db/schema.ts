@@ -410,7 +410,7 @@ export const aiQualificationConfigs = pgTable(
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     enabled: boolean("enabled").notNull().default(false),
-    assistantName: text("assistant_name").notNull().default("Assistente CorreTop"),
+    assistantName: text("assistant_name").notNull().default("Assistente Âncora Corretora"),
     initialMessage: text("initial_message").notNull(),
     finalMessage: text("final_message").notNull().default("Obrigado! Um corretor continuará seu atendimento em seguida."),
     handoffMessage: text("handoff_message").notNull().default("Vou encaminhar você para um corretor da equipe agora."),

@@ -212,8 +212,8 @@ export class ConversationResetGuard implements Guardrail {
     "sou a assistente virtual", "sou a assistente inteligente",
     "me chamo", "sou a atendente virtual",
     "assistente virtual da corretora",
-    "assistente virtual da corretop",
-    "bem-vindo à corretop",
+    "assistente virtual da ancora",
+    "bem-vindo à ancora",
   ];
 
   check(ctx: GuardrailContext): GuardrailResult {
@@ -349,7 +349,7 @@ export class HallucinationGuard implements Guardrail {
 
   // These are safe to mention
   private readonly _allowedGeneralClaims = [
-    "corretop", "corretora", "plano de saúde", "planos de saúde",
+    "ancora corretora", "corretora", "plano de saúde", "planos de saúde",
     "ans", "cobertura", "carência", "coparticipação",
     "rede credenciada", "nacional", "ambulatorial", "hospitalar",
   ];

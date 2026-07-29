@@ -1,6 +1,6 @@
 "use client"
 
-import { CorreTopLogo } from "@/components/corretop-logo"
+import { AncoraLogo } from "@/components/ancora-logo"
 import { ArrowRight, Compass } from "@/components/huge-icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,7 +29,7 @@ export function OnboardingHero({ steps, onDismiss, onNavigate }: OnboardingHeroP
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex items-center gap-2">
-        <CorreTopLogo className="h-7 w-28 object-contain object-left" />
+        <AncoraLogo className="h-7 w-28 object-contain object-left" />
         <Badge variant="outline" className="ml-auto text-[10px]">
           Configuração inicial
         </Badge>

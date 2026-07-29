@@ -45,8 +45,8 @@ async function getOrCreateConfig(tenantId: string) {
   const now = new Date();
   const [created] = await db.insert(schema.aiQualificationConfigs).values({
     id: randomUUID(), tenantId, enabled: await qualificationEnabled(),
-    assistantName: "Assistente CorreTop",
-    initialMessage: "Olá! Sou o assistente virtual do CorreTop. Vou fazer algumas perguntas rápidas para preparar seu atendimento. Você pode pedir um atendente humano a qualquer momento.",
+    assistantName: "Assistente Âncora Corretora",
+    initialMessage: "Olá! Sou o assistente virtual da Âncora Corretora. Vou fazer algumas perguntas rápidas para preparar seu atendimento. Você pode pedir um atendente humano a qualquer momento.",
     timeoutMinutes: 30, maxRetries: 2, createdAt: now, updatedAt: now,
   }).onConflictDoNothing().returning();
   return created ?? (await db.select().from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, tenantId)).limit(1))[0] ?? null;
@@ -102,7 +102,7 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
   let message: string | null = null;
   try {
     const result = await aiComplete({
-      systemPromptOverride: "Você é o qualificador do CorreTop. Não solicite documentos, senhas, CPF ou dados de saúde. Retorne somente JSON válido no formato {value:string|null,valid:boolean,message:string|null}. Valide a resposta para a pergunta indicada e escreva uma orientação curta em português se precisar repetir.",
+      systemPromptOverride: "Você é o qualificador da Âncora Corretora. Não solicite documentos, senhas, CPF ou dados de saúde. Retorne somente JSON válido no formato {value:string|null,valid:boolean,message:string|null}. Valide a resposta para a pergunta indicada e escreva uma orientação curta em português se precisar repetir.",
       maxTokensOverride: 220,
       temperatureOverride: 0.2,
       userMessage: JSON.stringify({ question: current.prompt, answer: input.text }),

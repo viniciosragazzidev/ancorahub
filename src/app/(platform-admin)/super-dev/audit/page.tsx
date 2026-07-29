@@ -107,7 +107,7 @@ export default function SuperDevAuditPage() {
 
   return (
     <>
-      <PlatformAdminHeader breadcrumb="CorreTop / Admin" title="Segurança & Auditoria" />
+      <PlatformAdminHeader breadcrumb="Âncora / Admin" title="Segurança & Auditoria" />
 
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         {/* Navigation Tabs */}

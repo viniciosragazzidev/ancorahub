@@ -41,7 +41,8 @@ export default async function TeamPage() {
         name: schema.brokerProfiles.professionalName,
         email: schema.brokerProfiles.invitedEmail,
         role: sql<"broker">`'broker'`,
-        jobTitle: sql<string>`'broker'`,
+        jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, 'broker')`,
+        customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.user.status} = 'pending' or ${schema.brokerProfiles.lifecycleStatus} = 'INVITED' then 'pending'::user_status
@@ -49,7 +50,7 @@ export default async function TeamPage() {
             else 'active'::user_status
           end
         `,
-        branchId: schema.brokerProfiles.branchId,
+        branchId: sql<string | null>`case when ${schema.tenantMemberships.id} is null then ${schema.brokerProfiles.branchId} else ${schema.tenantMemberships.branchId} end`,
         branchName: schema.branches.name,
       })
       .from(schema.brokerProfiles)
@@ -59,6 +60,7 @@ export default async function TeamPage() {
         eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
         eq(schema.tenantMemberships.tenantId, context.tenantId),
       ))
+      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
         eq(schema.brokerProfiles.tenantId, context.tenantId),
         context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined
@@ -71,6 +73,7 @@ export default async function TeamPage() {
         email: schema.user.email,
         role: schema.tenantMemberships.role,
         jobTitle: schema.tenantMemberships.jobTitle,
+        customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.user.status} = 'pending' then 'pending'::user_status
@@ -85,6 +88,7 @@ export default async function TeamPage() {
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.tenantMemberships.branchId, schema.branches.id))
       .leftJoin(schema.brokerProfiles, eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId))
+      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         branchScope,

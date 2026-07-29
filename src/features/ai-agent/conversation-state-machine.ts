@@ -472,7 +472,7 @@ export async function processInboundAiResponse({
     let notifiedUserId: string | null = null;
     if (quickReply.notifyHuman && leadOwner?.corretorId) {
       notifiedUserId = leadOwner.corretorId;
-      await publishNotification({ capability: "quick_reply_human", tenantId, recipientUserId: leadOwner.corretorId, leadId, type: "quick_reply_human", title: "Nova mensagem no atendimento", message: suppressed ? "O lead enviou nova mensagem; a resposta foi suprimida pelo cooldown." : "O lead enviou uma mensagem e o atendimento foi sinalizado.", pushTitle: "Mensagem de lead", pushBody: "Verifique o atendimento no CorreTop.", url: `/leads/${leadId}`, tag: `quick-reply-${leadId}` });
+      await publishNotification({ capability: "quick_reply_human", tenantId, recipientUserId: leadOwner.corretorId, leadId, type: "quick_reply_human", title: "Nova mensagem no atendimento", message: suppressed ? "O lead enviou nova mensagem; a resposta foi suprimida pelo cooldown." : "O lead enviou uma mensagem e o atendimento foi sinalizado.", pushTitle: "Mensagem de lead", pushBody: "Verifique o atendimento na plataforma.", url: `/leads/${leadId}`, tag: `quick-reply-${leadId}` });
     }
     const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < 30 * 60 * 1000;
     const isWaitRule = quickReply.ruleKey === "waiting_human" || quickReply.ruleKey === "waiting_response";

@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
     // Brand header bar
     page.drawRectangle({ x: 0, y: 760, width: 595.28, height: 81.89, color: brand });
-    page.drawText("CorreTop", { x: 42, y: 799, size: 22, font: bold, color: rgb(1, 1, 1) });
+    page.drawText("Âncora Corretora", { x: 42, y: 799, size: 22, font: bold, color: rgb(1, 1, 1) });
     page.drawText("Tabela Personalizada de Preços", { x: 42, y: 778, size: 11, font: regular, color: rgb(1, 1, 1) });
 
     // Info section
@@ -158,7 +158,7 @@ export async function POST(request: Request) {
     page.drawText("Valores de referência sujeitos à análise de crédito e às condições vigentes das operadoras.", {
       x: 42, y: 66, size: 8, font: regular, color: rgb(0.4, 0.43, 0.48),
     });
-    page.drawText("CorreTop · Tabela gerada digitalmente", {
+    page.drawText("Âncora Corretora · Tabela gerada digitalmente", {
       x: 42, y: 48, size: 8, font: regular, color: rgb(0.4, 0.43, 0.48),
     });
 

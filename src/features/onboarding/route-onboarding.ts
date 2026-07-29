@@ -61,9 +61,9 @@ export const routeOnboardingDefinitions: readonly RouteOnboardingDefinition[] = 
   route("reports", ["/relatorios"], "Decisões com contexto", "Compare operação, conversão e produtividade sem perder o responsável por trás dos números.", "reports", "Aplique filtros de período e unidade para transformar o panorama em decisão."),
   route("goals", ["/metas", "/minha-meta"], "Metas que movimentam a operação", "Defina objetivos, acompanhe progresso e entenda quais ações aproximam o resultado.", "goals", "O progresso é calculado a partir dos registros reais do sistema."),
   route("notifications", ["/notificacoes"], "Nada importante passa despercebido", "Reúna alertas e atualizações em um só lugar para agir no momento certo.", "conversations", "Marque como lida depois de decidir o próximo passo, não apenas para limpar a tela."),
-  route("settings", ["/settings", "/settings/whatsapp", "/assinatura"], "Seu espaço, do seu jeito", "Ajuste preferências pessoais e integrações disponíveis sem sair do ambiente CorreTop.", "settings", "Configurações da corretora e configurações pessoais aparecem separadas por permissão."),
+  route("settings", ["/settings", "/settings/whatsapp", "/assinatura"], "Seu espaço, do seu jeito", "Ajuste preferências pessoais e integrações disponíveis sem sair do ambiente da plataforma.", "settings", "Configurações da corretora e configurações pessoais aparecem separadas por permissão."),
   route("integrity", ["/integridade", "/noc"], "Confiança construída nos detalhes", "Monitore integridade, eventos e sinais que ajudam a manter a operação segura e previsível.", "integrity", "Quando algo exigir atenção, abra o registro para ver evidência e responsável."),
-  route("guide", ["/guia", "/roadmap"], "Aprenda no contexto", "Consulte orientações do produto, decisões e próximos passos da plataforma sem sair do fluxo.", "guide", "O conteúdo é vivo e acompanha a evolução das capacidades do CorreTop."),
+  route("guide", ["/guia", "/roadmap"], "Aprenda no contexto", "Consulte orientações do produto, decisões e próximos passos da plataforma sem sair do fluxo.", "guide", "O conteúdo é vivo e acompanha a evolução das capacidades da plataforma."),
 ];
 
 export function getRouteOnboardingDefinition(pathname: string) {

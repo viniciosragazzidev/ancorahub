@@ -48,7 +48,7 @@ export default async function WelcomePage() {
     <WelcomeScreen
       userName={user?.name ?? "Usuário"}
       role={role}
-      tenantName={tenant?.name ?? "CorreTop"}
+      tenantName={tenant?.name ?? "Âncora Corretora"}
       onboarding={onboarding}
     />
   );

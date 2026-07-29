@@ -33,7 +33,7 @@ function createAuth() {
     },
     plugins: [
       twoFactor({
-        issuer: "CorreTop",
+        issuer: "Âncora Corretora",
         backupCodeOptions: { amount: 10, storeBackupCodes: "encrypted" },
       }),
       passkey(),

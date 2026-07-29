@@ -17,7 +17,7 @@ export default async function SuperDevDashboard() {
 
   return (
     <>
-      <PlatformAdminHeader breadcrumb="CorreTop / Admin" title="Dashboard de Desenvolvimento" />
+      <PlatformAdminHeader breadcrumb="Âncora / Admin" title="Dashboard de Desenvolvimento" />
 
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         {/* KPI Grid */}

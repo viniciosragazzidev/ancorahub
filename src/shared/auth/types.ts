@@ -1,4 +1,5 @@
 import type { TenantRole } from "@/shared/db/schema";
+import type { CustomRoleScope } from "@/features/custom-roles/catalog";
 
 export const tenantRoles = ["director", "manager", "broker"] as const;
 
@@ -10,6 +11,8 @@ export type TenantContext = {
   /** Cargo exibido — função descritiva (director | manager | broker | marketing | finance | operations | support) */
   jobTitle: string;
   customRoleId?: string | null;
+  /** Escopo do cargo personalizado, sempre resolvido no servidor. */
+  customRoleScope?: CustomRoleScope | null;
   /** Escopo de filial — null para diretores e marketing central */
   branchId: string | null;
 };

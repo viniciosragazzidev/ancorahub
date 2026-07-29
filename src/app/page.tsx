@@ -1,6 +1,6 @@
 "use client";
 
-import { CorreTopLogo } from "@/components/corretop-logo";
+import { AncoraLogo } from "@/components/ancora-logo";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
@@ -116,7 +116,7 @@ function Nav() {
           className="flex items-center gap-2 text-sm font-semibold tracking-tight"
           href="/"
         >
-          <CorreTopLogo className="h-8 w-32 object-contain object-left" />
+          <AncoraLogo className="h-8 w-32 object-contain object-left" />
         </Link>
 
         <div className="hidden items-center gap-6 md:flex">
@@ -440,7 +440,7 @@ const steps = [
     icon: WhatsappLogo,
     title: "Conecte o WhatsApp",
     description:
-      "Vincule o numero da corretora em poucos cliques. Toda conversa com clientes fica centralizada no CorreTop.",
+      "Vincule o numero da corretora em poucos cliques. Toda conversa com clientes fica centralizada na plataforma.",
   },
   {
     number: "02",
@@ -508,7 +508,7 @@ function HowItWorks() {
 const testimonials = [
   {
     quote:
-      "O CorreTop transformou nossa operacao. Consegui organizar a equipe de 8 corretores e o acompanhamento de leads ficou muito mais eficiente.",
+      "A plataforma transformou nossa operacao. Consegui organizar a equipe de 8 corretores e o acompanhamento de leads ficou muito mais eficiente.",
     author: "Ricardo Mendes",
     role: "Diretor Comercial",
     company: "Vertice Saude Corretora",
@@ -537,7 +537,7 @@ function Testimonials() {
       <SectionHeader
         label="Depoimentos"
         title="O que dizem nossos clientes"
-        description="Corretoras de todo o Brasil confiam no CorreTop para gerenciar sua operacao."
+        description="Corretoras de todo o Brasil confiam na Âncora Corretora para gerenciar sua operacao."
       />
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -602,7 +602,7 @@ function CtaSection() {
           Pronto para transformar sua operacao?
         </h2>
         <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-[#a1a1aa]">
-          Cadastre-se gratuitamente e descubra como o CorreTop pode ajudar sua
+          Cadastre-se gratuitamente e descubra como a Âncora Corretora pode ajudar sua
           corretora a vender mais e melhor.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -637,7 +637,7 @@ function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <Link className="flex items-center gap-2 text-sm font-semibold tracking-tight" href="/">
-              <CorreTopLogo className="h-8 w-32 object-contain object-left" />
+              <AncoraLogo className="h-8 w-32 object-contain object-left" />
             </Link>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
               CRM operacional para corretoras de planos de saude. Gestao de leads,
@@ -689,7 +689,7 @@ function Footer() {
         </div>
 
         <div className="mt-12 border-t border-border pt-6 text-center text-xs text-muted-foreground md:text-left">
-          <p>&copy; {new Date().getFullYear()} CorreTop. Todos os direitos reservados.</p>
+          <p>&copy; {new Date().getFullYear()} Âncora Corretora. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

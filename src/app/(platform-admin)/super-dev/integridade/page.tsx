@@ -41,7 +41,7 @@ export default async function SuperDevIntegrityPage() {
 
   return (
     <>
-      <PlatformAdminHeader breadcrumb="CorreTop / Admin" title="Integridade" />
+      <PlatformAdminHeader breadcrumb="Âncora / Admin" title="Integridade" />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <section className="flex flex-col gap-2">
           <p className="text-xs font-medium text-primary">GOVERNANÇA</p>

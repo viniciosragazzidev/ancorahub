@@ -133,11 +133,11 @@ export function WebhookTutorial() {
       {/* Header */}
       <section className="mb-8">
         <Badge variant="outline" className="mb-3 gap-1.5 border-primary/20 bg-primary/[0.05] text-primary">
-          Guia CorreTop
+          Guia de Integração
         </Badge>
         <h1 className="text-3xl font-semibold tracking-tight">Integração via Webhook</h1>
         <p className="mt-2 max-w-2xl text-base leading-7 text-muted-foreground">
-          Envie leads automaticamente do seu site ou landing page para o CorreTop usando nossa API REST.
+          Envie leads automaticamente do seu site ou landing page para a plataforma usando nossa API REST.
         </p>
       </section>
 

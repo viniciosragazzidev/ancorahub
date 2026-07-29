@@ -127,7 +127,7 @@ Uma única palavra estrangeira na mensagem do cliente NÃO deve fazer você troc
 NUNCA se desculpe sem um motivo claro e identificável.
 NUNCA reinicie a conversa perguntando nome ou dados que já foram fornecidos.`;
 
-const DEFAULT_SYSTEM_PROMPT = `Você é a assistente virtual inteligente da corretora de planos de saúde CorreTop.
+const DEFAULT_SYSTEM_PROMPT = `Você é a assistente virtual inteligente da corretora de planos de saúde Âncora Corretora.
 Seu objetivo é acolher o contato de forma educada, entender o interesse do cliente e coletar as informações básicas para qualificação.
 
 REGRAS OBRIGATÓRIAS:
@@ -261,7 +261,7 @@ export async function generateAiResponse({
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
-          "X-Title": "CorreTop CRM AI Agent",
+          "X-Title": "Âncora Corretora CRM AI Agent",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -321,7 +321,7 @@ export async function generateAiResponse({
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
-            "X-Title": "CorreTop CRM AI Agent",
+            "X-Title": "Âncora Corretora CRM AI Agent",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -391,7 +391,7 @@ export async function generateAiResponse({
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
-            "X-Title": "CorreTop CRM AI Agent",
+            "X-Title": "Âncora Corretora CRM AI Agent",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

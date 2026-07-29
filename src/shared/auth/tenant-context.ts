@@ -5,6 +5,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "./errors";
 import { getRequiredSession } from "./session";
 import type { TenantContext } from "./types";
+import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 export type { TenantContext };
 
 export async function getRequiredTenantContext(): Promise<TenantContext> {
@@ -18,6 +19,7 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
       role: schema.tenantMemberships.role,
       jobTitle: schema.tenantMemberships.jobTitle,
       customRoleId: schema.tenantMemberships.customRoleId,
+      customRoleScope: schema.customRoles.scope,
       branchId: schema.tenantMemberships.branchId,
       branchStatus: schema.branches.status,
     })
@@ -30,6 +32,10 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
     .leftJoin(
       schema.branches,
       eq(schema.tenantMemberships.branchId, schema.branches.id),
+    )
+    .leftJoin(
+      schema.customRoles,
+      eq(schema.tenantMemberships.customRoleId, schema.customRoles.id),
     )
     .where(eq(schema.tenantMemberships.userId, sessionUser.id));
 
@@ -54,8 +60,10 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
     throw new AuthorizationError("The tenant is not active.");
   }
 
-  const isCentralMarketing = membership.jobTitle === "marketing" && !membership.branchId;
-  if ((membership.role === "manager" || membership.role === "broker") && !membership.branchId && !isCentralMarketing) {
+  if (requiresMemberBranch({
+    jobTitle: membership.jobTitle,
+    customRoleScope: membership.customRoleScope,
+  }) && !membership.branchId) {
     throw new AuthorizationError("O acesso operacional precisa estar vinculado a uma unidade.");
   }
 
@@ -69,6 +77,7 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
     role: membership.role,
     jobTitle: membership.jobTitle,
     customRoleId: membership.customRoleId,
+    customRoleScope: membership.customRoleScope,
     branchId: membership.branchId,
   };
 }

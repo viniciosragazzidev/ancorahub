@@ -344,6 +344,13 @@
       "when": 1785621600000,
       "tag": "0096_custom_roles_rbac",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1785621700000,
+      "tag": "0097_custom_role_member_scope",
+      "breakpoints": true
     }
   ]
 }

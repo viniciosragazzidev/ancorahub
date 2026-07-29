@@ -349,10 +349,10 @@ export function ConversationsWorkspace({
       </header>
 
       <div
-        className={cn(
-          "grid min-h-0 flex-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
-          profileOpen ? "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]" : "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,2fr)]",
-        )}
+          className={cn(
+            "grid min-h-0 flex-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
+            profileOpen && "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
+          )}
       >
         <section
           aria-label="Lista de atendimentos"
@@ -414,7 +414,7 @@ export function ConversationsWorkspace({
 
         <aside
           aria-label="Perfil do cliente"
-          className={cn("hidden min-h-0 border-l border-border bg-card 2xl:flex 2xl:flex-col", !profileOpen && "2xl:hidden")}
+          className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card 2xl:flex 2xl:flex-col", !profileOpen && "2xl:hidden")}
         >
           {selected ? <ClientProfile client={selected} /> : null}
         </aside>
@@ -777,7 +777,7 @@ function HistoryEmptyState({ phone }: { phone: string }) {
         animated
         icon={ChatCircleText}
         title="Nenhuma mensagem sincronizada"
-        description="Este atendimento ainda não possui histórico no CorreTop. Continue o contato pelo WhatsApp e o histórico aparecerá quando a sincronização estiver disponível."
+        description="Este atendimento ainda não possui histórico na plataforma. Continue o contato pelo WhatsApp e o histórico aparecerá quando a sincronização estiver disponível."
         action={
           <Button render={<a href={getWhatsAppUrl(phone)} rel="noreferrer" target="_blank" />} size="sm">
             <WhatsappLogo />

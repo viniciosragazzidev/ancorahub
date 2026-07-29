@@ -28,6 +28,7 @@ type TeamMember = {
   status: "pending" | "active" | "disabled";
   branchId: string | null;
   branchName: string | null;
+  customRoleScope: "none" | "own" | "branch" | "tenant" | null;
 };
 
 type Props = {
@@ -154,7 +155,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
         <DataTableColumnHeader column={column} title="Filial" />
       ),
       cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">{row.original.branchName ?? "Sem filial"}</span>
+        <span className="text-xs text-muted-foreground">{row.original.branchId ? row.original.branchName ?? "Unidade vinculada" : "Geral da empresa"}</span>
       ),
     },
     {

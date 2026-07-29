@@ -34,7 +34,7 @@ export function SecurityTab({ enabled: initialEnabled, email }: Props) {
   async function enable() {
     setBusy(true);
     try {
-      const result = await authClient.twoFactor.enable({ password: password || undefined, issuer: "CorreTop" });
+      const result = await authClient.twoFactor.enable({ password: password || undefined, issuer: "Âncora Corretora" });
       if (result.error || !result.data) throw new Error(result.error?.message ?? "Não foi possível ativar o 2FA.");
       setEnabled(true);
       setTotpUri(result.data.totpURI);

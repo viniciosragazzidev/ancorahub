@@ -26,10 +26,10 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-010 | Tenant só é liberado após pagamento confirmado; não existe trial. | Onboarding pago → tenant ativo; inadimplência → acesso bloqueado após tolerância. | RF001, RF006–007, RF090–092 |
 | BR-011 | Super-admin gerencia tenant, plano e ativação, fora do escopo das corretoras. | Ação administrativa → altera estado do tenant e gera auditoria. | RF090–091 |
 | BR-012 | Diretor pode criar Gestores e Corretores; Gestor pode criar somente Corretores; Corretor não administra equipe. | Tentativa de criar papel acima do escopo → negada no servidor. | RF003–005, prompt 2.3 |
-| BR-013 | Usuários operacionais pertencem a uma filial. | Criação/alteração → filial válida no mesmo tenant é obrigatória. | RF100–101 |
+| BR-013 | Gestor e Corretor pertencem a uma filial; cargo administrativo pode ser geral ou local. | Criação/alteração → Gestor/Corretor e cargo de uma unidade exigem filial ativa do mesmo tenant; cargo geral pode permanecer sem filial. | RF100–101, DEC-066 |
 | BR-014 | Corretor disponível pode pausar o recebimento; Gestor pode fazê-lo pela equipe. | Pausa → corretor deixa de ser elegível à distribuição. | RF110–112 |
 | BR-015 | Cargo organizacional e perfil de acesso são conceitos separados. | Criação/edição → cargo descritivo pode variar sem ampliar permissões; o perfil continua autorizado pelo servidor. | Gestão de equipe |
-| BR-016 | Todo membro operacional deve estar vinculado a uma filial ativa. | Criação/edição → unidade selecionada pertence ao tenant e é registrada na associação. | RF100–101 |
+| BR-016 | Todo membro operacional e todo cargo limitado a unidade deve estar vinculado a uma filial ativa. | Criação/edição → o servidor deriva a exigência do perfil e da abrangência do cargo, valida a unidade no tenant e registra a associação. | RF100–101, DEC-066 |
 
 ## Leads, funil e distribuição
 

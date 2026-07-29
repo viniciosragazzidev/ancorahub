@@ -388,3 +388,17 @@ feature estiver ativa; ele nunca concede privilégios de Super-admin, gestão de
 filiais, gestão financeira ou elevação de acesso. O piloto exige flag global e
 liberação por tenant, preserva o fallback legado ao ser desligado e audita criação,
 edição, atribuição e arquivamento.
+
+## DEC-066 — Escopo de unidade para cargos administrativos
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+Gestor e Corretor continuam perfis operacionais e exigem vínculo com uma única
+unidade ativa. Cargos administrativos personalizados podem ser criados com
+abrangência **Geral da empresa** ou **Uma unidade**. No primeiro caso, o membro
+não precisa de unidade; no segundo, o servidor exige e valida uma unidade do
+mesmo tenant. O cargo padrão Marketing é geral por padrão, mas o Diretor pode
+criar uma variante local de Marketing quando a operação pedir. A abrangência
+limita permissões elegíveis, nunca amplia acesso de Diretor, e toda alteração
+permanece auditável dentro do piloto de cargos personalizados.

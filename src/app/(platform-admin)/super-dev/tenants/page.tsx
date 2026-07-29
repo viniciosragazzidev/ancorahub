@@ -22,7 +22,7 @@ export default async function SuperDevTenantsPage() {
 
   return (
     <>
-      <PlatformAdminHeader breadcrumb="CorreTop / Admin" title="Empresas Parceiras" />
+      <PlatformAdminHeader breadcrumb="Âncora / Admin" title="Empresas Parceiras" />
 
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
