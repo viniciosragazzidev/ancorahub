@@ -250,7 +250,7 @@ function DeleteMemberDialog({
       <DialogPopup className="sm:max-w-md">
         <DialogTitle>Excluir membro</DialogTitle>
         <DialogDescription>
-          Essa ação remove o acesso, a associação de equipe e o login do membro.
+          Essa ação remove o acesso desta empresa, a associação de equipe e as sessões ativas. O histórico operacional é preservado.
         </DialogDescription>
         <form ref={formRef} action={action} className="space-y-4">
           <input name="memberId" type="hidden" value={member.id} />

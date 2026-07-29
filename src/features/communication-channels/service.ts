@@ -65,6 +65,10 @@ function samePhone(left: string, right: string) {
   return Boolean(a && b) && (a === b || a.endsWith(b) || b.endsWith(a) || a.slice(-11) === b.slice(-11));
 }
 
+export function matchesKnownBrokerPhone(phone: string, brokerPhones: readonly string[]) {
+  return brokerPhones.some((brokerPhone) => samePhone(brokerPhone, phone));
+}
+
 async function registerWebhookEvent(input: { channelId: string | null; externalEventId: string; eventType: string; payloadHash: string }) {
   const [event] = await getDatabase().insert(schema.communicationChannelWebhookEvents).values({
     id: randomUUID(), channelId: input.channelId, provider: META_CLOUD_PROVIDER, externalEventId: input.externalEventId, eventType: input.eventType, payloadHash: input.payloadHash,
@@ -95,6 +99,10 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         continue;
       }
       await db.update(schema.communicationChannels).set({ lastWebhookAt: new Date(), updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channel.id));
+      const brokerProfiles = await db
+        .select({ id: schema.brokerProfiles.id, phone: schema.brokerProfiles.phone })
+        .from(schema.brokerProfiles)
+        .where(eq(schema.brokerProfiles.tenantId, channel.tenantId));
 
       for (const message of change.value?.messages ?? []) {
         const eventId = await registerWebhookEvent({ channelId: channel.id, externalEventId: message.id, eventType: `message.${message.type ?? "unknown"}`, payloadHash });
@@ -116,25 +124,43 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           text = buttonText || buttonPayload || text;
         }
 
-        // Check if message is a response to a lead offer
+        const phone = normalizePhone(message.from);
+        const brokerProfile = brokerProfiles.find((profile) => matchesKnownBrokerPhone(phone, [profile.phone]));
+
+        // Check if message is a response to a lead offer before persisting it as
+        // a broker-channel message. A broker must never be turned into a lead.
         if (text) {
-          const offerResponse = await handleLeadOfferWebhookResponse({
+          await handleLeadOfferWebhookResponse({
             tenantId: channel.tenantId,
             phone: message.from,
             buttonText: buttonText || text,
             buttonPayload: buttonPayload,
             providerMessageId: message.context?.id,
           });
+        }
 
-          if (offerResponse.processed) {
-            await setWebhookEventResult(eventId, "processed");
-            processed += 1;
-            continue;
-          }
+        if (brokerProfile) {
+          await db.insert(schema.whatsappMessages).values({
+            id: randomUUID(),
+            tenantId: channel.tenantId,
+            leadId: null,
+            clientId: null,
+            communicationChannelId: channel.id,
+            provider: META_CLOUD_PROVIDER,
+            providerStatus: "received",
+            messageId: message.id,
+            phone,
+            direction: "incoming",
+            body: text || `[${messageKind}]`,
+            sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
+          }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+          console.info("[whatsapp/broker-channel] inbound.received", { tenantId: channel.tenantId, brokerProfileId: brokerProfile.id, messageKind });
+          await setWebhookEventResult(eventId, "processed");
+          processed += 1;
+          continue;
         }
 
         if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
-        const phone = normalizePhone(message.from);
         const [leads, clients] = await Promise.all([
           db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(eq(schema.leads.tenantId, channel.tenantId)),
           db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, channel.tenantId)),

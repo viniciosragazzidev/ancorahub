@@ -433,7 +433,9 @@ export async function deleteTeamMemberAction(
         if (profile) await tx.delete(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id)));
         if (profile) await tx.delete(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, context.tenantId)));
         await tx.delete(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, member.membershipId), eq(schema.tenantMemberships.tenantId, context.tenantId)));
-        await tx.delete(schema.user).where(eq(schema.user.id, member.userId));
+        // A identidade pode ter histórico/auditoria e até pertencer a outro tenant.
+        // Removemos somente o acesso desta empresa e invalidamos as sessões ativas.
+        await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
       });
     } else {
       const [profile] = await db.select({ id: schema.brokerProfiles.id, branchId: schema.brokerProfiles.branchId, userId: schema.brokerProfiles.userId }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, memberId), eq(schema.brokerProfiles.tenantId, context.tenantId))).limit(1);

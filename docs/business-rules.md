@@ -106,6 +106,8 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 - Base legal, retenção e consentimento LGPD (DEC-005).
 - Canal, aprovação e opt-out do reengajamento (DEC-006).
 
+| BR-062 | O Diretor pode consultar, em modo somente leitura, o histórico do número oficial com corretores do próprio tenant. | Mensagem oficial para/desde número de corretor → persiste no ledger autorizado; Diretor abre `/conversas?tab=corretores` → consulta convites, entregas e respostas sem enviar mensagens. | DEC-065 |
+
 ## Feedback e lembretes
 
 | ID | Regra | Gatilho → resultado | Origem |

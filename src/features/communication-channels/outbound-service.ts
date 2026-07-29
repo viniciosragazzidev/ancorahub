@@ -18,6 +18,17 @@ const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).defau
 export const whatsappOutboundStatusValues = ["pending", "queued", "processing", "sent", "delivered", "read", "failed", "cancelled", "expired"] as const;
 export type WhatsAppOutboundStatus = (typeof whatsappOutboundStatusValues)[number];
 
+export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean; attempts: number }) {
+  const deliveryStatus: "queued" | "failed" = input.shouldRetry ? "queued" : "failed";
+  return {
+    deliveryStatus,
+    deliveryAttempts: input.attempts,
+    deliveryError: input.shouldRetry
+      ? "Tentativa de envio será repetida automaticamente."
+      : "A Meta não confirmou o envio do convite. Revise o template aprovado e o número antes de reenviar.",
+  };
+}
+
 export async function enqueueMetaTemplateMessage(input: {
   tenantId: string;
   channelId?: string;
@@ -153,6 +164,14 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
       });
       const nextAttemptAt = shouldRetry ? new Date(Date.now() + Math.min(3_600_000, 30_000 * 2 ** row.attempts)) : null;
       await db.update(schema.whatsappOutboundMessages).set({ status: shouldRetry ? "queued" : "failed", nextAttemptAt, failedAt: shouldRetry ? null : new Date(), providerErrorCode: safeCode, providerErrorMessage: "Falha de entrega; consulte o histórico operacional.", updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      if (row.purpose === "brokerInvitation" && row.recipientId) {
+        await db.update(schema.brokerInvitations)
+          .set(getInvitationDeliveryFailureUpdate({ shouldRetry, attempts: row.attempts + 1 }))
+          .where(and(
+            eq(schema.brokerInvitations.id, row.recipientId),
+            eq(schema.brokerInvitations.tenantId, row.tenantId),
+          ));
+      }
       if (shouldRetry) retried += 1; else failed += 1;
     }
   };
