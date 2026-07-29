@@ -56,6 +56,7 @@ export default async function SalesPage() {
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-medium text-primary">COMERCIAL</p>
@@ -65,6 +66,7 @@ export default async function SalesPage() {
             </p>
           </div>
         </div>
+        */}
 
         <SalesWorkspace
           sales={sales.map((s) => ({

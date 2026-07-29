@@ -21,10 +21,10 @@ export function AnimatedPageTitle({
       className={motionEnabled ? "ct-page-title-enter" : undefined}
       key={`${pathname}:${title}`}
     >
-      <p className={compact ? "text-xs text-muted-foreground" : "truncate text-[11px] text-muted-foreground max-[559px]:hidden"}>
+      <p className={compact ? "text-xs text-muted-foreground" : "truncate text-xs text-muted-foreground max-[559px]:hidden"}>
         {breadcrumb}
       </p>
-      <p className="truncate text-sm font-semibold">{title}</p>
+      <p className="truncate text-sm font-medium tracking-tight">{title}</p>
     </div>
   );
 }

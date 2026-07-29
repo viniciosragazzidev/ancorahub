@@ -44,6 +44,7 @@ export default async function DocumentsPage() {
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Gestão Documental</h1>
@@ -51,6 +52,7 @@ export default async function DocumentsPage() {
             Acompanhe pendências de documentos enviados pelos corretores e configure exigências obrigatórias.
           </p>
         </section>
+        */}
 
         <DocumentsWorkspace
           role={context.role}

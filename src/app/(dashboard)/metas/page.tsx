@@ -25,16 +25,16 @@ export default async function GoalsPage() {
     <>
       <DashboardHeader breadcrumb="Gestão comercial" title="Metas" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs font-medium text-primary">GESTÃO COMERCIAL</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Metas</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Defina e acompanhe metas comerciais por corretor, equipe, filial ou corretora.
-              O progresso é calculado automaticamente com base nos dados reais de vendas e atendimento.
-            </p>
-            <div className="mt-3"><ViewScopeContext role={context.role} /></div>
-          </div>
+        <div>
+          {/* Contexto de página legado, preservado para eventual restauração:
+          <p className="text-xs font-medium text-primary">GESTÃO COMERCIAL</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Metas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Defina e acompanhe metas comerciais por corretor, equipe, filial ou corretora.
+            O progresso é calculado automaticamente com base nos dados reais de vendas e atendimento.
+          </p>
+          */}
+          <ViewScopeContext role={context.role} />
         </div>
 
         <GoalsManager

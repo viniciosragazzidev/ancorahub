@@ -22,11 +22,12 @@ export default async function TenantPrivateCatalogPage() {
     <>
       <DashboardHeader breadcrumb="Administração / Catálogo" title="Catálogo interno" />
       <main className="flex min-h-full flex-col gap-6 p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração.
         <section className="flex flex-col gap-2">
           <p className="text-xs font-medium text-primary">ACORDOS EXCLUSIVOS</p>
           <h1 className="text-2xl font-semibold tracking-tight">Operadoras e planos da sua corretora</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">Cadastre apenas condições comerciais exclusivas. Elas ficam isoladas da plataforma e do catálogo oficial, mas usam o mesmo padrão de vigência e auditoria.</p>
-        </section>
+        </section> */}
 
         {!enabled ? <Card className="border-warning/30 bg-warning/5 shadow-none"><CardContent className="p-4 text-sm">O Super-admin desativou temporariamente o catálogo interno. Seus dados históricos continuam preservados.</CardContent></Card> : null}
 

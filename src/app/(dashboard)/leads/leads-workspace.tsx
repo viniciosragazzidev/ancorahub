@@ -65,25 +65,30 @@ export type LeadWorkspaceItem = {
 
 const kanbanStatuses = ["new", "in_contact", "quote_sent", "negotiation", "converted"];
 
-const kanbanTone: Record<string, { warning: string; count: string }> = {
+const kanbanTone: Record<string, { dot: string; column: string; count: string }> = {
   new: {
-    warning: "bg-sky-500",
+    dot: "bg-sky-500",
+    column: "border-sky-500/20 bg-sky-500/[0.035]",
     count: "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300",
   },
   in_contact: {
-    warning: "bg-violet-500",
+    dot: "bg-violet-500",
+    column: "border-violet-500/20 bg-violet-500/[0.035]",
     count: "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300",
   },
   quote_sent: {
-    warning: "bg-amber-500",
+    dot: "bg-amber-500",
+    column: "border-amber-500/20 bg-amber-500/[0.035]",
     count: "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
   negotiation: {
-    warning: "bg-orange-500",
+    dot: "bg-orange-500",
+    column: "border-orange-500/20 bg-orange-500/[0.035]",
     count: "border-orange-500/25 bg-orange-500/10 text-orange-700 dark:text-orange-300",
   },
   converted: {
-    warning: "bg-emerald-500",
+    dot: "bg-emerald-500",
+    column: "border-emerald-500/20 bg-emerald-500/[0.035]",
     count: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   },
 };
@@ -159,7 +164,6 @@ export function LeadsWorkspace({
     </>
   ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers]);
 
-  const unworkedCount = useMemo(() => leads.filter((l) => l.status === "new").length, [leads]);
   const unassignedCount = useMemo(() => leads.filter((l) => !l.corretorId).length, [leads]);
   const activeCount = useMemo(() => leads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [leads]);
   const convertedCount = useMemo(() => leads.filter((l) => l.status === "converted").length, [leads]);
@@ -169,24 +173,13 @@ export function LeadsWorkspace({
 
 
 
-      {/* ─── 3. CARDS SECUNDÁRIOS NEUTROS ─── */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="border-border/70 bg-card p-4 shadow-xs">
-          <p className="text-xs font-medium text-muted-foreground">Sem Responsável</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">{unassignedCount}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Aguardando fila de distribuição</p>
-        </Card>
-        <Card className="border-border/70 bg-card p-4 shadow-xs">
-          <p className="text-xs font-medium text-muted-foreground">Em Atendimento</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">{activeCount}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Contatos em negociação</p>
-        </Card>
-        <Card className="border-border/70 bg-card p-4 shadow-xs">
-          <p className="text-xs font-medium text-muted-foreground">Finalizados</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">{convertedCount}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Vendas convertidas</p>
-        </Card>
-      </div>
+      <Card variant="overview" aria-label="Resumo da operação de leads">
+        <div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <LeadOverviewMetric label="Sem responsável" value={unassignedCount} description="Aguardando distribuição" />
+          <LeadOverviewMetric label="Em atendimento" value={activeCount} description="Contatos em negociação" />
+          <LeadOverviewMetric label="Finalizados" value={convertedCount} description="Vendas convertidas" />
+        </div>
+      </Card>
 
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs defaultValue="list" className="flex min-h-0 flex-1 flex-col">
@@ -396,7 +389,7 @@ export function LeadsWorkspace({
                 </SheetSection>
 
                 {/* ── Alerta de corretor excluído ─────────────────────────── */}
-                {selectedLead.distributionStatus === "returned_to_queue" && (
+                {(contextRole === "director" || contextRole === "manager") && !selectedLead.corretorId && selectedLead.distributionStatus === "returned_to_queue" && (
                   <div className="mx-4 rounded-lg border border-warning/20 bg-warning/5 px-4 py-3">
                     <p className="flex items-center gap-2 text-xs font-semibold text-warning">
                       <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -538,11 +531,11 @@ function KanbanColumn({
 
   return (
     <section
-      className="w-72 shrink-0 rounded-xl border border-border bg-muted/30 p-3.5 sm:w-80"
+      className={`w-72 shrink-0 rounded-xl border p-3 sm:w-80 ${tone.column}`}
       aria-labelledby={`kanban-${status}`}
     >
       <div className="flex min-w-0 items-center gap-2 border-b border-border/70 pb-3">
-        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${tone.warning}`} />
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${tone.dot}`} />
         <h2 id={`kanban-${status}`} className="min-w-0 flex-1 truncate text-sm font-semibold">
           {statusLabel(status)}
         </h2>
@@ -583,8 +576,9 @@ function KanbanLeadCard({
   const selected = isSelected(lead.id);
 
   return (
-    <div
-      className={`group w-full rounded-xl border bg-card text-left shadow-sm outline-none transition-all duration-150 ${
+    <Card
+      variant="kanban"
+      className={`group w-full text-left outline-none ${
         selected
           ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
           : "border-border hover:border-primary/30 hover:bg-muted/30"
@@ -628,6 +622,24 @@ function KanbanLeadCard({
           <span className="shrink-0 text-xs text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
         </div>
       </button>
+    </Card>
+  );
+}
+
+function LeadOverviewMetric({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: number;
+  description: string;
+}) {
+  return (
+    <div className="min-w-0 px-4 py-3.5 sm:px-5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-foreground">{value}</p>
+      <p className="mt-1 truncate text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }

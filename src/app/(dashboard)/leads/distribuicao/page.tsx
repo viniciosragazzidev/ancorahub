@@ -155,6 +155,7 @@ export default async function LeadDistributionPage() {
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Distribuição de Leads" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-medium text-primary">GESTÃO DE DISTRIBUIÇÃO</p>
@@ -164,6 +165,7 @@ export default async function LeadDistributionPage() {
             </p>
           </div>
         </section>
+        */}
         <DistributionDashboard
           branches={enrichedBranches}
           brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, email: broker.email, branchId: broker.branchId, branchName: broker.branchName, availabilityStatus: broker.availabilityStatus, activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0 }))}

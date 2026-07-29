@@ -32,7 +32,7 @@ export function IncomingLeadCard({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
           transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 28, mass: 0.7 }}
-          className="fixed inset-x-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[65] sm:bottom-5 sm:left-auto sm:right-5 sm:w-[min(380px,calc(100vw-2rem))]"
+          className="fixed inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[65] sm:bottom-5 sm:left-auto sm:right-5 sm:w-[min(380px,calc(100vw-2rem))]"
         >
           <Card className="overflow-hidden border-primary/25 bg-card/95 p-0 shadow-[0_18px_50px_-24px_hsl(var(--primary)/0.45)] backdrop-blur-sm">
             <div className="flex items-center gap-2 border-b border-primary/10 bg-primary/[0.04] px-4 py-3">

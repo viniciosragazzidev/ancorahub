@@ -36,6 +36,8 @@ export type StatCardProps = {
   animated?: boolean;
   /** Atraso da animação em segundos (ex: 0.08 para efeito cascata) */
   animationDelay?: number;
+  /** Variante visual para métricas isoladas ou agrupadas em uma visão geral. */
+  variant?: "default" | "overview";
 };
 
 /**
@@ -63,6 +65,7 @@ export function StatCard({
   className,
   animated,
   animationDelay = 0,
+  variant = "default",
 }: StatCardProps) {
   const resolvedVariant =
     changeVariant ??
@@ -77,12 +80,14 @@ export function StatCard({
 
   const card = (
     <Card
+      variant={variant === "overview" ? "overview" : "compact"}
       className={cn(
-        "group/card h-full min-w-0 rounded-2xl border border-border bg-card p-6 shadow-none transition-all duration-200 hover:border-border-strong hover:bg-card/95 hover:-translate-y-0.5",
+        "group/card h-full min-w-0",
+        variant === "overview" ? "rounded-none border-0 border-r border-border/70 last:border-r-0" : "hover:bg-card/95",
         className,
       )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2 pb-3">
+      <div className={variant === "overview" ? "flex min-w-0 items-center justify-between gap-2 p-4 pb-3" : "flex min-w-0 items-center justify-between gap-2 pb-2"}>
         <div className="flex min-w-0 items-center gap-2.5">
           {Icon && (
             <div
@@ -94,7 +99,7 @@ export function StatCard({
               <Icon className="size-4" />
             </div>
           )}
-          <span className="truncate font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">
+          <span className="truncate text-xs font-medium text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">
             {label}
           </span>
         </div>
@@ -110,18 +115,18 @@ export function StatCard({
           </Badge>
         )}
       </div>
-      <div className="flex items-end justify-between gap-3 pt-1">
+      <div className={variant === "overview" ? "flex items-end justify-between gap-3 px-4 pb-4" : "flex items-end justify-between gap-3 pt-1"}>
         <div className="min-w-0">
           <p
             className={cn(
-              "text-2xl font-bold tracking-tight tabular-nums text-foreground transition-colors duration-200",
+              "text-2xl font-semibold tracking-tight tabular-nums text-foreground transition-colors duration-200",
               valueClassName,
             )}
           >
             {value}
           </p>
           {sublabel && (
-            <p className="mt-1 font-mono text-[11px] leading-tight text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground/70">
+            <p className="mt-1 text-xs leading-tight text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground/70">
               {sublabel}
             </p>
           )}

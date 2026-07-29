@@ -114,6 +114,7 @@ export default async function TeamPage() {
         rightSlot={<div className="flex items-center gap-2">{context.role === "director" ? <Button render={<Link href="/equipe/cargos" />} variant="outline">Cargos e permissões</Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} /></div>}
       />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">GESTAO DE EQUIPE</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Membros da corretora</h1>
@@ -123,6 +124,7 @@ export default async function TeamPage() {
               : "Acompanhe os acessos da sua filial, edite corretores e gerencie seus estados operacionais."}
           </p>
         </section>
+        */}
         <div className="grid gap-3 sm:grid-cols-4">
           <Card size="sm" className="border-border bg-card shadow-none">
             <CardContent className="p-4">

@@ -43,12 +43,17 @@ interface NotificationRow {
   created_at?: string;
 }
 
+const LEADS_REVISION_KEY = "ancorahub:leads-revision";
+const LIVE_REFRESH_DELAY_MS = 160;
+
 export function RealtimeSyncProvider({ children, tenantId, userId, role, branchId }: RealtimeSyncProviderProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const playSoundRef = useRef<((cue: any) => void) | null>(null);
   const seenLeadIdsRef = useRef<Set<string>>(new Set());
   const broadcastRef = useRef<BroadcastChannel | null>(null);
+  const refreshTimerRef = useRef<number | null>(null);
+  const refreshPendingRef = useRef(false);
   const [isOnline, setIsOnline] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
@@ -69,11 +74,72 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
     );
   }, []);
 
+  const scheduleServerRefresh = useCallback(() => {
+    if (document.visibilityState !== "visible" || isFormElementFocused()) {
+      refreshPendingRef.current = true;
+      return;
+    }
+
+    refreshPendingRef.current = false;
+    if (refreshTimerRef.current !== null) return;
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      router.refresh();
+    }, LIVE_REFRESH_DELAY_MS);
+  }, [isFormElementFocused, router]);
+
+  const recordLeadRevision = useCallback((reason: string) => {
+    if (!reason.startsWith("lead.") && !reason.startsWith("notification.lead_assigned")) return;
+    try {
+      window.sessionStorage.setItem(LEADS_REVISION_KEY, String(Date.now()));
+    } catch {
+      // Storage can be unavailable in private browser contexts. The immediate
+      // route refresh remains sufficient for the currently open workspace.
+    }
+  }, []);
+
   const syncClientState = useCallback((reason: string, broadcast = true) => {
     void queryClient.invalidateQueries({ queryKey: ["local-first", tenantId, userId] });
     setLastSyncedAt(Date.now());
+    recordLeadRevision(reason);
+    scheduleServerRefresh();
     if (broadcast) broadcastRef.current?.postMessage({ type: "local-first.invalidate", reason });
-  }, [queryClient, tenantId, userId]);
+  }, [queryClient, recordLeadRevision, scheduleServerRefresh, tenantId, userId]);
+
+  useEffect(() => {
+    const resumePendingRefresh = () => {
+      if (refreshPendingRef.current) scheduleServerRefresh();
+    };
+    const handleFocusOut = () => window.setTimeout(resumePendingRefresh, 0);
+
+    window.addEventListener("focus", resumePendingRefresh);
+    window.addEventListener("focusout", handleFocusOut);
+    document.addEventListener("visibilitychange", resumePendingRefresh);
+    return () => {
+      window.removeEventListener("focus", resumePendingRefresh);
+      window.removeEventListener("focusout", handleFocusOut);
+      document.removeEventListener("visibilitychange", resumePendingRefresh);
+      if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
+    };
+  }, [scheduleServerRefresh]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+
+    const channel = new BroadcastChannel(`ancorahub:local-first:${tenantId}:${userId}`);
+    broadcastRef.current = channel;
+    channel.onmessage = (event: MessageEvent<{ type?: string; reason?: string }>) => {
+      if (event.data?.type === "local-first.invalidate" && event.data.reason) {
+        syncClientState(event.data.reason, false);
+      }
+    };
+
+    return () => {
+      if (broadcastRef.current === channel) broadcastRef.current = null;
+      channel.close();
+    };
+  }, [syncClientState, tenantId, userId]);
 
   useEffect(() => {
     // Only track online status change without triggering full page refresh
@@ -204,6 +270,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
         if (cancelled) return;
 
         const graceWindowStart = shellStartedAtRef.current - 30_000;
+        let recoveredAssignment = false;
         for (const notification of payload.notifications ?? []) {
           const createdAt = notification.createdAt ? Date.parse(notification.createdAt) : NaN;
           if (!notification.id || !notification.leadId || notification.readAt || !Number.isFinite(createdAt) || createdAt < graceWindowStart) continue;
@@ -220,7 +287,9 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
             message: notification.message ?? "Você recebeu um novo lead para atender.",
             createdAt: notification.createdAt!,
           }));
+          recoveredAssignment = true;
         }
+        if (recoveredAssignment) syncClientState("notification.lead_assigned.reconciled");
       } catch {
         // Realtime remains the primary path; polling is best-effort recovery.
       }
@@ -232,7 +301,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [role, tenantId, userId]);
+  }, [role, syncClientState, tenantId, userId]);
 
   return (
     <>

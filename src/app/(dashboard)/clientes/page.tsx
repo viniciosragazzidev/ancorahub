@@ -117,6 +117,7 @@ export default async function CustomersPage() {
     <>
       <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary uppercase tracking-wider font-mono">PÓS-VENDA & CARTEIRA</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Carteira de Clientes</h1>
@@ -124,6 +125,7 @@ export default async function CustomersPage() {
             Acompanhe clientes convertidos, informações de contato, corretores responsáveis e datas de renovação de contrato.
           </p>
         </section>
+        */}
         <ClientesList clients={clients} metrics={metrics} />
       </main>
     </>

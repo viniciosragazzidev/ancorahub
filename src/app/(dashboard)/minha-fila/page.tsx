@@ -262,18 +262,14 @@ export default async function MinhaFilaPage() {
         }
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        {/* Header */}
+        {/* Contexto de página legado, preservado para eventual restauração.
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-medium text-primary">OPERAÇÃO</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Minha fila
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Comece o dia aqui: leads, tarefas, conversas, cotações e metas em um só lugar.
-            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Minha fila</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Comece o dia aqui: leads, tarefas, conversas, cotações e metas em um só lugar.</p>
           </div>
-        </section>
+        </section> */}
 
         {/* Metric Cards */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">

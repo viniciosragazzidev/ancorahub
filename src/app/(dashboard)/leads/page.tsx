@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
+import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
 import { LeadsWorkspace } from "./leads-workspace";
 import { WifiHigh, Plus } from "@/components/huge-icons";
@@ -144,7 +145,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           </div>
         }
       />
-      <main className="flex min-h-0 flex-1 flex-col gap-6 bg-background p-4 lg:p-6">
+      <LeadsLiveSync />
+      <main className="flex min-h-0 flex-1 flex-col gap-6 bg-background p-4 pb-8 lg:p-6">
 
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}
