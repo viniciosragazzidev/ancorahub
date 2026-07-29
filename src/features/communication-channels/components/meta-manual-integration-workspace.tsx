@@ -145,7 +145,17 @@ export function MetaManualIntegrationWorkspace(props: Props) {
 }
 
 function Field({ name, label, defaultValue, help, required = false, format, href, type, autoComplete, placeholder, inputMode, description }: { name: string; label: string; defaultValue?: string | null; help: string; required?: boolean; format?: FormatType; href?: string; type?: string; autoComplete?: string; placeholder?: string; inputMode?: React.InputHTMLAttributes<HTMLInputElement>['inputMode']; description?: string }) {
-  return <div className="space-y-1.5"><div className="flex items-center gap-1.5"><Label htmlFor={name}>{label}</Label><Tooltip>{href ? <TooltipTrigger aria-label={`Ajuda sobre ${label}`} render={<a href={href} target="_blank" rel="noreferrer" />}><Warning className="size-3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" /></TooltipTrigger> : <TooltipTrigger aria-label={`Ajuda sobre ${label}`}><Warning className="size-3 text-muted-foreground" /></TooltipTrigger>}<TooltipContent>{help}</TooltipContent></Tooltip></div><Input autoComplete={autoComplete} defaultValue={defaultValue ?? ""} format={format} id={name} inputMode={inputMode ?? "numeric"} name={name} placeholder={placeholder ?? "Ex.: 1234567890"} required={required} type={type} /><p className="text-xs text-muted-foreground">{description ?? help}</p></div>;
+  const guidance: Record<string, string> = {
+    businessId: "Identifica a empresa dentro da Meta. Abra Configurações do negócio, selecione a empresa e copie o ID exibido em Informações da empresa.",
+    wabaId: "É a conta que administra o WhatsApp Business. Encontre em Meta Developers, WhatsApp, API Setup.",
+    phoneNumberId: "É o identificador técnico do número conectado, não é o telefone. Em Meta Developers, WhatsApp, API Setup, copie Phone number ID sem espaços.",
+    accessToken: "Cole um token com acesso ao WhatsApp Business e à Página, quando houver. Ele é validado no servidor, cifrado e nunca é exibido novamente.",
+    facebookPageId: "Opcional. Necessário no futuro para Lead Ads, comentários e Messenger. Encontre em Sobre, Transparência da Página ou Business Settings.",
+    adAccountId: "Opcional. Usado para campanhas e Lead Ads. No Gerenciador de Anúncios, copie o ID da conta; o prefixo act_ é aceito.",
+    pixelId: "Opcional por enquanto. Será usado em Conversões API, atribuição e análises.",
+    datasetId: "Opcional por enquanto. Será usado quando a empresa enviar eventos de conversão à Meta.",
+  };
+  return <div className="space-y-1.5"><div className="flex items-center gap-1.5"><Label htmlFor={name}>{label}{required ? <span className="ml-1 text-destructive">*</span> : <span className="ml-1 text-xs font-normal text-muted-foreground">(opcional)</span>}</Label><Tooltip>{href ? <TooltipTrigger aria-label={`Ajuda sobre ${label}`} render={<a href={href} target="_blank" rel="noreferrer" />}><Warning className="size-3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" /></TooltipTrigger> : <TooltipTrigger aria-label={`Ajuda sobre ${label}`}><Warning className="size-3 text-muted-foreground" /></TooltipTrigger>}<TooltipContent>{guidance[name] ?? help}</TooltipContent></Tooltip></div><Input autoComplete={autoComplete} defaultValue={defaultValue ?? ""} format={format} id={name} inputMode={inputMode ?? "numeric"} name={name} placeholder={placeholder ?? "Ex.: 1234567890"} required={required} type={type} /><p className="text-xs leading-5 text-muted-foreground">{description ?? guidance[name] ?? help}</p></div>;
 }
 
 function KeyValue({ label, value }: { label: string; value: string }) {
