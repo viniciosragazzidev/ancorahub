@@ -124,15 +124,15 @@ export async function createTeamUser(rawInput: unknown) {
       eq(schema.communicationChannels.isDefault, true),
     )).limit(1);
     if (channel) {
+      const company = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+      const roleLabel = input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
       const queued = await enqueueMetaTemplateMessage({
         tenantId: context.tenantId,
         recipientType: "user",
         recipientId: invitationId,
         destinationPhone: input.phone,
         purpose: "brokerInvitation",
-        // `broker_first_access` has a static body and a dynamic URL button.
-        // Do not persist body parameters the approved Meta template does not accept.
-        variables: [],
+        variables: [input.name, company[0]?.name ?? "sua corretora", roleLabel],
         requestedBy: context.userId,
         idempotencyKey: `team-invitation:${invitationId}`,
       });

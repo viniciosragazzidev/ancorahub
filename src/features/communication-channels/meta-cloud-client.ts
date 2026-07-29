@@ -63,32 +63,45 @@ export async function sendMetaCloudText(input: { phoneNumberId: string; accessTo
   }, input.accessToken);
 }
 
-export async function sendMetaCloudTemplate(input: {
-  phoneNumberId: string;
-  accessToken: string;
+type MetaCloudTemplateInput = {
   to: string;
   templateName: string;
   languageCode: string;
   variables: string[];
+  variableNames?: string[];
   urlButtonParameter?: string;
-}) {
-  const parameters = input.variables.map((text) => ({ type: "text", text }));
+};
+
+export function buildMetaCloudTemplatePayload(input: MetaCloudTemplateInput) {
+  if (input.variableNames && input.variableNames.length !== input.variables.length) {
+    throw new Error("A quantidade de variáveis nomeadas não corresponde ao template Meta.");
+  }
+  const parameters = input.variables.map((text, index) => ({
+    type: "text" as const,
+    text,
+    ...(input.variableNames ? { parameter_name: input.variableNames[index] } : {}),
+  }));
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: input.to.replace(/\D/g, ""),
+    type: "template",
+    template: {
+      name: input.templateName,
+      language: { code: input.languageCode },
+      ...(parameters.length || input.urlButtonParameter ? { components: [
+        ...(parameters.length ? [{ type: "body", parameters }] : []),
+        ...(input.urlButtonParameter ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: input.urlButtonParameter }] }] : []),
+      ] } : {}),
+    },
+  };
+}
+
+export async function sendMetaCloudTemplate(input: MetaCloudTemplateInput & { phoneNumberId: string; accessToken: string }) {
+  const payload = buildMetaCloudTemplatePayload(input);
   return graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: input.to.replace(/\D/g, ""),
-      type: "template",
-      template: {
-        name: input.templateName,
-        language: { code: input.languageCode },
-        ...(parameters.length || input.urlButtonParameter ? { components: [
-          ...(parameters.length ? [{ type: "body", parameters }] : []),
-          ...(input.urlButtonParameter ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: input.urlButtonParameter }] }] : []),
-        ] } : {}),
-      },
-    }),
+    body: JSON.stringify(payload),
   }, input.accessToken);
 }

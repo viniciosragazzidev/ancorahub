@@ -19,10 +19,10 @@ export function getMetaWhatsAppTemplate(purpose: string) {
 }
 
 /**
- * The approved `broker_first_access` template has a static body and a dynamic
- * URL button only. Never send body parameters for it: Meta rejects unexpected
- * parameters with Graph API error 100.
+ * Named variables must carry `parameter_name` in the Cloud API payload. The
+ * broker invitation template is configured with {{nome}}, {{empresa}} and
+ * {{cargo}}, rather than positional {{1}}, {{2}} and {{3}} placeholders.
  */
-export function getMetaWhatsAppTemplateVariables(purpose: string, variables: string[]) {
-  return purpose === "brokerInvitation" ? [] : variables;
+export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
+  return purpose === "brokerInvitation" ? ["nome", "empresa", "cargo"] : undefined;
 }

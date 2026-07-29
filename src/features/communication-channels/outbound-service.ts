@@ -8,7 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { MetaCloudApiError, sendMetaCloudTemplate, sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
-import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariables, type MetaWhatsAppTemplatePurpose } from "./templates";
+import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, type MetaWhatsAppTemplatePurpose } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 
@@ -134,10 +134,11 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
         }
       }
       const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-      const templateVariables = getMetaWhatsAppTemplateVariables(row.purpose, variables);
+      const templateVariables = row.purpose === "leadAssignmentConfirmed" ? variables.slice(0, 4) : row.purpose === "newLeadAssignment" ? variables.slice(0, 5) : variables;
+      const variableNames = getMetaWhatsAppTemplateVariableNames(row.purpose);
       const response = row.messageType === "text"
         ? await sendMetaCloudText({ phoneNumberId, accessToken, to: row.destinationPhone, body: variables[0] ?? "" })
-        : await sendMetaCloudTemplate({ phoneNumberId, accessToken, to: row.destinationPhone, templateName: row.templateName, languageCode: row.templateLanguage, variables: row.purpose === "leadAssignmentConfirmed" ? templateVariables.slice(0, 4) : row.purpose === "newLeadAssignment" ? templateVariables.slice(0, 5) : templateVariables, urlButtonParameter });
+        : await sendMetaCloudTemplate({ phoneNumberId, accessToken, to: row.destinationPhone, templateName: row.templateName, languageCode: row.templateLanguage, variables: templateVariables, variableNames, urlButtonParameter });
       const providerMessageId = response.messages?.[0]?.id;
       if (!providerMessageId) throw new Error("A Meta não retornou o identificador da mensagem.");
       await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, sentAt: new Date(), updatedAt: new Date(), providerErrorCode: null, providerErrorMessage: null }).where(eq(schema.whatsappOutboundMessages.id, row.id));
