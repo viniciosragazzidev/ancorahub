@@ -585,14 +585,15 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
     let whatsappStatus: TeamActionState["whatsappStatus"] = "not_available";
     if (newInvite.phone) {
       try {
-        const [company] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
         const queued = await enqueueMetaTemplateMessage({
           tenantId: context.tenantId,
           recipientType: "user",
           recipientId: newInvite.id,
           destinationPhone: newInvite.phone,
           purpose: "brokerInvitation",
-          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "manager" ? "Gestor" : "Corretor"],
+          // `broker_first_access` has no body placeholders; its access link is
+          // injected exclusively into the approved dynamic URL button.
+          variables: [],
           requestedBy: context.userId,
           idempotencyKey: `team-invitation:${newInvite.id}`,
         });

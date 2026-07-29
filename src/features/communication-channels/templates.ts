@@ -17,3 +17,12 @@ export function getMetaWhatsAppTemplate(purpose: string) {
   if (!(purpose in META_WHATSAPP_TEMPLATE_PURPOSES)) return null;
   return META_WHATSAPP_TEMPLATE_PURPOSES[purpose as MetaWhatsAppTemplatePurpose];
 }
+
+/**
+ * The approved `broker_first_access` template has a static body and a dynamic
+ * URL button only. Never send body parameters for it: Meta rejects unexpected
+ * parameters with Graph API error 100.
+ */
+export function getMetaWhatsAppTemplateVariables(purpose: string, variables: string[]) {
+  return purpose === "brokerInvitation" ? [] : variables;
+}
