@@ -78,7 +78,7 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else setOpen(true); }}>
       <DialogTrigger render={<Button><UserPlus weight="bold" /> Novo Funcionário</Button>} />
-      <DialogPopup className="sm:max-w-md">
+      <DialogPopup className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
         {createdLink ? (
           <div className="space-y-4 pt-2">
             <DialogTitle>Convite Criado!</DialogTitle>
@@ -169,7 +169,9 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
                     <SelectContent>{branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
-                <Button type="submit" disabled={pending}>{pending ? "Criando acesso..." : "Criar acesso"}</Button>
+                <div className="sticky bottom-0 -mx-1 border-t border-border bg-card px-1 pt-3">
+                  <Button className="w-full" type="submit" disabled={pending}>{pending ? "Criando acesso..." : "Criar acesso"}</Button>
+                </div>
               </form>
             ) : (
               <form ref={csvFormRef} action={handleImportSubmit} className="grid gap-4">
@@ -183,7 +185,9 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
                   <p>2. Adicionalmente, pode conter a coluna opcional <strong>unidade</strong> (nome ou ID da filial).</p>
                   <p>3. Os corretores importados serão criados como Rascunho (DRAFT) na unidade correspondente.</p>
                 </div>
-                <Button type="submit" disabled={pending}>{pending ? "Importando..." : "Importar Corretores"}</Button>
+                <div className="sticky bottom-0 -mx-1 border-t border-border bg-card px-1 pt-3">
+                  <Button className="w-full" type="submit" disabled={pending}>{pending ? "Importando..." : "Importar Corretores"}</Button>
+                </div>
               </form>
             )}
             <DialogClose render={<Button variant="ghost" className="w-full" disabled={pending}>Cancelar</Button>} />
