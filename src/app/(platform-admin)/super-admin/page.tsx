@@ -318,6 +318,13 @@ export default function SuperAdminDashboardPage() {
                     <span>Sessões de Conexão</span>
                     <ArrowRight className="size-3.5" />
                   </Link>
+                  <Link
+                    href="/super-admin/settings?tab=platform"
+                    className="inline-flex items-center justify-between p-2.5 rounded-md hover:bg-muted/40 border border-transparent hover:border-border/60 transition-all text-xs font-medium text-foreground/80 hover:text-foreground"
+                  >
+                    <span>Configurações da Plataforma</span>
+                    <ArrowRight className="size-3.5" />
+                  </Link>
                 </div>
               </div>
 
