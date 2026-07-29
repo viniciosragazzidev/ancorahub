@@ -3,7 +3,7 @@
 ## Escopo entregue
 
 - Evolução dos primitives compartilhados `Card`, `StatCard` e `Table` para superfícies operacionais compactas, overview e kanban.
-- Cabeçalho autenticado reduzido a contexto de rota e título compacto.
+- Cabeçalho autenticado reduzido a contexto de rota e título compacto, com slot de ações dinâmico por página.
 - Resumo de leads consolidado em uma superfície com divisores e kanban com colunas semânticas discretas.
 - Blocos grandes de contexto de página foram comentados nas superfícies operacionais prioritárias, preservando o JSX para restauração futura.
 
@@ -11,7 +11,7 @@
 
 - `src/components/ui/card.tsx`, `src/components/dashboard/metric-card.tsx` e `src/components/ui/table.tsx` centralizam as variantes reutilizáveis.
 - `src/app/(dashboard)/leads/leads-workspace.tsx` consome a nova composição de overview e kanban.
-- Páginas de tarefas, documentos, vendas, equipe, clientes, distribuição, checklist, filiais, metas, financeiro e comissões removem o hero interno duplicado sem alterar ações, filtros ou dados.
+- Páginas de tarefas, documentos, vendas, equipe, clientes, distribuição, checklist, filiais, metas, financeiro e comissões removem o hero interno duplicado sem alterar ações, filtros ou dados. Em Tarefas, a ação de abrir Leads foi para o cabeçalho; em Conversas, o seletor entre Leads e Número oficial foi para o mesmo slot.
 
 ## Validação
 

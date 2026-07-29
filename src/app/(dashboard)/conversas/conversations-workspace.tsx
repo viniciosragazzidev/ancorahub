@@ -752,8 +752,8 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
 
   return (
     <Bubble variant={isSystem ? "default" : "secondary"} align={isSystem ? "end" : "start"}>
-      <BubbleContent className="[&>p]:whitespace-pre-wrap">
-        <p className="leading-6">{message.body}</p>
+      <BubbleContent className="[&>p]:whitespace-pre-wrap text-xs">
+        <p className="leading-5">{message.body}</p>
         <div className={cn("mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground", isSystem && "justify-end")}>
           <span>
             {message.direction === "outbound"

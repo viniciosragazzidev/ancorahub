@@ -239,9 +239,21 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
   return (
     <>
-      <DashboardHeader breadcrumb="Atendimento" title="Conversas" />
+      <DashboardHeader
+        breadcrumb="Atendimento"
+        title="Conversas"
+        rightSlot={isDirector ? (
+          <nav aria-label="Tipo de conversa" className="flex items-center gap-1">
+            <Button render={<Link href="/conversas" />} size="sm" variant={officialBrokerTab ? "ghost" : "secondary"}>
+              Leads <Badge variant="outline">{conversations.length}</Badge>
+            </Button>
+            <Button render={<Link href="/conversas?tab=corretores" />} size="sm" variant={officialBrokerTab ? "secondary" : "ghost"}>
+              Número oficial <span className="hidden lg:inline">· corretores</span>
+            </Button>
+          </nav>
+        ) : undefined}
+      />
       <main className="min-w-0 min-h-0 flex-1 bg-background p-3 lg:p-4">
-        {isDirector ? <nav aria-label="Tipo de conversa" className="mb-3 flex items-center gap-1.5 border-b border-border px-1"><Button render={<Link href="/conversas" />} size="sm" variant={officialBrokerTab ? "ghost" : "secondary"}>Leads <Badge variant="outline">{conversations.length}</Badge></Button><Button render={<Link href="/conversas?tab=corretores" />} size="sm" variant={officialBrokerTab ? "secondary" : "ghost"}>Número oficial · corretores</Button></nav> : null}
         {officialBrokerTab ? <OfficialBrokerConversations enabled={officialBrokerMessagesEnabled} conversations={officialBrokerConversations} /> : <ConversationsWorkspace
           role={context.role}
           branches={branches}

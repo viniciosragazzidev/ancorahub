@@ -54,20 +54,24 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Tarefas" />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            {/* Contexto de página legado, preservado para eventual restauração:
-            <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tarefas</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Priorize o que precisa acontecer agora e abra o lead para criar ou ajustar responsáveis.</p>
-            */}
-            {leadId ? <ContextNote className="mt-3 max-w-xl" variant="info">Exibindo apenas tarefas do lead selecionado. <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/leads/${leadId}`}>Voltar ao lead</Link></ContextNote> : null}
-            {attention === "overdue" ? <ContextNote className="mt-3 max-w-xl" variant="warning">Exibindo somente tarefas vencidas e ainda não concluídas no seu escopo.</ContextNote> : null}
-          </div>
-          <Button render={<Link href="/leads" />} variant="outline">Abrir leads para criar tarefa</Button>
-        </section>
+      <DashboardHeader
+        breadcrumb="Operação comercial"
+        title="Tarefas"
+        rightSlot={
+          <Button render={<Link href="/leads" />} size="sm" variant="outline">
+            Abrir leads
+          </Button>
+        }
+      />
+      <main className="flex min-h-full flex-col gap-4 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
+        <section>
+          <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tarefas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Priorize o que precisa acontecer agora e abra o lead para criar ou ajustar responsáveis.</p>
+        </section> */}
+        {leadId ? <ContextNote className="max-w-xl" variant="info">Exibindo apenas tarefas do lead selecionado. <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/leads/${leadId}`}>Voltar ao lead</Link></ContextNote> : null}
+        {attention === "overdue" ? <ContextNote className="max-w-xl" variant="warning">Exibindo somente tarefas vencidas e ainda não concluídas no seu escopo.</ContextNote> : null}
 
         <Card className="border-border bg-card shadow-none">
           <CardHeader>
