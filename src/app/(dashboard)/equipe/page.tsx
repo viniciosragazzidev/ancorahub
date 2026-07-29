@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -109,7 +111,7 @@ export default async function TeamPage() {
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe"
-        rightSlot={<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} />}
+        rightSlot={<div className="flex items-center gap-2">{context.role === "director" ? <Button render={<Link href="/equipe/cargos" />} variant="outline">Cargos e permissões</Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} /></div>}
       />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <section>

@@ -350,6 +350,13 @@ sai da seleção de distribuição, as atribuições ativas ligadas a ela são i
 o histórico permanece disponível para auditoria. Exceções por data não fazem parte
 desta versão.
 
+## DEC-062 — Criação coordenada de plantões em múltiplas unidades
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O Diretor pode selecionar mais de uma unidade ao criar um plantão. A operação cria uma regra independente por unidade e fila, em uma única transação. Cobertura, escala, edição, arquivamento e auditoria permanecem locais a cada regra; o Gestor continua limitado à própria unidade. Unidade sem fila ativa bloqueia toda a criação antes da gravação.
+
 ## DEC-057 — Liberação global auditável do Centro de Treinamento
 
 **Estado:** Aceita
@@ -361,3 +368,23 @@ A alteração atualiza `feature_agent_training_center_enabled`, registra o ator 
 valor na auditoria de plataforma e invalida as telas de configuração. A liberação
 global não concede escopo extra: Diretores continuam restritos ao próprio tenant e
 ao fluxo de versões publicado.
+
+## DEC-063 — Integração manual temporária da Meta por tenant
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+Enquanto o Embedded Signup não for a rota principal, o Diretor pode conectar manualmente a conta Meta de sua corretora por um assistente guiado. O servidor deriva o tenant e valida WABA, número e token pela Graph API antes de ativar o canal; o token é cifrado no registro do canal e nunca volta ao navegador, logs ou auditoria. App Secret, verify token e chave de cifra permanecem variáveis privadas do ambiente AncoraHub, pois são compartilhados pelo app oficial e não podem ser cadastrados pelo cliente. IDs de página, conta de anúncios, pixel e dataset são isolados por tenant, auditados e preparados para sincronização futura. O Super-admin mantém o kill switch global existente.
+
+## DEC-064 — Cargos personalizados delegáveis por tenant
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+Diretor, Gestor e Corretor continuam perfis de sistema imutáveis. O Diretor pode criar
+cargos personalizados no próprio tenant a partir de capacidades explicitamente
+delegáveis. Um cargo substitui as capacidades herdadas do papel legado enquanto a
+feature estiver ativa; ele nunca concede privilégios de Super-admin, gestão de
+filiais, gestão financeira ou elevação de acesso. O piloto exige flag global e
+liberação por tenant, preserva o fallback legado ao ser desligado e audita criação,
+edição, atribuição e arquivamento.

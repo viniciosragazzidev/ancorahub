@@ -48,7 +48,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
-import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
+import { type PermissionKey } from "@/shared/auth/permissions";
 
 type SidebarItem = { label: string; icon: typeof House; url: string; permission: PermissionKey };
 type SidebarSection = { label: string; items: SidebarItem[] };
@@ -118,7 +118,7 @@ function canShowItem(item: SidebarItem, user: UserDisplayInfo | null, roleKey: U
   if (user?.jobTitle === "marketing" && marketingHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
     return false;
   }
-  return hasCapability(roleKey, item.permission, user?.jobTitle ?? null);
+  return user?.permissions?.includes(item.permission) ?? false;
 }
 
 export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
@@ -243,7 +243,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                {roleKey && hasCapability(roleKey, "acessar_configuracoes", user?.jobTitle ?? null) ? (
+                {roleKey && user?.permissions?.includes("acessar_configuracoes") ? (
                   <DropdownMenuItem render={<Link href="/settings" prefetch />}>
                     <SlidersHorizontal className="size-4" />
                     Configurações

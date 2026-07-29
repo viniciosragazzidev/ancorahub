@@ -53,14 +53,30 @@ Verify Token: <o mesmo META_WHATSAPP_WEBHOOK_VERIFY_TOKEN da Vercel>
 
 Assine inicialmente `messages`. Depois habilite `message_template_status_update`, `message_template_quality_update`, `phone_number_quality_update`, `account_alerts` e `business_capability_update` quando suas superfícies operacionais estiverem implementadas.
 
-## 4. Ativar com segurança
+## 4. Configuração manual guiada por empresa
+
+Enquanto o Embedded Signup estiver em transição, o Diretor pode concluir a associação da conta do cliente diretamente em **Configurações → Integrações → Meta Business** (`/settings/meta`). O assistente mostra o tutorial, permite copiar a URL do callback, valida WABA e Phone Number ID com a Graph API antes de salvar e exibe diagnóstico, histórico auditado e dados de marketing opcionais.
+
+O Diretor precisa apenas dos dados que pertencem à empresa cliente:
+
+- Business Manager ID;
+- WhatsApp Business Account ID (WABA);
+- Phone Number ID;
+- Access Token autorizado para a conta;
+- opcionalmente, IDs de página, conta de anúncios, pixel e dataset.
+
+O App ID é informado para conferência. App Secret, Verify Token e chave de criptografia pertencem à infraestrutura compartilhada do AncoraHub: nunca são mostrados, copiados pela tela ou cadastrados pelo cliente. O Verify Token deve ser entregue pelo administrador da plataforma pelo canal interno aprovado antes da verificação do callback na Meta.
+
+## 5. Ativar com segurança
 
 1. Faça deploy com as variáveis configuradas.
 2. Entre como Super-admin em `/super-admin/settings` e ative **WhatsApp oficial da Meta**.
-3. Entre como Diretor da corretora em `/settings/whatsapp`.
-4. Escolha a unidade (ou toda a corretora) e clique em **Conectar número oficial**.
-5. Conclua o Embedded Signup da Meta. O CorreTop troca o code no servidor, valida WABA/número, assina a WABA no app e cifra o token.
+3. Entre como Diretor da corretora em `/settings/meta`.
+4. Siga **Como configurar?**, informe os IDs e o token da conta cliente e clique em **Testar conexão**.
+5. Ao validar, clique em **Conectar Meta**. O AncoraHub valida WABA/número, assina a WABA no app e cifra o token antes de ativar o canal.
 6. Envie uma mensagem de teste para um lead de teste cujo telefone esteja registrado na corretora.
+
+O Embedded Signup continua compatível para a migração futura; ele não é necessário para a configuração manual.
 
 ## Contratos e limites desta fase
 

@@ -11,7 +11,7 @@ import { LeadProgressStepper } from "@/features/leads/components/lead-progress-s
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { InlineFeedbackForm } from "@/app/(dashboard)/leads/[id]/inline-feedback-form";
-import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
+
 
 type NextTask = { title: string; dueAt: string | null; priority: "low" | "normal" | "urgent"; assigneeName: string | null };
 type LeadActionHubProps = { leadId: string; status: string; currentOwner: string | null; hasPendingDocuments: boolean; nextTask: NextTask | null; isOwner: boolean; phone: string | null; canSeePersonalData: boolean; showFeedback?: boolean };
@@ -81,7 +81,6 @@ export function LeadActionHub({ leadId, status, currentOwner, hasPendingDocument
         <Button className="h-8 px-2.5 text-xs" render={<Link href={"/tarefas?leadId=" + leadId} />} size="sm" variant="outline"><ListChecks /> Tarefas</Button>
         <LeadReminder leadId={leadId} />
         <Button className="h-8 px-2.5 text-xs" render={<Link href="#documentos" />} size="sm" variant="outline"><FileText /> Documentos{hasPendingDocuments ? " · pendentes" : ""}</Button>
-        {currentOwner ? <LeadAssignedNotificationButton leadId={leadId} compact /> : null}
       </nav>
 
       {/* ─── Feedback accordion ─── */}

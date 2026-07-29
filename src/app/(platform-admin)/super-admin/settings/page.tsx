@@ -1,12 +1,14 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction } from "@/app/(platform-admin)/super-admin/actions";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { getDatabase, schema } from "@/shared/db";
+import { eq } from "drizzle-orm";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
 
 export default async function SuperAdminSettingsPage() {
@@ -33,6 +35,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_ai_quick_reply_enabled",
     "feature_browser_extension_enabled",
     "feature_agent_training_center_enabled",
+    "feature_custom_roles_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -45,7 +48,7 @@ export default async function SuperAdminSettingsPage() {
     "ai_google_api_key",
     "ai_openrouter_api_key",
   ]);
-  const notificationCapabilities = await getNotificationCapabilityStates();
+  const [notificationCapabilities, pilotTenants] = await Promise.all([getNotificationCapabilityStates(), getDatabase().select({ id: schema.tenants.id, name: schema.tenants.name, enabled: schema.tenantCustomRoleSettings.enabled }).from(schema.tenants).leftJoin(schema.tenantCustomRoleSettings, eq(schema.tenantCustomRoleSettings.tenantId, schema.tenants.id)).orderBy(schema.tenants.name)]);
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
   const centralEnabled = settingMap.get("feature_central_atencao_enabled") !== "false";
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
@@ -70,6 +73,7 @@ export default async function SuperAdminSettingsPage() {
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
   const agentTrainingCenterEnabled = settingMap.get("feature_agent_training_center_enabled") === "true";
+  const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -97,6 +101,11 @@ export default async function SuperAdminSettingsPage() {
         </section>
 
         <SuperAdminSettingsTabs>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Cargos personalizados</CardTitle><CardDescription>Libera o piloto de cargos por empresa. O Diretor monta apenas cargos e permissões delegáveis; Diretor, Gestor e Corretor de sistema permanecem protegidos.</CardDescription></CardHeader>
+          <CardContent className="space-y-4"><form action={updateCustomRolesGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" value="true" defaultChecked={customRolesEnabled} className="size-4" /><span><span className="font-medium">Habilitar globalmente</span><span className="block text-xs text-muted-foreground">Desativar preserva cargos e retorna o tenant ao comportamento legado.</span></span></label><Button type="submit" variant="outline">Salvar controle</Button></form><div className="divide-y divide-border rounded-lg border border-border">{pilotTenants.map((tenant) => <form action={updateTenantCustomRolesPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">Piloto por tenant e auditoria de alteração.</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={tenant.enabled ? "false" : "true"} /><Button size="sm" type="submit" variant={tenant.enabled ? "outline" : "default"}>{tenant.enabled ? "Remover do piloto" : "Liberar piloto"}</Button></form>)}</div></CardContent>
+        </Card>
+
         <Card className="border-border bg-card shadow-none">
           <CardHeader>
             <CardTitle>Configuração do Servidor</CardTitle>

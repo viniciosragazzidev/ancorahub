@@ -20,6 +20,8 @@ import { runSlaSweep } from "@/features/leads/sla";
 import { sql } from "drizzle-orm";
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 import { setSystemSetting } from "@/features/system-settings/queries";
+import { z } from "zod";
+import { provisionDefaultMarketingRole } from "@/features/custom-roles/service";
 import { notificationCapabilities, notificationCapabilitySettingKey } from "@/features/notifications/catalog";
 import { resetPlatformUserRouteOnboarding } from "@/features/onboarding/route-onboarding-service";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
@@ -442,6 +444,27 @@ export async function updateAgentTrainingCenterSettingsAction(formData: FormData
 
   revalidatePath("/super-admin/settings");
   revalidatePath("/settings");
+}
+
+export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("enabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_custom_roles_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.global_feature_updated", targetType: "system_settings", targetId: "custom_roles", metadata: { enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/equipe/cargos");
+}
+
+export async function updateTenantCustomRolesPilotAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const now = new Date();
+  if (input.enabled === "true") await provisionDefaultMarketingRole({ tenantId: input.tenantId, actorUserId: admin.userId });
+  await getDatabase().insert(schema.tenantCustomRoleSettings).values({ tenantId: input.tenantId, enabled: input.enabled === "true", updatedBy: admin.userId, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: schema.tenantCustomRoleSettings.tenantId, set: { enabled: input.enabled === "true", updatedBy: admin.userId, updatedAt: now } });
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.tenant_pilot_updated", targetType: "tenant", targetId: input.tenantId, metadata: { enabled: input.enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/equipe/cargos");
 }
 
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {

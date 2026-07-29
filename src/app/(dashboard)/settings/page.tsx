@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { WhatsappLogo } from "@/components/huge-icons";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getDatabase, schema } from "@/shared/db";
 import { AccountTab } from "./_components/account-tab";
 import { EmpresaTab } from "./_components/empresa-tab";
@@ -21,6 +22,7 @@ import { ExtensionTab } from "./extension/extension-tab";
 
 export default async function SettingsPage() {
   const context = await getRequiredTenantContext();
+  const canViewIntegrations = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
   const db = getDatabase();
   const [tenant, user] = await Promise.all([
     db.select({ name: schema.tenants.name, legalName: schema.tenants.legalName, cnpj: schema.tenants.cnpj, logoUrl: schema.tenants.logoUrl, brandColor: schema.tenants.brandColor }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
@@ -38,9 +40,9 @@ export default async function SettingsPage() {
     maxActiveLeadsLimit: schema.tenants.maxActiveLeadsLimit,
   }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
-  const integrations = context.role === "director" ? await getIntegrationsData() : null;
+  const integrations = canViewIntegrations ? await getIntegrationsData() : null;
   const agentTraining = context.role === "director" ? await getAgentTrainingCenter() : null;
-  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
+  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "seguranca"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
 

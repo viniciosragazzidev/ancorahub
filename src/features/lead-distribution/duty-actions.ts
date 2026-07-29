@@ -7,38 +7,17 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
+import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
 
-export type DutyActionState = { success?: boolean; error?: string; scheduleId?: string };
+export type DutyActionState = { success?: boolean; error?: string; scheduleId?: string; scheduleIds?: string[] };
 
-const scheduleInput = z.object({
-  branchId: z.string().uuid(),
-  queueId: z.string().uuid(),
-  name: z.string().trim().min(2).max(100),
-  dayOfWeek: z.coerce.number().int().min(0).max(6),
-  startsAt: z.string(),
-  endsAt: z.string(),
-  priority: z.coerce.number().int().min(1).max(999),
-  minimumBrokers: z.coerce.number().int().min(1).max(99),
-  validFrom: z.coerce.date(),
-  validUntil: z.coerce.date().optional(),
-  webhookCredentialId: z.string().uuid().optional().nullable(),
-});
 
-function cleanFormData(formData: FormData) {
-  const cleaned: Record<string, unknown> = {};
-  for (const [key, value] of formData.entries()) {
-    if (typeof value === "string" && value.trim() === "") continue;
-    cleaned[key] = value;
-  }
-  return cleaned;
-}
-
-async function assertDutyAccess(branchId: string) {
+async function assertBatchDutyAccess(branchIds: string[]) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") {
     throw new Error("Apenas Gestores e Diretores podem configurar plantões.");
   }
-  if (context.role === "manager" && context.branchId !== branchId) {
+  if (context.role === "manager" && branchIds.some((branchId) => branchId !== context.branchId)) {
     throw new Error("Você só pode configurar plantões da sua unidade.");
   }
   return { context, db: getDatabase() };
@@ -63,7 +42,7 @@ async function assertQueueInScope(
   if (!queue) throw new Error("Fila não encontrada nesta unidade.");
 }
 
-type ScheduleConflictInput = Pick<z.infer<typeof scheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "priority" | "startsAt" | "endsAt">;
+type ScheduleConflictInput = Pick<z.infer<typeof dutyScheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "priority" | "startsAt" | "endsAt">;
 
 async function assertNoScheduleConflict(
   db: ReturnType<typeof getDatabase>,
@@ -93,7 +72,7 @@ async function assertNoScheduleConflict(
   }
 }
 
-function validateSchedule(input: z.infer<typeof scheduleInput>) {
+function validateSchedule(input: Pick<z.infer<typeof dutyScheduleInput>, "dayOfWeek" | "startsAt" | "endsAt" | "validFrom" | "validUntil">) {
   if (!isValidDutyWindow(input.dayOfWeek, input.startsAt, input.endsAt)) {
     throw new Error("Informe um horário válido. O fim deve ser depois do início.");
   }
@@ -138,32 +117,46 @@ function revalidateDutyWorkspace() {
 }
 
 export async function createDutyScheduleAction(_previous: DutyActionState, formData: FormData): Promise<DutyActionState> {
-  const parsed = scheduleInput.safeParse(cleanFormData(formData));
+  const parsed = parseCreateDutyScheduleInput(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revise os dados do plantão." };
   try {
     validateSchedule(parsed.data);
-    const { context, db } = await assertDutyAccess(parsed.data.branchId);
-    await assertQueueInScope(db, context.tenantId, parsed.data.branchId, parsed.data.queueId);
-    await assertNoScheduleConflict(db, parsed.data, context.tenantId);
-    const scheduleId = randomUUID();
+    const { context, db } = await assertBatchDutyAccess(parsed.data.unitAssignments.map((assignment) => assignment.branchId));
+    const schedules = parsed.data.unitAssignments.map((assignment) => ({
+      ...parsed.data,
+      ...assignment,
+    }));
+    for (const schedule of schedules) {
+      await assertQueueInScope(db, context.tenantId, schedule.branchId, schedule.queueId);
+      await assertNoScheduleConflict(db, schedule, context.tenantId);
+    }
+    const scheduleIds = schedules.map(() => randomUUID());
     const now = new Date();
     await db.transaction(async (tx) => {
-      await tx.insert(schema.unitDutySchedules).values({
-        id: scheduleId,
+      await tx.insert(schema.unitDutySchedules).values(schedules.map((schedule, index) => ({
+        id: scheduleIds[index],
         tenantId: context.tenantId,
-        ...parsed.data,
-        validUntil: parsed.data.validUntil ?? null,
-        webhookCredentialId: parsed.data.webhookCredentialId ?? null,
+        branchId: schedule.branchId,
+        queueId: schedule.queueId,
+        name: schedule.name,
+        dayOfWeek: schedule.dayOfWeek,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        priority: schedule.priority,
+        minimumBrokers: schedule.minimumBrokers,
+        validFrom: schedule.validFrom,
+        validUntil: schedule.validUntil ?? null,
+        webhookCredentialId: schedule.webhookCredentialId ?? null,
         createdBy: context.userId,
         createdAt: now,
         updatedAt: now,
-      });
-      await tx.insert(schema.auditLogs).values({
+      })));
+      await tx.insert(schema.auditLogs).values(scheduleIds.map((scheduleId) => ({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: scheduleId, acao: "duty_schedule.created",
-      });
+      })));
     });
     revalidateDutyWorkspace();
-    return { success: true, scheduleId };
+    return { success: true, scheduleId: scheduleIds[0], scheduleIds };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível criar o plantão." };
   }
@@ -171,7 +164,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
 
 export async function updateDutyScheduleAction(_previous: DutyActionState, formData: FormData): Promise<DutyActionState> {
   const scheduleId = z.string().uuid().safeParse(formData.get("scheduleId"));
-  const parsed = scheduleInput.safeParse(cleanFormData(formData));
+  const parsed = parseDutyScheduleInput(formData);
   if (!scheduleId.success || !parsed.success) return { error: "Revise os dados do plantão." };
   try {
     validateSchedule(parsed.data);

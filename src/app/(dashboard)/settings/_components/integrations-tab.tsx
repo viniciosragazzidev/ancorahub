@@ -15,7 +15,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createIntegrationAction, getIntegrationsData, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../integrations-actions";
+import { createIntegrationAction, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../integrations-actions";
 
 type Branch = { id: string; name: string };
 type Props = { integrations: IntegrationRecord[]; branches: Branch[] };
@@ -138,7 +138,11 @@ export function IntegrationsTab({ integrations, branches }: Props) {
 
   async function copySnippet() { await navigator.clipboard.writeText(snippet); setCopied(true); window.setTimeout(() => setCopied(false), 1400); }
 
-  return <Tabs className="gap-5" defaultValue="sources">
+  return <div className="space-y-5">
+    <Card className="border-border bg-card shadow-none">
+      <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Meta Business</p><p className="mt-1 text-sm text-muted-foreground">Conecte o WhatsApp oficial da empresa e deixe IDs de página, anúncios e conversões prontos para uso.</p></div><Button render={<Link href="/settings/meta" />}>Abrir integração Meta</Button></CardContent>
+    </Card>
+  <Tabs className="gap-5" defaultValue="sources">
     <TabsList variant="line" className="w-full justify-start border-b border-border">
       <TabsTrigger value="sources"><LinkSimple /> Webhooks & Pixels</TabsTrigger>
     </TabsList>
@@ -215,7 +219,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
     </TabsContent>
     <CreateIntegrationDialog branches={branches} open={createOpen} onOpenChange={setCreateOpen} onSubmit={(formData) => createMutation.mutate(formData)} pending={createMutation.isPending} />
     <HelpIntegrationDialog open={helpOpen} onOpenChange={setHelpOpen} />
-  </Tabs>;
+  </Tabs></div>;
 }
 
 function CreateIntegrationDialog({ branches, open, onOpenChange, onSubmit, pending }: { branches: Branch[]; open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (formData: FormData) => void; pending: boolean }) {

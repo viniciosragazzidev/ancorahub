@@ -20,6 +20,8 @@ export const branchStatusValues = ["active", "inactive"] as const;
 export const membershipStatusValues = ["active", "inactive"] as const;
 export const availabilityStatusValues = ["available", "paused", "offline"] as const;
 export const tenantRoleValues = ["director", "manager", "broker"] as const;
+export const customRoleStatusValues = ["draft", "active", "archived"] as const;
+export const customRoleScopeValues = ["none", "own", "branch", "tenant"] as const;
 export const teamJobTitleValues = ["director", "manager", "broker", "marketing", "finance", "operations", "support"] as const;
 export const userStatusValues = ["pending", "active", "disabled"] as const;
 export const leadStatusValues = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"] as const;
@@ -48,6 +50,8 @@ export const membershipStatus = pgEnum(
 );
 export const availabilityStatus = pgEnum("availability_status", availabilityStatusValues);
 export const tenantRole = pgEnum("tenant_role", tenantRoleValues);
+export const customRoleStatus = pgEnum("custom_role_status", customRoleStatusValues);
+export const customRoleScope = pgEnum("custom_role_scope", customRoleScopeValues);
 export const userStatus = pgEnum("user_status", userStatusValues);
 export const leadStatus = pgEnum("lead_status", leadStatusValues);
 export const leadOrigin = pgEnum("lead_origin", leadOriginValues);
@@ -1338,6 +1342,33 @@ export const communicationChannels = pgTable(
   ],
 );
 
+/**
+ * Identificadores não sensíveis da conta Meta de cada corretora. O token de
+ * acesso permanece cifrado exclusivamente em communication_channels.
+ */
+export const metaIntegrationSettings = pgTable(
+  "meta_integration_settings",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    communicationChannelId: text("communication_channel_id").references(() => communicationChannels.id, { onDelete: "set null" }),
+    facebookPageId: text("facebook_page_id"),
+    adAccountId: text("ad_account_id"),
+    pixelId: text("pixel_id"),
+    datasetId: text("dataset_id"),
+    tutorialCompletedAt: timestamp("tutorial_completed_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_integration_settings_tenant_unique").on(table.tenantId),
+    index("meta_integration_settings_channel_idx").on(table.communicationChannelId),
+  ],
+);
+
 /** Minimal, PII-free webhook ledger for replay protection and operational audit. */
 export const communicationChannelWebhookEvents = pgTable(
   "communication_channel_webhook_events",
@@ -1643,6 +1674,70 @@ export const platformAuditLogs = pgTable(
   (table) => [index("platform_audit_logs_actor_idx").on(table.actorUserId)],
 );
 
+/** Tenant-owned role profiles. System roles remain immutable in tenant_memberships.role. */
+export const customRoles = pgTable(
+  "custom_roles",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    color: text("color").notNull().default("primary"),
+    icon: text("icon").notNull().default("shield"),
+    scope: customRoleScope("scope").notNull().default("none"),
+    status: customRoleStatus("status").notNull().default("draft"),
+    version: integer("version").notNull().default(1),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("custom_roles_tenant_name_unique").on(table.tenantId, table.name),
+    index("custom_roles_tenant_status_idx").on(table.tenantId, table.status),
+  ],
+);
+
+export const customRolePermissions = pgTable(
+  "custom_role_permissions",
+  {
+    id: text("id").primaryKey(),
+    customRoleId: text("custom_role_id").notNull().references(() => customRoles.id, { onDelete: "cascade" }),
+    permissionKey: text("permission_key").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("custom_role_permission_unique").on(table.customRoleId, table.permissionKey),
+    index("custom_role_permissions_key_idx").on(table.permissionKey),
+  ],
+);
+
+export const customRoleEvents = pgTable(
+  "custom_role_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    customRoleId: text("custom_role_id").notNull().references(() => customRoles.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").notNull().references(() => user.id),
+    action: text("action").notNull(),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").notNull().default({}),
+    createdAt,
+  },
+  (table) => [index("custom_role_events_role_created_idx").on(table.customRoleId, table.createdAt)],
+);
+
+export const tenantCustomRoleSettings = pgTable(
+  "tenant_custom_role_settings",
+  {
+    tenantId: text("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+);
+
 export const tenantMemberships = pgTable(
   "tenant_memberships",
   {
@@ -1656,6 +1751,7 @@ export const tenantMemberships = pgTable(
     branchId: text("branch_id"),
     role: tenantRole("role").notNull(),
     jobTitle: text("job_title").notNull().default("broker"),
+    customRoleId: text("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     status: membershipStatus("status").notNull().default("active"),
     availabilityStatus: availabilityStatus("availability_status").notNull().default("available"),
     onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
@@ -1666,6 +1762,7 @@ export const tenantMemberships = pgTable(
     index("tenant_memberships_tenant_id_idx").on(table.tenantId),
     index("tenant_memberships_user_id_idx").on(table.userId),
     index("tenant_memberships_branch_id_idx").on(table.branchId),
+    index("tenant_memberships_custom_role_idx").on(table.customRoleId),
     unique("tenant_memberships_tenant_user_unique").on(
       table.tenantId,
       table.userId,

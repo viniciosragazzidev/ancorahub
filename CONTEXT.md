@@ -18,6 +18,10 @@
 - **Cancelamento**: encerramento do cliente ativo informado à corretora; não desconta dinheiro automaticamente e gera pendências financeiras auditáveis.
 - **Estorno pendente**: sinalização de uma parcela já paga que pode estar dentro da janela de chargeback; sua resolução é manual.
 
+## Distribuição de leads
+
+- **Plantão multiunidade**: criação coordenada de regras de plantão independentes para mais de uma unidade. Não é uma regra compartilhada: cada unidade conserva fila, escala, cobertura e histórico próprios.
+
 ## Canais de comunicação
 
 - **Agente de atendimento**: capacidade governada que conduz uma conversa com um lead pelo canal autorizado, preserva seu estado e pode solicitar ações CRM somente por ferramentas validadas. Na primeira entrega, ele só responde após mensagem inbound no WhatsApp oficial.

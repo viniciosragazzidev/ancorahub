@@ -9,6 +9,7 @@ export type TenantContext = {
   role: TenantRole;
   /** Cargo exibido — função descritiva (director | manager | broker | marketing | finance | operations | support) */
   jobTitle: string;
+  customRoleId?: string | null;
   /** Escopo de filial — null para diretores e marketing central */
   branchId: string | null;
 };

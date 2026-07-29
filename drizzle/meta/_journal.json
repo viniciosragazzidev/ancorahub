@@ -330,6 +330,20 @@
       "when": 1785531600000,
       "tag": "0094_duty_schedule_coverage",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1785535200000,
+      "tag": "0095_meta_manual_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1785621600000,
+      "tag": "0096_custom_roles_rbac",
+      "breakpoints": true
     }
   ]
 }

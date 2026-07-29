@@ -30,6 +30,7 @@ import {
 } from "recharts";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { LeadStatusBadge } from "@/components/status-badges";
 import { NocHeaderSlot } from "@/app/(dashboard)/noc/noc-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -985,7 +986,7 @@ const activities = [
                   <p className="text-xs text-muted-foreground">{lead.phone} • {lead.source || "Manual"}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-xs uppercase font-mono">{lead.status}</Badge>
+                  <LeadStatusBadge status={lead.status} />
                   <Button render={<Link href={`/conversas?leadId=${lead.id}`} />} size="sm" variant="ghost" className="h-7 text-xs">
                     Atender
                   </Button>

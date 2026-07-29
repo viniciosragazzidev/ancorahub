@@ -49,6 +49,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-029D | Exceções de intake/outbox possuem dono operacional e SLA inicial. | Diretor trata exceções centrais; Gestor trata apenas a própria unidade; P0 em até 30 min e P1 até o fim do dia útil. | DEC-060 |
 | BR-029E | Plantão tem cobertura mínima configurável e não bloqueia a distribuição quando incompleto. | Escalados abaixo do mínimo → alerta operacional; corretores elegíveis já escalados continuam concorrendo à distribuição. | DEC-061 |
 | BR-029F | Remover plantão significa arquivar, nunca apagar o histórico. | Arquivamento → regra e atribuições ativas saem da operação; restauração reativa somente a regra e mantém auditoria. | DEC-061 |
+| BR-029G | Criar plantão para várias unidades gera regras independentes por unidade e fila. | Diretor seleciona unidades e filas ativas → regras, auditorias e coberturas locais são criadas atomicamente; Gestor só pode criar para a própria unidade. | DEC-062 |
 
 ## Cotação, documentos e venda
 

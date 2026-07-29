@@ -17,6 +17,7 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
       membershipStatus: schema.tenantMemberships.status,
       role: schema.tenantMemberships.role,
       jobTitle: schema.tenantMemberships.jobTitle,
+      customRoleId: schema.tenantMemberships.customRoleId,
       branchId: schema.tenantMemberships.branchId,
       branchStatus: schema.branches.status,
     })
@@ -67,6 +68,7 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
     tenantId: membership.tenantId,
     role: membership.role,
     jobTitle: membership.jobTitle,
+    customRoleId: membership.customRoleId,
     branchId: membership.branchId,
   };
 }

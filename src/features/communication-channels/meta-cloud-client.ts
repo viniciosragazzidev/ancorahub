@@ -34,6 +34,15 @@ export async function getMetaWaba(wabaId: string, accessToken: string) {
   return graphRequest<{ id: string; name?: string }>(`${encodeURIComponent(wabaId)}?fields=id,name`, { method: "GET" }, accessToken);
 }
 
+export async function getMetaBusiness(businessId: string, accessToken: string) {
+  return graphRequest<{ id: string; name?: string }>(`${encodeURIComponent(businessId)}?fields=id,name`, { method: "GET" }, accessToken);
+}
+
+/** Checks optional marketing identifiers without returning campaign or audience data. */
+export async function validateMetaMarketingResource(resourceId: string, accessToken: string) {
+  return graphRequest<{ id: string; name?: string }>(`${encodeURIComponent(resourceId)}?fields=id,name`, { method: "GET" }, accessToken);
+}
+
 export async function getMetaPhoneNumber(phoneNumberId: string, accessToken: string) {
   return graphRequest<{ id: string; display_phone_number?: string; verified_name?: string; quality_rating?: string; messaging_limit_tier?: string }>(`${encodeURIComponent(phoneNumberId)}?fields=id,display_phone_number,verified_name,quality_rating,messaging_limit_tier`, { method: "GET" }, accessToken);
 }

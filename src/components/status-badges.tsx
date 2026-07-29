@@ -23,7 +23,9 @@ export function LeadQualificationBadge({ status }: { status: string }) {
 }
 
 export function LeadStatusBadge({ status }: { status: string }) {
-  switch (status) {
+  const normalizedStatus = status.trim().toLowerCase();
+
+  switch (normalizedStatus) {
     case "new":
       return (
         <Badge variant="info" className="gap-1 px-2 py-0.5">
@@ -42,7 +44,7 @@ export function LeadStatusBadge({ status }: { status: string }) {
       return (
         <Badge variant="warning" className="gap-1 px-2 py-0.5">
           <Phone className="size-3 text-warning" />
-          Em contato
+          Em atendimento
         </Badge>
       );
     case "quote_sent":
