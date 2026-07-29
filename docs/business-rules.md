@@ -78,6 +78,9 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-041 | Comissão prevista, paga e pendente são estados distintos e conferíveis por período. | Marcação de pagamento → atualiza parcela e mantém rastreabilidade. | RF052–054 |
 | BR-042 | Renovação gera alerta antecipado; interações pós-venda permanecem no cliente. | Proximidade do aniversário → notificação; interação → histórico do cliente. | RF131–132 |
 | BR-043 | Metas podem ser por corretor e por equipe/filial, em período definido. | Registro de venda → recalcula progresso do alvo aplicável. | RF120–121 |
+| BR-063 | Temporadas de desempenho são isoladas por tenant e somente o Diretor pode criar, ativar ou encerrar um ciclo. | Ativação ou reinício → encerra o ciclo ativo, preserva histórico e registra auditoria. | DEC-067 |
+| BR-064 | Premiações por colocação são declarativas e não movimentam valores financeiros automaticamente. | Diretor cria uma premiação → regra fica vinculada à temporada, sem pagamento ou comissão automática. | DEC-067 |
+| BR-065 | Perfil administrativo de membro é exclusivo de Diretor e Gestor no próprio tenant; Gestor vê somente membros, leads e métricas da própria unidade. | Abre `/equipe/[id]` → servidor deriva tenant e escopo da sessão, filtra cada consulta por unidade quando o ator é Gestor e registra a leitura na auditoria. | DEC-068 |
 
 ## Comunicação, relatórios e integridade
 

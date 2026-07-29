@@ -1,6 +1,6 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,8 @@ export default async function SuperAdminSettingsPage() {
     "feature_browser_extension_enabled",
     "feature_agent_training_center_enabled",
     "feature_custom_roles_enabled",
+    "feature_performance_ranking_enabled",
+    "feature_team_member_profile_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -97,6 +99,8 @@ export default async function SuperAdminSettingsPage() {
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
   const agentTrainingCenterEnabled = settingMap.get("feature_agent_training_center_enabled") === "true";
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
+  const performanceRankingEnabled = settingMap.get("feature_performance_ranking_enabled") !== "false";
+  const teamMemberProfileEnabled = settingMap.get("feature_team_member_profile_enabled") !== "false";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -162,6 +166,21 @@ export default async function SuperAdminSettingsPage() {
               </p>
             )}
           </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Temporadas e ranking comercial</CardTitle><CardDescription>Kill switch global para a gestão de temporadas, metas e premiações. Desativar bloqueia novos ajustes, mas preserva ciclos, resultados e auditoria.</CardDescription></CardHeader>
+          <CardContent>
+            <form action={updatePerformanceRankingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="performanceRankingEnabled" value="true" defaultChecked={performanceRankingEnabled} className="size-4" /><span><span className="font-medium">Ranking habilitado globalmente</span><span className="block text-xs text-muted-foreground">A gestão continua restrita ao Diretor dentro da própria empresa.</span></span></label>
+              <Button type="submit" variant={performanceRankingEnabled ? "outline" : "default"}>{performanceRankingEnabled ? "Salvar controle" : "Liberar ranking"}</Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Perfil administrativo da equipe</CardTitle><CardDescription>Libera a visão de desempenho individual para Diretores e Gestores. Gestores permanecem limitados aos membros e leads da própria unidade; cada acesso fica auditado.</CardDescription></CardHeader>
+          <CardContent><form action={updateTeamMemberProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="teamMemberProfileEnabled" value="true" defaultChecked={teamMemberProfileEnabled} className="size-4" /><span><span className="font-medium">Perfis administrativos habilitados</span><span className="block text-xs text-muted-foreground">Desativar remove o atalho e bloqueia a rota sem apagar históricos ou auditoria.</span></span></label><Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>{teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}</Button></form></CardContent>
         </Card>
 
         <Card className="border-border bg-card shadow-none">

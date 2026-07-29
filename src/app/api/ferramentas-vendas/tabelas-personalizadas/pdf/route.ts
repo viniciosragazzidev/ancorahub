@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     const page = pdf.addPage([595.28, 841.89]); // A4
     const regular = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    const brand = rgb(0.15, 0.39, 0.93); // #2563eb
+    const brand = rgb(0.09, 0.64, 0.29); // #16A34A (verde Âncora)
 
     // Brand header bar
     page.drawRectangle({ x: 0, y: 760, width: 595.28, height: 81.89, color: brand });
@@ -167,7 +167,7 @@ export async function POST(request: Request) {
     return new Response(Uint8Array.from(bytes).buffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="tabela-personalizada-corretop.pdf"`,
+        "Content-Disposition": `attachment; filename="tabela-personalizada-ancora.pdf"`,
         "Cache-Control": "private, no-store",
       },
     });

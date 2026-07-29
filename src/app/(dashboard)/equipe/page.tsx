@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
 
@@ -23,7 +24,7 @@ export default async function TeamPage() {
     ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
     : undefined;
 
-  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal] = await Promise.all([
+  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal, memberProfileEnabled] = await Promise.all([
     getDatabase()
       .select({ name: schema.tenants.name })
       .from(schema.tenants)
@@ -103,6 +104,7 @@ export default async function TeamPage() {
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
       .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadBranchScope)),
+    isTeamMemberProfileEnabled(),
   ]);
 
   const members = [...brokers, ...nonBrokers].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -163,6 +165,7 @@ export default async function TeamPage() {
           currentRole={context.role}
           currentUserId={context.userId}
           members={members}
+          canViewProfile={memberProfileEnabled}
         />
       </main>
     </>

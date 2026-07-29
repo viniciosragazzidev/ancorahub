@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { Target } from "@/components/huge-icons";
 import { ViewScopeContext } from "@/components/ownership-context";
+import { Button } from "@/components/ui/button";
 import { GoalsManager } from "@/features/goals/components/goals-manager";
 import {
   getGoals,
@@ -10,6 +12,7 @@ import {
 } from "@/features/goals/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
+import Link from "next/link";
 
 export default async function GoalsPage() {
   const context = await getRequiredTenantContext();
@@ -23,7 +26,11 @@ export default async function GoalsPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Gestão comercial" title="Metas" />
+      <DashboardHeader
+        breadcrumb="Gestão comercial"
+        title="Metas"
+        rightSlot={context.role === "director" ? <Button render={<Link href="/metas/desempenho" />} size="sm"><Target className="size-4" /> Temporadas e ranking</Button> : undefined}
+      />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <div>
           {/* Contexto de página legado, preservado para eventual restauração:

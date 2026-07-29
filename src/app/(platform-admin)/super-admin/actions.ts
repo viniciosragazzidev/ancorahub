@@ -446,6 +446,42 @@ export async function updateAgentTrainingCenterSettingsAction(formData: FormData
   revalidatePath("/settings");
 }
 
+export async function updatePerformanceRankingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("performanceRankingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_performance_ranking_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "performance_ranking.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "performance_ranking",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/metas/desempenho");
+}
+
+export async function updateTeamMemberProfileSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("teamMemberProfileEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_team_member_profile_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "team_member_profile.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "team_member_profile",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/equipe");
+}
+
 export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("enabled") === "true" ? "true" : "false";

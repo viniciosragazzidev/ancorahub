@@ -1928,6 +1928,8 @@ export const commissionRuleTypeValues = ["unica", "escalonada"] as const;
 export const commissionScheduleStatusValues = ["pending", "paid", "cancelled", "chargeback_pending"] as const;
 export const goalScopeValues = ["broker", "team", "branch", "tenant"] as const;
 export const goalTargetTypeValues = ["sales_count", "revenue", "conversion_rate", "leads_contacted"] as const;
+export const performanceSeasonStatusValues = ["draft", "active", "closed", "archived"] as const;
+export const performanceAwardTypeValues = ["recognition", "bonus", "gift", "other"] as const;
 export const saleStatusValues = ["active", "cancelled"] as const;
 export const activeCustomerStatusValues = ["active", "cancelled"] as const;
 
@@ -1935,6 +1937,8 @@ export const commissionRuleType = pgEnum("commission_rule_type", commissionRuleT
 export const commissionScheduleStatus = pgEnum("commission_schedule_status", commissionScheduleStatusValues);
 export const goalScope = pgEnum("goal_scope", goalScopeValues);
 export const goalTargetType = pgEnum("goal_target_type", goalTargetTypeValues);
+export const performanceSeasonStatus = pgEnum("performance_season_status", performanceSeasonStatusValues);
+export const performanceAwardType = pgEnum("performance_award_type", performanceAwardTypeValues);
 export const saleStatus = pgEnum("sale_status", saleStatusValues);
 export const activeCustomerStatus = pgEnum("active_customer_status", activeCustomerStatusValues);
 
@@ -2327,6 +2331,55 @@ export const goalProgress = pgTable(
   },
   (table) => [
     uniqueIndex("goal_progress_goal_unique").on(table.goalId),
+  ],
+);
+
+/**
+ * A season is the immutable time boundary used by the broker leaderboard. A
+ * reset closes the current season and starts another; it never removes points
+ * or historical results.
+ */
+export const performanceSeasons = pgTable(
+  "performance_seasons",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: performanceSeasonStatus("status").notNull().default("draft"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    resetAt: timestamp("reset_at", { withTimezone: true }),
+    resetReason: text("reset_reason"),
+    createdBy: text("created_by").notNull().references(() => user.id),
+    closedBy: text("closed_by").references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("performance_seasons_tenant_status_idx").on(table.tenantId, table.status),
+    index("performance_seasons_tenant_starts_idx").on(table.tenantId, table.startsAt),
+  ],
+);
+
+export const performanceAwards = pgTable(
+  "performance_awards",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    seasonId: text("season_id").notNull().references(() => performanceSeasons.id, { onDelete: "cascade" }),
+    rankPosition: integer("rank_position").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    rewardType: performanceAwardType("reward_type").notNull().default("recognition"),
+    rewardValue: text("reward_value"),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by").notNull().references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("performance_awards_season_rank_title_unique").on(table.seasonId, table.rankPosition, table.title),
+    index("performance_awards_tenant_season_idx").on(table.tenantId, table.seasonId),
   ],
 );
 

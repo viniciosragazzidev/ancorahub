@@ -857,16 +857,27 @@ body {
   animation: ct-route-enter var(--duration-fast) var(--ease-smooth-out) both;
 }
 
+/* During route transitions (non-theme): freeze the header snapshot */
 html:not([data-magicui-theme-vt="active"])::view-transition-group(ct-shell-header) {
   z-index: 100;
   animation: none;
 }
-
 html:not([data-magicui-theme-vt="active"])::view-transition-old(ct-shell-header) {
   display: none;
 }
-
 html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header) {
+  animation: none;
+}
+
+/* During theme transitions: keep z-index and suppress the default crossfade so
+   the clip-path mask (applied via JS Web Animation) is the only visible effect */
+html[data-magicui-theme-vt="active"]::view-transition-group(ct-shell-header) {
+  z-index: 100;
+}
+html[data-magicui-theme-vt="active"]::view-transition-old(ct-shell-header) {
+  display: none;
+}
+html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   animation: none;
 }
 

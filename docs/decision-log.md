@@ -402,3 +402,17 @@ mesmo tenant. O cargo padrão Marketing é geral por padrão, mas o Diretor pode
 criar uma variante local de Marketing quando a operação pedir. A abrangência
 limita permissões elegíveis, nunca amplia acesso de Diretor, e toda alteração
 permanece auditável dentro do piloto de cargos personalizados.
+
+## DEC-067 — Temporadas de desempenho e reinício preservam histórico
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+O ranking comercial usa temporadas por tenant como recorte temporal. Somente uma temporada pode estar ativa; o Diretor pode preparar rascunhos, ativar um ciclo e reiniciar o ranking. Reiniciar nunca apaga ou reescreve resultados: encerra o ciclo atual com o motivo auditado e inicia uma nova temporada. Premiações são regras de reconhecimento registradas por colocação; não iniciam pagamento, comissão ou qualquer obrigação financeira automaticamente. Metas existentes permanecem a fonte oficial dos objetivos comerciais e não são duplicadas pelo módulo de desempenho.
+
+## DEC-068 — Perfil administrativo de membro respeita unidade e carteira
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+O perfil administrativo de um membro é uma visão de supervisão, não uma página pública ou uma área de autoatendimento. Diretor pode consultar qualquer membro do próprio tenant. Gestor só pode consultar membro com vínculo na própria unidade, e todas as métricas e listas do perfil recebem o mesmo filtro de unidade. A rota não distingue membro inexistente de membro fora do escopo, evitando revelar a estrutura de equipe. Cada consulta autorizada é registrada na auditoria; o Super Admin pode desativar globalmente a capacidade sem apagar histórico.

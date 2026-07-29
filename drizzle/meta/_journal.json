@@ -351,6 +351,13 @@
       "when": 1785621700000,
       "tag": "0097_custom_role_member_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1785621800000,
+      "tag": "0098_performance_seasons",
+      "breakpoints": true
     }
   ]
 }
