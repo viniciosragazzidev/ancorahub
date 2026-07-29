@@ -358,6 +358,13 @@
       "when": 1785621800000,
       "tag": "0098_performance_seasons",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1785700800000,
+      "tag": "0099_meta_manual_lead_ads",
+      "breakpoints": true
     }
   ]
 }

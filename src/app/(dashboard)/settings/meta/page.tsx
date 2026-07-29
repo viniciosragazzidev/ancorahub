@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetaManualIntegrationWorkspace } from "@/features/communication-channels/components/meta-manual-integration-workspace";
-import { getMetaCloudConfigurationState } from "@/features/communication-channels/meta-cloud-config";
+import { getMetaCloudConfigurationState, getMetaLeadAdsConfigurationState } from "@/features/communication-channels/meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -16,7 +16,7 @@ export default async function MetaIntegrationSettingsPage() {
   if (context.role !== "director") redirect("/settings");
 
   const db = getDatabase();
-  const [metaEnabled, channel, settings] = await Promise.all([
+  const [metaEnabled, channel, settings, leadAdSources, branches] = await Promise.all([
     isMetaCloudWhatsAppEnabled(),
     db.select({
       id: schema.communicationChannels.id,
@@ -47,6 +47,9 @@ export default async function MetaIntegrationSettingsPage() {
       lastSyncedAt: schema.metaIntegrationSettings.lastSyncedAt,
       lastError: schema.metaIntegrationSettings.lastError,
     }).from(schema.metaIntegrationSettings).where(eq(schema.metaIntegrationSettings.tenantId, context.tenantId)).limit(1),
+    db.select({ id: schema.metaLeadAdSources.id, pageId: schema.metaLeadAdSources.pageId, adAccountId: schema.metaLeadAdSources.adAccountId, branchId: schema.metaLeadAdSources.branchId, status: schema.metaLeadAdSources.status, lastWebhookAt: schema.metaLeadAdSources.lastWebhookAt, lastLeadAt: schema.metaLeadAdSources.lastLeadAt, lastError: schema.metaLeadAdSources.lastError })
+      .from(schema.metaLeadAdSources).where(eq(schema.metaLeadAdSources.tenantId, context.tenantId)),
+    db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId)),
   ]);
   const activeChannel = channel[0] ?? null;
   const activeSettings = settings[0] ?? null;
@@ -62,6 +65,7 @@ export default async function MetaIntegrationSettingsPage() {
       .orderBy(desc(schema.auditLogs.createdAt)).limit(30)
     : [];
   const config = getMetaCloudConfigurationState({ includeEmbeddedSignup: false });
+  const leadAdsConfig = getMetaLeadAdsConfigurationState();
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://app.ancorahub.com.br";
 
   return <>
@@ -77,8 +81,12 @@ export default async function MetaIntegrationSettingsPage() {
       enabled={metaEnabled}
       logs={logs}
       missingServerConfig={config.missing}
+      leadAdsServerReady={leadAdsConfig.configured}
+      leadAdsMissingServerConfig={leadAdsConfig.missing}
       serverReady={config.configured}
       settings={activeSettings}
+      leadAdSources={leadAdSources}
+      branches={branches}
       verifyTokenConfigured={!config.missing.includes("META_WHATSAPP_WEBHOOK_VERIFY_TOKEN")}
       webhookUrl={`${baseUrl}/api/webhooks/meta/whatsapp`}
     />

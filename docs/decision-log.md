@@ -104,6 +104,13 @@ As rotas do aplicativo usam a integração experimental de View Transitions do N
 
 O CorreTop usa `services/whatsapp-api` como fronteira Fastify separada para chamadas da Graph API que exigem credenciais privadas da Meta. O CRM não chama a Meta pelo navegador: uma Server Action restrita ao Super-admin e governada pela capacidade global encaminha o pedido ao Fastify usando segredo interno. O serviço recebe somente a solicitação autorizada, usa o token da Meta localmente e devolve ao CRM apenas o resultado seguro. A infraestrutura do Fastify é implantada separadamente da Vercel; Embedded Signup, templates e armazenamento de tokens por WABA continuam como fases explícitas.
 
+## DEC-069 — Captação manual de Meta Lead Ads com credencial técnica central
+
+**Estado:** Aceita  
+**Data:** 2026-07-29
+
+Enquanto o OAuth/Embedded Signup de Marketing não estiver liberado, cada cliente compartilha manualmente sua Página e ativos com o portfólio empresarial do AncoraHub. A plataforma mantém um único token técnico de Usuário do Sistema somente no ambiente privado; nenhum tenant envia, armazena ou visualiza esse segredo. O Diretor mapeia a Página autorizada para seu tenant e, opcionalmente, para uma unidade. O webhook assinado resolve a empresa exclusivamente pelo `page_id`, busca o `leadgen_id` no servidor e cria o lead pelo intake transacional existente. Uma Página só pode pertencer a um tenant por vez; pausar a fonte interrompe novas captações e preserva histórico. O Super-admin controla a capacidade global por `feature_meta_lead_ads_enabled`, com auditoria.
+
 ## Pendentes bloqueantes
 
 | ID | Decisão necessária | Impacto | Dono sugerido |

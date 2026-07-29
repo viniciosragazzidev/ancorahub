@@ -2335,6 +2335,36 @@ export const goalProgress = pgTable(
 );
 
 /**
+ * A Page shared manually with the AncoraHub platform for Lead Ads. The platform
+ * credential remains server-only; this record is solely the auditable routing
+ * map from a Meta Page to a tenant and its intake credential.
+ */
+export const metaLeadAdSources = pgTable(
+  "meta_lead_ad_sources",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+    pageId: text("page_id").notNull(),
+    adAccountId: text("ad_account_id"),
+    leadWebhookCredentialId: text("lead_webhook_credential_id").notNull().references(() => leadWebhookCredentials.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("active"),
+    lastWebhookAt: timestamp("last_webhook_at", { withTimezone: true }),
+    lastLeadAt: timestamp("last_lead_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_lead_ad_sources_page_unique").on(table.pageId),
+    uniqueIndex("meta_lead_ad_sources_credential_unique").on(table.leadWebhookCredentialId),
+    index("meta_lead_ad_sources_tenant_status_idx").on(table.tenantId, table.status),
+    index("meta_lead_ad_sources_branch_idx").on(table.branchId),
+  ],
+);
+
+/**
  * A season is the immutable time boundary used by the broker leaderboard. A
  * reset closes the current season and starts another; it never removes points
  * or historical results.

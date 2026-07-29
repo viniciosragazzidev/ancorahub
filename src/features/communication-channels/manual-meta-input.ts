@@ -20,3 +20,11 @@ export const manualMetaConnectionInputSchema = z.object({
 });
 
 export type ManualMetaConnectionInput = z.infer<typeof manualMetaConnectionInputSchema>;
+
+export const manualMetaLeadAdsSourceInputSchema = z.object({
+  pageId: metaIdSchema,
+  adAccountId: optionalAdAccountIdSchema,
+  branchId: z.string().trim().min(1).max(80).nullable(),
+});
+
+export type ManualMetaLeadAdsSourceInput = z.infer<typeof manualMetaLeadAdsSourceInputSchema>;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Bell, BellRinging, ChatCircleText, CheckCircle, MagnifyingGlass, Plus } from "@/components/huge-icons";
 
 import { CorretorSidebar } from "@/components/corretor-sidebar";
+import { LeadTrendChart } from "@/components/dashboard/lead-trend-chart";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -174,7 +175,18 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
           ))}
         </section>
 
-        {/* ─── 3. MINHA FILA (Tabela de Atendimento) ─── */}
+        {/* ─── 3. TENDÊNCIA DE LEADS ─── */}
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader>
+            <CardTitle>Tendência de leads</CardTitle>
+            <CardDescription>Últimos 30 dias · Recebidos vs. Convertidos na sua carteira</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LeadTrendChart data={data.trend} />
+          </CardContent>
+        </Card>
+
+        {/* ─── 4. MINHA FILA (Tabela de Atendimento) ─── */}
         <section id="minha-fila">
           <Card className="border-border bg-card shadow-xs">
             <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border/50 p-4">

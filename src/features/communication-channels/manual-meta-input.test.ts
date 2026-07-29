@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { manualMetaConnectionInputSchema } from "./manual-meta-input";
+import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema } from "./manual-meta-input";
 
 const validInput = {
   businessId: "1234567890",
@@ -22,5 +22,10 @@ describe("manual Meta connection input", () => {
   it("rejects malformed identifiers and a short access token", () => {
     expect(manualMetaConnectionInputSchema.safeParse({ ...validInput, wabaId: "abc" }).success).toBe(false);
     expect(manualMetaConnectionInputSchema.safeParse({ ...validInput, accessToken: "short" }).success).toBe(false);
+  });
+
+  it("accepts a lead ads page mapping without accepting a client token", () => {
+    expect(manualMetaLeadAdsSourceInputSchema.safeParse({ pageId: "1234567890", adAccountId: "act_1234567891", branchId: null }).success).toBe(true);
+    expect(manualMetaLeadAdsSourceInputSchema.safeParse({ pageId: "page-name", adAccountId: "", branchId: null }).success).toBe(false);
   });
 });

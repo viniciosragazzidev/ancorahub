@@ -7,11 +7,12 @@ import { revalidatePath } from "next/cache";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
-import { getMetaCloudServerConfig } from "./meta-cloud-config";
+import { getMetaCloudServerConfig, getMetaLeadAdsConfigurationState } from "./meta-cloud-config";
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER } from "./types";
-import { manualMetaConnectionInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
+import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
+import { configureMetaLeadAdsSource, isMetaLeadAdsEnabled, pauseMetaLeadAdsSource } from "./meta-lead-ads";
 
 export type ManualMetaActionState = {
   success?: boolean;
@@ -223,5 +224,32 @@ export async function completeManualMetaTutorialAction() {
   if (existing) await db.update(schema.metaIntegrationSettings).set({ tutorialCompletedAt: now, updatedAt: now }).where(eq(schema.metaIntegrationSettings.id, existing.id));
   else await db.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, tutorialCompletedAt: now, createdBy: context.userId, createdAt: now, updatedAt: now });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: context.tenantId, acao: "meta_manual.tutorial_completed" });
+  revalidatePath("/settings/meta");
+}
+
+export async function configureManualMetaLeadAdsSourceAction(formData: FormData) {
+  const context = await requireManualMetaAccess();
+  if (!(await isMetaLeadAdsEnabled())) throw new Error("A captação por Lead Ads está desativada pelo Super-admin.");
+  const leadAdsConfig = getMetaLeadAdsConfigurationState();
+  if (!leadAdsConfig.configured) throw new Error(`A plataforma ainda precisa configurar: ${leadAdsConfig.missing.join(", ")}.`);
+  const input = manualMetaLeadAdsSourceInputSchema.parse({
+    pageId: formData.get("pageId"),
+    adAccountId: formData.get("adAccountId"),
+    branchId: String(formData.get("branchId") ?? "").trim() || null,
+  });
+  if (input.branchId) {
+    const [branch] = await getDatabase().select({ id: schema.branches.id }).from(schema.branches)
+      .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+    if (!branch) throw new Error("Selecione uma unidade ativa da sua empresa.");
+  }
+  await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: input.branchId, pageId: input.pageId, adAccountId: input.adAccountId || null, actorUserId: context.userId });
+  revalidatePath("/settings/meta");
+}
+
+export async function pauseManualMetaLeadAdsSourceAction(formData: FormData) {
+  const context = await requireManualMetaAccess();
+  const sourceId = String(formData.get("sourceId") ?? "").trim();
+  if (!sourceId) throw new Error("Fonte de captação inválida.");
+  await pauseMetaLeadAdsSource({ tenantId: context.tenantId, sourceId, actorUserId: context.userId });
   revalidatePath("/settings/meta");
 }

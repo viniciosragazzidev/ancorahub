@@ -1,6 +1,7 @@
 import "server-only";
 
 export const META_WHATSAPP_FEATURE_SETTING = "feature_whatsapp_meta_cloud_enabled";
+export const META_LEAD_ADS_FEATURE_SETTING = "feature_meta_lead_ads_enabled";
 
 const graphVersionPattern = /^v\d+\.\d+$/;
 
@@ -10,6 +11,22 @@ export type MetaCloudConfigurationState = {
   appId: string | null;
   embeddedSignupConfigId: string | null;
 };
+
+export type MetaLeadAdsServerConfig = {
+  appSecret: string;
+  webhookVerifyToken: string;
+  accessToken: string;
+  graphVersion: string;
+};
+
+export function getMetaLeadAdsConfigurationState() {
+  const missing = [
+    ...(process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim() ? [] : ["META_LEAD_ADS_ACCESS_TOKEN"]),
+    ...((process.env.META_LEAD_ADS_APP_SECRET?.trim() || process.env.META_WHATSAPP_APP_SECRET?.trim()) ? [] : ["META_LEAD_ADS_APP_SECRET"]),
+    ...((process.env.META_LEAD_WEBHOOK_VERIFY_TOKEN?.trim() || process.env.META_LEAD_ADS_WEBHOOK_VERIFY_TOKEN?.trim()) ? [] : ["META_LEAD_WEBHOOK_VERIFY_TOKEN"]),
+  ];
+  return { configured: missing.length === 0, missing };
+}
 
 type MetaCloudServerConfig = {
   appId: string;
@@ -51,4 +68,17 @@ export function getMetaCloudServerConfig(): MetaCloudServerConfig {
     graphVersion,
     redirectUri: process.env.META_WHATSAPP_REDIRECT_URI?.trim() || undefined,
   };
+}
+
+/** Platform-owned credential. It is never entered by, stored for, or exposed to a tenant. */
+export function getMetaLeadAdsServerConfig(): MetaLeadAdsServerConfig {
+  const accessToken = process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim();
+  const appSecret = process.env.META_LEAD_ADS_APP_SECRET?.trim() || process.env.META_WHATSAPP_APP_SECRET?.trim();
+  const webhookVerifyToken = process.env.META_LEAD_WEBHOOK_VERIFY_TOKEN?.trim() || process.env.META_LEAD_ADS_WEBHOOK_VERIFY_TOKEN?.trim();
+  if (!accessToken) throw new Error("Configuração de Lead Ads incompleta: META_LEAD_ADS_ACCESS_TOKEN.");
+  if (!appSecret) throw new Error("Configuração de Lead Ads incompleta: META_LEAD_ADS_APP_SECRET.");
+  if (!webhookVerifyToken) throw new Error("Configuração de Lead Ads incompleta: META_LEAD_WEBHOOK_VERIFY_TOKEN.");
+  const graphVersion = process.env.META_GRAPH_API_VERSION?.trim() || process.env.META_WHATSAPP_GRAPH_API_VERSION?.trim() || "v23.0";
+  if (!graphVersionPattern.test(graphVersion)) throw new Error("META_GRAPH_API_VERSION inválida.");
+  return { appSecret, graphVersion, accessToken, webhookVerifyToken };
 }
