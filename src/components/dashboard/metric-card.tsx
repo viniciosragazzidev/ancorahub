@@ -92,24 +92,24 @@ export function StatCard({
           {Icon && (
             <div
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 transition-all duration-200 group-hover/card:scale-105 group-hover/card:bg-foreground/10 group-hover/card:text-foreground",
+                "flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 transition-[background-color,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:bg-foreground/10 group-hover/card:text-foreground motion-reduce:transition-none",
                 iconClassName,
               )}
             >
               <Icon className="size-4" />
             </div>
           )}
-          <span className="truncate text-xs font-medium text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">
+          <span className="truncate text-xs font-medium text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground motion-reduce:transition-none">
             {label}
           </span>
         </div>
         {(trend || change) && (
           <Badge
-            className="shrink-0 rounded-full font-mono text-[11px] font-medium transition-transform duration-200 group-hover/card:scale-105"
+            className="shrink-0 rounded-full font-mono text-[11px] font-medium"
             variant={resolvedVariant}
           >
             {trend && trend !== "neutral" && TrendIcon && (
-              <TrendIcon className="mr-0.5 size-2.5 transition-transform duration-200 group-hover/card:translate-x-px group-hover/card:-translate-y-px" />
+              <TrendIcon className="mr-0.5 size-2.5" />
             )}
             {change}
           </Badge>
@@ -119,14 +119,14 @@ export function StatCard({
         <div className="min-w-0">
           <p
             className={cn(
-              "text-2xl font-semibold tracking-tight tabular-nums text-foreground transition-colors duration-200",
+              "text-2xl font-semibold tracking-tight tabular-nums text-foreground",
               valueClassName,
             )}
           >
             {value}
           </p>
           {sublabel && (
-            <p className="mt-1 text-xs leading-tight text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground/70">
+            <p className="mt-1 text-xs leading-tight text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">
               {sublabel}
             </p>
           )}

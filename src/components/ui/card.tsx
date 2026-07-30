@@ -8,10 +8,10 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-4 rounded-2xl border border-border bg-card p-6 shadow-none transition-colors duration-150 hover:border-border-strong",
+        default: "gap-4 rounded-2xl border border-border bg-card p-5 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
         overview: "gap-0 overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-none",
-        compact: "gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-none transition-colors duration-150 hover:border-border-strong",
-        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-none transition-colors duration-150 hover:border-border-strong",
+        compact: "gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
+        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
       },
     },
     defaultVariants: {
@@ -59,7 +59,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-sans text-base font-bold tracking-tight text-foreground",
+        "font-sans text-base font-semibold tracking-tight text-foreground",
         className
       )}
       {...props}
@@ -104,7 +104,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center rounded-b-xl px-(--card-spacing) pb-(--card-spacing)", className)}
+      className={cn("flex items-center rounded-b-xl px-5 pb-5", className)}
       {...props}
     />
   )

@@ -84,7 +84,7 @@ export function MiniDonut({
               strokeDasharray={strokeDasharray}
               strokeDashoffset={strokeDashoffset}
               transform={`rotate(${rotation} ${center} ${center})`}
-              className="transition-all duration-300 ease-out"
+              className="transition-[stroke-dashoffset,stroke] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none"
             />
           );
         })}
