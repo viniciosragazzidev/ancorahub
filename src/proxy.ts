@@ -18,24 +18,41 @@ async function lookupSession(token: string): Promise<SessionLookup> {
   const cached = sessionCache.get(token);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   if (cached) sessionCache.delete(token);
-  const [dbSession] = await getDatabase()
-    .select({
-      userId: schema.session.userId,
-      role: schema.tenantMemberships.role,
-      onboardingStatus: schema.userOnboarding.status,
-    })
-    .from(schema.session)
-    .leftJoin(schema.tenantMemberships, eq(schema.tenantMemberships.userId, schema.session.userId))
-    .leftJoin(schema.userOnboarding, eq(schema.userOnboarding.userId, schema.session.userId))
-    .where(eq(schema.session.token, token))
-    .limit(1);
-  const value = dbSession ?? null;
-  sessionCache.set(token, { expiresAt: Date.now() + SESSION_CACHE_TTL_MS, value });
-  if (sessionCache.size > 500) {
-    const first = sessionCache.keys().next().value;
-    if (first) sessionCache.delete(first);
+  // Timeout after 3s to avoid blocking ALL requests when the connection pool
+  // is exhausted by heavy pages (e.g. /super-admin/settings).
+  // The page component will verify auth independently if the middleware
+  // cannot reach the database in time.
+  const TIMEOUT_MS = 3_000;
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const [dbSession] = await Promise.race([
+      getDatabase()
+        .select({
+          userId: schema.session.userId,
+          role: schema.tenantMemberships.role,
+          onboardingStatus: schema.userOnboarding.status,
+        })
+        .from(schema.session)
+        .leftJoin(schema.tenantMemberships, eq(schema.tenantMemberships.userId, schema.session.userId))
+        .leftJoin(schema.userOnboarding, eq(schema.userOnboarding.userId, schema.session.userId))
+        .where(eq(schema.session.token, token))
+        .limit(1),
+      new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error("Session lookup timed out")), TIMEOUT_MS);
+      }),
+    ]);
+    const value = dbSession ?? null;
+    sessionCache.set(token, { expiresAt: Date.now() + SESSION_CACHE_TTL_MS, value });
+    if (sessionCache.size > 500) {
+      const first = sessionCache.keys().next().value;
+      if (first) sessionCache.delete(first);
+    }
+    return value;
+  } catch {
+    return null;
+  } finally {
+    if (timerId) clearTimeout(timerId);
   }
-  return value;
 }
 
 function copyCookies(source: NextResponse, target: NextResponse) {
