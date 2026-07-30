@@ -120,20 +120,52 @@ export type ManagerDashboardData = {
   stalled: number;
   branchId: string;
   autoDistribute: boolean;
+  trend: LeadTrend;
 };
 
 export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const [branch, members, leads] = await Promise.all([
+  const [branch, members, leads, trendRaw] = await Promise.all([
     db.select({ autoDistribute: schema.branches.autoDistribute, branchName: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.id, context.branchId!), eq(schema.branches.tenantId, context.tenantId))).limit(1),
     db.select({ userId: schema.tenantMemberships.userId, status: schema.tenantMemberships.status }).from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.branchId, context.branchId!), eq(schema.tenantMemberships.role, "broker"))),
     db.select({ status: schema.leads.status, corretorId: schema.leads.corretorId, assignedAt: schema.leads.assignedAt, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.branchId, context.branchId!))),
+    db
+      .select({
+        date: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
+        leads: sql<number>`count(*)::int`,
+        converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')::int`,
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.branchId, context.branchId!),
+          gte(schema.leads.createdAt, sql`now() - interval '29 days'`),
+        ),
+      )
+      .groupBy(sql`1`)
+      .orderBy(sql`1`),
   ]);
   const now = Date.now();
   const unworked = leads.filter((lead) => lead.status === "distributed" && lead.assignedAt && now - lead.assignedAt.getTime() > 15 * 60 * 1000).length;
   const stalled = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status) && now - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000).length;
-  return { branchName: branch[0]?.branchName ?? "Unidade não identificada", teamSize: members.length, activeMembers: members.filter((member) => member.status === "active").length, leadsTotal: leads.length, newLeads: leads.filter((lead) => lead.status === "new").length, inContact: leads.filter((lead) => lead.status === "in_contact").length, unassigned: leads.filter((lead) => !lead.corretorId).length, unworked, stalled, branchId: context.branchId!, autoDistribute: branch[0]?.autoDistribute ?? true };
+
+  const trendMap = new Map(trendRaw.map((r) => [r.date, r]));
+  const trend: LeadTrend = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const existing = trendMap.get(key);
+    trend.push({
+      date: key,
+      leads: existing?.leads ?? 0,
+      converted: existing?.converted ?? 0,
+    });
+  }
+
+  return { branchName: branch[0]?.branchName ?? "Unidade não identificada", teamSize: members.length, activeMembers: members.filter((member) => member.status === "active").length, leadsTotal: leads.length, newLeads: leads.filter((lead) => lead.status === "new").length, inContact: leads.filter((lead) => lead.status === "in_contact").length, unassigned: leads.filter((lead) => !lead.corretorId).length, unworked, stalled, branchId: context.branchId!, autoDistribute: branch[0]?.autoDistribute ?? true, trend };
 }
 
 export type LeadTrend = Array<{ date: string; leads: number; converted: number }>;

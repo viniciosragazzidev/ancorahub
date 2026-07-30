@@ -49,6 +49,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { type PermissionKey } from "@/shared/auth/permissions";
+import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 
 type SidebarItem = { label: string; icon: typeof House; url: string; permission: PermissionKey };
 type SidebarSection = { label: string; items: SidebarItem[] };
@@ -126,9 +127,11 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   const [user, setUser] = useState<UserDisplayInfo | null>(null);
+  const [onDuty, setOnDuty] = useState(false);
 
   useEffect(() => {
     getUserDisplayInfo().then(setUser);
+    isCurrentUserOnDuty().then(setOnDuty);
   }, []);
 
   const userName = user?.name ?? "Usuário";
@@ -164,25 +167,27 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <img src="/icon.png" alt="Ancora" className="hidden size-5 object-contain group-data-[collapsible=icon]:block" />
         </Link>
 
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={isPlantaoActive}
-              render={<Link href="/leads/distribuicao/plantao" onClick={() => isMobile && setOpenMobile(false)} prefetch />}
-              tooltip="Plantão ao vivo"
-              className="group/plantao relative h-9 justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[11px] font-semibold uppercase text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/40 hover:bg-emerald-500/15 dark:text-emerald-400 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-emerald-500/25 group-data-[collapsible=icon]:bg-emerald-500/12 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
-            >
-              <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
-                <span className="relative flex size-2 shrink-0">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                </span>
-                <span className="truncate tracking-wide">Plantão ao vivo</span>
-              </div>
-              <WifiHigh className="size-4 shrink-0 text-emerald-500 transition-transform duration-[var(--duration-quick)] group-hover/plantao:scale-105 motion-reduce:transition-none" />
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {onDuty ? (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={isPlantaoActive}
+                render={<Link href="/leads/distribuicao/plantao" onClick={() => isMobile && setOpenMobile(false)} prefetch />}
+                tooltip="Plantão ao vivo"
+                className="group/plantao relative h-9 justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[11px] font-semibold uppercase text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/40 hover:bg-emerald-500/15 dark:text-emerald-400 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-emerald-500/25 group-data-[collapsible=icon]:bg-emerald-500/12 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
+              >
+                <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
+                  <span className="relative flex size-2 shrink-0">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  </span>
+                  <span className="truncate tracking-wide">Plantão ao vivo</span>
+                </div>
+                <WifiHigh className="size-4 shrink-0 text-emerald-500 transition-transform duration-[var(--duration-quick)] group-hover/plantao:scale-105 motion-reduce:transition-none" />
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">

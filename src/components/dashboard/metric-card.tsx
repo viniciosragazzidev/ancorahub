@@ -1,10 +1,13 @@
 "use client";
 
+import { useId } from "react";
 import { motion } from "motion/react";
+import { Area, AreaChart } from "recharts";
 import { ArrowDownRight, ArrowUpRight } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { MiniDonut } from "./mini-donut";
 import { cardItemVariants } from "@/shared/animations";
@@ -28,6 +31,12 @@ export type StatCardProps = {
   changeVariant?: "success" | "destructive" | "warning" | "secondary";
   /** Segmentos para exibir um MiniDonut opcional */
   chartSegments?: Array<{ name: string; value: number; color: string }>;
+  /** Dados para exibição de mini gráfico de linha (sparkline) usando shadcn Chart */
+  sparklineData?: number[] | Array<Record<string, any>>;
+  /** Cor da linha do gráfico (ex: "var(--chart-1)") */
+  sparklineColor?: string;
+  /** Nome da chave dos dados se for um array de objetos (default: "value") */
+  sparklineDataKey?: string;
   /** Classes personalizadas para o valor */
   valueClassName?: string;
   /** Classes adicionais no card */
@@ -45,7 +54,8 @@ export type StatCardProps = {
  *
  * Suporta:
  * - Ícone opcional com fundo colorido
- * - Badge de tendência/variacão
+ * - Badge de tendência/variação
+ * - Gráfico de linha (sparkline) via shadcn Chart
  * - Gráfico MiniDonut opcional
  * - Valor com cor personalizada
  * - Label + sublabel opcional
@@ -61,12 +71,33 @@ export function StatCard({
   change,
   changeVariant,
   chartSegments,
+  sparklineData,
+  sparklineColor,
+  sparklineDataKey,
   valueClassName,
   className,
   animated,
   animationDelay = 0,
   variant = "default",
 }: StatCardProps) {
+  const uniqueId = useId().replace(/:/g, "");
+  const dataKey = sparklineDataKey || "value";
+  const lineColor = sparklineColor || "var(--primary)";
+
+  const formattedSparklineData = (sparklineData ?? []).map((item, idx) => {
+    if (typeof item === "number") {
+      return { [dataKey]: item, index: idx };
+    }
+    return item;
+  });
+
+  const chartConfig = {
+    [dataKey]: {
+      label,
+      color: lineColor,
+    },
+  } satisfies ChartConfig;
+
   const resolvedVariant =
     changeVariant ??
     (trend === "up" ? "success" : trend === "down" ? "destructive" : "secondary");
@@ -131,9 +162,31 @@ export function StatCard({
             </p>
           )}
         </div>
-        {chartSegments && chartSegments.length > 0 && (
+        {sparklineData && sparklineData.length > 0 ? (
+          <div className="h-10 w-24 shrink-0 overflow-hidden">
+            <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
+              <AreaChart data={formattedSparklineData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                <defs>
+                  <linearGradient id={`sparkline-grad-${uniqueId}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={lineColor} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={lineColor} stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey={dataKey}
+                  stroke={lineColor}
+                  strokeWidth={2}
+                  fill={`url(#sparkline-grad-${uniqueId})`}
+                  isAnimationActive={true}
+                  dot={false}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </div>
+        ) : chartSegments && chartSegments.length > 0 ? (
           <MiniDonut segments={chartSegments} showCenterText={false} />
-        )}
+        ) : null}
       </div>
     </Card>
   );

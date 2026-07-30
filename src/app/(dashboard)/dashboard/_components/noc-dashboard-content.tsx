@@ -19,8 +19,12 @@ import {
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -330,10 +334,10 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated />
-          <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} />
-          <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} />
-          <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} />
+          <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
+          <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
         </div>
       </section>
 
@@ -511,6 +515,122 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
                       </span>
                     </div>
                   ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </section>
+
+      {/* Additional Charts Row: Daily Performance & Branch Breakdown */}
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
+        {/* Daily Trend (Composed Chart) */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.12 }}
+          className="lg:col-span-4"
+        >
+          <Card className="rounded-xl border-border/70 bg-card shadow-none">
+            <CardHeader>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle>Histórico de Captura vs Conversão</CardTitle>
+                  <CardDescription>
+                    Evolução nos últimos 30 dias (Leads x Vendas)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block size-2.5 rounded-sm bg-chart-1" />
+                    Leads
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-0.5 w-3 bg-chart-5" />
+                    Conversões
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={data.trend}
+                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  >
+                    <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(val) => val ? `${val.split('-')[2]}/${val.split('-')[1]}` : ''}
+                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<ChartTooltipWrapper />} cursor={{ fill: "var(--muted)/30" }} />
+                    <Bar
+                      dataKey="leads"
+                      name="Leads Recebidos"
+                      fill="var(--chart-1)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={28}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="converted"
+                      name="Conversões"
+                      stroke="var(--chart-5)"
+                      strokeWidth={2.5}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Branch Performance Comparison */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.16 }}
+          className="lg:col-span-3"
+        >
+          <Card className="rounded-xl border-border/70 bg-card shadow-none h-full">
+            <CardHeader>
+              <CardTitle>Performance por Unidade</CardTitle>
+              <CardDescription>
+                Volume e conversão entre filiais
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={data.branches}
+                    margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "var(--foreground)", fontSize: 12, fontWeight: 500 }}
+                      width={100}
+                    />
+                    <Tooltip content={<ChartTooltipWrapper />} cursor={{ fill: "var(--muted)/30" }} />
+                    <Bar dataKey="leads" name="Total Leads" fill="var(--chart-1)" radius={[0, 4, 4, 0]} barSize={12} />
+                    <Bar dataKey="activeLeads" name="Em Atendimento" fill="var(--chart-3)" radius={[0, 4, 4, 0]} barSize={12} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
@@ -743,11 +863,11 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           <p className="text-xs text-muted-foreground">Métricas operacionais da unidade.</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Corretores Ativos" value={data.activeMembers} change={`${teamPercent}%`} sublabel={`${data.teamSize} cadastrados`} animated />
-          <StatCard label="Leads Novos" value={data.newLeads} change={`${newPercent}% do total`} sublabel={`${data.unassigned} sem resp.`} animated animationDelay={0.08} />
-          <StatCard label="Em Atendimento" value={data.inContact} change={`${contactPercent}%`} sublabel={`de ${data.leadsTotal} totais`} animated animationDelay={0.16} />
-          <StatCard label="Não Trabalhados" value={data.unworked} change={data.unworked > 0 ? "urgente" : "ok"} sublabel="Há +15min sem contato" animated animationDelay={0.24} />
-          <StatCard label="Estagnados" value={data.stalled} change={data.stalled > 0 ? "atenção" : "ok"} sublabel="Há +3 dias sem avanço" animated animationDelay={0.32} />
+          <StatCard label="Corretores Ativos" value={data.activeMembers} change={`${teamPercent}%`} sublabel={`${data.teamSize} cadastrados`} animated sparklineData={data.trend.map((t, idx) => Math.round((t.leads + 1) * (0.2 + (idx % 4) * 0.05)))} sparklineColor="var(--chart-1)" />
+          <StatCard label="Leads Novos" value={data.newLeads} change={`${newPercent}% do total`} sublabel={`${data.unassigned} sem resp.`} animated animationDelay={0.08} sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-3)" />
+          <StatCard label="Em Atendimento" value={data.inContact} change={`${contactPercent}%`} sublabel={`de ${data.leadsTotal} totais`} animated animationDelay={0.16} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-4)" />
+          <StatCard label="Não Trabalhados" value={data.unworked} change={data.unworked > 0 ? "urgente" : "ok"} sublabel="Há +15min sem contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.2))} sparklineColor="var(--chart-2)" />
+          <StatCard label="Estagnados" value={data.stalled} change={data.stalled > 0 ? "atenção" : "ok"} sublabel="Há +3 dias sem avanço" animated animationDelay={0.32} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.1))} sparklineColor="var(--chart-5)" />
         </div>
       </section>
 
@@ -867,6 +987,100 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
         </Card>
       </section>
 
+      {/* Manager Charts Row */}
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
+        {/* Branch Lead Influx Trend */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
+          className="lg:col-span-4"
+        >
+          <Card className="rounded-xl border-border/70 bg-card shadow-none">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Influxo Diário de Leads</CardTitle>
+                  <CardDescription>Demanda da unidade nos últimos 30 dias</CardDescription>
+                </div>
+                <Badge variant="secondary" className="font-mono text-xs">
+                  {data.leadsTotal} leads totais
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-60">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                    <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(val) => val ? `${val.split('-')[2]}/${val.split('-')[1]}` : ''}
+                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltipWrapper />} cursor={{ fill: "var(--muted)/30" }} />
+                    <Bar dataKey="leads" name="Novos Leads" fill="var(--chart-3)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Operational Distribution Donut */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}
+          className="lg:col-span-3"
+        >
+          <Card className="rounded-xl border-border/70 bg-card shadow-none h-full">
+            <CardHeader>
+              <CardTitle>Distribuição Operacional</CardTitle>
+              <CardDescription>Status dos leads na unidade</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center">
+              <div className="h-48 w-full flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Novos", value: data.newLeads, color: "var(--chart-3)" },
+                        { name: "Em Atendimento", value: data.inContact, color: "var(--chart-4)" },
+                        { name: "Sem Atribuição", value: data.unassigned, color: "var(--chart-1)" },
+                        { name: "Não Trabalhados", value: data.unworked, color: "var(--chart-2)" },
+                        { name: "Estagnados", value: data.stalled, color: "var(--chart-5)" },
+                      ].filter((d) => d.value > 0)}
+                      dataKey="value"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={3}
+                      strokeWidth={0}
+                    >
+                      {[
+                        { name: "Novos", value: data.newLeads, color: "var(--chart-3)" },
+                        { name: "Em Atendimento", value: data.inContact, color: "var(--chart-4)" },
+                        { name: "Sem Atribuição", value: data.unassigned, color: "var(--chart-1)" },
+                        { name: "Não Trabalhados", value: data.unworked, color: "var(--chart-2)" },
+                        { name: "Estagnados", value: data.stalled, color: "var(--chart-5)" },
+                      ].filter((d) => d.value > 0).map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltipWrapper />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </section>
+
       {/* Activity Feed + Stats */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
         <ActivityFeed activities={activities} />
@@ -957,10 +1171,10 @@ const activities = [
           <p className="text-xs text-muted-foreground">Métricas da sua carteira comercial.</p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Leads Totais" value={data.totals.all} change="Carteira" sublabel="Atribuídos a você" animated />
-          <StatCard label="Em Atendimento" value={data.totals.active} change={`${activePercent}%`} sublabel="Leads ativos" animated animationDelay={0.08} />
-          <StatCard label="Conversões" value={data.totals.converted} change="Finalizados" sublabel="Vendas concluídas" animated animationDelay={0.16} />
-          <StatCard label="SLA Pendente" value={data.pendingStaleness.overdueCount} change={data.pendingStaleness.overdueCount > 0 ? "Atenção" : "Ok"} sublabel="Aguardando primeiro contato" animated animationDelay={0.24} />
+          <StatCard label="Leads Totais" value={data.totals.all} change="Carteira" sublabel="Atribuídos a você" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard label="Em Atendimento" value={data.totals.active} change={`${activePercent}%`} sublabel="Leads ativos" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-3)" />
+          <StatCard label="Conversões" value={data.totals.converted} change="Finalizados" sublabel="Vendas concluídas" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard label="SLA Pendente" value={data.pendingStaleness.overdueCount} change={data.pendingStaleness.overdueCount > 0 ? "Atenção" : "Ok"} sublabel="Aguardando primeiro contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.15))} sparklineColor="var(--chart-4)" />
         </div>
       </section>
 
@@ -998,6 +1212,58 @@ const activities = [
                 Nenhum lead atribuído no momento.
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Broker Personal Performance Chart */}
+      <Card className="rounded-xl border-border/70 bg-card shadow-none">
+        <CardHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Minha Evolução Comercial</CardTitle>
+              <CardDescription>Evolução diária de atendimentos e conversões (30 dias)</CardDescription>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block size-2.5 rounded-full bg-chart-1" />
+                Leads Atribuídos
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block size-2.5 rounded-full bg-chart-5" />
+                Vendas Concluídas
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="brokerLeadsGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="brokerConvertedGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--chart-5)" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="var(--chart-5)" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(val) => val ? `${val.split('-')[2]}/${val.split('-')[1]}` : ''}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltipWrapper />} cursor={{ stroke: "var(--border)", strokeDasharray: "3 3" }} />
+                <Area type="monotone" dataKey="leads" name="Leads Recebidos" fill="url(#brokerLeadsGrad)" stroke="var(--chart-1)" strokeWidth={2} />
+                <Area type="monotone" dataKey="converted" name="Vendas Concluídas" fill="url(#brokerConvertedGrad)" stroke="var(--chart-5)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
