@@ -50,48 +50,69 @@
 
 :root {
   color-scheme: light;
-  --surface-base: #F4F4F2;
-  --surface-card: #EFEFEF;
-  --surface-secondary: #EBEBE9;
-  --surface-elevated: #F2F2F0;
-  --surface-overlay: #F2F2F0;
-  --background: #F4F4F2;
-  --foreground: #191919;
-  --card: #EFEFEF;
-  --card-foreground: #191919;
-  --popover: #F2F2F0;
-  --popover-foreground: #191919;
-  --primary: #191919;
-  --primary-foreground: #F4F4F2;
-  --secondary: #EBEBE9;
-  --secondary-foreground: #191919;
-  --accent: #15A46B;
-  --accent-foreground: #FFFFFF;
-  --muted: #EBEBE9;
-  --muted-foreground: #6E6E73;
-  --muted-text: #9B9B9B;
-  --warning: #D97706;
-  --warning-foreground: #FFFFFF;
-  --success: #16A34A;
-  --success-foreground: #FFFFFF;
-  --destructive: #DC2626;
-  --border: #E2E2DF;
-  --border-strong: #D4D4D0;
-  --input: #EFEFEF;
-  --ring: #191919;
-  --sidebar: #F4F4F2;
-  --sidebar-foreground: #191919;
-  --sidebar-primary: #191919;
-  --sidebar-primary-foreground: #F4F4F2;
-  --sidebar-accent: #EBEBE9;
-  --sidebar-accent-foreground: #191919;
-  --sidebar-warning: #EBEBE9;
-  --sidebar-warning-foreground: #191919;
-  --sidebar-border: #E2E2DF;
-  --sidebar-ring: #191919;
-  --sidebar-ring: #000000;
-  --ct-blue: #0f172a;
-  --ct-blue-strong: #000000;
+  /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
+  --surface-base: oklch(0.965 0.003 95);      /* Lvl 0: Base Canvas (#f5f5f3) */
+  --surface-card: oklch(0.985 0.002 95);      /* Lvl 1: Card Surface (#fafaf9) */
+  --surface-secondary: oklch(0.940 0.005 95); /* Lvl 2: Recessed / Input (#eeeee9) */
+  --surface-elevated: oklch(1.000 0 0);       /* Lvl 3: Elevated Popover (#ffffff) */
+  --surface-overlay: oklch(1.000 0 0);
+
+  --background: oklch(0.965 0.003 95);
+  --foreground: oklch(0.180 0.005 95);
+
+  --card: oklch(0.985 0.002 95);
+  --card-foreground: oklch(0.180 0.005 95);
+
+  --popover: oklch(1.000 0 0);
+  --popover-foreground: oklch(0.180 0.005 95);
+
+  /* ── Camada 2: Acentos Funcionais & Ações da Marca ─────────────────────── */
+  --primary: oklch(0.180 0.005 95);
+  --primary-foreground: oklch(0.985 0.002 95);
+
+  --secondary: oklch(0.940 0.005 95);
+  --secondary-foreground: oklch(0.180 0.005 95);
+
+  --accent: oklch(0.620 0.165 155);            /* Ramp Esmeralda da Marca (#15A46B) */
+  --accent-foreground: oklch(0.990 0 0);
+
+  --muted: oklch(0.940 0.005 95);
+  --muted-foreground: oklch(0.480 0.008 95);
+  --muted-text: oklch(0.580 0.008 95);
+
+  /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
+  --warning: oklch(0.660 0.165 75);            /* Alertas e Atenção */
+  --warning-foreground: oklch(0.990 0 0);
+  --success: oklch(0.620 0.170 145);           /* Sucesso e Confirmação */
+  --success-foreground: oklch(0.990 0 0);
+  --destructive: oklch(0.580 0.200 25);        /* Erro e Ação Destrutiva */
+
+  --border: oklch(0.890 0.004 95);             /* Bordas suaves 1px */
+  --border-strong: oklch(0.830 0.006 95);
+  --input: oklch(0.940 0.005 95);
+  --ring: oklch(0.180 0.005 95);
+
+  --sidebar: oklch(0.965 0.003 95);
+  --sidebar-foreground: oklch(0.180 0.005 95);
+  --sidebar-primary: oklch(0.180 0.005 95);
+  --sidebar-primary-foreground: oklch(0.985 0.002 95);
+  --sidebar-accent: oklch(0.940 0.005 95);
+  --sidebar-accent-foreground: oklch(0.180 0.005 95);
+  --sidebar-warning: oklch(0.940 0.005 95);
+  --sidebar-warning-foreground: oklch(0.180 0.005 95);
+  --sidebar-border: oklch(0.890 0.004 95);
+  --sidebar-ring: oklch(0.180 0.005 95);
+
+  --ct-blue: oklch(0.180 0.005 95);
+  --ct-blue-strong: oklch(0.120 0.005 95);
+
+  /* ── Camada 4: Paleta de Gráficos em OKLCH (L = 0.64, C = 0.16) ─────────── */
+  --chart-1: oklch(0.640 0.160 260);          /* Indigo/Blue */
+  --chart-2: oklch(0.640 0.160 150);          /* Emerald */
+  --chart-3: oklch(0.640 0.160 230);          /* Sky */
+  --chart-4: oklch(0.640 0.160 300);          /* Violet */
+  --chart-5: oklch(0.640 0.160 65);           /* Amber */
+
   --font-sans: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
   --duration-stagger: 40ms;
@@ -117,53 +138,23 @@
   --ease-in-out: ease-in-out;
   --ease-out: ease-out;
   --ease-linear: linear;
-  /* ── Motion Design System tokens ────────────────────────────────────────────
-     Duration scale: use these for new components and interactions.
-     --motion-duration-extra-fast : small elements (buttons, toggles, checkboxes)
-     --motion-duration-fast       : micro-interactions, dropdowns, short moves
-     --motion-duration-normal     : medium expansions, toasts, alerts           */
   --motion-duration-extra-fast: 100ms;
   --motion-duration-fast: 200ms;
   --motion-duration-normal: 300ms;
-  /* Timing functions:
-     ease-in     → removing elements (close modal, collapse, hide alert)
-     ease-out    → adding elements   (show modal, sidebar, alert)
-     ease-in-out → elements visible from start to finish (dropdown, toggle)    */
   --motion-timing-function-ease-in: cubic-bezier(0.55, 0.055, 0.675, 0.19);
   --motion-timing-function-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
   --motion-timing-function-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
 
-  /* ── Border Radius ───────────────────────────────────────────────────────────
-     --border-radius-rounded : standard rounding for most components (2px)
-     --border-radius-circle  : elliptical shapes — must be same width & height
-     --border-radius-pill    : fully round badges, tags, chips (999px)          */
   --border-radius-rounded: 2px;
   --border-radius-circle: 50%;
   --border-radius-pill: 999px;
 
-  /* ── Elevation (shadows) ─────────────────────────────────────────────────────
-     Level 1 — base layer: texts, buttons, forms (no shadow)
-     Level 2 — xs: nav bars, raised cards, state changes
-     Level 3 — sm: dropdowns, popovers, datepickers
-     Level 4 — md: toasts
-     Level 5 — lg: drawer on light background
-     Level 6 — xl: modal/dialog/drawer on dark overlay                          */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.06), 0 1px 3px 0 rgb(0 0 0 / 0.08);
   --shadow-sm: 0 2px 4px 0 rgb(0 0 0 / 0.08), 0 4px 8px 0 rgb(0 0 0 / 0.06);
   --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.10), 0 8px 16px -4px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 8px 16px -4px rgb(0 0 0 / 0.12), 0 16px 32px -8px rgb(0 0 0 / 0.10);
   --shadow-xl: 0 16px 32px -8px rgb(0 0 0 / 0.18), 0 32px 64px -16px rgb(0 0 0 / 0.14);
 
-  /* ── Z-index scale ───────────────────────────────────────────────────────────
-     --zindex-back  : send behind base after interaction (-1)
-     --zindex-auto  : default document order (auto)
-     --zindex-0     : selected elements — buttons, select, card (1)
-     --zindex-1     : dropdown, popover (1000)
-     --zindex-2     : tooltips, fixed navbar (1010)
-     --zindex-3     : overlay for drawer/modal/dialog (1020)
-     --zindex-4     : drawer, dialog, modal (1030)
-     --zindex-5     : overlays above all elements (1040)
-     --zindex-6     : toast (1050)                                               */
   --zindex-back: -1;
   --zindex-auto: auto;
   --zindex-0: 1;
@@ -174,12 +165,6 @@
   --zindex-5: 1040;
   --zindex-6: 1050;
 
-  /* ── Spacing scale (8px grid) ────────────────────────────────────────────────
-     Small structures (components):  --size-spacing-01 to --size-spacing-05
-     Large structures (compositions): --size-spacing-06 to --size-spacing-12
-     Vertical rhythm minimums:
-       title → content : min --size-spacing-04 (16px)
-       title → title   : min --size-spacing-05 (24px)                           */
   --size-spacing-01: 4px;
   --size-spacing-02: 8px;
   --size-spacing-03: 12px;
@@ -193,24 +178,6 @@
   --size-spacing-11: 96px;
   --size-spacing-12: 160px;
 
-  /* ── Typography scale ────────────────────────────────────────────────────────
-     Font family: DM Sans (regular 400, bold 700, extra bold 800)
-     These tokens are semantic and agnostic — not tied to any HTML element.
-     Apply via utility classes or component-level styles.
-
-     Vertical pairing rules:
-       title → content  : gap min --size-spacing-04 (16px)
-       title → title    : gap min --size-spacing-05 (24px)
-
-     Token           font-size  line-height  letter-spacing  usage
-     --text-xxl      36px       46px/130%    -0.02em         big numbers
-     --text-xl       28px       36px/130%    -0.01em         main titles
-     --text-lg       20px       30px/150%    -0.01em         minor titles, modal/sidebar titles
-     --text-md       16px       24px/150%    -0.01em         body, labels, inputs, buttons
-     --text-sm       14px       20px/140%    -0.01em         secondary text, validation
-     --text-xs       12px       16px/130%    0em             table headers, chart axes, footers  */
-
-  /* Font size */
   --text-xxl-font-size: 36px;
   --text-xl-font-size: 28px;
   --text-lg-font-size: 20px;
@@ -218,7 +185,6 @@
   --text-sm-font-size: 14px;
   --text-xs-font-size: 12px;
 
-  /* Line height */
   --text-xxl-line-height: 46px;
   --text-xl-line-height: 36px;
   --text-lg-line-height: 30px;
@@ -226,7 +192,6 @@
   --text-sm-line-height: 20px;
   --text-xs-line-height: 16px;
 
-  /* Letter spacing */
   --text-xxl-letter-spacing: -0.02em;
   --text-xl-letter-spacing: -0.01em;
   --text-lg-letter-spacing: -0.01em;
@@ -234,26 +199,10 @@
   --text-sm-letter-spacing: -0.01em;
   --text-xs-letter-spacing: 0em;
 
-  /* Font weights */
   --text-weight-regular: 400;
   --text-weight-bold: 700;
   --text-weight-extra-bold: 800;
 
-  /* ── Grid system ─────────────────────────────────────────────────────────────
-     12-column grid (desktop), 8 (tablet), 4 (mobile). Max content width: 1280px.
-     Fixed grid: screens 1024px+, 48px margins, columns stretch until 1280px max.
-     Fluid grid: full-screen dashboards, CRM Live, TV/large displays.
-     Navigation is always fluid and independent of the grid.
-
-     Token              Breakpoint  Columns  Gutters  Margins  Max content
-     --breakpoint-xs    480px       4        16px     16px     448px
-     --breakpoint-sm    768px       8        16px     32px     704px
-     --breakpoint-md    1024px      12       24px     48px     928px
-     --breakpoint-lg    1280px      12       24px     48px     1184px
-     --breakpoint-xl    1440px      12       24px     fluid    1280px
-     --breakpoint-max   1920px      12       24px     fluid    1280px           */
-
-  /* Breakpoints */
   --breakpoint-xs: 480px;
   --breakpoint-sm: 768px;
   --breakpoint-md: 1024px;
@@ -261,22 +210,18 @@
   --breakpoint-xl: 1440px;
   --breakpoint-max: 1920px;
 
-  /* Grid columns */
   --grid-columns-mobile: 4;
   --grid-columns-tablet: 8;
   --grid-columns-desktop: 12;
 
-  /* Gutters (space between columns) */
   --grid-gutter-mobile: 8px;
   --grid-gutter-tablet: 16px;
   --grid-gutter-desktop: 24px;
 
-  /* Margins (outer left/right padding) */
   --grid-margin-mobile: 16px;
   --grid-margin-tablet: 32px;
   --grid-margin-desktop: 48px;
 
-  /* Max content widths */
   --grid-max-content-xs: 448px;
   --grid-max-content-sm: 704px;
   --grid-max-content-md: 928px;
@@ -284,70 +229,86 @@
   --grid-max-content-xl: 1280px;
   --grid-max-content-max: 1280px;
 
-  /* Global maximum grid width */
   --grid-max-width: 1280px;
 
   --tabs-dur: var(--duration-fast);
   --tabs-ease: var(--ease-smooth-out);
-  --tabs-text-muted: #71717a;
-  --tabs-text-active: #09090b;
+  --tabs-text-muted: oklch(0.480 0.008 95);
+  --tabs-text-active: oklch(0.180 0.005 95);
   --tabs-bar-bg: transparent;
-  --tabs-pill-bg: #ffffff;
+  --tabs-pill-bg: oklch(1.000 0 0);
   --sync-local: var(--warning);
   --sync-confirmed: var(--primary);
   --sync-error: var(--destructive);
   --sync-surface: var(--muted);
-  --chart-1: #09090b;
-  --chart-2: #059669;
-  --chart-3: #3b82f6;
-  --chart-4: #8b5cf6;
-  --chart-5: #f59e0b;
-  --dashboard-canvas: #f6f7f9;
+  --dashboard-canvas: oklch(0.965 0.003 95);
   --radius: 0.75rem;
 }
 
 .dark {
   color-scheme: dark;
-  --surface-base: #171717;
-  --surface-card: #1E1E1E;
-  --surface-secondary: #222222;
-  --surface-elevated: #1E1E1E;
-  --surface-overlay: #1E1E1E;
-  --background: #171717;
-  --foreground: #F4F4F5;
-  --card: #1E1E1E;
-  --card-foreground: #F4F4F5;
-  --popover: #1E1E1E;
-  --popover-foreground: #F4F4F5;
-  --primary: #F4F4F5;
-  --primary-foreground: #171717;
-  --secondary: #222222;
-  --secondary-foreground: #F4F4F5;
-  --accent: #47D18C;
-  --accent-foreground: #171717;
-  --muted: #222222;
-  --muted-foreground: #B3B3B3;
-  --warning: #D97706;
-  --warning-foreground: #FFFFFF;
-  --success: #16A34A;
-  --success-foreground: #FFFFFF;
-  --destructive: #DC2626;
-  --border: #2D2D2D;
-  --border-strong: #3B3B3B;
-  --input: #2D2D2D;
-  --ring: #F4F4F5;
-  --sidebar: #171717;
-  --sidebar-foreground: #F4F4F5;
-  --sidebar-primary: #F4F4F5;
-  --sidebar-primary-foreground: #171717;
-  --sidebar-accent: #222222;
-  --sidebar-accent-foreground: #F4F4F5;
-  --sidebar-warning: #222222;
-  --sidebar-warning-foreground: #F4F4F5;
-  --sidebar-border: #2D2D2D;
-  --sidebar-ring: #F4F4F5;
-  --ct-blue: #F4F4F5;
-  --ct-blue-strong: #F4F4F5;
+  /* ── Camada 1: Fundação Neutra Dark (Contraste Dobrado) ───────────────── */
+  --surface-base: oklch(0.140 0.005 260);     /* Lvl 0: Base Canvas (#0d0f12) */
+  --surface-card: oklch(0.190 0.006 260);     /* Lvl 1: Card Surface (#16191d) */
+  --surface-secondary: oklch(0.240 0.008 260);/* Lvl 2: Recessed / Active (#20242a) */
+  --surface-elevated: oklch(0.280 0.010 260); /* Lvl 3: Elevated Popover (#292e36) */
+  --surface-overlay: oklch(0.280 0.010 260);
+
+  --background: oklch(0.140 0.005 260);
+  --foreground: oklch(0.960 0.003 260);
+
+  --card: oklch(0.190 0.006 260);
+  --card-foreground: oklch(0.960 0.003 260);
+
+  --popover: oklch(0.280 0.010 260);
+  --popover-foreground: oklch(0.960 0.003 260);
+
+  /* ── Camada 2: Acentos Funcionais & Ações da Marca Dark ───────────────── */
+  --primary: oklch(0.960 0.003 260);
+  --primary-foreground: oklch(0.140 0.005 260);
+
+  --secondary: oklch(0.240 0.008 260);
+  --secondary-foreground: oklch(0.960 0.003 260);
+
+  --accent: oklch(0.720 0.180 155);            /* Ramp Esmeralda da Marca Dark (#47D18C) */
+  --accent-foreground: oklch(0.120 0.005 260);
+
+  --muted: oklch(0.240 0.008 260);
+  --muted-foreground: oklch(0.720 0.008 260);
+  --muted-text: oklch(0.580 0.010 260);
+
+  /* ── Camada 3: Comunicação Semântica Dark (Uniformidade OKLCH L ≈ 0.70-0.76) */
+  --warning: oklch(0.760 0.160 75);
+  --warning-foreground: oklch(0.120 0.005 260);
+  --success: oklch(0.740 0.175 145);
+  --success-foreground: oklch(0.120 0.005 260);
+  --destructive: oklch(0.700 0.210 25);
+
+  --border: oklch(0.290 0.008 260);            /* Bordas nítidas sem empastamento */
+  --border-strong: oklch(0.380 0.010 260);
+  --input: oklch(0.290 0.008 260);
+  --ring: oklch(0.960 0.003 260);
+
+  --sidebar: oklch(0.140 0.005 260);
+  --sidebar-foreground: oklch(0.960 0.003 260);
+  --sidebar-primary: oklch(0.960 0.003 260);
+  --sidebar-primary-foreground: oklch(0.140 0.005 260);
+  --sidebar-accent: oklch(0.240 0.008 260);
+  --sidebar-accent-foreground: oklch(0.960 0.003 260);
+  --sidebar-warning: oklch(0.240 0.008 260);
+  --sidebar-warning-foreground: oklch(0.960 0.003 260);
+  --sidebar-border: oklch(0.290 0.008 260);
+  --sidebar-ring: oklch(0.960 0.003 260);
+
+  --ct-blue: oklch(0.960 0.003 260);
+  --ct-blue-strong: oklch(0.960 0.003 260);
+
+  /* ── Camada 4: Paleta de Gráficos Dark em OKLCH (L = 0.74, C = 0.15) ───── */
+  --chart-1: oklch(0.740 0.150 260);
+  --chart-2: oklch(0.740 0.150 150);
+  --chart-3: oklch(0.740 0.150 230);
+  --chart-4: oklch(0.740 0.150 300);
+  --chart-5: oklch(0.740 0.150 65);
   --radius: 0.75rem;
 }
 

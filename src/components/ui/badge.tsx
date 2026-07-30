@@ -13,25 +13,25 @@ const badgeVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
-          "bg-muted/80 text-foreground/80 border border-border/50 [a]:hover:bg-muted",
+          "bg-muted/80 text-foreground/80 border border-border/60 [a]:hover:bg-muted",
         success:
-          "border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-400 [a]:hover:bg-emerald-100",
+          "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 dark:border-emerald-500/30 dark:bg-emerald-500/15 [a]:hover:bg-emerald-500/20",
         warning:
-          "border-amber-200/60 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-400 [a]:hover:bg-amber-100",
+          "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-300 dark:border-amber-500/30 dark:bg-amber-500/15 [a]:hover:bg-amber-500/20",
         destructive:
-          "border-rose-200/60 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-400 [a]:hover:bg-rose-100",
+          "border-rose-500/25 bg-rose-500/10 text-rose-800 dark:text-rose-300 dark:border-rose-500/30 dark:bg-rose-500/15 [a]:hover:bg-rose-500/20",
         info:
-          "border-sky-200/60 bg-sky-50 text-sky-700 dark:border-sky-800/40 dark:bg-sky-950/40 dark:text-sky-400 [a]:hover:bg-sky-100",
+          "border-sky-500/25 bg-sky-500/10 text-sky-800 dark:text-sky-300 dark:border-sky-500/30 dark:bg-sky-500/15 [a]:hover:bg-sky-500/20",
         indigo:
-          "border-indigo-200/60 bg-indigo-50 text-indigo-700 dark:border-indigo-800/40 dark:bg-indigo-950/40 dark:text-indigo-400",
+          "border-indigo-500/25 bg-indigo-500/10 text-indigo-800 dark:text-indigo-300 dark:border-indigo-500/30 dark:bg-indigo-500/15",
         purple:
-          "border-purple-200/60 bg-purple-50 text-purple-700 dark:border-purple-800/40 dark:bg-purple-950/40 dark:text-purple-400",
+          "border-purple-500/25 bg-purple-500/10 text-purple-800 dark:text-purple-300 dark:border-purple-500/30 dark:bg-purple-500/15",
         pink:
-          "border-pink-200/60 bg-pink-50 text-pink-700 dark:border-pink-800/40 dark:bg-pink-950/40 dark:text-pink-400",
+          "border-pink-500/25 bg-pink-500/10 text-pink-800 dark:text-pink-300 dark:border-pink-500/30 dark:bg-pink-500/15",
         cyan:
-          "border-cyan-200/60 bg-cyan-50 text-cyan-700 dark:border-cyan-800/40 dark:bg-cyan-950/40 dark:text-cyan-400",
+          "border-cyan-500/25 bg-cyan-500/10 text-cyan-800 dark:text-cyan-300 dark:border-cyan-500/30 dark:bg-cyan-500/15",
         orange:
-          "border-orange-200/60 bg-orange-50 text-orange-700 dark:border-orange-800/40 dark:bg-orange-950/40 dark:text-orange-400",
+          "border-orange-500/25 bg-orange-500/10 text-orange-800 dark:text-orange-300 dark:border-orange-500/30 dark:bg-orange-500/15",
         outline:
           "border-border/80 text-muted-foreground bg-card [a]:hover:bg-muted [a]:hover:text-foreground",
         ghost:
