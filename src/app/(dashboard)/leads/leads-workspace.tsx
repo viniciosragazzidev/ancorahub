@@ -1,10 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SquaresFour, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
+import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, SquaresFour, UserList, WhatsappLogo, X } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
@@ -39,6 +57,19 @@ import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { maskPhone, maskName, formatDate } from "@/features/quotes/utils";
 import { OwnershipContext } from "@/components/ownership-context";
 import { LeadHealthBadge, computeLeadHealth } from "@/features/leads/components/lead-health-badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
 
@@ -63,7 +94,38 @@ export type LeadWorkspaceItem = {
   branchName: string | null;
 };
 
+const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
+
 const kanbanStatuses = ["new", "in_contact", "quote_sent", "negotiation", "converted"];
+
+function loadKanbanConfig(): { ordered: string[]; hidden: string[] } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(KANBAN_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ordered?: string[]; hidden?: string[] };
+    if (!Array.isArray(parsed.ordered) || !Array.isArray(parsed.hidden)) return null;
+    // Validate that all items are valid statuses
+    const valid = parsed.ordered.every((s: string) => kanbanStatuses.includes(s));
+    const validHidden = parsed.hidden.every((s: string) => kanbanStatuses.includes(s));
+    if (!valid || !validHidden) return null;
+    return { ordered: parsed.ordered, hidden: parsed.hidden };
+  } catch {
+    return null;
+  }
+}
+
+function saveKanbanConfig(ordered: string[], hidden: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      KANBAN_STORAGE_KEY,
+      JSON.stringify({ ordered, hidden }),
+    );
+  } catch {
+    // localStorage may be full or unavailable
+  }
+}
 
 const kanbanTone: Record<string, { dot: string; column: string; count: string }> = {
   new: {
@@ -113,6 +175,64 @@ export function LeadsWorkspace({
   branches?: Array<{ id: string; name: string }>;
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const kanbanRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
+    const saved = loadKanbanConfig();
+    return saved?.ordered ?? kanbanStatuses;
+  });
+  const [hiddenStatuses, setHiddenStatuses] = useState<string[]>(() => {
+    const saved = loadKanbanConfig();
+    return saved?.hidden ?? [];
+  });
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const visibleStatuses = useMemo(
+    () => orderedStatuses.filter((s) => !hiddenStatuses.includes(s)),
+    [orderedStatuses, hiddenStatuses],
+  );
+
+  useEffect(() => {
+    saveKanbanConfig(orderedStatuses, hiddenStatuses);
+  }, [orderedStatuses, hiddenStatuses]);
+
+  function toggleStatusVisibility(status: string) {
+    setHiddenStatuses((current) =>
+      current.includes(status)
+        ? current.filter((s) => s !== status)
+        : [...current, status],
+    );
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  );
+
+  useEffect(() => {
+    const el = kanbanRef.current;
+    if (!el) return;
+    const viewport = el.parentElement;
+    if (!viewport) return;
+
+    const checkScroll = () => {
+      setShowScrollButton(viewport.scrollLeft > 20);
+    };
+
+    checkScroll();
+    viewport.addEventListener("scroll", checkScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", checkScroll);
+  }, []);
+
+  const scrollToStart = useCallback(() => {
+    const el = kanbanRef.current;
+    if (!el) return;
+    const viewport = el.parentElement;
+    if (!viewport) return;
+    viewport.scrollTo({ left: 0, behavior: "smooth" });
+  }, []);
+
   const leadsIds = useMemo(() => leads.map((l) => l.id), [leads]);
   const multiSelect = useMultiSelect(leadsIds);
   const isMarketing = contextJobTitle === "marketing";
@@ -131,6 +251,7 @@ export function LeadsWorkspace({
     return brokers.filter((b) => b.branchId === selectedLead.branchId);
   }, [selectedLead, brokers]);
 
+  const unassignedCount = useMemo(() => leads.filter((l) => !l.corretorId).length, [leads]);
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
 
@@ -164,14 +285,28 @@ export function LeadsWorkspace({
     </>
   ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers]);
 
-  const unassignedCount = useMemo(() => leads.filter((l) => !l.corretorId).length, [leads]);
+
   const activeCount = useMemo(() => leads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [leads]);
   const convertedCount = useMemo(() => leads.filter((l) => l.status === "converted").length, [leads]);
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveDragId(String(event.active.id));
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setOrderedStatuses((current) => {
+      const oldIndex = current.indexOf(String(active.id));
+      const newIndex = current.indexOf(String(over.id));
+      if (oldIndex === -1 || newIndex === -1) return current;
+      return arrayMove(current, oldIndex, newIndex);
+    });
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
-
-
 
       <Card variant="overview" aria-label="Resumo da operação de leads">
         <div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -194,6 +329,28 @@ export function LeadsWorkspace({
               Kanban do Funil
             </TabsTrigger>
           </TabsList>
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs">
+                <SlidersHorizontal className="size-3.5" />
+                Colunas
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {kanbanStatuses.map((status) => (
+                <DropdownMenuCheckboxItem
+                  key={status}
+                  className="text-xs"
+                  checked={!hiddenStatuses.includes(status)}
+                  onCheckedChange={() => toggleStatusVisibility(status)}
+                >
+                  {statusLabel(status)}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <TabsContent value="list" className="mt-4">
@@ -324,7 +481,7 @@ export function LeadsWorkspace({
           </Card>
         </TabsContent>
 
-        <TabsContent value="kanban" className="mt-4 min-h-0 min-w-0 flex-1 overflow-hidden">
+        <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
           <SelectionToolbar
             selectedCount={multiSelect.count}
             totalCount={leads.length}
@@ -332,25 +489,59 @@ export function LeadsWorkspace({
           >
             {selectionActions}
           </SelectionToolbar>
-          <ScrollArea className="h-full w-full" aria-label="Funil de leads em Kanban">
-            <div className="flex min-w-max items-start gap-4 pr-4">
-              {kanbanStatuses.map((status) => (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToHorizontalAxis]}
+          >
+            <ScrollArea className="h-full w-full" aria-label="Funil de leads em Kanban">
+              <div ref={kanbanRef} className="flex min-w-max items-start gap-4 pr-4">
+                <SortableContext items={visibleStatuses} strategy={horizontalListSortingStrategy}>
+                  {visibleStatuses.map((status) => (
+                    <SortableKanbanColumn
+                      key={status}
+                      status={status}
+                      leads={groupedLeads[status] ?? []}
+                      onOpen={setSelectedLead}
+                      isSelected={multiSelect.isSelected}
+                      onToggle={multiSelect.toggle}
+                      slaFirstContactMinutes={slaFirstContactMinutes}
+                      slaStagnantDays={slaStagnantDays}
+                    />
+                  ))}
+                </SortableContext>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </DndContext>
+          <DragOverlay dropAnimation={null}>
+            {activeDragId ? (
+              <div className="w-72 sm:w-80 opacity-90">
                 <KanbanColumn
-                  key={status}
-                  leads={groupedLeads[status] ?? []}
-                  onOpen={setSelectedLead}
-                  status={status}
-                  isSelected={multiSelect.isSelected}
-                  onToggle={multiSelect.toggle}
+                  status={activeDragId}
+                  leads={groupedLeads[activeDragId] ?? []}
+                  onOpen={() => {}}
+                  isSelected={() => false}
+                  onToggle={() => {}}
                   slaFirstContactMinutes={slaFirstContactMinutes}
                   slaStagnantDays={slaStagnantDays}
                 />
-              ))}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+              </div>
+            ) : null}
+          </DragOverlay>
+          {showScrollButton && (
+            <button
+              onClick={scrollToStart}
+              className="absolute bottom-12 left-3 z-10 flex items-center gap-1.5 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-background hover:text-foreground hover:shadow-md active:scale-95"
+            >
+              <ArrowLeft className="size-3.5" />
+              Início
+            </button>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">
-            Deslize horizontalmente para acompanhar todas as etapas do funil.
+            Arraste as colunas para reordenar. Use o botão "Colunas" para exibir/ocultar etapas.
           </p>
         </TabsContent>
       </Tabs>
@@ -510,6 +701,49 @@ export function LeadsWorkspace({
   );
 }
 
+function SortableKanbanColumn({
+  status,
+  leads,
+  onOpen,
+  isSelected,
+  onToggle,
+  slaFirstContactMinutes = 15,
+  slaStagnantDays = 3,
+}: {
+  status: string;
+  leads: LeadWorkspaceItem[];
+  onOpen: (lead: LeadWorkspaceItem) => void;
+  isSelected: (id: string) => boolean;
+  onToggle: (id: string) => void;
+  slaFirstContactMinutes?: number;
+  slaStagnantDays?: number;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: status,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    cursor: "grab",
+  } as const;
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <KanbanColumn
+        leads={leads}
+        onOpen={onOpen}
+        status={status}
+        isSelected={isSelected}
+        onToggle={onToggle}
+        slaFirstContactMinutes={slaFirstContactMinutes}
+        slaStagnantDays={slaStagnantDays}
+      />
+    </div>
+  );
+}
+
 function KanbanColumn({
   leads,
   onOpen,
@@ -544,7 +778,7 @@ function KanbanColumn({
         </Badge>
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 space-y-3 overflow-y-auto" style={{ maxHeight: "calc(80vh - 7rem)" }}>
         {leads.map((lead) => (
           <KanbanLeadCard key={lead.id} lead={lead} onOpen={onOpen} isSelected={isSelected} onToggle={onToggle} slaFirstContactMinutes={slaFirstContactMinutes} slaStagnantDays={slaStagnantDays} />
         ))}
@@ -574,6 +808,7 @@ function KanbanLeadCard({
   slaStagnantDays?: number;
 }) {
   const selected = isSelected(lead.id);
+  const sla = useMemo(() => computeSlaInfo(lead, slaFirstContactMinutes, slaStagnantDays), [lead, slaFirstContactMinutes, slaStagnantDays]);
 
   return (
     <Card
@@ -595,9 +830,12 @@ function KanbanLeadCard({
         <ArrowUpRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
 
+      {/* SLA bar */}
+      {sla && <SlaBar sla={sla} />}
+
       {/* Card body */}
       <button
-        className="w-full p-4 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
+        className="w-full p-4 pt-3 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
         onClick={() => onOpen(lead)}
         type="button"
       >
@@ -624,6 +862,127 @@ function KanbanLeadCard({
       </button>
     </Card>
   );
+}
+
+function SlaBar({ sla }: { sla: NonNullable<SlaInfo> }) {
+  const pct = Math.min(100, Math.max(0, sla.ratio * 100));
+  const barColor =
+    sla.ratio >= 1 ? "bg-red-500"
+    : sla.ratio >= 0.7 ? "bg-amber-500"
+    : sla.ratio >= 0.4 ? "bg-yellow-500"
+    : "bg-emerald-500";
+  const textColor = sla.ratio >= 1 ? "text-red-500" : sla.ratio >= 0.7 ? "text-amber-500" : "text-muted-foreground";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={
+        <div className="flex items-center gap-2 px-3 py-1.5 cursor-default">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${barColor}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className={`shrink-0 text-[10px] font-medium tabular-nums ${textColor}`}>
+            {sla.label}
+          </span>
+        </div>
+      } />
+      <TooltipContent side="top" className="max-w-56">
+        <div className="space-y-1">
+          <p className="font-semibold">{sla.title}</p>
+          <p>{sla.deadline}</p>
+          <p className={`text-[11px] ${textColor}`}>{sla.label}</p>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+type SlaInfo = {
+  ratio: number;
+  label: string;
+  title: string;
+  deadline: string;
+} | null;
+
+function computeSlaInfo(
+  lead: {
+    status: string;
+    createdAt: string;
+    assignedAt?: string | null;
+    stageEnteredAt?: string | null;
+    serviceStartedAt?: string | null;
+    firstContactAt?: string | null;
+    corretorId?: string | null;
+  },
+  slaFirstContactMinutes: number,
+  slaStagnantDays: number,
+): SlaInfo {
+  const now = Date.now();
+  const fmtTime = (ms: number) =>
+    new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(ms));
+  const fmtDate = (ms: number) =>
+    new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(ms));
+
+  // New or distributed without first contact → first-contact SLA
+  if ((lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt) {
+    const anchor = lead.assignedAt || lead.createdAt;
+    if (!anchor) return null;
+    const anchorMs = new Date(anchor).getTime();
+    const elapsed = now - anchorMs;
+    const total = slaFirstContactMinutes * 60_000;
+    const ratio = Math.min(elapsed / total, 2);
+    const remaining = Math.max(0, total - elapsed);
+    const deadlineMs = anchorMs + total;
+
+    let label: string;
+    if (elapsed >= total) {
+      const over = Math.round((elapsed - total) / 60000);
+      label = over >= 60 ? `${Math.round(over / 60)}h atrasado` : `${over}min atrasado`;
+    } else if (remaining >= 3600000) {
+      label = `${Math.round(remaining / 3600000)}h restantes`;
+    } else {
+      label = `${Math.round(remaining / 60000)}min restantes`;
+    }
+
+    return {
+      ratio,
+      label,
+      title: "Prazo de 1º contato",
+      deadline: `Limite: ${fmtTime(deadlineMs)} (${slaFirstContactMinutes}min)`,
+    };
+  }
+
+  // Active stages → stagnation SLA
+  const activeStatuses: readonly string[] = ["in_contact", "quote_sent", "negotiation"];
+  if (activeStatuses.includes(lead.status) && lead.stageEnteredAt) {
+    const stageMs = new Date(lead.stageEnteredAt).getTime();
+    const elapsed = now - stageMs;
+    const total = slaStagnantDays * 24 * 60 * 60_000;
+    const ratio = Math.min(elapsed / total, 2);
+    const remaining = Math.max(0, total - elapsed);
+    const deadlineMs = stageMs + total;
+
+    let label: string;
+    if (elapsed >= total) {
+      const over = Math.round(elapsed / 86400000 - slaStagnantDays);
+      label = `${over}d atrasado`;
+    } else if (remaining >= 86400000) {
+      label = `${Math.round(remaining / 86400000)}d restantes`;
+    } else {
+      label = `${Math.round(remaining / 3600000)}h restantes`;
+    }
+
+    return {
+      ratio,
+      label,
+      title: `Tempo na etapa (${statusLabel(lead.status)})`,
+      deadline: `Limite: ${fmtDate(deadlineMs)} (${slaStagnantDays}d)`,
+    };
+  }
+
+  return null;
 }
 
 function LeadOverviewMetric({
@@ -655,9 +1014,6 @@ function DetailRow({ label, value }: { label: string; value: string | ReactNode 
   );
 }
 
-// StatusBadge removido — usar LeadStatusBadge diretamente
-
 function statusLabel(status: string) {
   return (LEAD_STATUS_LABELS as Record<string, string>)[status] ?? status;
 }
-
