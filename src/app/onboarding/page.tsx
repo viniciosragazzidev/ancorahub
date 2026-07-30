@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { normalizeInvitationToken } from "@/features/team/invitation-token";
 import { OnboardingWizard } from "../primeiro-acesso/onboarding-wizard";
 
 export default async function OnboardingPage({
@@ -8,7 +9,8 @@ export default async function OnboardingPage({
 }: {
   searchParams: Promise<{ token?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token: rawToken } = await searchParams;
+  const token = normalizeInvitationToken(rawToken);
   if (!token) {
     return <ErrorMessage title="Acesso inválido" message="O token de convite não foi fornecido na URL de acesso." />;
   }

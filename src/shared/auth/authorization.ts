@@ -1,7 +1,8 @@
 import "server-only";
 
 import { AuthorizationError } from "./errors";
-import { hasCapability, type PermissionKey } from "./permissions";
+import type { PermissionKey } from "./permissions";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import type { TenantContext } from "./types";
 import type { TenantRole } from "@/shared/db/schema";
 
@@ -27,11 +28,11 @@ export function requireAnyRole(
   return context;
 }
 
-export function requireCapability(
+export async function requireCapability(
   context: TenantContext,
   permission: PermissionKey,
-): TenantContext {
-  if (!hasCapability(context.role, permission, context.jobTitle)) {
+): Promise<TenantContext> {
+  if (!(await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission }))) {
     throw new AuthorizationError("The current profile does not have this capability.");
   }
 

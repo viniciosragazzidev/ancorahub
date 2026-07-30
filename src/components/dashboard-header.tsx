@@ -22,18 +22,22 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
+      className="sticky top-0 z-10 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-border/80 bg-background/95 px-4 backdrop-blur-sm lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
 
       <div className="min-w-0 flex-1">
         <AnimatedPageTitle breadcrumb={breadcrumb} title={title} />
       </div>
-      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-        {rightSlot}
+      <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
+        {rightSlot ? (
+          <div aria-label="Ações da página" className="flex min-w-0 max-w-[calc(100vw-8rem)] items-center gap-1.5 overflow-x-auto whitespace-nowrap pr-0.5 [scrollbar-width:none] sm:max-w-[min(58vw,48rem)] sm:gap-2 lg:max-w-[min(62vw,58rem)]" data-slot="page-actions">
+            {rightSlot}
+          </div>
+        ) : null}
         <div className="max-[559px]:hidden"><GlobalSearch /></div>
         <div className="max-[559px]:hidden"><ThemeToggle /></div>
-        <Button aria-label="Abrir guia do sistema" title="Guia do sistema" render={<Link href="/guia" />} size="icon" variant="ghost" className="size-9 rounded-lg hover:bg-muted/60 transition-colors">
+        <Button aria-label="Abrir guia do sistema" title="Guia do sistema" render={<Link href="/guia" />} size="icon" variant="ghost" className={`size-9 rounded-lg transition-colors hover:bg-muted/60 ${rightSlot ? "max-[559px]:hidden" : ""}`}>
           <BookOpen aria-hidden="true" className="size-4" />
         </Button>
         <NotificationPopover />

@@ -19,7 +19,7 @@ export async function NextUrgentLeadButton() {
             size="sm"
             variant="default"
             render={<Link href={`/leads/${urgentLead.id}`} />}
-            className="h-8 gap-1.5 px-3 text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold shadow-xs transition-all animate-pulse"
+            className="h-8 gap-1.5 bg-amber-500 px-3 text-xs font-semibold text-black shadow-xs hover:bg-amber-600"
           >
             <Lightning className="size-3.5 fill-current" />
             <span>Próximo lead</span>

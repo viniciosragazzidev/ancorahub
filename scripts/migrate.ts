@@ -7,7 +7,7 @@ import postgres from "postgres";
 
 // Preserve variables injected by Vercel/CI. Only load local env files when the
 // process was started without a database connection configured.
-if (!process.env.SUPABASE_DB_URL && !process.env.DATABASE_URL) {
+if (!process.env.SUPABASE_DB_URL?.trim() && !process.env.DATABASE_URL?.trim()) {
   loadEnvConfig(process.cwd());
 }
 
@@ -15,7 +15,7 @@ type Journal = {
   entries: Array<{ tag: string; when: number }>;
 };
 
-const databaseUrl = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? "";
+const databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim() || "";
 if (!databaseUrl) {
   throw new Error("SUPABASE_DB_URL or DATABASE_URL is required to apply migrations.");
 }

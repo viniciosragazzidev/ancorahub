@@ -136,7 +136,7 @@ export const leadAssignedNotificationPlugin: ServerPluginDefinition<{
             recipientId: broker.id,
             destinationPhone: broker.phone,
             purpose: "newLeadAssignment",
-            variables: [broker.name ?? "Corretor(a)", tenant?.name ?? "CorreTop", leadType, branch?.name ?? "Unidade Principal", "3", lead.id],
+            variables: [broker.name ?? "Corretor(a)", tenant?.name ?? "Âncora Corretora", leadType, branch?.name ?? "Unidade Principal", "3", lead.id],
             requestedBy: context.userId,
             idempotencyKey: `${executionKey}:whatsapp`,
           });

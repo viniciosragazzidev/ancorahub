@@ -2,9 +2,12 @@ import { redirect } from "next/navigation";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
 
@@ -21,7 +24,7 @@ export default async function TeamPage() {
     ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
     : undefined;
 
-  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal] = await Promise.all([
+  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal, memberProfileEnabled] = await Promise.all([
     getDatabase()
       .select({ name: schema.tenants.name })
       .from(schema.tenants)
@@ -39,7 +42,8 @@ export default async function TeamPage() {
         name: schema.brokerProfiles.professionalName,
         email: schema.brokerProfiles.invitedEmail,
         role: sql<"broker">`'broker'`,
-        jobTitle: sql<string>`'broker'`,
+        jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, 'broker')`,
+        customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.user.status} = 'pending' or ${schema.brokerProfiles.lifecycleStatus} = 'INVITED' then 'pending'::user_status
@@ -47,7 +51,7 @@ export default async function TeamPage() {
             else 'active'::user_status
           end
         `,
-        branchId: schema.brokerProfiles.branchId,
+        branchId: sql<string | null>`case when ${schema.tenantMemberships.id} is null then ${schema.brokerProfiles.branchId} else ${schema.tenantMemberships.branchId} end`,
         branchName: schema.branches.name,
       })
       .from(schema.brokerProfiles)
@@ -57,6 +61,7 @@ export default async function TeamPage() {
         eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
         eq(schema.tenantMemberships.tenantId, context.tenantId),
       ))
+      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
         eq(schema.brokerProfiles.tenantId, context.tenantId),
         context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined
@@ -69,6 +74,7 @@ export default async function TeamPage() {
         email: schema.user.email,
         role: schema.tenantMemberships.role,
         jobTitle: schema.tenantMemberships.jobTitle,
+        customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.user.status} = 'pending' then 'pending'::user_status
@@ -83,6 +89,7 @@ export default async function TeamPage() {
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.tenantMemberships.branchId, schema.branches.id))
       .leftJoin(schema.brokerProfiles, eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId))
+      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         branchScope,
@@ -97,6 +104,7 @@ export default async function TeamPage() {
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
       .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadBranchScope)),
+    isTeamMemberProfileEnabled(),
   ]);
 
   const members = [...brokers, ...nonBrokers].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -109,9 +117,10 @@ export default async function TeamPage() {
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe"
-        rightSlot={<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} />}
+        rightSlot={<div className="flex items-center gap-2">{context.role === "director" ? <Button render={<Link href="/equipe/cargos" />} variant="outline">Cargos e permissões</Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} /></div>}
       />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">GESTAO DE EQUIPE</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Membros da corretora</h1>
@@ -121,6 +130,7 @@ export default async function TeamPage() {
               : "Acompanhe os acessos da sua filial, edite corretores e gerencie seus estados operacionais."}
           </p>
         </section>
+        */}
         <div className="grid gap-3 sm:grid-cols-4">
           <Card size="sm" className="border-border bg-card shadow-none">
             <CardContent className="p-4">
@@ -155,6 +165,7 @@ export default async function TeamPage() {
           currentRole={context.role}
           currentUserId={context.userId}
           members={members}
+          canViewProfile={memberProfileEnabled}
         />
       </main>
     </>

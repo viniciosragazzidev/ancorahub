@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
+import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
 import { LeadsWorkspace } from "./leads-workspace";
 import { WifiHigh, Plus } from "@/components/huge-icons";
@@ -14,11 +15,14 @@ import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
 import { ContextNote } from "@/components/ui/context-note";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
+import { redirect } from "next/navigation";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<{ attention?: string; status?: string; search?: string; branch?: string; new?: string; tipo?: string }> }) {
   const context = await getRequiredTenantContext();
+  if (!(await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "acessar_leads" }))) redirect("/access-denied");
   const filters = await searchParams;
   const db = getDatabase();
   const configuredStagnantDays = Number(await getSystemSetting("feature_central_atencao_stagnant_days") ?? 3);
@@ -141,7 +145,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           </div>
         }
       />
-      <main className="flex min-h-0 flex-1 flex-col gap-6 bg-background p-4 lg:p-6">
+      <LeadsLiveSync />
+      <main className="flex min-h-0 flex-1 flex-col gap-6 bg-background p-4 pb-8 lg:p-6">
 
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}

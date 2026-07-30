@@ -15,7 +15,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createIntegrationAction, getIntegrationsData, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../integrations-actions";
+import { createIntegrationAction, revokeIntegrationAction, toggleIntegrationAction, type IntegrationRecord } from "../integrations-actions";
 
 type Branch = { id: string; name: string };
 type Props = { integrations: IntegrationRecord[]; branches: Branch[] };
@@ -118,7 +118,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
     if (!selected) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "https://app.corretop.com.br";
     const token = revealedToken ?? `${selected.tokenPrefix}⬢⬢⬢⬢⬢⬢⬢⬢`;
-    return `<form data-corretop-form>
+    return `<form data-ancora-form>
   <input type="text" name="nome" placeholder="Seu nome" required>
   <input type="tel" name="telefone" placeholder="Telefone" required>
   <input type="email" name="email" placeholder="E-mail">
@@ -138,7 +138,11 @@ export function IntegrationsTab({ integrations, branches }: Props) {
 
   async function copySnippet() { await navigator.clipboard.writeText(snippet); setCopied(true); window.setTimeout(() => setCopied(false), 1400); }
 
-  return <Tabs className="gap-5" defaultValue="sources">
+  return <div className="space-y-5">
+    <Card className="border-border bg-card shadow-none">
+      <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Meta Business</p><p className="mt-1 text-sm text-muted-foreground">Conecte o WhatsApp oficial da empresa e deixe IDs de página, anúncios e conversões prontos para uso.</p></div><Button render={<Link href="/settings/meta" />}>Abrir integração Meta</Button></CardContent>
+    </Card>
+  <Tabs className="gap-5" defaultValue="sources">
     <TabsList variant="line" className="w-full justify-start border-b border-border">
       <TabsTrigger value="sources"><LinkSimple /> Webhooks & Pixels</TabsTrigger>
     </TabsList>
@@ -215,7 +219,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
     </TabsContent>
     <CreateIntegrationDialog branches={branches} open={createOpen} onOpenChange={setCreateOpen} onSubmit={(formData) => createMutation.mutate(formData)} pending={createMutation.isPending} />
     <HelpIntegrationDialog open={helpOpen} onOpenChange={setHelpOpen} />
-  </Tabs>;
+  </Tabs></div>;
 }
 
 function CreateIntegrationDialog({ branches, open, onOpenChange, onSubmit, pending }: { branches: Branch[]; open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (formData: FormData) => void; pending: boolean }) {
@@ -228,7 +232,7 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       <DialogPopup className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogTitle>Como integrar com sua Landing Page</DialogTitle>
         <DialogDescription>
-          Cole um snippet no seu site e comece a receber leads automaticamente no CorreTop.
+          Cole um snippet no seu site e comece a receber leads na plataforma.
         </DialogDescription>
 
         <div className="mt-4 space-y-5 text-xs leading-relaxed text-muted-foreground">
@@ -236,21 +240,21 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <div className="space-y-1.5">
             <h4 className="flex items-center gap-2 font-bold text-foreground">
               <span className="grid size-6 place-items-center rounded-full border border-primary/15 bg-primary/[0.07] text-[10px] font-semibold text-primary">1</span>
-              Adicione <code>data-corretop-form</code> no seu formulário
+              Adicione <code>data-ancora-form</code> no seu formulário
             </h4>
-            <p>No construtor da sua LP, adicione o atributo <code>data-corretop-form</code> no elemento {"<form>"}. Use os nomes de campo:</p>
+            <p>No construtor da sua LP, adicione o atributo <code>data-ancora-form</code> no elemento {"<form>"}. Use os nomes de campo:</p>
             <div className="mt-2 space-y-1">
               <div><code className="rounded bg-muted px-1 py-0.5 text-[11px]">name="nome"</code> <span className="text-muted-foreground">— nome completo (obrigatório)</span></div>
               <div><code className="rounded bg-muted px-1 py-0.5 text-[11px]">name="telefone"</code> <span className="text-muted-foreground">— telefone com DDD (obrigatório)</span></div>
               <div><code className="rounded bg-muted px-1 py-0.5 text-[11px]">name="email"</code> <span className="text-muted-foreground">— e-mail (opcional)</span></div>
               <div><code className="rounded bg-muted px-1 py-0.5 text-[11px]">name="plano_interesse"</code> <span className="text-muted-foreground">— plano desejado (opcional)</span></div>
             </div>
-            <p className="mt-2">Se os campos da sua LP já usam nomes diferentes, mapeie com <code>data-corretop-field="nome"</code> em cada input:</p>
+            <p className="mt-2">Se os campos da sua LP já usam nomes diferentes, mapeie com <code>data-ancora-field="nome"</code> em cada input:</p>
             <pre className="rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-foreground overflow-x-auto">
-{`<form data-corretop-form>
-  <input data-corretop-field="nome" name="full_name" required>
-  <input data-corretop-field="telefone" name="phone_number" required>
-  <input data-corretop-field="email" name="email_address">
+{`<form data-ancora-form>
+  <input data-ancora-field="nome" name="full_name" required>
+  <input data-ancora-field="telefone" name="phone_number" required>
+  <input data-ancora-field="email" name="email_address">
 </form>`}
             </pre>
           </div>

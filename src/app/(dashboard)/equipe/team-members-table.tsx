@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, UsersThree, XCircle } from "@/components/huge-icons";
@@ -28,6 +29,7 @@ type TeamMember = {
   status: "pending" | "active" | "disabled";
   branchId: string | null;
   branchName: string | null;
+  customRoleScope: "none" | "own" | "branch" | "tenant" | null;
 };
 
 type Props = {
@@ -36,9 +38,10 @@ type Props = {
   currentRole: "director" | "manager" | "broker";
   currentBranchId: string | null;
   currentUserId: string;
+  canViewProfile: boolean;
 };
 
-export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId }: Props) {
+export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId, canViewProfile }: Props) {
   const [branchFilter, setBranchFilter] = useState("all");
   const memberIds = useMemo(() => members.map((m) => m.id), [members]);
   const multiSelect = useMultiSelect(memberIds);
@@ -127,7 +130,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
           <div className="flex items-center gap-3 pl-2">
             <UserAvatar seed={member.email || member.name || "Membro"} name={member.name ?? undefined} size="sm" className="size-8" />
             <div>
-              <p className="font-semibold text-xs text-foreground leading-snug">{member.name ?? "Sem nome"}</p>
+              {canViewProfile && member.userId ? <Link href={`/equipe/${member.userId}`} className="font-semibold text-xs leading-snug text-foreground hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{member.name ?? "Sem nome"}</Link> : <p className="font-semibold text-xs text-foreground leading-snug">{member.name ?? "Sem nome"}</p>}
               {member.userId === currentUserId ? <p className="text-[10px] text-muted-foreground font-mono">Você</p> : null}
             </div>
           </div>
@@ -154,7 +157,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
         <DataTableColumnHeader column={column} title="Filial" />
       ),
       cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">{row.original.branchName ?? "Sem filial"}</span>
+        <span className="text-xs text-muted-foreground">{row.original.branchId ? row.original.branchName ?? "Unidade vinculada" : "Geral da empresa"}</span>
       ),
     },
     {

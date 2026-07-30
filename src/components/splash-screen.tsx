@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CorreTopLogo } from "@/components/corretop-logo";
+import { AncoraLogo } from "@/components/ancora-logo";
 
-const SPLASH_KEY = "__corretop_splash_shown";
+const SPLASH_KEY = "__ancora_splash_shown";
 
 /**
  * PWA splash screen.
@@ -56,7 +56,7 @@ export function SplashScreen() {
         willChange: "opacity",
       }}
     >
-      <CorreTopLogo
+      <AncoraLogo
         className="h-12 w-48 object-contain"
         style={{
           opacity: phase === "idle" ? 0 : 1,

@@ -323,6 +323,48 @@
       "when": 1785441600000,
       "tag": "0093_lead_form_data",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1785531600000,
+      "tag": "0094_duty_schedule_coverage",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1785535200000,
+      "tag": "0095_meta_manual_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1785621600000,
+      "tag": "0096_custom_roles_rbac",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1785621700000,
+      "tag": "0097_custom_role_member_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1785621800000,
+      "tag": "0098_performance_seasons",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1785700800000,
+      "tag": "0099_meta_manual_lead_ads",
+      "breakpoints": true
     }
   ]
 }

@@ -58,8 +58,8 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex items-center justify-center gap-2 pb-3 pt-2 text-xs sm:text-sm font-medium whitespace-nowrap text-muted-foreground transition-all duration-150 hover:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-active:text-foreground data-active:font-semibold cursor-pointer",
-        "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-accent after:opacity-0 after:scale-x-0 after:transition-all after:duration-200 data-active:after:opacity-100 data-active:after:scale-x-100",
+        "relative inline-flex items-center justify-center gap-2 rounded-sm pb-3 pt-2 text-xs sm:text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 data-active:text-foreground data-active:font-semibold cursor-pointer motion-reduce:transition-none",
+        "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-accent after:opacity-0 after:scale-x-0 after:transition-[opacity,transform] after:duration-[var(--duration-fast)] after:ease-[var(--ease-smooth-out)] data-active:after:opacity-100 data-active:after:scale-x-100 motion-reduce:after:transition-none",
         className
       )}
       {...props}

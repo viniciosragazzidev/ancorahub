@@ -36,7 +36,7 @@ export async function sendWhatsAppReviewMessage(rawInput: unknown): Promise<{ me
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-CorreTop-Internal-Token": environment.internalToken,
+      "X-Ancora-Internal-Token": environment.internalToken,
     },
     body: JSON.stringify(input),
     cache: "no-store",

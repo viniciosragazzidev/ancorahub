@@ -49,7 +49,6 @@ import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { cn } from "@/lib/utils";
 import {
   takeoverConversationAction,
-  returnConversationToAiAction,
   closeConversationAction,
   resetAiConversationAction,
 } from "@/features/ai-agent/actions";
@@ -350,10 +349,10 @@ export function ConversationsWorkspace({
       </header>
 
       <div
-        className={cn(
-          "grid min-h-0 flex-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
-          profileOpen ? "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]" : "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,2fr)]",
-        )}
+          className={cn(
+            "grid min-h-0 flex-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
+            profileOpen && "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
+          )}
       >
         <section
           aria-label="Lista de atendimentos"
@@ -415,7 +414,7 @@ export function ConversationsWorkspace({
 
         <aside
           aria-label="Perfil do cliente"
-          className={cn("hidden min-h-0 border-l border-border bg-card 2xl:flex 2xl:flex-col", !profileOpen && "2xl:hidden")}
+          className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card 2xl:flex 2xl:flex-col", !profileOpen && "2xl:hidden")}
         >
           {selected ? <ClientProfile client={selected} /> : null}
         </aside>
@@ -474,14 +473,6 @@ function ConversationHeader({
     router.refresh();
   }
 
-  async function handleReturnToAi() {
-    if (!tenantId || !client.aiConversation?.id) return;
-    setIsPending(true);
-    await returnConversationToAiAction(client.aiConversation.id);
-    setIsPending(false);
-    router.refresh();
-  }
-
   async function handleResetChat() {
     if (!tenantId || !client.aiConversation?.id) return;
     if (!confirm("Tem certeza que deseja resetar a qualificação da inteligência artificial e limpar a memória deste lead? O robô de IA iniciará a conversa do zero.")) return;
@@ -533,28 +524,16 @@ function ConversationHeader({
         )}
         {client.aiConversation?.id && (
           isHumanActive ? (
-            isAssignedToMe ? (
+            !isAssignedToMe && (role === "director" || role === "manager") ? (
               <Button
-                className="h-8 text-xs gap-1.5"
+                className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
                 disabled={isPending}
-                onClick={handleReturnToAi}
+                onClick={handleTakeover}
                 size="sm"
-                variant="outline"
               >
-                Devolver para IA
+                Assumir e pausar automação
               </Button>
-            ) : (
-              (role === "director" || role === "manager") ? (
-                <Button
-                  className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
-                  disabled={isPending}
-                  onClick={handleTakeover}
-                  size="sm"
-                >
-                  Assumir e pausar automação
-                </Button>
-              ) : null
-            )
+            ) : null
           ) : (
             <Button
               className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
@@ -773,8 +752,8 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
 
   return (
     <Bubble variant={isSystem ? "default" : "secondary"} align={isSystem ? "end" : "start"}>
-      <BubbleContent className="[&>p]:whitespace-pre-wrap">
-        <p className="leading-6">{message.body}</p>
+      <BubbleContent className="[&>p]:whitespace-pre-wrap text-xs">
+        <p className="leading-5">{message.body}</p>
         <div className={cn("mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground", isSystem && "justify-end")}>
           <span>
             {message.direction === "outbound"
@@ -798,7 +777,7 @@ function HistoryEmptyState({ phone }: { phone: string }) {
         animated
         icon={ChatCircleText}
         title="Nenhuma mensagem sincronizada"
-        description="Este atendimento ainda não possui histórico no CorreTop. Continue o contato pelo WhatsApp e o histórico aparecerá quando a sincronização estiver disponível."
+        description="Este atendimento ainda não possui histórico na plataforma. Continue o contato pelo WhatsApp e o histórico aparecerá quando a sincronização estiver disponível."
         action={
           <Button render={<a href={getWhatsAppUrl(phone)} rel="noreferrer" target="_blank" />} size="sm">
             <WhatsappLogo />

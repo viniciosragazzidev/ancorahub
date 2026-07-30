@@ -31,7 +31,7 @@ function Progress({
     >
       <div
         data-slot="progress-indicator"
-        className="h-full w-full flex-1 rounded-full bg-primary transition-all duration-300 ease-smooth-out"
+        className="h-full w-full flex-1 rounded-full bg-primary transition-transform duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none"
         style={{ transform: `translateX(-${100 - percentage}%)` }}
       />
     </div>

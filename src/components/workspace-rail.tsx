@@ -42,7 +42,7 @@ function WorkspaceRailButton({ area, active }: { area: (typeof areas)[number]; a
       aria-current={active ? "page" : undefined}
       title={area.label}
       className={cn(
-        "grid size-10 place-items-center rounded-xl border text-sidebar-foreground/60 transition-colors hover:bg-sidebar-warning hover:text-sidebar-warning-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        "grid size-10 place-items-center rounded-xl border text-sidebar-foreground/60 transition-colors hover:bg-sidebar-warning hover:text-sidebar-warning-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
         active && "border-primary/20 bg-primary/10 text-primary shadow-sm",
       )}
     >

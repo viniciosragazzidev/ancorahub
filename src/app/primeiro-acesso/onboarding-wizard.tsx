@@ -192,12 +192,12 @@ export function OnboardingWizard({ invitation, profile }: Props) {
           {step === 4 && (
             <div className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/40 p-4 text-xs text-muted-foreground max-h-60 overflow-y-auto space-y-3 leading-relaxed">
-                <p className="font-semibold text-foreground text-sm">Termos de Uso e Política de Privacidade do CorreTop</p>
+                <p className="font-semibold text-foreground text-sm">Termos de Uso e Política de Privacidade</p>
                 <p>
-                  Ao acessar a plataforma CorreTop, você declara estar ciente de que todos os dados de leads, clientes e cotações pertencem exclusivamente à corretora licenciante. É expressamente vedado o compartilhamento ou extração externa de informações protegidas sem autorização expressa da diretoria.
+                  Ao acessar esta plataforma, você declara estar ciente de que todos os dados de leads, clientes e cotações pertencem exclusivamente à corretora licenciante. É expressamente vedado o compartilhamento ou extração externa de informações protegidas sem autorização expressa da diretoria.
                 </p>
                 <p>
-                  O CorreTop atua sob a base de controlador e operador em estrita conformidade com as diretrizes da LGPD (Lei Geral de Proteção de Dados). Toda e qualquer operação executada pelo usuário gera registros de auditoria inalteráveis contendo dados de identificação, IP e timestamp.
+                  O sistema atua sob a base de controlador e operador em estrita conformidade com as diretrizes da LGPD (Lei Geral de Proteção de Dados). Toda e qualquer operação executada pelo usuário gera registros de auditoria inalteráveis contendo dados de identificação, IP e timestamp.
                 </p>
               </div>
               <div className="flex items-start gap-2.5">
@@ -211,7 +211,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
                   disabled={pending}
                 />
                 <Label htmlFor="user-terms" className="text-xs text-muted-foreground leading-normal cursor-pointer select-none">
-                  Li e aceito os termos de uso, a política de privacidade e de confidencialidade da plataforma CorreTop.
+                  Li e aceito os termos de uso, a política de privacidade e de confidencialidade da plataforma.
                 </Label>
               </div>
               <div className="flex gap-2 pt-2">

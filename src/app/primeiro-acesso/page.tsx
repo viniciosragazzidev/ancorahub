@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { normalizeInvitationToken } from "@/features/team/invitation-token";
 import { OnboardingWizard } from "./onboarding-wizard";
 
 export default async function PrimeiroAcessoPage({
@@ -8,7 +9,8 @@ export default async function PrimeiroAcessoPage({
 }: {
   searchParams: Promise<{ token?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token: rawToken } = await searchParams;
+  const token = normalizeInvitationToken(rawToken);
   if (!token) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center bg-background">

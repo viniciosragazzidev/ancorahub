@@ -8,6 +8,7 @@ const state = vi.hoisted(() => {
     leadDistributionEvents: Symbol("leadDistributionEvents"),
     auditLogs: Symbol("auditLogs"),
     user: Symbol("user"),
+    session: Symbol("session"),
     tenantMemberships: Symbol("tenantMemberships"),
     brokerProfiles: Symbol("brokerProfiles"),
     brokerInvitations: Symbol("brokerInvitations"),
@@ -235,7 +236,7 @@ describe("deleteTeamMemberAction", () => {
     // 5. Member records should be deleted
     expect(deleted(state.schema.tenantMemberships)).toHaveLength(1);
     expect(deleted(state.schema.brokerProfiles)).toHaveLength(1);
-    expect(deleted(state.schema.user)).toHaveLength(1);
+    expect(deleted(state.schema.user)).toHaveLength(0);
   });
 
   it("skips lead handling when broker has no assigned leads", async () => {
@@ -271,7 +272,7 @@ describe("deleteTeamMemberAction", () => {
     expect(auditLogs[0]).toMatchObject({ entidade: "tenant_membership", acao: "excluiu_membro" });
 
     // Member should be deleted
-    expect(deleted(state.schema.user)).toHaveLength(1);
+    expect(deleted(state.schema.user)).toHaveLength(0);
   });
 
   it("returns error when member is not found", async () => {

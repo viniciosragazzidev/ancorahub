@@ -134,7 +134,7 @@ export default async function PublicQuotePage({ params }: Props) {
         {/* Footer */}
         <div className="mt-12 border-t border-border/40 pt-6 text-center">
           <p className="text-[10px] text-muted-foreground">
-            Proposta gerada pela plataforma CorreTop. Este documento não substitui a análise formal da operadora.
+            Proposta gerada pela Âncora Corretora. Este documento não substitui a análise formal da operadora.
           </p>
         </div>
       </div>

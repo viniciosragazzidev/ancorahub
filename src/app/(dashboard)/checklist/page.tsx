@@ -218,6 +218,7 @@ export default async function ChecklistPage() {
     <>
       <DashboardHeader breadcrumb="Operação" title="Checklist de fechamento" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-medium text-primary">VALIDAÇÃO</p>
@@ -227,6 +228,7 @@ export default async function ChecklistPage() {
             </p>
           </div>
         </section>
+        */}
 
         <ChecklistClient preItems={preChecklist} postItems={postChecklist} />
       </main>

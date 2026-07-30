@@ -194,7 +194,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   }
 
   // Footer
-  page.drawText("Proposta gerada pela plataforma CorreTop", {
+  page.drawText("Proposta gerada pela Âncora Corretora", {
     x: 50,
     y: 40,
     size: 8,

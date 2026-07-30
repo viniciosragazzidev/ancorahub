@@ -1,19 +1,7 @@
-"use client";
-
-import { ViewTransition } from "react";
-
-import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
-import { useReducedMotionPreference } from "@/shared/hooks/use-reduced-motion";
-
 export function RouteViewTransition({ children }: { children: React.ReactNode }) {
-  const motionEnabled = useInterfaceMotionEnabled();
-  const prefersReducedMotion = useReducedMotionPreference();
-
-  if (!motionEnabled || prefersReducedMotion) return children;
-
-  return (
-    <ViewTransition enter="ct-route-enter" exit="ct-route-exit" default="none">
-      {children}
-    </ViewTransition>
-  );
+  // React ViewTransition wraps every App Router navigation. In production this
+  // can cancel concurrent RSC requests, leaving the route-level loading UI
+  // mounted indefinitely. Keep motion local to controls and overlays until the
+  // experimental integration is stable for streamed routes.
+  return children;
 }

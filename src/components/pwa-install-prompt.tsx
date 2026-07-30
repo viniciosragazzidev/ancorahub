@@ -105,7 +105,7 @@ export function PwaInstallPrompt() {
   return (
     <AnimatePresence>
       {canInstall && (
-        <div className="fixed bottom-6 right-6 z-50 max-[559px]:bottom-[calc(5.75rem+env(safe-area-inset-bottom))] max-[559px]:right-3">
+        <div className="fixed bottom-6 right-6 z-50 max-[559px]:bottom-[calc(7rem+env(safe-area-inset-bottom))] max-[559px]:right-3">
           <AnimatePresence mode="wait">
             {showCard && (
               <motion.div
@@ -178,7 +178,7 @@ export function PwaInstallPrompt() {
             exit={{ opacity: 0, scale: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 20 }}
             onClick={() => setShowCard((prev) => !prev)}
-            className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90 max-[559px]:size-10"
+            className="flex size-12 items-center justify-center rounded-full border border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90 max-[559px]:size-10"
             aria-label="Instalar CorreTop"
           >
             <FileArrowDown className="size-5 max-[559px]:size-4" />

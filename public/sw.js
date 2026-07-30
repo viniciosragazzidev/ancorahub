@@ -2,9 +2,8 @@
 // Versão: 1.0.1
 // Incremente CACHE_VERSION para forçar atualização do cache.
 
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 const STATIC_CACHE = `corretop-static-v${CACHE_VERSION}`;
-const NAV_CACHE = `corretop-nav-v${CACHE_VERSION}`;
 const ASSET_CACHE = `corretop-assets-v${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -29,7 +28,7 @@ self.addEventListener("activate", (event) => {
       caches.keys().then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== STATIC_CACHE && key !== NAV_CACHE && key !== ASSET_CACHE)
+            .filter((key) => key !== STATIC_CACHE && key !== ASSET_CACHE)
             .map((key) => caches.delete(key))
         )
       ),
@@ -52,8 +51,15 @@ function isNavigation(request) {
 }
 
 // API calls → Network Only (não cachear dados dinâmicos)
-function isApiRequest(url) {
-  return url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/");
+function isDynamicAppRequest(request, url) {
+  return (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/_next/") ||
+    url.searchParams.has("_rsc") ||
+    request.headers.has("RSC") ||
+    request.headers.has("Next-Router-State-Tree") ||
+    request.headers.has("Next-Router-Prefetch")
+  );
 }
 
 // ─── Interceptação de Fetch ───────────────────────────────────────────────────
@@ -66,7 +72,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Não cachear requisições de API ou Next.js internas
-  if (isApiRequest(url)) {
+  if (isDynamicAppRequest(request, url) || isNavigation(request)) {
     event.respondWith(fetch(request).catch(() => new Response(null, { status: 503 })));
     return;
   }
@@ -89,23 +95,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Navegação → Network First com fallback offline
-  if (isNavigation(request)) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(NAV_CACHE).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(request).then((cached) => cached || caches.match("/"))
-        )
-    );
-    return;
-  }
-
   // Demais requisições (manifest, etc.) → Stale-while-revalidate
   event.respondWith(
     caches.match(request).then((cached) => {

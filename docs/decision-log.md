@@ -104,6 +104,20 @@ As rotas do aplicativo usam a integração experimental de View Transitions do N
 
 O CorreTop usa `services/whatsapp-api` como fronteira Fastify separada para chamadas da Graph API que exigem credenciais privadas da Meta. O CRM não chama a Meta pelo navegador: uma Server Action restrita ao Super-admin e governada pela capacidade global encaminha o pedido ao Fastify usando segredo interno. O serviço recebe somente a solicitação autorizada, usa o token da Meta localmente e devolve ao CRM apenas o resultado seguro. A infraestrutura do Fastify é implantada separadamente da Vercel; Embedded Signup, templates e armazenamento de tokens por WABA continuam como fases explícitas.
 
+## DEC-069 — Captação manual de Meta Lead Ads com credencial técnica central
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+Enquanto o OAuth/Embedded Signup de Marketing não estiver liberado, cada cliente compartilha manualmente sua Página e ativos com o portfólio empresarial do AncoraHub. A plataforma mantém um único token técnico de Usuário do Sistema somente no ambiente privado; nenhum tenant envia, armazena ou visualiza esse segredo. O Diretor mapeia a Página autorizada para seu tenant e, opcionalmente, para uma unidade. O webhook assinado resolve a empresa exclusivamente pelo `page_id`, busca o `leadgen_id` no servidor e cria o lead pelo intake transacional existente. Uma Página só pode pertencer a um tenant por vez; pausar a fonte interrompe novas captações e preserva histórico. O Super-admin controla a capacidade global por `feature_meta_lead_ads_enabled`, com auditoria.
+
+## DEC-070 — Autorização guiada de ativos Meta para piloto
+
+**Estado:** Aceita
+**Data:** 2026-07-30
+
+Lead Ads deixa de solicitar token ou identificadores técnicos ao Diretor. A plataforma exibe somente o nome do parceiro, Business ID e suporte; depois de o cliente compartilhar ativos na Meta e liberar o app Corretop API Oficial em Acesso a Leads, o servidor descobre ativos usando a credencial técnica central. O Diretor seleciona uma ou mais Páginas e elas entram na fila central do tenant. A descoberta é permitida apenas para tenants explicitamente habilitados no piloto pelo Super-admin; cada confirmação revalida a seleção contra a Meta e é auditada. WhatsApp permanece em trilha independente.
+
 ## Pendentes bloqueantes
 
 | ID | Decisão necessária | Impacto | Dono sugerido |
@@ -314,6 +328,49 @@ o Super-admin pode desligar as capacidades sem apagar histórico. Ao assumir, o 
 pausa a automação e não oferece envio de mensagens; somente Diretor ou Gestor pode
 retomar a IA.
 
+## DEC-059 — Fila geral central para leads sem unidade resolvida
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+Um lead aceito cujo canal ou regra de entrada não determine uma unidade entra na
+fila geral central do tenant, sem atribuição automática a corretor. O Diretor é
+responsável por encaminhá-lo para uma unidade; após esse encaminhamento, o Gestor
+pode direcioná-lo dentro do escopo da própria unidade. Essa ordem preserva o
+isolamento entre unidades e evita que um Gestor visualize uma fila central de
+outra unidade. Cada encaminhamento deve manter o motivo e o ator em auditoria.
+
+## DEC-060 — Titularidade operacional de exceções de intake e outbox
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O Diretor é o dono primário das exceções centrais de intake, distribuição e
+outbox. O Gestor atua apenas sobre exceções de leads de sua unidade. O prazo
+operacional inicial é de até 30 minutos para uma exceção P0 e até o fim do dia
+útil para uma P1; o alerta e qualquer reprocessamento permanecem auditados e
+idempotentes.
+
+## DEC-061 — Cobertura mínima e arquivamento de plantões
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+Plantões permanecem regras semanais recorrentes por unidade e fila. Cada regra define
+um mínimo de corretores escalados, com valor inicial de um. A cobertura inferior ao
+mínimo cria uma pendência operacional visível, mas não bloqueia a distribuição aos
+corretores já elegíveis. A remoção de um plantão é arquivamento reversível: a regra
+sai da seleção de distribuição, as atribuições ativas ligadas a ela são inativadas e
+o histórico permanece disponível para auditoria. Exceções por data não fazem parte
+desta versão.
+
+## DEC-062 — Criação coordenada de plantões em múltiplas unidades
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+O Diretor pode selecionar mais de uma unidade ao criar um plantão. A operação cria uma regra independente por unidade e fila, em uma única transação. Cobertura, escala, edição, arquivamento e auditoria permanecem locais a cada regra; o Gestor continua limitado à própria unidade. Unidade sem fila ativa bloqueia toda a criação antes da gravação.
+
 ## DEC-057 — Liberação global auditável do Centro de Treinamento
 
 **Estado:** Aceita
@@ -325,3 +382,51 @@ A alteração atualiza `feature_agent_training_center_enabled`, registra o ator 
 valor na auditoria de plataforma e invalida as telas de configuração. A liberação
 global não concede escopo extra: Diretores continuam restritos ao próprio tenant e
 ao fluxo de versões publicado.
+
+## DEC-063 — Integração manual temporária da Meta por tenant
+
+**Estado:** Aceita
+**Data:** 2026-07-28
+
+Enquanto o Embedded Signup não for a rota principal, o Diretor pode conectar manualmente a conta Meta de sua corretora por um assistente guiado. O servidor deriva o tenant e valida WABA, número e token pela Graph API antes de ativar o canal; o token é cifrado no registro do canal e nunca volta ao navegador, logs ou auditoria. App Secret, verify token e chave de cifra permanecem variáveis privadas do ambiente AncoraHub, pois são compartilhados pelo app oficial e não podem ser cadastrados pelo cliente. IDs de página, conta de anúncios, pixel e dataset são isolados por tenant, auditados e preparados para sincronização futura. O Super-admin mantém o kill switch global existente.
+
+## DEC-064 — Cargos personalizados delegáveis por tenant
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+Diretor, Gestor e Corretor continuam perfis de sistema imutáveis. O Diretor pode criar
+cargos personalizados no próprio tenant a partir de capacidades explicitamente
+delegáveis. Um cargo substitui as capacidades herdadas do papel legado enquanto a
+feature estiver ativa; ele nunca concede privilégios de Super-admin, gestão de
+filiais, gestão financeira ou elevação de acesso. O piloto exige flag global e
+liberação por tenant, preserva o fallback legado ao ser desligado e audita criação,
+edição, atribuição e arquivamento.
+
+## DEC-066 — Escopo de unidade para cargos administrativos
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+Gestor e Corretor continuam perfis operacionais e exigem vínculo com uma única
+unidade ativa. Cargos administrativos personalizados podem ser criados com
+abrangência **Geral da empresa** ou **Uma unidade**. No primeiro caso, o membro
+não precisa de unidade; no segundo, o servidor exige e valida uma unidade do
+mesmo tenant. O cargo padrão Marketing é geral por padrão, mas o Diretor pode
+criar uma variante local de Marketing quando a operação pedir. A abrangência
+limita permissões elegíveis, nunca amplia acesso de Diretor, e toda alteração
+permanece auditável dentro do piloto de cargos personalizados.
+
+## DEC-067 — Temporadas de desempenho e reinício preservam histórico
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+O ranking comercial usa temporadas por tenant como recorte temporal. Somente uma temporada pode estar ativa; o Diretor pode preparar rascunhos, ativar um ciclo e reiniciar o ranking. Reiniciar nunca apaga ou reescreve resultados: encerra o ciclo atual com o motivo auditado e inicia uma nova temporada. Premiações são regras de reconhecimento registradas por colocação; não iniciam pagamento, comissão ou qualquer obrigação financeira automaticamente. Metas existentes permanecem a fonte oficial dos objetivos comerciais e não são duplicadas pelo módulo de desempenho.
+
+## DEC-068 — Perfil administrativo de membro respeita unidade e carteira
+
+**Estado:** Aceita
+**Data:** 2026-07-29
+
+O perfil administrativo de um membro é uma visão de supervisão, não uma página pública ou uma área de autoatendimento. Diretor pode consultar qualquer membro do próprio tenant. Gestor só pode consultar membro com vínculo na própria unidade, e todas as métricas e listas do perfil recebem o mesmo filtro de unidade. A rota não distingue membro inexistente de membro fora do escopo, evitando revelar a estrutura de equipe. Cada consulta autorizada é registrada na auditoria; o Super Admin pode desativar globalmente a capacidade sem apagar histórico.

@@ -146,7 +146,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                     <Icon className="size-7 text-foreground" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3b82f6]">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
                       {definition.eyebrow}
                     </span>
                     <DialogTitle className="mt-2 text-xl font-bold tracking-tight text-foreground leading-tight">
@@ -178,7 +178,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                     </div>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3b82f6]">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
                       Recursos e Acesso
                     </span>
                     <DialogTitle className="mt-2 text-xl font-bold tracking-tight text-foreground leading-tight">
@@ -205,7 +205,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                     <RocketLaunch className="size-7 text-foreground" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3b82f6]">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
                       Dica Operacional
                     </span>
                     <DialogTitle className="mt-2 text-xl font-bold tracking-tight text-foreground leading-tight">
@@ -230,7 +230,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                   key={s}
                   className={cn(
                     "h-1.5 rounded-full transition-all duration-300",
-                    step === s ? "w-5 bg-[#3b82f6]" : "w-1.5 bg-muted-foreground/30"
+                    step === s ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30"
                   )}
                 />
               ))}
@@ -240,7 +240,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
               disabled={isPending}
               onClick={handleNext}
               type="button"
-              className="rounded-full px-5 py-5 bg-[#3b82f6] text-white hover:bg-[#2563eb] text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all duration-200 shrink-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+              className="rounded-full px-5 py-5 bg-primary text-primary-foreground hover:opacity-90 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all duration-200 shrink-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
             >
               {step === 3 ? (isPending ? "Salvando..." : "Começar") : "Continuar"}
               <ArrowRight className="size-3.5" />

@@ -22,7 +22,7 @@ export function RouteError({ error, unstable_retry, title = "Não foi possível 
     <main className="flex min-h-[60vh] items-center justify-center p-6" aria-labelledby="route-error-title">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle id="route-error-title">{title}</CardTitle>
+          <CardTitle id="route-error-title" role="alert">{title}</CardTitle>
           <CardDescription>
             O problema pode ser temporário. Tente novamente ou volte para o painel sem expor dados internos do sistema.
           </CardDescription>

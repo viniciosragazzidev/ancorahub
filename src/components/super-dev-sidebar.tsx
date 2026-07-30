@@ -35,7 +35,7 @@ import {
 import { SidebarCollapsibleGroup } from "@/components/sidebar-collapsible-group";
 import { useSession, signOut } from "@/shared/auth/client";
 import { toast } from "sonner";
-import { CorreTopLogo } from "@/components/corretop-logo";
+import { AncoraLogo } from "@/components/ancora-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 const superItems = [
@@ -135,8 +135,8 @@ export function SuperDevSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton className="h-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/super-dev" prefetch />}>
-              <CorreTopLogo className="h-7 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
-              <img src="/icon.png" alt="CorreTop" className="h-7 w-7 mx-auto hidden group-data-[collapsible=icon]:block object-contain" />
+              <AncoraLogo className="h-7 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
+              <img src="/icon.png" alt="Ancora" className="h-7 w-7 mx-auto hidden group-data-[collapsible=icon]:block object-contain" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

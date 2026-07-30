@@ -545,7 +545,7 @@ export function NotificationPopover() {
             });
           }}
           className={cn(
-            "group/notif-trigger relative inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-all duration-150",
+            "group/notif-trigger relative inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
             "hover:bg-muted hover:text-foreground",
             open && "bg-muted text-foreground",
           )}
@@ -708,7 +708,7 @@ export function NotificationPopover() {
                   href="/notificacoes"
                   onClick={() => setOpen(false)}
                   className={cn(
-                    "group/link flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150",
+                    "group/link flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-[background-color,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
                     "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
@@ -719,7 +719,7 @@ export function NotificationPopover() {
                         {data.totalCount} no total
                       </span>
                     )}
-                    <ArrowRight className="size-3.5 transition-transform duration-150 group-hover/link:translate-x-0.5" />
+                    <ArrowRight className="size-3.5 transition-transform duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/link:translate-x-0.5 motion-reduce:transition-none" />
                   </span>
                 </Link>
               </div>

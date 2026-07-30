@@ -2,9 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-html {
-  font-size: 105%;
-}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -386,6 +383,66 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Keyboard access is a system property, not a page-level concern. */
+.skip-to-content {
+  position: fixed;
+  z-index: 10000;
+  top: 0.75rem;
+  left: 0.75rem;
+  transform: translateY(-200%);
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform var(--duration-quick) var(--ease-smooth-out);
+}
+
+.skip-to-content:focus-visible {
+  transform: translateY(0);
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+:where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [role="menuitem"]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+#main-content:focus {
+  outline: none;
+}
+
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [role="menuitem"]):focus-visible,
+  .skip-to-content:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 3px;
+  }
+}
+
+/* Shared route frame: pages keep their domain composition, while every
+   authenticated shell gets a safe inline axis and a single scroll owner. */
+[data-slot="app-content"] {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+[data-slot="app-content"] :where(main, section, article, aside, header, footer, form) {
+  min-inline-size: 0;
+}
+
+[data-slot="app-content"] :where(.flex, .grid) > * {
+  min-inline-size: 0;
+}
+
+[data-slot="app-content"] [data-slot="table-container"],
+[data-slot="app-content"] [data-slot="scroll-area"] {
+  max-inline-size: 100%;
 }
 
 @layer base {
@@ -860,16 +917,27 @@ body {
   animation: ct-route-enter var(--duration-fast) var(--ease-smooth-out) both;
 }
 
+/* During route transitions (non-theme): freeze the header snapshot */
 html:not([data-magicui-theme-vt="active"])::view-transition-group(ct-shell-header) {
   z-index: 100;
   animation: none;
 }
-
 html:not([data-magicui-theme-vt="active"])::view-transition-old(ct-shell-header) {
   display: none;
 }
-
 html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header) {
+  animation: none;
+}
+
+/* During theme transitions: keep z-index and suppress the default crossfade so
+   the clip-path mask (applied via JS Web Animation) is the only visible effect */
+html[data-magicui-theme-vt="active"]::view-transition-group(ct-shell-header) {
+  z-index: 100;
+}
+html[data-magicui-theme-vt="active"]::view-transition-old(ct-shell-header) {
+  display: none;
+}
+html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   animation: none;
 }
 
@@ -964,6 +1032,20 @@ html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header)
   50% {
     transform: translate3d(-10px, 8px, 0) scale(1.08);
   }
+}
+
+@media screen and (min-width:768px) {
+  html {
+    font-size: 103%;
+  }
+
+}
+
+@media screen and (max-width:767px) {
+  html {
+    font-size: 90%;
+  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

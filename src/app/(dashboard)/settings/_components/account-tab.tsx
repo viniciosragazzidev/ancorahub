@@ -5,7 +5,7 @@ export function AccountTab({ name, email, role }: { name: string; email: string;
     <Card className="border-border bg-card shadow-none">
       <CardHeader>
         <CardTitle>Minha conta</CardTitle>
-        <CardDescription>Seus dados de acesso e o papel que define suas permissões no CorreTop.</CardDescription>
+        <CardDescription>Seus dados de acesso e o papel que define suas permissões na plataforma.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-border p-4"><p className="text-xs text-muted-foreground">Nome</p><p className="mt-1 text-sm font-medium">{name}</p></div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { maskPhone, normalizePhone, resolveLeadSchema, suggestionSchema } from "./schemas";
 
-describe("CorreTop Assistant contracts", () => {
+describe("Âncora Corretora Assistant contracts", () => {
   it("normalizes and masks phone numbers without exposing the full value", () => {
     expect(normalizePhone("(21) 99999-1234")).toBe("+21999991234");
     expect(maskPhone("+5521999991234")).toContain("****-1234");

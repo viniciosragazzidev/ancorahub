@@ -19,11 +19,14 @@ import { eq } from "drizzle-orm";
 import { runSlaSweep } from "@/features/leads/sla";
 import { sql } from "drizzle-orm";
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
-import { setSystemSetting } from "@/features/system-settings/queries";
+import { getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
+import { z } from "zod";
+import { provisionDefaultMarketingRole } from "@/features/custom-roles/service";
 import { notificationCapabilities, notificationCapabilitySettingKey } from "@/features/notifications/catalog";
 import { resetPlatformUserRouteOnboarding } from "@/features/onboarding/route-onboarding-service";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 
 function boundedDistributionSetting(value: FormDataEntryValue | null, fallback: number, min: number, max: number) {
   const parsed = Number(value);
@@ -147,6 +150,46 @@ export async function updateMetaCloudWhatsAppSettingsAction(formData: FormData) 
   });
   revalidatePath("/super-admin/settings");
   revalidatePath("/settings/whatsapp");
+}
+
+export async function updateMetaLeadAdsSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("metaLeadAdsEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_meta_lead_ads_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads_feature.updated",
+    targetType: "system_settings", targetId: "meta_lead_ads", metadata: { enabled }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/settings/meta");
+}
+
+export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ partnerName: z.string().trim().min(2).max(80), businessId: z.string().trim().regex(/^\d{5,40}$/), supportWhatsApp: z.string().trim().min(8).max(32) }).parse({ partnerName: formData.get("partnerName"), businessId: formData.get("businessId"), supportWhatsApp: formData.get("supportWhatsApp") });
+  const now = new Date();
+  await Promise.all([
+    setSystemSetting(META_LEAD_ADS_PLATFORM_SETTINGS.partnerName, input.partnerName, now),
+    setSystemSetting(META_LEAD_ADS_PLATFORM_SETTINGS.businessId, input.businessId, now),
+    setSystemSetting(META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp, input.supportWhatsApp, now),
+  ]);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.platform_identity_updated", targetType: "system_settings", targetId: "meta_lead_ads_identity", metadata: input, createdAt: now });
+  revalidatePath("/super-admin/settings"); revalidatePath("/settings/meta");
+}
+
+export async function updateMetaLeadAdsPilotAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const key = META_LEAD_ADS_PLATFORM_SETTINGS.pilotTenantIds;
+  const current = await getSystemSetting(key);
+  let ids: string[] = [];
+  try { const parsed: unknown = JSON.parse(current ?? "[]"); if (Array.isArray(parsed)) ids = parsed.filter((value): value is string => typeof value === "string"); } catch { /* recover to a safe empty pilot */ }
+  const next = input.enabled === "true" ? [...new Set([...ids, input.tenantId])] : ids.filter((id) => id !== input.tenantId);
+  const now = new Date();
+  await setSystemSetting(key, JSON.stringify(next), now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.tenant_pilot_updated", targetType: "tenant", targetId: input.tenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now });
+  revalidatePath("/super-admin/settings"); revalidatePath("/settings/meta");
 }
 
 export async function updateNotificationCapabilityAction(formData: FormData) {
@@ -442,6 +485,63 @@ export async function updateAgentTrainingCenterSettingsAction(formData: FormData
 
   revalidatePath("/super-admin/settings");
   revalidatePath("/settings");
+}
+
+export async function updatePerformanceRankingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("performanceRankingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_performance_ranking_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "performance_ranking.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "performance_ranking",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/metas/desempenho");
+}
+
+export async function updateTeamMemberProfileSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("teamMemberProfileEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_team_member_profile_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "team_member_profile.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "team_member_profile",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/equipe");
+}
+
+export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("enabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_custom_roles_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.global_feature_updated", targetType: "system_settings", targetId: "custom_roles", metadata: { enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/equipe/cargos");
+}
+
+export async function updateTenantCustomRolesPilotAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const now = new Date();
+  if (input.enabled === "true") await provisionDefaultMarketingRole({ tenantId: input.tenantId, actorUserId: admin.userId });
+  await getDatabase().insert(schema.tenantCustomRoleSettings).values({ tenantId: input.tenantId, enabled: input.enabled === "true", updatedBy: admin.userId, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: schema.tenantCustomRoleSettings.tenantId, set: { enabled: input.enabled === "true", updatedBy: admin.userId, updatedAt: now } });
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.tenant_pilot_updated", targetType: "tenant", targetId: input.tenantId, metadata: { enabled: input.enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/equipe/cargos");
 }
 
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {

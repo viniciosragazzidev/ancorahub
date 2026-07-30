@@ -5,6 +5,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { getAuth } from "@/shared/auth";
 import { headers } from "next/headers";
 import type { TenantRole } from "@/shared/db/schema";
+import { listEffectiveCapabilities } from "@/features/custom-roles/service";
+import type { PermissionKey } from "@/shared/auth/permissions";
 
 const ROLE_REDIRECT: Record<TenantRole, string> = {
   director: "/dashboard",
@@ -23,6 +25,7 @@ export type UserDisplayInfo = {
   role: string | null;
   roleKey: TenantRole | null;
   jobTitle: string | null;
+  permissions?: PermissionKey[];
   redirectLogout: string;
 };
 
@@ -34,8 +37,9 @@ export async function getRoleRedirect(): Promise<string> {
   if (!session) return "/login";
 
   const [membership] = await getDatabase()
-    .select({ role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle })
+    .select({ tenantId: schema.tenantMemberships.tenantId, role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle, customRoleId: schema.tenantMemberships.customRoleId, customRoleName: schema.customRoles.name })
     .from(schema.tenantMemberships)
+    .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
     .where(eq(schema.tenantMemberships.userId, session.user.id))
     .limit(1);
 
@@ -58,19 +62,22 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
   }
 
   const [membership] = await getDatabase()
-    .select({ role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle })
+    .select({ tenantId: schema.tenantMemberships.tenantId, role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle, customRoleId: schema.tenantMemberships.customRoleId, customRoleName: schema.customRoles.name })
     .from(schema.tenantMemberships)
+    .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
     .where(eq(schema.tenantMemberships.userId, session.user.id))
     .limit(1);
 
   const role = membership?.role ?? null;
   const redirectLogout = role ? ROLE_REDIRECT[role] ?? "/login" : "/login";
+  const permissions = membership ? await listEffectiveCapabilities({ tenantId: membership.tenantId, role: membership.role, jobTitle: membership.jobTitle, customRoleId: membership.customRoleId }) : [];
 
   return {
     name: session.user.name,
-    role: role ? ROLE_LABELS[role] ?? role : null,
+    role: membership?.customRoleName ?? (role ? ROLE_LABELS[role] ?? role : null),
     roleKey: role,
     jobTitle: membership?.jobTitle ?? null,
+    permissions,
     redirectLogout,
   };
 }

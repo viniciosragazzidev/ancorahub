@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
+import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { generateWebhookToken } from "@/features/leads/webhooks/utils/lead-webhook.utils";
@@ -43,7 +44,9 @@ async function requireDirector() {
 }
 
 export async function getIntegrationsData() {
-  const context = await requireDirector();
+  const context = await getRequiredTenantContext();
+  const canView = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
+  if (!canView) throw new Error("Sem permissão para consultar integrações.");
   const db = getDatabase();
   const [integrations, branches] = await Promise.all([
     db.select({

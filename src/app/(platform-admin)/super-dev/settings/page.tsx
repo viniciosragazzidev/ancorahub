@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 export default function SuperDevSettingsPage() {
   return (
     <>
-      <PlatformAdminHeader breadcrumb="CorreTop / Admin" title="Configurações da Plataforma" />
+      <PlatformAdminHeader breadcrumb="Âncora / Admin" title="Configurações da Plataforma" />
 
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Parâmetros Globais</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ajuste as configurações gerais da plataforma CorreTop.
+              Ajuste as configurações gerais da plataforma.
             </p>
           </div>
         </section>
@@ -25,7 +25,7 @@ export default function SuperDevSettingsPage() {
           <CardContent className="space-y-4 text-xs">
             <div className="flex justify-between py-2 border-b">
               <span className="font-medium text-muted-foreground">Nome do sistema:</span>
-              <span className="font-semibold">CorreTop CRM</span>
+              <span className="font-semibold">Âncora Corretora CRM</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="font-medium text-muted-foreground">Banco de dados:</span>

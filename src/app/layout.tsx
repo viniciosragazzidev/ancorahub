@@ -7,6 +7,7 @@ import { AppProviders } from "@/components/app-providers";
 import { SplashScreen } from "@/components/splash-screen";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { RouteViewTransition } from "@/components/motion/route-view-transition";
+import { SkipToContent } from "@/components/skip-to-content";
 import "./globals.css";
 
 const interSans = Inter({
@@ -45,7 +46,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const theme = (await cookies()).get("corretop-theme")?.value === "dark" ? "dark" : "light";
+  const theme = (await cookies()).get("ancora-theme")?.value === "dark" ? "dark" : "light";
   // Motion is enabled by default. The system setting check was removed from
   // the root layout because a database query here blocks ALL page rendering,
   // including the public landing page. If the database is slow or unreachable
@@ -56,10 +57,11 @@ export default async function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning className={`${interSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
+        <SkipToContent />
         <SplashScreen />
         <InterfaceMotionProvider enabled={motionEnabled}>
           <AppProviders>
-            <TooltipProvider><RouteViewTransition>{children}</RouteViewTransition></TooltipProvider>
+            <TooltipProvider><div id="main-content" tabIndex={-1}><RouteViewTransition>{children}</RouteViewTransition></div></TooltipProvider>
             <Toaster />
           </AppProviders>
         </InterfaceMotionProvider>

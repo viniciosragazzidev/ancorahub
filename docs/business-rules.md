@@ -26,10 +26,10 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-010 | Tenant só é liberado após pagamento confirmado; não existe trial. | Onboarding pago → tenant ativo; inadimplência → acesso bloqueado após tolerância. | RF001, RF006–007, RF090–092 |
 | BR-011 | Super-admin gerencia tenant, plano e ativação, fora do escopo das corretoras. | Ação administrativa → altera estado do tenant e gera auditoria. | RF090–091 |
 | BR-012 | Diretor pode criar Gestores e Corretores; Gestor pode criar somente Corretores; Corretor não administra equipe. | Tentativa de criar papel acima do escopo → negada no servidor. | RF003–005, prompt 2.3 |
-| BR-013 | Usuários operacionais pertencem a uma filial. | Criação/alteração → filial válida no mesmo tenant é obrigatória. | RF100–101 |
+| BR-013 | Gestor e Corretor pertencem a uma filial; cargo administrativo pode ser geral ou local. | Criação/alteração → Gestor/Corretor e cargo de uma unidade exigem filial ativa do mesmo tenant; cargo geral pode permanecer sem filial. | RF100–101, DEC-066 |
 | BR-014 | Corretor disponível pode pausar o recebimento; Gestor pode fazê-lo pela equipe. | Pausa → corretor deixa de ser elegível à distribuição. | RF110–112 |
 | BR-015 | Cargo organizacional e perfil de acesso são conceitos separados. | Criação/edição → cargo descritivo pode variar sem ampliar permissões; o perfil continua autorizado pelo servidor. | Gestão de equipe |
-| BR-016 | Todo membro operacional deve estar vinculado a uma filial ativa. | Criação/edição → unidade selecionada pertence ao tenant e é registrada na associação. | RF100–101 |
+| BR-016 | Todo membro operacional e todo cargo limitado a unidade deve estar vinculado a uma filial ativa. | Criação/edição → o servidor deriva a exigência do perfil e da abrangência do cargo, valida a unidade no tenant e registra a associação. | RF100–101, DEC-066 |
 
 ## Leads, funil e distribuição
 
@@ -45,6 +45,11 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-027 | Reabertura e reatribuição são decisões de Gestor/Diretor e preservam histórico. | Reabertura → lead volta ao fluxo com evento de auditoria/timeline. | RF196 |
 | BR-028 | Estouro de SLA remove o corretor responsável antes de redistribuir. | Lead do Diretor tenta outro corretor elegível da unidade e, sem elegível, retorna à fila central da corretora mãe; lead do Gestor retorna à fila da própria unidade para distribuição manual. | DEC-027 |
 | BR-029 | Notificação operacional é um evento coordenado. | Capacidade ativa → cria notificação in-app para Realtime/toast e tenta push; capacidade desativada pelo Super-admin → nenhum canal é emitido, com auditoria da alteração. | DEC-028 |
+| BR-029C | Lead sem unidade resolvida entra na fila geral central do tenant, sem atribuição automática. | Diretor encaminha para uma unidade; Gestor direciona somente após o lead entrar em sua unidade; cada ação é auditada. | DEC-059 |
+| BR-029D | Exceções de intake/outbox possuem dono operacional e SLA inicial. | Diretor trata exceções centrais; Gestor trata apenas a própria unidade; P0 em até 30 min e P1 até o fim do dia útil. | DEC-060 |
+| BR-029E | Plantão tem cobertura mínima configurável e não bloqueia a distribuição quando incompleto. | Escalados abaixo do mínimo → alerta operacional; corretores elegíveis já escalados continuam concorrendo à distribuição. | DEC-061 |
+| BR-029F | Remover plantão significa arquivar, nunca apagar o histórico. | Arquivamento → regra e atribuições ativas saem da operação; restauração reativa somente a regra e mantém auditoria. | DEC-061 |
+| BR-029G | Criar plantão para várias unidades gera regras independentes por unidade e fila. | Diretor seleciona unidades e filas ativas → regras, auditorias e coberturas locais são criadas atomicamente; Gestor só pode criar para a própria unidade. | DEC-062 |
 
 ## Cotação, documentos e venda
 
@@ -73,6 +78,9 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-041 | Comissão prevista, paga e pendente são estados distintos e conferíveis por período. | Marcação de pagamento → atualiza parcela e mantém rastreabilidade. | RF052–054 |
 | BR-042 | Renovação gera alerta antecipado; interações pós-venda permanecem no cliente. | Proximidade do aniversário → notificação; interação → histórico do cliente. | RF131–132 |
 | BR-043 | Metas podem ser por corretor e por equipe/filial, em período definido. | Registro de venda → recalcula progresso do alvo aplicável. | RF120–121 |
+| BR-063 | Temporadas de desempenho são isoladas por tenant e somente o Diretor pode criar, ativar ou encerrar um ciclo. | Ativação ou reinício → encerra o ciclo ativo, preserva histórico e registra auditoria. | DEC-067 |
+| BR-064 | Premiações por colocação são declarativas e não movimentam valores financeiros automaticamente. | Diretor cria uma premiação → regra fica vinculada à temporada, sem pagamento ou comissão automática. | DEC-067 |
+| BR-065 | Perfil administrativo de membro é exclusivo de Diretor e Gestor no próprio tenant; Gestor vê somente membros, leads e métricas da própria unidade. | Abre `/equipe/[id]` → servidor deriva tenant e escopo da sessão, filtra cada consulta por unidade quando o ator é Gestor e registra a leitura na auditoria. | DEC-068 |
 
 ## Comunicação, relatórios e integridade
 
@@ -100,6 +108,8 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 - Fórmula, vigência e reversão de comissões (DEC-004).
 - Base legal, retenção e consentimento LGPD (DEC-005).
 - Canal, aprovação e opt-out do reengajamento (DEC-006).
+
+| BR-062 | O Diretor pode consultar, em modo somente leitura, o histórico do número oficial com corretores do próprio tenant. | Mensagem oficial para/desde número de corretor → persiste no ledger autorizado; Diretor abre `/conversas?tab=corretores` → consulta convites, entregas e respostas sem enviar mensagens. | DEC-065 |
 
 ## Feedback e lembretes
 

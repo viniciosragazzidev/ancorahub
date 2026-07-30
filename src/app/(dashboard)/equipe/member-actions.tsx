@@ -25,6 +25,7 @@ type TeamMember = {
   status: "pending" | "active" | "disabled";
   branchId: string | null;
   branchName: string | null;
+  customRoleScope?: "none" | "own" | "branch" | "tenant" | null;
 };
 
 type Props = {
@@ -91,6 +92,7 @@ function EditMemberDialog({
   const [role, setRole] = useState<string>(
     currentRole === "director" && member.role === "manager" ? "manager" : "broker"
   );
+  const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || member.customRoleScope === "branch";
 
   useEffect(() => {
     if (state.success) {
@@ -178,16 +180,17 @@ function EditMemberDialog({
             </Select>
           </Field>
           <Field>
-            <FieldLabel>Filial</FieldLabel>
+            <FieldLabel>{requiresBranch ? "Unidade" : "Unidade (opcional)"}</FieldLabel>
             <Select
-              defaultValue={member.branchId ?? ""}
+              defaultValue={member.branchId ?? "__tenant__"}
               disabled={pending || allowedBranches.length === 1}
               name="branchId"
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione a filial">{(value: string | null) => allowedBranches.find((branch) => branch.id === value)?.name ?? "Selecione a filial"}</SelectValue>
+                <SelectValue placeholder={requiresBranch ? "Selecione a unidade" : "Geral da empresa"}>{(value: string | null) => value === "__tenant__" ? "Geral da empresa" : allowedBranches.find((branch) => branch.id === value)?.name ?? "Selecione a unidade"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
+                {!requiresBranch ? <SelectItem value="__tenant__">Geral da empresa</SelectItem> : null}
                 {allowedBranches.map((branch) => (
                   <SelectItem key={branch.id} value={branch.id}>
                     {branch.name}
@@ -195,6 +198,7 @@ function EditMemberDialog({
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">{requiresBranch ? "Este acesso precisa permanecer em uma única unidade." : "Sem unidade, este cargo atua em toda a empresa dentro das permissões liberadas."}</p>
           </Field>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button className="flex-1" disabled={pending} type="submit">
@@ -250,7 +254,7 @@ function DeleteMemberDialog({
       <DialogPopup className="sm:max-w-md">
         <DialogTitle>Excluir membro</DialogTitle>
         <DialogDescription>
-          Essa ação remove o acesso, a associação de equipe e o login do membro.
+          Essa ação remove o acesso desta empresa, a associação de equipe e as sessões ativas. O histórico operacional é preservado.
         </DialogDescription>
         <form ref={formRef} action={action} className="space-y-4">
           <input name="memberId" type="hidden" value={member.id} />

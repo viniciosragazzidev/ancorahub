@@ -6,6 +6,7 @@ import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTeamUser } from "@/features/team/create-user";
+import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole, requireCanManageMember } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
@@ -36,7 +37,10 @@ const updateMemberInput = z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   role: memberRole,
   jobTitle: memberJobTitle,
-  branchId: z.string().uuid(),
+  branchId: z.preprocess(
+    (value) => value === "__tenant__" ? "" : value,
+    z.string().uuid().optional().or(z.literal("")),
+  ),
 });
 
 const memberIdInput = z.object({
@@ -73,11 +77,13 @@ export async function updateTeamMemberAction(
         userId: schema.user.id,
         role: schema.tenantMemberships.role,
         jobTitle: schema.tenantMemberships.jobTitle,
+        customRoleScope: schema.customRoles.scope,
         branchId: schema.tenantMemberships.branchId,
         status: schema.user.status,
       })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(
         and(
           eq(schema.tenantMemberships.id, input.memberId),
@@ -96,25 +102,37 @@ export async function updateTeamMemberAction(
       userId: member.userId,
     });
 
-    if (context.role === "manager" && context.branchId && input.branchId !== context.branchId) {
+    const normalizedBranchId = input.branchId || null;
+    const requiresBranch = requiresMemberBranch({
+      jobTitle: input.jobTitle,
+      customRoleScope: member.customRoleScope,
+    });
+    if (requiresBranch && !normalizedBranchId) {
+      throw new Error("Gestor e Corretor, ou cargos limitados a uma unidade, precisam de uma unidade vinculada.");
+    }
+
+    if (context.role === "manager" && context.branchId && normalizedBranchId !== context.branchId) {
       throw new Error("Gestores so podem manter corretores na propria filial.");
     }
 
     requireCanCreateRole(context, input.role);
 
-    const [branch] = await db
-      .select({ id: schema.branches.id })
-      .from(schema.branches)
-      .where(
-        and(
-          eq(schema.branches.id, input.branchId),
-          eq(schema.branches.tenantId, context.tenantId),
-          eq(schema.branches.status, "active"),
-        ),
-      )
-      .limit(1);
+    const branchRows = normalizedBranchId
+      ? await db
+        .select({ id: schema.branches.id })
+        .from(schema.branches)
+        .where(
+          and(
+            eq(schema.branches.id, normalizedBranchId),
+            eq(schema.branches.tenantId, context.tenantId),
+            eq(schema.branches.status, "active"),
+          ),
+        )
+        .limit(1)
+      : [];
+    const [branch] = branchRows;
 
-    if (!branch) {
+    if (normalizedBranchId && !branch) {
       throw new Error("A filial selecionada nao pertence ao tenant ativo ou esta inativa.");
     }
 
@@ -138,7 +156,7 @@ export async function updateTeamMemberAction(
       await tx.update(schema.tenantMemberships).set({
         role: input.role,
         jobTitle: input.jobTitle,
-        branchId: input.branchId,
+        branchId: normalizedBranchId,
         updatedAt: new Date(),
       }).where(eq(schema.tenantMemberships.id, member.membershipId));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.membershipId, acao: "atualizou_membro" });
@@ -170,7 +188,7 @@ export async function bulkToggleTeamMemberStatusAction(
 
     const nextActive = targetStatus === "active";
     let updatedCount = 0;
-    let errorMessages: string[] = [];
+    const errorMessages: string[] = [];
 
     for (const memberId of memberIds) {
       try {
@@ -433,7 +451,9 @@ export async function deleteTeamMemberAction(
         if (profile) await tx.delete(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id)));
         if (profile) await tx.delete(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, context.tenantId)));
         await tx.delete(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, member.membershipId), eq(schema.tenantMemberships.tenantId, context.tenantId)));
-        await tx.delete(schema.user).where(eq(schema.user.id, member.userId));
+        // A identidade pode ter histórico/auditoria e até pertencer a outro tenant.
+        // Removemos somente o acesso desta empresa e invalidamos as sessões ativas.
+        await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
       });
     } else {
       const [profile] = await db.select({ id: schema.brokerProfiles.id, branchId: schema.brokerProfiles.branchId, userId: schema.brokerProfiles.userId }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, memberId), eq(schema.brokerProfiles.tenantId, context.tenantId))).limit(1);
@@ -683,7 +703,7 @@ export async function importBrokersAction(
 
     const db = getDatabase();
     let imported = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     await db.transaction(async (tx) => {
       for (let i = 1; i < lines.length; i++) {

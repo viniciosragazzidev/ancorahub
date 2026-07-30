@@ -239,7 +239,7 @@ export async function purgeUserLGPD(userId: string) {
     // Update user active status and nullify details
     await tx.update(schema.user).set({
       name: "LGPD EXCLUÍDO",
-      email: `lgpd-deleted-${randomUUID()}@corretop.com.br`,
+      email: `lgpd-deleted-${randomUUID()}@ancoracorretora.com.br`,
       active: false,
       twoFactorEnabled: false,
     }).where(eq(schema.user.id, userId));

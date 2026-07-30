@@ -22,6 +22,14 @@ export type CreateLeadFromWebhookSyncInput = {
   payload: unknown;
   idempotencyKey: string | null;
   requestMetadata: { requestId: string; userAgent: string | null; receivedAt: Date };
+  leadSource?: {
+    channel: string;
+    externalId: string;
+    campaign?: string | null;
+    ad?: string | null;
+    form?: string | null;
+    metadata?: Record<string, string | number | boolean | null>;
+  };
 };
 
 /**
@@ -88,6 +96,15 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
       id: leadId, tenantId, branchId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
       origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: "queued",
       consentimentoLgpd: false, webhookCredentialId: credentialId, createdAt: now,
+      ...(input.leadSource ? {
+        externalId: input.leadSource.externalId,
+        sourceChannel: input.leadSource.channel,
+        sourceCampaign: input.leadSource.campaign ?? null,
+        sourceAd: input.leadSource.ad ?? null,
+        sourceForm: input.leadSource.form ?? null,
+        sourceMetadata: input.leadSource.metadata ?? null,
+        capturedAt: receivedAt,
+      } : {}),
     });
     await tx.insert(schema.leadInteractions).values({
       id: randomUUID(), leadId, userId: createdByUserId, tipo: "note",

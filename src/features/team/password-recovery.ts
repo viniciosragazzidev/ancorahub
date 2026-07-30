@@ -179,7 +179,7 @@ export async function approvePasswordReset(requestId: string) {
         recipientType: "user",
         destinationPhone: profile.phone,
         purpose: "brokerInvitation", // Reusing template infrastructure
-        variables: [request.userEmail, tenant?.name ?? "CorreTop", resetUrl],
+        variables: [request.userEmail, tenant?.name ?? "Âncora Corretora", resetUrl],
         requestedBy: context.userId,
         idempotencyKey: `password-reset:${requestId}`,
       });

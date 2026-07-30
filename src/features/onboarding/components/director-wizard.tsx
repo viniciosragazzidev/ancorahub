@@ -190,7 +190,7 @@ export function DirectorWizard({
           <span className="grid size-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
             C
           </span>
-          <span className="text-sm font-semibold tracking-tight">CorreTop</span>
+          <span className="text-sm font-semibold tracking-tight">Ancora Corretora</span>
           <StepDots current={step} total={TOTAL_STEPS} />
         </div>
 
@@ -214,7 +214,7 @@ export function DirectorWizard({
                     </span>
                   </div>
                   <h1 className="text-xl font-semibold tracking-tight">
-                    Bem-vindo ao CorreTop
+                    Bem-vindo a Ancora Corretora
                   </h1>
                   <p className="text-sm text-muted-foreground">
                     Vamos personalizar sua corretora. Primeiro, confirme o nome
@@ -353,7 +353,7 @@ export function DirectorWizard({
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {!logo
-                          ? "Logo padrao do CorreTop"
+                          ? "Logo padrao do sistema"
                           : "Logo personalizada"}
                       </p>
                     </div>

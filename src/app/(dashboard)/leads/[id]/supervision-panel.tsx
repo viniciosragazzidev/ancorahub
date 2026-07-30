@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
 
 type Broker = { id: string; name: string };
@@ -108,9 +109,12 @@ export function SupervisionPanel({
               Métricas de SLA, desempenho e ferramentas de intervenção para este lead.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-xs">
-            Modo Supervisor
-          </Badge>
+          <div className="flex items-center gap-2">
+            <LeadAssignedNotificationButton leadId={leadId} compact />
+            <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-xs">
+              Modo Supervisor
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-6 space-y-6">

@@ -27,10 +27,10 @@ export async function GET(
             .slice(0, 2)
             .join("")
             .toUpperCase()
-        : "CT";
+        : "--";
 
       const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 100 100">
-        <rect width="100" height="100" rx="50" fill="#3b82f6" />
+        <rect width="100" height="100" rx="50" fill="#16A34A" />
         <text x="50" y="55" font-family="sans-serif" font-size="36" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${initials}</text>
       </svg>`;
 

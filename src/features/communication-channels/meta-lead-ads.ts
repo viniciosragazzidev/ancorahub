@@ -1,0 +1,135 @@
+import "server-only";
+
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+
+import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
+import { generateWebhookToken, resolveRequestId } from "@/features/leads/webhooks/utils/lead-webhook.utils";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { getDatabase, schema } from "@/shared/db";
+
+import { MetaCloudApiError } from "./meta-cloud-client";
+import { getMetaLeadAdsServerConfig } from "./meta-cloud-config";
+import { isMetaLeadAdsTenantPilotEnabled } from "./meta-lead-ads-platform";
+
+export type MetaLeadAdsWebhookPayload = {
+  object?: string;
+  entry?: Array<{
+    id?: string;
+    changes?: Array<{ field?: string; value?: { leadgen_id?: string; form_id?: string; ad_id?: string } }>;
+  }>;
+};
+
+type MetaLeadField = { name?: string; values?: string[] };
+type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; form_id?: string; field_data?: MetaLeadField[] };
+
+export const META_LEAD_ADS_SOURCE = "meta_lead_ads";
+
+export async function isMetaLeadAdsEnabled(tenantId?: string) {
+  if ((await getSystemSetting("feature_meta_lead_ads_enabled")) !== "true") return false;
+  return tenantId ? isMetaLeadAdsTenantPilotEnabled(tenantId) : true;
+}
+
+export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: string | null, appSecret: string) {
+  const signature = signatureHeader?.replace(/^sha256=/i, "") ?? "";
+  const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex");
+  return signature.length === expected.length && signature.length > 0 && timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
+}
+
+function normalizeFieldName(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+}
+
+function firstField(fields: MetaLeadField[], names: string[]) {
+  const match = fields.find((field) => field.name && names.includes(normalizeFieldName(field.name)));
+  return match?.values?.find((value) => value.trim())?.trim() ?? "";
+}
+
+/** Deterministic field mapping; unknown form answers are never sent to logs. */
+export function normalizeMetaLead(record: MetaLeadAdRecord) {
+  const fields = record.field_data ?? [];
+  const nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
+  const telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
+  const email = firstField(fields, ["email", "email_address", "e_mail"]);
+  return { nome, telefone, email, externalId: record.id ?? "", adId: record.ad_id ?? null, formId: record.form_id ?? null };
+}
+
+async function fetchMetaLead(leadgenId: string): Promise<MetaLeadAdRecord> {
+  const config = getMetaLeadAdsServerConfig();
+  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,form_id,field_data`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` }, cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({})) as MetaLeadAdRecord & { error?: { message?: string; code?: number } };
+  if (!response.ok) throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a leitura do lead.", response.status, payload.error?.code);
+  return payload;
+}
+
+export async function configureMetaLeadAdsSource(input: { tenantId: string; branchId: string | null; pageId: string; adAccountId: string | null; actorUserId: string }) {
+  const db = getDatabase();
+  const now = new Date();
+  const [existing] = await db.select().from(schema.metaLeadAdSources).where(eq(schema.metaLeadAdSources.pageId, input.pageId)).limit(1);
+  if (existing && existing.tenantId !== input.tenantId) throw new Error("Esta Página Meta já está conectada a outra empresa.");
+  const sourceId = existing?.id ?? randomUUID();
+  const credentialId = existing?.leadWebhookCredentialId ?? randomUUID();
+  await db.transaction(async (tx) => {
+    if (!existing) {
+      const internalToken = generateWebhookToken();
+      await tx.insert(schema.leadWebhookCredentials).values({ id: credentialId, tenantId: input.tenantId, branchId: input.branchId, name: `Meta Lead Ads • ${input.pageId}`, source: META_LEAD_ADS_SOURCE, tokenPrefix: internalToken.tokenPrefix, tokenHash: internalToken.tokenHash, status: "active", createdBy: input.actorUserId, createdAt: now, updatedAt: now });
+      await tx.insert(schema.metaLeadAdSources).values({ id: sourceId, tenantId: input.tenantId, branchId: input.branchId, pageId: input.pageId, adAccountId: input.adAccountId, leadWebhookCredentialId: credentialId, status: "active", createdBy: input.actorUserId, createdAt: now, updatedAt: now });
+    } else {
+      await tx.update(schema.metaLeadAdSources).set({ branchId: input.branchId, adAccountId: input.adAccountId, status: "active", lastError: null, updatedAt: now }).where(eq(schema.metaLeadAdSources.id, sourceId));
+      await tx.update(schema.leadWebhookCredentials).set({ branchId: input.branchId, status: "active", revokedAt: null, updatedAt: now }).where(eq(schema.leadWebhookCredentials.id, credentialId));
+    }
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "meta_lead_ads_source", entidadeId: sourceId, acao: existing ? "meta_lead_ads.source_updated" : "meta_lead_ads.source_created" });
+  });
+  return { sourceId };
+}
+
+export async function pauseMetaLeadAdsSource(input: { tenantId: string; sourceId: string; actorUserId: string }) {
+  const db = getDatabase();
+  const [source] = await db.select().from(schema.metaLeadAdSources).where(and(eq(schema.metaLeadAdSources.id, input.sourceId), eq(schema.metaLeadAdSources.tenantId, input.tenantId))).limit(1);
+  if (!source) throw new Error("Fonte de Lead Ads não encontrada.");
+  await db.transaction(async (tx) => {
+    await tx.update(schema.metaLeadAdSources).set({ status: "inactive", updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+    await tx.update(schema.leadWebhookCredentials).set({ status: "revoked", revokedAt: new Date(), updatedAt: new Date() }).where(eq(schema.leadWebhookCredentials.id, source.leadWebhookCredentialId));
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "meta_lead_ads_source", entidadeId: source.id, acao: "meta_lead_ads.source_paused" });
+  });
+}
+
+export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayload, _rawPayload: string, request: Request) {
+  if (payload.object !== "page" || !(await isMetaLeadAdsEnabled())) return { processed: 0, ignored: 1 };
+  const db = getDatabase();
+  const receivedAt = new Date();
+  let processed = 0;
+  let ignored = 0;
+  for (const entry of payload.entry ?? []) {
+    if (!entry.id) { ignored += 1; continue; }
+    const [source] = await db.select().from(schema.metaLeadAdSources).where(and(eq(schema.metaLeadAdSources.pageId, entry.id), eq(schema.metaLeadAdSources.status, "active"))).limit(1);
+    if (!source || !(await isMetaLeadAdsEnabled(source.tenantId))) { ignored += 1; continue; }
+    const [credential] = source.createdBy ? [{ createdBy: source.createdBy }] : await db.select({ createdBy: schema.leadWebhookCredentials.createdBy }).from(schema.leadWebhookCredentials).where(eq(schema.leadWebhookCredentials.id, source.leadWebhookCredentialId)).limit(1);
+    if (!credential?.createdBy) { ignored += 1; continue; }
+    await db.update(schema.metaLeadAdSources).set({ lastWebhookAt: receivedAt, updatedAt: receivedAt }).where(eq(schema.metaLeadAdSources.id, source.id));
+    for (const change of entry.changes ?? []) {
+      const leadgenId = change.field === "leadgen" ? change.value?.leadgen_id?.trim() : undefined;
+      if (!leadgenId) continue;
+      try {
+        const leadRecord = await fetchMetaLead(leadgenId);
+        const lead = normalizeMetaLead(leadRecord);
+        if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
+        const result = await createLeadFromWebhookSync({
+          tenantId: source.tenantId, branchId: source.branchId, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
+          payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
+          requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
+          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, ad: lead.adId, form: lead.formId, metadata: { pageId: entry.id } },
+        });
+        if (!result.success) throw new Error(result.code);
+        await db.update(schema.metaLeadAdSources).set({ lastLeadAt: receivedAt, lastError: null, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+        processed += 1;
+      } catch (error) {
+        await db.update(schema.metaLeadAdSources).set({ lastError: error instanceof Error ? error.message.slice(0, 240) : "Falha no processamento do Lead Ads.", updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+        ignored += 1;
+      }
+    }
+  }
+  return { processed, ignored };
+}

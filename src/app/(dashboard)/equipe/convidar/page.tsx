@@ -20,6 +20,7 @@ export default async function CreateTeamMemberPage() {
     <>
       <DashboardHeader breadcrumb="Gestao de equipe" title="Criar membro" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <div>
           <p className="text-xs font-medium text-primary">GESTAO DE EQUIPE</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Criar membro</h1>
@@ -27,6 +28,7 @@ export default async function CreateTeamMemberPage() {
             Informe apenas os dados básicos. A senha será criada pelo colaborador no primeiro acesso.
           </p>
         </div>
+        */}
         <Card className="max-w-xl border-border bg-card shadow-none">
           <CardHeader>
             <CardTitle>Novo Funcionário</CardTitle>

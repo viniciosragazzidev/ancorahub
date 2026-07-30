@@ -25,7 +25,7 @@ import {
 import { SidebarCollapsibleGroup } from "@/components/sidebar-collapsible-group";
 import { useSession, signOut } from "@/shared/auth/client";
 import { toast } from "sonner";
-import { CorreTopLogo } from "@/components/corretop-logo";
+import { AncoraLogo } from "@/components/ancora-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
 export function PlatformAdminSidebar() {
@@ -58,7 +58,7 @@ export function PlatformAdminSidebar() {
               <UserAvatar seed={session?.user?.email || userName} name={userName} size="sm" className="size-8" />
               <div className="flex flex-col text-left group-data-[collapsible=icon]:hidden">
                 <span className="font-semibold tracking-tight text-sm text-foreground">Super Admin</span>
-                <CorreTopLogo className="h-4 w-24 object-contain object-left" />
+                <AncoraLogo className="h-4 w-24 object-contain object-left" />
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -211,7 +211,7 @@ export function PlatformAdminSidebar() {
                   </span>
                   <div className="flex flex-col text-left flex-1 pl-2">
                     <span className="truncate text-xs font-medium text-foreground">{userName}</span>
-                    <span className="truncate text-[10px] text-muted-foreground">Equipe CorreTop</span>
+                    <span className="truncate text-[10px] text-muted-foreground">Equipe Âncora Corretora</span>
                   </div>
                   <SignOut className="ml-auto size-4 shrink-0 text-muted-foreground/60 group-data-[collapsible=icon]:hidden" />
                 </SidebarMenuButton>

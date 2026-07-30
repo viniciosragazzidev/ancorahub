@@ -243,6 +243,7 @@ export const AnimatedThemeToggler = ({
     const ready = transition?.ready
     if (ready && typeof ready.then === "function") {
       ready.then(() => {
+        // Animate the root (main content area) with the clip-path mask
         document.documentElement.animate(
           {
             clipPath,
@@ -253,6 +254,18 @@ export const AnimatedThemeToggler = ({
             easing: shape === "star" ? "linear" : "ease-in-out",
             fill: "forwards",
             pseudoElement: "::view-transition-new(root)",
+          }
+        )
+        // Also animate the header so it reveals with the same mask instead of a plain fade
+        document.documentElement.animate(
+          {
+            clipPath,
+          },
+          {
+            duration,
+            easing: shape === "star" ? "linear" : "ease-in-out",
+            fill: "forwards",
+            pseudoElement: "::view-transition-new(ct-shell-header)",
           }
         )
       })

@@ -31,6 +31,7 @@ export default async function BranchesPage() {
     <>
       <DashboardHeader breadcrumb="Administracao" title="Filiais" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-medium text-primary">ESTRUTURA OPERACIONAL</p>
@@ -38,6 +39,7 @@ export default async function BranchesPage() {
             <p className="mt-1 text-sm text-muted-foreground">Organize a operacao por unidade, mantenha o escopo de equipe isolado e controle quais filiais podem receber novos leads.</p>
           </div>
         </section>
+        */}
         <BranchesManager branches={branches.map((branch) => ({ ...branch, externalId: null, memberCount: countsByBranch.get(branch.id) ?? 0, acceptingLeads: branch.acceptingLeads }))} />
       </main>
     </>

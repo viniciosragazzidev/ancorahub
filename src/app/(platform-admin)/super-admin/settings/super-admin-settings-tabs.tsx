@@ -15,8 +15,10 @@ const tabs = [
 type SettingsTab = (typeof tabs)[number]["id"];
 
 const tabForCard: SettingsTab[] = [
-  "platform", "platform", "operations", "operations", "channels", "platform", "platform",
-  "platform", "platform", "intelligence", "channels", "intelligence", "intelligence", "intelligence",
+  "platform", "platform", "platform", "platform", "platform", "operations", "platform",
+  "channels", "channels", "platform", "platform", "platform", "operations", "intelligence",
+  "operations", "channels", "intelligence", "intelligence", "intelligence",
+  "channels", "channels",
 ];
 
 type SuperAdminSettingsTabsProps = { children: ReactNode };

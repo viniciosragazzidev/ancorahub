@@ -183,7 +183,7 @@ export default async function RoadmapPage() {
               <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                 <CalendarBlank size={15} /> Plano oficial de 7 dias
               </div>
-              <CardTitle className="mt-2 text-2xl">CorreTop em construcao</CardTitle>
+              <CardTitle className="mt-2 text-2xl">Plataforma em construção</CardTitle>
               <CardDescription className="max-w-2xl">Acompanhe tudo que foi definido no plano, o que ja esta funcionando e os proximos blocos para chegar ao primeiro go-live.</CardDescription>
             </CardHeader>
           </Card>

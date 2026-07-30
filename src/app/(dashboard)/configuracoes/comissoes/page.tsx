@@ -21,6 +21,7 @@ export default async function CommissionRulesPage() {
     <>
       <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de Comissão" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+        {/* Contexto de página legado, preservado para eventual restauração:
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-medium text-primary">CONFIGURAÇÃO FINANCEIRA</p>
@@ -31,6 +32,7 @@ export default async function CommissionRulesPage() {
             </p>
           </div>
         </div>
+        */}
 
         <CommissionRulesManager rules={rules} carriers={carriers} />
         <PostSaleSettings {...postSaleSettings} />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CorreTopLogo } from "@/components/corretop-logo";
+import { AncoraLogo } from "@/components/ancora-logo";
 
 type Phase = "idle" | "logo_in" | "logo_pulse" | "page_cover";
 
@@ -64,7 +64,7 @@ export function LoginTransition({ active, onComplete }: LoginTransitionProps) {
           willChange: "opacity, transform",
         }}
       >
-        <CorreTopLogo className="h-14 w-52 object-contain" />
+        <AncoraLogo className="h-14 w-52 object-contain" />
       </div>
 
       {/* Pulsing ring behind logo */}

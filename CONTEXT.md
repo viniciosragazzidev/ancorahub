@@ -18,12 +18,17 @@
 - **Cancelamento**: encerramento do cliente ativo informado à corretora; não desconta dinheiro automaticamente e gera pendências financeiras auditáveis.
 - **Estorno pendente**: sinalização de uma parcela já paga que pode estar dentro da janela de chargeback; sua resolução é manual.
 
+## Distribuição de leads
+
+- **Plantão multiunidade**: criação coordenada de regras de plantão independentes para mais de uma unidade. Não é uma regra compartilhada: cada unidade conserva fila, escala, cobertura e histórico próprios.
+
 ## Canais de comunicação
 
 - **Agente de atendimento**: capacidade governada que conduz uma conversa com um lead pelo canal autorizado, preserva seu estado e pode solicitar ações CRM somente por ferramentas validadas. Na primeira entrega, ele só responde após mensagem inbound no WhatsApp oficial.
 - **Sessão de atendimento automatizado**: estado persistido, único por tenant, lead e canal, que registra os campos coletados, perguntas pendentes e o ponto seguro de retomada de uma conversa do agente.
 - **Canal de comunicação**: identidade operacional de um provedor associada a um tenant e, opcionalmente, a uma unidade. Para WhatsApp oficial, a chave externa é o `phone_number_id` da Meta.
 - **Canal Meta Cloud**: canal empresarial conectado por Embedded Signup; seu token é cifrado no servidor e nunca é devolvido ao navegador.
+- **Fonte Meta Lead Ads**: vínculo auditável entre uma Página Meta compartilhada e um tenant/unidade. A Página identifica o tenant no webhook; a credencial técnica de leitura é central da plataforma e nunca pertence ao cliente.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
 - **Atendimento externo temporário**: enquanto o chat interno não estiver operacional, o Corretor inicia o atendimento auditado no CorreTop e é direcionado ao WhatsApp pessoal pelo número autorizado do lead. A interface não apresenta mensagens como se estivessem sincronizadas.
 

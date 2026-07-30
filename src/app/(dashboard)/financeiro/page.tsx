@@ -14,12 +14,14 @@ export default async function FinancialPage() {
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
+            {/* Contexto de página legado, preservado para eventual restauração:
             <p className="text-xs font-medium text-primary">GESTÃO FINANCEIRA</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">Financeiro</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Acompanhe comissões, repasses, metas financeiras e resultados da corretora.
             </p>
-            <div className="mt-3"><ViewScopeContext role={context.role} /></div>
+            */}
+            <ViewScopeContext role={context.role} />
           </div>
         </section>
 
