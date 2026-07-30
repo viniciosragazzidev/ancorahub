@@ -29,7 +29,7 @@ export default async function MetaIntegrationSettingsPage() {
     <DashboardHeader breadcrumb="Configurações / Integrações" title="Meta Business" />
     <main className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
       <TenantDebugBar tenantId={context.tenantId} tenantName={tenantInfo?.name ?? null} pilotEnabled={pilotEnabled} />
-      <MetaManualIntegrationWorkspace channel={channel[0] ?? null} identity={identity} leadAdsEnabled={pilotEnabled && config.configured} leadAdsServerReady={config.configured} leadAdsMissingServerConfig={config.missing} leadAdSources={sources} />
+      <MetaManualIntegrationWorkspace channel={channel[0] ?? null} identity={identity} leadAdsEnabled={pilotEnabled} leadAdsServerReady={config.configured} leadAdsMissingServerConfig={config.missing} leadAdSources={sources} />
     </main>
   </>;
 }
