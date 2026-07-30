@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import { ArrowRight, MagnifyingGlass } from "@/components/huge-icons";
@@ -69,7 +70,7 @@ export function GlobalSearch() {
   }
 
   return <>
-    {open ? <div className="fixed inset-0 z-40 flex items-start justify-center bg-background/80 p-4 pt-[12vh] backdrop-blur-sm" onClick={close}>
+    {open && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[9999] flex items-start justify-center bg-background/80 p-4 pt-[12vh] backdrop-blur-sm" onClick={close}>
       <section aria-label="Busca global" className="w-full max-w-2xl overflow-hidden rounded-xl border border-border bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
         <form className="flex items-center gap-2 border-b border-border p-3" onSubmit={(event) => { event.preventDefault(); const first = groups[0]?.items[0]; if (first) goTo(first.href); }}>
           <MagnifyingGlass className="size-4 text-muted-foreground" />
@@ -81,7 +82,7 @@ export function GlobalSearch() {
         </div>
         <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">Resultados respeitam o tenant, a filial e o cargo do usuário.</p>
       </section>
-    </div> : null}
+    </div>, document.body) : null}
     <Button aria-label="Busca global (Ctrl K)" className="hidden gap-2 text-muted-foreground md:flex" onClick={() => setOpen(true)} size="sm" variant="outline"><MagnifyingGlass /> Buscar <kbd className="rounded border border-border px-1.5 text-[10px]">Ctrl K</kbd></Button>
   </>;
 }
