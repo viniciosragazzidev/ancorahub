@@ -247,6 +247,12 @@
       "skillPath": "skills/engineering/resolving-merge-conflicts/SKILL.md",
       "computedHash": "6a005119c18c477c2122321a380a43d40242bae3cc7027125f13497d90875be2"
     },
+    "revenue-centric-design": {
+      "source": "heliocosta-dev/revenue-centric-design",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "2302f5d551df943ca823b262a8c3f1009ab60aa3f15fd866703b7e337bd0530d"
+    },
     "review-animations": {
       "source": "emilkowalski/skills",
       "sourceType": "github",

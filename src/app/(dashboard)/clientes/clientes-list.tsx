@@ -186,6 +186,22 @@ export function ClientesList({
             showColumnToggle={true}
             showPagination={true}
             pageSize={10}
+            emptyState={
+              <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/15">
+                  <UserList className="size-6 text-primary" />
+                </div>
+                <div className="max-w-sm space-y-1.5">
+                  <p className="text-sm font-semibold text-foreground">Nenhum cliente convertido ainda</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Aqui ficará o histórico de todos os seus clientes convertidos. Para adicionar um, feche um lead como vendido.
+                  </p>
+                </div>
+                <a href="/leads" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/50 transition-colors">
+                  <ArrowRight className="size-3.5" /> Ir para Leads
+                </a>
+              </div>
+            }
           />
         </CardContent>
       </Card>

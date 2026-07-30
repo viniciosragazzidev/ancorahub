@@ -135,32 +135,56 @@ function DirectorActionCenter({ data }: { data: DirectorDashboardData }) {
     },
   ] as const;
 
+  const isCritical = (label: string) =>
+    (label === "Leads sem contato" && data.totals.unworked > 0) ||
+    (label === "Leads estagnados" && data.totals.stalled > 0);
+
   return (
     <section aria-labelledby="director-action-center" className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 id="director-action-center" className="text-sm font-bold tracking-tight">Minha Operação & Pendências</h2>
-          <p className="text-xs text-muted-foreground">Monitore pontos que exigem ação rápida do gestor.</p>
+          <h2 id="director-action-center" className="text-sm font-bold tracking-tight">Ação Necessária</h2>
+          <p className="text-xs text-muted-foreground">Pontos críticos que exigem ação imediata do gestor.</p>
         </div>
+        {(data.totals.unworked > 0 || data.totals.stalled > 0) && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-0.5 text-[10px] font-semibold text-destructive">
+            <Warning className="size-3" weight="fill" />
+            {data.totals.unworked + data.totals.stalled} pendentes
+          </span>
+        )}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {actions.map((action) => {
           const Icon = action.icon;
+          const critical = isCritical(action.label);
           return (
             <Link
               key={action.label}
               href={action.href}
-              className="group rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:border-border-strong hover:bg-card/95 hover:-translate-y-0.5 shadow-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={cn(
+                "group rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-none focus-visible:ring-2 focus-visible:ring-ring",
+                critical
+                  ? "border-l-4 border-destructive/60 bg-destructive/5 hover:bg-destructive/8"
+                  : "border-border bg-card hover:border-border-strong hover:bg-card/95"
+              )}
             >
               <div className="flex items-center justify-between gap-2">
                 <Badge variant="outline" className={`text-[10px] font-mono uppercase ${action.badgeTone}`}>
                   {action.badge}
                 </Badge>
-                <ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                <ArrowUpRight className={cn(
+                  "size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
+                  critical ? "text-destructive/70" : "text-muted-foreground"
+                )} />
               </div>
-              <p className="mt-3 text-xs font-semibold text-muted-foreground">{action.label}</p>
-              <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums text-foreground">{action.value}</p>
+              <p className={cn("mt-3 text-xs font-semibold", critical ? "text-destructive/80" : "text-muted-foreground")}>{action.label}</p>
+              <p className={cn("mt-1 text-2xl font-bold tracking-tight tabular-nums", critical ? "text-destructive" : "text-foreground")}>{action.value}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">{action.description}</p>
+              {critical && (
+                <p className="mt-2 text-[10px] font-semibold text-destructive/70 flex items-center gap-1">
+                  <Warning className="size-3" weight="fill" /> Ação imediata necessária →
+                </p>
+              )}
             </Link>
           );
         })}

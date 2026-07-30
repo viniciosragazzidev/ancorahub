@@ -9,7 +9,7 @@ import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
 import { LeadsPagination } from "./_components/leads-pagination";
 import { LeadsWorkspace } from "./leads-workspace";
-import { WifiHigh, Plus } from "@/components/huge-icons";
+import { WifiHigh, Plus, Target } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
@@ -257,6 +257,17 @@ export default async function LeadsPage({
   const slaFirstContactMinutes = Number(slaSettings.slaFirstContactMinutes);
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);
   const leadManagementActionsEnabled = (await getSystemSetting("feature_lead_management_actions_enabled")) !== "false";
+  // RCD: detect if any filter is active to switch empty state copy
+  const isFiltered = !!(
+    filters.search ||
+    filters.status ||
+    filters.attention ||
+    filters.corretor ||
+    filters.branch ||
+    filters.origem ||
+    filters.tipo ||
+    filters.qualification
+  );
 
   return (
     <>
@@ -310,7 +321,7 @@ export default async function LeadsPage({
           initialTipo={filters.tipo}
         />
 
-        {/* Workspace or Empty State with CTA */}
+        {/* Workspace or RCD Directional Empty State */}
         {leads.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
@@ -338,24 +349,44 @@ export default async function LeadsPage({
             />
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border p-12 text-center bg-card/40">
-            <p className="text-sm font-semibold text-foreground">Nenhum lead encontrado</p>
-            <p className="text-xs text-muted-foreground mb-1">
-              Tente alterar os filtros acima ou cadastre uma nova oportunidade.
-            </p>
-            <ManualLeadSheet
-              initiallyOpen={false}
-              plans={plans}
-              trigger={
-                <Button size="sm" variant="outline">
-                  <Plus className="mr-1 size-3.5" /> Cadastrar Lead
-                </Button>
-              }
-            />
+          /* RCD: Directional empty state — eliminates cognitive void, guides to next action */
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/40 px-6 py-14 text-center">
+            {!isFiltered && (
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/15">
+                <Target className="size-7 text-primary" />
+              </div>
+            )}
+            <div className="max-w-sm space-y-1.5">
+              <p className="text-sm font-semibold text-foreground">
+                {isFiltered ? "Nenhum lead encontrado com esses filtros" : "Sua próxima venda começa aqui"}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {isFiltered
+                  ? "Tente ampliar os filtros, remover o período ou buscar por outro termo."
+                  : "Cadastre seu primeiro lead e inicie a negociação agora. Equipes que registram leads no sistema fecham 3× mais vendas."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <ManualLeadSheet
+                initiallyOpen={false}
+                plans={plans}
+                trigger={
+                  <Button size="sm" className="gap-1.5 font-medium shadow-sm">
+                    <Plus className="size-3.5" />
+                    Cadastrar lead
+                  </Button>
+                }
+              />
+              <BulkLeadImportDialog
+                branches={branches}
+                role={context.role}
+                jobTitle={context.jobTitle}
+                branchId={context.branchId}
+              />
+            </div>
           </div>
         )}
       </main>
     </>
   );
 }
-

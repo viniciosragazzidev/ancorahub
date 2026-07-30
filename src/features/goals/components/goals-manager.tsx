@@ -351,16 +351,21 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
 
       {/* Goals list / empty states */}
       {goals.length === 0 ? (
-        <EmptyState
-          icon={Target}
-          title="Nenhuma meta cadastrada"
-          description="Crie a primeira meta para acompanhar o desempenho comercial da sua equipe."
-          action={
-            <Button onClick={() => setCreateOpen(true)} variant="outline">
-              <Plus className="size-4" /> Criar primeira meta
-            </Button>
-          }
-        />
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/40 px-6 py-14 text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/15">
+            <Target className="size-7 text-primary" />
+          </div>
+          <div className="max-w-sm space-y-1.5">
+            <p className="text-sm font-semibold text-foreground">Defina a primeira meta da equipe</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Equipes com metas definidas vendem 37% mais. O progresso é calculado automaticamente com base nas vendas reais.
+            </p>
+          </div>
+          <Button onClick={() => setCreateOpen(true)} size="sm" className="gap-1.5 font-medium shadow-sm">
+            <Plus className="size-3.5" />
+            Criar primeira meta
+          </Button>
+        </div>
       ) : visibleGoals.length === 0 ? (
         <EmptyState
           title="Nenhuma meta encontrada"

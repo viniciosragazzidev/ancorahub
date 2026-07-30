@@ -130,7 +130,7 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
             <div className="mt-8">
               <div className="relative h-4 overflow-hidden rounded-full bg-muted">
                 <motion.div
-                  className={`absolute inset-y-0 left-0 rounded-full ${progressBgColor}`}
+                  className={`absolute inset-y-0 left-0 rounded-full ${progressBgColor} ${pct >= 90 && pct < 100 ? "animate-pulse" : ""}`}
                   initial={{ width: 0 }}
                   animate={{ width: `${pct}%` }}
                   transition={{ duration: 1.2, ease: [0, 0, 0.2, 1] }}
@@ -138,9 +138,24 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
               </div>
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  Progresso
+                  {pct >= 100
+                    ? "✓ Meta atingida! Parabéns!"
+                    : pct >= 60
+                    ? (() => {
+                        const target = parseFloat(goal.targetValue);
+                        const curr = parseFloat(current);
+                        const remaining = Math.max(0, target - curr);
+                        const label = goal.targetType === "revenue"
+                          ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(remaining)
+                          : new Intl.NumberFormat("pt-BR").format(Math.round(remaining));
+                        return `Faltam apenas ${label} para bater a meta`;
+                      })()
+                    : "Progresso"}
                 </span>
-                <span className={`text-2xl font-bold tabular-nums ${pct >= 100 ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
+                <span className={`text-2xl font-bold tabular-nums ${
+                  pct >= 100 ? "text-emerald-600 dark:text-emerald-400" :
+                  pct >= 60 ? "text-primary" : ""
+                }`}>
                   {pct.toFixed(1)}%
                 </span>
               </div>
@@ -157,6 +172,13 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
                 </div>
               ))}
             </div>
+
+            {/* 100% celebration banner — Peak-End Rule */}
+            {pct >= 100 && (
+              <div className="mt-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">🎉 Meta atingida! Você faz parte dos melhores corretores do período.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -179,8 +201,12 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
         >
           <Card className="border-border bg-card shadow-none">
             <CardContent className="p-5">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Faltam</p>
-              <p className="mt-2 font-mono text-3xl font-semibold tabular-nums">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                {pct >= 60 && pct < 100 ? "Faltam para garantir o bônus" : "Faltam"}
+              </p>
+              <p className={`mt-2 font-mono text-3xl font-semibold tabular-nums ${
+                pct >= 90 && pct < 100 ? "text-primary" : ""
+              }`}>
                 {(() => {
                   const target = parseFloat(goal.targetValue);
                   const curr = parseFloat(current);
@@ -194,7 +220,9 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
                   return new Intl.NumberFormat("pt-BR").format(Math.round(remaining));
                 })()}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">para atingir a meta</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {pct >= 100 ? "✓ Meta atingida" : "para atingir a meta"}
+              </p>
             </CardContent>
           </Card>
         </motion.div>
