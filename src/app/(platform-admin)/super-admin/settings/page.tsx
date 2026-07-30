@@ -12,6 +12,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
 
+export const dynamic = "force-dynamic";
+
 type MissingRelationError = { code?: string; cause?: { code?: string } };
 
 function isMissingCustomRolesSchema(error: unknown) {
