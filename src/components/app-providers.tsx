@@ -31,7 +31,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         scope: "/",
         updateViaCache: "none",
       }).then(
-        (reg) => console.log("SW registrado com sucesso:", reg.scope),
+        (reg) => {
+          // Checks the latest worker on every application boot. This lets a
+          // cache-policy recovery reach already-open CRM sessions promptly.
+          void reg.update();
+          console.log("SW registrado com sucesso:", reg.scope);
+        },
         (err) => console.error("Falha no SW:", err)
       );
     }

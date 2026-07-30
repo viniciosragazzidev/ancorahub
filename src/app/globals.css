@@ -385,6 +385,26 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Shared route frame: pages keep their domain composition, while every
+   authenticated shell gets a safe inline axis and a single scroll owner. */
+[data-slot="app-content"] {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+[data-slot="app-content"] :where(main, section, article, aside, header, footer, form) {
+  min-inline-size: 0;
+}
+
+[data-slot="app-content"] :where(.flex, .grid) > * {
+  min-inline-size: 0;
+}
+
+[data-slot="app-content"] [data-slot="table-container"],
+[data-slot="app-content"] [data-slot="scroll-area"] {
+  max-inline-size: 100%;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

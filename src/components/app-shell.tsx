@@ -66,7 +66,7 @@ export function AppShell({
 
   return (
     <SidebarProvider
-      className="overflow-hidden"
+      className="min-h-dvh overflow-hidden"
       style={
         {
           "--sidebar-width": "225px",
@@ -90,13 +90,13 @@ export function AppShell({
         <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
       )}
       <SidebarInset
-        className="min-w-0 min-h-0 h-dvh bg-background overflow-y-auto overflow-x-hidden overscroll-contain max-[559px]:pb-[calc(8rem+env(safe-area-inset-bottom))]"
+        className="min-h-0 h-dvh bg-background overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
         style={{
           scrollPaddingTop: "var(--header-height)",
-          scrollPaddingBottom: "calc(8rem + env(safe-area-inset-bottom))",
+          scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
         }}
       >
-        <div className="flex min-w-0 min-h-0 flex-1 flex-col">{children}</div>
+        <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       </SidebarInset>
       <MobileBottomNav />
     </SidebarProvider>
