@@ -330,11 +330,9 @@ export function LeadsWorkspace({
             </TabsTrigger>
           </TabsList>
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs">
-                <SlidersHorizontal className="size-3.5" />
-                Colunas
-              </Button>
+            <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="gap-1.5 text-xs" />}>
+              <SlidersHorizontal className="size-3.5" />
+              Colunas
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>

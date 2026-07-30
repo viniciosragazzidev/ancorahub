@@ -90,17 +90,7 @@ export function PlatformAdminSidebar() {
                 <span>Revisão WhatsApp Meta</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                isActive={pathname === "/super-admin/catalogo"}
-                render={<Link href="/super-admin/catalogo" prefetch />}
-                tooltip="Catálogo global"
-                className="px-3.5 py-2 text-xs font-medium"
-              >
-                <FileText className="size-4" />
-                <span>Catálogo global</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/onboarding"}
