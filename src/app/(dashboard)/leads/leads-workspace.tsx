@@ -34,6 +34,7 @@ import { LeadDrawerManagementActions } from "./_components/lead-drawer-managemen
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/metric-card";
 import {
   Sheet,
   SheetBody,
@@ -288,6 +289,26 @@ export function LeadsWorkspace({
 
   const activeCount = useMemo(() => leads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [leads]);
   const convertedCount = useMemo(() => leads.filter((l) => l.status === "converted").length, [leads]);
+  const leadsTrend = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      date.setHours(0, 0, 0, 0);
+      const dayStart = date.getTime();
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+
+      const dayLeads = leads.filter((lead) => {
+        const createdAt = new Date(lead.createdAt).getTime();
+        return createdAt >= dayStart && createdAt < dayEnd;
+      });
+
+      return {
+        unassigned: dayLeads.filter((lead) => !lead.corretorId).length,
+        active: dayLeads.filter((lead) => lead.status === "in_contact" || lead.status === "negotiation").length,
+        converted: dayLeads.filter((lead) => lead.status === "converted").length,
+      };
+    });
+  }, [leads]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveDragId(String(event.active.id));
@@ -308,13 +329,29 @@ export function LeadsWorkspace({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
 
-      <Card variant="overview" aria-label="Resumo da operação de leads">
-        <div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <LeadOverviewMetric label="Sem responsável" value={unassignedCount} description="Aguardando distribuição" />
-          <LeadOverviewMetric label="Em atendimento" value={activeCount} description="Contatos em negociação" />
-          <LeadOverviewMetric label="Finalizados" value={convertedCount} description="Vendas convertidas" />
-        </div>
-      </Card>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard
+          label="Sem responsável"
+          value={unassignedCount}
+          sublabel="Aguardando distribuição"
+          sparklineData={leadsTrend.map((day) => day.unassigned)}
+          sparklineColor="var(--chart-1)"
+        />
+        <StatCard
+          label="Em atendimento"
+          value={activeCount}
+          sublabel="Contatos em negociação"
+          sparklineData={leadsTrend.map((day) => day.active)}
+          sparklineColor="var(--chart-3)"
+        />
+        <StatCard
+          label="Finalizados"
+          value={convertedCount}
+          sublabel="Vendas convertidas"
+          sparklineData={leadsTrend.map((day) => day.converted)}
+          sparklineColor="var(--chart-5)"
+        />
+      </div>
 
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs defaultValue="list" className="flex min-h-0 flex-1 flex-col">

@@ -10,6 +10,7 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OwnershipContext } from "@/components/ownership-context";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { StatCard } from "@/components/dashboard/metric-card";
 
 /* ─── Types ─── */
 
@@ -132,34 +133,29 @@ export function ClientesList({
   clients: ClientItem[];
   metrics: ClientsMetrics;
 }) {
+  const conversionTrend = clients.reduce<number[]>((acc, client) => {
+    const convertedAt = new Date(client.convertedAt).getTime();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let index = 0; index < 7; index += 1) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index));
+      const dayStart = date.getTime();
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+      if (convertedAt >= dayStart && convertedAt < dayEnd) acc[index] += 1;
+    }
+
+    return acc;
+  }, Array.from({ length: 7 }, () => 0));
+
   return (
     <div className="flex flex-col gap-6">
-      {/* 4 Cards Compactos - Padrão /equipe */}
       <div className="grid gap-3 sm:grid-cols-4">
-        <Card size="sm" className="border-border bg-card shadow-none">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Total de clientes</p>
-            <p className="mt-2 font-mono text-2xl font-semibold">{metrics.totalClients}</p>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="border-border bg-card shadow-none">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Taxa de conversão</p>
-            <p className="mt-2 font-mono text-2xl font-semibold text-blue-500">{metrics.conversionRate}%</p>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="border-border bg-card shadow-none">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Média por corretor</p>
-            <p className="mt-2 font-mono text-2xl font-semibold text-purple-500">{metrics.avgClientsPerBroker}</p>
-          </CardContent>
-        </Card>
-        <Card size="sm" className="border-border bg-card shadow-none">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Renovações próximas</p>
-            <p className="mt-2 font-mono text-2xl font-semibold text-amber-500">{metrics.upcomingRenewals}</p>
-          </CardContent>
-        </Card>
+        <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos 30 dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
+        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
+        <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
+        <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={conversionTrend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" />
       </div>
 
       {/* Container de Tabela - Padrão /equipe */}

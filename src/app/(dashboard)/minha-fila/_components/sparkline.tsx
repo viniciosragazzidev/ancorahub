@@ -21,7 +21,7 @@ export function Sparkline({
 
   return (
     <div className={className} aria-hidden="true">
-      <svg viewBox="0 0 100 36" className={`h-9 w-full overflow-visible ${colorClassName}`}>
+      <svg viewBox="0 0 100 36" className="h-9 w-full overflow-visible text-primary">
         <defs>
           <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
@@ -41,7 +41,6 @@ export function Sparkline({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={colorClassName}
         />
         <path
           d={`${data
@@ -52,12 +51,11 @@ export function Sparkline({
             })
             .join(" ")} L 100 34 L 0 34 Z`}
           fill={`url(#${id})`}
-          className={colorClassName}
         />
         {data.map((point, index) => {
           const x = data.length === 1 ? 50 : (index / (data.length - 1)) * 100;
           const y = 30 - (point.value / max) * 22;
-          return <circle key={`${point.label}-${index}`} cx={x} cy={y} r="1.8" fill="currentColor" className={colorClassName} />;
+          return <circle key={`${point.label}-${index}`} cx={x} cy={y} r="1.8" fill="currentColor" />;
         })}
       </svg>
     </div>

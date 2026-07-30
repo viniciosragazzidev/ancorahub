@@ -312,20 +312,20 @@ export default async function MinhaFilaPage() {
         {/* Metric Cards */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Total na fila", value: totalLeads, color: "text-foreground", chart: dailyTrend.map((day) => ({ label: day.label, value: day.leads })) },
-            { label: "Novos / urgentes", value: urgentLeads, color: urgentLeads > 0 ? "text-warning" : "text-muted-foreground", chart: dailyTrend.map((day) => ({ label: day.label, value: day.urgent })) },
-            { label: "Em andamento", value: inProgress, color: "text-chart-3", chart: dailyTrend.map((day) => ({ label: day.label, value: day.active })) },
-            { label: "Estagnados", value: stalledCount, color: stalledCount > 0 ? "text-destructive" : "text-muted-foreground", chart: dailyTrend.map((day) => ({ label: day.label, value: day.stalled })) },
+            { label: "Total na fila", value: totalLeads, color: "var(--primary)", chart: dailyTrend.map((day) => day.leads) },
+            { label: "Novos / urgentes", value: urgentLeads, color: "var(--warning)", chart: dailyTrend.map((day) => day.urgent) },
+            { label: "Em andamento", value: inProgress, color: "var(--chart-3)", chart: dailyTrend.map((day) => day.active) },
+            { label: "Estagnados", value: stalledCount, color: "var(--destructive)", chart: dailyTrend.map((day) => day.stalled) },
           ].map((stat) => (
             <div key={stat.label} className="rounded-lg border border-border/40 bg-card p-4 shadow-none">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+                  <p className="text-2xl font-bold tabular-nums text-foreground">{stat.value}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
                 </div>
                 <p className="text-[10px] font-medium text-muted-foreground">7 dias</p>
               </div>
-              <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart} colorClassName={stat.color} className="mt-3" />
+              <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart.map((val, idx) => ({ label: String(idx), value: val }))} colorClassName="text-primary" className="mt-3" />
             </div>
           ))}
         </section>
