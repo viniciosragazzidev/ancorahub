@@ -38,6 +38,7 @@ function FieldError({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
       data-slot="field-error"
+      role="alert"
       className={cn("text-xs font-medium text-destructive", className)}
       {...props}
     />

@@ -37,7 +37,7 @@ export function MobileBottomNav() {
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1.5 text-xs font-medium text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-out hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1.5 text-xs font-medium text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-out hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 active && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/85",
               )}
             >
@@ -50,7 +50,7 @@ export function MobileBottomNav() {
           type="button"
           aria-label="Abrir mais opções"
           onClick={() => setOpenMobile(true)}
-          className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1.5 text-xs font-medium text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-out hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1.5 text-xs font-medium text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-out hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <MoreHorizontalIcon aria-hidden="true" className="size-5" />
           <span>Mais</span>

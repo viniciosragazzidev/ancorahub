@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
 import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
@@ -138,420 +139,422 @@ export default async function SuperAdminSettingsPage() {
           </div>
         </section>
 
-        <SuperAdminSettingsTabs>
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Cargos personalizados</CardTitle>
-            <CardDescription>
-              Libera o piloto de cargos por empresa. O Diretor monta apenas cargos e permissões delegáveis; Diretor, Gestor e Corretor de sistema permanecem protegidos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form action={updateCustomRolesGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="enabled" value="true" defaultChecked={customRolesEnabled} className="size-4" />
-                <span>
-                  <span className="font-medium">Habilitar globalmente</span>
-                  <span className="block text-xs text-muted-foreground">Desativar preserva cargos e retorna o tenant ao comportamento legado.</span>
-                </span>
-              </label>
-              <Button type="submit" variant="outline">Salvar controle</Button>
-            </form>
-            {customRolesPilot.available ? (
-              <div className="divide-y divide-border rounded-lg border border-border">
-                {pilotTenants.map((tenant) => (
-                  <form action={updateTenantCustomRolesPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium">{tenant.name}</p>
-                      <p className="text-xs text-muted-foreground">Piloto por tenant e auditoria de alteração.</p>
+        <Suspense fallback={<div className="flex items-center justify-center py-20 text-sm text-muted-foreground">Carregando configurações...</div>}>
+          <SuperAdminSettingsTabs>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Cargos personalizados</CardTitle>
+                <CardDescription>
+                  Libera o piloto de cargos por empresa. O Diretor monta apenas cargos e permissões delegáveis; Diretor, Gestor e Corretor de sistema permanecem protegidos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form action={updateCustomRolesGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="enabled" value="true" defaultChecked={customRolesEnabled} className="size-4" />
+                    <span>
+                      <span className="font-medium">Habilitar globalmente</span>
+                      <span className="block text-xs text-muted-foreground">Desativar preserva cargos e retorna o tenant ao comportamento legado.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar controle</Button>
+                </form>
+                {customRolesPilot.available ? (
+                  <div className="divide-y divide-border rounded-lg border border-border">
+                    {pilotTenants.map((tenant) => (
+                      <form action={updateTenantCustomRolesPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium">{tenant.name}</p>
+                          <p className="text-xs text-muted-foreground">Piloto por tenant e auditoria de alteração.</p>
+                        </div>
+                        <input type="hidden" name="tenantId" value={tenant.id} />
+                        <input type="hidden" name="enabled" value={tenant.enabled ? "false" : "true"} />
+                        <Button size="sm" type="submit" variant={tenant.enabled ? "outline" : "default"}>{tenant.enabled ? "Remover do piloto" : "Liberar piloto"}</Button>
+                      </form>
+                    ))}
+                  </div>
+                ) : (
+                  <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    A estrutura de cargos ainda está sendo aplicada. As demais configurações permanecem disponíveis.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Temporadas e ranking comercial</CardTitle><CardDescription>Kill switch global para a gestão de temporadas, metas e premiações. Desativar bloqueia novos ajustes, mas preserva ciclos, resultados e auditoria.</CardDescription></CardHeader>
+              <CardContent>
+                <form action={updatePerformanceRankingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="performanceRankingEnabled" value="true" defaultChecked={performanceRankingEnabled} className="size-4" /><span><span className="font-medium">Ranking habilitado globalmente</span><span className="block text-xs text-muted-foreground">A gestão continua restrita ao Diretor dentro da própria empresa.</span></span></label>
+                  <Button type="submit" variant={performanceRankingEnabled ? "outline" : "default"}>{performanceRankingEnabled ? "Salvar controle" : "Liberar ranking"}</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Perfil administrativo da equipe</CardTitle><CardDescription>Libera a visão de desempenho individual para Diretores e Gestores. Gestores permanecem limitados aos membros e leads da própria unidade; cada acesso fica auditado.</CardDescription></CardHeader>
+              <CardContent><form action={updateTeamMemberProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="teamMemberProfileEnabled" value="true" defaultChecked={teamMemberProfileEnabled} className="size-4" /><span><span className="font-medium">Perfis administrativos habilitados</span><span className="block text-xs text-muted-foreground">Desativar remove o atalho e bloqueia a rota sem apagar históricos ou auditoria.</span></span></label><Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>{teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}</Button></form></CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Configuração do Servidor</CardTitle>
+                <CardDescription>Parâmetros operacionais do ambiente ativo.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="font-medium text-muted-foreground">Nome do sistema:</span>
+                  <span className="font-semibold">CorreTop CRM</span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="font-medium text-muted-foreground">Banco de dados:</span>
+                  <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10">PostgreSQL (Supabase)</Badge>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="font-medium text-muted-foreground">Versão do sistema:</span>
+                  <span className="font-semibold">v2.10.0-prod</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Onboarding por rota</CardTitle><CardDescription>Apresentações contextuais aparecem uma vez por usuário e rota. O estado é persistido por corretora, pode ser reiniciado pela central administrativa e toda alteração fica auditada.</CardDescription></CardHeader>
+              <CardContent>
+                <form action={setRouteOnboardingGlobalAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" value="true" defaultChecked={routeOnboardingEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Onboarding de rotas habilitado</span><span className="block text-xs text-muted-foreground">Desative temporariamente sem apagar progresso nem auditoria.</span></span></label>
+                  <Button type="submit">Salvar onboarding</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Motor de distribuição</CardTitle>
+                <CardDescription>Processa leads em fila, recupera execuções interrompidas e mantém exceções auditáveis. Desativar interrompe novas tentativas sem apagar a fila.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form action={updateLeadDistributionJobsSettingsAction} className="grid gap-4 lg:grid-cols-3">
+                  <label className="flex items-center gap-2 text-sm lg:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={distributionJobsEnabled} className="size-4" /><span><span className="font-medium">Distribuição automática resiliente habilitada</span><span className="block text-xs text-muted-foreground">A fila segue preservada quando desativada; Diretor e Gestor ainda podem atribuir manualmente.</span></span></label>
+                  <label className="grid gap-1 text-xs font-medium">Leads por ciclo<Input name="batchSize" min={1} max={100} type="number" defaultValue={distributionBatchSize} /></label>
+                  <label className="grid gap-1 text-xs font-medium">Tentativas máximas<Input name="maxAttempts" min={1} max={20} type="number" defaultValue={distributionMaxAttempts} /></label>
+                  <label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" min={30} max={900} type="number" defaultValue={distributionLeaseSeconds} /></label>
+                  <label className="grid gap-1 text-xs font-medium">Retry inicial (segundos)<Input name="retryBaseSeconds" min={15} max={3600} type="number" defaultValue={distributionRetryBaseSeconds} /></label>
+                  <label className="grid gap-1 text-xs font-medium">Recuperação (minutos)<Input name="recoveryMinutes" min={1} max={60} type="number" defaultValue={distributionRecoveryMinutes} /></label>
+                  <div className="flex items-end"><Button type="submit">Salvar motor</Button></div>
+                </form>
+                <form action={runLeadDistributionJobsAction} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Use apenas para intervenção operacional: executa um ciclo com os limites configurados e registra a solicitação na auditoria.</p>
+                  <Button type="submit" variant="outline">Processar fila agora</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Central de notificações</CardTitle>
+                <CardDescription>Ative ou desative globalmente cada evento. Quando desativado, o CorreTop não cria o toast/in-app nem envia push para esse evento.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {notificationCapabilities.map((capability) => (
+                  <form action={updateNotificationCapabilityAction} className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between" key={capability.id}>
+                    <input name="capabilityId" type="hidden" value={capability.id} />
+                    <div className="min-w-0">
+                      <p className="font-medium">{capability.label}</p>
+                      <p className="text-xs text-muted-foreground">{capability.description} · {capability.channels}</p>
                     </div>
-                    <input type="hidden" name="tenantId" value={tenant.id} />
-                    <input type="hidden" name="enabled" value={tenant.enabled ? "false" : "true"} />
-                    <Button size="sm" type="submit" variant={tenant.enabled ? "outline" : "default"}>{tenant.enabled ? "Remover do piloto" : "Liberar piloto"}</Button>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={capability.enabled ? "success" : "outline"}>{capability.enabled ? "Ativo" : "Desativado"}</Badge>
+                      <input name="enabled" type="hidden" value={capability.enabled ? "false" : "true"} />
+                      <Button size="sm" type="submit" variant={capability.enabled ? "outline" : "default"}>{capability.enabled ? "Desativar" : "Ativar"}</Button>
+                    </div>
                   </form>
                 ))}
-              </div>
-            ) : (
-              <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                A estrutura de cargos ainda está sendo aplicada. As demais configurações permanecem disponíveis.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Temporadas e ranking comercial</CardTitle><CardDescription>Kill switch global para a gestão de temporadas, metas e premiações. Desativar bloqueia novos ajustes, mas preserva ciclos, resultados e auditoria.</CardDescription></CardHeader>
-          <CardContent>
-            <form action={updatePerformanceRankingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="performanceRankingEnabled" value="true" defaultChecked={performanceRankingEnabled} className="size-4" /><span><span className="font-medium">Ranking habilitado globalmente</span><span className="block text-xs text-muted-foreground">A gestão continua restrita ao Diretor dentro da própria empresa.</span></span></label>
-              <Button type="submit" variant={performanceRankingEnabled ? "outline" : "default"}>{performanceRankingEnabled ? "Salvar controle" : "Liberar ranking"}</Button>
-            </form>
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>WhatsApp oficial da Meta</CardTitle><CardDescription>Ativa o Embedded Signup, o webhook oficial e o envio pela Cloud API. A capacidade pode ser interrompida sem apagar canais ou histórico.</CardDescription></CardHeader>
+              <CardContent><form action={updateMetaCloudWhatsAppSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="metaCloudWhatsAppEnabled" value="true" defaultChecked={metaCloudWhatsAppEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Integração oficial habilitada</span><span className="block text-xs text-muted-foreground">Exige as credenciais privadas da Meta configuradas no ambiente da Vercel.</span></span></label><Button type="submit" variant="outline">Salvar integração</Button></form></CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Perfil administrativo da equipe</CardTitle><CardDescription>Libera a visão de desempenho individual para Diretores e Gestores. Gestores permanecem limitados aos membros e leads da própria unidade; cada acesso fica auditado.</CardDescription></CardHeader>
-          <CardContent><form action={updateTeamMemberProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="teamMemberProfileEnabled" value="true" defaultChecked={teamMemberProfileEnabled} className="size-4" /><span><span className="font-medium">Perfis administrativos habilitados</span><span className="block text-xs text-muted-foreground">Desativar remove o atalho e bloqueia a rota sem apagar históricos ou auditoria.</span></span></label><Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>{teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}</Button></form></CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Captação manual de Lead Ads</CardTitle><CardDescription>Libera o webhook Page/leadgen com um token técnico exclusivo da plataforma. Cada Página continua mapeada e auditada por empresa, sem guardar token do cliente.</CardDescription></CardHeader>
+              <CardContent><form action={updateMetaLeadAdsSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="metaLeadAdsEnabled" value="true" defaultChecked={metaLeadAdsEnabled} className="size-4" /><span><span className="font-medium">Recebimento de Lead Ads habilitado</span><span className="block text-xs text-muted-foreground">Desativar interrompe novas capturas e preserva páginas, leads e auditoria existentes.</span></span></label><Button type="submit" variant={metaLeadAdsEnabled ? "outline" : "default"}>{metaLeadAdsEnabled ? "Salvar controle" : "Liberar Lead Ads"}</Button></form></CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Configuração do Servidor</CardTitle>
-            <CardDescription>Parâmetros operacionais do ambiente ativo.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="flex justify-between py-2 border-b">
-              <span className="font-medium text-muted-foreground">Nome do sistema:</span>
-              <span className="font-semibold">CorreTop CRM</span>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="font-medium text-muted-foreground">Banco de dados:</span>
-              <Badge variant="outline" className="text-emerald-500 border-emerald-500/20 bg-emerald-500/10">PostgreSQL (Supabase)</Badge>
-            </div>
-            <div className="flex justify-between py-2 border-b">
-              <span className="font-medium text-muted-foreground">Versão do sistema:</span>
-              <span className="font-semibold">v2.10.0-prod</span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Capacidades operacionais</CardTitle>
+                <CardDescription>Controle reversível de recursos que impactam a operação dos tenants. Toda alteração é registrada na auditoria da plataforma.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateCentralAtencaoSettingsAction} className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="centralAtencaoEnabled" value="true" defaultChecked={centralEnabled} className="size-4 warning-[var(--primary)]" />
+                    <span><span className="font-medium">Central Atenção agora</span><span className="block text-xs text-muted-foreground">Exibir pendências acionáveis no roadmap.</span></span>
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium">Dias para estagnação<Input name="stagnantDays" type="number" min={1} max={30} defaultValue={stagnantDays} /></label>
+                  <Button type="submit">Salvar alterações</Button>
+                </form>
+              </CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Onboarding por rota</CardTitle><CardDescription>Apresentações contextuais aparecem uma vez por usuário e rota. O estado é persistido por corretora, pode ser reiniciado pela central administrativa e toda alteração fica auditada.</CardDescription></CardHeader>
-          <CardContent>
-            <form action={setRouteOnboardingGlobalAction} className="flex flex-wrap items-center justify-between gap-4">
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" value="true" defaultChecked={routeOnboardingEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Onboarding de rotas habilitado</span><span className="block text-xs text-muted-foreground">Desative temporariamente sem apagar progresso nem auditoria.</span></span></label>
-              <Button type="submit">Salvar onboarding</Button>
-            </form>
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Busca global</CardTitle><CardDescription>Pesquisa leads, clientes, cotações, tarefas e equipe respeitando o escopo de cada usuário.</CardDescription></CardHeader>
+              <CardContent><form action={updateGlobalSearchSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="globalSearchEnabled" value="true" defaultChecked={globalSearchEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Busca global habilitada</span><span className="block text-xs text-muted-foreground">Permitir pesquisas pelo cabeçalho do sistema.</span></span></label><Button type="submit" variant="outline">Salvar busca</Button></form></CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Motor de distribuição</CardTitle>
-            <CardDescription>Processa leads em fila, recupera execuções interrompidas e mantém exceções auditáveis. Desativar interrompe novas tentativas sem apagar a fila.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form action={updateLeadDistributionJobsSettingsAction} className="grid gap-4 lg:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm lg:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={distributionJobsEnabled} className="size-4" /><span><span className="font-medium">Distribuição automática resiliente habilitada</span><span className="block text-xs text-muted-foreground">A fila segue preservada quando desativada; Diretor e Gestor ainda podem atribuir manualmente.</span></span></label>
-              <label className="grid gap-1 text-xs font-medium">Leads por ciclo<Input name="batchSize" min={1} max={100} type="number" defaultValue={distributionBatchSize} /></label>
-              <label className="grid gap-1 text-xs font-medium">Tentativas máximas<Input name="maxAttempts" min={1} max={20} type="number" defaultValue={distributionMaxAttempts} /></label>
-              <label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" min={30} max={900} type="number" defaultValue={distributionLeaseSeconds} /></label>
-              <label className="grid gap-1 text-xs font-medium">Retry inicial (segundos)<Input name="retryBaseSeconds" min={15} max={3600} type="number" defaultValue={distributionRetryBaseSeconds} /></label>
-              <label className="grid gap-1 text-xs font-medium">Recuperação (minutos)<Input name="recoveryMinutes" min={1} max={60} type="number" defaultValue={distributionRecoveryMinutes} /></label>
-              <div className="flex items-end"><Button type="submit">Salvar motor</Button></div>
-            </form>
-            <form action={runLeadDistributionJobsAction} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
-              <p className="text-xs text-muted-foreground">Use apenas para intervenção operacional: executa um ciclo com os limites configurados e registra a solicitação na auditoria.</p>
-              <Button type="submit" variant="outline">Processar fila agora</Button>
-            </form>
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Movimento da interface</CardTitle><CardDescription>Controla transições curtas de rota, títulos e superfícies. Não altera a preferência de acessibilidade de cada pessoa.</CardDescription></CardHeader>
+              <CardContent><form action={updateInterfaceMotionSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="interfaceMotionEnabled" value="true" defaultChecked={interfaceMotionEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Motion da interface habilitado</span><span className="block text-xs text-muted-foreground">Desative para trocar rotas e estados instantaneamente em toda a plataforma.</span></span></label><Button type="submit" variant="outline">Salvar motion</Button></form></CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Central de notificações</CardTitle>
-            <CardDescription>Ative ou desative globalmente cada evento. Quando desativado, o CorreTop não cria o toast/in-app nem envia push para esse evento.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {notificationCapabilities.map((capability) => (
-              <form action={updateNotificationCapabilityAction} className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between" key={capability.id}>
-                <input name="capabilityId" type="hidden" value={capability.id} />
-                <div className="min-w-0">
-                  <p className="font-medium">{capability.label}</p>
-                  <p className="text-xs text-muted-foreground">{capability.description} · {capability.channels}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant={capability.enabled ? "success" : "outline"}>{capability.enabled ? "Ativo" : "Desativado"}</Badge>
-                  <input name="enabled" type="hidden" value={capability.enabled ? "false" : "true"} />
-                  <Button size="sm" type="submit" variant={capability.enabled ? "outline" : "default"}>{capability.enabled ? "Desativar" : "Ativar"}</Button>
-                </div>
-              </form>
-            ))}
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Painel e Ações Administrativas no Lead</CardTitle>
+                <CardDescription>Customiza a tela de detalhes e o drawer rápido de leads para Diretores e Gestores com foco em supervisão, auditoria de propostas e reatribuição.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateLeadManagementActionsSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="leadManagementActionsEnabled" value="true" defaultChecked={leadManagementActionsEnabled} className="size-4 warning-[var(--primary)]" />
+                    <span>
+                      <span className="font-medium">Personalização para diretores e gestores habilitada</span>
+                      <span className="block text-xs text-muted-foreground">Desative para retornar à mesma visualização padrão (Corretor) para todos os cargos.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar personalização</Button>
+                </form>
+              </CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>WhatsApp oficial da Meta</CardTitle><CardDescription>Ativa o Embedded Signup, o webhook oficial e o envio pela Cloud API. A capacidade pode ser interrompida sem apagar canais ou histórico.</CardDescription></CardHeader>
-          <CardContent><form action={updateMetaCloudWhatsAppSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="metaCloudWhatsAppEnabled" value="true" defaultChecked={metaCloudWhatsAppEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Integração oficial habilitada</span><span className="block text-xs text-muted-foreground">Exige as credenciais privadas da Meta configuradas no ambiente da Vercel.</span></span></label><Button type="submit" variant="outline">Salvar integração</Button></form></CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Motor de Inteligência Artificial</CardTitle>
+                <CardDescription>
+                  Gerencie o motor central de IA da plataforma CorreTop. Os recursos utilizam o Vercel AI SDK para streaming rápido de respostas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateAiSettingsAction} className="space-y-6">
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Captação manual de Lead Ads</CardTitle><CardDescription>Libera o webhook Page/leadgen com um token técnico exclusivo da plataforma. Cada Página continua mapeada e auditada por empresa, sem guardar token do cliente.</CardDescription></CardHeader>
-          <CardContent><form action={updateMetaLeadAdsSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="metaLeadAdsEnabled" value="true" defaultChecked={metaLeadAdsEnabled} className="size-4" /><span><span className="font-medium">Recebimento de Lead Ads habilitado</span><span className="block text-xs text-muted-foreground">Desativar interrompe novas capturas e preserva páginas, leads e auditoria existentes.</span></span></label><Button type="submit" variant={metaLeadAdsEnabled ? "outline" : "default"}>{metaLeadAdsEnabled ? "Salvar controle" : "Liberar Lead Ads"}</Button></form></CardContent>
-        </Card>
-
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Capacidades operacionais</CardTitle>
-            <CardDescription>Controle reversível de recursos que impactam a operação dos tenants. Toda alteração é registrada na auditoria da plataforma.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={updateCentralAtencaoSettingsAction} className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="centralAtencaoEnabled" value="true" defaultChecked={centralEnabled} className="size-4 warning-[var(--primary)]" />
-                <span><span className="font-medium">Central Atenção agora</span><span className="block text-xs text-muted-foreground">Exibir pendências acionáveis no roadmap.</span></span>
-              </label>
-              <label className="grid gap-1 text-xs font-medium">Dias para estagnação<Input name="stagnantDays" type="number" min={1} max={30} defaultValue={stagnantDays} /></label>
-              <Button type="submit">Salvar alterações</Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Busca global</CardTitle><CardDescription>Pesquisa leads, clientes, cotações, tarefas e equipe respeitando o escopo de cada usuário.</CardDescription></CardHeader>
-          <CardContent><form action={updateGlobalSearchSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="globalSearchEnabled" value="true" defaultChecked={globalSearchEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Busca global habilitada</span><span className="block text-xs text-muted-foreground">Permitir pesquisas pelo cabeçalho do sistema.</span></span></label><Button type="submit" variant="outline">Salvar busca</Button></form></CardContent>
-        </Card>
-
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Movimento da interface</CardTitle><CardDescription>Controla transições curtas de rota, títulos e superfícies. Não altera a preferência de acessibilidade de cada pessoa.</CardDescription></CardHeader>
-          <CardContent><form action={updateInterfaceMotionSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="interfaceMotionEnabled" value="true" defaultChecked={interfaceMotionEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Motion da interface habilitado</span><span className="block text-xs text-muted-foreground">Desative para trocar rotas e estados instantaneamente em toda a plataforma.</span></span></label><Button type="submit" variant="outline">Salvar motion</Button></form></CardContent>
-        </Card>
-
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Painel e Ações Administrativas no Lead</CardTitle>
-            <CardDescription>Customiza a tela de detalhes e o drawer rápido de leads para Diretores e Gestores com foco em supervisão, auditoria de propostas e reatribuição.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={updateLeadManagementActionsSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="leadManagementActionsEnabled" value="true" defaultChecked={leadManagementActionsEnabled} className="size-4 warning-[var(--primary)]" />
-                <span>
-                  <span className="font-medium">Personalização para diretores e gestores habilitada</span>
-                  <span className="block text-xs text-muted-foreground">Desative para retornar à mesma visualização padrão (Corretor) para todos os cargos.</span>
-                </span>
-              </label>
-              <Button type="submit" variant="outline">Salvar personalização</Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Motor de Inteligência Artificial</CardTitle>
-            <CardDescription>
-              Gerencie o motor central de IA da plataforma CorreTop. Os recursos utilizam o Vercel AI SDK para streaming rápido de respostas.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={updateAiSettingsAction} className="space-y-6">
-              
-              {/* Ativação Global */}
-              <div className="flex items-center justify-between border-b pb-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    name="aiEnabled" 
-                    value="true" 
-                    defaultChecked={aiEnabled} 
-                    className="size-4 rounded border-gray-300 text-primary focus:ring-primary" 
-                  />
-                  <span>
-                    <span className="font-semibold block">Habilitar Inteligência Artificial</span>
-                    <span className="text-xs text-muted-foreground">Ativa recursos inteligentes e rotas de chat em toda a plataforma.</span>
-                  </span>
-                </label>
-              </div>
-
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Provedor Primário */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Provedor Primário</label>
-                  <select 
-                    name="primaryProvider" 
-                    defaultValue={aiPrimaryProvider}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="groq">Groq (Llama 3.3 / Llama 3)</option>
-                    <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                    <option value="google">Google Gemini (Gemini 2.5 Flash)</option>
-                    <option value="openrouter">OpenRouter (Modelos Gratuitos & Diversos)</option>
-                  </select>
-                  <p className="text-xs text-muted-foreground">Provedor principal utilizado para completar requisições.</p>
-                </div>
-
-                {/* Modelo Primário Override */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Modelo Primário (Override)</label>
-                  <Input 
-                    name="primaryModel" 
-                    placeholder="Ex: llama-3.3-70b-versatile" 
-                    defaultValue={aiPrimaryModel} 
-                  />
-                  <p className="text-xs text-muted-foreground">Deixe em branco para usar o modelo padrão do provedor.</p>
-                </div>
-
-                {/* Provedor de Fallback */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Provedor de Fallback</label>
-                  <select 
-                    name="fallbackProvider" 
-                    defaultValue={aiFallbackProvider}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <option value="none">Nenhum (Disparar erro em caso de falha)</option>
-                    <option value="groq">Groq</option>
-                    <option value="openai">OpenAI</option>
-                    <option value="google">Google Gemini</option>
-                    <option value="openrouter">OpenRouter</option>
-                  </select>
-                  <p className="text-xs text-muted-foreground">Provedor utilizado caso o primário retorne erro ou atinja limite.</p>
-                </div>
-
-                {/* Modelo de Fallback Override */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Modelo de Fallback (Override)</label>
-                  <Input 
-                    name="fallbackModel" 
-                    placeholder="Ex: gpt-4o-mini" 
-                    defaultValue={aiFallbackModel} 
-                  />
-                  <p className="text-xs text-muted-foreground">Deixe em branco para usar o modelo padrão do fallback.</p>
-                </div>
-
-                {/* Temperatura */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Temperatura</label>
-                  <Input 
-                    name="temperature" 
-                    type="number" 
-                    step="0.1" 
-                    min="0" 
-                    max="1" 
-                    defaultValue={aiTemperature} 
-                  />
-                  <p className="text-xs text-muted-foreground">Precisão e criatividade da IA (0.0 = preciso, 1.0 = criativo).</p>
-                </div>
-
-                {/* Max Tokens */}
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold">Limite de Tokens (Max Tokens)</label>
-                  <Input 
-                    name="maxTokens" 
-                    type="number" 
-                    min="1" 
-                    max="8192" 
-                    defaultValue={aiMaxTokens} 
-                  />
-                  <p className="text-xs text-muted-foreground">Tamanho máximo da resposta gerada.</p>
-                </div>
-              </div>
-
-              {/* Chaves de API */}
-              <div className="border-t pt-4 space-y-4">
-                <h4 className="text-sm font-bold tracking-tight">Chaves de API (Configuração de Credenciais)</h4>
-                <p className="text-xs text-muted-foreground">
-                  As chaves informadas abaixo serão salvas no banco de dados. Caso já estejam configuradas nas variáveis de ambiente (.env), não é necessário preencher.
-                </p>
-
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold">Groq API Key</label>
-                    <Input 
-                      name="groqApiKey" 
-                      type="password" 
-                      placeholder={hasGroqKey ? "Configurado (Preencha para alterar)" : "Chave da API Groq"} 
-                    />
+                  {/* Ativação Global */}
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="aiEnabled"
+                        value="true"
+                        defaultChecked={aiEnabled}
+                        className="size-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <span>
+                        <span className="font-semibold block">Habilitar Inteligência Artificial</span>
+                        <span className="text-xs text-muted-foreground">Ativa recursos inteligentes e rotas de chat em toda a plataforma.</span>
+                      </span>
+                    </label>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold">OpenAI API Key</label>
-                    <Input 
-                      name="openaiApiKey" 
-                      type="password" 
-                      placeholder={hasOpenaiKey ? "Configurado (Preencha para alterar)" : "Chave da API OpenAI"} 
-                    />
+
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* Provedor Primário */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Provedor Primário</label>
+                      <select
+                        name="primaryProvider"
+                        defaultValue={aiPrimaryProvider}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="groq">Groq (Llama 3.3 / Llama 3)</option>
+                        <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                        <option value="google">Google Gemini (Gemini 2.5 Flash)</option>
+                        <option value="openrouter">OpenRouter (Modelos Gratuitos & Diversos)</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground">Provedor principal utilizado para completar requisições.</p>
+                    </div>
+
+                    {/* Modelo Primário Override */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Modelo Primário (Override)</label>
+                      <Input
+                        name="primaryModel"
+                        placeholder="Ex: llama-3.3-70b-versatile"
+                        defaultValue={aiPrimaryModel}
+                      />
+                      <p className="text-xs text-muted-foreground">Deixe em branco para usar o modelo padrão do provedor.</p>
+                    </div>
+
+                    {/* Provedor de Fallback */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Provedor de Fallback</label>
+                      <select
+                        name="fallbackProvider"
+                        defaultValue={aiFallbackProvider}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="none">Nenhum (Disparar erro em caso de falha)</option>
+                        <option value="groq">Groq</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="google">Google Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground">Provedor utilizado caso o primário retorne erro ou atinja limite.</p>
+                    </div>
+
+                    {/* Modelo de Fallback Override */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Modelo de Fallback (Override)</label>
+                      <Input
+                        name="fallbackModel"
+                        placeholder="Ex: gpt-4o-mini"
+                        defaultValue={aiFallbackModel}
+                      />
+                      <p className="text-xs text-muted-foreground">Deixe em branco para usar o modelo padrão do fallback.</p>
+                    </div>
+
+                    {/* Temperatura */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Temperatura</label>
+                      <Input
+                        name="temperature"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="1"
+                        defaultValue={aiTemperature}
+                      />
+                      <p className="text-xs text-muted-foreground">Precisão e criatividade da IA (0.0 = preciso, 1.0 = criativo).</p>
+                    </div>
+
+                    {/* Max Tokens */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Limite de Tokens (Max Tokens)</label>
+                      <Input
+                        name="maxTokens"
+                        type="number"
+                        min="1"
+                        max="8192"
+                        defaultValue={aiMaxTokens}
+                      />
+                      <p className="text-xs text-muted-foreground">Tamanho máximo da resposta gerada.</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold">Google API Key</label>
-                    <Input 
-                      name="googleApiKey" 
-                      type="password" 
-                      placeholder={hasGoogleKey ? "Configurado (Preencha para alterar)" : "Chave da API Google"} 
-                    />
+
+                  {/* Chaves de API */}
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="text-sm font-bold tracking-tight">Chaves de API (Configuração de Credenciais)</h4>
+                    <p className="text-xs text-muted-foreground">
+                      As chaves informadas abaixo serão salvas no banco de dados. Caso já estejam configuradas nas variáveis de ambiente (.env), não é necessário preencher.
+                    </p>
+
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold">Groq API Key</label>
+                        <Input
+                          name="groqApiKey"
+                          type="password"
+                          placeholder={hasGroqKey ? "Configurado (Preencha para alterar)" : "Chave da API Groq"}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold">OpenAI API Key</label>
+                        <Input
+                          name="openaiApiKey"
+                          type="password"
+                          placeholder={hasOpenaiKey ? "Configurado (Preencha para alterar)" : "Chave da API OpenAI"}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold">Google API Key</label>
+                        <Input
+                          name="googleApiKey"
+                          type="password"
+                          placeholder={hasGoogleKey ? "Configurado (Preencha para alterar)" : "Chave da API Google"}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold">OpenRouter API Key</label>
+                        <Input
+                          name="openrouterApiKey"
+                          type="password"
+                          placeholder={hasOpenrouterKey ? "Configurado (Preencha para alterar)" : "Chave da API OpenRouter"}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold">OpenRouter API Key</label>
-                    <Input 
-                      name="openrouterApiKey" 
-                      type="password" 
-                      placeholder={hasOpenrouterKey ? "Configurado (Preencha para alterar)" : "Chave da API OpenRouter"} 
+
+                  {/* Prompt de Sistema Global */}
+                  <div className="space-y-2 border-t pt-4">
+                    <label className="text-sm font-semibold">Instruções do Sistema (System Prompt Global)</label>
+                    <textarea
+                      name="systemPrompt"
+                      rows={4}
+                      defaultValue={aiSystemPrompt}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
+                      placeholder="Você é um assistente virtual utilitário e direto..."
                     />
+                    <p className="text-xs text-muted-foreground">Instruções comportamentais enviadas por padrão a todas as chamadas de IA.</p>
                   </div>
-                </div>
-              </div>
 
-              {/* Prompt de Sistema Global */}
-              <div className="space-y-2 border-t pt-4">
-                <label className="text-sm font-semibold">Instruções do Sistema (System Prompt Global)</label>
-                <textarea 
-                  name="systemPrompt" 
-                  rows={4}
-                  defaultValue={aiSystemPrompt}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-foreground"
-                  placeholder="Você é um assistente virtual utilitário e direto..."
-                />
-                <p className="text-xs text-muted-foreground">Instruções comportamentais enviadas por padrão a todas as chamadas de IA.</p>
-              </div>
+                  <div className="flex justify-end pt-2 border-t">
+                    <Button type="submit">Salvar Configurações de IA</Button>
+                  </div>
 
-              <div className="flex justify-end pt-2 border-t">
-                <Button type="submit">Salvar Configurações de IA</Button>
-              </div>
+                </form>
+              </CardContent>
+            </Card>
 
-            </form>
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Outbox do recebimento de leads</CardTitle><CardDescription>Garante que distribuição e notificações sejam executadas após o commit do lead. Desativar pausa novas tentativas sem apagar a fila ou os erros auditáveis.</CardDescription></CardHeader>
+              <CardContent className="space-y-4">
+                <form action={updateLeadEffectOutboxSettingsAction} className="grid gap-4 lg:grid-cols-3">
+                  <label className="flex items-center gap-2 text-sm lg:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={leadEffectOutboxEnabled} className="size-4" /><span><span className="font-medium">Outbox de efeitos habilitada</span><span className="block text-xs text-muted-foreground">Kill switch global para notificações e distribuição disparadas pelo intake.</span></span></label>
+                  <label className="grid gap-1 text-xs font-medium">Tentativas máximas<Input name="maxAttempts" min={1} max={20} type="number" defaultValue={leadEffectOutboxMaxAttempts} /></label>
+                  <label className="grid gap-1 text-xs font-medium">Retry inicial (segundos)<Input name="retryBaseSeconds" min={15} max={3600} type="number" defaultValue={leadEffectOutboxRetryBaseSeconds} /></label>
+                  <label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" min={30} max={900} type="number" defaultValue={leadEffectOutboxLeaseSeconds} /></label>
+                  <div className="flex items-end"><Button type="submit">Salvar outbox</Button></div>
+                </form>
+                <form action={runLeadEffectOutboxAction} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">Executa uma passagem segura pelos efeitos pendentes e registra a intervenção na auditoria.</p><Button type="submit" variant="outline">Processar efeitos agora</Button></form>
+              </CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Outbox do recebimento de leads</CardTitle><CardDescription>Garante que distribuição e notificações sejam executadas após o commit do lead. Desativar pausa novas tentativas sem apagar a fila ou os erros auditáveis.</CardDescription></CardHeader>
-          <CardContent className="space-y-4">
-            <form action={updateLeadEffectOutboxSettingsAction} className="grid gap-4 lg:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm lg:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={leadEffectOutboxEnabled} className="size-4" /><span><span className="font-medium">Outbox de efeitos habilitada</span><span className="block text-xs text-muted-foreground">Kill switch global para notificações e distribuição disparadas pelo intake.</span></span></label>
-              <label className="grid gap-1 text-xs font-medium">Tentativas máximas<Input name="maxAttempts" min={1} max={20} type="number" defaultValue={leadEffectOutboxMaxAttempts} /></label>
-              <label className="grid gap-1 text-xs font-medium">Retry inicial (segundos)<Input name="retryBaseSeconds" min={15} max={3600} type="number" defaultValue={leadEffectOutboxRetryBaseSeconds} /></label>
-              <label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" min={30} max={900} type="number" defaultValue={leadEffectOutboxLeaseSeconds} /></label>
-              <div className="flex items-end"><Button type="submit">Salvar outbox</Button></div>
-            </form>
-            <form action={runLeadEffectOutboxAction} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">Executa uma passagem segura pelos efeitos pendentes e registra a intervenção na auditoria.</p><Button type="submit" variant="outline">Processar efeitos agora</Button></form>
-          </CardContent>
-        </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>CorreTop Assistant</CardTitle><CardDescription>Kill switch global da extensão contextual. Desativar bloqueia novas consultas sem revogar dados históricos ou sessões já registradas.</CardDescription></CardHeader>
+              <CardContent><form action={updateExtensionGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="extensionEnabled" value="true" defaultChecked={browserExtensionEnabled} className="size-4" /><span><span className="font-medium">Extensão habilitada globalmente</span><span className="block text-xs text-muted-foreground">O Diretor ainda controla a ativação por tenant.</span></span></label><Button type="submit">Salvar extensão</Button></form></CardContent>
+            </Card>
 
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>CorreTop Assistant</CardTitle><CardDescription>Kill switch global da extensão contextual. Desativar bloqueia novas consultas sem revogar dados históricos ou sessões já registradas.</CardDescription></CardHeader>
-          <CardContent><form action={updateExtensionGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="extensionEnabled" value="true" defaultChecked={browserExtensionEnabled} className="size-4" /><span><span className="font-medium">Extensão habilitada globalmente</span><span className="block text-xs text-muted-foreground">O Diretor ainda controla a ativação por tenant.</span></span></label><Button type="submit">Salvar extensão</Button></form></CardContent>
-        </Card>
-
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Qualificação automática no WhatsApp</CardTitle><CardDescription>Usa o mesmo motor de IA e o canal oficial da Meta para fazer perguntas iniciais. Desativar interrompe novas sessões sem apagar histórico.</CardDescription></CardHeader>
-          <CardContent><form action={updateAiWhatsAppQualificationSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="aiWhatsAppQualificationEnabled" value="true" defaultChecked={aiWhatsAppQualificationEnabled} className="size-4" /><span><span className="font-medium">Iniciar qualificação para novos leads</span><span className="block text-xs text-muted-foreground">Requer Motor de IA e canal Meta Cloud ativos. O atendimento humano pode assumir a qualquer momento.</span></span></label><Button type="submit" variant="outline">Salvar qualificação</Button></form></CardContent>
-        </Card>
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Quick Reply determinístico</CardTitle><CardDescription>Resolve saudações, mídia, opt-out e solicitações humanas antes de chamar a IA. O estado e o cooldown são persistidos.</CardDescription></CardHeader>
-          <CardContent><form action={updateQuickReplySettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="quickReplyEnabled" value="true" defaultChecked={aiQuickReplyEnabled} className="size-4" /><span><span className="font-medium">Quick Reply habilitado</span><span className="block text-xs text-muted-foreground">Desative sem apagar eventos, métricas ou templates por tenant.</span></span></label><Button type="submit" variant="outline">Salvar Quick Reply</Button></form></CardContent>
-        </Card>
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Centro de Treinamento do Agente</CardTitle>
-            <CardDescription>Libera o piloto para Diretores criarem, validarem e publicarem versões de comportamento. Desativar preserva histórico, rascunhos e auditoria; apenas bloqueia novos acessos.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={updateAgentTrainingCenterSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="agentTrainingCenterEnabled" value="true" defaultChecked={agentTrainingCenterEnabled} className="size-4" />
-                <span><span className="font-medium">Liberar Centro de Treinamento globalmente</span><span className="block text-xs text-muted-foreground">Quando ativo, o Diretor ainda opera exclusivamente dentro do próprio tenant.</span></span>
-              </label>
-              <Button type="submit" variant={agentTrainingCenterEnabled ? "outline" : "default"}>{agentTrainingCenterEnabled ? "Salvar controle" : "Liberar piloto"}</Button>
-            </form>
-          </CardContent>
-        </Card>
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Identidade pública do Lead Ads</CardTitle><CardDescription>Estes são os únicos dados técnicos exibidos ao Diretor/cliente durante a autorização. Tokens, App Secret e webhooks ficam exclusivamente no ambiente da plataforma.</CardDescription></CardHeader>
-          <CardContent><form action={updateMetaLeadAdsPlatformIdentityAction} className="grid gap-4 md:grid-cols-3"><label className="grid gap-1 text-sm font-medium">Nome do parceiro<Input name="partnerName" defaultValue={metaLeadAdsPartnerName} /></label><label className="grid gap-1 text-sm font-medium">Business ID público<Input name="businessId" defaultValue={metaLeadAdsBusinessId} inputMode="numeric" /></label><label className="grid gap-1 text-sm font-medium">WhatsApp de suporte<Input name="supportWhatsApp" defaultValue={metaLeadAdsSupportWhatsApp} /></label><div className="md:col-span-3"><Button type="submit">Salvar dados públicos</Button></div></form></CardContent>
-        </Card>
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Piloto de Lead Ads por empresa</CardTitle><CardDescription>O kill switch global preserva fontes e histórico. Esta lista decide quais empresas podem abrir o assistente de descoberta de ativos.</CardDescription></CardHeader>
-          <CardContent className="space-y-2">{tenants.map((tenant) => { const enabled = metaLeadAdsPilotTenantIds.includes(tenant.id); return <form action={updateMetaLeadAdsPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">{enabled ? "Pode buscar e ativar Páginas." : "Bloqueada fora do piloto."}</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={enabled ? "false" : "true"} /><Button size="sm" type="submit" variant={enabled ? "outline" : "default"}>{enabled ? "Remover do piloto" : "Liberar piloto"}</Button></form>; })}</CardContent>
-        </Card>
-        </SuperAdminSettingsTabs>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Qualificação automática no WhatsApp</CardTitle><CardDescription>Usa o mesmo motor de IA e o canal oficial da Meta para fazer perguntas iniciais. Desativar interrompe novas sessões sem apagar histórico.</CardDescription></CardHeader>
+              <CardContent><form action={updateAiWhatsAppQualificationSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="aiWhatsAppQualificationEnabled" value="true" defaultChecked={aiWhatsAppQualificationEnabled} className="size-4" /><span><span className="font-medium">Iniciar qualificação para novos leads</span><span className="block text-xs text-muted-foreground">Requer Motor de IA e canal Meta Cloud ativos. O atendimento humano pode assumir a qualquer momento.</span></span></label><Button type="submit" variant="outline">Salvar qualificação</Button></form></CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Quick Reply determinístico</CardTitle><CardDescription>Resolve saudações, mídia, opt-out e solicitações humanas antes de chamar a IA. O estado e o cooldown são persistidos.</CardDescription></CardHeader>
+              <CardContent><form action={updateQuickReplySettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="quickReplyEnabled" value="true" defaultChecked={aiQuickReplyEnabled} className="size-4" /><span><span className="font-medium">Quick Reply habilitado</span><span className="block text-xs text-muted-foreground">Desative sem apagar eventos, métricas ou templates por tenant.</span></span></label><Button type="submit" variant="outline">Salvar Quick Reply</Button></form></CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Centro de Treinamento do Agente</CardTitle>
+                <CardDescription>Libera o piloto para Diretores criarem, validarem e publicarem versões de comportamento. Desativar preserva histórico, rascunhos e auditoria; apenas bloqueia novos acessos.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateAgentTrainingCenterSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="agentTrainingCenterEnabled" value="true" defaultChecked={agentTrainingCenterEnabled} className="size-4" />
+                    <span><span className="font-medium">Liberar Centro de Treinamento globalmente</span><span className="block text-xs text-muted-foreground">Quando ativo, o Diretor ainda opera exclusivamente dentro do próprio tenant.</span></span>
+                  </label>
+                  <Button type="submit" variant={agentTrainingCenterEnabled ? "outline" : "default"}>{agentTrainingCenterEnabled ? "Salvar controle" : "Liberar piloto"}</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Identidade pública do Lead Ads</CardTitle><CardDescription>Estes são os únicos dados técnicos exibidos ao Diretor/cliente durante a autorização. Tokens, App Secret e webhooks ficam exclusivamente no ambiente da plataforma.</CardDescription></CardHeader>
+              <CardContent><form action={updateMetaLeadAdsPlatformIdentityAction} className="grid gap-4 md:grid-cols-3"><label className="grid gap-1 text-sm font-medium">Nome do parceiro<Input name="partnerName" defaultValue={metaLeadAdsPartnerName} /></label><label className="grid gap-1 text-sm font-medium">Business ID público<Input name="businessId" defaultValue={metaLeadAdsBusinessId} inputMode="numeric" /></label><label className="grid gap-1 text-sm font-medium">WhatsApp de suporte<Input name="supportWhatsApp" defaultValue={metaLeadAdsSupportWhatsApp} /></label><div className="md:col-span-3"><Button type="submit">Salvar dados públicos</Button></div></form></CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Piloto de Lead Ads por empresa</CardTitle><CardDescription>O kill switch global preserva fontes e histórico. Esta lista decide quais empresas podem abrir o assistente de descoberta de ativos.</CardDescription></CardHeader>
+              <CardContent className="space-y-2">{tenants.map((tenant) => { const enabled = metaLeadAdsPilotTenantIds.includes(tenant.id); return <form action={updateMetaLeadAdsPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">{enabled ? "Pode buscar e ativar Páginas." : "Bloqueada fora do piloto."}</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={enabled ? "false" : "true"} /><Button size="sm" type="submit" variant={enabled ? "outline" : "default"}>{enabled ? "Remover do piloto" : "Liberar piloto"}</Button></form>; })}</CardContent>
+            </Card>
+          </SuperAdminSettingsTabs>
+        </Suspense>
       </main>
     </>
   );
