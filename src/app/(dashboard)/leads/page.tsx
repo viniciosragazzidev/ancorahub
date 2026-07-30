@@ -159,13 +159,10 @@ export default async function LeadsPage({
 
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
 
-  // Total items count query for pagination
-  const [totalCountResult] = await db.select({ total: count() }).from(schema.leads).where(where);
-  const totalItems = Number(totalCountResult?.total ?? 0);
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const offset = (page - 1) * pageSize;
 
-  const [availablePlans, leads, legacyPlans, branches, pausedBranchCount, slaSettings, brokers] = await Promise.all([
+  const [totalCountResult, availablePlans, leads, legacyPlans, branches, pausedBranchCount, slaSettings, brokers] = await Promise.all([
+    db.select({ total: count() }).from(schema.leads).innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id)).where(where),
     listAvailableCatalogPlans(context),
     db
       .select({
@@ -237,6 +234,9 @@ export default async function LeadsPage({
           )
       : Promise.resolve([]),
   ]);
+
+  const totalItems = Number(totalCountResult[0]?.total ?? 0);
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
 
   // Merge legacy carrier plans with global + private catalog plans
   const seen = new Set<string>();
