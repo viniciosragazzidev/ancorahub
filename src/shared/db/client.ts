@@ -15,9 +15,10 @@ function connectionLimit() {
   if (process.env.NEXT_PHASE === "phase-production-build") return 3;
   const configured = Number.parseInt(process.env.DB_POOL_MAX ?? "", 10);
   if (Number.isFinite(configured) && configured >= 1 && configured <= 10) return configured;
-  // Production: 3 connections to avoid serializing cron jobs and page requests
-  // on a single connection, while staying well within Supabase's 15-connection limit.
-  return process.env.NODE_ENV === "production" ? 3 : 3;
+  // Increased from 3 to 5 to prevent pool exhaustion when pages run multiple
+  // parallel queries (e.g. /super-admin/settings with Promise.all).
+  // Supabase's 15-connection project limit is still respected.
+  return process.env.NODE_ENV === "production" ? 5 : 3;
 }
 
 function getDatabaseUrl(): string {
