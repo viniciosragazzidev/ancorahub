@@ -7,6 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BrokerQueueClient } from "./_components/queue-client";
 import { BrokerAvailabilityButton } from "./_components/broker-availability";
+import { Sparkline } from "./_components/sparkline";
 import { ChatCircleText, ClipboardText, ListChecks, Target } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -222,6 +223,43 @@ export default async function MinhaFilaPage() {
       : lead.phone,
   }));
 
+  const dailyTrend = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    date.setHours(0, 0, 0, 0);
+
+    const dayStart = date.getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+
+    const leadsCreated = leads.filter((lead) => {
+      const createdAt = lead.createdAt.getTime();
+      return createdAt >= dayStart && createdAt < dayEnd;
+    }).length;
+
+    const urgentCreated = leads.filter((lead) => {
+      const createdAt = lead.createdAt.getTime();
+      return createdAt >= dayStart && dayEnd > createdAt && (lead.status === "new" || lead.status === "distributed");
+    }).length;
+
+    const activeCreated = leads.filter((lead) => {
+      const createdAt = lead.createdAt.getTime();
+      return createdAt >= dayStart && createdAt < dayEnd && (["in_contact", "quote_sent", "negotiation"] as readonly string[]).includes(lead.status);
+    }).length;
+
+    const stalledCreated = leads.filter((lead) => {
+      const createdAt = lead.createdAt.getTime();
+      return createdAt >= dayStart && createdAt < dayEnd && (activeLeadStatuses as readonly string[]).includes(lead.status) && lead.stageEnteredAt && Date.now() - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000;
+    }).length;
+
+    return {
+      label: new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(date),
+      leads: leadsCreated,
+      urgent: urgentCreated,
+      active: activeCreated,
+      stalled: stalledCreated,
+    };
+  });
+
   const targetTypeLabel: Record<string, string> = {
     sales_count: "Vendas",
     revenue: "Receita",
@@ -274,14 +312,20 @@ export default async function MinhaFilaPage() {
         {/* Metric Cards */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Total na fila", value: totalLeads, color: "text-foreground" },
-            { label: "Novos / urgentes", value: urgentLeads, color: urgentLeads > 0 ? "text-warning" : "text-muted-foreground" },
-            { label: "Em andamento", value: inProgress, color: "text-chart-3" },
-            { label: "Estagnados", value: stalledCount, color: stalledCount > 0 ? "text-destructive" : "text-muted-foreground" },
+            { label: "Total na fila", value: totalLeads, color: "text-foreground", chart: dailyTrend.map((day) => ({ label: day.label, value: day.leads })) },
+            { label: "Novos / urgentes", value: urgentLeads, color: urgentLeads > 0 ? "text-warning" : "text-muted-foreground", chart: dailyTrend.map((day) => ({ label: day.label, value: day.urgent })) },
+            { label: "Em andamento", value: inProgress, color: "text-chart-3", chart: dailyTrend.map((day) => ({ label: day.label, value: day.active })) },
+            { label: "Estagnados", value: stalledCount, color: stalledCount > 0 ? "text-destructive" : "text-muted-foreground", chart: dailyTrend.map((day) => ({ label: day.label, value: day.stalled })) },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-lg border border-border/40 bg-card p-4 text-center shadow-none">
-              <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+            <div key={stat.label} className="rounded-lg border border-border/40 bg-card p-4 shadow-none">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+                </div>
+                <p className="text-[10px] font-medium text-muted-foreground">7 dias</p>
+              </div>
+              <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart} colorClassName={stat.color} className="mt-3" />
             </div>
           ))}
         </section>

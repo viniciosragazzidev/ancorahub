@@ -6,17 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, SlidersHorizontal, ListChecks } from "@/components/huge-icons";
 
 type Branch = { id: string; name: string };
@@ -155,8 +146,8 @@ export function LeadsFilters({
         </form>
 
         {/* Filter Popup Button */}
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger render={<Button size="sm" variant={activeCount > 0 ? "default" : "outline"} className="h-9 gap-2 px-3.5 text-xs font-medium shrink-0 shadow-xs" />}>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger render={<Button size="sm" variant={activeCount > 0 ? "default" : "outline"} className="h-9 gap-2 px-3.5 text-xs font-medium shrink-0 shadow-xs" />}>
             <SlidersHorizontal className="size-4" />
             Filtros Avançados
             {activeCount > 0 && (
@@ -164,167 +155,172 @@ export function LeadsFilters({
                 {activeCount}
               </Badge>
             )}
-          </SheetTrigger>
+          </PopoverTrigger>
 
-          <SheetContent side="right" className="w-[min(100vw-1rem,26rem)] sm:max-w-md">
-            <SheetHeader>
+          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 sm:w-96 p-0 rounded-2xl border border-border/80 bg-card shadow-2xl backdrop-blur-2xl">
+            <div className="flex items-center justify-between border-b border-border/70 p-3.5">
               <div className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg border border-border bg-accent/30">
-                  <SlidersHorizontal className="size-4 text-foreground" />
+                <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
+                  <SlidersHorizontal className="size-3.5 text-foreground" />
                 </div>
                 <div>
-                  <SheetTitle className="text-sm font-semibold">Filtros da Fila de Leads</SheetTitle>
-                  <SheetDescription className="text-xs">
-                    Refine os resultados exibidos na lista e no Kanban.
-                  </SheetDescription>
+                  <h3 className="text-xs font-bold text-foreground">Filtros da Fila</h3>
+                  <p className="text-[11px] text-muted-foreground">Refine os resultados do Kanban e da tabela</p>
                 </div>
               </div>
-            </SheetHeader>
+              {activeCount > 0 && (
+                <Badge variant="secondary" className="text-[10px] font-mono">
+                  {activeCount} ativo(s)
+                </Badge>
+              )}
+            </div>
 
-            <SheetBody className="space-y-4">
-              {/* Status */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Etapa / Status</label>
-                <select
-                  aria-label="Status"
-                  className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  name="status"
-                  onChange={(event) => setStatus(event.target.value)}
-                  value={status}
-                >
-                  <option value="">Todos os status</option>
-                  <option value="new">Novos</option>
-                  <option value="distributed">Distribuídos</option>
-                  <option value="in_contact">Em atendimento</option>
-                  <option value="quote_sent">Cotação Enviada</option>
-                  <option value="negotiation">Negociação</option>
-                  <option value="documentation_pending">Doc Pendente</option>
-                  <option value="under_analysis">Em Análise</option>
-                  <option value="converted">Convertidos</option>
-                  <option value="lost">Perdidos</option>
-                </select>
-              </div>
-
-              {/* Tipo (PF / PME) */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Tipo de Lead</label>
-                <select
-                  aria-label="Tipo"
-                  className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  name="tipo"
-                  onChange={(event) => setTipo(event.target.value)}
-                  value={tipo}
-                >
-                  <option value="">Todos os tipos (PF & PME)</option>
-                  <option value="PF">Pessoa Física (PF)</option>
-                  <option value="PME">Pessoa Jurídica (PME)</option>
-                </select>
-              </div>
-
-              {/* Origem */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Origem da Oportunidade</label>
-                <select
-                  aria-label="Origem"
-                  className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  name="origem"
-                  onChange={(event) => setOrigem(event.target.value)}
-                  value={origem}
-                >
-                  <option value="">Todas as origens</option>
-                  <option value="manual">Cadastro Manual</option>
-                  <option value="webhook">Integrador / Meta Ads / Landing Page</option>
-                </select>
-              </div>
-
-              {/* Qualificação */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Status de Qualificação</label>
-                <select
-                  aria-label="Qualificação"
-                  className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  name="qualification"
-                  onChange={(event) => setQualification(event.target.value)}
-                  value={qualification}
-                >
-                  <option value="">Todas as qualificações</option>
-                  <option value="unqualified">Sem Qualificação</option>
-                  <option value="warm">Morna (Em Qualificação)</option>
-                  <option value="hot">Quente (Alta Prioridade)</option>
-                  <option value="disqualified">Desqualificado</option>
-                </select>
-              </div>
-
-              {/* Filial */}
-              {branches.length > 0 && (
+            <ScrollArea className="max-h-[360px] p-4">
+              <div className="space-y-4">
+                {/* Status */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Filial / Unidade</label>
+                  <label className="text-xs font-semibold text-foreground">Etapa / Status</label>
                   <select
-                    aria-label="Filial"
-                    className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="branch"
-                    onChange={(event) => setBranch(event.target.value)}
-                    value={branch}
+                    aria-label="Status"
+                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    name="status"
+                    onChange={(event) => setStatus(event.target.value)}
+                    value={status}
                   >
-                    <option value="">Todas as filiais</option>
-                    {branches.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
+                    <option value="">Todos os status</option>
+                    <option value="new">Novos</option>
+                    <option value="distributed">Distribuídos</option>
+                    <option value="in_contact">Em atendimento</option>
+                    <option value="quote_sent">Cotação Enviada</option>
+                    <option value="negotiation">Negociação</option>
+                    <option value="documentation_pending">Doc Pendente</option>
+                    <option value="under_analysis">Em Análise</option>
+                    <option value="converted">Convertidos</option>
+                    <option value="lost">Perdidos</option>
                   </select>
                 </div>
-              )}
 
-              {/* Corretor */}
-              {brokers.length > 0 && (
+                {/* Tipo (PF / PME) */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Corretor Responsável</label>
+                  <label className="text-xs font-semibold text-foreground">Tipo de Lead</label>
                   <select
-                    aria-label="Corretor"
-                    className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="corretor"
-                    onChange={(event) => setCorretor(event.target.value)}
-                    value={corretor}
+                    aria-label="Tipo"
+                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    name="tipo"
+                    onChange={(event) => setTipo(event.target.value)}
+                    value={tipo}
                   >
-                    <option value="">Todos os corretores</option>
-                    {brokers.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
+                    <option value="">Todos os tipos (PF & PME)</option>
+                    <option value="PF">Pessoa Física (PF)</option>
+                    <option value="PME">Pessoa Jurídica (PME)</option>
                   </select>
                 </div>
-              )}
 
-              {/* Itens por página */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Itens por Página</label>
-                <select
-                  aria-label="Itens por página"
-                  className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  name="pageSize"
-                  onChange={(event) => setPageSize(event.target.value)}
-                  value={pageSize}
-                >
-                  <option value="10">10 resultados por página</option>
-                  <option value="20">20 resultados por página (Padrão)</option>
-                  <option value="50">50 resultados por página</option>
-                  <option value="100">100 resultados por página</option>
-                </select>
+                {/* Origem */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Origem da Oportunidade</label>
+                  <select
+                    aria-label="Origem"
+                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    name="origem"
+                    onChange={(event) => setOrigem(event.target.value)}
+                    value={origem}
+                  >
+                    <option value="">Todas as origens</option>
+                    <option value="manual">Cadastro Manual</option>
+                    <option value="webhook">Integrador / Meta Ads / Landing Page</option>
+                  </select>
+                </div>
+
+                {/* Qualificação */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Status de Qualificação</label>
+                  <select
+                    aria-label="Qualificação"
+                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    name="qualification"
+                    onChange={(event) => setQualification(event.target.value)}
+                    value={qualification}
+                  >
+                    <option value="">Todas as qualificações</option>
+                    <option value="unqualified">Sem Qualificação</option>
+                    <option value="warm">Morna (Em Qualificação)</option>
+                    <option value="hot">Quente (Alta Prioridade)</option>
+                    <option value="disqualified">Desqualificado</option>
+                  </select>
+                </div>
+
+                {/* Filial */}
+                {branches.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Filial / Unidade</label>
+                    <select
+                      aria-label="Filial"
+                      className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      name="branch"
+                      onChange={(event) => setBranch(event.target.value)}
+                      value={branch}
+                    >
+                      <option value="">Todas as filiais</option>
+                      {branches.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Corretor */}
+                {brokers.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Corretor Responsável</label>
+                    <select
+                      aria-label="Corretor"
+                      className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      name="corretor"
+                      onChange={(event) => setCorretor(event.target.value)}
+                      value={corretor}
+                    >
+                      <option value="">Todos os corretores</option>
+                      {brokers.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Itens por página */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Itens por Página</label>
+                  <select
+                    aria-label="Itens por página"
+                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    name="pageSize"
+                    onChange={(event) => setPageSize(event.target.value)}
+                    value={pageSize}
+                  >
+                    <option value="10">10 resultados por página</option>
+                    <option value="20">20 resultados por página (Padrão)</option>
+                    <option value="50">50 resultados por página</option>
+                    <option value="100">100 resultados por página</option>
+                  </select>
+                </div>
               </div>
-            </SheetBody>
+            </ScrollArea>
 
-            <SheetFooter className="flex items-center justify-between border-t border-border/80 bg-card/80 p-4">
+            <div className="flex items-center justify-between border-t border-border/70 bg-muted/20 p-3">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handleReset}
-                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
                 <X className="size-3.5" />
-                Limpar Filtros
+                Limpar
               </Button>
 
               <Button
@@ -332,14 +328,14 @@ export function LeadsFilters({
                 size="sm"
                 variant="default"
                 onClick={applyFilters}
-                className="gap-1.5 px-4 text-xs font-semibold"
+                className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
               >
                 <SlidersHorizontal className="size-3.5" />
-                Aplicar Filtros
+                Aplicar
               </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {hasAnyFilter && (
           <Button

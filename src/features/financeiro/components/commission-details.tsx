@@ -36,14 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerClose,
-} from "@/components/ui/drawer";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { formatCurrency, formatCurrencyCompact, normalize } from "@/features/quotes/utils";
@@ -128,76 +121,73 @@ export function CommissionDetails({ data }: Props) {
           />
         </div>
         
-        <Button variant="outline" onClick={() => setDrawerOpen(true)}>
-          <SlidersHorizontal className="mr-2 size-4" />
-          Filtros e Ações
-        </Button>
-      </div>
+        <Popover open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <PopoverTrigger render={<Button variant="outline" size="sm" className="h-9 gap-2 text-xs font-medium" />}>
+            <SlidersHorizontal className="size-4" />
+            Filtros e Ações
+          </PopoverTrigger>
 
-      {/* Drawer: Filters & Actions */}
-      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} swipeDirection="right">
-        <DrawerContent className="w-full sm:max-w-xl border-l border-border/40 bg-background/95 backdrop-blur-2xl">
-          <DrawerHeader className="border-b border-border/40 pb-6 pt-8 px-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <DrawerTitle className="text-2xl font-bold tracking-tight">Filtros e Ações</DrawerTitle>
-                <DrawerDescription className="mt-1.5 text-base">
-                  Refine a visualização ou exporte relatórios.
-                </DrawerDescription>
+          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-80 p-0 rounded-2xl border border-border/80 bg-card shadow-2xl backdrop-blur-2xl">
+            <div className="flex items-center justify-between border-b border-border/70 p-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
+                  <SlidersHorizontal className="size-3.5 text-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-foreground">Filtros e Ações</h3>
+                  <p className="text-[11px] text-muted-foreground">Refine e exporte relatórios</p>
+                </div>
               </div>
-              <DrawerClose render={<Button size="icon-sm" variant="ghost" aria-label="Fechar" className="rounded-full hover:bg-muted" />}>
-                <X className="size-5" />
-              </DrawerClose>
-            </div>
-          </DrawerHeader>
-          
-          <div className="flex-1 overflow-y-auto p-8 space-y-8">
-            <div className="space-y-3">
-              <label className="text-sm font-medium">Agrupar visão por</label>
-              <Select value={view} onValueChange={(v) => setView(v as "sales" | "brokers")}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o agrupamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sales">Por venda</SelectItem>
-                  <SelectItem value="brokers">Por corretor</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
-            {view === "sales" && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Status da parcela</label>
-                <Select value={scheduleFilter} onValueChange={(v) => setScheduleFilter(v as "all" | "pending" | "paid")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filtre por status" />
+            <div className="p-4 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Agrupar visão por</label>
+                <Select value={view} onValueChange={(v) => setView(v as "sales" | "brokers")}>
+                  <SelectTrigger className="h-8.5 text-xs">
+                    <SelectValue placeholder="Selecione o agrupamento" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todas as parcelas</SelectItem>
-                    <SelectItem value="pending">Pendentes</SelectItem>
-                    <SelectItem value="paid">Pagas</SelectItem>
+                    <SelectItem value="sales">Por venda</SelectItem>
+                    <SelectItem value="brokers">Por corretor</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            <div className="space-y-3 border-t border-border/60 pt-6">
-              <label className="text-sm font-medium">Ações disponíveis</label>
-              <Button 
-                variant="outline" 
-                className="w-full h-12 text-base font-medium justify-start transition-transform duration-300 active:scale-[0.98] hover:-translate-y-0.5 shadow-sm group"
-                onClick={() => {
-                  toast.success("Exportação iniciada, o download começará em breve.");
-                  setDrawerOpen(false);
-                }}
-              >
-                <FileArrowDown className="mr-3 size-5 text-muted-foreground transition-transform group-hover:scale-110" />
-                Exportar Relatório (.csv)
-              </Button>
+              {view === "sales" && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground">Status da parcela</label>
+                  <Select value={scheduleFilter} onValueChange={(v) => setScheduleFilter(v as "all" | "pending" | "paid")}>
+                    <SelectTrigger className="h-8.5 text-xs">
+                      <SelectValue placeholder="Filtre por status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as parcelas</SelectItem>
+                      <SelectItem value="pending">Pendentes</SelectItem>
+                      <SelectItem value="paid">Pagas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-border/60">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full h-9 text-xs font-medium justify-start gap-2 shadow-xs group"
+                  onClick={() => {
+                    toast.success("Exportação iniciada, o download começará em breve.");
+                    setDrawerOpen(false);
+                  }}
+                >
+                  <FileArrowDown className="size-4 text-muted-foreground transition-transform group-hover:scale-110" />
+                  Exportar Relatório (.csv)
+                </Button>
+              </div>
             </div>
-          </div>
-        </DrawerContent>
-      </Drawer>
+          </PopoverContent>
+        </Popover>
+      </div>
 
       {/* Broker Summary Table */}
       {view === "brokers" && (
