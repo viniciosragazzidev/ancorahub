@@ -168,145 +168,200 @@ export function LeadsFilters({
                   <p className="text-[11px] text-muted-foreground">Refine os resultados do Kanban e da tabela</p>
                 </div>
               </div>
-              {activeCount > 0 && (
+              {activeCount > 0 ? (
                 <Badge variant="secondary" className="text-[10px] font-mono">
                   {activeCount} ativo(s)
                 </Badge>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
+                  <span className="flex size-1.5 rounded-full bg-primary animate-pulse" />
+                  Ajustar
+                </span>
               )}
             </div>
 
-            <ScrollArea className="max-h-[360px] p-4">
+            <ScrollArea className="max-h-[380px] p-4">
               <div className="space-y-4">
-                {/* Status */}
+                {/* Tipo (PF / PME) - Segmented Control */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Etapa / Status</label>
-                  <select
-                    aria-label="Status"
-                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="status"
-                    onChange={(event) => setStatus(event.target.value)}
-                    value={status}
-                  >
-                    <option value="">Todos os status</option>
-                    <option value="new">Novos</option>
-                    <option value="distributed">Distribuídos</option>
-                    <option value="in_contact">Em atendimento</option>
-                    <option value="quote_sent">Cotação Enviada</option>
-                    <option value="negotiation">Negociação</option>
-                    <option value="documentation_pending">Doc Pendente</option>
-                    <option value="under_analysis">Em Análise</option>
-                    <option value="converted">Convertidos</option>
-                    <option value="lost">Perdidos</option>
-                  </select>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tipo de Lead</label>
+                  <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
+                    {[
+                      { label: "Todos", val: "" },
+                      { label: "PF", val: "PF" },
+                      { label: "PME", val: "PME" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => setTipo(opt.val)}
+                        className={`h-7 rounded-md text-xs font-medium transition-all duration-150 ${
+                          tipo === opt.val
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Tipo (PF / PME) */}
+                {/* Origem - Segmented Control */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Tipo de Lead</label>
-                  <select
-                    aria-label="Tipo"
-                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="tipo"
-                    onChange={(event) => setTipo(event.target.value)}
-                    value={tipo}
-                  >
-                    <option value="">Todos os tipos (PF & PME)</option>
-                    <option value="PF">Pessoa Física (PF)</option>
-                    <option value="PME">Pessoa Jurídica (PME)</option>
-                  </select>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Origem da Oportunidade</label>
+                  <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
+                    {[
+                      { label: "Todas", val: "" },
+                      { label: "Manual", val: "manual" },
+                      { label: "Webhook", val: "webhook" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => setOrigem(opt.val)}
+                        className={`h-7 rounded-md text-xs font-medium transition-all duration-150 ${
+                          origem === opt.val
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Origem */}
+                {/* Status / Etapa */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Origem da Oportunidade</label>
-                  <select
-                    aria-label="Origem"
-                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="origem"
-                    onChange={(event) => setOrigem(event.target.value)}
-                    value={origem}
-                  >
-                    <option value="">Todas as origens</option>
-                    <option value="manual">Cadastro Manual</option>
-                    <option value="webhook">Integrador / Meta Ads / Landing Page</option>
-                  </select>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Etapa / Status</label>
+                  <div className="relative">
+                    <select
+                      aria-label="Status"
+                      className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      name="status"
+                      onChange={(event) => setStatus(event.target.value)}
+                      value={status}
+                    >
+                      <option value="">Todos os status</option>
+                      <option value="new">Novos</option>
+                      <option value="distributed">Distribuídos</option>
+                      <option value="in_contact">Em atendimento</option>
+                      <option value="quote_sent">Cotação Enviada</option>
+                      <option value="negotiation">Negociação</option>
+                      <option value="documentation_pending">Doc Pendente</option>
+                      <option value="under_analysis">Em Análise</option>
+                      <option value="converted">Convertidos</option>
+                      <option value="lost">Perdidos</option>
+                    </select>
+                    <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Qualificação */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Status de Qualificação</label>
-                  <select
-                    aria-label="Qualificação"
-                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="qualification"
-                    onChange={(event) => setQualification(event.target.value)}
-                    value={qualification}
-                  >
-                    <option value="">Todas as qualificações</option>
-                    <option value="unqualified">Sem Qualificação</option>
-                    <option value="warm">Morna (Em Qualificação)</option>
-                    <option value="hot">Quente (Alta Prioridade)</option>
-                    <option value="disqualified">Desqualificado</option>
-                  </select>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status de Qualificação</label>
+                  <div className="relative">
+                    <select
+                      aria-label="Qualificação"
+                      className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      name="qualification"
+                      onChange={(event) => setQualification(event.target.value)}
+                      value={qualification}
+                    >
+                      <option value="">Todas as qualificações</option>
+                      <option value="unqualified">Sem Qualificação</option>
+                      <option value="warm">Morna (Em Qualificação)</option>
+                      <option value="hot">Quente (Alta Prioridade)</option>
+                      <option value="disqualified">Desqualificado</option>
+                    </select>
+                    <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Filial */}
                 {branches.length > 0 && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-foreground">Filial / Unidade</label>
-                    <select
-                      aria-label="Filial"
-                      className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      name="branch"
-                      onChange={(event) => setBranch(event.target.value)}
-                      value={branch}
-                    >
-                      <option value="">Todas as filiais</option>
-                      {branches.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Filial / Unidade</label>
+                    <div className="relative">
+                      <select
+                        aria-label="Filial"
+                        className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        name="branch"
+                        onChange={(event) => setBranch(event.target.value)}
+                        value={branch}
+                      >
+                        <option value="">Todas as filiais</option>
+                        {branches.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 9l6 6 6-6" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {/* Corretor */}
                 {brokers.length > 0 && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-foreground">Corretor Responsável</label>
-                    <select
-                      aria-label="Corretor"
-                      className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      name="corretor"
-                      onChange={(event) => setCorretor(event.target.value)}
-                      value={corretor}
-                    >
-                      <option value="">Todos os corretores</option>
-                      {brokers.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Corretor Responsável</label>
+                    <div className="relative">
+                      <select
+                        aria-label="Corretor"
+                        className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        name="corretor"
+                        onChange={(event) => setCorretor(event.target.value)}
+                        value={corretor}
+                      >
+                        <option value="">Todos os corretores</option>
+                        {brokers.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 9l6 6 6-6" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Itens por página */}
+                {/* Itens por página - Segmented Control */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Itens por Página</label>
-                  <select
-                    aria-label="Itens por página"
-                    className="h-8.5 w-full rounded-lg border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    name="pageSize"
-                    onChange={(event) => setPageSize(event.target.value)}
-                    value={pageSize}
-                  >
-                    <option value="10">10 resultados por página</option>
-                    <option value="20">20 resultados por página (Padrão)</option>
-                    <option value="50">50 resultados por página</option>
-                    <option value="100">100 resultados por página</option>
-                  </select>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Itens por Página</label>
+                  <div className="grid grid-cols-4 rounded-lg bg-muted/50 p-0.5 border border-border/40">
+                    {["10", "20", "50", "100"].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setPageSize(size)}
+                        className={`h-7 rounded-md text-xs font-medium transition-all duration-150 ${
+                          pageSize === size
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </ScrollArea>
