@@ -131,7 +131,7 @@ export function DataTable<TData, TValue>({
                 <TableRow key={headerGroup.id} className="h-10 border-b border-border hover:bg-transparent">
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id} className="h-10 px-4 font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <TableHead key={header.id} className="h-9 px-3.5 font-medium text-[11px] text-muted-foreground">
                         {header.isPlaceholder
                           ? null
                           : flexRender(

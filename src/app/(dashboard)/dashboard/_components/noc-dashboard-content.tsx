@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
+import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
   ChartBar,
   CheckCircle,
   Circle,
   Globe,
+  Handshake,
+  Lightning,
+  Phone,
   SealCheck,
   Users,
   UserList,
@@ -1082,28 +1086,40 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
       </section>
 
       {/* Activity Feed + Stats */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] items-stretch">
         <ActivityFeed activities={activities} />
-        <div className="grid grid-cols-2 gap-3 content-start">
+        <div className="grid grid-cols-2 gap-3 h-full">
           {[
-            { label: 'Leads totais', value: data.leadsTotal, color: 'text-chart-1' },
-            { label: 'Leads novos', value: data.newLeads, color: 'text-chart-3' },
-            { label: 'Corretores ativos', value: data.activeMembers, color: 'text-chart-5' },
-            { label: 'Em atendimento', value: data.inContact, color: 'text-chart-4' },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
-              className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
-            >
-              <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
-                {stat.value}
-              </p>
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-            </motion.div>
-          ))}
+            { label: 'Leads totais', value: data.leadsTotal, color: 'text-chart-1', bg: 'bg-chart-1/10', icon: UserList },
+            { label: 'Leads novos', value: data.newLeads, color: 'text-chart-3', bg: 'bg-chart-3/10', icon: Lightning },
+            { label: 'Corretores ativos', value: data.activeMembers, color: 'text-chart-5', bg: 'bg-chart-5/10', icon: Handshake },
+            { label: 'Em atendimento', value: data.inContact, color: 'text-chart-4', bg: 'bg-chart-4/10', icon: Phone },
+          ].map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
+                whileHover={{ y: -2 }}
+                className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Gestão</span>
+                </div>
+                <div className="mt-3 space-y-1">
+                  <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>
+                    {stat.value}
+                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -1269,28 +1285,40 @@ const activities = [
       </Card>
 
       {/* Activity Feed + Stats */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] items-stretch">
         <ActivityFeed activities={activities} />
-        <div className="grid grid-cols-2 gap-3 content-start">
+        <div className="grid grid-cols-2 gap-3 h-full">
           {[
-            { label: 'Leads totais', value: data.totals.all, color: 'text-chart-1' },
-            { label: 'Em atendimento', value: data.totals.active, color: 'text-chart-3' },
-            { label: 'Conversões', value: data.totals.converted, color: 'text-chart-5' },
-            { label: 'Perdidos', value: data.totals.lost, color: 'text-chart-4' },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
-              className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
-            >
-              <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
-                {stat.value}
-              </p>
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-            </motion.div>
-          ))}
+            { label: 'Leads totais', value: data.totals.all, color: 'text-chart-1', bg: 'bg-chart-1/10', icon: UserList },
+            { label: 'Em atendimento', value: data.totals.active, color: 'text-chart-3', bg: 'bg-chart-3/10', icon: Phone },
+            { label: 'Conversões', value: data.totals.converted, color: 'text-chart-5', bg: 'bg-chart-5/10', icon: CheckCircle },
+            { label: 'Perdidos', value: data.totals.lost, color: 'text-chart-4', bg: 'bg-chart-4/10', icon: XCircle },
+          ].map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
+                whileHover={{ y: -2 }}
+                className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Métrica</span>
+                </div>
+                <div className="mt-3 space-y-1">
+                  <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>
+                    {stat.value}
+                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </div>
