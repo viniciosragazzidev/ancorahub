@@ -1,6 +1,7 @@
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,9 @@ export default async function SuperAdminSettingsPage() {
     "feature_route_onboarding_enabled",
     "feature_whatsapp_meta_cloud_enabled",
     "feature_meta_lead_ads_enabled",
+    META_LEAD_ADS_PLATFORM_SETTINGS.partnerName,
+    META_LEAD_ADS_PLATFORM_SETTINGS.businessId,
+    META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp,
     "feature_lead_distribution_jobs_enabled",
     "lead_distribution_jobs_batch_size",
     "lead_distribution_jobs_max_attempts",
@@ -73,7 +77,7 @@ export default async function SuperAdminSettingsPage() {
     "ai_google_api_key",
     "ai_openrouter_api_key",
   ]);
-  const [notificationCapabilities, customRolesPilot] = await Promise.all([getNotificationCapabilityStates(), getCustomRolesPilotTenants()]);
+  const [notificationCapabilities, customRolesPilot, metaLeadAdsPilotTenantIds, tenants] = await Promise.all([getNotificationCapabilityStates(), getCustomRolesPilotTenants(), getMetaLeadAdsPilotTenantIds(), getDatabase().select({ id: schema.tenants.id, name: schema.tenants.name }).from(schema.tenants).orderBy(schema.tenants.name)]);
   const pilotTenants = customRolesPilot.tenants;
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
   const centralEnabled = settingMap.get("feature_central_atencao_enabled") !== "false";
@@ -83,6 +87,9 @@ export default async function SuperAdminSettingsPage() {
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
+  const metaLeadAdsPartnerName = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.partnerName) ?? "Ancora Hub";
+  const metaLeadAdsBusinessId = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.businessId) ?? "37173915645589885";
+  const metaLeadAdsSupportWhatsApp = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp) ?? "+55 21 95930-7782";
   const distributionJobsEnabled = settingMap.get("feature_lead_distribution_jobs_enabled") !== "false";
   const leadManagementActionsEnabled = settingMap.get("feature_lead_management_actions_enabled") !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
@@ -533,6 +540,14 @@ export default async function SuperAdminSettingsPage() {
               <Button type="submit" variant={agentTrainingCenterEnabled ? "outline" : "default"}>{agentTrainingCenterEnabled ? "Salvar controle" : "Liberar piloto"}</Button>
             </form>
           </CardContent>
+        </Card>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Identidade pública do Lead Ads</CardTitle><CardDescription>Estes são os únicos dados técnicos exibidos ao Diretor/cliente durante a autorização. Tokens, App Secret e webhooks ficam exclusivamente no ambiente da plataforma.</CardDescription></CardHeader>
+          <CardContent><form action={updateMetaLeadAdsPlatformIdentityAction} className="grid gap-4 md:grid-cols-3"><label className="grid gap-1 text-sm font-medium">Nome do parceiro<Input name="partnerName" defaultValue={metaLeadAdsPartnerName} /></label><label className="grid gap-1 text-sm font-medium">Business ID público<Input name="businessId" defaultValue={metaLeadAdsBusinessId} inputMode="numeric" /></label><label className="grid gap-1 text-sm font-medium">WhatsApp de suporte<Input name="supportWhatsApp" defaultValue={metaLeadAdsSupportWhatsApp} /></label><div className="md:col-span-3"><Button type="submit">Salvar dados públicos</Button></div></form></CardContent>
+        </Card>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Piloto de Lead Ads por empresa</CardTitle><CardDescription>O kill switch global preserva fontes e histórico. Esta lista decide quais empresas podem abrir o assistente de descoberta de ativos.</CardDescription></CardHeader>
+          <CardContent className="space-y-2">{tenants.map((tenant) => { const enabled = metaLeadAdsPilotTenantIds.includes(tenant.id); return <form action={updateMetaLeadAdsPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">{enabled ? "Pode buscar e ativar Páginas." : "Bloqueada fora do piloto."}</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={enabled ? "false" : "true"} /><Button size="sm" type="submit" variant={enabled ? "outline" : "default"}>{enabled ? "Remover do piloto" : "Liberar piloto"}</Button></form>; })}</CardContent>
         </Card>
         </SuperAdminSettingsTabs>
       </main>

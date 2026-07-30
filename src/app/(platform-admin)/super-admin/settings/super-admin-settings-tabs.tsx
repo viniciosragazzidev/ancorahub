@@ -18,6 +18,7 @@ const tabForCard: SettingsTab[] = [
   "platform", "platform", "platform", "platform", "platform", "operations", "platform",
   "channels", "channels", "platform", "platform", "platform", "operations", "intelligence",
   "operations", "channels", "intelligence", "intelligence", "intelligence",
+  "channels", "channels",
 ];
 
 type SuperAdminSettingsTabsProps = { children: ReactNode };

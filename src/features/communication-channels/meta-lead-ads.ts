@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 import { MetaCloudApiError } from "./meta-cloud-client";
 import { getMetaLeadAdsServerConfig } from "./meta-cloud-config";
+import { isMetaLeadAdsTenantPilotEnabled } from "./meta-lead-ads-platform";
 
 export type MetaLeadAdsWebhookPayload = {
   object?: string;
@@ -24,8 +25,9 @@ type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; fo
 
 export const META_LEAD_ADS_SOURCE = "meta_lead_ads";
 
-export async function isMetaLeadAdsEnabled() {
-  return (await getSystemSetting("feature_meta_lead_ads_enabled")) === "true";
+export async function isMetaLeadAdsEnabled(tenantId?: string) {
+  if ((await getSystemSetting("feature_meta_lead_ads_enabled")) !== "true") return false;
+  return tenantId ? isMetaLeadAdsTenantPilotEnabled(tenantId) : true;
 }
 
 export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: string | null, appSecret: string) {
@@ -103,7 +105,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
   for (const entry of payload.entry ?? []) {
     if (!entry.id) { ignored += 1; continue; }
     const [source] = await db.select().from(schema.metaLeadAdSources).where(and(eq(schema.metaLeadAdSources.pageId, entry.id), eq(schema.metaLeadAdSources.status, "active"))).limit(1);
-    if (!source) { ignored += 1; continue; }
+    if (!source || !(await isMetaLeadAdsEnabled(source.tenantId))) { ignored += 1; continue; }
     const [credential] = source.createdBy ? [{ createdBy: source.createdBy }] : await db.select({ createdBy: schema.leadWebhookCredentials.createdBy }).from(schema.leadWebhookCredentials).where(eq(schema.leadWebhookCredentials.id, source.leadWebhookCredentialId)).limit(1);
     if (!credential?.createdBy) { ignored += 1; continue; }
     await db.update(schema.metaLeadAdSources).set({ lastWebhookAt: receivedAt, updatedAt: receivedAt }).where(eq(schema.metaLeadAdSources.id, source.id));

@@ -3,16 +3,22 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
+import { discoverMetaLeadAdsAssets, getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
 import { getMetaCloudServerConfig, getMetaLeadAdsConfigurationState } from "./meta-cloud-config";
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER } from "./types";
 import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
 import { configureMetaLeadAdsSource, isMetaLeadAdsEnabled, pauseMetaLeadAdsSource } from "./meta-lead-ads";
+
+export type MetaLeadAdsDiscoveryState = {
+  error?: string;
+  assets?: { pages: Array<{ id: string; name?: string }>; adAccounts: Array<{ id: string; name?: string }>; pixels: Array<{ id: string; name?: string }>; datasets: Array<{ id: string; name?: string }> };
+};
 
 export type ManualMetaActionState = {
   success?: boolean;
@@ -36,6 +42,13 @@ async function requireManualMetaAccess() {
   const context = await getRequiredTenantContext();
   if (context.role !== "director") throw new Error("Somente o Diretor pode configurar a integração Meta da empresa.");
   if (!(await isMetaCloudWhatsAppEnabled())) throw new Error("A integração oficial da Meta está desativada pelo Super-admin.");
+  return context;
+}
+
+async function requireLeadAdsAccess() {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director") throw new Error("Somente o Diretor pode configurar a captação por anúncios.");
+  if (!(await isMetaLeadAdsEnabled(context.tenantId))) throw new Error("A captação por Lead Ads ainda não está liberada para esta empresa piloto.");
   return context;
 }
 
@@ -228,8 +241,7 @@ export async function completeManualMetaTutorialAction() {
 }
 
 export async function configureManualMetaLeadAdsSourceAction(formData: FormData) {
-  const context = await requireManualMetaAccess();
-  if (!(await isMetaLeadAdsEnabled())) throw new Error("A captação por Lead Ads está desativada pelo Super-admin.");
+  const context = await requireLeadAdsAccess();
   const leadAdsConfig = getMetaLeadAdsConfigurationState();
   if (!leadAdsConfig.configured) throw new Error(`A plataforma ainda precisa configurar: ${leadAdsConfig.missing.join(", ")}.`);
   const input = manualMetaLeadAdsSourceInputSchema.parse({
@@ -244,6 +256,47 @@ export async function configureManualMetaLeadAdsSourceAction(formData: FormData)
   }
   await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: input.branchId, pageId: input.pageId, adAccountId: input.adAccountId || null, actorUserId: context.userId });
   revalidatePath("/settings/meta");
+}
+
+export async function discoverManualMetaLeadAdsAssetsAction(): Promise<MetaLeadAdsDiscoveryState> {
+  try {
+    await requireLeadAdsAccess();
+    const config = getMetaLeadAdsConfigurationState();
+    if (!config.configured) throw new Error("A credencial técnica da plataforma ainda não está pronta.");
+    const assets = await discoverMetaLeadAdsAssets();
+    return { assets };
+  } catch (error) {
+    return { error: sanitizeError(error) };
+  }
+}
+
+const selectedAssetSchema = z.object({
+  pageIds: z.array(z.string().regex(/^\d{5,40}$/)).min(1, "Selecione ao menos uma Página."),
+  adAccountId: z.string().regex(/^(?:act_)?\d{5,40}$/).optional().or(z.literal("")),
+  pixelId: z.string().regex(/^\d{5,40}$/).optional().or(z.literal("")),
+  datasetId: z.string().regex(/^\d{5,40}$/).optional().or(z.literal("")),
+});
+
+export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
+  const context = await requireLeadAdsAccess();
+  const selected = selectedAssetSchema.parse(input);
+  const discovered = await discoverMetaLeadAdsAssets();
+  const allowed = (items: Array<{ id: string }>, id: string) => !id || items.some((item) => item.id === id);
+  if (selected.pageIds.some((pageId) => !allowed(discovered.pages, pageId)) || !allowed(discovered.adAccounts, selected.adAccountId ?? "") || !allowed(discovered.pixels, selected.pixelId ?? "") || !allowed(discovered.datasets, selected.datasetId ?? "")) {
+    throw new Error("Um dos ativos selecionados não está autorizado para a plataforma. Busque novamente antes de confirmar.");
+  }
+  const db = getDatabase();
+  for (const pageId of [...new Set(selected.pageIds)]) {
+    await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId, adAccountId: selected.adAccountId || null, actorUserId: context.userId });
+  }
+  const now = new Date();
+  const [settings] = await db.select({ id: schema.metaIntegrationSettings.id }).from(schema.metaIntegrationSettings).where(eq(schema.metaIntegrationSettings.tenantId, context.tenantId)).limit(1);
+  const values = { adAccountId: selected.adAccountId || null, pixelId: selected.pixelId || null, datasetId: selected.datasetId || null, lastSyncedAt: now, lastError: null, updatedAt: now };
+  if (settings) await db.update(schema.metaIntegrationSettings).set(values).where(eq(schema.metaIntegrationSettings.id, settings.id));
+  else await db.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, createdBy: context.userId, createdAt: now, ...values });
+  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_lead_ads_source", entidadeId: context.tenantId, acao: "meta_lead_ads.assets_confirmed" });
+  revalidatePath("/settings/meta");
+  return { success: true };
 }
 
 export async function pauseManualMetaLeadAdsSourceAction(formData: FormData) {

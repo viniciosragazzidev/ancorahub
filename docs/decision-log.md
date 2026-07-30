@@ -106,10 +106,17 @@ O CorreTop usa `services/whatsapp-api` como fronteira Fastify separada para cham
 
 ## DEC-069 — Captação manual de Meta Lead Ads com credencial técnica central
 
-**Estado:** Aceita  
+**Estado:** Aceita
 **Data:** 2026-07-29
 
 Enquanto o OAuth/Embedded Signup de Marketing não estiver liberado, cada cliente compartilha manualmente sua Página e ativos com o portfólio empresarial do AncoraHub. A plataforma mantém um único token técnico de Usuário do Sistema somente no ambiente privado; nenhum tenant envia, armazena ou visualiza esse segredo. O Diretor mapeia a Página autorizada para seu tenant e, opcionalmente, para uma unidade. O webhook assinado resolve a empresa exclusivamente pelo `page_id`, busca o `leadgen_id` no servidor e cria o lead pelo intake transacional existente. Uma Página só pode pertencer a um tenant por vez; pausar a fonte interrompe novas captações e preserva histórico. O Super-admin controla a capacidade global por `feature_meta_lead_ads_enabled`, com auditoria.
+
+## DEC-070 — Autorização guiada de ativos Meta para piloto
+
+**Estado:** Aceita
+**Data:** 2026-07-30
+
+Lead Ads deixa de solicitar token ou identificadores técnicos ao Diretor. A plataforma exibe somente o nome do parceiro, Business ID e suporte; depois de o cliente compartilhar ativos na Meta e liberar o app Corretop API Oficial em Acesso a Leads, o servidor descobre ativos usando a credencial técnica central. O Diretor seleciona uma ou mais Páginas e elas entram na fila central do tenant. A descoberta é permitida apenas para tenants explicitamente habilitados no piloto pelo Super-admin; cada confirmação revalida a seleção contra a Meta e é auditada. WhatsApp permanece em trilha independente.
 
 ## Pendentes bloqueantes
 

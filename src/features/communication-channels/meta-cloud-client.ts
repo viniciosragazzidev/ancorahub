@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
+import { getMetaLeadAdsServerConfig } from "./meta-cloud-config";
 
 type MetaApiErrorResponse = { error?: { message?: string; code?: number; error_subcode?: number } };
 
@@ -53,6 +54,38 @@ export async function getMetaWabaPhoneNumbers(wabaId: string, accessToken: strin
 
 export async function subscribeWabaToApp(wabaId: string, accessToken: string) {
   return graphRequest<{ success?: boolean }>(`${encodeURIComponent(wabaId)}/subscribed_apps`, { method: "POST" }, accessToken);
+}
+
+type MetaAsset = { id: string; name?: string };
+export type MetaLeadAdsAssets = { pages: MetaAsset[]; adAccounts: MetaAsset[]; pixels: MetaAsset[]; datasets: MetaAsset[] };
+
+async function leadAdsRequest<T>(path: string): Promise<T> {
+  const config = getMetaLeadAdsServerConfig();
+  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${path.replace(/^\//, "")}`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` }, cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({})) as T & MetaApiErrorResponse;
+  if (!response.ok) throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a busca dos ativos.", response.status, payload.error?.code);
+  return payload;
+}
+
+/** Returns only non-sensitive asset labels and IDs authorized for the platform credential. */
+export async function discoverMetaLeadAdsAssets(): Promise<MetaLeadAdsAssets> {
+  const list = async (path: string) => {
+    try {
+      return (await leadAdsRequest<{ data?: MetaAsset[] }>(path)).data ?? [];
+    } catch (error) {
+      if (error instanceof MetaCloudApiError && [400, 403].includes(error.status)) return [];
+      throw error;
+    }
+  };
+  const [pages, adAccounts, pixels, datasets] = await Promise.all([
+    list("me/accounts?fields=id,name&limit=100"),
+    list("me/adaccounts?fields=id,name&limit=100"),
+    list("me/adspixels?fields=id,name&limit=100"),
+    list("me/datasets?fields=id,name&limit=100"),
+  ]);
+  return { pages, adAccounts, pixels, datasets };
 }
 
 export async function sendMetaCloudText(input: { phoneNumberId: string; accessToken: string; to: string; body: string }) {
