@@ -139,16 +139,16 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
   const pendingCount = data.totals.unworked + data.totals.stalled;
 
   return (
-    <aside className="space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto pr-1">
-      {/* ─── WIDGET 1: AÇÃO NECESSÁRIA (CARDS VERTICAIS) ─── */}
+    <aside className="space-y-4">
+      {/* ─── WIDGET 1: AÇÃO NECESSÁRIA (CARDS VERTICAIS SEM BORDA VERMELHA) ─── */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
           <div>
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ação Necessária</h2>
           </div>
           {pendingCount > 0 && (
-            <Badge variant="destructive" className="gap-1 rounded-full px-2 py-0 text-[10px] font-bold">
-              <Warning className="size-3" weight="fill" />
+            <Badge variant="outline" className="gap-1 rounded-full px-2 py-0 text-[10px] font-bold text-amber-600 border-amber-500/30">
+              <Warning className="size-3 text-amber-500" weight="fill" />
               {pendingCount}
             </Badge>
           )}
@@ -162,13 +162,10 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
               <Link
                 key={action.label}
                 href={action.href}
-                className={cn(
-                  "group relative overflow-hidden rounded-xl border border-border/70 bg-card p-3 transition-colors hover:border-border-strong focus-visible:ring-1 focus-visible:ring-ring",
-                  critical && "border-l-3 border-l-amber-500"
-                )}
+                className="group relative overflow-hidden rounded-xl border border-border/70 bg-card p-3.5 transition-colors hover:border-border-strong focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <div className="flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <div className={cn(
                       "flex size-6 items-center justify-center rounded-md border text-xs shrink-0",
                       critical
@@ -184,7 +181,7 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
                   <ArrowUpRight className="size-3.5 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </div>
 
-                <div className="mt-2 flex items-baseline justify-between gap-2">
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
                   <p className="text-xs text-muted-foreground/80 truncate">{action.description}</p>
                   <p className={cn("text-xl font-bold tracking-tight tabular-nums shrink-0", critical ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
                     {action.value}
@@ -197,7 +194,7 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       </div>
 
       {/* ─── WIDGET 2: PLANTÃO AO VIVO (COMPACTO NO FIM DA LISTA) ─── */}
-      <div className="rounded-xl border border-border/70 bg-card p-3 space-y-2 transition-colors hover:border-border-strong">
+      <div className="rounded-xl border border-border/70 bg-card p-3.5 space-y-2.5 transition-colors hover:border-border-strong">
         <div className="flex items-center justify-between gap-1.5">
           <Badge variant="outline" className="gap-1.5 rounded-md border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
             <span className="relative flex size-1.5">
@@ -217,7 +214,7 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
           render={<Link href="/leads/distribuicao/plantao" />}
           size="sm"
           variant="outline"
-          className="w-full h-7 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+          className="w-full h-8 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
         >
           <WifiHigh className="size-3.5" /> Ver Plantão
         </Button>
@@ -363,9 +360,9 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 items-start">
-      {/* ─── ESQUERDA: INDICADORES E ANALYTICS (xl:col-span-9 - MAIOR ÁREA CENTRAL) ─── */}
-      <div className="xl:col-span-9 space-y-6">
+    <div className="flex flex-col xl:flex-row h-full min-h-0 w-full overflow-hidden">
+      {/* ─── CENTRO: DASHBOARD PRINCIPAL (SCROLL INDEPENDENTE, LARGURA GENEROSA) ─── */}
+      <div className="flex-1 min-w-0 h-full overflow-y-auto p-4 sm:p-6 space-y-6">
         {/* ─── INDICADORES ─── */}
         <section className="space-y-4">
           <div className="border-b border-border/50 pb-2">
@@ -380,254 +377,104 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           </div>
         </section>
 
-      {/* Charts Row */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        {/* Funnel Flow */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
-          className="lg:col-span-4"
-        >
-          <Card className="rounded-xl border-border/70 bg-card shadow-none">
-            <CardHeader>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle>Funil Comercial</CardTitle>
-                  <CardDescription>
-                    Leads por etapa no tenant
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  {funnelChartData.map((d) => (
-                    <span
-                      key={d.name}
-                      className="flex items-center gap-1.5"
-                    >
-                      <span className="inline-block size-2.5 rounded-full bg-primary" />
-                      {d.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
-                  <AreaChart
-                    data={funnelChartData}
-                    margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="funnelGradient"
-                        x1="0"
-                        x2="0"
-                        y1="0"
-                        y2="1"
+        {/* Charts Row 1: Funnel Flow (7/12) & Status Distribution (5/12) */}
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Funnel Flow */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
+            className="lg:col-span-7"
+          >
+            <Card className="rounded-xl border-border/70 bg-card shadow-none">
+              <CardHeader>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle>Funil Comercial</CardTitle>
+                    <CardDescription>
+                      Leads por etapa no tenant
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {funnelChartData.map((d) => (
+                      <span
+                        key={d.name}
+                        className="flex items-center gap-1.5"
                       >
-                        <stop
-                          offset="0%"
-                          stopColor="var(--chart-1)"
-                          stopOpacity={0.25}
-                        />
-                        <stop
-                          offset="100%"
-                          stopColor="var(--chart-1)"
-                          stopOpacity={0.02}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      stroke="var(--border)"
-                      strokeDasharray="3 3"
-                      vertical={false}
-                    />
-                    <XAxis
-                      axisLine={false}
-                      dataKey="name"
-                      tick={{
-                        fill: "var(--muted-foreground)",
-                        fontSize: 12,
-                      }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tick={{
-                        fill: "var(--muted-foreground)",
-                        fontSize: 12,
-                      }}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      content={<ChartTooltipWrapper />}
-                      cursor={{
-                        stroke: "var(--border)",
-                        strokeDasharray: "3 3",
-                      }}
-                    />
-                    <Area
-                      dataKey="volume"
-                      fill="url(#funnelGradient)"
-                      stroke="var(--chart-1)"
-                      strokeWidth={2}
-                      type="monotone"
-                      animationDuration={600}
-                      animationEasing="ease-out"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Status Distribution Pie */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}
-          className="lg:col-span-3"
-        >
-          <Card className="rounded-xl border-border/70 bg-card shadow-none">
-            <CardHeader>
-              <CardTitle>Distribuição por Status</CardTitle>
-              <CardDescription>
-                Leads em cada etapa do funil
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex h-64 items-center justify-center">
-                <div className="relative">
-                  <ResponsiveContainer height={180} width={220}>
-                    <PieChart>
-                      <Pie
-                        cx="50%"
-                        cy="50%"
-                        data={statusDistribution.filter((d) => d.value > 0)}
-                        dataKey="value"
-                        endAngle={-270}
-                        innerRadius={50}
-                        outerRadius={75}
-                        paddingAngle={3}
-                        strokeWidth={0}
-                        animationDuration={600}
-                        animationEasing="ease-out"
-                      >
-                        {statusDistribution
-                          .filter((d) => d.value > 0)
-                          .map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
-                      </Pie>
-                      <Tooltip content={<ChartTooltipWrapper />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-lg font-bold tabular-nums">
-                      {totalLeads}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Total
-                    </span>
+                        <span className="inline-block size-2.5 rounded-full bg-primary" />
+                        {d.name}
+                      </span>
+                    ))}
                   </div>
                 </div>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {statusDistribution
-                  .filter((d) => d.value > 0)
-                  .map((item) => (
-                    <div
-                      key={item.name}
-                      className="flex items-center gap-2 text-xs"
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer height="100%" width="100%">
+                    <AreaChart
+                      data={funnelChartData}
+                      margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
                     >
-                      <span
-                        className="inline-block size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: item.color }}
+                      <defs>
+                        <linearGradient
+                          id="funnelGradient"
+                          x1="0"
+                          x2="0"
+                          y1="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="var(--chart-1)"
+                            stopOpacity={0.25}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="var(--chart-1)"
+                            stopOpacity={0.02}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        stroke="var(--border)"
+                        strokeDasharray="3 3"
+                        vertical={false}
                       />
-                      <span className="text-muted-foreground">
-                        {item.name}
-                      </span>
-                      <span className="ml-auto font-medium tabular-nums">
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </section>
-
-      {/* Additional Charts Row: Daily Performance & Branch Breakdown */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        {/* Daily Trend (Composed Chart) */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.12 }}
-          className="lg:col-span-4"
-        >
-          <Card className="rounded-xl border-border/70 bg-card shadow-none">
-            <CardHeader>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle>Histórico de Captura vs Conversão</CardTitle>
-                  <CardDescription>
-                    Evolução nos últimos 30 dias (Leads x Vendas)
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block size-2.5 rounded-sm bg-chart-1" />
-                    Leads
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-0.5 w-3 bg-chart-5" />
-                    Conversões
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart
-                    data={data.trend}
-                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                  >
-                    <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(val) => val ? `${val.split('-')[2]}/${val.split('-')[1]}` : ''}
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip content={<ChartTooltipWrapper />} cursor={{ fill: "var(--muted)/30" }} />
-                    <Bar
-                      dataKey="leads"
-                      name="Leads Recebidos"
-                      fill="var(--chart-1)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={28}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="converted"
-                      name="Conversões"
-                      stroke="var(--chart-5)"
-                      strokeWidth={2.5}
-                      dot={false}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                      <XAxis
+                        axisLine={false}
+                        dataKey="name"
+                        tick={{
+                          fill: "var(--muted-foreground)",
+                          fontSize: 12,
+                        }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tick={{
+                          fill: "var(--muted-foreground)",
+                          fontSize: 12,
+                        }}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        content={<ChartTooltipWrapper />}
+                        cursor={{
+                          stroke: "var(--border)",
+                          strokeDasharray: "3 3",
+                        }}
+                      />
+                      <Area
+                        dataKey="volume"
+                        fill="url(#funnelGradient)"
+                        stroke="var(--chart-1)"
+                        strokeWidth={2}
+                        type="monotone"
+                        animationDuration={600}
+                        animationEasing="ease-out"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>

@@ -51,10 +51,14 @@
 :root {
   color-scheme: light;
   /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
-  --surface-base: oklch(0.965 0.003 95);      /* Lvl 0: Base Canvas (#f5f5f3) */
-  --surface-card: oklch(0.985 0.002 95);      /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: oklch(0.940 0.005 95); /* Lvl 2: Recessed / Input (#eeeee9) */
-  --surface-elevated: oklch(1.000 0 0);       /* Lvl 3: Elevated Popover (#ffffff) */
+  --surface-base: oklch(0.965 0.003 95);
+  /* Lvl 0: Base Canvas (#f5f5f3) */
+  --surface-card: oklch(0.985 0.002 95);
+  /* Lvl 1: Card Surface (#fafaf9) */
+  --surface-secondary: oklch(0.940 0.005 95);
+  /* Lvl 2: Recessed / Input (#eeeee9) */
+  --surface-elevated: oklch(1.000 0 0);
+  /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
   --background: oklch(0.965 0.003 95);
@@ -73,7 +77,8 @@
   --secondary: oklch(0.940 0.005 95);
   --secondary-foreground: oklch(0.180 0.005 95);
 
-  --accent: oklch(0.620 0.165 155);            /* Ramp Esmeralda da Marca (#15A46B) */
+  --accent: oklch(0.620 0.165 155);
+  /* Ramp Esmeralda da Marca (#15A46B) */
   --accent-foreground: oklch(0.990 0 0);
 
   --muted: oklch(0.940 0.005 95);
@@ -81,13 +86,17 @@
   --muted-text: oklch(0.580 0.008 95);
 
   /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
-  --warning: oklch(0.660 0.165 75);            /* Alertas e Atenção */
+  --warning: oklch(0.660 0.165 75);
+  /* Alertas e Atenção */
   --warning-foreground: oklch(0.990 0 0);
-  --success: oklch(0.620 0.170 145);           /* Sucesso e Confirmação */
+  --success: oklch(0.620 0.170 145);
+  /* Sucesso e Confirmação */
   --success-foreground: oklch(0.990 0 0);
-  --destructive: oklch(0.580 0.200 25);        /* Erro e Ação Destrutiva */
+  --destructive: oklch(0.580 0.200 25);
+  /* Erro e Ação Destrutiva */
 
-  --border: oklch(0.890 0.004 95);             /* Bordas suaves 1px */
+  --border: oklch(0.890 0.004 95);
+  /* Bordas suaves 1px */
   --border-strong: oklch(0.830 0.006 95);
   --input: oklch(0.940 0.005 95);
   --ring: oklch(0.180 0.005 95);
@@ -107,11 +116,16 @@
   --ct-blue-strong: oklch(0.120 0.005 95);
 
   /* ── Camada 4: Paleta de Gráficos em OKLCH (L = 0.64, C = 0.16) ─────────── */
-  --chart-1: oklch(0.640 0.160 260);          /* Indigo/Blue */
-  --chart-2: oklch(0.640 0.160 150);          /* Emerald */
-  --chart-3: oklch(0.640 0.160 230);          /* Sky */
-  --chart-4: oklch(0.640 0.160 300);          /* Violet */
-  --chart-5: oklch(0.640 0.160 65);           /* Amber */
+  --chart-1: oklch(0.640 0.160 260);
+  /* Indigo/Blue */
+  --chart-2: oklch(0.640 0.160 150);
+  /* Emerald */
+  --chart-3: oklch(0.640 0.160 230);
+  /* Sky */
+  --chart-4: oklch(0.640 0.160 300);
+  /* Violet */
+  --chart-5: oklch(0.640 0.160 65);
+  /* Amber */
 
   --font-sans: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
@@ -248,10 +262,14 @@
 .dark {
   color-scheme: dark;
   /* ── Camada 1: Fundação Neutra Dark (Contraste Dobrado) ───────────────── */
-  --surface-base: oklch(0.140 0.005 260);     /* Lvl 0: Base Canvas (#0d0f12) */
-  --surface-card: oklch(0.190 0.006 260);     /* Lvl 1: Card Surface (#16191d) */
-  --surface-secondary: oklch(0.240 0.008 260);/* Lvl 2: Recessed / Active (#20242a) */
-  --surface-elevated: oklch(0.280 0.010 260); /* Lvl 3: Elevated Popover (#292e36) */
+  --surface-base: oklch(0.140 0.005 260);
+  /* Lvl 0: Base Canvas (#0d0f12) */
+  --surface-card: oklch(0.190 0.006 260);
+  /* Lvl 1: Card Surface (#16191d) */
+  --surface-secondary: oklch(0.240 0.008 260);
+  /* Lvl 2: Recessed / Active (#20242a) */
+  --surface-elevated: oklch(0.280 0.010 260);
+  /* Lvl 3: Elevated Popover (#292e36) */
   --surface-overlay: oklch(0.280 0.010 260);
 
   --background: oklch(0.140 0.005 260);
@@ -270,7 +288,8 @@
   --secondary: oklch(0.240 0.008 260);
   --secondary-foreground: oklch(0.960 0.003 260);
 
-  --accent: oklch(0.720 0.180 155);            /* Ramp Esmeralda da Marca Dark (#47D18C) */
+  --accent: oklch(0.720 0.180 155);
+  /* Ramp Esmeralda da Marca Dark (#47D18C) */
   --accent-foreground: oklch(0.120 0.005 260);
 
   --muted: oklch(0.240 0.008 260);
@@ -284,7 +303,8 @@
   --success-foreground: oklch(0.120 0.005 260);
   --destructive: oklch(0.700 0.210 25);
 
-  --border: oklch(0.290 0.008 260);            /* Bordas nítidas sem empastamento */
+  --border: oklch(0.290 0.008 260);
+  /* Bordas nítidas sem empastamento */
   --border-strong: oklch(0.380 0.010 260);
   --input: oklch(0.290 0.008 260);
   --ring: oklch(0.960 0.003 260);
@@ -379,6 +399,7 @@ body {
 }
 
 @media (forced-colors: active) {
+
   :where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [role="menuitem"]):focus-visible,
   .skip-to-content:focus-visible {
     outline: 2px solid CanvasText;
@@ -397,7 +418,7 @@ body {
   min-inline-size: 0;
 }
 
-[data-slot="app-content"] :where(.flex, .grid) > * {
+[data-slot="app-content"] :where(.flex, .grid)>* {
   min-inline-size: 0;
 }
 
@@ -883,9 +904,11 @@ html:not([data-magicui-theme-vt="active"])::view-transition-group(ct-shell-heade
   z-index: 100;
   animation: none;
 }
+
 html:not([data-magicui-theme-vt="active"])::view-transition-old(ct-shell-header) {
   display: none;
 }
+
 html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header) {
   animation: none;
 }
@@ -895,9 +918,11 @@ html:not([data-magicui-theme-vt="active"])::view-transition-new(ct-shell-header)
 html[data-magicui-theme-vt="active"]::view-transition-group(ct-shell-header) {
   z-index: 100;
 }
+
 html[data-magicui-theme-vt="active"]::view-transition-old(ct-shell-header) {
   display: none;
 }
+
 html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   animation: none;
 }
@@ -997,7 +1022,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 
 @media screen and (min-width:768px) {
   html {
-    font-size: 103%;
+    font-size: 95%;
   }
 
 }
