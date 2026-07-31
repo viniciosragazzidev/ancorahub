@@ -35,6 +35,15 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   const paidPercentage = totalCommissions > 0 ? Math.round((paidCommissions / totalCommissions) * 100) : 0;
   const paidCount = schedule.filter((i) => i.status === "paid").length;
   const pendingCount = schedule.filter((i) => i.status === "pending").length;
+
+  // Progressão do cronograma: valores por parcela na ordem do mês + acumulado pago
+  const orderedSchedule = [...schedule].sort((a, b) => a.monthNumber - b.monthNumber);
+  const scheduleTrend = orderedSchedule.map((item) => Number(item.amount));
+  let paidAccum = 0;
+  const paidTrend = orderedSchedule.map((item) => {
+    if (item.status === "paid") paidAccum += Number(item.amount);
+    return paidAccum;
+  });
   const initials = sale.leadName
     ? sale.leadName
         .split(" ")
@@ -102,6 +111,8 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
           scheduleLength={schedule.length}
           paidCount={paidCount}
           pendingCount={pendingCount}
+          scheduleTrend={scheduleTrend}
+          paidTrend={paidTrend}
         />
 
         {/* Main Details & Schedule Tabs */}

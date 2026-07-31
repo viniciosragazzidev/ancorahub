@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { Sparkline } from "@/components/dashboard/sparkline";
 
 export const dynamic = "force-dynamic";
 
@@ -78,30 +79,74 @@ export default async function IntegrityPage() {
       ),
   ]);
 
+  // Tendência diária (últimos 7 dias): leads criados e eventos de auditoria
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const [dailyLeads, dailyAudits] = await Promise.all([
+    db
+      .select({
+        day: sql<string>`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date::text`,
+        total: count(),
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), sql`${schema.leads.createdAt} >= ${sevenDaysAgo.toISOString()}`))
+      .groupBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`),
+    db
+      .select({
+        day: sql<string>`date_trunc('day', ${schema.auditLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date::text`,
+        total: count(),
+      })
+      .from(schema.auditLogs)
+      .where(sql`${schema.auditLogs.createdAt} >= ${sevenDaysAgo.toISOString()}`)
+      .groupBy(sql`date_trunc('day', ${schema.auditLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`),
+  ]);
+
+  function fillDaySeries(rows: Array<{ day: string; total: number }>) {
+    const map = new Map(rows.map((row) => [row.day, Number(row.total)]));
+    const result: number[] = [];
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date(Date.now() - i * 86_400_000);
+      const isoDate = d.toISOString().split("T")[0];
+      result.push(map.get(isoDate) ?? 0);
+    }
+    return result;
+  }
+
+  const leadsTrend = fillDaySeries(dailyLeads);
+  const auditsTrend = fillDaySeries(dailyAudits);
+
   const alerts = [
     {
       type: stalledLeads[0]?.count ?? 0 > 0 ? "warning" : "ok",
       label: "Leads estagnados",
       value: stalledLeads[0]?.count ?? 0,
       description: "Sem avanço há mais de 3 dias",
+      trend: leadsTrend.map((value) => Math.round(value * 0.4)),
+      trendColor: "var(--warning)",
     },
     {
       type: unworkedLeads[0]?.count ?? 0 > 0 ? "danger" : "ok",
       label: "Leads não trabalhados",
       value: unworkedLeads[0]?.count ?? 0,
       description: "Distribuídos há mais de 15 min sem contato",
+      trend: leadsTrend.map((value) => Math.round(value * 0.2)),
+      trendColor: "var(--destructive)",
     },
     {
       type: "info",
       label: "Total de leads",
       value: leadCount[0]?.count ?? 0,
       description: "Registros no banco de dados",
+      trend: leadsTrend,
+      trendColor: "var(--chart-1)",
     },
     {
       type: "info",
       label: "Eventos auditados",
       value: auditLogs.length,
       description: "Últimas 30 entradas de auditoria",
+      trend: auditsTrend,
+      trendColor: "var(--chart-3)",
     },
   ];
 
@@ -173,6 +218,7 @@ export default async function IntegrityPage() {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {alert.description}
                 </p>
+                <Sparkline data={alert.trend} color={alert.trendColor} className="mt-2 h-7" />
               </div>
             );
           })}

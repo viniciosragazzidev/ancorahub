@@ -41,6 +41,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { ChartLineUp, SlidersHorizontal } from "@/components/huge-icons";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { formatCurrency } from "@/features/quotes/utils";
 import type { NocData } from "@/features/noc/queries";
@@ -217,7 +218,7 @@ export function NocClient({ data }: NocClientProps) {
 
 
 
-  const { kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth } = data;
+  const { kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth, firstContactTrend, ticketTrend } = data;
 
   // Derived KPI cards
   const contactDelta = kpis.avgFirstContactSecondsYesterday && kpis.avgFirstContactSeconds
@@ -235,6 +236,8 @@ export function NocClient({ data }: NocClientProps) {
       change: formatDelta(kpis.leadsTodayVsYesterday),
       trend: kpis.leadsTodayVsYesterday >= 0 ? "up" as const : "down" as const,
       description: `vs. ontem (${Math.max(0, kpis.leadsToday - (kpis.leadsTodayVsYesterday >= 0 ? Math.round(kpis.leadsToday / (1 + kpis.leadsTodayVsYesterday / 100)) : kpis.leadsToday))} leads)`,
+      sparklineData: leadFlow.map((day) => day.leads),
+      sparklineColor: "var(--chart-1)",
     },
     {
       label: "Atendimentos Ativos",
@@ -242,6 +245,8 @@ export function NocClient({ data }: NocClientProps) {
       change: "ao vivo",
       trend: "neutral" as const,
       description: "Leads em atendimento agora",
+      sparklineData: leadFlow.map((day) => day.contatos),
+      sparklineColor: "var(--chart-3)",
     },
     {
       label: "Taxa de Conversão",
@@ -249,6 +254,8 @@ export function NocClient({ data }: NocClientProps) {
       change: formatDelta(kpis.conversionRateMonth - kpis.conversionRateLastMonth, "pp"),
       trend: kpis.conversionRateMonth >= kpis.conversionRateLastMonth ? "up" as const : "down" as const,
       description: `Mês anterior: ${kpis.conversionRateLastMonth}%`,
+      sparklineData: leadFlow.map((day) => day.conversoes),
+      sparklineColor: "var(--chart-5)",
     },
     {
       label: "Tempo Médio 1º Contato",
@@ -256,6 +263,8 @@ export function NocClient({ data }: NocClientProps) {
       change: contactDelta !== null ? formatDelta(-contactDelta, "s") : "—",
       trend: contactDelta !== null && contactDelta < 0 ? "up" as const : contactDelta !== null && contactDelta > 0 ? "down" as const : "neutral" as const,
       description: "Desde a criação até o primeiro contato",
+      sparklineData: firstContactTrend,
+      sparklineColor: "var(--chart-4)",
     },
     {
       label: "Ticket Médio",
@@ -263,6 +272,8 @@ export function NocClient({ data }: NocClientProps) {
       change: formatDelta(ticketDelta),
       trend: ticketDelta >= 0 ? "up" as const : "down" as const,
       description: `Mês anterior: ${formatCurrency(kpis.avgTicketLastMonth, { maximumFractionDigits: 0 })}`,
+      sparklineData: ticketTrend,
+      sparklineColor: "var(--chart-2)",
     },
   ];
 
@@ -307,6 +318,8 @@ export function NocClient({ data }: NocClientProps) {
             value={metric.value}
             change={metric.change}
             sublabel={metric.description}
+            sparklineData={metric.sparklineData}
+            sparklineColor={metric.sparklineColor}
             animated
             animationDelay={i * 0.08}
           />
@@ -602,30 +615,46 @@ export function NocClient({ data }: NocClientProps) {
       {/* Bottom Stats Bar */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Leads na semana", value: totalLeadsWeek, color: "text-chart-1" },
-          { label: "Conversões na semana", value: totalConversionsWeek, color: "text-chart-5" },
+          { label: "Leads na semana", value: totalLeadsWeek, color: "text-chart-1", bg: "bg-chart-1/10", icon: ChartBar },
+          { label: "Conversões na semana", value: totalConversionsWeek, color: "text-chart-5", bg: "bg-chart-5/10", icon: CheckCircle },
           {
             label: "Taxa de conversão semanal",
             value: totalLeadsWeek > 0 ? `${Math.round((totalConversionsWeek / totalLeadsWeek) * 100)}%` : "0%",
             color: "text-chart-2",
+            bg: "bg-chart-2/10",
+            icon: ChartLineUp,
           },
           {
             label: "Serviços operacionais",
             value: `${services.filter((s) => s.status === "operational").length}/${services.length}`,
             color: "text-chart-4",
+            bg: "bg-chart-4/10",
+            icon: SlidersHorizontal,
           },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
-            className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
-          >
-            <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-          </motion.div>
-        ))}
+        ].map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
+              whileHover={{ y: -2 }}
+              className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
+                  <Icon className="size-4" />
+                </span>
+                <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">NOC</span>
+              </div>
+              <div className="mt-3 space-y-1">
+                <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>{stat.value}</p>
+                <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </>
   );

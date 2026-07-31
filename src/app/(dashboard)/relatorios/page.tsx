@@ -19,6 +19,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
 import { ExportButtons } from "./_components/export-buttons";
 import { SpreadsheetSection } from "./_components/spreadsheet-section";
+import { Sparkline } from "@/components/dashboard/sparkline";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,55 @@ export default async function ReportsPage() {
         sql`to_char(${schema.sales.saleDate}, 'YYYY-MM') = ${currentMonth}`,
       ),
     );
+
+  // Monthly trends (últimos 6 meses) para os cards do resumo
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
+
+  const [leadsByMonth, clientsByMonth, salesByMonth, revenueByMonth] = await Promise.all([
+    db
+      .select({ month: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM')`, count: count() })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, sql`${schema.leads.createdAt} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`),
+    db
+      .select({ month: sql<string>`to_char(${schema.clients.convertedAt}, 'YYYY-MM')`, count: count() })
+      .from(schema.clients)
+      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, sql`${schema.clients.convertedAt} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.clients.convertedAt}, 'YYYY-MM')`),
+    db
+      .select({ month: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM')`, count: count() })
+      .from(schema.sales)
+      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, sql`${schema.sales.saleDate} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM')`),
+    db
+      .select({ month: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM')`, total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')` })
+      .from(schema.sales)
+      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, eq(schema.sales.status, "active"), sql`${schema.sales.saleDate} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM')`),
+  ]);
+
+  function fillMonthSeries(rows: Array<{ month: string; count?: number; total?: string }>) {
+    const map = new Map(rows.map((row) => [row.month, row]));
+    const result: number[] = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const row = map.get(key);
+      result.push(row ? Number(row.count ?? row.total ?? 0) : 0);
+    }
+    return result;
+  }
+
+  const leadsTrend = fillMonthSeries(leadsByMonth);
+  const clientsTrend = fillMonthSeries(clientsByMonth);
+  const salesTrend = fillMonthSeries(salesByMonth);
+  const revenueTrend = fillMonthSeries(revenueByMonth);
 
   const totalLeads = leadCount[0]?.count ?? 0;
   const totalClients = clientCount[0]?.count ?? 0;
@@ -147,21 +197,29 @@ export default async function ReportsPage() {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             {[
-              { label: "Leads", value: totalLeads, color: "text-chart-1" },
+              { label: "Leads", value: totalLeads, color: "text-chart-1", sparkline: leadsTrend, sparkColor: "var(--chart-1)" },
               {
                 label: "Clientes",
                 value: totalClients,
                 color: "text-chart-5",
+                sparkline: clientsTrend,
+                sparkColor: "var(--chart-5)",
               },
               {
                 label: "Vendas",
                 value: totalSales,
                 color: "text-chart-2",
+                sparkline: salesTrend,
+                sparkColor: "var(--chart-2)",
               },
               {
                 label: "Conversão",
                 value: `${conversionRate}%`,
                 color: "text-chart-4",
+                sparkline: leadsTrend.map((value, index) =>
+                  value > 0 ? Math.round((clientsTrend[index] / value) * 100) : 0,
+                ),
+                sparkColor: "var(--chart-4)",
               },
               {
                 label: "Receita (mês)",
@@ -170,6 +228,8 @@ export default async function ReportsPage() {
                   currency: "BRL",
                 }),
                 color: "text-success",
+                sparkline: revenueTrend,
+                sparkColor: "var(--success)",
               },
             ].map((stat) => (
               <div
@@ -182,6 +242,7 @@ export default async function ReportsPage() {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {stat.label}
                 </p>
+                <Sparkline data={stat.sparkline} color={stat.sparkColor} className="mt-2 h-7" />
               </div>
             ))}
           </div>

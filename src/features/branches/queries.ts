@@ -36,6 +36,8 @@ export type BranchMetrics = {
   leadsDistribuidos: number;
   taxaConversao: number;
   taxaPerda: number;
+  /** Leads criados por dia (últimos 7 dias, mais antigo → hoje). */
+  leadsTrend: number[];
 };
 
 export type BranchProfileData = {
@@ -138,6 +140,33 @@ export async function getBranchProfileData(
   const converted = Number(metricsRaw?.leadsConvertidos ?? 0);
   const lost = Number(metricsRaw?.leadsPerdidos ?? 0);
 
+  // 2b. Tendência diária de leads (últimos 7 dias) para os cards
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const dailyRows = await db
+    .select({
+      day: sql<string>`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date::text`,
+      total: count(),
+    })
+    .from(schema.leads)
+    .where(
+      and(
+        eq(schema.leads.tenantId, context.tenantId),
+        eq(schema.leads.branchId, branchId),
+        gte(schema.leads.createdAt, sevenDaysAgo),
+      ),
+    )
+    .groupBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`)
+    .orderBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`);
+
+  const leadsTrend: number[] = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(Date.now() - i * 86_400_000);
+    const isoDate = d.toISOString().split("T")[0];
+    const row = dailyRows.find((r) => r.day === isoDate);
+    leadsTrend.push(Number(row?.total ?? 0));
+  }
+
   const metrics: BranchMetrics = {
     period: label,
     totalLeads: total,
@@ -147,6 +176,7 @@ export async function getBranchProfileData(
     leadsDistribuidos: Number(metricsRaw?.leadsDistribuidos ?? 0),
     taxaConversao: total > 0 ? Math.round((converted / total) * 100) : 0,
     taxaPerda: total > 0 ? Math.round((lost / total) * 100) : 0,
+    leadsTrend,
   };
 
   // 3. Members and top brokers — visible only to director and manager.

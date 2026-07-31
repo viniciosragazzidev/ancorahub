@@ -4,6 +4,7 @@ import { and, count, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 
 import { type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { brazilDayKey } from "@/shared/trends";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,10 @@ export type NocData = {
   teamPerformance: TeamMemberPerf[];
   recentActivity: ActivityItem[];
   branchHealth: BranchHealth[];
+  /** Tempo médio até o 1º contato por dia (últimos 7 dias, em segundos). */
+  firstContactTrend: number[];
+  /** Ticket médio por dia (últimos 7 dias, em R$). */
+  ticketTrend: number[];
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -318,7 +323,7 @@ async function getLeadFlow(context: TenantContext): Promise<LeadFlowDay[]> {
   const result: LeadFlowDay[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86_400_000);
-    const isoDate = d.toISOString().split("T")[0];
+    const isoDate = brazilDayKey(d);
     const row = rows.find((r) => r.day === isoDate);
     result.push({
       dia: DAYS_SHORT[d.getDay()],
@@ -365,6 +370,79 @@ async function getStatusDistribution(context: TenantContext): Promise<StatusBuck
 }
 
 // ─── Hourly Activity Today ────────────────────────────────────────────────────
+
+// ─── First Contact Trend (7 days) ────────────────────────────────────────────
+
+async function getFirstContactTrend(context: TenantContext): Promise<number[]> {
+  const db = getDatabase();
+  const scope = tenantScope(context);
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  const rows = await db
+    .select({
+      day: sql<string>`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date::text`,
+      avg: sql<number>`avg(extract(epoch from (${schema.leads.firstContactAt} - ${schema.leads.createdAt})))`,
+    })
+    .from(schema.leads)
+    .where(
+      and(
+        eq(schema.leads.tenantId, scope.tenantId),
+        gte(schema.leads.createdAt, sevenDaysAgo),
+        isNotNull(schema.leads.firstContactAt),
+        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+      ),
+    )
+    .groupBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`)
+    .orderBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`);
+
+  const result: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86_400_000);
+    const isoDate = brazilDayKey(d);
+    const row = rows.find((r) => r.day === isoDate);
+    result.push(Math.round(Number(row?.avg ?? 0)));
+  }
+  return result;
+}
+
+// ─── Ticket Trend (7 days) ────────────────────────────────────────────────────
+
+async function getTicketTrend(context: TenantContext): Promise<number[]> {
+  const db = getDatabase();
+  const scope = tenantScope(context);
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  const rows = await db
+    .select({
+      day: sql<string>`date_trunc('day', ${schema.sales.saleDate} AT TIME ZONE 'America/Sao_Paulo')::date::text`,
+      avg: sql<number>`coalesce(avg(${schema.sales.saleValue}::numeric), 0)`,
+    })
+    .from(schema.sales)
+    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+    .where(
+      and(
+        eq(schema.sales.tenantId, scope.tenantId),
+        gte(schema.sales.saleDate, sevenDaysAgo),
+        eq(schema.sales.status, "active"),
+        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+      ),
+    )
+    .groupBy(sql`date_trunc('day', ${schema.sales.saleDate} AT TIME ZONE 'America/Sao_Paulo')::date`)
+    .orderBy(sql`date_trunc('day', ${schema.sales.saleDate} AT TIME ZONE 'America/Sao_Paulo')::date`);
+
+  const result: number[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86_400_000);
+    const isoDate = brazilDayKey(d);
+    const row = rows.find((r) => r.day === isoDate);
+    result.push(Math.round(Number(row?.avg ?? 0)));
+  }
+  return result;
+}
 
 async function getHourlyActivity(context: TenantContext): Promise<HourlyBucket[]> {
   const db = getDatabase();
@@ -589,7 +667,7 @@ async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> 
 }
 
 export async function getNocData(context: TenantContext): Promise<NocData> {
-  const [kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth] =
+  const [kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth, firstContactTrend, ticketTrend] =
     await Promise.all([
       getNocKpis(context),
       getLeadFlow(context),
@@ -598,7 +676,9 @@ export async function getNocData(context: TenantContext): Promise<NocData> {
       getTeamPerformance(context),
       getRecentActivity(context),
       getBranchHealth(context),
+      getFirstContactTrend(context),
+      getTicketTrend(context),
     ]);
 
-  return { kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth };
+  return { kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth, firstContactTrend, ticketTrend };
 }

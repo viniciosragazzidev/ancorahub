@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { RecoveryRequestsTable } from "./recovery-requests-table";
+import { dailyCounts } from "@/shared/trends";
 
 export default async function PasswordRecoveryPage() {
   const context = await getRequiredTenantContext();
@@ -31,6 +33,16 @@ export default async function PasswordRecoveryPage() {
 
   const pendingCount = requests.filter((r) => r.status === "requested").length;
 
+  const allTrend = dailyCounts(requests.map((r) => r.createdAt));
+  const pendingTrend = dailyCounts(
+    requests.filter((r) => r.status === "requested").map((r) => r.createdAt),
+  );
+  const resolvedTrend = dailyCounts(
+    requests
+      .filter((r) => r.status === "approved" || r.status === "rejected")
+      .map((r) => r.reviewedAt ?? r.createdAt),
+  );
+
   return (
     <>
       <DashboardHeader
@@ -48,28 +60,35 @@ export default async function PasswordRecoveryPage() {
         </section>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Pendentes</p>
-              <p className="mt-2 font-mono text-2xl font-semibold text-amber-500">{pendingCount}</p>
-            </CardContent>
-          </Card>
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Aprovadas</p>
-              <p className="mt-2 font-mono text-2xl font-semibold text-emerald-500">
-                {requests.filter((r) => r.status === "approved").length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Rejeitadas</p>
-              <p className="mt-2 font-mono text-2xl font-semibold text-red-500">
-                {requests.filter((r) => r.status === "rejected").length}
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="Pendentes"
+            value={pendingCount}
+            sublabel="aguardando análise"
+            valueClassName="text-amber-500"
+            sparklineData={pendingTrend}
+            sparklineColor="var(--warning)"
+            animated
+          />
+          <StatCard
+            label="Aprovadas"
+            value={requests.filter((r) => r.status === "approved").length}
+            sublabel="link enviado ao membro"
+            valueClassName="text-emerald-500"
+            sparklineData={resolvedTrend}
+            sparklineColor="var(--chart-2)"
+            animated
+            animationDelay={0.06}
+          />
+          <StatCard
+            label="Rejeitadas"
+            value={requests.filter((r) => r.status === "rejected").length}
+            sublabel="solicitações recusadas"
+            valueClassName="text-red-500"
+            sparklineData={allTrend}
+            sparklineColor="var(--destructive)"
+            animated
+            animationDelay={0.12}
+          />
         </div>
 
         <Card className="border-border shadow-none">

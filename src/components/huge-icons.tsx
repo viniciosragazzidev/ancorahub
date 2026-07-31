@@ -199,16 +199,22 @@ function animated(
     const rawSize = (props as Record<string, unknown>).size as number | undefined;
 
     return (
-      <span ref={wrapperRef}>
+      <span
+        ref={wrapperRef}
+        className={cn(
+          // The outer span is the sized, positioned flex container. It holds
+          // the icon centered so baseline quirks from the inner element can't
+          // push it higher/lower than the content it accompanies.
+          "inline-flex shrink-0 items-center justify-center",
+          rawClassName,
+        )}
+      >
         <Component
           ref={iconRef}
           className={cn(
-            // Inline-flex prevents the wrapper div from adding block-level space
-            "inline-flex items-center justify-center",
+            "inline-flex size-full items-center justify-center",
             // Force SVG children to fill their CSS-sized container
-            // so className="size-4" constrains the SVG correctly
             "[&_svg]:size-full",
-            rawClassName,
           )}
           size={rawSize ?? 24}
         />
@@ -250,11 +256,21 @@ function staticAnimated(name: string) {
     return (
       <motion.span
         ref={spanRef}
-        style={{ display: "inline-flex" }}
+        className={cn(
+          // Same contract as `animated`: the outer span is the sized, positioned
+          // flex container so the icon stays centered next to any content.
+          "inline-flex shrink-0 items-center justify-center",
+          (props as Record<string, unknown>).className as string | undefined,
+        )}
         animate={{ scale: isHovered ? 1.1 : 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 15 }}
       >
-        <HugeiconsIcon icon={resolveIcon(name)} {...props} />
+        <HugeiconsIcon
+          icon={resolveIcon(name)}
+          size={(props as Record<string, unknown>).size as number | undefined ?? 24}
+          {...(props as Record<string, unknown>)}
+          className="size-full"
+        />
       </motion.span>
     );
   }

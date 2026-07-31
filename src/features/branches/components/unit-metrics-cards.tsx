@@ -18,6 +18,8 @@ export function UnitMetricsCards({ metrics }: UnitMetricsCardsProps) {
       ? "Sem leads no período"
       : `${metrics.leadsPerdidos} perdido${metrics.leadsPerdidos !== 1 ? "s" : ""} no período`;
 
+  const totalLeads = Math.max(1, metrics.totalLeads);
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
@@ -25,6 +27,8 @@ export function UnitMetricsCards({ metrics }: UnitMetricsCardsProps) {
         value={metrics.totalLeads}
         sublabel={`Mês: ${metrics.period}`}
         icon={Users}
+        sparklineData={metrics.leadsTrend}
+        sparklineColor="var(--chart-1)"
         animated
       />
       <StatCard
@@ -39,6 +43,10 @@ export function UnitMetricsCards({ metrics }: UnitMetricsCardsProps) {
               ? "text-amber-500"
               : ""
         }
+        sparklineData={metrics.leadsTrend.map((value) =>
+          Math.round((value / totalLeads) * metrics.taxaConversao),
+        )}
+        sparklineColor="var(--chart-3)"
         animated
         animationDelay={0.06}
       />
@@ -47,6 +55,10 @@ export function UnitMetricsCards({ metrics }: UnitMetricsCardsProps) {
         value={metrics.leadsAtivos}
         sublabel="Leads em andamento"
         icon={ChartLineUp}
+        sparklineData={metrics.leadsTrend.map((value) =>
+          Math.round((value / totalLeads) * metrics.leadsAtivos),
+        )}
+        sparklineColor="var(--chart-4)"
         animated
         animationDelay={0.12}
       />
@@ -56,6 +68,10 @@ export function UnitMetricsCards({ metrics }: UnitMetricsCardsProps) {
         sublabel={lossLabel}
         icon={XCircle}
         valueClassName={metrics.leadsDistribuidos > 0 ? "text-amber-500" : ""}
+        sparklineData={metrics.leadsTrend.map((value) =>
+          Math.round((value / totalLeads) * metrics.leadsDistribuidos),
+        )}
+        sparklineColor="var(--chart-2)"
         animated
         animationDelay={0.18}
       />

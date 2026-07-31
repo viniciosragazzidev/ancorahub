@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { formatCurrency, formatCurrencyCompact, normalize } from "@/features/quotes/utils";
 import type { CommissionDetailsData } from "@/features/financeiro/queries/commission-details";
+import { monthlyCounts, monthlySums } from "@/shared/trends";
 
 type Props = {
   data: CommissionDetailsData;
@@ -94,14 +95,38 @@ export function CommissionDetails({ data }: Props) {
     });
   }, [byBroker, normalizedQuery]);
 
+  // Monthly trends for the summary cards (últimos 6 meses)
+  const commissionTrend = useMemo(() => {
+    const totalEntries = bySale.map((sale) => ({
+      date: sale.saleDate,
+      value: sale.scheduleItems.reduce((sum, item) => sum + Number(item.amount), 0),
+    }));
+    const paidEntries = bySale.flatMap((sale) =>
+      sale.scheduleItems
+        .filter((item) => item.status === "paid" && item.paidAt)
+        .map((item) => ({ date: item.paidAt as Date, value: Number(item.amount) })),
+    );
+    const pendingEntries = bySale.flatMap((sale) =>
+      sale.scheduleItems
+        .filter((item) => item.status === "pending" && item.dueDate)
+        .map((item) => ({ date: item.dueDate as Date, value: Number(item.amount) })),
+    );
+    return {
+      total: monthlySums(totalEntries),
+      paid: monthlySums(paidEntries),
+      pending: monthlySums(pendingEntries),
+      sales: monthlyCounts(bySale.map((sale) => sale.saleDate)),
+    };
+  }, [bySale]);
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total de comissões" value={formatCurrencyCompact(summary.totalCommission)} icon={TrendUp} animated />
-        <StatCard label="Comissões pendentes" value={formatCurrencyCompact(summary.pendingCommission)} icon={ArrowsDownUp} animated animationDelay={0.06} />
-        <StatCard label="Comissões pagas" value={formatCurrencyCompact(summary.paidCommission)} icon={Calculator} animated animationDelay={0.12} />
-        <StatCard label="Vendas / Regras ativas" value={`${summary.totalSales} / ${summary.activeRules}`} icon={Calculator} animated animationDelay={0.18} />
+        <StatCard label="Total de comissões" value={formatCurrencyCompact(summary.totalCommission)} icon={TrendUp} sparklineData={commissionTrend.total} sparklineColor="var(--chart-1)" animated />
+        <StatCard label="Comissões pendentes" value={formatCurrencyCompact(summary.pendingCommission)} icon={ArrowsDownUp} sparklineData={commissionTrend.pending} sparklineColor="var(--chart-4)" animated animationDelay={0.06} />
+        <StatCard label="Comissões pagas" value={formatCurrencyCompact(summary.paidCommission)} icon={Calculator} sparklineData={commissionTrend.paid} sparklineColor="var(--chart-2)" animated animationDelay={0.12} />
+        <StatCard label="Vendas / Regras ativas" value={`${summary.totalSales} / ${summary.activeRules}`} icon={Calculator} sparklineData={commissionTrend.sales} sparklineColor="var(--chart-3)" animated animationDelay={0.18} />
       </section>
 
       {/* Action Bar */}

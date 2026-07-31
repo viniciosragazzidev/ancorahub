@@ -10,13 +10,14 @@ import { FileArrowDown } from "@/components/huge-icons";
 
 import { SaleStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkExportSalesAction } from "@/features/sales/actions";
 import { formatCurrency, formatDate } from "@/features/quotes/utils";
+import { monthlyCounts, monthlySums } from "@/shared/trends";
 
 type SaleRow = {
   id: string;
@@ -78,6 +79,20 @@ export function SalesWorkspace({
   }, [exportState, clearSelection]);
 
   const activeSales = sales.filter((s) => s.status === "active").length;
+
+  const salesTrend = useMemo(() => {
+    const saleDates = sales.map((s) => new Date(s.saleDate));
+    const activeDates = sales
+      .filter((s) => s.status === "active")
+      .map((s) => new Date(s.saleDate));
+    return {
+      total: monthlyCounts(saleDates),
+      active: monthlyCounts(activeDates),
+      revenue: monthlySums(
+        sales.map((s) => ({ date: new Date(s.saleDate), value: s.saleValue })),
+      ),
+    };
+  }, [sales]);
 
   const columns: ColumnDef<SaleRow>[] = [
     {
@@ -197,39 +212,43 @@ export function SalesWorkspace({
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <motion.div
-        className="grid gap-3 sm:grid-cols-4"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
-        }}
-      >
-        {[
-          { label: "Total de vendas", value: sales.length },
-          { label: "Vendas ativas", value: activeSales },
-          { label: "Receita total", value: formatCurrency(totalRevenue) },
-          { label: "Comissão a repassar", value: formatCurrency(totalRevenue) },
-        ].map((item) => (
-          <motion.div
-            key={item.label}
-            variants={{
-              hidden: { opacity: 0, y: 8 },
-              visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
-            }}
-            whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
-            whileTap={{ scale: 0.995, transition: { duration: 0.1 } }}
-          >
-            <Card size="sm" className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">{item.label}</p>
-                <p className="mt-2 font-mono text-lg font-semibold transition-colors duration-200 group-hover/card:text-primary">{item.value}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Total de vendas"
+          value={sales.length}
+          sublabel="últimos 6 meses"
+          sparklineData={salesTrend.total}
+          sparklineColor="var(--chart-1)"
+          animated
+        />
+        <StatCard
+          label="Vendas ativas"
+          value={activeSales}
+          sublabel="em andamento"
+          sparklineData={salesTrend.active}
+          sparklineColor="var(--chart-3)"
+          animated
+          animationDelay={0.06}
+        />
+        <StatCard
+          label="Receita total"
+          value={formatCurrency(totalRevenue)}
+          sublabel="acumulado no período"
+          sparklineData={salesTrend.revenue}
+          sparklineColor="var(--chart-2)"
+          animated
+          animationDelay={0.12}
+        />
+        <StatCard
+          label="Comissão a repassar"
+          value={formatCurrency(totalRevenue)}
+          sublabel="gerada nas vendas"
+          sparklineData={salesTrend.revenue}
+          sparklineColor="var(--chart-4)"
+          animated
+          animationDelay={0.18}
+        />
+      </div>
 
       {/* Bulk selection toolbar */}
       <SelectionToolbar

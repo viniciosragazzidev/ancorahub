@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
   ChartBar,
+  ChartLineUp,
   CheckCircle,
   Circle,
   Globe,
@@ -678,54 +679,56 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
             <CardDescription>Pontos de atenção</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-              <div className="flex items-center gap-2">              <Warning
-                className="size-4 text-warning"
-                weight="fill"
-              />
-                <span className="text-sm font-medium">
-                  Leads não trabalhados
-                </span>
-              </div>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {data.totals.unworked}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Distribuídos há mais de 15 minutos sem contato
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-              <div className="flex items-center gap-2">
-                <Warning
-                  className="size-4 text-destructive"
-                  weight="fill"
-                />
-                <span className="text-sm font-medium">
-                  Leads estagnados
-                </span>
-              </div>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {data.totals.stalled}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Sem avanço há mais de 3 dias
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-              <div className="flex items-center gap-2">
-                <UserList
-                  className="size-4 text-chart-2"
-                  weight="fill"
-                />
-                <span className="text-sm font-medium">Equipe</span>
-              </div>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {data.totals.activeBrokers}/{data.totals.members}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Corretores ativos vs. cadastrados
-              </p>
-            </div>
+            {[
+              {
+                label: "Leads não trabalhados",
+                description: "Distribuídos há mais de 15 minutos sem contato",
+                value: data.totals.unworked,
+                color: "text-warning",
+                bg: "bg-warning/10",
+                icon: Warning,
+              },
+              {
+                label: "Leads estagnados",
+                description: "Sem avanço há mais de 3 dias",
+                value: data.totals.stalled,
+                color: "text-destructive",
+                bg: "bg-destructive/10",
+                icon: XCircle,
+              },
+              {
+                label: "Equipe",
+                description: "Corretores ativos vs. cadastrados",
+                value: `${data.totals.activeBrokers}/${data.totals.members}`,
+                color: "text-chart-2",
+                bg: "bg-chart-2/10",
+                icon: UserList,
+              },
+            ].map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.07, 0.2) }}
+                  whileHover={{ y: -1 }}
+                  className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", item.bg, item.color)}>
+                      <Icon className="size-4" weight="fill" />
+                    </span>
+                    <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Alerta</span>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <p className={cn("text-2xl font-bold tabular-nums tracking-tight", item.color)}>{item.value}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+                    <p className="text-[11px] text-muted-foreground/70">{item.description}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
           </CardContent>
         </Card>
       </section>
@@ -733,24 +736,34 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Leads totais', value: totalLeads, color: 'text-chart-1' },
-          { label: 'Conversões', value: totalConverted, color: 'text-chart-5' },
-          { label: 'Taxa de conversão', value: `${conversionRate}%`, color: 'text-chart-2' },
-          { label: 'Corretores ativos', value: `${data.totals.activeBrokers}/${data.totals.members}`, color: 'text-chart-4' },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
-            className="rounded-lg border border-border/40 bg-card p-3 text-center shadow-none"
-          >
-            <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
-              {stat.value}
-            </p>
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
-          </motion.div>
-        ))}
+          { label: 'Leads totais', value: totalLeads, color: 'text-chart-1', bg: 'bg-chart-1/10', icon: UserList },
+          { label: 'Conversões', value: totalConverted, color: 'text-chart-5', bg: 'bg-chart-5/10', icon: CheckCircle },
+          { label: 'Taxa de conversão', value: `${conversionRate}%`, color: 'text-chart-2', bg: 'bg-chart-2/10', icon: ChartLineUp },
+          { label: 'Corretores ativos', value: `${data.totals.activeBrokers}/${data.totals.members}`, color: 'text-chart-4', bg: 'bg-chart-4/10', icon: Users },
+        ].map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.05, 0.2) }}
+              whileHover={{ y: -2 }}
+              className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
+                  <Icon className="size-4" />
+                </span>
+                <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Diretor</span>
+              </div>
+              <div className="mt-3 space-y-1">
+                <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>{stat.value}</p>
+                <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Desempenho por Filial */}
@@ -964,53 +977,56 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
             <CardDescription>Pontos que precisam de ação</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-              <div className="flex items-center gap-2">              <Warning
-                className="size-4 text-warning"
-                weight="fill"
-              />
-                <span className="text-sm font-medium">
-                  Não trabalhados
-                </span>
-              </div>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {data.unworked}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Leads distribuídos sem contato inicial
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-              <div className="flex items-center gap-2">
-                <Warning
-                  className="size-4 text-destructive"
-                  weight="fill"
-                />
-                <span className="text-sm font-medium">
-                  Estagnados
-                </span>
-              </div>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {data.stalled}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Sem avanço há mais de 3 dias
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-              <div className="flex items-center gap-2">
-                <Users className="size-4 text-chart-2" weight="fill" />
-                <span className="text-sm font-medium">
-                  Sem responsável
-                </span>
-              </div>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {data.unassigned}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Leads não atribuídos a nenhum corretor
-              </p>
-            </div>
+            {[
+              {
+                label: "Não trabalhados",
+                description: "Leads distribuídos sem contato inicial",
+                value: data.unworked,
+                color: "text-warning",
+                bg: "bg-warning/10",
+                icon: Warning,
+              },
+              {
+                label: "Estagnados",
+                description: "Sem avanço há mais de 3 dias",
+                value: data.stalled,
+                color: "text-destructive",
+                bg: "bg-destructive/10",
+                icon: XCircle,
+              },
+              {
+                label: "Sem responsável",
+                description: "Leads não atribuídos a nenhum corretor",
+                value: data.unassigned,
+                color: "text-chart-2",
+                bg: "bg-chart-2/10",
+                icon: Users,
+              },
+            ].map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <motion.div
+                  key={item.label}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.07, 0.2) }}
+                  whileHover={{ y: -1 }}
+                  className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", item.bg, item.color)}>
+                      <Icon className="size-4" weight="fill" />
+                    </span>
+                    <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Alerta</span>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <p className={cn("text-2xl font-bold tabular-nums tracking-tight", item.color)}>{item.value}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+                    <p className="text-[11px] text-muted-foreground/70">{item.description}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
           </CardContent>
         </Card>
       </section>

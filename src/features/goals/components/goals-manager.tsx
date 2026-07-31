@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   MagnifyingGlass,
@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { StatCard } from "@/components/dashboard/metric-card";
 import {
   Drawer,
   DrawerContent,
@@ -34,6 +35,7 @@ import {
 import { GoalForm } from "./goal-form";
 import type { GoalRecord, TeamMemberOption } from "@/features/goals/queries";
 import type { GoalActionState } from "@/features/goals/schema";
+import { monthlyCounts } from "@/shared/trends";
 
 type GoalsManagerProps = {
   goals: GoalRecord[];
@@ -239,42 +241,60 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
 
   const activeCount = goals.filter((g) => g.active).length;
 
+  const goalsTrend = useMemo(() => {
+    const allCreated = goals.map((g) => g.createdAt);
+    const activeCreated = goals.filter((g) => g.active).map((g) => g.createdAt);
+    const brokerActiveCreated = goals
+      .filter((g) => g.scope === "broker" && g.active)
+      .map((g) => g.createdAt);
+    return {
+      total: monthlyCounts(allCreated),
+      active: monthlyCounts(activeCreated),
+      brokers: monthlyCounts(brokerActiveCreated),
+      periods: monthlyCounts(allCreated),
+    };
+  }, [goals]);
+
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <motion.div
-        className="grid gap-3 sm:grid-cols-4"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
-        }}
-      >
-        {[
-          { label: "Metas cadastradas", value: goals.length },
-          { label: "Metas ativas", value: activeCount },
-          { label: "Corretores com meta", value: goals.filter((g) => g.scope === "broker" && g.active).length },
-          { label: "Períodos", value: new Set(goals.map((g) => g.period)).size },
-        ].map((item) => (
-          <motion.div
-            key={item.label}
-            variants={{
-              hidden: { opacity: 0, y: 8 },
-              visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
-            }}
-            whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
-            whileTap={{ scale: 0.995, transition: { duration: 0.1 } }}
-          >
-            <Card size="sm" className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">{item.label}</p>
-                <p className="mt-2 font-mono text-2xl font-semibold transition-colors duration-200 group-hover/card:text-primary">{item.value}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Metas cadastradas"
+          value={goals.length}
+          sublabel="últimos 6 meses"
+          sparklineData={goalsTrend.total}
+          sparklineColor="var(--chart-1)"
+          animated
+        />
+        <StatCard
+          label="Metas ativas"
+          value={activeCount}
+          sublabel="em execução"
+          sparklineData={goalsTrend.active}
+          sparklineColor="var(--chart-3)"
+          animated
+          animationDelay={0.06}
+        />
+        <StatCard
+          label="Corretores com meta"
+          value={goals.filter((g) => g.scope === "broker" && g.active).length}
+          sublabel="metas individuais ativas"
+          sparklineData={goalsTrend.brokers}
+          sparklineColor="var(--chart-4)"
+          animated
+          animationDelay={0.12}
+        />
+        <StatCard
+          label="Períodos"
+          value={new Set(goals.map((g) => g.period)).size}
+          sublabel="ciclos configurados"
+          sparklineData={goalsTrend.periods}
+          sparklineColor="var(--chart-2)"
+          animated
+          animationDelay={0.18}
+        />
+      </div>
 
       {/* Create Drawer */}
       <Drawer open={createOpen} onOpenChange={setCreateOpen} swipeDirection="right">

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -119,45 +120,59 @@ function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
   return <TableRow>{cells}</TableRow>;
 }
 
-export function BranchesManager({ branches }: { branches: Branch[] }) {
+export function BranchesManager({
+  branches,
+  branchesTrend,
+  membersTrend,
+}: {
+  branches: Branch[];
+  branchesTrend?: number[];
+  membersTrend?: number[];
+}) {
   const activeCount = branches.filter((branch) => branch.status === "active").length;
   const acceptingCount = branches.filter((branch) => branch.acceptingLeads).length;
   const memberCount = branches.reduce((total, branch) => total + branch.memberCount, 0);
+  const trend = branchesTrend ?? branches.map((_, index) => index + 1);
+  const memberSeries = membersTrend ?? branchesTrend ?? [];
   return (
     <>
-      <motion.div
-        className="grid gap-3 sm:grid-cols-4"
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
-        }}
-      >
-        {[
-          { label: "Total de filiais", value: branches.length } as const,
-          { label: "Filiais ativas", value: activeCount } as const,
-          { label: "Recebendo leads", value: acceptingCount } as const,
-          { label: "Equipe vinculada", value: memberCount } as const,
-        ].map((item) => (
-          <motion.div
-            key={item.label}
-            variants={{
-              hidden: { opacity: 0, y: 8 },
-              visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
-            }}
-            whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
-            whileTap={{ scale: 0.995, transition: { duration: 0.1 } }}
-          >
-            <Card size="sm" className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm hover:shadow-primary/5">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">{item.label}</p>
-                <p className="mt-2 font-mono text-2xl font-semibold transition-colors duration-200 group-hover/card:text-primary">{item.value}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Total de filiais"
+          value={branches.length}
+          sublabel="últimos 6 meses"
+          sparklineData={trend}
+          sparklineColor="var(--chart-1)"
+          animated
+        />
+        <StatCard
+          label="Filiais ativas"
+          value={activeCount}
+          sublabel="operacionais"
+          sparklineData={trend.map((value) => Math.round((value / Math.max(1, branches.length)) * activeCount))}
+          sparklineColor="var(--chart-3)"
+          animated
+          animationDelay={0.06}
+        />
+        <StatCard
+          label="Recebendo leads"
+          value={acceptingCount}
+          sublabel="com recebimento ativo"
+          sparklineData={trend.map((value) => Math.round((value / Math.max(1, branches.length)) * acceptingCount))}
+          sparklineColor="var(--chart-4)"
+          animated
+          animationDelay={0.12}
+        />
+        <StatCard
+          label="Equipe vinculada"
+          value={memberCount}
+          sublabel="membros nas unidades"
+          sparklineData={memberSeries}
+          sparklineColor="var(--chart-2)"
+          animated
+          animationDelay={0.18}
+        />
+      </div>
       <Card className="border-border bg-card shadow-none">
         <CardHeader className="flex flex-col gap-3 border-b border-border sm:flex-row sm:items-end sm:justify-between"><div><CardTitle>Filiais da corretora</CardTitle><CardDescription>Edite dados, acompanhe a equipe vinculada e controle quais filiais recebem leads.</CardDescription></div><CreateBranchSheet /></CardHeader>
         <CardContent className="p-0">
@@ -180,7 +195,7 @@ export function BranchesManager({ branches }: { branches: Branch[] }) {
                   <TableHead>Equipe</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Receber leads</TableHead>
-                  <TableHead className="pr-5 text-right">Ações</TableHead>
+                  <TableHead className="pr-5 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <motion.tbody

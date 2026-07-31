@@ -8,9 +8,10 @@ import { getDatabase, schema } from "@/shared/db";
 import { BrokerQueueClient } from "./_components/queue-client";
 import { BrokerAvailabilityButton } from "./_components/broker-availability";
 import { Sparkline } from "./_components/sparkline";
-import { ChatCircleText, ClipboardText, ListChecks, Target } from "@/components/huge-icons";
+import { ChatCircleText, ClipboardText, ListChecks, Target, Users, Warning, XCircle, ChartLineUp } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 const activeLeadStatuses = [
   "new",
@@ -312,22 +313,31 @@ export default async function MinhaFilaPage() {
         {/* Metric Cards */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Total na fila", value: totalLeads, color: "var(--primary)", chart: dailyTrend.map((day) => day.leads) },
-            { label: "Novos / urgentes", value: urgentLeads, color: "var(--warning)", chart: dailyTrend.map((day) => day.urgent) },
-            { label: "Em andamento", value: inProgress, color: "var(--chart-3)", chart: dailyTrend.map((day) => day.active) },
-            { label: "Estagnados", value: stalledCount, color: "var(--destructive)", chart: dailyTrend.map((day) => day.stalled) },
-          ].map((stat) => (
-            <div key={stat.label} className="rounded-lg border border-border/40 bg-card p-4 shadow-none">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-2xl font-bold tabular-nums text-foreground">{stat.value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+            { label: "Total na fila", value: totalLeads, color: "text-primary", bg: "bg-primary/10", icon: ListChecks, chart: dailyTrend.map((day) => day.leads) },
+            { label: "Novos / urgentes", value: urgentLeads, color: "text-warning", bg: "bg-warning/10", icon: Warning, chart: dailyTrend.map((day) => day.urgent) },
+            { label: "Em andamento", value: inProgress, color: "text-chart-3", bg: "bg-chart-3/10", icon: ChartLineUp, chart: dailyTrend.map((day) => day.active) },
+            { label: "Estagnados", value: stalledCount, color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, chart: dailyTrend.map((day) => day.stalled) },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div
+                key={stat.label}
+                className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs hover:-translate-y-0.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">7 dias</span>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground">7 dias</p>
+                <div className="mt-3 space-y-1">
+                  <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>{stat.value}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+                </div>
+                <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart.map((val, idx) => ({ label: String(idx), value: val }))} colorClassName="text-primary" className="mt-3" />
               </div>
-              <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart.map((val, idx) => ({ label: String(idx), value: val }))} colorClassName="text-primary" className="mt-3" />
-            </div>
-          ))}
+            );
+          })}
         </section>
 
         {/* ─── Quick Action Cards ─── */}

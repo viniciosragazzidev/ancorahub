@@ -15,6 +15,8 @@ export function SaleStatsCards({
   scheduleLength,
   paidCount,
   pendingCount,
+  scheduleTrend,
+  paidTrend,
 }: {
   saleValue: string;
   totalCommissions: number;
@@ -24,6 +26,8 @@ export function SaleStatsCards({
   scheduleLength: number;
   paidCount: number;
   pendingCount: number;
+  scheduleTrend: number[];
+  paidTrend: number[];
 }) {
   return (
     <>
@@ -33,6 +37,8 @@ export function SaleStatsCards({
           label="Valor da Venda"
           value={saleValue}
           icon={CreditCard}
+          sparklineData={scheduleTrend}
+          sparklineColor="var(--chart-1)"
           animated
         />
         <StatCard
@@ -40,6 +46,8 @@ export function SaleStatsCards({
           value={formatCurrency(totalCommissions)}
           icon={CurrencyCircleDollar}
           iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          sparklineData={scheduleTrend}
+          sparklineColor="var(--chart-2)"
           animated
           animationDelay={0.06}
         />
@@ -49,6 +57,8 @@ export function SaleStatsCards({
           icon={CheckCircle}
           iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
           valueClassName="text-emerald-600 dark:text-emerald-400"
+          sparklineData={paidTrend}
+          sparklineColor="var(--chart-3)"
           animated
           animationDelay={0.12}
         />
@@ -58,6 +68,8 @@ export function SaleStatsCards({
           icon={Clock}
           iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
           valueClassName="text-amber-600 dark:text-amber-400"
+          sparklineData={scheduleTrend.map((amount, index) => Math.max(0, amount - (paidTrend[index] ?? 0)))}
+          sparklineColor="var(--chart-4)"
           animated
           animationDelay={0.18}
         />

@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { StatCard } from "@/components/dashboard/metric-card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
@@ -107,6 +107,47 @@ export default async function TeamPage() {
     isTeamMemberProfileEnabled(),
   ]);
 
+  // Tendências mensais (últimos 6 meses) para os cards do topo
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
+  const [membersByMonth, leadsByMonth, salesByMonth] = await Promise.all([
+    getDatabase()
+      .select({ month: sql<string>`to_char(${schema.tenantMemberships.createdAt}, 'YYYY-MM')`, count: sql<number>`count(*)::int` })
+      .from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), sql`${schema.tenantMemberships.createdAt} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.tenantMemberships.createdAt}, 'YYYY-MM')`),
+    getDatabase()
+      .select({ month: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM')`, count: sql<number>`count(*)::int` })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), leadBranchScope, sql`${schema.leads.createdAt} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`),
+    getDatabase()
+      .select({ month: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM')`, total: sql<number>`coalesce(sum(${schema.sales.saleValue}), 0)::int` })
+      .from(schema.sales)
+      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadBranchScope, sql`${schema.sales.saleDate} >= ${sixMonthsAgo.toISOString()}`))
+      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM')`),
+  ]);
+
+  function fillMonthSeries(rows: Array<{ month: string; count?: number; total?: number }>) {
+    const map = new Map(rows.map((row) => [row.month, row]));
+    const result: number[] = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const row = map.get(key);
+      result.push(row ? Number(row.count ?? row.total ?? 0) : 0);
+    }
+    return result;
+  }
+
+  const membersTrend = fillMonthSeries(membersByMonth);
+  const leadsTrend = fillMonthSeries(leadsByMonth);
+  const salesTrend = fillMonthSeries(salesByMonth);
+
   const members = [...brokers, ...nonBrokers].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   const activeMembers = members.filter((member) => member.status === "active").length;
   const unassignedCount = unassignedLeads[0]?.count ?? 0;
@@ -132,32 +173,10 @@ export default async function TeamPage() {
         </section>
         */}
         <div className="grid gap-3 sm:grid-cols-4">
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total de membros</p>
-              <p className="mt-2 font-mono text-2xl font-semibold">{members.length}</p>
-            </CardContent>
-          </Card>
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Acessos ativos</p>
-              <p className="mt-2 font-mono text-2xl font-semibold">{activeMembers}</p>
-            </CardContent>
-          </Card>
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Leads sem atendimento</p>
-              <p className="mt-2 font-mono text-2xl font-semibold text-amber-500">{unassignedCount}</p>
-            </CardContent>
-          </Card>
-          <Card size="sm" className="border-border bg-card shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Vendas acumuladas</p>
-              <p className="mt-2 font-mono text-2xl font-semibold text-emerald-500">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalVolume)}
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
+          <StatCard label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
+          <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />
+          <StatCard label="Vendas acumuladas" value={new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalVolume)} sublabel="últimos 6 meses" sparklineData={salesTrend} sparklineColor="var(--chart-2)" />
         </div>
         <TeamMembersTable
           branches={branches}
