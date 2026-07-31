@@ -39,6 +39,9 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   // Progressão do cronograma: valores por parcela na ordem do mês + acumulado pago
   const orderedSchedule = [...schedule].sort((a, b) => a.monthNumber - b.monthNumber);
   const scheduleTrend = orderedSchedule.map((item) => Number(item.amount));
+  const pendingTrend = orderedSchedule.map((item) =>
+    item.status === "pending" ? Number(item.amount) : 0,
+  );
   let paidAccum = 0;
   const paidTrend = orderedSchedule.map((item) => {
     if (item.status === "paid") paidAccum += Number(item.amount);
@@ -112,6 +115,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
           paidCount={paidCount}
           pendingCount={pendingCount}
           scheduleTrend={scheduleTrend}
+          pendingTrend={pendingTrend}
           paidTrend={paidTrend}
         />
 

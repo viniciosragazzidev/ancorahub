@@ -16,6 +16,7 @@ export function SaleStatsCards({
   paidCount,
   pendingCount,
   scheduleTrend,
+  pendingTrend,
   paidTrend,
 }: {
   saleValue: string;
@@ -27,6 +28,7 @@ export function SaleStatsCards({
   paidCount: number;
   pendingCount: number;
   scheduleTrend: number[];
+  pendingTrend: number[];
   paidTrend: number[];
 }) {
   return (
@@ -68,7 +70,7 @@ export function SaleStatsCards({
           icon={Clock}
           iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
           valueClassName="text-amber-600 dark:text-amber-400"
-          sparklineData={scheduleTrend.map((amount, index) => Math.max(0, amount - (paidTrend[index] ?? 0)))}
+          sparklineData={pendingTrend}
           sparklineColor="var(--chart-4)"
           animated
           animationDelay={0.18}

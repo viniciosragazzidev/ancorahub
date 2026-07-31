@@ -2,7 +2,6 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";

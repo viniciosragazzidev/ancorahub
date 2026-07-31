@@ -15,7 +15,7 @@ type SparklineProps = {
  * Aceita cor dinâmica (ex.: "var(--chart-1)") e tem o mesmo
  * visual de linha com gradiente usado nos demais cards.
  */
-export function Sparkline({ data, color = "var(--primary)", className }: SparklineProps) {
+export function Sparkline({ data, color = "var(--chart-1)", className }: SparklineProps) {
   const gradientId = useId().replace(/:/g, "");
   const values = data.length ? data : [0];
   const max = Math.max(...values, 1);

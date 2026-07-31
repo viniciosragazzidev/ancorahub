@@ -5,6 +5,7 @@ import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { brazilDayKey } from "@/shared/trends";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ export async function getBranchProfileData(
   const leadsTrend: number[] = [];
   for (let i = 6; i >= 0; i -= 1) {
     const d = new Date(Date.now() - i * 86_400_000);
-    const isoDate = d.toISOString().split("T")[0];
+    const isoDate = brazilDayKey(d);
     const row = dailyRows.find((r) => r.day === isoDate);
     leadsTrend.push(Number(row?.total ?? 0));
   }

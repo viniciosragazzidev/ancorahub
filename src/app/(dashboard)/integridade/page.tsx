@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { Sparkline } from "@/components/dashboard/sparkline";
+import { brazilDayKey } from "@/shared/trends";
 
 export const dynamic = "force-dynamic";
 
@@ -106,7 +107,7 @@ export default async function IntegrityPage() {
     const result: number[] = [];
     for (let i = 6; i >= 0; i -= 1) {
       const d = new Date(Date.now() - i * 86_400_000);
-      const isoDate = d.toISOString().split("T")[0];
+      const isoDate = brazilDayKey(d);
       result.push(map.get(isoDate) ?? 0);
     }
     return result;
@@ -115,22 +116,27 @@ export default async function IntegrityPage() {
   const leadsTrend = fillDaySeries(dailyLeads);
   const auditsTrend = fillDaySeries(dailyAudits);
 
-  const alerts = [
+  type IntegrityAlert = {
+    type: "warning" | "danger" | "ok" | "info";
+    label: string;
+    value: number;
+    description: string;
+    trend?: number[];
+    trendColor?: string;
+  };
+
+  const alerts: IntegrityAlert[] = [
     {
       type: stalledLeads[0]?.count ?? 0 > 0 ? "warning" : "ok",
       label: "Leads estagnados",
       value: stalledLeads[0]?.count ?? 0,
       description: "Sem avanço há mais de 3 dias",
-      trend: leadsTrend.map((value) => Math.round(value * 0.4)),
-      trendColor: "var(--warning)",
     },
     {
       type: unworkedLeads[0]?.count ?? 0 > 0 ? "danger" : "ok",
       label: "Leads não trabalhados",
       value: unworkedLeads[0]?.count ?? 0,
       description: "Distribuídos há mais de 15 min sem contato",
-      trend: leadsTrend.map((value) => Math.round(value * 0.2)),
-      trendColor: "var(--destructive)",
     },
     {
       type: "info",
@@ -218,7 +224,9 @@ export default async function IntegrityPage() {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {alert.description}
                 </p>
-                <Sparkline data={alert.trend} color={alert.trendColor} className="mt-2 h-7" />
+                {alert.trend ? (
+                  <Sparkline data={alert.trend} color={alert.trendColor} className="mt-2 h-7" />
+                ) : null}
               </div>
             );
           })}

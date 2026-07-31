@@ -72,6 +72,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       email: schema.leads.email,
       origem: schema.leads.origem,
       sourceCampaign: schema.leads.sourceCampaign,
+      sourceAd: schema.leads.sourceAd,
+      sourceForm: schema.leads.sourceForm,
+      capturedAt: schema.leads.capturedAt,
+      metaCampaignId: schema.leads.metaCampaignId,
       tipo: schema.leads.tipo,
       status: schema.leads.status,
       formData: schema.leads.formData,
@@ -348,6 +352,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     {formData.funcionarios && (
                       <div><p className="text-xs text-muted-foreground">Funcionários</p><p className="mt-1 font-medium">{formData.funcionarios}</p></div>
                     )}
+                  </CardContent>
+                </Card>
+              )}
+              {/* ── Origem Meta Ads ──────────────── */}
+              {(lead.origem === "webhook" || lead.sourceCampaign || lead.metaCampaignId) && (
+                <Card className="border-primary/20 bg-primary/5 shadow-none">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">f</span>
+                      <CardTitle className="text-sm font-bold">Origem Meta Ads</CardTitle>
+                    </div>
+                    <CardDescription className="text-xs">Rastreabilidade completa do anúncio até este lead.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 text-xs sm:grid-cols-3 pt-2">
+                    <div><p className="text-muted-foreground">Origem</p><p className="font-semibold text-foreground mt-0.5">Meta Ads (Lead Ads / Click to WhatsApp)</p></div>
+                    <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceCampaign || "Campanha Meta"}</p></div>
+                    <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceAd || "Anúncio Padrão"}</p></div>
+                    <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceForm || "Formulário Direct"}</p></div>
+                    <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.createdAt)}</p></div>
                   </CardContent>
                 </Card>
               )}

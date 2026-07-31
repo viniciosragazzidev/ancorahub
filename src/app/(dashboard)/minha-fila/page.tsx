@@ -313,10 +313,10 @@ export default async function MinhaFilaPage() {
         {/* Metric Cards */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Total na fila", value: totalLeads, color: "text-primary", bg: "bg-primary/10", icon: ListChecks, chart: dailyTrend.map((day) => day.leads) },
-            { label: "Novos / urgentes", value: urgentLeads, color: "text-warning", bg: "bg-warning/10", icon: Warning, chart: dailyTrend.map((day) => day.urgent) },
-            { label: "Em andamento", value: inProgress, color: "text-chart-3", bg: "bg-chart-3/10", icon: ChartLineUp, chart: dailyTrend.map((day) => day.active) },
-            { label: "Estagnados", value: stalledCount, color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, chart: dailyTrend.map((day) => day.stalled) },
+            { label: "Total na fila", value: totalLeads, color: "text-chart-1", bg: "bg-chart-1/10", icon: ListChecks, chart: dailyTrend.map((day) => day.leads), sparkColor: "var(--chart-1)" },
+            { label: "Novos / urgentes", value: urgentLeads, color: "text-warning", bg: "bg-warning/10", icon: Warning, chart: dailyTrend.map((day) => day.urgent), sparkColor: "var(--warning)" },
+            { label: "Em andamento", value: inProgress, color: "text-chart-3", bg: "bg-chart-3/10", icon: ChartLineUp, chart: dailyTrend.map((day) => day.active), sparkColor: "var(--chart-3)" },
+            { label: "Estagnados", value: stalledCount, color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, chart: dailyTrend.map((day) => day.stalled), sparkColor: "var(--destructive)" },
           ].map((stat) => {
             const Icon = stat.icon;
             return (
@@ -334,14 +334,14 @@ export default async function MinhaFilaPage() {
                   <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>{stat.value}</p>
                   <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
                 </div>
-                <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart.map((val, idx) => ({ label: String(idx), value: val }))} colorClassName="text-primary" className="mt-3" />
+                <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart.map((val, idx) => ({ label: String(idx), value: val }))} color={stat.sparkColor} className="mt-3" />
               </div>
             );
           })}
         </section>
 
         {/* ─── Quick Action Cards ─── */}
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-3">
           {/* Tasks */}
           <Card className="border-border bg-card shadow-none">
             <CardHeader className="pb-3">

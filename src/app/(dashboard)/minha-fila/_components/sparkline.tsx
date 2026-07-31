@@ -5,14 +5,14 @@ type SparklinePoint = {
 
 type SparklineProps = {
   data: SparklinePoint[];
-  colorClassName?: string;
+  color?: string;
   className?: string;
   id: string;
 };
 
 export function Sparkline({
   data,
-  colorClassName = "text-primary",
+  color = "var(--chart-1)",
   className,
   id,
 }: SparklineProps) {
@@ -21,11 +21,11 @@ export function Sparkline({
 
   return (
     <div className={className} aria-hidden="true">
-      <svg viewBox="0 0 100 36" className="h-9 w-full overflow-visible text-primary">
+      <svg viewBox="0 0 100 36" className="h-9 w-full overflow-visible">
         <defs>
           <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
         </defs>
         <path
@@ -37,7 +37,7 @@ export function Sparkline({
             })
             .join(" ")}
           fill="none"
-          stroke="currentColor"
+          stroke={color}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -55,7 +55,7 @@ export function Sparkline({
         {data.map((point, index) => {
           const x = data.length === 1 ? 50 : (index / (data.length - 1)) * 100;
           const y = 30 - (point.value / max) * 22;
-          return <circle key={`${point.label}-${index}`} cx={x} cy={y} r="1.8" fill="currentColor" />;
+          return <circle key={`${point.label}-${index}`} cx={x} cy={y} r="1.8" fill={color} />;
         })}
       </svg>
     </div>

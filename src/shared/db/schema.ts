@@ -388,6 +388,11 @@ export const leads = pgTable(
     sourceForm: text("source_form"),
     sourceMetadata: jsonb("source_metadata"),
     webhookCredentialId: text("webhook_credential_id").references(() => leadWebhookCredentials.id, { onDelete: "set null" }),
+    metaCampaignId: text("meta_campaign_id"),
+    metaAdSetId: text("meta_ad_set_id"),
+    metaAdId: text("meta_ad_id"),
+    metaFormId: text("meta_form_id"),
+    metaPageId: text("meta_page_id"),
     createdAt,
     updatedAt,
   },
@@ -1387,6 +1392,232 @@ export const communicationChannelWebhookEvents = pgTable(
   (table) => [
     index("communication_channel_webhook_events_channel_idx").on(table.channelId, table.receivedAt),
     uniqueIndex("communication_channel_webhook_events_provider_external_unique").on(table.provider, table.externalEventId).where(sql`${table.externalEventId} IS NOT NULL`),
+  ],
+);
+
+/**
+ * Conexões Meta por tenant obtidas via Facebook Login for Business + Embedded Signup v4.
+ */
+export const metaConnections = pgTable(
+  "meta_connections",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    businessId: text("business_id").notNull(),
+    businessName: text("business_name"),
+    accessTokenCiphertext: text("access_token_ciphertext").notNull(),
+    tokenKeyVersion: text("token_key_version").notNull().default("v1"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    status: text("status").notNull().default("connected"), // connected, disconnected, expired, error
+    permissions: jsonb("permissions").notNull().default([]),
+    lastError: text("last_error"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_connections_tenant_business_unique").on(table.tenantId, table.businessId),
+    index("meta_connections_tenant_status_idx").on(table.tenantId, table.status),
+  ],
+);
+
+/** Páginas do Facebook vinculadas ao tenant/conexão Meta */
+export const metaPages = pgTable(
+  "meta_pages",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
+    pageId: text("page_id").notNull(),
+    name: text("name").notNull(),
+    accessTokenCiphertext: text("access_token_ciphertext"),
+    status: text("status").notNull().default("active"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_pages_tenant_page_unique").on(table.tenantId, table.pageId),
+    index("meta_pages_tenant_idx").on(table.tenantId),
+  ],
+);
+
+/** Contas de anúncios Meta associadas */
+export const metaAdAccounts = pgTable(
+  "meta_ad_accounts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
+    adAccountId: text("ad_account_id").notNull(),
+    name: text("name").notNull(),
+    currency: text("currency").notNull().default("BRL"),
+    accountStatus: integer("account_status").notNull().default(1),
+    status: text("status").notNull().default("active"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_ad_accounts_tenant_account_unique").on(table.tenantId, table.adAccountId),
+    index("meta_ad_accounts_tenant_idx").on(table.tenantId),
+  ],
+);
+
+/** Campanhas de anúncios Meta */
+export const metaCampaigns = pgTable(
+  "meta_campaigns",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    adAccountId: text("ad_account_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    name: text("name").notNull(),
+    objective: text("objective"),
+    status: text("status").notNull().default("PAUSED"),
+    dailyBudget: integer("daily_budget"),
+    lifetimeBudget: integer("lifetime_budget"),
+    startTime: timestamp("start_time", { withTimezone: true }),
+    stopTime: timestamp("stop_time", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_campaigns_tenant_campaign_unique").on(table.tenantId, table.campaignId),
+    index("meta_campaigns_tenant_status_idx").on(table.tenantId, table.status),
+    index("meta_campaigns_ad_account_idx").on(table.tenantId, table.adAccountId),
+  ],
+);
+
+/** Conjuntos de anúncios (Ad Sets) */
+export const metaAdSets = pgTable(
+  "meta_ad_sets",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id").notNull(),
+    adSetId: text("ad_set_id").notNull(),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("PAUSED"),
+    targeting: jsonb("targeting"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_ad_sets_tenant_adset_unique").on(table.tenantId, table.adSetId),
+    index("meta_ad_sets_campaign_idx").on(table.tenantId, table.campaignId),
+  ],
+);
+
+/** Anúncios (Ads) */
+export const metaAds = pgTable(
+  "meta_ads",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    adSetId: text("ad_set_id").notNull(),
+    adId: text("ad_id").notNull(),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("PAUSED"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_ads_tenant_ad_unique").on(table.tenantId, table.adId),
+    index("meta_ads_ad_set_idx").on(table.tenantId, table.adSetId),
+  ],
+);
+
+/** Formulários Lead Ads */
+export const metaLeadForms = pgTable(
+  "meta_lead_forms",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    pageId: text("page_id").notNull(),
+    formId: text("form_id").notNull(),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("ACTIVE"),
+    locale: text("locale"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_lead_forms_tenant_form_unique").on(table.tenantId, table.formId),
+    index("meta_lead_forms_page_idx").on(table.tenantId, table.pageId),
+  ],
+);
+
+/** Pixels da Meta */
+export const metaPixels = pgTable(
+  "meta_pixels",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    pixelId: text("pixel_id").notNull(),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_pixels_tenant_pixel_unique").on(table.tenantId, table.pixelId),
+  ],
+);
+
+/** Datasets da Meta */
+export const metaDatasets = pgTable(
+  "meta_datasets",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    datasetId: text("dataset_id").notNull(),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_datasets_tenant_dataset_unique").on(table.tenantId, table.datasetId),
+  ],
+);
+
+/** Logs operacionais de sincronização da Meta */
+export const metaSyncLogs = pgTable(
+  "meta_sync_logs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    syncType: text("sync_type").notNull(), // campaigns, lead_forms, full, token_refresh
+    status: text("status").notNull(), // success, error, in_progress
+    itemsSynced: integer("items_synced").notNull().default(0),
+    errorDetails: text("error_details"),
+    durationMs: integer("duration_ms"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("meta_sync_logs_tenant_started_idx").on(table.tenantId, table.startedAt),
+  ],
+);
+
+/** Ledger de eventos de Webhook da Meta */
+export const metaWebhookEvents = pgTable(
+  "meta_webhook_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("meta_ads"),
+    externalEventId: text("external_event_id"),
+    eventType: text("event_type").notNull(), // leadgen, messaging, ad_account
+    payloadHash: text("payload_hash").notNull(),
+    status: text("status").notNull().default("received"), // received, processed, failed, ignored
+    errorCode: text("error_code"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("meta_webhook_events_tenant_idx").on(table.tenantId, table.receivedAt),
+    uniqueIndex("meta_webhook_events_external_unique").on(table.externalEventId).where(sql`${table.externalEventId} IS NOT NULL`),
   ],
 );
 

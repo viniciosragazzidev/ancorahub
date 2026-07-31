@@ -82,7 +82,7 @@ export function StatCard({
 }: StatCardProps) {
   const uniqueId = useId().replace(/:/g, "");
   const dataKey = sparklineDataKey || "value";
-  const lineColor = sparklineColor || "var(--primary)";
+  const lineColor = sparklineColor || "var(--chart-1)";
 
   const formattedSparklineData = (sparklineData ?? []).map((item, idx) => {
     if (typeof item === "number") {
