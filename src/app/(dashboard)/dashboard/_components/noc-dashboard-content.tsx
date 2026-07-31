@@ -96,7 +96,7 @@ function ActivityIcon({ type }: { type: string }) {
   }
 }
 
-function DirectorActionCenter({ data }: { data: DirectorDashboardData }) {
+function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
   const actions = [
     {
       label: "Leads sem contato",
@@ -104,7 +104,7 @@ function DirectorActionCenter({ data }: { data: DirectorDashboardData }) {
       description: "Distribuídos há mais de 15 min",
       href: "/leads?attention=unworked",
       badge: data.totals.unworked > 0 ? "Crítico" : "Ok",
-      badgeTone: data.totals.unworked > 0 ? "bg-amber-500/10 text-amber-600 border-amber-500/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      badgeTone: data.totals.unworked > 0 ? "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400",
       icon: Warning,
     },
     {
@@ -113,7 +113,7 @@ function DirectorActionCenter({ data }: { data: DirectorDashboardData }) {
       description: "Sem avanço há 3+ dias",
       href: "/leads?attention=stalled",
       badge: data.totals.stalled > 0 ? "Atenção" : "Ok",
-      badgeTone: data.totals.stalled > 0 ? "bg-red-500/10 text-red-600 border-red-500/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      badgeTone: data.totals.stalled > 0 ? "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400",
       icon: XCircle,
     },
     {
@@ -122,7 +122,7 @@ function DirectorActionCenter({ data }: { data: DirectorDashboardData }) {
       description: "Corretores na operação",
       href: "/equipe",
       badge: "Equipe",
-      badgeTone: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+      badgeTone: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400",
       icon: Users,
     },
     {
@@ -140,57 +140,117 @@ function DirectorActionCenter({ data }: { data: DirectorDashboardData }) {
     (label === "Leads sem contato" && data.totals.unworked > 0) ||
     (label === "Leads estagnados" && data.totals.stalled > 0);
 
+  const pendingCount = data.totals.unworked + data.totals.stalled;
+
   return (
-    <section aria-labelledby="director-action-center" className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 id="director-action-center" className="text-sm font-bold tracking-tight">Ação Necessária</h2>
-          <p className="text-xs text-muted-foreground">Pontos críticos que exigem ação imediata do gestor.</p>
+    <aside className="space-y-6 xl:sticky xl:top-4">
+      {/* ─── WIDGET 1: PLANTÃO AO VIVO ─── */}
+      <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent p-5 shadow-xs transition-all duration-200 hover:border-emerald-500/50 backdrop-blur-xs">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <Badge variant="outline" className="gap-2 rounded-full border-emerald-500/30 bg-emerald-500/15 px-3 py-1 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+            </span>
+            Plantão ao Vivo
+          </Badge>
+          <span className="text-[10px] font-semibold text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wider font-mono">Operação</span>
         </div>
-        {(data.totals.unworked > 0 || data.totals.stalled > 0) && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2.5 py-0.5 text-[10px] font-semibold text-destructive">
-            <Warning className="size-3" weight="fill" />
-            {data.totals.unworked + data.totals.stalled} pendentes
-          </span>
-        )}
+
+        <div className="space-y-1 mb-4">
+          <p className="text-2xl font-black tracking-tight text-foreground tabular-nums">
+            {data.totals.activeBrokers} <span className="text-xs font-normal text-muted-foreground">de {data.totals.members} em escala</span>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Corretores online e aptos a receber novos leads na roleta.
+          </p>
+        </div>
+
+        <Button
+          render={<Link href="/leads/distribuicao/plantao" />}
+          size="sm"
+          className="w-full h-10 px-4 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 rounded-xl transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+        >
+          <WifiHigh className="size-4" /> Abrir Módulo de Plantão
+        </Button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          const critical = isCritical(action.label);
-          return (
-            <Link
-              key={action.label}
-              href={action.href}
-              className={cn(
-                "group rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 shadow-none focus-visible:ring-2 focus-visible:ring-ring",
-                critical
-                  ? "border-l-4 border-destructive/60 bg-destructive/5 hover:bg-destructive/8"
-                  : "border-border bg-card hover:border-border-strong hover:bg-card/95"
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <Badge variant="outline" className={`text-[10px] font-mono uppercase ${action.badgeTone}`}>
-                  {action.badge}
-                </Badge>
-                <ArrowUpRight className={cn(
-                  "size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
-                  critical ? "text-destructive/70" : "text-muted-foreground"
-                )} />
-              </div>
-              <p className={cn("mt-3 text-xs font-semibold", critical ? "text-destructive/80" : "text-muted-foreground")}>{action.label}</p>
-              <p className={cn("mt-1 text-2xl font-bold tracking-tight tabular-nums", critical ? "text-destructive" : "text-foreground")}>{action.value}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">{action.description}</p>
-              {critical && (
-                <p className="mt-2 text-[10px] font-semibold text-destructive/70 flex items-center gap-1">
-                  <Warning className="size-3" weight="fill" /> Ação imediata necessária →
-                </p>
-              )}
-            </Link>
-          );
-        })}
+
+      {/* ─── WIDGET 2: AÇÃO NECESSÁRIA (VERTICAL STACK) ─── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold tracking-tight">Ação Necessária</h2>
+            <p className="text-xs text-muted-foreground">Pendências operacionais da diretoria.</p>
+          </div>
+          {pendingCount > 0 && (
+            <Badge variant="destructive" className="gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold">
+              <Warning className="size-3" weight="fill" />
+              {pendingCount} pendentes
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {actions.map((action) => {
+            const Icon = action.icon;
+            const critical = isCritical(action.label);
+            return (
+              <Link
+                key={action.label}
+                href={action.href}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border p-4 transition-all duration-200 hover:-translate-y-0.5 shadow-2xs focus-visible:ring-2 focus-visible:ring-ring",
+                  critical
+                    ? "border-amber-500/50 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent hover:border-amber-500"
+                    : "border-border/80 bg-card hover:border-border-strong hover:bg-accent/40"
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "flex size-7 items-center justify-center rounded-lg border text-xs",
+                      critical
+                        ? "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                        : "border-border bg-muted/50 text-muted-foreground"
+                    )}>
+                      <Icon className="size-4" />
+                    </div>
+                    <Badge variant="outline" className={`text-[10px] font-mono uppercase ${action.badgeTone}`}>
+                      {action.badge}
+                    </Badge>
+                  </div>
+                  <ArrowUpRight className={cn(
+                    "size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
+                    critical ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+                  )} />
+                </div>
+
+                <div className="mt-3 flex items-baseline justify-between gap-2">
+                  <div>
+                    <p className={cn("text-xs font-medium", critical ? "text-amber-700 dark:text-amber-300 font-semibold" : "text-muted-foreground")}>
+                      {action.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground/80 mt-0.5">{action.description}</p>
+                  </div>
+                  <p className={cn("text-2xl font-black tracking-tight tabular-nums shrink-0", critical ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+                    {action.value}
+                  </p>
+                </div>
+
+                {critical && (
+                  <div className="mt-2.5 pt-2 border-t border-amber-500/20 flex items-center justify-between text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                    <span className="flex items-center gap-1">
+                      <Warning className="size-3" weight="fill" /> Ação imediata
+                    </span>
+                    <span>Resolver →</span>
+                  </div>
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </div>
-    </section>
+    </aside>
   );
 }
 
@@ -218,8 +278,8 @@ function ChartTooltipWrapper({
             className="inline-block size-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          {entry.name}:{" "}
-          <span className="font-medium text-foreground">{entry.value}</span>
+          <span className="font-medium text-foreground">{entry.name}:</span>
+          <span className="font-bold tabular-nums text-foreground">{entry.value}</span>
         </p>
       ))}
     </div>
@@ -331,44 +391,22 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* ─── ZONA 1: MINHA FILA & PENDÊNCIAS ─── */}
-      <DirectorActionCenter data={data} />
-
-      {/* ─── ZONA 3: PLANTÃO ATUAL (Daily Operation Bar) ─── */}
-      <Card className="rounded-2xl border border-border bg-card p-5 shadow-none transition-all duration-200 hover:border-border-strong">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3.5">
-            <Badge variant="outline" className="gap-2 rounded-full border-emerald-500/20 bg-emerald-500/10 px-3 py-1 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-              </span>
-              PLANTÃO AO VIVO
-            </Badge>
-            <p className="text-xs sm:text-sm font-medium text-foreground">
-              <span className="font-bold tabular-nums">{data.totals.activeBrokers} de {data.totals.members}</span> corretores online na escala de distribuição
-            </p>
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 items-start">
+      {/* ─── ESQUERDA: INDICADORES E ANALYTICS (xl:col-span-8) ─── */}
+      <div className="xl:col-span-8 space-y-6">
+        {/* ─── INDICADORES ─── */}
+        <section className="space-y-4">
+          <div className="border-b border-border/50 pb-2">
+            <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
+            <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
           </div>
-          <Button render={<Link href="/leads/distribuicao/plantao" />} size="sm" variant="default" className="h-9 px-4 text-xs font-semibold gap-2 shrink-0">
-            <WifiHigh className="size-4" /> Abrir Módulo de Plantão
-          </Button>
-        </div>
-      </Card>
-
-      {/* ─── ZONA 4: INDICADORES (Gráficos Isolados no Final) ─── */}
-      <section className="space-y-4 pt-2">
-        <div className="border-b border-border/50 pb-2">
-          <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
-          <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
-          <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
-          <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
-          <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
-        </div>
-      </section>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+            <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
+            <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+            <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
+          </div>
+        </section>
 
       {/* Charts Row */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
@@ -822,6 +860,12 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           </div>
         </CardContent>
       </Card>
+      </div>
+
+      {/* ─── DIREITA: SIDEBAR DO DIRETOR (xl:col-span-4) ─── */}
+      <div className="xl:col-span-4">
+        <DirectorRightSidebar data={data} />
+      </div>
     </div>
   );
 }
