@@ -6,6 +6,8 @@ import { AuthorizationError } from "./errors";
 import { getRequiredSession } from "./session";
 import type { TenantContext } from "./types";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
+import { getSuperAdminRoleOverride } from "@/features/super-admin/role-impersonation";
+
 export type { TenantContext };
 
 export async function getRequiredTenantContext(): Promise<TenantContext> {
@@ -13,6 +15,7 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
   const memberships = await getDatabase()
     .select({
       userActive: schema.user.active,
+      isPlatformAdmin: schema.user.isPlatformAdmin,
       tenantId: schema.tenants.id,
       tenantStatus: schema.tenants.status,
       membershipStatus: schema.tenantMemberships.status,
@@ -60,8 +63,20 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
     throw new AuthorizationError("The tenant is not active.");
   }
 
+  // Verificar se há simulação de cargo ativa para o Super-Admin
+  let effectiveRole = membership.role;
+  let effectiveJobTitle: string = membership.jobTitle || membership.role;
+
+  if (membership.isPlatformAdmin) {
+    const override = await getSuperAdminRoleOverride();
+    if (override) {
+      effectiveRole = override.role;
+      effectiveJobTitle = override.jobTitle;
+    }
+  }
+
   if (requiresMemberBranch({
-    jobTitle: membership.jobTitle,
+    jobTitle: effectiveJobTitle,
     customRoleScope: membership.customRoleScope,
   }) && !membership.branchId) {
     throw new AuthorizationError("O acesso operacional precisa estar vinculado a uma unidade.");
@@ -74,8 +89,8 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
   return {
     userId: sessionUser.id,
     tenantId: membership.tenantId,
-    role: membership.role,
-    jobTitle: membership.jobTitle,
+    role: effectiveRole,
+    jobTitle: effectiveJobTitle,
     customRoleId: membership.customRoleId,
     customRoleScope: membership.customRoleScope,
     branchId: membership.branchId,

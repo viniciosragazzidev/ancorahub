@@ -313,16 +313,19 @@ export default async function MinhaFilaPage() {
         {/* Metric Cards */}
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { label: "Total na fila", value: totalLeads, color: "text-chart-1", bg: "bg-chart-1/10", icon: ListChecks, chart: dailyTrend.map((day) => day.leads), sparkColor: "var(--chart-1)" },
-            { label: "Novos / urgentes", value: urgentLeads, color: "text-warning", bg: "bg-warning/10", icon: Warning, chart: dailyTrend.map((day) => day.urgent), sparkColor: "var(--warning)" },
-            { label: "Em andamento", value: inProgress, color: "text-chart-3", bg: "bg-chart-3/10", icon: ChartLineUp, chart: dailyTrend.map((day) => day.active), sparkColor: "var(--chart-3)" },
-            { label: "Estagnados", value: stalledCount, color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, chart: dailyTrend.map((day) => day.stalled), sparkColor: "var(--destructive)" },
+            { label: "Total na fila", value: totalLeads, color: "text-chart-1", bg: "bg-chart-1/10", icon: ListChecks, chart: dailyTrend.map((day) => day.leads), sparkColor: "var(--chart-1)", cardClassName: undefined },
+            { label: "Novos / urgentes", value: urgentLeads, color: "text-warning", bg: "bg-warning/10", icon: Warning, chart: dailyTrend.map((day) => day.urgent), sparkColor: "var(--warning)", cardClassName: undefined },
+            { label: "Em andamento", value: inProgress, color: "text-chart-3", bg: "bg-chart-3/10", icon: ChartLineUp, chart: dailyTrend.map((day) => day.active), sparkColor: "var(--chart-3)", cardClassName: undefined },
+            { label: "Estagnados", value: stalledCount, color: "text-destructive", bg: "bg-destructive/10", icon: XCircle, chart: dailyTrend.map((day) => day.stalled), sparkColor: "var(--destructive)", cardClassName: "border-destructive/40 bg-destructive/[0.03] hover:border-destructive/60" },
           ].map((stat) => {
             const Icon = stat.icon;
             return (
               <div
                 key={stat.label}
-                className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs hover:-translate-y-0.5"
+                className={cn(
+                  "group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs hover:-translate-y-0.5",
+                  stat.cardClassName,
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>

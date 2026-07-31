@@ -27,6 +27,8 @@ export type UserDisplayInfo = {
   jobTitle: string | null;
   permissions?: PermissionKey[];
   redirectLogout: string;
+  isPlatformAdmin?: boolean;
+  activeRoleOverride?: string | null;
 };
 
 export async function getRoleRedirect(): Promise<string> {
@@ -35,6 +37,12 @@ export async function getRoleRedirect(): Promise<string> {
   });
 
   if (!session) return "/login";
+
+  const [dbUser] = await getDatabase()
+    .select({ isPlatformAdmin: schema.user.isPlatformAdmin })
+    .from(schema.user)
+    .where(eq(schema.user.id, session.user.id))
+    .limit(1);
 
   const [membership] = await getDatabase()
     .select({ tenantId: schema.tenantMemberships.tenantId, role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle, customRoleId: schema.tenantMemberships.customRoleId, customRoleName: schema.customRoles.name })
@@ -45,11 +53,23 @@ export async function getRoleRedirect(): Promise<string> {
 
   if (!membership) return "/login";
 
-  if (membership.jobTitle === "marketing") {
+  let role = membership.role;
+  let jobTitle: string | null = membership.jobTitle;
+
+  if (dbUser?.isPlatformAdmin) {
+    const { getSuperAdminRoleOverride } = await import("@/features/super-admin/role-impersonation");
+    const override = await getSuperAdminRoleOverride();
+    if (override) {
+      role = override.role;
+      jobTitle = override.jobTitle;
+    }
+  }
+
+  if (jobTitle === "marketing") {
     return "/leads";
   }
 
-  return ROLE_REDIRECT[membership.role] ?? "/corretor/resumo";
+  return ROLE_REDIRECT[role] ?? "/corretor/resumo";
 }
 
 export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
@@ -61,6 +81,14 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
     return { name: "Usuário", role: null, roleKey: null, jobTitle: null, redirectLogout: "/login" };
   }
 
+  const [dbUser] = await getDatabase()
+    .select({ isPlatformAdmin: schema.user.isPlatformAdmin })
+    .from(schema.user)
+    .where(eq(schema.user.id, session.user.id))
+    .limit(1);
+
+  const isPlatformAdmin = !!dbUser?.isPlatformAdmin;
+
   const [membership] = await getDatabase()
     .select({ tenantId: schema.tenantMemberships.tenantId, role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle, customRoleId: schema.tenantMemberships.customRoleId, customRoleName: schema.customRoles.name })
     .from(schema.tenantMemberships)
@@ -68,16 +96,35 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
     .where(eq(schema.tenantMemberships.userId, session.user.id))
     .limit(1);
 
-  const role = membership?.role ?? null;
+  let role = membership?.role ?? null;
+  let jobTitle: string | null = membership?.jobTitle ?? null;
+  let activeRoleOverride: string | null = null;
+  let displayRoleLabel = membership?.customRoleName ?? (role ? ROLE_LABELS[role] ?? role : null);
+
+  if (isPlatformAdmin) {
+    const { getSuperAdminRoleOverride } = await import("@/features/super-admin/role-impersonation");
+    const override = await getSuperAdminRoleOverride();
+    if (override) {
+      role = override.role;
+      jobTitle = override.jobTitle;
+      activeRoleOverride = override.key;
+      displayRoleLabel = `${override.label} (Simulação)`;
+    }
+  }
+
   const redirectLogout = role ? ROLE_REDIRECT[role] ?? "/login" : "/login";
-  const permissions = membership ? await listEffectiveCapabilities({ tenantId: membership.tenantId, role: membership.role, jobTitle: membership.jobTitle, customRoleId: membership.customRoleId }) : [];
+  const permissions = membership
+    ? await listEffectiveCapabilities({ tenantId: membership.tenantId, role: role ?? membership.role, jobTitle: jobTitle, customRoleId: membership.customRoleId })
+    : [];
 
   return {
     name: session.user.name,
-    role: membership?.customRoleName ?? (role ? ROLE_LABELS[role] ?? role : null),
+    role: displayRoleLabel,
     roleKey: role,
-    jobTitle: membership?.jobTitle ?? null,
+    jobTitle,
     permissions,
     redirectLogout,
+    isPlatformAdmin,
+    activeRoleOverride,
   };
 }

@@ -50,6 +50,7 @@ import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
+import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 
 type SidebarItem = { label: string; icon: typeof House; url: string; permission: PermissionKey };
 type SidebarSection = { label: string; items: SidebarItem[] };
@@ -166,6 +167,12 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <AncoraLogo src={logoUrl} className="h-8 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
           <img src="/icon.png" alt="Ancora" className="hidden size-5 object-contain group-data-[collapsible=icon]:block" />
         </Link>
+
+        {user?.isPlatformAdmin && (
+          <div className="group-data-[collapsible=icon]:hidden">
+            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
+          </div>
+        )}
 
         {onDuty ? (
           <SidebarMenu>
