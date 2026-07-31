@@ -96,23 +96,25 @@ function ActivityIcon({ type }: { type: string }) {
   }
 }
 
-function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
+function DirectorTopActionHeader({ data }: { data: DirectorDashboardData }) {
   const actions = [
     {
       label: "Leads sem contato",
       value: data.totals.unworked,
-      description: "Distribuídos há mais de 15 min",
+      description: "Distribuídos há +15 min",
       href: "/leads?attention=unworked",
       badge: data.totals.unworked > 0 ? "Crítico" : "Ok",
       icon: Warning,
+      critical: data.totals.unworked > 0,
     },
     {
       label: "Leads estagnados",
       value: data.totals.stalled,
-      description: "Sem avanço há 3+ dias",
+      description: "Sem avanço há +3 dias",
       href: "/leads?attention=stalled",
       badge: data.totals.stalled > 0 ? "Atenção" : "Ok",
       icon: XCircle,
+      critical: data.totals.stalled > 0,
     },
     {
       label: "Equipe ativa",
@@ -121,6 +123,7 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       href: "/equipe",
       badge: "Equipe",
       icon: Users,
+      critical: false,
     },
     {
       label: "Parâmetros do Tenant",
@@ -129,97 +132,83 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       href: "/settings",
       badge: "Sistema",
       icon: Globe,
+      critical: false,
     },
   ] as const;
 
-  const isCritical = (label: string) =>
-    (label === "Leads sem contato" && data.totals.unworked > 0) ||
-    (label === "Leads estagnados" && data.totals.stalled > 0);
-
-  const pendingCount = data.totals.unworked + data.totals.stalled;
-
   return (
-    <aside className="space-y-4">
-      {/* ─── WIDGET 1: AÇÃO NECESSÁRIA (CARDS VERTICAIS SEM BORDA VERMELHA) ─── */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-          <div>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ação Necessária</h2>
-          </div>
-          {pendingCount > 0 && (
-            <Badge variant="outline" className="gap-1 rounded-full px-2 py-0 text-[10px] font-bold text-amber-600 border-amber-500/30">
-              <Warning className="size-3 text-amber-500" weight="fill" />
-              {pendingCount}
-            </Badge>
-          )}
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold tracking-tight">Ações Necessárias & Plantão</h2>
+          <p className="text-xs text-muted-foreground">Pendências operacionais e escala da equipe ao vivo.</p>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-2.5">
-          {actions.map((action) => {
-            const Icon = action.icon;
-            const critical = isCritical(action.label);
-            return (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="group relative overflow-hidden rounded-xl border border-border/70 bg-card p-3.5 transition-colors hover:border-border-strong focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <div className="flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={cn(
-                      "flex size-6 items-center justify-center rounded-md border text-xs shrink-0",
-                      critical
-                        ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                        : "border-border bg-muted/40 text-muted-foreground"
-                    )}>
-                      <Icon className="size-3.5" />
-                    </div>
-                    <p className={cn("text-xs font-medium truncate", critical ? "text-amber-700 dark:text-amber-300 font-semibold" : "text-foreground")}>
-                      {action.label}
-                    </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {actions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link
+              key={action.label}
+              href={action.href}
+              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/70 bg-card p-3.5 transition-colors hover:border-border-strong focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={cn(
+                    "flex size-6 items-center justify-center rounded-md border text-xs shrink-0",
+                    action.critical
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      : "border-border bg-muted/40 text-muted-foreground"
+                  )}>
+                    <Icon className="size-3.5" />
                   </div>
-                  <ArrowUpRight className="size-3.5 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                </div>
-
-                <div className="mt-2.5 flex items-baseline justify-between gap-2">
-                  <p className="text-xs text-muted-foreground/80 truncate">{action.description}</p>
-                  <p className={cn("text-xl font-bold tracking-tight tabular-nums shrink-0", critical ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
-                    {action.value}
+                  <p className={cn("text-xs font-medium truncate", action.critical ? "text-amber-700 dark:text-amber-300 font-semibold" : "text-foreground")}>
+                    {action.label}
                   </p>
                 </div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+                <ArrowUpRight className="size-3.5 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </div>
 
-      {/* ─── WIDGET 2: PLANTÃO AO VIVO (COMPACTO NO FIM DA LISTA) ─── */}
-      <div className="rounded-xl border border-border/70 bg-card p-3.5 space-y-2.5 transition-colors hover:border-border-strong">
-        <div className="flex items-center justify-between gap-1.5">
-          <Badge variant="outline" className="gap-1.5 rounded-md border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-            <span className="relative flex size-1.5">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              <div className="mt-3 flex items-baseline justify-between gap-2">
+                <p className="text-xs text-muted-foreground/80 truncate">{action.description}</p>
+                <p className={cn("text-xl font-bold tracking-tight tabular-nums shrink-0", action.critical ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+                  {action.value}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
+
+        {/* Plantão ao Vivo */}
+        <div className="rounded-xl border border-border/70 bg-card p-3.5 flex flex-col justify-between transition-colors hover:border-border-strong">
+          <div className="flex items-center justify-between gap-1.5">
+            <Badge variant="outline" className="gap-1.5 rounded-md border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="relative flex size-1.5">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              </span>
+              Plantão ao Vivo
+            </Badge>
+            <span className="text-[10px] font-bold tabular-nums text-foreground">
+              {data.totals.activeBrokers}/{data.totals.members} online
             </span>
-            Plantão ao Vivo
-          </Badge>
-          <span className="text-[10px] font-bold tabular-nums text-foreground">
-            {data.totals.activeBrokers}/{data.totals.members} online
-          </span>
+          </div>
+          <div className="my-1">
+            <p className="text-xs text-muted-foreground truncate">Roleta de distribuição ativa</p>
+          </div>
+          <Button
+            render={<Link href="/leads/distribuicao/plantao" />}
+            size="sm"
+            variant="outline"
+            className="w-full h-7 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+          >
+            <WifiHigh className="size-3.5" /> Ver Plantão
+          </Button>
         </div>
-        <p className="text-[11px] text-muted-foreground leading-tight">
-          Corretores em escala de distribuição na roleta.
-        </p>
-        <Button
-          render={<Link href="/leads/distribuicao/plantao" />}
-          size="sm"
-          variant="outline"
-          className="w-full h-8 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
-        >
-          <WifiHigh className="size-3.5" /> Ver Plantão
-        </Button>
       </div>
-    </aside>
+    </section>
   );
 }
 
@@ -360,22 +349,23 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
   ];
 
   return (
-    <div className="flex flex-col xl:flex-row h-full min-h-0 w-full overflow-hidden">
-      {/* ─── CENTRO: DASHBOARD PRINCIPAL (SCROLL INDEPENDENTE, LARGURA GENEROSA) ─── */}
-      <div className="flex-1 min-w-0 h-full overflow-y-auto p-4 sm:p-6 space-y-6">
-        {/* ─── INDICADORES ─── */}
-        <section className="space-y-4">
-          <div className="border-b border-border/50 pb-2">
-            <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
-            <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
-            <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
-            <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
-            <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
-          </div>
-        </section>
+    <div className="space-y-6">
+      {/* ─── TOPO: AÇÕES NECESSÁRIAS & PLANTÃO ─── */}
+      <DirectorTopActionHeader data={data} />
+
+      {/* ─── INDICADORES & ANALYTICS ─── */}
+      <section className="space-y-4">
+        <div className="border-b border-border/50 pb-2">
+          <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
+          <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
+          <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
+        </div>
+      </section>
 
         {/* Charts Row 1: Funnel Flow (7/12) & Status Distribution (5/12) */}
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -679,12 +669,6 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           </div>
         </CardContent>
       </Card>
-      </div>
-
-      {/* ─── DIREITA: SIDEBAR DO DIRETOR (xl:col-span-3 - COMPACTA) ─── */}
-      <div className="xl:col-span-3">
-        <DirectorRightSidebar data={data} />
-      </div>
     </div>
   );
 }
