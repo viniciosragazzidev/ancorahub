@@ -435,160 +435,54 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           </Card>
         </motion.div>
 
-      {/* ActivityFeed + Desempenho por Filial | Gargalos + Performance por Unidade */}
+      {/* Atividades Recentes + Performance por Unidade — lado a lado */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        {/* Coluna esquerda: Atividades + Desempenho por Filial */}
-        <div className="flex flex-col gap-6 lg:col-span-4">
+        {/* Atividades Recentes */}
+        <div className="lg:col-span-4">
           <ActivityFeed activities={activities} />
-
-          {/* Desempenho por Filial */}
-          <Card className="rounded-xl border-border/70 bg-card shadow-none flex flex-col">
-            <CardHeader>
-              <CardTitle>Desempenho por Filial</CardTitle>
-              <CardDescription>Leads, ativos e conversão por unidade</CardDescription>
-            </CardHeader>
-            <CardContent className="min-h-0 flex-1 p-0">
-              <div className="max-h-[500px] overflow-y-auto px-6 pb-6">
-                <div className="space-y-4">
-                  {data.branches.map((branch, i) => (
-                    <motion.div
-                      key={branch.name}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.3) }}
-                      className="rounded-lg border border-border/40 bg-muted/20 p-3"
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-sm font-medium">{branch.name}</span>
-                        <Badge variant="outline" className="rounded-md text-xs">{branch.conversion}</Badge>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>{branch.leads} leads</span>
-                        <span>·</span>
-                        <span>{branch.activeLeads} ativos</span>
-                        <span>·</span>
-                        <span>{branch.conversion} conversão</span>
-                      </div>
-                      <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-chart-5 transition-all duration-700"
-                          style={{ width: `${branch.leads > 0 ? (branch.activeLeads / branch.leads) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </motion.div>
-                  ))}
-                  {data.branches.length === 0 && (
-                    <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma filial cadastrada.</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Coluna direita: Gargalos + Performance por Unidade (4 cards) */}
-        <div className="flex flex-col gap-4 lg:col-span-3">
-          {/* Gargalos Operacionais */}
-          <Card className="rounded-xl border-border/70 bg-card shadow-none">
-            <CardHeader>
-              <CardTitle>Gargalos Operacionais</CardTitle>
-              <CardDescription>Pontos de atenção</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                {
-                  label: "Leads não trabalhados",
-                  description: "Distribuídos há mais de 15 minutos sem contato",
-                  value: data.totals.unworked,
-                  color: "text-warning",
-                  bg: "bg-warning/10",
-                  icon: Warning,
-                },
-                {
-                  label: "Leads estagnados",
-                  description: "Sem avanço há mais de 3 dias",
-                  value: data.totals.stalled,
-                  color: "text-destructive",
-                  bg: "bg-destructive/10",
-                  icon: XCircle,
-                },
-                {
-                  label: "Equipe",
-                  description: "Corretores ativos vs. cadastrados",
-                  value: `${data.totals.activeBrokers}/${data.totals.members}`,
-                  color: "text-chart-2",
-                  bg: "bg-chart-2/10",
-                  icon: UserList,
-                },
-              ].map((item, i) => {
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={item.label}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.07, 0.2) }}
-                    whileHover={{ y: -1 }}
-                    className="group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", item.bg, item.color)}>
-                        <Icon className="size-4" weight="fill" />
-                      </span>
-                      <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Alerta</span>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      <p className={cn("text-2xl font-bold tabular-nums tracking-tight", item.color)}>{item.value}</p>
-                      <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
-                      <p className="text-[11px] text-muted-foreground/70">{item.description}</p>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {/* Performance por Unidade — 4 cards 2x2 */}
+        {/* Performance por Unidade — 4 cards 2×2 */}
+        <div className="flex flex-col gap-3 lg:col-span-3">
           <div>
-            <div className="mb-3">
-              <p className="text-sm font-bold tracking-tight">Performance por Unidade</p>
-              <p className="text-xs text-muted-foreground">Volume e conversão por filial</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {data.branches.slice(0, 4).map((branch, i) => (
-                <motion.div
-                  key={branch.name}
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.18, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.2) }}
-                  whileHover={{ y: -2 }}
-                  className="group flex flex-col gap-2 rounded-xl border border-border/60 bg-card p-3.5 shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
-                >
-                  <div className="flex items-start justify-between gap-1">
-                    <p className="text-[11px] font-semibold leading-tight text-foreground line-clamp-2">{branch.name}</p>
-                    <Badge variant="outline" className="shrink-0 rounded-md px-1.5 py-0 text-[10px] font-bold">
-                      {branch.conversion}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xl font-bold tabular-nums tracking-tight text-foreground">{branch.leads}</p>
-                    <p className="text-[10px] text-muted-foreground">leads · {branch.activeLeads} ativos</p>
-                  </div>
-                  <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-chart-1 transition-all duration-700"
-                      style={{ width: `${branch.leads > 0 ? (branch.activeLeads / branch.leads) * 100 : 0}%` }}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-              {data.branches.length === 0 && (
-                <p className="col-span-2 py-4 text-center text-xs text-muted-foreground">Nenhuma filial cadastrada.</p>
-              )}
-            </div>
+            <p className="text-sm font-bold tracking-tight">Performance por Unidade</p>
+            <p className="text-xs text-muted-foreground">Volume e conversão por filial</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {data.branches.slice(0, 4).map((branch, i) => (
+              <motion.div
+                key={branch.name}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.18, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.2) }}
+                whileHover={{ y: -2 }}
+                className="group flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-semibold leading-tight text-foreground line-clamp-2">{branch.name}</p>
+                  <Badge variant="outline" className="shrink-0 rounded-md px-1.5 py-0 text-[10px] font-bold">
+                    {branch.conversion}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{branch.leads}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">leads · {branch.activeLeads} ativos</p>
+                </div>
+                <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-chart-1 transition-all duration-700"
+                    style={{ width: `${branch.leads > 0 ? (branch.activeLeads / branch.leads) * 100 : 0}%` }}
+                  />
+                </div>
+              </motion.div>
+            ))}
+            {data.branches.length === 0 && (
+              <p className="col-span-2 py-4 text-center text-xs text-muted-foreground">Nenhuma filial cadastrada.</p>
+            )}
           </div>
         </div>
       </section>
+
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
