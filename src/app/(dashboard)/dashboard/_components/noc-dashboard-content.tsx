@@ -104,7 +104,6 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       description: "Distribuídos há mais de 15 min",
       href: "/leads?attention=unworked",
       badge: data.totals.unworked > 0 ? "Crítico" : "Ok",
-      badgeTone: data.totals.unworked > 0 ? "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400",
       icon: Warning,
     },
     {
@@ -113,7 +112,6 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       description: "Sem avanço há 3+ dias",
       href: "/leads?attention=stalled",
       badge: data.totals.stalled > 0 ? "Atenção" : "Ok",
-      badgeTone: data.totals.stalled > 0 ? "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400",
       icon: XCircle,
     },
     {
@@ -122,7 +120,6 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       description: "Corretores na operação",
       href: "/equipe",
       badge: "Equipe",
-      badgeTone: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400",
       icon: Users,
     },
     {
@@ -131,7 +128,6 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
       description: "Integrações & Segurança",
       href: "/settings",
       badge: "Sistema",
-      badgeTone: "bg-muted text-muted-foreground border-border",
       icon: Globe,
     },
   ] as const;
@@ -143,54 +139,22 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
   const pendingCount = data.totals.unworked + data.totals.stalled;
 
   return (
-    <aside className="space-y-6 xl:sticky xl:top-4">
-      {/* ─── WIDGET 1: PLANTÃO AO VIVO ─── */}
-      <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent p-5 shadow-xs transition-all duration-200 hover:border-emerald-500/50 backdrop-blur-xs">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <Badge variant="outline" className="gap-2 rounded-full border-emerald-500/30 bg-emerald-500/15 px-3 py-1 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-            </span>
-            Plantão ao Vivo
-          </Badge>
-          <span className="text-[10px] font-semibold text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wider font-mono">Operação</span>
-        </div>
-
-        <div className="space-y-1 mb-4">
-          <p className="text-2xl font-black tracking-tight text-foreground tabular-nums">
-            {data.totals.activeBrokers} <span className="text-xs font-normal text-muted-foreground">de {data.totals.members} em escala</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Corretores online e aptos a receber novos leads na roleta.
-          </p>
-        </div>
-
-        <Button
-          render={<Link href="/leads/distribuicao/plantao" />}
-          size="sm"
-          className="w-full h-10 px-4 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 rounded-xl transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-        >
-          <WifiHigh className="size-4" /> Abrir Módulo de Plantão
-        </Button>
-      </div>
-
-      {/* ─── WIDGET 2: AÇÃO NECESSÁRIA (VERTICAL STACK) ─── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+    <aside className="space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto pr-1">
+      {/* ─── WIDGET 1: AÇÃO NECESSÁRIA (CARDS VERTICAIS) ─── */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
           <div>
-            <h2 className="text-sm font-bold tracking-tight">Ação Necessária</h2>
-            <p className="text-xs text-muted-foreground">Pendências operacionais da diretoria.</p>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ação Necessária</h2>
           </div>
           {pendingCount > 0 && (
-            <Badge variant="destructive" className="gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold">
+            <Badge variant="destructive" className="gap-1 rounded-full px-2 py-0 text-[10px] font-bold">
               <Warning className="size-3" weight="fill" />
-              {pendingCount} pendentes
+              {pendingCount}
             </Badge>
           )}
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           {actions.map((action) => {
             const Icon = action.icon;
             const critical = isCritical(action.label);
@@ -199,56 +163,64 @@ function DirectorRightSidebar({ data }: { data: DirectorDashboardData }) {
                 key={action.label}
                 href={action.href}
                 className={cn(
-                  "group relative overflow-hidden rounded-xl border p-4 transition-all duration-200 hover:-translate-y-0.5 shadow-2xs focus-visible:ring-2 focus-visible:ring-ring",
-                  critical
-                    ? "border-amber-500/50 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent hover:border-amber-500"
-                    : "border-border/80 bg-card hover:border-border-strong hover:bg-accent/40"
+                  "group relative overflow-hidden rounded-xl border border-border/70 bg-card p-3 transition-colors hover:border-border-strong focus-visible:ring-1 focus-visible:ring-ring",
+                  critical && "border-l-3 border-l-amber-500"
                 )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <div className={cn(
-                      "flex size-7 items-center justify-center rounded-lg border text-xs",
+                      "flex size-6 items-center justify-center rounded-md border text-xs shrink-0",
                       critical
-                        ? "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                        : "border-border bg-muted/50 text-muted-foreground"
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        : "border-border bg-muted/40 text-muted-foreground"
                     )}>
-                      <Icon className="size-4" />
+                      <Icon className="size-3.5" />
                     </div>
-                    <Badge variant="outline" className={`text-[10px] font-mono uppercase ${action.badgeTone}`}>
-                      {action.badge}
-                    </Badge>
-                  </div>
-                  <ArrowUpRight className={cn(
-                    "size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
-                    critical ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
-                  )} />
-                </div>
-
-                <div className="mt-3 flex items-baseline justify-between gap-2">
-                  <div>
-                    <p className={cn("text-xs font-medium", critical ? "text-amber-700 dark:text-amber-300 font-semibold" : "text-muted-foreground")}>
+                    <p className={cn("text-xs font-medium truncate", critical ? "text-amber-700 dark:text-amber-300 font-semibold" : "text-foreground")}>
                       {action.label}
                     </p>
-                    <p className="text-xs text-muted-foreground/80 mt-0.5">{action.description}</p>
                   </div>
-                  <p className={cn("text-2xl font-black tracking-tight tabular-nums shrink-0", critical ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+                  <ArrowUpRight className="size-3.5 text-muted-foreground shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </div>
+
+                <div className="mt-2 flex items-baseline justify-between gap-2">
+                  <p className="text-xs text-muted-foreground/80 truncate">{action.description}</p>
+                  <p className={cn("text-xl font-bold tracking-tight tabular-nums shrink-0", critical ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
                     {action.value}
                   </p>
                 </div>
-
-                {critical && (
-                  <div className="mt-2.5 pt-2 border-t border-amber-500/20 flex items-center justify-between text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                    <span className="flex items-center gap-1">
-                      <Warning className="size-3" weight="fill" /> Ação imediata
-                    </span>
-                    <span>Resolver →</span>
-                  </div>
-                )}
               </Link>
             );
           })}
         </div>
+      </div>
+
+      {/* ─── WIDGET 2: PLANTÃO AO VIVO (COMPACTO NO FIM DA LISTA) ─── */}
+      <div className="rounded-xl border border-border/70 bg-card p-3 space-y-2 transition-colors hover:border-border-strong">
+        <div className="flex items-center justify-between gap-1.5">
+          <Badge variant="outline" className="gap-1.5 rounded-md border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="relative flex size-1.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+            </span>
+            Plantão ao Vivo
+          </Badge>
+          <span className="text-[10px] font-bold tabular-nums text-foreground">
+            {data.totals.activeBrokers}/{data.totals.members} online
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground leading-tight">
+          Corretores em escala de distribuição na roleta.
+        </p>
+        <Button
+          render={<Link href="/leads/distribuicao/plantao" />}
+          size="sm"
+          variant="outline"
+          className="w-full h-7 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+        >
+          <WifiHigh className="size-3.5" /> Ver Plantão
+        </Button>
       </div>
     </aside>
   );
@@ -392,8 +364,8 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-12 items-start">
-      {/* ─── ESQUERDA: INDICADORES E ANALYTICS (xl:col-span-8) ─── */}
-      <div className="xl:col-span-8 space-y-6">
+      {/* ─── ESQUERDA: INDICADORES E ANALYTICS (xl:col-span-9 - MAIOR ÁREA CENTRAL) ─── */}
+      <div className="xl:col-span-9 space-y-6">
         {/* ─── INDICADORES ─── */}
         <section className="space-y-4">
           <div className="border-b border-border/50 pb-2">
@@ -862,8 +834,8 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
       </Card>
       </div>
 
-      {/* ─── DIREITA: SIDEBAR DO DIRETOR (xl:col-span-4) ─── */}
-      <div className="xl:col-span-4">
+      {/* ─── DIREITA: SIDEBAR DO DIRETOR (xl:col-span-3 - COMPACTA) ─── */}
+      <div className="xl:col-span-3">
         <DirectorRightSidebar data={data} />
       </div>
     </div>
