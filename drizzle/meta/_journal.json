@@ -365,6 +365,13 @@
       "when": 1785700800000,
       "tag": "0099_meta_manual_lead_ads",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1785700900000,
+      "tag": "0100_meta_ads_embedded_signup",
+      "breakpoints": true
     }
   ]
 }

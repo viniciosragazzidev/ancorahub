@@ -1,7 +1,12 @@
-CREATE TYPE "custom_role_status" AS ENUM ('draft', 'active', 'archived');
-CREATE TYPE "custom_role_scope" AS ENUM ('none', 'own', 'branch', 'tenant');
+DO $$ BEGIN
+  CREATE TYPE "custom_role_status" AS ENUM ('draft', 'active', 'archived');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE "custom_roles" (
+DO $$ BEGIN
+  CREATE TYPE "custom_role_scope" AS ENUM ('none', 'own', 'branch', 'tenant');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "custom_roles" (
   "id" text PRIMARY KEY NOT NULL,
   "tenant_id" text NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "name" text NOT NULL,
@@ -16,19 +21,19 @@ CREATE TABLE "custom_roles" (
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "updated_at" timestamp with time zone NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX "custom_roles_tenant_name_unique" ON "custom_roles" ("tenant_id", "name");
-CREATE INDEX "custom_roles_tenant_status_idx" ON "custom_roles" ("tenant_id", "status");
+CREATE UNIQUE INDEX IF NOT EXISTS "custom_roles_tenant_name_unique" ON "custom_roles" ("tenant_id", "name");
+CREATE INDEX IF NOT EXISTS "custom_roles_tenant_status_idx" ON "custom_roles" ("tenant_id", "status");
 
-CREATE TABLE "custom_role_permissions" (
+CREATE TABLE IF NOT EXISTS "custom_role_permissions" (
   "id" text PRIMARY KEY NOT NULL,
   "custom_role_id" text NOT NULL REFERENCES "custom_roles"("id") ON DELETE CASCADE,
   "permission_key" text NOT NULL,
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX "custom_role_permission_unique" ON "custom_role_permissions" ("custom_role_id", "permission_key");
-CREATE INDEX "custom_role_permissions_key_idx" ON "custom_role_permissions" ("permission_key");
+CREATE UNIQUE INDEX IF NOT EXISTS "custom_role_permission_unique" ON "custom_role_permissions" ("custom_role_id", "permission_key");
+CREATE INDEX IF NOT EXISTS "custom_role_permissions_key_idx" ON "custom_role_permissions" ("permission_key");
 
-CREATE TABLE "custom_role_events" (
+CREATE TABLE IF NOT EXISTS "custom_role_events" (
   "id" text PRIMARY KEY NOT NULL,
   "tenant_id" text NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "custom_role_id" text NOT NULL REFERENCES "custom_roles"("id") ON DELETE CASCADE,
@@ -38,9 +43,9 @@ CREATE TABLE "custom_role_events" (
   "snapshot" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
-CREATE INDEX "custom_role_events_role_created_idx" ON "custom_role_events" ("custom_role_id", "created_at");
+CREATE INDEX IF NOT EXISTS "custom_role_events_role_created_idx" ON "custom_role_events" ("custom_role_id", "created_at");
 
-CREATE TABLE "tenant_custom_role_settings" (
+CREATE TABLE IF NOT EXISTS "tenant_custom_role_settings" (
   "tenant_id" text PRIMARY KEY NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "enabled" boolean NOT NULL DEFAULT false,
   "updated_by" text REFERENCES "user"("id") ON DELETE SET NULL,

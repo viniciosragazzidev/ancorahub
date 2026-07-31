@@ -1,7 +1,12 @@
-CREATE TYPE "performance_season_status" AS ENUM ('draft', 'active', 'closed', 'archived');
-CREATE TYPE "performance_award_type" AS ENUM ('recognition', 'bonus', 'gift', 'other');
+DO $$ BEGIN
+  CREATE TYPE "performance_season_status" AS ENUM ('draft', 'active', 'closed', 'archived');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE "performance_seasons" (
+DO $$ BEGIN
+  CREATE TYPE "performance_award_type" AS ENUM ('recognition', 'bonus', 'gift', 'other');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "performance_seasons" (
   "id" text PRIMARY KEY NOT NULL,
   "tenant_id" text NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "name" text NOT NULL,
@@ -15,10 +20,10 @@ CREATE TABLE "performance_seasons" (
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "updated_at" timestamp with time zone NOT NULL DEFAULT now()
 );
-CREATE INDEX "performance_seasons_tenant_status_idx" ON "performance_seasons" ("tenant_id", "status");
-CREATE INDEX "performance_seasons_tenant_starts_idx" ON "performance_seasons" ("tenant_id", "starts_at");
+CREATE INDEX IF NOT EXISTS "performance_seasons_tenant_status_idx" ON "performance_seasons" ("tenant_id", "status");
+CREATE INDEX IF NOT EXISTS "performance_seasons_tenant_starts_idx" ON "performance_seasons" ("tenant_id", "starts_at");
 
-CREATE TABLE "performance_awards" (
+CREATE TABLE IF NOT EXISTS "performance_awards" (
   "id" text PRIMARY KEY NOT NULL,
   "tenant_id" text NOT NULL REFERENCES "tenants"("id") ON DELETE CASCADE,
   "season_id" text NOT NULL REFERENCES "performance_seasons"("id") ON DELETE CASCADE,
@@ -32,5 +37,5 @@ CREATE TABLE "performance_awards" (
   "created_at" timestamp with time zone NOT NULL DEFAULT now(),
   "updated_at" timestamp with time zone NOT NULL DEFAULT now()
 );
-CREATE UNIQUE INDEX "performance_awards_season_rank_title_unique" ON "performance_awards" ("season_id", "rank_position", "title");
-CREATE INDEX "performance_awards_tenant_season_idx" ON "performance_awards" ("tenant_id", "season_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "performance_awards_season_rank_title_unique" ON "performance_awards" ("season_id", "rank_position", "title");
+CREATE INDEX IF NOT EXISTS "performance_awards_tenant_season_idx" ON "performance_awards" ("tenant_id", "season_id");
