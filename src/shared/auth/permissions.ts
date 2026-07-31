@@ -61,6 +61,7 @@ export const PERMISSIONS = {
   importar_planilhas: ["manager", "director"],
   importar_leads_meta: ["director"],
   ver_importacoes_meta: ["director"],
+  acessar_campanhas_meta: ["broker", "manager", "director"],
   acessar_ferramentas_vendas: ["broker", "manager", "director"],
 } as const satisfies Record<string, readonly TenantRole[]>;
 
@@ -73,7 +74,10 @@ export const JOB_TITLE_CAPABILITIES: Record<JobTitleCapability, readonly Permiss
     "importar_planilhas",
     "importar_leads_meta",
     "ver_importacoes_meta",
+    "acessar_campanhas_meta",
     "acessar_leads",
+    "acessar_configuracoes",
+    "acessar_configuracoes_pessoais",
   ],
   finance: [
     "acessar_financeiro",

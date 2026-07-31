@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowsClockwise, Lightning, ShieldCheck, UserList } from "@/components/huge-icons";
-import { Badge } from "@/components/ui/badge";
+import { ArrowsClockwise, Lightning, ShieldCheck } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { setSuperAdminRoleOverrideAction } from "@/features/super-admin/role-impersonation-actions";
 import type { RoleOverrideOption } from "@/features/super-admin/role-impersonation";
@@ -14,16 +13,16 @@ type SuperAdminRoleSwitcherProps = {
   compact?: boolean;
 };
 
-const ROLE_OPTIONS: Array<{ value: RoleOverrideOption; label: string; icon: string; badge: string }> = [
-  { value: "none", label: "👑 Cargo Real (Super-Admin)", icon: "👑", badge: "Super-Admin" },
-  { value: "director", label: "🏢 Diretor", icon: "🏢", badge: "Diretor" },
-  { value: "manager", label: "👔 Gestor / Gerente", icon: "👔", badge: "Gestor" },
-  { value: "broker", label: "💼 Corretor", icon: "💼", badge: "Corretor" },
-  { value: "marketing", label: "🎯 Marketing (Especialista)", icon: "🎯", badge: "Marketing" },
-  { value: "finance", label: "💰 Financeiro (Backoffice)", icon: "💰", badge: "Financeiro" },
+const ROLE_OPTIONS: Array<{ value: RoleOverrideOption; label: string; badge: string }> = [
+  { value: "none", label: "👑 Cargo Real (Super-Admin)", badge: "Super-Admin" },
+  { value: "director", label: "🏢 Diretor", badge: "Diretor" },
+  { value: "manager", label: "👔 Gestor / Gerente", badge: "Gestor" },
+  { value: "broker", label: "💼 Corretor", badge: "Corretor" },
+  { value: "marketing", label: "🎯 Marketing (Especialista)", badge: "Marketing" },
+  { value: "finance", label: "💰 Financeiro (Backoffice)", badge: "Financeiro" },
 ];
 
-export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: SuperAdminRoleSwitcherProps) {
+export function SuperAdminRoleSwitcher({ activeOverride }: SuperAdminRoleSwitcherProps) {
   const [isPending, startTransition] = useTransition();
   const [selectedRole, setSelectedRole] = useState<RoleOverrideOption>((activeOverride as RoleOverrideOption) || "none");
   const router = useRouter();
@@ -36,8 +35,8 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
         if (res.success) {
           toast.success(
             newRole === "none"
-              ? "Cargo real de Super-Admin restaurado com sucesso!"
-              : `Simulação de cargo alterada para: ${ROLE_OPTIONS.find((r) => r.value === newRole)?.badge}`
+              ? "Cargo real restaurado com sucesso!"
+              : `Visão simulada: ${ROLE_OPTIONS.find((r) => r.value === newRole)?.badge}`
           );
           router.refresh();
         }
@@ -49,48 +48,24 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
 
   const isSimulating = activeOverride && activeOverride !== "none";
 
-  if (compact) {
-    return (
-      <div className="flex items-center gap-2">
-        <select
-          value={selectedRole}
-          onChange={(e) => handleRoleChange(e.target.value as RoleOverrideOption)}
-          disabled={isPending}
-          className="h-8 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 text-xs font-semibold px-2 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-        >
-          {ROLE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-background text-foreground">
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        {isPending && <ArrowsClockwise className="size-3.5 animate-spin text-amber-500" />}
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-2 mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
-          <Lightning className="size-4 shrink-0" />
-          <span>Modo Super-Admin</span>
-        </div>
+    <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-2 text-left">
+      <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+        <span className="flex items-center gap-1.5 truncate">
+          <Lightning className="size-3.5 shrink-0 text-amber-500" /> Modo Super-Admin
+        </span>
         {isSimulating && (
-          <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] font-mono font-semibold uppercase">
-            🧪 Simulação Ativa
-          </Badge>
+          <span className="size-2 rounded-full bg-amber-500 animate-pulse shrink-0" title="Simulação Ativa" />
         )}
       </div>
 
       <div className="space-y-1">
-        <label className="text-[11px] text-muted-foreground font-medium block">Visão de Cargo Simulada:</label>
         <div className="relative">
           <select
             value={selectedRole}
             onChange={(e) => handleRoleChange(e.target.value as RoleOverrideOption)}
             disabled={isPending}
-            className="w-full h-9 rounded-lg border border-border bg-card text-foreground text-xs font-medium px-3 pr-8 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs"
+            className="w-full h-8 rounded-lg border border-amber-500/20 bg-background text-foreground text-xs font-medium pl-2.5 pr-7 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer truncate shadow-2xs"
           >
             {ROLE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -99,8 +74,8 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
             ))}
           </select>
           {isPending && (
-            <div className="absolute right-2.5 top-2.5">
-              <ArrowsClockwise className="size-4 animate-spin text-amber-500" />
+            <div className="absolute right-2 top-2">
+              <ArrowsClockwise className="size-3.5 animate-spin text-amber-500" />
             </div>
           )}
         </div>
@@ -112,9 +87,9 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
           size="sm"
           onClick={() => handleRoleChange("none")}
           disabled={isPending}
-          className="w-full h-7 text-[11px] text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 font-semibold gap-1.5"
+          className="w-full h-6 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 font-semibold gap-1 px-1"
         >
-          <ShieldCheck className="size-3.5" /> Restaurar Cargo Real
+          <ShieldCheck className="size-3" /> Restaurar Cargo Real
         </Button>
       )}
     </div>
