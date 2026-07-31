@@ -367,7 +367,7 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
         </div>
       </section>
 
-        {/* Charts Row 1: Funnel Flow (7/12) & Status Distribution (5/12) */}
+        {/* Charts Row 1: Funnel Flow (7/12) & Performance por Unidade (5/12) */}
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Funnel Flow */}
           <motion.div
@@ -470,12 +470,12 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           </Card>
         </motion.div>
 
-        {/* Branch Performance Comparison */}
+        {/* Performance por Unidade — expandido para col-span-5 */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.16 }}
-          className="lg:col-span-3"
+          className="lg:col-span-5"
         >
           <Card className="rounded-xl border-border/70 bg-card shadow-none h-full">
             <CardHeader>
@@ -490,7 +490,7 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
                   <BarChart
                     layout="vertical"
                     data={data.branches}
-                    margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
+                    margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
                   >
                     <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
@@ -500,11 +500,11 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: "var(--foreground)", fontSize: 12, fontWeight: 500 }}
-                      width={100}
+                      width={110}
                     />
                     <Tooltip content={<ChartTooltipWrapper />} cursor={{ fill: "var(--muted)/30" }} />
-                    <Bar dataKey="leads" name="Total Leads" fill="var(--chart-1)" radius={[0, 4, 4, 0]} barSize={12} />
-                    <Bar dataKey="activeLeads" name="Em Atendimento" fill="var(--chart-3)" radius={[0, 4, 4, 0]} barSize={12} />
+                    <Bar dataKey="leads" name="Total Leads" fill="var(--chart-1)" radius={[0, 4, 4, 0]} barSize={14} />
+                    <Bar dataKey="activeLeads" name="Em Atendimento" fill="var(--chart-3)" radius={[0, 4, 4, 0]} barSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -513,13 +513,71 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
         </motion.div>
       </section>
 
-      {/* ActivityFeed + Gargalos Operacionais */}
+      {/* ActivityFeed + Desempenho por Filial | Gargalos Operacionais */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        <div className="lg:col-span-4">
+        {/* Coluna esquerda: Atividades + Desempenho por Filial empilhados */}
+        <div className="flex flex-col gap-6 lg:col-span-4">
           <ActivityFeed activities={activities} />
+
+          {/* Desempenho por Filial — abaixo das atividades */}
+          <Card className="rounded-xl border-border/70 bg-card shadow-none flex flex-col">
+            <CardHeader>
+              <CardTitle>Desempenho por Filial</CardTitle>
+              <CardDescription>
+                Leads, ativos e conversão por unidade
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="min-h-0 flex-1 p-0">
+              <div className="max-h-[500px] overflow-y-auto px-6 pb-6">
+                <div className="space-y-4">
+                  {data.branches.map((branch, i) => (
+                    <motion.div
+                      key={branch.name}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.3) }}
+                      className="rounded-lg border border-border/40 bg-muted/20 p-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          {branch.name}
+                        </span>
+                        <Badge variant="outline" className="rounded-md text-xs">
+                          {branch.conversion}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>{branch.leads} leads</span>
+                        <span>·</span>
+                        <span>{branch.activeLeads} ativos</span>
+                        <span>·</span>
+                        <span>{branch.conversion} conversão</span>
+                      </div>
+                      <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-chart-5 transition-all duration-700"
+                          style={{
+                            width: `${branch.leads > 0
+                              ? (branch.activeLeads / branch.leads) * 100
+                              : 0
+                              }%`,
+                          }}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                  {data.branches.length === 0 && (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      Nenhuma filial cadastrada.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Bottleneck Cards */}
+        {/* Coluna direita: Gargalos Operacionais */}
         <Card className="rounded-xl border-border/70 bg-card shadow-none lg:col-span-3">
           <CardHeader>
             <CardTitle>Gargalos Operacionais</CardTitle>
@@ -612,63 +670,6 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           );
         })}
       </div>
-
-      {/* Desempenho por Filial */}
-      <Card className="rounded-xl border-border/70 bg-card shadow-none flex flex-col">
-        <CardHeader>
-          <CardTitle>Desempenho por Filial</CardTitle>
-          <CardDescription>
-            Leads, ativos e conversão por unidade
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 p-0">
-          <div className="max-h-[500px] overflow-y-auto px-6 pb-6">
-            <div className="space-y-4">
-              {data.branches.map((branch, i) => (
-                <motion.div
-                  key={branch.name}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.3) }}
-                  className="rounded-lg border border-border/40 bg-muted/20 p-3"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      {branch.name}
-                    </span>
-                    <Badge variant="outline" className="rounded-md text-xs">
-                      {branch.conversion}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span>{branch.leads} leads</span>
-                    <span>·</span>
-                    <span>{branch.activeLeads} ativos</span>
-                    <span>·</span>
-                    <span>{branch.conversion} conversão</span>
-                  </div>
-                  <div className="mt-2 relative h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-chart-5 transition-all duration-700"
-                      style={{
-                        width: `${branch.leads > 0
-                          ? (branch.activeLeads / branch.leads) * 100
-                          : 0
-                          }%`,
-                      }}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-              {data.branches.length === 0 && (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nenhuma filial cadastrada.
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
