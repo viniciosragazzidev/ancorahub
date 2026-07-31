@@ -485,7 +485,7 @@ function ConversationHeader({
   return (
     <header className="flex min-h-16 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
       <Button aria-label="Voltar para atendimentos" className="lg:hidden" onClick={onBack} size="icon-sm" type="button" variant="ghost">
-        <ArrowLeft />
+        <ArrowLeft className="size-3.5" />
       </Button>
       <ContactAvatar name={client.nome} />
       <div className="min-w-0 flex-1">
@@ -546,24 +546,24 @@ function ConversationHeader({
           )
         )}
         <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Ligar para cliente" render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} />} size="icon-sm" variant="ghost"><Phone /></Button>} />
+          <TooltipTrigger render={<Button aria-label="Ligar para cliente" render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} />} size="icon-sm" variant="ghost"><Phone className="size-3.5" /></Button>} />
           <TooltipContent>Ligar</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir WhatsApp do cliente" render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />} size="icon-sm" variant="ghost"><WhatsappLogo /></Button>} />
+          <TooltipTrigger render={<Button aria-label="Abrir WhatsApp do cliente" render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />} size="icon-sm" variant="ghost"><WhatsappLogo className="size-3.5" /></Button>} />
           <TooltipContent>Abrir WhatsApp</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir perfil do atendimento" className="2xl:hidden" onClick={onOpenProfile} size="icon-sm" type="button" variant="ghost"><UserList /></Button>} />
+          <TooltipTrigger render={<Button aria-label="Abrir perfil do atendimento" className="2xl:hidden" onClick={onOpenProfile} size="icon-sm" type="button" variant="ghost"><UserList className="size-3.5" /></Button>} />
           <TooltipContent>Ver perfil</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir lead completo" render={<Link href={`/leads/${client.id}`} />} size="icon-sm" variant="ghost"><ArrowSquareOut /></Button>} />
+          <TooltipTrigger render={<Button aria-label="Abrir lead completo" render={<Link href={`/leads/${client.id}`} />} size="icon-sm" variant="ghost"><ArrowSquareOut className="size-3.5" /></Button>} />
           <TooltipContent>Abrir lead</TooltipContent>
         </Tooltip>
         <div className="ml-1 hidden border-l border-border pl-2 2xl:block">
           <Tooltip>
-            <TooltipTrigger render={<Button aria-label={profileOpen ? "Recolher perfil do cliente" : "Mostrar perfil do cliente"} onClick={onToggleProfile} size="icon-sm" type="button" variant="ghost"><PanelLeftIcon className={cn(profileOpen && "rotate-180")} /></Button>} />
+            <TooltipTrigger render={<Button aria-label={profileOpen ? "Recolher perfil do cliente" : "Mostrar perfil do cliente"} onClick={onToggleProfile} size="icon-sm" type="button" variant="ghost"><PanelLeftIcon className={cn("size-3.5", profileOpen && "rotate-180")} /></Button>} />
             <TooltipContent>{profileOpen ? "Recolher perfil" : "Mostrar perfil"}</TooltipContent>
           </Tooltip>
         </div>
@@ -598,7 +598,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        active ? "bg-primary/[0.08]" : "hover:bg-muted/65",
+        active ? "bg-muted/80" : "hover:bg-muted/65",
       )}
       onClick={onClick}
       type="button"
@@ -780,9 +780,9 @@ function HistoryEmptyState({ phone }: { phone: string }) {
         description="Este atendimento ainda não possui histórico na plataforma. Continue o contato pelo WhatsApp e o histórico aparecerá quando a sincronização estiver disponível."
         action={
           <Button render={<a href={getWhatsAppUrl(phone)} rel="noreferrer" target="_blank" />} size="sm">
-            <WhatsappLogo />
+            <WhatsappLogo className="size-4" />
             Abrir WhatsApp
-            <ArrowSquareOut />
+            <ArrowSquareOut className="size-4" />
           </Button>
         }
       />
@@ -793,10 +793,10 @@ function HistoryEmptyState({ phone }: { phone: string }) {
 function ConversationChannelNotice({ phone }: { phone: string }) {
   return (
     <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
-      <ContextNote title="Envio no chat interno ainda indisponível" variant="warning">
+      <ContextNote className="bg-muted/80 border-border/70" title="Envio no chat interno ainda indisponível" variant="warning">
         Use o WhatsApp para enviar novas mensagens. O histórico exibido aqui é somente leitura nesta etapa.
         <Button className="ml-2 align-middle" render={<a href={getWhatsAppUrl(phone)} rel="noreferrer" target="_blank" />} size="xs" variant="outline">
-          <WhatsappLogo />
+          <WhatsappLogo className="size-3.5" />
           Abrir WhatsApp
         </Button>
       </ContextNote>
@@ -856,9 +856,9 @@ function ClientProfile({ client }: { client: ConversationItem }) {
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <ProfileAction label="Ligar" render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} />}><Phone /></ProfileAction>
-          <ProfileAction label="WhatsApp" render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />}><WhatsappLogo /></ProfileAction>
-          <ProfileAction label="Abrir lead" render={<Link href={`/leads/${client.id}`} />}><ArrowSquareOut /></ProfileAction>
+          <ProfileAction label="Ligar" render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} />}><Phone className="size-4" /></ProfileAction>
+          <ProfileAction label="WhatsApp" render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />}><WhatsappLogo className="size-4" /></ProfileAction>
+          <ProfileAction label="Abrir lead" render={<Link href={`/leads/${client.id}`} />}><ArrowSquareOut className="size-4" /></ProfileAction>
         </div>
       </div>
 
