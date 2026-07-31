@@ -182,6 +182,10 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
               </p>
             )}
 
+            <p className="rounded-md bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              Colunas esperadas: <code className="font-mono text-[11px]">ID</code>, <code className="font-mono text-[11px]">Data</code>, <code className="font-mono text-[11px]">Nome</code>, <code className="font-mono text-[11px]">E-mail</code>, <code className="font-mono text-[11px]">Telefone</code>, <code className="font-mono text-[11px]">Operadora</code>, <code className="font-mono text-[11px]">Nome da campanha</code>, <code className="font-mono text-[11px]">Nome do conjunto de anúncio</code>, <code className="font-mono text-[11px]">Nome do anúncio</code>. A coluna <code className="font-mono text-[11px]">Nome do formulário</code> é opcional — quando ausente, os leads são registrados como “Formulário Direct”.
+            </p>
+
             <Button
               onClick={handleSubmit}
               disabled={busy || !file || (canChooseBranch && !branchId)}

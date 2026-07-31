@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowsClockwise,
   CheckCircle,
   Clock,
   Globe,
+  Key,
   Lightning,
   Phone,
   Power,
@@ -17,10 +18,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { confirmMetaConnection, disconnectMetaConnection, discoverMetaAssetsFromAuthCode, triggerManualMetaSync } from "../actions";
+import { confirmMetaConnection, disconnectMetaConnection, discoverMetaAssetsFromAuthCode, discoverMetaAssetsFromToken, triggerManualMetaSync } from "../actions";
 import type { MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "../types";
 import { MetaAssetsModal } from "./meta-assets-modal";
+
+const DEFAULT_META_APP_ID = "780859815090303";
+const DEFAULT_META_CONFIG_ID = "2285077245657163";
 
 export function MetaIntegrationView({
   connection,
@@ -31,27 +37,87 @@ export function MetaIntegrationView({
 }) {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [assetsModalOpen, setAssetsModalOpen] = useState(false);
   const [discoveredAssets, setDiscoveredAssets] = useState<MetaDiscoveredAssets | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [userAccessToken, setUserAccessToken] = useState("");
+  const [activeTab, setActiveTab] = useState<"oauth" | "token">("oauth");
 
   const isConnected = connection?.status === "connected";
 
-  const handleLaunchEmbeddedSignup = async () => {
+  // Escutar postMessage enviadas pelo popup da Meta após conclusão do Login
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "META_AUTH_SUCCESS") {
+        if (event.data.assets) {
+          setDiscoveredAssets(event.data.assets);
+          setConnectModalOpen(false);
+          setAssetsModalOpen(true);
+        }
+      } else if (event.data?.type === "META_AUTH_ERROR") {
+        setErrorMessage(event.data.error || "Erro na autenticação da Meta.");
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handleLaunchFacebookOAuth = async () => {
     try {
       setLoading(true);
       setErrorMessage(null);
 
-      // Simulação / Preparação do fluxo Embedded Signup v4
-      // Em produção: FB.login() via SDK com config_id do Meta App Dashboard
-      const mockAuthCode = "mock_code_" + Date.now();
-      const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/api/meta/oauth/callback` : "";
+      const appId = process.env.NEXT_PUBLIC_META_APP_ID || process.env.NEXT_PUBLIC_META_WHATSAPP_APP_ID || DEFAULT_META_APP_ID;
+      const configId = process.env.NEXT_PUBLIC_META_CONFIG_ID || process.env.NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID || DEFAULT_META_CONFIG_ID;
+      const redirectUri = typeof window !== "undefined" ? `${window.location.origin}/api/integrations/meta/lead-ads/callback` : "";
 
-      const assets = await discoverMetaAssetsFromAuthCode(mockAuthCode, redirectUri);
-      setDiscoveredAssets(assets);
-      setAssetsModalOpen(true);
+      const extrasObj = {
+        version: "v4",
+        sessionInfoVersion: "3",
+        featureType: "whatsapp_business_app_onboarding",
+      };
+
+      const authUrl = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${appId}&config_id=${configId}&extras=${encodeURIComponent(
+        JSON.stringify(extrasObj)
+      )}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        authUrl,
+        "MetaEmbeddedSignup",
+        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=yes`
+      );
+
+      if (!popup) {
+        setErrorMessage("O navegador bloqueou a janela popup. Por favor, permita popups para este site e tente novamente.");
+      }
     } catch (err: any) {
       setErrorMessage(err?.message || "Falha ao iniciar o Facebook Login for Business.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDiscoverFromToken = async () => {
+    if (!userAccessToken.trim()) {
+      setErrorMessage("Por favor, informe seu Access Token da Meta.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setErrorMessage(null);
+      const assets = await discoverMetaAssetsFromToken(userAccessToken.trim());
+      setDiscoveredAssets(assets);
+      setConnectModalOpen(false);
+      setAssetsModalOpen(true);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Falha ao consultar ativos com o token fornecido. Verifique se o token é válido e possui permissões.");
     } finally {
       setLoading(false);
     }
@@ -132,7 +198,7 @@ export function MetaIntegrationView({
                 </Button>
               </>
             ) : (
-              <Button size="sm" onClick={handleLaunchEmbeddedSignup} disabled={loading} className="h-9 px-4 text-xs font-semibold gap-2">
+              <Button size="sm" onClick={() => setConnectModalOpen(true)} disabled={loading} className="h-9 px-4 text-xs font-semibold gap-2">
                 <Lightning className="size-4" /> Conectar com Meta
               </Button>
             )}
@@ -256,6 +322,92 @@ export function MetaIntegrationView({
           </Table>
         </CardContent>
       </Card>
+
+      {/* Modal de escolha de método de conexão */}
+      <Dialog open={connectModalOpen} onOpenChange={setConnectModalOpen}>
+        <DialogPopup className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Conectar Conta Meta</DialogTitle>
+            <DialogDescription className="text-xs">
+              Escolha a forma de autorizar o acesso aos seus ativos reais no Meta Business Suite:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div className="flex rounded-lg border border-border bg-muted/30 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveTab("oauth")}
+                className={`flex-1 rounded-md py-1.5 font-medium transition-all ${
+                  activeTab === "oauth" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Facebook Login
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("token")}
+                className={`flex-1 rounded-md py-1.5 font-medium transition-all ${
+                  activeTab === "token" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Token de Acesso Direct
+              </button>
+            </div>
+
+            {activeTab === "oauth" ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs space-y-2">
+                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Lightning className="size-4 text-primary" /> Facebook Login for Business
+                  </p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    Abre a janela oficial da Meta em um popup para selecionar suas Páginas, Contas de Anúncios e WhatsApp Business.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleLaunchFacebookOAuth}
+                  disabled={loading}
+                  className="w-full h-10 text-xs font-semibold gap-2"
+                >
+                  <Globe className="size-4" /> Abrir Janela do Facebook
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Key className="size-3.5 text-muted-foreground" /> Access Token / System User Token
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Cole seu token iniciado por EAA..."
+                    value={userAccessToken}
+                    onChange={(e) => setUserAccessToken(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Gere um User Access Token ou System User Token no seu Meta Business Manager com permissões <code>pages_show_list</code>, <code>ads_read</code>, <code>leads_retrieval</code>.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleDiscoverFromToken}
+                  disabled={loading || !userAccessToken.trim()}
+                  className="w-full h-10 text-xs font-semibold gap-2"
+                >
+                  <CheckCircle className="size-4" /> {loading ? "Consultando Meta..." : "Buscar Meus Ativos Meta"}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setConnectModalOpen(false)}>
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
 
       {/* Modal de confirmação de ativos */}
       <MetaAssetsModal

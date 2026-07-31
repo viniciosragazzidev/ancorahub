@@ -33,6 +33,7 @@ interface RawRow {
   campanha: string;
   conjunto: string;
   anuncio: string;
+  formulario: string;
   externalId: string;
   data: string;
   tipoPlano?: string;
@@ -47,6 +48,7 @@ interface NormalizedRow {
   campanha: string;
   conjunto: string;
   anuncio: string;
+  formulario: string;
   externalId: string;
   capturedAt: Date | null;
   tipo: string;
@@ -87,7 +89,7 @@ function validateHeaders(headers: string[], type: ImportType): Map<string, numbe
   const headerMap = new Map(headers.map((h, i) => [normalizeHeader(h), i]));
 
   for (const col of required) {
-    if (!headerMap.has(col)) {
+    if (!headerMap.has(normalizeHeader(col))) {
       throw new Error(`Campo obrigatório ausente: ${col.charAt(0).toUpperCase() + col.slice(1)}`);
     }
   }
@@ -123,6 +125,7 @@ function validateRow(row: RawRow, index: number, type: ImportType): { normalized
   const campanha = (row.campanha || "").trim();
   const conjunto = (row.conjunto || "").trim();
   const anuncio = (row.anuncio || "").trim();
+  const formulario = (row.formulario || "").trim();
   const externalId = (row.externalId || "").trim();
 
   if (nome.length < 2) errors.push("Nome deve ter ao menos 2 caracteres");
@@ -134,7 +137,7 @@ function validateRow(row: RawRow, index: number, type: ImportType): { normalized
 
   return {
     normalized: {
-      nome, email, telefone, operadora, campanha, conjunto, anuncio,
+      nome, email, telefone, operadora, campanha, conjunto, anuncio, formulario,
       externalId,
       capturedAt: parseDate(row.data),
       tipo: type === "pf" ? (row.tipoPlano || "").trim() : (row.tipoCnpj || "").trim(),
@@ -298,8 +301,9 @@ export async function importMetaLeads(
           telefone: String(raw[normalizedHeaders.get("telefone") ?? ""] ?? ""),
           operadora: String(raw[normalizedHeaders.get("operadora") ?? ""] ?? ""),
           campanha: String(raw[normalizedHeaders.get("nome da campanha") ?? ""] ?? ""),
-          conjunto: String(raw[normalizedHeaders.get("nome do conjunto de anúncio") ?? ""] ?? ""),
-          anuncio: String(raw[normalizedHeaders.get("nome do anúncio") ?? ""] ?? ""),
+          conjunto: String(raw[normalizedHeaders.get("nome do conjunto de anuncio") ?? ""] ?? ""),
+          anuncio: String(raw[normalizedHeaders.get("nome do anuncio") ?? ""] ?? ""),
+          formulario: String(raw[normalizedHeaders.get("nome do formulario") ?? normalizedHeaders.get("formulario") ?? ""] ?? ""),
           externalId: String(raw[normalizedHeaders.get("id") ?? ""] ?? ""),
           data: String(raw[normalizedHeaders.get("data") ?? ""] ?? ""),
           tipoPlano: type === "pf" ? String(raw[normalizedHeaders.get("tipo de plano") ?? ""] ?? "") : undefined,
@@ -326,6 +330,7 @@ export async function importMetaLeads(
             campanha: item.normalized.campanha || undefined,
             conjunto: item.normalized.conjunto || undefined,
             anuncio: item.normalized.anuncio || undefined,
+            formulario: item.normalized.formulario || undefined,
             external_id: item.normalized.externalId || undefined,
             tipo: item.normalized.tipo || undefined,
           };
@@ -342,6 +347,7 @@ export async function importMetaLeads(
             sourceChannel: "meta_ads",
             sourceCampaign: item.normalized.campanha || null,
             sourceAd: item.normalized.anuncio || null,
+            sourceForm: item.normalized.formulario || "Formulário Direct",
             sourceMetadata,
             externalId: item.normalized.externalId || null,
             capturedAt,

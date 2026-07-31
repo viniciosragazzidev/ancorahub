@@ -97,6 +97,12 @@ export async function discoverMetaAssetsFromAuthCode(code: string, redirectUri: 
   return client.discoverAssets();
 }
 
+/** Descobrir ativos Meta fornecendo o Access Token diretamente */
+export async function discoverMetaAssetsFromToken(token: string): Promise<MetaDiscoveredAssets> {
+  const client = new MetaGraphClient(token.trim());
+  return client.discoverAssets();
+}
+
 /** Salva/Confirma a conexão Meta do tenant com os ativos selecionados */
 export async function confirmMetaConnection(payload: {
   authCode?: string;

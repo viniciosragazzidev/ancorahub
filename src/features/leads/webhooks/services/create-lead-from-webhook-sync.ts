@@ -28,6 +28,8 @@ export type CreateLeadFromWebhookSyncInput = {
     campaign?: string | null;
     ad?: string | null;
     form?: string | null;
+    /** Hora real de captura no anúncio (ex.: created_time da Meta). Fallback: receivedAt. */
+    capturedAt?: Date;
     metadata?: Record<string, string | number | boolean | null>;
   };
 };
@@ -103,7 +105,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         sourceAd: input.leadSource.ad ?? null,
         sourceForm: input.leadSource.form ?? null,
         sourceMetadata: input.leadSource.metadata ?? null,
-        capturedAt: receivedAt,
+        capturedAt: input.leadSource.capturedAt ?? receivedAt,
       } : {}),
     });
     await tx.insert(schema.leadInteractions).values({

@@ -51,7 +51,14 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   const nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
   const telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
   const email = firstField(fields, ["email", "email_address", "e_mail"]);
-  return { nome, telefone, email, externalId: record.id ?? "", adId: record.ad_id ?? null, formId: record.form_id ?? null };
+  return {
+    nome, telefone, email,
+    externalId: record.id ?? "",
+    adId: record.ad_id ?? null,
+    formId: record.form_id ?? null,
+    /** ISO 8601 retornado pela Meta — quando o lead foi realmente capturado no anúncio. */
+    createdTime: record.created_time ?? null,
+  };
 }
 
 async function fetchMetaLead(leadgenId: string): Promise<MetaLeadAdRecord> {
@@ -120,7 +127,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           tenantId: source.tenantId, branchId: source.branchId, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
-          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, ad: lead.adId, form: lead.formId, metadata: { pageId: entry.id } },
+          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, ad: lead.adId, form: lead.formId, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: entry.id } },
         });
         if (!result.success) throw new Error(result.code);
         await db.update(schema.metaLeadAdSources).set({ lastLeadAt: receivedAt, lastError: null, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));

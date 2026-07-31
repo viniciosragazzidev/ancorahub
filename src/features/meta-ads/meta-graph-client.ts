@@ -86,20 +86,8 @@ export class MetaGraphClient {
         datasets: [],
       };
     } catch (err: any) {
-      // Retorna estrutura mock para desenvolvimento se as credenciais da Meta não forem reais
-      return {
-        business: { id: "biz_mock_123", name: "Imobiliária Demo Meta" },
-        pages: [{ id: "page_mock_456", name: "Página Principal Facebook" }],
-        adAccounts: [{ id: "act_mock_789", name: "Conta Principal Ads", currency: "BRL", accountStatus: 1 }],
-        whatsapp: {
-          wabaId: "waba_mock_101",
-          phoneNumberId: "phone_mock_202",
-          displayPhoneNumber: "+55 11 99999-8888",
-          verifiedName: "Atendimento Imobiliária",
-        },
-        pixels: [{ id: "px_mock_303", name: "Pixel Principal" }],
-        datasets: [{ id: "ds_mock_404", name: "Dataset Conversões" }],
-      };
+      console.error("[MetaGraphClient] Error discovering assets:", err);
+      throw new Error(`Falha ao consultar ativos na Graph API da Meta: ${err?.message || "Token inválido ou sem permissões suficentes."}`);
     }
   }
 

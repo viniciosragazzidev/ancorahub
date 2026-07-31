@@ -22,16 +22,20 @@ export async function exchangeCodeForLongLivedToken(authCode: string, redirectUr
   expiresIn: number;
   tokenType: string;
 }> {
-  const appId = process.env.META_APP_ID;
-  const appSecret = process.env.META_APP_SECRET;
-
-  if (!appId || !appSecret) {
-    // Development fallback mock token if keys aren't set in local env yet
+  // Se o código informado já for um User Access Token ou System User Token da Meta
+  if (authCode.startsWith("EAA") || authCode.startsWith("EAAB") || authCode.length > 50) {
     return {
-      accessToken: `EAA_MOCK_META_TOKEN_${randomUUID()}`,
-      expiresIn: 5184000, // 60 days
+      accessToken: authCode,
+      expiresIn: 5184000,
       tokenType: "bearer",
     };
+  }
+
+  const appId = process.env.META_APP_ID || process.env.META_WHATSAPP_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID || "780859815090303";
+  const appSecret = process.env.META_APP_SECRET || process.env.META_WHATSAPP_APP_SECRET;
+
+  if (!appId || !appSecret) {
+    throw new Error("As variáveis de ambiente META_APP_ID e META_APP_SECRET não estão configuradas no servidor.");
   }
 
   // 1. Exchange auth code for short-lived token
