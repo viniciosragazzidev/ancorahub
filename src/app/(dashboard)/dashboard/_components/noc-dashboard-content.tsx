@@ -1278,95 +1278,98 @@ const activities = [
         </div>
       </section>
 
-      {/* Leads */}
-      <Card className="rounded-xl border-border/70 bg-card shadow-none">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Minha Carteira de Leads</CardTitle>
-              <CardDescription>Leads sob sua responsabilidade</CardDescription>
+      {/* ─── ZONA 4: CARTEIRA DE LEADS & EVOLUÇÃO COMERCIAL (SIDE-BY-SIDE) ─── */}
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
+        {/* Minha Carteira de Leads (col-span-5) */}
+        <Card className="rounded-xl border-border/70 bg-card shadow-none lg:col-span-5 flex flex-col justify-between">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Minha Carteira de Leads</CardTitle>
+                <CardDescription>Leads sob sua responsabilidade</CardDescription>
+              </div>
+              <Button render={<Link href="/leads" />} size="sm" variant="outline" className="text-xs h-8">
+                Ver Todos
+              </Button>
             </div>
-            <Button render={<Link href="/leads" />} size="sm" variant="outline" className="text-xs h-8">
-              Ver Todos
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y divide-border/40">
-            {data.leads.slice(0, 5).map((lead) => (
-              <div key={lead.id} className="flex items-center justify-between px-6 py-3 hover:bg-muted/20 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{lead.name}</p>
-                  <p className="text-xs text-muted-foreground">{lead.phone} • {lead.source || "Manual"}</p>
+          </CardHeader>
+          <CardContent className="p-0 flex-1 flex flex-col justify-between">
+            <div className="divide-y divide-border/40">
+              {data.leads.slice(0, 5).map((lead) => (
+                <div key={lead.id} className="flex items-center justify-between px-5 py-3 hover:bg-muted/20 transition-colors">
+                  <div className="min-w-0 pr-2">
+                    <p className="text-sm font-medium text-foreground truncate">{lead.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{lead.phone} • {lead.source || "Manual"}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <LeadStatusBadge status={lead.status} />
+                    <Button render={<Link href={`/conversas?leadId=${lead.id}`} />} size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                      Atender
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <LeadStatusBadge status={lead.status} />
-                  <Button render={<Link href={`/conversas?leadId=${lead.id}`} />} size="sm" variant="ghost" className="h-7 text-xs">
-                    Atender
-                  </Button>
+              ))}
+              {data.leads.length === 0 && (
+                <div className="p-8 text-center text-xs text-muted-foreground">
+                  Nenhum lead atribuído no momento.
                 </div>
-              </div>
-            ))}
-            {data.leads.length === 0 && (
-              <div className="p-8 text-center text-xs text-muted-foreground">
-                Nenhum lead atribuído no momento.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Broker Personal Performance Chart */}
-      <Card className="rounded-xl border-border/70 bg-card shadow-none">
-        <CardHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Minha Evolução Comercial</CardTitle>
-              <CardDescription>Evolução diária de atendimentos e conversões (30 dias)</CardDescription>
+        {/* Minha Evolução Comercial (col-span-7 - 20% maior que o do lado) */}
+        <Card className="rounded-xl border-border/70 bg-card shadow-none lg:col-span-7 flex flex-col">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Minha Evolução Comercial</CardTitle>
+                <CardDescription>Evolução diária de atendimentos e conversões (30 dias)</CardDescription>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block size-2.5 rounded-full bg-chart-1" />
+                  Leads Recebidos
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block size-2.5 rounded-full bg-chart-5" />
+                  Vendas Concluídas
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block size-2.5 rounded-full bg-chart-1" />
-                Leads Atribuídos
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block size-2.5 rounded-full bg-chart-5" />
-                Vendas Concluídas
-              </span>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-center">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="brokerLeadsGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="brokerConvertedGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--chart-5)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="var(--chart-5)" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(val) => val ? `${val.split('-')[2]}/${val.split('-')[1]}` : ''}
+                    tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltipWrapper />} cursor={{ stroke: "var(--border)", strokeDasharray: "3 3" }} />
+                  <Area type="monotone" dataKey="leads" name="Leads Recebidos" fill="url(#brokerLeadsGrad)" stroke="var(--chart-1)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="converted" name="Vendas Concluídas" fill="url(#brokerConvertedGrad)" stroke="var(--chart-5)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="brokerLeadsGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.0} />
-                  </linearGradient>
-                  <linearGradient id="brokerConvertedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-5)" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="var(--chart-5)" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(val) => val ? `${val.split('-')[2]}/${val.split('-')[1]}` : ''}
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltipWrapper />} cursor={{ stroke: "var(--border)", strokeDasharray: "3 3" }} />
-                <Area type="monotone" dataKey="leads" name="Leads Recebidos" fill="url(#brokerLeadsGrad)" stroke="var(--chart-1)" strokeWidth={2} />
-                <Area type="monotone" dataKey="converted" name="Vendas Concluídas" fill="url(#brokerConvertedGrad)" stroke="var(--chart-5)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* Activity Feed + Stats */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] items-stretch">
