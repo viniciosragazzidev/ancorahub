@@ -7,6 +7,15 @@ import { ArrowsClockwise, Lightning, ShieldCheck } from "@/components/huge-icons
 import { Button } from "@/components/ui/button";
 import { setSuperAdminRoleOverrideAction } from "@/features/super-admin/role-impersonation-actions";
 import type { RoleOverrideOption } from "@/features/super-admin/role-impersonation";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SuperAdminRoleSwitcherProps = {
   activeOverride: string | null | undefined;
@@ -49,49 +58,54 @@ export function SuperAdminRoleSwitcher({ activeOverride }: SuperAdminRoleSwitche
   const isSimulating = activeOverride && activeOverride !== "none";
 
   return (
-    <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/5 p-2.5 space-y-2 text-left">
-      <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-        <span className="flex items-center gap-1.5 truncate">
-          <Lightning className="size-3.5 shrink-0 text-amber-500" /> Modo Super-Admin
-        </span>
-        {isSimulating && (
-          <span className="size-2 rounded-full bg-amber-500 animate-pulse shrink-0" title="Simulação Ativa" />
-        )}
-      </div>
-
-      <div className="space-y-1">
-        <div className="relative">
-          <select
-            value={selectedRole}
-            onChange={(e) => handleRoleChange(e.target.value as RoleOverrideOption)}
-            disabled={isPending}
-            className="w-full h-8 rounded-lg border border-amber-500/20 bg-background text-foreground text-xs font-medium pl-2.5 pr-7 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer truncate shadow-2xs"
+    <div className="fixed bottom-24 right-6 max-[559px]:bottom-32 max-[559px]:right-3 z-50">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-12 rounded-full shadow-lg border-border bg-popover hover:bg-muted relative"
           >
+            <Lightning className="size-5 text-foreground" />
+            {isSimulating && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+              </span>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="top" className="w-56">
+          <DropdownMenuLabel className="text-xs font-bold flex items-center justify-between">
+            Modo Super-Admin
+            {isPending && <ArrowsClockwise className="size-3.5 animate-spin text-muted-foreground" />}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuRadioGroup value={selectedRole} onValueChange={(v) => handleRoleChange(v as RoleOverrideOption)}>
             {ROLE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <DropdownMenuRadioItem key={opt.value} value={opt.value} disabled={isPending} className="text-xs">
                 {opt.label}
-              </option>
+              </DropdownMenuRadioItem>
             ))}
-          </select>
-          {isPending && (
-            <div className="absolute right-2 top-2">
-              <ArrowsClockwise className="size-3.5 animate-spin text-amber-500" />
-            </div>
+          </DropdownMenuRadioGroup>
+          {isSimulating && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="p-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRoleChange("none")}
+                  disabled={isPending}
+                  className="w-full h-7 text-[10px] font-semibold gap-1 px-1 justify-start text-muted-foreground hover:text-foreground"
+                >
+                  <ShieldCheck className="size-3" /> Restaurar Cargo Real
+                </Button>
+              </div>
+            </>
           )}
-        </div>
-      </div>
-
-      {isSimulating && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleRoleChange("none")}
-          disabled={isPending}
-          className="w-full h-6 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 font-semibold gap-1 px-1"
-        >
-          <ShieldCheck className="size-3" /> Restaurar Cargo Real
-        </Button>
-      )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

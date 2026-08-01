@@ -171,9 +171,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
         </Link>
 
         {user?.isPlatformAdmin && (
-          <div className="group-data-[collapsible=icon]:hidden">
-            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
-          </div>
+          <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
         )}
 
         {onDuty ? (

@@ -23,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("border-b border-border/70 bg-muted/25 [&_tr]:border-b", className)}
+      className={cn("border-b border-border/70 [&_tr]:border-b", className)}
       {...props}
     />
   )
@@ -70,7 +70,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 px-3.5 text-left align-middle text-[11px] font-medium text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "py-3 px-3.5 text-left align-middle text-[11px] font-medium text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

@@ -129,7 +129,7 @@ export function LeadsFilters({
       {/* Top Search Bar + Filter Trigger */}
       <div className="flex w-full items-center gap-2">
         <form
-          className="relative flex-1"
+          className="relative flex-1 max-w-[300px]"
           onSubmit={(e) => {
             e.preventDefault();
             applyFilters();
@@ -157,7 +157,7 @@ export function LeadsFilters({
             )}
           </PopoverTrigger>
 
-          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 sm:w-96 p-0 rounded-2xl border border-border/80 bg-card shadow-2xl backdrop-blur-2xl">
+          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 sm:w-96 p-0 rounded-2xl border border-border/80 bg-popover shadow-2xl backdrop-blur-2xl">
             <div className="flex items-center justify-between border-b border-border/70 p-3.5">
               <div className="flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">

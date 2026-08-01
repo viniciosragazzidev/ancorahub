@@ -119,8 +119,9 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <AvailabilityToggle initialStatus={data.availabilityStatus} />
-            <Button render={<Link href="/leads" />} size="sm" className="h-9 gap-1.5 text-xs font-semibold">
-              <Plus className="size-4" /> Novo Lead
+            <Button render={<Link href="/leads" />} className="h-9 gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[11px] font-semibold uppercase text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/40 hover:bg-emerald-500/15 dark:text-emerald-400">
+              <Plus className="size-4 shrink-0 text-emerald-500" />
+              <span className="truncate tracking-wide">Novo Lead</span>
             </Button>
           </div>
         </div>
