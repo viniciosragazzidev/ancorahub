@@ -101,7 +101,7 @@
   --input: oklch(0.940 0.005 95);
   --ring: oklch(0.180 0.005 95);
 
-  --sidebar: oklch(0.965 0.003 95);
+  --sidebar: oklch(0.940 0.005 95 / 0.7); /* Matching cards background */
   --sidebar-foreground: oklch(0.180 0.005 95);
   --sidebar-primary: oklch(0.180 0.005 95);
   --sidebar-primary-foreground: oklch(0.985 0.002 95);
@@ -309,7 +309,7 @@
   --input: oklch(0.290 0.008 260);
   --ring: oklch(0.960 0.003 260);
 
-  --sidebar: oklch(0.140 0.005 260);
+  --sidebar: oklch(0.240 0.008 260 / 0.7); /* Matching cards background */
   --sidebar-foreground: oklch(0.960 0.003 260);
   --sidebar-primary: oklch(0.960 0.003 260);
   --sidebar-primary-foreground: oklch(0.140 0.005 260);
