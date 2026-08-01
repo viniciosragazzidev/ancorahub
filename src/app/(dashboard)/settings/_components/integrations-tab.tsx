@@ -140,7 +140,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
 
   return <div className="space-y-5">
     <Card className="border-transparent bg-transparent shadow-none">
-      <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Meta Business</p><p className="mt-1 text-sm text-muted-foreground">Conecte o WhatsApp oficial da empresa e deixe IDs de página, anúncios e conversões prontos para uso.</p></div><Button render={<Link href="/settings/meta" />}>Abrir integração Meta</Button></CardContent>
+      <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Catálogo de integrações</p><p className="mt-1 text-sm text-muted-foreground">Escolha Meta, WhatsApp, fontes de site e os próximos conectores da operação.</p></div><Button render={<Link href="/settings/integrations" />}>Abrir integrações</Button></CardContent>
     </Card>
   <Tabs className="gap-5" defaultValue="sources">
     <TabsList variant="line" className="w-full justify-start border-b border-border">

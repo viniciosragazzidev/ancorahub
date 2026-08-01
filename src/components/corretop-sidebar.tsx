@@ -88,7 +88,7 @@ const navSections: SidebarSection[] = [
     items: [
       { label: "Campanhas Meta", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
       { label: "Importações Meta", icon: FileArrowDown, url: "/marketing/importacoes", permission: "ver_importacoes_meta" },
-      { label: "Integração Meta", icon: WifiHigh, url: "/settings/meta", permission: "acessar_integracao_meta" },
+      { label: "Integrações", icon: WifiHigh, url: "/settings/integrations", permission: "acessar_integracao_meta" },
       { label: "Comissões", icon: CurrencyCircleDollar, url: "/configuracoes/comissoes", permission: "gerenciar_comissoes" },
       { label: "Catálogo Global", icon: FolderSimple, url: "/catalogo", permission: "acessar_catalogo" },
       { label: "Materiais", icon: Megaphone, url: "/materiais-divulgacao", permission: "acessar_materiais_divulgacao" },

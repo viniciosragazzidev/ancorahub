@@ -49,8 +49,8 @@ export function SuperAdminRoleSwitcher({ activeOverride }: SuperAdminRoleSwitche
           );
           router.refresh();
         }
-      } catch (err: any) {
-        toast.error(err?.message || "Falha ao alterar cargo simulado.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Falha ao alterar cargo simulado.");
       }
     });
   };
@@ -60,8 +60,7 @@ export function SuperAdminRoleSwitcher({ activeOverride }: SuperAdminRoleSwitche
   return (
     <div className="fixed bottom-24 right-6 max-[559px]:bottom-32 max-[559px]:right-3 z-50">
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
+        <DropdownMenuTrigger render={<Button
             size="icon"
             variant="outline"
             className="size-12 rounded-full shadow-lg border-border bg-popover hover:bg-muted relative"
@@ -73,8 +72,7 @@ export function SuperAdminRoleSwitcher({ activeOverride }: SuperAdminRoleSwitche
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
               </span>
             )}
-          </Button>
-        </DropdownMenuTrigger>
+          </Button>} />
         <DropdownMenuContent align="end" side="top" className="w-56">
           <DropdownMenuLabel className="text-xs font-bold flex items-center justify-between">
             Modo Super-Admin
@@ -109,4 +107,3 @@ export function SuperAdminRoleSwitcher({ activeOverride }: SuperAdminRoleSwitche
     </div>
   );
 }
-
