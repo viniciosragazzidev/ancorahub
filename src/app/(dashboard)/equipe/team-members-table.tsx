@@ -184,7 +184,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
   ];
 
   return (
-    <Card className="border-border bg-card shadow-xs">
+    <Card className="border-transparent bg-transparent shadow-none">
       <CardHeader className="border-b border-border/50 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>

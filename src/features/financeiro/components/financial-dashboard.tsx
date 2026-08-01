@@ -103,7 +103,7 @@ function SummaryCard({
       whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
       whileTap={{ scale: 0.995 }}
     >
-      <Card className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm">
+      <Card className="group/card border-transparent bg-transparent shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-none">
         <CardHeader className="pb-1">
           <div className="flex items-center justify-between">
             <CardDescription className="transition-colors duration-200 group-hover/card:text-foreground">
@@ -198,7 +198,7 @@ export function FinancialDashboard({ data, role }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}
           className="lg:col-span-4"
         >
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -295,7 +295,7 @@ export function FinancialDashboard({ data, role }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.16 }}
           className="lg:col-span-3"
         >
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Resumo do período</CardTitle>
               <CardDescription>Mês atual ({monthlyTrend[monthlyTrend.length - 1]?.month ?? "—"})</CardDescription>
@@ -387,7 +387,7 @@ export function FinancialDashboard({ data, role }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.24 }}
           className="lg:col-span-4"
         >
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -503,7 +503,7 @@ export function FinancialDashboard({ data, role }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.32 }}
           className="lg:col-span-3"
         >
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Próximos Repasses</CardTitle>
               <CardDescription>
@@ -570,7 +570,7 @@ export function FinancialDashboard({ data, role }: Props) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.4 }}
       >
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -676,7 +676,7 @@ export function FinancialDashboard({ data, role }: Props) {
       </motion.div>
 
       {(role === "director" || role === "manager") && (
-        <Card className="border-amber-500/30 bg-card shadow-none">
+        <Card className="border-amber-500/30 bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Fila de chargeback</CardTitle>
             <CardDescription>

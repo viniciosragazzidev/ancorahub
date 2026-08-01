@@ -225,7 +225,7 @@ export default function SuperAdminAuditPage() {
 
         {/* Tab Content */}
         {activeTab === "platform" && (
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 p-4">
               <div>
                 <CardTitle className="text-base">Eventos da Plataforma</CardTitle>
@@ -251,7 +251,7 @@ export default function SuperAdminAuditPage() {
         )}
 
         {activeTab === "tenant" && (
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 p-4">
               <div>
                 <CardTitle className="text-base">Eventos de Operação do Tenant</CardTitle>
@@ -278,7 +278,7 @@ export default function SuperAdminAuditPage() {
 
         {activeTab === "evidence" && (
           <div className="space-y-4">
-            <Card className="border-border bg-card shadow-xs">
+            <Card className="border-transparent bg-transparent shadow-none">
               <CardHeader>
                 <CardTitle className="text-base">Dossiê Forense de Evidências</CardTitle>
                 <CardDescription className="text-xs">Consolide todo o histórico de logs, timeline e arquivos do lead em um arquivo único para auditorias.</CardDescription>
@@ -304,7 +304,7 @@ export default function SuperAdminAuditPage() {
             </Card>
 
             {evidenceReport && (
-              <Card className="border-border bg-card shadow-xs">
+              <Card className="border-transparent bg-transparent shadow-none">
                 <CardHeader className="border-b border-border/50 p-4">
                   <CardTitle className="text-sm font-semibold">Evidências: {evidenceReport.lead.nome}</CardTitle>
                   <CardDescription className="text-[10px] font-mono mt-0.5">Exportado em: {new Date(evidenceReport.exportedAt).toLocaleString("pt-BR")}</CardDescription>
@@ -318,7 +318,7 @@ export default function SuperAdminAuditPage() {
         )}
 
         {activeTab === "lgpd" && (
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle className="text-base">Expurgo Governança LGPD</CardTitle>
               <CardDescription className="text-xs">Anonimize de forma permanente um usuário deletando suas conexões ativas, dados pessoais e acessos por requisição judicial ou de titularidade.</CardDescription>

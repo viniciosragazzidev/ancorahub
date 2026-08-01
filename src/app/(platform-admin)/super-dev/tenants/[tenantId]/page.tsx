@@ -36,7 +36,7 @@ export default async function SuperDevTenantDetailPage({
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="space-y-6">
-            <Card className="border-border bg-card shadow-none">
+            <Card className="border-transparent bg-transparent shadow-none">
               <CardHeader>
                 <CardTitle>{tenant.name}</CardTitle>
                 <CardDescription>{tenant.legalName ?? "Razão social não informada"}</CardDescription>
@@ -59,7 +59,7 @@ export default async function SuperDevTenantDetailPage({
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card className="border-transparent bg-transparent shadow-none">
               <CardHeader>
                 <CardTitle>Filiais cadastradas</CardTitle>
                 <CardDescription>Estrutura territorial da corretora.</CardDescription>
@@ -88,7 +88,7 @@ export default async function SuperDevTenantDetailPage({
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card className="border-transparent bg-transparent shadow-none">
               <CardHeader>
                 <CardTitle>Membros com acesso</CardTitle>
                 <CardDescription>Visão geral dos colaboradores vinculados a esta corretora.</CardDescription>
@@ -124,7 +124,7 @@ export default async function SuperDevTenantDetailPage({
             </Card>
           </div>
 
-          <Card className="border-border bg-card shadow-none h-fit">
+          <Card className="border-transparent bg-transparent shadow-none h-fit">
             <CardHeader>
               <CardTitle>Criar acesso inicial</CardTitle>
               <CardDescription>Crie o primeiro usuário/administrador da corretora.</CardDescription>

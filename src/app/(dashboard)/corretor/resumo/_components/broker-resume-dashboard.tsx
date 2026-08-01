@@ -127,7 +127,7 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
 
         {/* ─── 1. CARD DE PRÓXIMA AÇÃO DA OPERAÇÃO ─── */}
         {nextActionLead ? (
-          <Card className="relative overflow-hidden border border-primary/20 bg-primary text-primary-foreground shadow-sm rounded-xl">
+          <Card className="relative overflow-hidden border border-primary/20 bg-primary text-primary-foreground shadow-none rounded-xl">
             <CardContent className="flex flex-col gap-3 p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between relative z-10">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-border/60 bg-card p-4 shadow-xs">
+          <Card className="border-transparent bg-transparent p-4 shadow-none">
             <div className="flex items-center gap-3">
               <CheckCircle className="size-5 text-emerald-500" />
               <div>
@@ -176,7 +176,7 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
         </section>
 
         {/* ─── 3. TENDÊNCIA DE LEADS ─── */}
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Tendência de leads</CardTitle>
             <CardDescription>Últimos 30 dias · Recebidos vs. Convertidos na sua carteira</CardDescription>
@@ -188,7 +188,7 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
 
         {/* ─── 4. MINHA FILA (Tabela de Atendimento) ─── */}
         <section id="minha-fila">
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
               <div>
                 <CardTitle className="text-base font-bold">Minha Fila de Atendimento</CardTitle>

@@ -53,7 +53,7 @@ export default async function SuperDevIntegrityPage() {
 
         {/* Status Summary */}
         <section className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="pb-2">
               <CardDescription>Empresas ativas</CardDescription>
             </CardHeader>
@@ -61,7 +61,7 @@ export default async function SuperDevIntegrityPage() {
               <p className="text-2xl font-bold tabular-nums">{tenantCount[0]?.count ?? 0}</p>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="pb-2">
               <CardDescription>Total de leads</CardDescription>
             </CardHeader>
@@ -69,7 +69,7 @@ export default async function SuperDevIntegrityPage() {
               <p className="text-2xl font-bold tabular-nums">{leadCount[0]?.count ?? 0}</p>
             </CardContent>
           </Card>
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="pb-2">
               <CardDescription>Eventos auditados</CardDescription>
             </CardHeader>
@@ -81,7 +81,7 @@ export default async function SuperDevIntegrityPage() {
         </section>
 
         {/* Audit Logs */}
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Eventos de Auditoria</CardTitle>
             <CardDescription>Registro detalhado de alterações e acessos no sistema</CardDescription>

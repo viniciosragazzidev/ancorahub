@@ -231,7 +231,7 @@ export function WebhookTutorial() {
       <section className="mb-8">
         <h2 className="mb-4 text-xl font-semibold">Referência de campos</h2>
 
-        <Card className="mb-4 border-border">
+        <Card className="mb-4 border-transparent">
           <CardHeader>
             <CardTitle className="text-base">Campos obrigatórios</CardTitle>
           </CardHeader>
@@ -248,7 +248,7 @@ export function WebhookTutorial() {
           </CardContent>
         </Card>
 
-        <Card className="border-border">
+        <Card className="border-transparent">
           <CardHeader>
             <CardTitle className="text-base">Campos opcionais</CardTitle>
           </CardHeader>
@@ -271,7 +271,7 @@ export function WebhookTutorial() {
       {/* Response Codes */}
       <section className="mb-8">
         <h2 className="mb-4 text-xl font-semibold">Códigos de resposta</h2>
-        <Card className="border-border">
+        <Card className="border-transparent">
           <CardContent className="p-0">
             <div className="divide-y divide-border">
               {responseCodes.map((r) => (

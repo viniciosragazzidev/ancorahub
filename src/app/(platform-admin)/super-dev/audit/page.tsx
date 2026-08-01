@@ -140,7 +140,7 @@ export default function SuperDevAuditPage() {
 
         {/* Tab Content */}
         {activeTab === "platform" && (
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Eventos da Plataforma</CardTitle>
@@ -187,7 +187,7 @@ export default function SuperDevAuditPage() {
         )}
 
         {activeTab === "tenant" && (
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Eventos de Auditoria das Operadoras</CardTitle>
@@ -234,7 +234,7 @@ export default function SuperDevAuditPage() {
         )}
 
         {activeTab === "evidence" && (
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Relatório de Evidências do Lead</CardTitle>
               <CardDescription>Dumps estruturados e consolidados de todas as interações e documentos do lead para auditorias criminais e comerciais.</CardDescription>
@@ -303,7 +303,7 @@ export default function SuperDevAuditPage() {
         )}
 
         {activeTab === "lgpd" && (
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="flex flex-row items-start gap-3">
               <ShieldWarning className="size-6 text-warning mt-0.5 shrink-0" />
               <div>

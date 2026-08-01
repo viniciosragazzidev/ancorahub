@@ -158,7 +158,7 @@ export function MaterialsManager({ materials }: { materials: Material[] }) {
       </div>
 
       {showForm && (
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle>{editingId ? "Editar material" : "Novo material"}</CardTitle>
@@ -309,7 +309,7 @@ export function MaterialsManager({ materials }: { materials: Material[] }) {
         </Card>
       )}
 
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-transparent bg-transparent shadow-none">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

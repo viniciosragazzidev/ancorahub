@@ -35,7 +35,7 @@ export default async function SuperDevTenantsPage() {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Corretoras cadastradas</CardTitle>
               <CardDescription>{tenants.length} empresa(s) registradas.</CardDescription>
@@ -93,7 +93,7 @@ export default async function SuperDevTenantsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card shadow-none h-fit">
+          <Card className="border-transparent bg-transparent shadow-none h-fit">
             <CardHeader>
               <CardTitle>Nova empresa</CardTitle>
               <CardDescription>Registre uma nova corretora.</CardDescription>

@@ -21,7 +21,7 @@ export default async function SuperAdminOnboardingPage({ searchParams }: { searc
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Pesquise por nome, e-mail ou ID. O reset reativa todas as apresentações de todas as rotas daquele usuário na corretora selecionada, sem apagar o histórico da operação.</p>
         </section>
 
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader><CardTitle>Encontrar usuário</CardTitle><CardDescription>A busca é executada no servidor e mostra somente vínculos administrativos necessários para escolher o escopo.</CardDescription></CardHeader>
           <CardContent>
             <form className="flex flex-col gap-2 sm:flex-row" method="get">
@@ -32,7 +32,7 @@ export default async function SuperAdminOnboardingPage({ searchParams }: { searc
         </Card>
 
         {q && (
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader><CardTitle>Resultados</CardTitle><CardDescription>{users.length} vínculo(s) encontrado(s) para “{q}”.</CardDescription></CardHeader>
             <CardContent className="p-0">
               <Table>

@@ -165,7 +165,7 @@ export function MetaIntegrationView({
   return (
     <div className="space-y-6">
       {/* ─── STATUS DA INTEGRAÇÃO ─── */}
-      <Card className="rounded-2xl border border-border bg-card p-6 shadow-none">
+      <Card className="rounded-2xl border border-transparent bg-transparent p-6 shadow-none">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <div className={`flex size-12 items-center justify-center rounded-xl ${isConnected ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground"}`}>
@@ -248,7 +248,7 @@ export function MetaIntegrationView({
       </div>
 
       {/* ─── ATIVOS SELECIONADOS NO EMBEDDED SIGNUP (PRODUTOS) ─── */}
-      <Card className="rounded-xl border border-border/70 bg-card shadow-none">
+      <Card className="rounded-xl border border-transparent bg-transparent shadow-none">
         <CardHeader>
           <CardTitle className="text-base font-bold">Produtos Ativados no Embedded Signup v4</CardTitle>
           <CardDescription className="text-xs">
@@ -272,7 +272,7 @@ export function MetaIntegrationView({
       </Card>
 
       {/* ─── AUDITORIA DE SINCRONIZAÇÕES (LOGS) ─── */}
-      <Card className="rounded-xl border border-border/70 bg-card shadow-none">
+      <Card className="rounded-xl border border-transparent bg-transparent shadow-none">
         <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
           <div>
             <CardTitle className="text-base font-bold">Logs de Sincronização & Auditoria</CardTitle>

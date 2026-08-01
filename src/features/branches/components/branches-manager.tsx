@@ -173,7 +173,7 @@ export function BranchesManager({
           animationDelay={0.18}
         />
       </div>
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-transparent bg-transparent shadow-none">
         <CardHeader className="flex flex-col gap-3 border-b border-border sm:flex-row sm:items-end sm:justify-between"><div><CardTitle>Filiais da corretora</CardTitle><CardDescription>Edite dados, acompanhe a equipe vinculada e controle quais filiais recebem leads.</CardDescription></div><CreateBranchSheet /></CardHeader>
         <CardContent className="p-0">
           {branches.length === 0 ? (

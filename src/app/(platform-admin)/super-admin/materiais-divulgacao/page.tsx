@@ -40,7 +40,7 @@ export default async function SuperAdminMaterialsPage() {
           </p>
         </section>
 
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Materiais por empresa</CardTitle>
             <CardDescription>

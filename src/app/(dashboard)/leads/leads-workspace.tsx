@@ -389,7 +389,7 @@ export function LeadsWorkspace({
         </div>
 
         <TabsContent value="list" className="mt-4">
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardContent className="p-0">
               <div className="hidden divide-y divide-border max-[559px]:block">
                 {leads.map((lead) => (

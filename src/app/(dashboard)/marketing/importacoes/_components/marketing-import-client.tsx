@@ -243,7 +243,7 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
         {/* Left column */}
         <div className="grid gap-6">
           {/* Action Card */}
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -290,7 +290,7 @@ export function MarketingImportClient({ branches, history, lastImport, role, bra
         </div>
 
         {/* Right Column - History */}
-        <Card className="h-fit border-border bg-card shadow-none">
+        <Card className="h-fit border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Histórico de importações</CardTitle>
             <CardDescription>Últimas 50 importações realizadas.</CardDescription>

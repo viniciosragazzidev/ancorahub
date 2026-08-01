@@ -35,7 +35,7 @@ export default async function SuperAdminTenantDetailPage({
         </Link>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>{tenant.name}</CardTitle>
               <CardDescription>{tenant.legalName ?? "Razão social não informada"}</CardDescription>
@@ -58,7 +58,7 @@ export default async function SuperAdminTenantDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Filiais</CardTitle>
               <CardDescription>
@@ -71,7 +71,7 @@ export default async function SuperAdminTenantDetailPage({
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Membros com acesso</CardTitle>
               <CardDescription>Visão somente leitura dos logins vinculados a esta corretora.</CardDescription>
@@ -113,7 +113,7 @@ export default async function SuperAdminTenantDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="border-border bg-card shadow-none h-fit">
+          <Card className="border-transparent bg-transparent shadow-none h-fit">
             <CardHeader>
               <CardTitle>Adicionar acesso</CardTitle>
               <CardDescription>Cria diretamente um login inicial para esta empresa.</CardDescription>

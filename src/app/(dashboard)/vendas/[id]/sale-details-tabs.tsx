@@ -95,7 +95,7 @@ export function SaleDetailsTabs({ sale, schedule, canManage }: SaleDetailProps) 
 
       {/* Tab 1: Schedule Table */}
       <TabsContent value="schedule" className="space-y-4 m-0 focus-visible:outline-none">
-        <Card className="border-border bg-card shadow-xs transition-all">
+        <Card className="border-transparent bg-transparent shadow-none transition-all">
           <CardHeader className="border-b border-border/50 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
@@ -119,7 +119,7 @@ export function SaleDetailsTabs({ sale, schedule, canManage }: SaleDetailProps) 
       <TabsContent value="info" className="space-y-6 m-0 focus-visible:outline-none">
         <div className="grid gap-6 md:grid-cols-2">
           {/* Card 1: Participantes */}
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="border-b border-border/40 pb-3">
               <div className="flex items-center gap-2 text-primary">
                 <Users className="size-5" />
@@ -144,7 +144,7 @@ export function SaleDetailsTabs({ sale, schedule, canManage }: SaleDetailProps) 
           </Card>
 
           {/* Card 2: Produto e Regra */}
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="border-b border-border/40 pb-3">
               <div className="flex items-center gap-2 text-primary">
                 <Handshake className="size-5" />
@@ -179,7 +179,7 @@ export function SaleDetailsTabs({ sale, schedule, canManage }: SaleDetailProps) 
       {/* Tab 3: Notes if present */}
       {sale.notes && (
         <TabsContent value="notes" className="space-y-4 m-0 focus-visible:outline-none">
-          <Card className="border-border bg-card shadow-xs">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="border-b border-border/40 pb-3">
               <div className="flex items-center gap-2 text-primary">
                 <ListChecks className="size-5" />

@@ -26,7 +26,7 @@ export default async function SuperAdminCatalogPage() {
           </p>
         </section>
 
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Capacidades do domínio</CardTitle>
             <CardDescription>Controles globais e reversíveis. Desativar bloqueia novas consultas sem apagar o histórico.</CardDescription>
@@ -41,7 +41,7 @@ export default async function SuperAdminCatalogPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Nova operadora</CardTitle>
             <CardDescription>Cadastre uma operadora com nome, descrição e logotipo.</CardDescription>
@@ -64,7 +64,7 @@ export default async function SuperAdminCatalogPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Operadoras cadastradas</CardTitle>
             <CardDescription>{carriers.length} operadora(s) registrada(s) na plataforma.</CardDescription>

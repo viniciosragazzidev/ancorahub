@@ -127,7 +127,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-transparent bg-transparent shadow-none">
       <CardHeader className="gap-4 border-b border-border">
         <div>
           <CardTitle>Corretores da unidade</CardTitle>
@@ -283,7 +283,7 @@ export function DistributionDashboard({
               whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
               whileTap={{ scale: 0.995, transition: { duration: 0.1 } }}
             >
-              <Card className="group/card border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm hover:shadow-primary/5">
+              <Card className="group/card border-transparent bg-transparent shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-none hover:shadow-none/5">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <p className="text-xs text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">{metric.label}</p>
@@ -301,7 +301,7 @@ export function DistributionDashboard({
       </motion.div>
 
       {/* Branch Table */}
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-transparent bg-transparent shadow-none">
         <CardHeader className="flex flex-col gap-3 border-b border-border sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardTitle>Filiais</CardTitle>
@@ -409,7 +409,7 @@ export function DistributionDashboard({
 
       <BrokerDirectory brokers={brokers} />
       {/*
-      <Card className="border-border bg-card shadow-none">
+      <Card className="border-transparent bg-transparent shadow-none">
         <CardHeader>
           <CardTitle>Corretores da unidade</CardTitle>
           <CardDescription>Pause o recebimento de novos leads sem remover o corretor da equipe. Leads já atribuídos continuam na carteira dele.</CardDescription>

@@ -223,7 +223,7 @@ export function CommissionDetails({ data }: Props) {
               description="Ajuste a busca para ver outros resultados."
             />
           ) : (
-            <Card className="border-border bg-card shadow-none">
+            <Card className="border-transparent bg-transparent shadow-none">
               <CardHeader>
                 <CardTitle>Comissões por Corretor</CardTitle>
                 <CardDescription>
@@ -314,7 +314,7 @@ export function CommissionDetails({ data }: Props) {
                     delay: Math.min(i * 0.04, 0.3),
                   }}
                 >
-                  <Card className="border-border bg-card shadow-none transition-all duration-200 hover:border-primary/25">
+                  <Card className="border-transparent bg-transparent shadow-none transition-all duration-200 hover:border-primary/25">
                     <CardContent className="p-0">
                       {/* Sale Header */}
                       <div className="flex items-center justify-between gap-4 border-b border-border p-4 sm:px-5">

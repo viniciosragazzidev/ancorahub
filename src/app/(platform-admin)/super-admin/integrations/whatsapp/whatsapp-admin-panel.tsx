@@ -35,7 +35,7 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
   }
 
   return <div className="space-y-6">
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-transparent bg-transparent shadow-none">
       <CardHeader><CardTitle>Contas empresariais</CardTitle><CardDescription>O Super Admin valida e associa um único canal oficial a cada tenant. Nenhum token é exibido depois do salvamento.</CardDescription></CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -44,7 +44,7 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
       </CardContent>
     </Card>
 
-    <Card className="border-border bg-card shadow-none">
+    <Card className="border-transparent bg-transparent shadow-none">
       <CardHeader><CardTitle>Configurar canal oficial</CardTitle><CardDescription>Selecione a empresa, valide os dados diretamente na Meta e só então salve a conexão.</CardDescription></CardHeader>
       <CardContent>
         <form action={submit} className="grid gap-4 lg:grid-cols-2">

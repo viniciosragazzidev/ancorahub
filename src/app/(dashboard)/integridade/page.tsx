@@ -235,7 +235,7 @@ export default async function IntegrityPage() {
         {/* Audit Log Feed + Alerts */}
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Audit Logs */}
-          <Card className="border-border bg-card shadow-none lg:col-span-2">
+          <Card className="border-transparent bg-transparent shadow-none lg:col-span-2">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -304,7 +304,7 @@ export default async function IntegrityPage() {
           </Card>
 
           {/* System Health & Integrity */}
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Integridade do Sistema</CardTitle>
               <CardDescription>

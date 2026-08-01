@@ -346,7 +346,7 @@ export default async function MinhaFilaPage() {
         {/* ─── Quick Action Cards ─── */}
         <section className="grid gap-4 sm:grid-cols-3">
           {/* Tasks */}
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <ClipboardText className="size-5 text-primary" />
@@ -377,7 +377,7 @@ export default async function MinhaFilaPage() {
           </Card>
 
           {/* Conversations */}
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <ChatCircleText className="size-5 text-primary" />
@@ -405,7 +405,7 @@ export default async function MinhaFilaPage() {
           </Card>
 
           {/* Goals */}
-          <Card className="border-border bg-card shadow-none">
+          <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <Target className="size-5 text-primary" />
@@ -441,7 +441,7 @@ export default async function MinhaFilaPage() {
         </section>
 
         {/* Queue */}
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader className="pb-0">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>

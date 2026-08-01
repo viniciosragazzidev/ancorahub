@@ -22,7 +22,7 @@ export default async function SuperAdminSessionsPage() {
           </div>
         </section>
 
-        <Card className="border-border bg-card shadow-none">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Conexões ativas</CardTitle>
             <CardDescription>{sessions.length} dispositivo(s) autenticado(s).</CardDescription>
