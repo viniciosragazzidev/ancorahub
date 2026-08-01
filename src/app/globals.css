@@ -64,7 +64,7 @@
   --background: oklch(0.965 0.003 95);
   --foreground: oklch(0.180 0.005 95);
 
-  --card: oklch(0.940 0.005 95); /* Changed to match sidebar active / muted */
+  --card: oklch(0.940 0.005 95 / 0.7); /* Changed to match sidebar active / muted, 70% opacity */
   --card-foreground: oklch(0.180 0.005 95);
 
   --popover: oklch(1.000 0 0);
@@ -275,7 +275,7 @@
   --background: oklch(0.140 0.005 260);
   --foreground: oklch(0.960 0.003 260);
 
-  --card: oklch(0.240 0.008 260); /* Changed to match sidebar active / muted */
+  --card: oklch(0.240 0.008 260 / 0.7); /* Changed to match sidebar active / muted, 70% opacity */
   --card-foreground: oklch(0.960 0.003 260);
 
   --popover: oklch(0.280 0.010 260);
