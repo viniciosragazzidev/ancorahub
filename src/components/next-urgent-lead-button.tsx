@@ -17,7 +17,8 @@ export async function NextUrgentLeadButton() {
         <TooltipTrigger>
           <Button
             render={<Link href={`/leads/${urgentLead.id}`} />}
-            className="h-9 gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 text-[11px] font-semibold uppercase text-amber-700 transition-[background-color,border-color,color] hover:border-amber-500/40 hover:bg-amber-500/15 dark:text-amber-400"
+            size="sm"
+            className="gap-1.5 border border-amber-500/20 bg-amber-500/10 text-[11px] font-semibold uppercase text-amber-700 transition-[background-color,border-color,color] hover:border-amber-500/40 hover:bg-amber-500/15 dark:text-amber-400"
           >
             <Lightning className="size-4 shrink-0 text-amber-500" />
             <span className="truncate tracking-wide">Próximo lead</span>
