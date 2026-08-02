@@ -178,3 +178,165 @@ O redesign só poderá ser considerado completo se estas regras forem cumpridas:
 - Cópia literal da marca Firecrawl, incluindo seu laranja, logo, textos ou assets.
 - Motion decorativo em tabelas, métricas, filas ou dados sensíveis.
 
+## 10. Pontos de planejamento ainda necessários
+
+O redesign e a nova arquitetura de informação cobrem a forma da interface. Para a experiência ser realmente assertiva, estes temas precisam ser decididos, documentados e validados antes de qualquer implementação. Não são detalhes visuais; são decisões que definem o que a interface pode prometer.
+
+### 10.1 Fonte de verdade, frescor e confiança dos dados
+
+Para cada indicador, fila, status e alerta, definir:
+
+- fonte de dados, escopo de tenant/unidade/usuário e regra de cálculo;
+- hora da última atualização e quando mostrar “sincronizando”, “atrasado” ou “indisponível”;
+- comportamento para dado parcial, sem histórico ou integração desconectada;
+- destino de drill-down que explica o número, sem métrica decorativa;
+- proprietário operacional do dado quando houver divergência.
+
+**Critério:** nenhum número aparece sem origem, período, escopo e rota de explicação.
+
+### 10.2 Matriz completa de ações por papel
+
+Mapear cada papel, cargo personalizado e escopo de unidade para definir:
+
+- o que vê, o que pode fazer, o que pode solicitar e o que nunca deve descobrir;
+- diferenças entre Diretor, Gestor, Corretor, Marketing, Financeiro e Super Admin;
+- estados de “sem acesso”, “recurso desativado” e “aguardando aprovação”;
+- ações que exigem confirmação, justificativa, dupla aprovação, auditoria ou desfazer;
+- mensagens de interface sem jargão técnico para cada negação.
+
+**Critério:** a navegação, a busca, os atalhos e a URL obedecem à mesma matriz.
+
+### 10.3 Taxonomia e ciclo de vida comercial
+
+Formalizar um glossário único para:
+
+- estágios de lead, status de qualificação, distribuição, conversa, tarefa, venda e cliente;
+- significado de “novo”, “em atendimento”, “aguardando humano”, “estagnado”, “perdido”, “convertido”, “frio”, “morno” e “quente”;
+- gatilhos que criam próxima ação, pausam automação, reiniciam SLA ou redistribuem;
+- motivo obrigatório para perda, reabertura, reatribuição e encerramento;
+- quais estados podem coexistir e quais são mutuamente exclusivos.
+
+**Critério:** o mesmo estado tem rótulo, descrição, cor, filtro, badge e impacto iguais em toda a aplicação.
+
+### 10.4 Estratégia de conversão por tipo de operação
+
+Definir jornadas distintas para PF, PME, familiar, renovação, indicação, campanha Meta, captação manual e pós-venda:
+
+- dados mínimos para avançar;
+- próxima melhor ação por estágio;
+- prazo de resposta e regra de follow-up;
+- momento correto de qualificar, transferir, cotar, solicitar documento e encerrar;
+- indicadores de queda de conversão por etapa;
+- diferença entre conversão assistida por IA e atendimento totalmente humano.
+
+**Critério:** a interface recomenda uma ação baseada na jornada real, não apenas no status atual.
+
+### 10.5 Onboarding, ativação e adoção do cliente pagante
+
+Planejar uma jornada de implantação mensurável:
+
+1. criar empresa e unidade;
+2. convidar equipe e atribuir cargos;
+3. configurar canal oficial e origem de leads;
+4. definir distribuição, plantão e metas;
+5. testar lead sintético;
+6. acompanhar primeira semana de operação.
+
+Para cada etapa, definir responsável, prazo, evidência de conclusão, ajuda contextual e próximo passo. Incluir um modo de demonstração com dados sintéticos para venda e treinamento.
+
+**Critério:** a empresa entende quando está pronta para receber o primeiro lead sem depender de suporte humano.
+
+### 10.6 Pesquisa, instrumentação e ciclo de melhoria
+
+Antes de “congelar” a experiência, planejar:
+
+- testes moderados com pelo menos dois Diretores, dois Gestores e dois Corretores;
+- roteiros de tarefa: primeiro acesso, novo lead, primeiro contato, transferência, reatribuição, integração e análise de resultado;
+- eventos sem PII: primeira ação, abandono de formulário, uso de filtro, erro, tempo de resposta, retorno à mesma tela e conclusão de fluxo;
+- feedback contextual “isso ajudou?” ligado a uma tela, decisão ou sugestão de IA;
+- revisão mensal de fricções, tickets e quedas de conversão.
+
+**Critério:** hipóteses de UX são confirmadas por comportamento observado, não apenas por estética.
+
+### 10.7 Busca, atalhos e produtividade de usuários experientes
+
+Definir o contrato da busca global e da paleta de comandos:
+
+- entidades realmente indexadas e seu escopo de acesso;
+- busca por nome, telefone, e-mail, empresa, tarefa, campanha e documento quando permitido;
+- ações rápidas seguras: criar lead, abrir fila, trocar unidade, registrar contato e navegar;
+- histórico recente, favoritos e atalhos de teclado;
+- comportamento quando não há resultado e quando a permissão bloqueia um resultado.
+
+**Critério:** busca nunca promete uma entidade que não consegue encontrar.
+
+### 10.8 Mobile, conectividade e operação em campo
+
+Definir de forma explícita:
+
+- tarefas prioritárias em mobile e o que fica exclusivamente desktop;
+- navegação inferior, safe area, teclado virtual, cards longos e ações flutuantes;
+- estratégia para rede lenta, offline parcial e falha de realtime;
+- como salvar um registro pendente e informar sincronização sem duplicar ações;
+- notificações push, permissão, profundidade do link e privacidade da prévia.
+
+**Critério:** o corretor consegue abrir, agir e registrar o próximo passo em um celular sem conteúdo coberto ou perda de trabalho.
+
+### 10.9 Ajuda, suporte e recuperação de erro
+
+Planejar um sistema de ajuda integrado:
+
+- explicação curta no ponto da decisão e guia detalhado somente sob demanda;
+- central de ajuda por papel e por etapa de onboarding;
+- links de suporte com contexto técnico redigido, tenant e rota, sem PII;
+- erro acionável com retry, alternativa e status da integração;
+- histórico de incidentes e comunicação de manutenção quando relevante.
+
+**Critério:** o usuário sabe como recuperar uma falha sem abrir um chamado para cada obstáculo.
+
+### 10.10 Privacidade, segurança e percepção de controle
+
+Definir a apresentação de dados pessoais e automação:
+
+- quando mascarar telefone, e-mail, documento e conteúdo de conversa;
+- quando exigir ação deliberada para revelar dado sensível;
+- como comunicar que IA está pausada, humano está atendendo ou uma mensagem não será enviada automaticamente;
+- explicação de auditoria, responsáveis, permissões e impacto de reatribuição;
+- retenção visual de logs, exportações e exclusões.
+
+**Critério:** o produto comunica controle e segurança sem expor detalhes técnicos desnecessários.
+
+### 10.11 Governança do próprio design system
+
+Definir operação contínua do sistema visual:
+
+- dono de cada primitive e processo para criar variante;
+- catálogo interno com exemplo, estados, quando usar e quando não usar;
+- revisão obrigatória de acessibilidade e responsividade;
+- snapshots visuais e orçamento de regressão;
+- changelog de componentes para que páginas migrem sem variações paralelas.
+
+**Critério:** uma nova funcionalidade não consegue introduzir um segundo botão, card, tabela ou status por acidente.
+
+### 10.12 Localização, tom de voz e comunicação comercial
+
+Planejar:
+
+- glossário de linguagem simples para operação, vendas, IA e integrações;
+- pluralização, datas, moeda, timezone e formatos de telefone;
+- mensagens de sucesso, erro, alerta, confirmação e indisponibilidade;
+- tom diferente para Diretor, Gestor, Corretor e cliente final;
+- revisão de acessibilidade da copy: não depender de ícone, cor ou abreviação ambígua.
+
+**Critério:** a pessoa entende a consequência de cada ação sem treinamento técnico.
+
+## 11. Ordem de planejamento antes da implementação
+
+1. Aprovar a direção visual, os tokens e a regra de marca dinâmica.
+2. Aprovar a matriz por papel e o glossário de status.
+3. Aprovar jornadas de conversão por tipo de lead e origem.
+4. Definir métricas, fontes de dados e critérios de realtime.
+5. Definir onboarding, readiness e teste de lead sintético.
+6. Definir busca, produtividade, mobile, suporte e privacidade.
+7. Preparar protótipos das rotas críticas e rodar testes moderados.
+8. Só então iniciar a migração técnica em ondas.
