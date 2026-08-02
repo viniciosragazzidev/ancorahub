@@ -35,7 +35,6 @@ import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-bad
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 import {
   Sheet,
   SheetBody,
@@ -330,9 +329,8 @@ export function LeadsWorkspace({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
 
-      <MetricsOverview columns={3}>
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
-          variant="overview"
           label="Sem responsável"
           value={unassignedCount}
           sublabel="Aguardando distribuição"
@@ -340,7 +338,6 @@ export function LeadsWorkspace({
           sparklineColor="var(--chart-1)"
         />
         <StatCard
-          variant="overview"
           label="Em atendimento"
           value={activeCount}
           sublabel="Contatos em negociação"
@@ -348,14 +345,13 @@ export function LeadsWorkspace({
           sparklineColor="var(--chart-3)"
         />
         <StatCard
-          variant="overview"
           label="Finalizados"
           value={convertedCount}
           sublabel="Vendas convertidas"
           sparklineData={leadsTrend.map((day) => day.converted)}
           sparklineColor="var(--chart-5)"
         />
-      </MetricsOverview>
+      </div>
 
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs defaultValue="list" className="flex min-h-0 flex-1 flex-col">

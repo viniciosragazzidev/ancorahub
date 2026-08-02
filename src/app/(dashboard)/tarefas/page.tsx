@@ -73,7 +73,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         {leadId ? <ContextNote className="max-w-xl" variant="info">Exibindo apenas tarefas do lead selecionado. <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/leads/${leadId}`}>Voltar ao lead</Link></ContextNote> : null}
         {attention === "overdue" ? <ContextNote className="max-w-xl" variant="warning">Exibindo somente tarefas vencidas e ainda não concluídas no seu escopo.</ContextNote> : null}
 
-        <Card variant="overview" className="overflow-hidden">
+        <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader>
             <CardTitle>Minha operação</CardTitle>
             <CardDescription>Tarefas urgentes podem envolver vários corretores. As demais preservam um responsável claro.</CardDescription>

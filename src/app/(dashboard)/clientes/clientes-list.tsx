@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { OwnershipContext } from "@/components/ownership-context";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 
 /* ─── Types ─── */
 
@@ -152,15 +151,15 @@ export function ClientesList({
 
   return (
     <div className="flex flex-col gap-6">
-      <MetricsOverview columns={4}>
-        <StatCard variant="overview" label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos 30 dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
-        <StatCard variant="overview" label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
-        <StatCard variant="overview" label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
-        <StatCard variant="overview" label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={conversionTrend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" />
-      </MetricsOverview>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos 30 dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
+        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
+        <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
+        <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={conversionTrend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" />
+      </div>
 
       {/* Container de Tabela - Padrão /equipe */}
-      <Card variant="overview" className="overflow-hidden">
+      <Card className="border-transparent bg-transparent shadow-none">
         <CardHeader className="border-b border-border/50 p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>

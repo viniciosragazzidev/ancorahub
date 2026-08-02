@@ -13,7 +13,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkExportSalesAction } from "@/features/sales/actions";
 import { formatCurrency, formatDate } from "@/features/quotes/utils";
@@ -212,9 +211,8 @@ export function SalesWorkspace({
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <MetricsOverview columns={4}>
+      <div className="grid gap-3 sm:grid-cols-4">
         <StatCard
-          variant="overview"
           label="Total de vendas"
           value={sales.length}
           sublabel="últimos 6 meses"
@@ -223,7 +221,6 @@ export function SalesWorkspace({
           animated
         />
         <StatCard
-          variant="overview"
           label="Vendas ativas"
           value={activeSales}
           sublabel="em andamento"
@@ -233,7 +230,6 @@ export function SalesWorkspace({
           animationDelay={0.06}
         />
         <StatCard
-          variant="overview"
           label="Receita total"
           value={formatCurrency(totalRevenue)}
           sublabel="acumulado no período"
@@ -243,7 +239,6 @@ export function SalesWorkspace({
           animationDelay={0.12}
         />
         <StatCard
-          variant="overview"
           label="Comissão a repassar"
           value={formatCurrency(totalRevenue)}
           sublabel="gerada nas vendas"
@@ -252,7 +247,7 @@ export function SalesWorkspace({
           animated
           animationDelay={0.18}
         />
-      </MetricsOverview>
+      </div>
 
       {/* Bulk selection toolbar */}
       <SelectionToolbar
