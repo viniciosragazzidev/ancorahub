@@ -3,6 +3,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -172,12 +173,12 @@ export default async function TeamPage() {
           </p>
         </section>
         */}
-        <div className="grid gap-3 sm:grid-cols-4">
-          <StatCard label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
-          <StatCard label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
-          <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />
-          <StatCard label="Vendas acumuladas" value={new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalVolume)} sublabel="últimos 6 meses" sparklineData={salesTrend} sparklineColor="var(--chart-2)" />
-        </div>
+        <MetricsOverview columns={4}>
+          <StatCard variant="overview" label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
+          <StatCard variant="overview" label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
+          <StatCard variant="overview" label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />
+          <StatCard variant="overview" label="Vendas acumuladas" value={new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalVolume)} sublabel="últimos 6 meses" sparklineData={salesTrend} sparklineColor="var(--chart-2)" />
+        </MetricsOverview>
         <TeamMembersTable
           branches={branches}
           currentBranchId={context.branchId}

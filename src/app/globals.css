@@ -353,6 +353,35 @@
   box-sizing: border-box;
 }
 
+/* Shared workspace canvas for every authenticated route. */
+[data-slot="app-content"] > main {
+  isolation: isolate;
+  padding: clamp(1rem, 1.8vw, 1.5rem);
+  gap: 1rem;
+}
+
+[data-slot="app-content"] [data-slot="card"] {
+  border-color: var(--border);
+}
+
+/* Legacy transparent Cards were being used as ad-hoc layout wrappers. In the
+   operational workspace they become real, consistent surfaces instead of
+   disappearing against the canvas. */
+[data-slot="app-content"] [data-slot="card"].bg-transparent {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 1px rgb(15 23 42 / 0.02) !important;
+}
+
+[data-slot="app-content"] [data-slot="table-container"] {
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 1px rgb(15 23 42 / 0.02);
+}
+
+[data-slot="app-content"] [data-slot="metrics-overview"] {
+  background: var(--border);
+}
+
 html {
   /* font-size: 110% escala textos e componentes rem sem quebrar
      elementos position:fixed/sticky, ao contrário do zoom.       */

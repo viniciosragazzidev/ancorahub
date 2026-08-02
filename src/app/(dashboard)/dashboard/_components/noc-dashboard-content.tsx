@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 import type {
   DirectorDashboardData,
   ManagerDashboardData,
@@ -359,12 +360,12 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
           <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
-          <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
-          <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
-          <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
-        </div>
+        <MetricsOverview columns={4}>
+          <StatCard variant="overview" label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard variant="overview" label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
+          <StatCard variant="overview" label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard variant="overview" label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
+        </MetricsOverview>
       </section>
 
         {/* Funil Comercial — full width */}
@@ -597,13 +598,13 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           <h2 className="text-sm font-bold tracking-tight">Indicadores de Desempenho</h2>
           <p className="text-xs text-muted-foreground">Métricas operacionais da unidade.</p>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="Corretores Ativos" value={data.activeMembers} change={`${teamPercent}%`} sublabel={`${data.teamSize} cadastrados`} animated sparklineData={data.trend.map((t, idx) => Math.round((t.leads + 1) * (0.2 + (idx % 4) * 0.05)))} sparklineColor="var(--chart-1)" />
-          <StatCard label="Leads Novos" value={data.newLeads} change={`${newPercent}% do total`} sublabel={`${data.unassigned} sem resp.`} animated animationDelay={0.08} sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-3)" />
-          <StatCard label="Em Atendimento" value={data.inContact} change={`${contactPercent}%`} sublabel={`de ${data.leadsTotal} totais`} animated animationDelay={0.16} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-4)" />
-          <StatCard label="Não Trabalhados" value={data.unworked} change={data.unworked > 0 ? "urgente" : "ok"} sublabel="Há +15min sem contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.2))} sparklineColor="var(--chart-2)" />
-          <StatCard label="Estagnados" value={data.stalled} change={data.stalled > 0 ? "atenção" : "ok"} sublabel="Há +3 dias sem avanço" animated animationDelay={0.32} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.1))} sparklineColor="var(--chart-5)" />
-        </div>
+        <MetricsOverview columns={5}>
+          <StatCard variant="overview" label="Corretores Ativos" value={data.activeMembers} change={`${teamPercent}%`} sublabel={`${data.teamSize} cadastrados`} animated sparklineData={data.trend.map((t, idx) => Math.round((t.leads + 1) * (0.2 + (idx % 4) * 0.05)))} sparklineColor="var(--chart-1)" />
+          <StatCard variant="overview" label="Leads Novos" value={data.newLeads} change={`${newPercent}% do total`} sublabel={`${data.unassigned} sem resp.`} animated animationDelay={0.08} sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-3)" />
+          <StatCard variant="overview" label="Em Atendimento" value={data.inContact} change={`${contactPercent}%`} sublabel={`de ${data.leadsTotal} totais`} animated animationDelay={0.16} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-4)" />
+          <StatCard variant="overview" label="Não Trabalhados" value={data.unworked} change={data.unworked > 0 ? "urgente" : "ok"} sublabel="Há +15min sem contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.2))} sparklineColor="var(--chart-2)" />
+          <StatCard variant="overview" label="Estagnados" value={data.stalled} change={data.stalled > 0 ? "atenção" : "ok"} sublabel="Há +3 dias sem avanço" animated animationDelay={0.32} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.1))} sparklineColor="var(--chart-5)" />
+        </MetricsOverview>
       </section>
 
       {/* Team Overview + Bottlenecks */}
@@ -920,12 +921,12 @@ const activities = [
           <h2 className="text-sm font-bold tracking-tight">Indicadores de Desempenho Pessoal</h2>
           <p className="text-xs text-muted-foreground">Métricas da sua carteira comercial.</p>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Leads Totais" value={data.totals.all} change="Carteira" sublabel="Atribuídos a você" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
-          <StatCard label="Em Atendimento" value={data.totals.active} change={`${activePercent}%`} sublabel="Leads ativos" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-3)" />
-          <StatCard label="Conversões" value={data.totals.converted} change="Finalizados" sublabel="Vendas concluídas" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
-          <StatCard label="SLA Pendente" value={data.pendingStaleness.overdueCount} change={data.pendingStaleness.overdueCount > 0 ? "Atenção" : "Ok"} sublabel="Aguardando primeiro contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.15))} sparklineColor="var(--chart-4)" />
-        </div>
+        <MetricsOverview columns={4}>
+          <StatCard variant="overview" label="Leads Totais" value={data.totals.all} change="Carteira" sublabel="Atribuídos a você" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard variant="overview" label="Em Atendimento" value={data.totals.active} change={`${activePercent}%`} sublabel="Leads ativos" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-3)" />
+          <StatCard variant="overview" label="Conversões" value={data.totals.converted} change="Finalizados" sublabel="Vendas concluídas" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard variant="overview" label="SLA Pendente" value={data.pendingStaleness.overdueCount} change={data.pendingStaleness.overdueCount > 0 ? "Atenção" : "Ok"} sublabel="Aguardando primeiro contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.15))} sparklineColor="var(--chart-4)" />
+        </MetricsOverview>
       </section>
 
       {/* ─── ZONA 4: CARTEIRA DE LEADS & EVOLUÇÃO COMERCIAL (SIDE-BY-SIDE) ─── */}
