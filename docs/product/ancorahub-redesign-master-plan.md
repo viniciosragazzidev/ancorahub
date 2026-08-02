@@ -1,6 +1,6 @@
 # Plano mestre — redesign e experiência de conversão do AncoraHub
 
-**Status:** proposto para aprovação  
+**Status:** em execução — fundação compartilhada iniciada em 02/08/2026; cada rota continua exigindo auditoria visual, de estados e acessibilidade antes de ser considerada migrada.
 **Escopo:** todas as superfícies do produto — operação, gestão, administração, plataforma, fluxos públicos e extensão de navegador.  
 **Referência visual:** imagens em `NewDesignRefs/` e linguagem de workspace da Firecrawl.  
 **Regra de marca:** a referência define composição, densidade, superfícies e hierarquia. A cor de ação continua sendo a marca configurada pelo tenant; não será copiada a cor laranja da referência.

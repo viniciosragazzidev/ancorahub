@@ -12,7 +12,7 @@ export function PlatformAdminHeader({
   title: string;
 }) {
   return (
-    <header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-4 lg:px-6" style={{ viewTransitionName: "ct-shell-header" }}>
+    <header className="sticky top-0 z-10 flex h-(--header-height) shrink-0 items-center gap-3 border-b border-border bg-background px-4 lg:px-5" style={{ viewTransitionName: "ct-shell-header" }}>
       <SidebarTrigger />
       <div className="h-4 w-px bg-border" />
       <div className="min-w-0 flex-1">
