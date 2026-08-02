@@ -63,7 +63,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           </Button>
         }
       />
-      <main className="flex min-h-full flex-col gap-4 bg-background p-4 lg:p-6">
+      <main className="flex min-h-full flex-col gap-3 bg-background px-4 py-3 lg:px-5 lg:py-4">
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
@@ -74,7 +74,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         {attention === "overdue" ? <ContextNote className="max-w-xl" variant="warning">Exibindo somente tarefas vencidas e ainda não concluídas no seu escopo.</ContextNote> : null}
 
         <Card variant="overview" className="overflow-hidden">
-          <CardHeader>
+          <CardHeader className="px-5 py-4 pb-3">
             <CardTitle>Minha operação</CardTitle>
             <CardDescription>Tarefas urgentes podem envolver vários corretores. As demais preservam um responsável claro.</CardDescription>
           </CardHeader>
@@ -122,7 +122,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
               </TableBody>
             </Table>
             {!tasks.length ? (
-              <div className="flex flex-col items-center gap-2 border-t border-border px-6 py-12 text-center">
+              <div className="flex flex-col items-center gap-2 border-t border-border px-6 py-8 text-center">
                 <span className="grid size-10 place-items-center rounded-full border border-primary/15 bg-primary/[0.06] text-primary" aria-hidden="true"><ListChecks className="size-5" /></span>
                 <p className="font-medium">Nenhuma tarefa no seu escopo</p>
                 <p className="max-w-md text-sm leading-6 text-muted-foreground">Abra um lead para criar o próximo passo e atribuí-lo à equipe.</p>

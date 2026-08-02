@@ -29,3 +29,4 @@ Esta é a primeira onda do plano em `docs/product/ancorahub-redesign-master-plan
 - `npm run agent:verify -- --level fast` — aprovado novamente após a migração visível de workspace em 02/08/2026: 53 arquivos e 227 testes.
 - `npm run build` — aprovado novamente após a migração visível, com as 74 rotas e o pacote da extensão.
 - Correção de tema em 02/08/2026: tokens de sidebar e ambos os cabeçalhos passaram a consumir superfícies semânticas; `type-check` e verificação rápida aprovados após o ajuste.
+- Ajuste de acabamento em 02/08/2026: logos respeitam o contraste do tema pelo componente compartilhado, e a superfície operacional de Tarefas recebeu cabeçalho e estado vazio compactos.
