@@ -8,10 +8,10 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-4 rounded-2xl border border-border bg-card p-5 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
-        overview: "gap-0 overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-none",
-        compact: "gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
-        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
+        default: "gap-4 rounded-lg border border-border bg-card p-5 shadow-[0_1px_3px_rgb(15_23_42/0.04)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_4px_12px_rgb(15_23_42/0.05)] motion-reduce:transition-none",
+        overview: "gap-0 overflow-hidden rounded-lg border border-border bg-card p-0 shadow-[0_1px_3px_rgb(15_23_42/0.04)]",
+        compact: "gap-3 rounded-lg border border-border bg-card p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong motion-reduce:transition-none",
+        kanban: "gap-0 overflow-hidden rounded-lg border border-border bg-card p-0 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong motion-reduce:transition-none",
       },
     },
     defaultVariants: {
@@ -33,7 +33,7 @@ function Card({
       data-size={size}
       className={cn(
         cardVariants({ variant }),
-        size === "sm" && variant === "default" && "gap-3 rounded-xl p-4",
+        size === "sm" && variant === "default" && "gap-3 rounded-lg p-4",
         className
       )}
       {...props}
@@ -104,7 +104,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center rounded-b-xl px-5 pb-5", className)}
+      className={cn("flex items-center rounded-b-lg px-5 pb-5", className)}
       {...props}
     />
   )

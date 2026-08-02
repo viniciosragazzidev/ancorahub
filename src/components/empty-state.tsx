@@ -34,10 +34,10 @@ export interface EmptyStateProps {
 /* ─── Variant styles ─── */
 
 const variantStyles: Record<EmptyStateVariant, string> = {
-  default: "rounded-xl border border-dashed border-border/80 bg-muted/30 px-6 py-10",
-  card: "rounded-xl border border-dashed border-border/80 bg-muted/30 px-6 py-14",
+  default: "rounded-lg border border-dashed border-border bg-muted/25 px-6 py-10",
+  card: "rounded-lg border border-dashed border-border bg-muted/25 px-6 py-14",
   ghost: "",
-  inline: "flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-muted-foreground bg-muted/50",
+  inline: "flex items-center gap-2 rounded-md px-3 py-2.5 text-xs text-muted-foreground bg-muted/50",
 };
 
 /* ─── Loading skeleton ─── */

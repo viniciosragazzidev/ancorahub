@@ -69,8 +69,8 @@ export function AppShell({
       className="min-h-dvh overflow-hidden"
       style={
         {
-          "--sidebar-width": "225px",
-          "--header-height": "4.5rem",
+          "--sidebar-width": "15rem",
+          "--header-height": "3.75rem",
           ...(branding?.brandColor
             ? {
                 "--primary": branding.brandColor,

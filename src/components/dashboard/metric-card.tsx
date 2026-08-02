@@ -114,7 +114,7 @@ export function StatCard({
       variant={variant === "overview" ? "overview" : "compact"}
       className={cn(
         "group/card h-full min-w-0",
-        variant === "overview" ? "rounded-none border-0 border-r border-border/70 last:border-r-0" : "hover:bg-card/95",
+        variant === "overview" ? "rounded-none border-0 border-r border-border last:border-r-0" : "hover:bg-card/95",
         className,
       )}
     >
@@ -123,7 +123,7 @@ export function StatCard({
           {Icon && (
             <div
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 transition-[background-color,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:bg-foreground/10 group-hover/card:text-foreground motion-reduce:transition-none",
+                "flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-foreground/80 transition-[background-color,color] duration-150 ease-out group-hover/card:bg-foreground/10 group-hover/card:text-foreground motion-reduce:transition-none",
                 iconClassName,
               )}
             >
@@ -136,7 +136,7 @@ export function StatCard({
         </div>
         {(trend || change) && (
           <Badge
-            className="shrink-0 rounded-full font-mono text-[11px] font-medium"
+            className="shrink-0 rounded-md text-[11px] font-medium"
             variant={resolvedVariant}
           >
             {trend && trend !== "neutral" && TrendIcon && (
@@ -150,7 +150,7 @@ export function StatCard({
         <div className="min-w-0">
           <p
             className={cn(
-              "text-2xl font-semibold tracking-tight tabular-nums text-foreground",
+              "text-xl font-semibold tracking-tight tabular-nums text-foreground",
               valueClassName,
             )}
           >
