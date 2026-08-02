@@ -58,7 +58,7 @@ export function PlatformAdminSidebar() {
               <UserAvatar seed={session?.user?.email || userName} name={userName} size="sm" className="size-8" />
               <div className="flex flex-col text-left group-data-[collapsible=icon]:hidden">
                 <span className="font-semibold tracking-tight text-sm text-foreground">Super Admin</span>
-                <AncoraLogo className="h-4 w-24 object-contain object-left" />
+                <AncoraLogo className="h-4 w-24 object-contain object-left brightness-0 invert" />
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
