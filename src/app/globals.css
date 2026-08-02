@@ -101,17 +101,17 @@
   --input: oklch(1 0 0);
   --ring: oklch(0.180 0.005 95);
 
-  /* A navegação acompanha a aparência escolhida. No modo claro ela é uma
-     superfície elevada neutra; o grafite é reservado ao modo escuro. */
-  --sidebar: oklch(0.998 0.001 95);
-  --sidebar-foreground: oklch(0.180 0.005 95);
+  /* Navigation stays graphite in both themes. Tenant colour only signals focus,
+     selection and direct actions; it never becomes the navigation canvas. */
+  --sidebar: oklch(0.145 0.004 95);
+  --sidebar-foreground: oklch(0.890 0.003 95);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.962 0.003 95);
-  --sidebar-accent-foreground: oklch(0.180 0.005 95);
-  --sidebar-warning: color-mix(in oklch, var(--primary) 9%, var(--sidebar));
-  --sidebar-warning-foreground: oklch(0.180 0.005 95);
-  --sidebar-border: var(--border);
+  --sidebar-accent: oklch(0.205 0.004 95);
+  --sidebar-accent-foreground: oklch(0.980 0.002 95);
+  --sidebar-warning: color-mix(in oklch, var(--primary) 16%, transparent);
+  --sidebar-warning-foreground: oklch(0.985 0.002 95);
+  --sidebar-border: oklch(0.255 0.004 95);
   --sidebar-ring: var(--ring);
 
   --ct-blue: oklch(0.180 0.005 95);

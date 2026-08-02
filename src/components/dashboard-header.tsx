@@ -22,12 +22,12 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-10 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-border bg-background px-4 text-foreground lg:px-5 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
+      className="sticky top-0 z-10 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground lg:px-5 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3 [&_[data-slot=button]]:text-sidebar-foreground [&_[data-slot=button]]:hover:bg-sidebar-accent [&_[data-slot=button]]:hover:text-sidebar-accent-foreground"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
 
       <div className="min-w-0 flex-1">
-        <AnimatedPageTitle breadcrumb={breadcrumb} title={title} />
+        <AnimatedPageTitle breadcrumb={breadcrumb} title={title} tone="inverse" />
       </div>
       <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
         {rightSlot ? (
