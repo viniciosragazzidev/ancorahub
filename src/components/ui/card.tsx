@@ -8,10 +8,10 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-4 rounded-xl border border-border bg-card p-5 shadow-[0_1px_1px_rgb(15_23_42/0.02)] transition-[border-color,background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
-        overview: "gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-[0_1px_1px_rgb(15_23_42/0.02)]",
-        compact: "gap-3 rounded-lg border border-border bg-card p-4 shadow-none transition-[border-color,background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
-        kanban: "gap-0 overflow-hidden rounded-lg border border-border bg-card p-0 shadow-none transition-[border-color,background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
+        default: "gap-4 rounded-2xl border border-border bg-card p-5 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
+        overview: "gap-0 overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-none",
+        compact: "gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
+        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-none transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
       },
     },
     defaultVariants: {
@@ -33,7 +33,7 @@ function Card({
       data-size={size}
       className={cn(
         cardVariants({ variant }),
-        size === "sm" && variant === "default" && "gap-3 rounded-lg p-4",
+        size === "sm" && variant === "default" && "gap-3 rounded-xl p-4",
         className
       )}
       {...props}

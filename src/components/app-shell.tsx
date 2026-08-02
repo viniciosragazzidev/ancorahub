@@ -70,7 +70,7 @@ export function AppShell({
       style={
         {
           "--sidebar-width": "225px",
-          "--header-height": "4rem",
+          "--header-height": "4.5rem",
           ...(branding?.brandColor
             ? {
                 "--primary": branding.brandColor,

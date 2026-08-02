@@ -46,7 +46,7 @@ function DialogPopup({
       <DialogPrimitive.Popup
         data-slot="dialog-popup"
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] min-h-0 w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-visible rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-[0_24px_48px_rgb(15_23_42/0.14)] transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 motion-reduce:transition-none sm:w-full sm:rounded-xl sm:p-6 [&>*]:min-w-0",
+          "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] min-h-0 w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-visible rounded-2xl border border-border/80 bg-popover p-6 text-popover-foreground shadow-2xl transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-95 data-starting-style:scale-95 motion-reduce:transition-none sm:w-full sm:rounded-2xl sm:p-6 [&>*]:min-w-0",
           className
         )}
         {...props}

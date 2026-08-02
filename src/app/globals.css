@@ -51,37 +51,37 @@
 :root {
   color-scheme: light;
   /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
-  --surface-base: oklch(0.992 0.002 95);
+  --surface-base: oklch(0.965 0.003 95);
   /* Lvl 0: Base Canvas (#f5f5f3) */
-  --surface-card: oklch(1 0 0);
+  --surface-card: oklch(0.985 0.002 95);
   /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: oklch(0.970 0.003 95);
+  --surface-secondary: oklch(0.940 0.005 95);
   /* Lvl 2: Recessed / Input (#eeeee9) */
   --surface-elevated: oklch(1.000 0 0);
   /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
-  --background: oklch(0.992 0.002 95);
+  --background: oklch(0.965 0.003 95);
   --foreground: oklch(0.180 0.005 95);
 
-  --card: oklch(1 0 0);
+  --card: oklch(0.940 0.005 95 / 0.4); /* Changed to match sidebar active / muted, 40% opacity */
   --card-foreground: oklch(0.180 0.005 95);
 
-  --popover: oklch(1 0 0);
+  --popover: oklch(0.940 0.005 95);
   --popover-foreground: oklch(0.180 0.005 95);
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca ─────────────────────── */
   --primary: oklch(0.180 0.005 95);
   --primary-foreground: oklch(0.985 0.002 95);
 
-  --secondary: oklch(0.970 0.003 95);
+  --secondary: oklch(0.940 0.005 95);
   --secondary-foreground: oklch(0.180 0.005 95);
 
   --accent: oklch(0.620 0.165 155);
   /* Ramp Esmeralda da Marca (#15A46B) */
   --accent-foreground: oklch(0.990 0 0);
 
-  --muted: oklch(0.970 0.003 95);
+  --muted: oklch(0.940 0.005 95);
   --muted-foreground: oklch(0.480 0.008 95);
   --muted-text: oklch(0.580 0.008 95);
 
@@ -95,24 +95,22 @@
   --destructive: oklch(0.580 0.200 25);
   /* Erro e Ação Destrutiva */
 
-  --border: oklch(0.915 0.003 95);
+  --border: oklch(0.890 0.004 95);
   /* Bordas suaves 1px */
   --border-strong: oklch(0.830 0.006 95);
-  --input: oklch(1 0 0);
+  --input: oklch(0.940 0.005 95);
   --ring: oklch(0.180 0.005 95);
 
-  /* Navigation stays graphite in both themes. Tenant colour only signals focus,
-     selection and direct actions; it never becomes the navigation canvas. */
-  --sidebar: oklch(0.145 0.004 95);
-  --sidebar-foreground: oklch(0.890 0.003 95);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.205 0.004 95);
-  --sidebar-accent-foreground: oklch(0.980 0.002 95);
-  --sidebar-warning: color-mix(in oklch, var(--primary) 16%, transparent);
-  --sidebar-warning-foreground: oklch(0.985 0.002 95);
-  --sidebar-border: oklch(0.255 0.004 95);
-  --sidebar-ring: var(--ring);
+  --sidebar: oklch(0.940 0.005 95 / 0.7); /* Matching cards background */
+  --sidebar-foreground: oklch(0.180 0.005 95);
+  --sidebar-primary: oklch(0.180 0.005 95);
+  --sidebar-primary-foreground: oklch(0.985 0.002 95);
+  --sidebar-accent: oklch(0.940 0.005 95);
+  --sidebar-accent-foreground: oklch(0.180 0.005 95);
+  --sidebar-warning: oklch(0.940 0.005 95);
+  --sidebar-warning-foreground: oklch(0.180 0.005 95);
+  --sidebar-border: oklch(0.890 0.004 95);
+  --sidebar-ring: oklch(0.180 0.005 95);
 
   --ct-blue: oklch(0.180 0.005 95);
   --ct-blue-strong: oklch(0.120 0.005 95);
@@ -264,37 +262,37 @@
 .dark {
   color-scheme: dark;
   /* ── Camada 1: Fundação Neutra Dark (Contraste Dobrado) ───────────────── */
-  --surface-base: oklch(0.135 0.004 260);
+  --surface-base: oklch(0.140 0.005 260);
   /* Lvl 0: Base Canvas (#0d0f12) */
-  --surface-card: oklch(0.175 0.004 260);
+  --surface-card: oklch(0.190 0.006 260);
   /* Lvl 1: Card Surface (#16191d) */
-  --surface-secondary: oklch(0.215 0.006 260);
+  --surface-secondary: oklch(0.240 0.008 260);
   /* Lvl 2: Recessed / Active (#20242a) */
   --surface-elevated: oklch(0.280 0.010 260);
   /* Lvl 3: Elevated Popover (#292e36) */
   --surface-overlay: oklch(0.280 0.010 260);
 
-  --background: oklch(0.135 0.004 260);
+  --background: oklch(0.140 0.005 260);
   --foreground: oklch(0.960 0.003 260);
 
-  --card: oklch(0.175 0.004 260);
+  --card: oklch(0.240 0.008 260 / 0.4); /* Changed to match sidebar active / muted, 40% opacity */
   --card-foreground: oklch(0.960 0.003 260);
 
-  --popover: oklch(0.205 0.005 260);
+  --popover: oklch(0.240 0.008 260);
   --popover-foreground: oklch(0.960 0.003 260);
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca Dark ───────────────── */
   --primary: oklch(0.960 0.003 260);
   --primary-foreground: oklch(0.140 0.005 260);
 
-  --secondary: oklch(0.215 0.006 260);
+  --secondary: oklch(0.240 0.008 260);
   --secondary-foreground: oklch(0.960 0.003 260);
 
   --accent: oklch(0.720 0.180 155);
   /* Ramp Esmeralda da Marca Dark (#47D18C) */
   --accent-foreground: oklch(0.120 0.005 260);
 
-  --muted: oklch(0.215 0.006 260);
+  --muted: oklch(0.240 0.008 260);
   --muted-foreground: oklch(0.720 0.008 260);
   --muted-text: oklch(0.580 0.010 260);
 
@@ -308,19 +306,19 @@
   --border: oklch(0.290 0.008 260);
   /* Bordas nítidas sem empastamento */
   --border-strong: oklch(0.380 0.010 260);
-  --input: oklch(0.175 0.004 260);
+  --input: oklch(0.290 0.008 260);
   --ring: oklch(0.960 0.003 260);
 
-  --sidebar: oklch(0.115 0.004 260);
-  --sidebar-foreground: oklch(0.900 0.003 260);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.180 0.005 260);
-  --sidebar-accent-foreground: oklch(0.980 0.002 260);
-  --sidebar-warning: color-mix(in oklch, var(--primary) 20%, transparent);
-  --sidebar-warning-foreground: oklch(0.980 0.002 260);
-  --sidebar-border: oklch(0.245 0.006 260);
-  --sidebar-ring: var(--ring);
+  --sidebar: oklch(0.240 0.008 260 / 0.7); /* Matching cards background */
+  --sidebar-foreground: oklch(0.960 0.003 260);
+  --sidebar-primary: oklch(0.960 0.003 260);
+  --sidebar-primary-foreground: oklch(0.140 0.005 260);
+  --sidebar-accent: oklch(0.240 0.008 260);
+  --sidebar-accent-foreground: oklch(0.960 0.003 260);
+  --sidebar-warning: oklch(0.240 0.008 260);
+  --sidebar-warning-foreground: oklch(0.960 0.003 260);
+  --sidebar-border: oklch(0.290 0.008 260);
+  --sidebar-ring: oklch(0.960 0.003 260);
 
   --ct-blue: oklch(0.960 0.003 260);
   --ct-blue-strong: oklch(0.960 0.003 260);
