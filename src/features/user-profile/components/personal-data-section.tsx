@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { updateDisplayNameAction, type ProfileActionState } from "../actions";
-import type { PerfilData } from "../perfil-tabs";
+import type { PerfilData } from "./perfil-tabs";
 
 export function PersonalDataSection({ data }: { data: PerfilData }) {
   const [state, formAction, isPending] = useActionState<ProfileActionState, FormData>(

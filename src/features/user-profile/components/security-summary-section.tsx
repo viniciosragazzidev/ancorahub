@@ -6,7 +6,7 @@ import { CheckCircle, LockKey, ShieldCheck } from "@/components/huge-icons";
 
 import { authClient } from "@/shared/auth/client";
 import { recordProfileAuditAction } from "../actions";
-import type { PerfilData } from "../perfil-tabs";
+import type { PerfilData } from "./perfil-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";

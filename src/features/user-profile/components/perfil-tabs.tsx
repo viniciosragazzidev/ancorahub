@@ -9,11 +9,11 @@ import {
   UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 
-import { ProfileHeader } from "./_components/profile-header";
-import { PersonalDataSection } from "./_components/personal-data-section";
-import { SecuritySummarySection } from "./_components/security-summary-section";
-import { SessionsSection } from "./_components/sessions-section";
-import { ActivityLogSection } from "./_components/activity-log-section";
+import { ProfileHeader } from "./profile-header";
+import { PersonalDataSection } from "./personal-data-section";
+import { SecuritySummarySection } from "./security-summary-section";
+import { SessionsSection } from "./sessions-section";
+import { ActivityLogSection } from "./activity-log-section";
 
 export type PerfilData = {
   currentUserId: string;
@@ -58,9 +58,11 @@ const tabs: { id: TabId; label: string; icon: typeof UserCircleIcon }[] = [
 export function PerfilTabs({ data }: { data: PerfilData }) {
   const [active, setActive] = useState<TabId>("visao-geral");
 
+  // O perfil é renderizado dentro da aba "Minha conta" do /settings, então as
+  // sub-seções aparecem como pills horizontais (sem rail lateral aninhado).
   return (
-    <div className="grid gap-5 lg:grid-cols-[13.5rem_1fr]">
-      <nav className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Seções do perfil">
+    <div className="flex flex-col gap-5">
+      <nav className="flex gap-1 overflow-x-auto" aria-label="Seções do perfil">
         {tabs.map((tab) => (
           <button
             key={tab.id}

@@ -1,18 +1,15 @@
+import "server-only";
+
 import { and, desc, eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
 
-import { DashboardHeader } from "@/components/dashboard-header";
-import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { isUserProfileEnabled } from "@/features/user-profile/feature";
-import { PerfilTabs } from "./perfil-tabs";
+import type { TenantContext } from "@/shared/auth/tenant-context";
 
-export const dynamic = "force-dynamic";
-
-export default async function PerfilPage() {
-  if (!(await isUserProfileEnabled())) redirect("/settings");
-
-  const context = await getRequiredTenantContext();
+/**
+ * Carrega todos os dados exibidos na experiência de perfil ("Minha conta").
+ * Compartilhado entre o tab de configurações e quaisquer outras superfícies.
+ */
+export async function getUserProfileData(context: TenantContext) {
   const db = getDatabase();
 
   const [user, membership, brokerProfile, auditLogs, sessions, branches] = await Promise.all([
@@ -86,7 +83,7 @@ export default async function PerfilPage() {
       .orderBy(schema.branches.name),
   ]);
 
-  const data = {
+  return {
     user: user[0],
     membership: membership[0],
     brokerProfile: brokerProfile[0] ?? null,
@@ -99,13 +96,4 @@ export default async function PerfilPage() {
     branches,
     currentUserId: context.userId,
   };
-
-  return (
-    <>
-      <DashboardHeader breadcrumb="Minha área" title="Meu perfil" />
-      <main className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 bg-background p-4 lg:p-6">
-        <PerfilTabs data={data} />
-      </main>
-    </>
-  );
 }

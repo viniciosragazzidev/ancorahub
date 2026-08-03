@@ -257,7 +257,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 {user?.userProfileEnabled ? (
-                  <DropdownMenuItem render={<Link href="/perfil" prefetch />}>
+                  <DropdownMenuItem render={<Link href="/settings?tab=conta" prefetch />}>
                     <UserCircle className="size-4" />
                     Meu perfil
                   </DropdownMenuItem>

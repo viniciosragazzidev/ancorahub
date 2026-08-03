@@ -9,7 +9,7 @@ import { recordProfileAuditAction } from "../actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/features/quotes/utils";
-import type { PerfilData } from "../perfil-tabs";
+import type { PerfilData } from "./perfil-tabs";
 
 type SessionInfo = {
   id: string;

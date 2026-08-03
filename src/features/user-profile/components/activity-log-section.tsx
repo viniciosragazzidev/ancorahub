@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/features/quotes/utils";
-import type { PerfilData } from "../perfil-tabs";
+import type { PerfilData } from "./perfil-tabs";
 
 const ACTION_LABELS: Record<string, string> = {
   login: "Entrou na conta",

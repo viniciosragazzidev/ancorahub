@@ -46,7 +46,7 @@ const allBrokerItems: BrokerSidebarItem[] = [
   { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
   { label: "Minha meta", icon: ChartLineUp, url: "/minha-meta", permission: "ver_meta_propria" },
   { label: "Notificações", icon: Bell, url: "/notificacoes", permission: "acessar_notificacoes" },
-  { label: "Meu perfil", icon: UserCircle, url: "/perfil", permission: "acessar_configuracoes_pessoais", requiresFeature: true },
+  { label: "Meu perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais", requiresFeature: true },
   { label: "Configurações", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
 ];
 

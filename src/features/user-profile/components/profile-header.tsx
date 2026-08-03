@@ -13,7 +13,7 @@ import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
 import { AvailabilityToggle } from "@/app/(dashboard)/corretor/resumo/_components/availability-toggle";
 import { formatDate } from "@/features/quotes/utils";
 import { updateAvatarAction, type ProfileActionState } from "../actions";
-import type { PerfilData } from "../perfil-tabs";
+import type { PerfilData } from "./perfil-tabs";
 
 const roleLabel: Record<string, string> = {
   director: "Diretor",
