@@ -43,6 +43,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { ChartLineUp, SlidersHorizontal } from "@/components/huge-icons";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import { formatCurrency } from "@/features/quotes/utils";
 import type { NocData } from "@/features/noc/queries";
 import { NocHeatmap } from "@/features/noc/components/noc-heatmap";
@@ -363,7 +364,7 @@ export function NocClient({ data }: NocClientProps) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <AreaChart data={leadFlow} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <defs>
                       <linearGradient id="leadsGradient" x1="0" x2="0" y1="0" y2="1">
@@ -406,7 +407,7 @@ export function NocClient({ data }: NocClientProps) {
               ) : (
                 <>
                   <div className="flex h-64 items-center justify-center">
-                    <ResponsiveContainer height="100%" width="100%">
+                    <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                       <PieChart>
                         <Pie
                           cx="50%"
@@ -462,7 +463,7 @@ export function NocClient({ data }: NocClientProps) {
             </CardHeader>
             <CardContent>
               <div className="h-56">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <BarChart data={hourlyActivity} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
                     <XAxis axisLine={false} dataKey="hora" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} />

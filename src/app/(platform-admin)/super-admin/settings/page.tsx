@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
@@ -43,6 +43,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_stagnant_days", 
     "feature_global_search_enabled", 
     "feature_interface_motion_enabled",
+    "feature_r2_storage_enabled",
     "feature_route_onboarding_enabled",
     "feature_whatsapp_meta_cloud_enabled",
     "feature_meta_lead_ads_enabled",
@@ -68,6 +69,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_custom_roles_enabled",
     "feature_performance_ranking_enabled",
     "feature_team_member_profile_enabled",
+    "feature_user_profile_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -87,6 +89,7 @@ export default async function SuperAdminSettingsPage() {
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const interfaceMotionEnabled = settingMap.get("feature_interface_motion_enabled") !== "false";
+  const r2StorageEnabled = settingMap.get("feature_r2_storage_enabled") !== "false";
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
@@ -113,6 +116,7 @@ export default async function SuperAdminSettingsPage() {
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const performanceRankingEnabled = settingMap.get("feature_performance_ranking_enabled") !== "false";
   const teamMemberProfileEnabled = settingMap.get("feature_team_member_profile_enabled") !== "false";
+  const userProfileEnabled = settingMap.get("feature_user_profile_enabled") !== "false";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -194,6 +198,11 @@ export default async function SuperAdminSettingsPage() {
             <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>Perfil administrativo da equipe</CardTitle><CardDescription>Libera a visão de desempenho individual para Diretores e Gestores. Gestores permanecem limitados aos membros e leads da própria unidade; cada acesso fica auditado.</CardDescription></CardHeader>
               <CardContent><form action={updateTeamMemberProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="teamMemberProfileEnabled" value="true" defaultChecked={teamMemberProfileEnabled} className="size-4" /><span><span className="font-medium">Perfis administrativos habilitados</span><span className="block text-xs text-muted-foreground">Desativar remove o atalho e bloqueia a rota sem apagar históricos ou auditoria.</span></span></label><Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>{teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}</Button></form></CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Perfil pessoal do usuário</CardTitle><CardDescription>Libera a área "Meu perfil" para todos os usuários editarem nome, foto, senha, sessões e consultarem o histórico de atividades de sua conta.</CardDescription></CardHeader>
+              <CardContent><form action={updateUserProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="userProfileEnabled" value="true" defaultChecked={userProfileEnabled} className="size-4" /><span><span className="font-medium">Área de perfil habilitada</span><span className="block text-xs text-muted-foreground">Desativar bloqueia a rota e remove o atalho, preservando auditoria e histórico.</span></span></label><Button type="submit" variant={userProfileEnabled ? "outline" : "default"}>{userProfileEnabled ? "Salvar controle" : "Liberar perfil"}</Button></form></CardContent>
             </Card>
 
             <Card className="border-border bg-card shadow-none">
@@ -520,6 +529,11 @@ export default async function SuperAdminSettingsPage() {
             <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>CorreTop Assistant</CardTitle><CardDescription>Kill switch global da extensão contextual. Desativar bloqueia novas consultas sem revogar dados históricos ou sessões já registradas.</CardDescription></CardHeader>
               <CardContent><form action={updateExtensionGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="extensionEnabled" value="true" defaultChecked={browserExtensionEnabled} className="size-4" /><span><span className="font-medium">Extensão habilitada globalmente</span><span className="block text-xs text-muted-foreground">O Diretor ainda controla a ativação por tenant.</span></span></label><Button type="submit">Salvar extensão</Button></form></CardContent>
+              </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Armazenamento de arquivos</CardTitle><CardDescription>Controle global do bucket privado Cloudflare R2. Desativar interrompe uploads e downloads sem apagar registros, objetos ou auditoria.</CardDescription></CardHeader>
+              <CardContent><form action={updateR2StorageSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="r2StorageEnabled" value="true" defaultChecked={r2StorageEnabled} className="size-4" /><span><span className="font-medium">Armazenamento R2 habilitado</span><span className="block text-xs text-muted-foreground">Requer credenciais privadas configuradas no ambiente do servidor.</span></span></label><Button type="submit" variant="outline">Salvar armazenamento</Button></form></CardContent>
             </Card>
 
             <Card className="border-border bg-card shadow-none">

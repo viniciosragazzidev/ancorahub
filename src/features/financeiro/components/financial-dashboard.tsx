@@ -24,6 +24,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import {
   Card,
   CardContent,
@@ -221,7 +222,7 @@ export function FinancialDashboard({ data, role }: Props) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <AreaChart
                     data={chartData}
                     margin={{ top: 4, right: 4, left: -16, bottom: 0 }}

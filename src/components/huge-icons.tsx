@@ -138,6 +138,7 @@ const aliases: Record<string, string> = {
   TriangleAlertIcon: "Alert02Icon",
   UserList: "UserListIcon",
   UserPlus: "UserAdd01Icon",
+  UserCircle: "UserCircleIcon",
   Users: "UserGroupIcon",
   UsersThree: "UserGroupIcon",
   UserSwitch: "UserSwitchIcon",
@@ -378,6 +379,7 @@ export const TrendUp = staticAnimated("TrendUp");
 export const TriangleAlertIcon = staticAnimated("TriangleAlertIcon");
 export const UserList = staticAnimated("UserList");
 export const UserPlus = staticAnimated("UserPlus");
+export const UserCircle = staticAnimated("UserCircle");
 export const UserSwitch = staticAnimated("UserSwitch");
 export const Warning = staticAnimated("Warning");
 export const WarningCircle = staticAnimated("WarningCircle");

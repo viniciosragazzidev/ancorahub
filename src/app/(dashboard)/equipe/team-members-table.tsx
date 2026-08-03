@@ -131,7 +131,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
             <UserAvatar seed={member.email || member.name || "Membro"} name={member.name ?? undefined} size="sm" className="size-8" />
             <div>
               {canViewProfile && member.userId ? <Link href={`/equipe/${member.userId}`} className="font-semibold text-xs leading-snug text-foreground hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{member.name ?? "Sem nome"}</Link> : <p className="font-semibold text-xs text-foreground leading-snug">{member.name ?? "Sem nome"}</p>}
-              {member.userId === currentUserId ? <p className="text-[10px] text-muted-foreground font-mono">Você</p> : null}
+              {member.userId === currentUserId ? <p className="text-xs text-muted-foreground font-mono mt-0.5">Você</p> : null}
             </div>
           </div>
         );

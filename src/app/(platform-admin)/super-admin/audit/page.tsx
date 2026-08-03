@@ -47,7 +47,7 @@ const platformColumns: ColumnDef<PlatformLog>[] = [
       <DataTableColumnHeader column={column} title="Data" />
     ),
     cell: ({ row }) => (
-      <span className="font-mono text-[11px] text-muted-foreground pl-2">
+      <span className="font-mono text-xs text-muted-foreground pl-2">
         {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(row.original.createdAt))}
       </span>
     ),
@@ -60,7 +60,7 @@ const platformColumns: ColumnDef<PlatformLog>[] = [
     cell: ({ row }) => (
       <div className="text-xs">
         <span className="font-semibold block text-foreground">{row.original.actorName || "Sistema"}</span>
-        <span className="text-[10px] text-muted-foreground font-mono">{row.original.actorEmail || "auto"}</span>
+        <span className="text-xs text-muted-foreground font-mono mt-0.5">{row.original.actorEmail || "auto"}</span>
       </div>
     ),
   },
@@ -82,7 +82,7 @@ const platformColumns: ColumnDef<PlatformLog>[] = [
     accessorKey: "targetId",
     header: "ID do Destino",
     cell: ({ row }) => (
-      <span className="font-mono text-[10px] text-muted-foreground pr-2">{row.original.targetId}</span>
+      <span className="font-mono text-xs text-muted-foreground pr-2">{row.original.targetId}</span>
     ),
   },
 ];
@@ -94,7 +94,7 @@ const tenantColumns: ColumnDef<TenantLog>[] = [
       <DataTableColumnHeader column={column} title="Data" />
     ),
     cell: ({ row }) => (
-      <span className="font-mono text-[11px] text-muted-foreground pl-2">
+      <span className="font-mono text-xs text-muted-foreground pl-2">
         {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(row.original.createdAt))}
       </span>
     ),
@@ -129,7 +129,7 @@ const tenantColumns: ColumnDef<TenantLog>[] = [
     accessorKey: "entidadeId",
     header: "ID Recurso",
     cell: ({ row }) => (
-      <span className="font-mono text-[10px] text-muted-foreground pr-2">{row.original.entidadeId}</span>
+      <span className="font-mono text-xs text-muted-foreground pr-2">{row.original.entidadeId}</span>
     ),
   },
 ];

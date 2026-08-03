@@ -5,14 +5,11 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { DocumentStorageConfigurationError, uploadDocumentObject } from "@/shared/storage/document-storage";
+import { isR2StorageEnabled } from "@/features/storage/r2-storage-feature";
+import { R2StorageConfigurationError, uploadR2Object } from "@/shared/storage/r2-storage";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const allowedMimeTypes = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-]);
+const allowedMimeTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
 const leadIdSchema = z.string().uuid();
 
 export async function POST(req: NextRequest) {
@@ -20,6 +17,12 @@ export async function POST(req: NextRequest) {
     const context = await getRequiredTenantContext();
     if (!context) {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
+    if (!(await isR2StorageEnabled())) {
+      return NextResponse.json(
+        { error: "O armazenamento de arquivos está temporariamente desativado pela plataforma." },
+        { status: 503 },
+      );
     }
 
     const formData = await req.formData();
@@ -32,15 +35,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Lead inválido." }, { status: 400 });
     }
     if (file.size === 0 || file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "O arquivo deve ter entre 1 byte e 10 MB." }, { status: 400 });
+      return NextResponse.json(
+        { error: "O arquivo deve ter entre 1 byte e 10 MB." },
+        { status: 400 },
+      );
     }
     if (!allowedMimeTypes.has(file.type)) {
-      return NextResponse.json({ error: "Formato não permitido. Envie PDF, JPG ou PNG." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Formato não permitido. Envie PDF, JPG ou PNG." },
+        { status: 400 },
+      );
     }
 
     const db = getDatabase();
     const [lead] = await db
-      .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId })
+      .select({
+        id: schema.leads.id,
+        corretorId: schema.leads.corretorId,
+        branchId: schema.leads.branchId,
+      })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, leadId.data), eq(schema.leads.tenantId, context.tenantId)))
       .limit(1);
@@ -48,7 +61,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
     }
     if (context.role === "broker" && lead.corretorId !== context.userId) {
-      return NextResponse.json({ error: "Você não pode anexar documentos a este lead." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Você não pode anexar documentos a este lead." },
+        { status: 403 },
+      );
     }
     if (context.role === "manager" && (!context.branchId || lead.branchId !== context.branchId)) {
       return NextResponse.json({ error: "Este lead não pertence à sua filial." }, { status: 403 });
@@ -63,19 +79,28 @@ export async function POST(req: NextRequest) {
     const uniqueFilename = `${uuid}-${safeFilename}`;
 
     const checksumSha256 = createHash("sha256").update(buffer).digest("hex");
-    const storageKey = `${context.tenantId}/${uniqueFilename}`;
-    await uploadDocumentObject(storageKey, buffer, file.type);
+    const storageKey = `documents/${context.tenantId}/${uniqueFilename}`;
+    await uploadR2Object(storageKey, buffer, file.type);
     const fileUrl = `/api/documents/download?key=${encodeURIComponent(storageKey)}`;
 
-    return NextResponse.json({ fileUrl, storageKey, filename: file.name, mimeType: file.type, sizeBytes: file.size, checksumSha256 });
+    return NextResponse.json({
+      fileUrl,
+      storageKey,
+      filename: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      checksumSha256,
+    });
   } catch (error) {
-    if (error instanceof DocumentStorageConfigurationError) {
+    if (error instanceof R2StorageConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    console.error("Document upload failed", { error: error instanceof Error ? error.message : "unknown" });
+    console.error("Document upload failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return NextResponse.json(
       { error: "Não foi possível concluir o upload. Tente novamente." },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }

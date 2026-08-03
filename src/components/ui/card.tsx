@@ -9,6 +9,7 @@ const cardVariants = cva(
     variants: {
       variant: {
         default: "gap-4 rounded-lg border border-border bg-card p-5 shadow-[0_1px_3px_rgb(15_23_42/0.04)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_4px_12px_rgb(15_23_42/0.05)] motion-reduce:transition-none",
+        subtle: "gap-4 rounded-lg border border-border/60 bg-card/70 p-5 shadow-none",
         overview: "gap-0 overflow-hidden rounded-lg border border-border bg-card p-0 shadow-[0_1px_3px_rgb(15_23_42/0.04)]",
         compact: "gap-3 rounded-lg border border-border bg-card p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong motion-reduce:transition-none",
         kanban: "gap-0 overflow-hidden rounded-lg border border-border bg-card p-0 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong motion-reduce:transition-none",

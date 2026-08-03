@@ -207,7 +207,7 @@ O funil de leads não tinha transições formalizadas. O seletor de status permi
 - `assumeLeadForInvestigation` continua saltando o pipeline para status `under_analysis` — é uma ação de gestão legítima.
 ## DEC-043 — Armazenamento privado dos documentos de atendimento
 
-**Estado:** Aceita
+**Estado:** Substituída por DEC-069
 **Data:** 2026-07-21
 
 Documentos de leads e clientes não serão gravados no sistema de arquivos local do deploy.
@@ -430,3 +430,10 @@ O ranking comercial usa temporadas por tenant como recorte temporal. Somente uma
 **Data:** 2026-07-29
 
 O perfil administrativo de um membro é uma visão de supervisão, não uma página pública ou uma área de autoatendimento. Diretor pode consultar qualquer membro do próprio tenant. Gestor só pode consultar membro com vínculo na própria unidade, e todas as métricas e listas do perfil recebem o mesmo filtro de unidade. A rota não distingue membro inexistente de membro fora do escopo, evitando revelar a estrutura de equipe. Cada consulta autorizada é registrada na auditoria; o Super Admin pode desativar globalmente a capacidade sem apagar histórico.
+
+## DEC-069 — Armazenamento privado unificado no Cloudflare R2
+
+**Estado:** Aceita
+**Data:** 2026-08-03
+
+O armazenamento persistido de binários do CorreTop passa a usar um único bucket privado Cloudflare R2, na classe Standard. O banco mantém a autoridade sobre metadados, vínculos e autorização; documentos são servidos somente pela rota autenticada do servidor. Como o ambiente ainda não contém objetos a preservar, o bucket Supabase Storage não terá cópia histórica. O prefixo `documents/<tenantId>/` assegura a organização física, mas não substitui a autorização derivada da sessão, tenant, unidade e carteira. A capacidade tem kill switch global `feature_r2_storage_enabled`, controlado e auditado pelo Super-admin, sem apagar objetos ou registros.

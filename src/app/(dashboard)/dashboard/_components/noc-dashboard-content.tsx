@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import type {
   DirectorDashboardData,
   ManagerDashboardData,
@@ -259,7 +260,7 @@ function ActivityFeed({
   }>;
 }) {
   return (
-    <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+    <Card variant="subtle" className="rounded-xl">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -373,7 +374,7 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
         >
-          <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-xl">
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -392,7 +393,7 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <AreaChart
                     data={funnelChartData}
                     margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
@@ -608,7 +609,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
 
       {/* Team Overview + Bottlenecks */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-4">
+        <Card variant="subtle" className="rounded-xl lg:col-span-4">
           <CardHeader>
             <CardTitle>Visão Geral da Equipe</CardTitle>
             <CardDescription>
@@ -665,7 +666,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-3">
+        <Card variant="subtle" className="rounded-xl lg:col-span-3">
           <CardHeader>
             <CardTitle>Alertas</CardTitle>
             <CardDescription>Pontos que precisam de ação</CardDescription>
@@ -734,7 +735,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
           className="lg:col-span-4"
         >
-          <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -748,7 +749,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
             </CardHeader>
             <CardContent>
               <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={INITIAL_DIMENSION}>
                   <BarChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
                     <XAxis
@@ -775,14 +776,14 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}
           className="lg:col-span-3"
         >
-          <Card className="rounded-xl border-transparent bg-transparent shadow-none h-full">
+          <Card variant="subtle" className="h-full rounded-xl">
             <CardHeader>
               <CardTitle>Distribuição Operacional</CardTitle>
               <CardDescription>Status dos leads na unidade</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center">
               <div className="h-48 w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={INITIAL_DIMENSION}>
                   <PieChart>
                     <Pie
                       data={[
@@ -894,7 +895,7 @@ const activities = [
   return (
     <div className="space-y-6">
       {/* ─── ZONA 2: PLANTÃO AO VIVO ─── */}
-      <Card className="rounded-2xl border border-transparent bg-transparent p-5 shadow-none transition-all duration-200 hover:border-transparent-strong">
+      <Card variant="subtle" className="rounded-2xl transition-all duration-200 hover:border-border">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3.5">
             <Badge variant="outline" className="gap-2 rounded-full border-emerald-500/20 bg-emerald-500/10 px-3 py-1 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
@@ -931,7 +932,7 @@ const activities = [
       {/* ─── ZONA 4: CARTEIRA DE LEADS & EVOLUÇÃO COMERCIAL (SIDE-BY-SIDE) ─── */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
         {/* Minha Carteira de Leads (col-span-5) */}
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-5 flex flex-col justify-between">
+        <Card variant="subtle" className="rounded-xl lg:col-span-5 flex flex-col justify-between">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -969,7 +970,7 @@ const activities = [
         </Card>
 
         {/* Minha Evolução Comercial (col-span-7 - 20% maior que o do lado) */}
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-7 flex flex-col">
+        <Card variant="subtle" className="rounded-xl lg:col-span-7 flex flex-col">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -990,7 +991,7 @@ const activities = [
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-center">
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={INITIAL_DIMENSION}>
                 <AreaChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="brokerLeadsGrad" x1="0" y1="0" x2="0" y2="1">

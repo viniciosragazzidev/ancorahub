@@ -49,7 +49,7 @@ export const columns: ColumnDef<ClientItem>[] = [
           <UserAvatar seed={client.email || client.name} name={client.name} size="sm" className="size-8" />
           <div>
             <p className="text-xs font-semibold text-foreground leading-snug">{client.name}</p>
-            <Badge variant="outline" className="text-[9px] px-1 py-0 font-medium text-muted-foreground mt-0.5">
+            <Badge variant="outline" className="text-[10px] px-1 py-0 font-medium text-muted-foreground mt-0.5">
               Cliente Ativo
             </Badge>
           </div>
@@ -66,7 +66,7 @@ export const columns: ColumnDef<ClientItem>[] = [
       const client = row.original;
       return (
         <div className="flex flex-col text-xs text-muted-foreground">
-          {client.email && <span className="font-mono text-foreground/80 truncate max-w-[220px]">{client.email}</span>}
+          {client.email && <span className="font-mono text-muted-foreground truncate max-w-[220px]">{client.email}</span>}
           <span className="font-mono">{client.phone}</span>
         </div>
       );

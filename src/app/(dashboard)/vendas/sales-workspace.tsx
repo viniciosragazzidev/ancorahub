@@ -124,9 +124,9 @@ export function SalesWorkspace({
         const sale = row.original;
         return (
           <div>
-            <p className="font-medium text-xs text-foreground">{sale.leadName}</p>
+            <p className="font-semibold text-xs text-foreground leading-snug">{sale.leadName}</p>
             {sale.clientName && (
-              <p className="text-[11px] text-muted-foreground">{sale.clientName}</p>
+              <p className="text-xs text-muted-foreground">{sale.clientName}</p>
             )}
           </div>
         );
@@ -137,14 +137,18 @@ export function SalesWorkspace({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Corretor" />
       ),
-      cell: ({ row }) => row.original.brokerName ?? "—",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.brokerName ?? "—"}</span>
+      ),
     },
     {
       accessorKey: "branchName",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Filial" />
       ),
-      cell: ({ row }) => row.original.branchName ?? "—",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.branchName ?? "—"}</span>
+      ),
     },
     {
       accessorKey: "planName",
@@ -157,7 +161,7 @@ export function SalesWorkspace({
           <div>
             <span className="text-xs text-foreground">{sale.planName ?? "—"}</span>
             {sale.carrierName && (
-              <span className="ml-1 text-[11px] text-muted-foreground">({sale.carrierName})</span>
+              <span className="ml-1 text-xs text-muted-foreground">({sale.carrierName})</span>
             )}
           </div>
         );

@@ -139,6 +139,18 @@ export async function updateInterfaceMotionSettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateR2StorageSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("r2StorageEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_r2_storage_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "r2_storage_feature.updated",
+    targetType: "system_settings", targetId: "r2_storage", metadata: { enabled }, createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateMetaCloudWhatsAppSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("metaCloudWhatsAppEnabled") === "true" ? "true" : "false";
@@ -521,6 +533,24 @@ export async function updateTeamMemberProfileSettingsAction(formData: FormData) 
   });
   revalidatePath("/super-admin/settings");
   revalidatePath("/equipe");
+}
+
+export async function updateUserProfileSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("userProfileEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_user_profile_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "user_profile.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "user_profile",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/perfil");
 }
 
 export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {

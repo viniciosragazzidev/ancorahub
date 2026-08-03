@@ -23,6 +23,7 @@ import {
   SlidersHorizontal,
   Target,
   Users,
+  UserCircle,
   WifiHigh,
 } from "@/components/huge-icons";
 import { AncoraLogo } from "@/components/ancora-logo";
@@ -255,6 +256,12 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                {user?.userProfileEnabled ? (
+                  <DropdownMenuItem render={<Link href="/perfil" prefetch />}>
+                    <UserCircle className="size-4" />
+                    Meu perfil
+                  </DropdownMenuItem>
+                ) : null}
                 {roleKey && user?.permissions?.includes("acessar_configuracoes") ? (
                   <DropdownMenuItem render={<Link href="/settings" prefetch />}>
                     <SlidersHorizontal className="size-4" />
