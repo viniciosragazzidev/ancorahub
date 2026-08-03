@@ -28,6 +28,21 @@ O comportamento comercial do agente é um artefato imutável por tenant. O Diret
 
 ## Decididas
 
+## DEC-059 - Seletor de período 7/14/30/90 nas rotas de dados
+
+**Estado:** Aceita
+**Data:** 2026-08-03
+
+As rotas do núcleo que exibem dados temporais ganham um único seletor de período
+(7/14/30/90 dias) persistido em `?period=N`, uniformizando janeiras agregadas
+fixas (all-time, 7d, 30d, 6 meses, mês atual). Janelas operacionais (hoje/ontem,
+SLA, horário-do-dia, health de filiais) permanecem fixas. Valores fora da
+whitelist caem no fallback de 30 dias — nunca propagam input do cliente. O
+Financeiro mantém uma opção `all` (total geral) além do período numérico;
+`/leads` filtra lista e contador pela janela. Os KPIs do NOC (conversão, ticket
+médio) passam a comparar período atual vs período anterior. Todas as queries
+respeitam o escopo multi-tenant do papel.
+
 ## DEC-052 - Proteção contra saturação de conexões do banco
 
 **Estado:** Aceita
@@ -437,3 +452,18 @@ O perfil administrativo de um membro é uma visão de supervisão, não uma pág
 **Data:** 2026-08-03
 
 O armazenamento persistido de binários do CorreTop passa a usar um único bucket privado Cloudflare R2, na classe Standard. O banco mantém a autoridade sobre metadados, vínculos e autorização; documentos são servidos somente pela rota autenticada do servidor. Como o ambiente ainda não contém objetos a preservar, o bucket Supabase Storage não terá cópia histórica. O prefixo `documents/<tenantId>/` assegura a organização física, mas não substitui a autorização derivada da sessão, tenant, unidade e carteira. A capacidade tem kill switch global `feature_r2_storage_enabled`, controlado e auditado pelo Super-admin, sem apagar objetos ou registros.
+
+## DEC-070 — Workspace do Corretor como home operacional reversível
+
+**Estado:** Aceita
+**Data:** 2026-08-03
+
+`/dashboard` permanece a única entrada por papel. Para Corretores, a capacidade
+`feature_broker_workspace_enabled` troca a visão legada pelo Workspace operacional;
+desativá-la restaura a visão anterior sem apagar dados. A prioridade é calculada no
+servidor por fatos persistidos e ordem determinística: mensagem aguardando resposta,
+SLA vencido/em risco, tarefa vencida, retorno, lead novo, cotação, documentos e
+estagnação. A central `/conversas` continua a única experiência de chat. Sem canal
+oficial disponível, o sistema não simula envio interno: mantém o fluxo auditado para
+o WhatsApp autorizado. O Super-admin controla a capacidade globalmente e cada
+alteração fica em `platform_audit_logs`.

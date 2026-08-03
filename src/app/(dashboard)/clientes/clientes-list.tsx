@@ -129,30 +129,32 @@ export const columns: ColumnDef<ClientItem>[] = [
 export function ClientesList({
   clients,
   metrics,
+  period,
 }: {
   clients: ClientItem[];
   metrics: ClientsMetrics;
+  period: number;
 }) {
   const conversionTrend = clients.reduce<number[]>((acc, client) => {
     const convertedAt = new Date(client.convertedAt).getTime();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    for (let index = 0; index < 7; index += 1) {
+    for (let index = 0; index < period; index += 1) {
       const date = new Date(today);
-      date.setDate(today.getDate() - (6 - index));
+      date.setDate(today.getDate() - (period - 1 - index));
       const dayStart = date.getTime();
       const dayEnd = dayStart + 24 * 60 * 60 * 1000;
       if (convertedAt >= dayStart && convertedAt < dayEnd) acc[index] += 1;
     }
 
     return acc;
-  }, Array.from({ length: 7 }, () => 0));
+  }, Array.from({ length: period }, () => 0));
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-3 sm:grid-cols-4">
-        <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos 30 dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
+        <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos ${period} dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
         <StatCard label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
         <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
         <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={conversionTrend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" />

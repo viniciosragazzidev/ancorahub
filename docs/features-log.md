@@ -4,6 +4,24 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 ---
 
+## 03/08/2026 - Seletor de período 7/14/30/90 nas rotas de dados
+
+- Seletor de período persistido em `?period=N` (ToggleGroup pills) nas rotas do
+  núcleo: `/dashboard`, `/gestor`, `/noc`, `/vendas`, `/leads`, `/clientes`,
+  `/relatorios`, `/metas`, `/unidades/[branchId]` e `/financeiro`.
+- Janelas agregadas fixas (all-time, 7d, 30d, 6 meses, mês atual) uniformizadas
+  em um único controle por rota; janelas operacionais (hoje/ontem, SLA, horário,
+  health) permanecem fixas.
+- `/leads`: o seletor filtra a lista e o contador (`createdAt >= periodStart`).
+- `/financeiro`: opção extra `all` (total geral) além de 7/14/30/90; resumo,
+  comissões, vendas e tendência seguem o período (série diária N dias; mensal de
+  6 meses apenas com `all`).
+- NOC: KPIs de conversão e ticket médio comparam período atual vs período
+  anterior (rolling), em vez de mês atual vs mês anterior.
+- Helpers compartilhados em `src/shared/period.ts` (`parsePeriod`, `periodStart`,
+  `periodDaysAgoSql`, `fillTrendDays`) e séries diárias em `src/shared/trends.ts`
+  (`dailyCounts`, `dailySums`).
+
 ## 03/08/2026 - Área "Meu perfil" para todos os usuários
 
 - Nova rota `/perfil` acessível a qualquer papel autenticado, com abas de visão

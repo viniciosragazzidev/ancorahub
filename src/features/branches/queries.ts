@@ -6,6 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
+import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,16 +56,6 @@ export type BranchProfileData = {
   topBrokers: BranchTopBroker[] | null; // null = caller has no permission
 };
 
-// ─── Period helpers ───────────────────────────────────────────────────────────
-
-function currentMonthBounds(): { start: Date; end: Date; label: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const label = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  return { start, end, label };
-}
-
 // ─── Authorization helper ─────────────────────────────────────────────────────
 
 async function assertBranchProfileAccess(branchId: string) {
@@ -87,6 +78,7 @@ async function assertBranchProfileAccess(branchId: string) {
 
 export async function getBranchProfileData(
   branchId: string,
+  period: PeriodValue = DEFAULT_PERIOD,
 ): Promise<BranchProfileData> {
   const context = await assertBranchProfileAccess(branchId);
   const db = getDatabase();
@@ -114,7 +106,9 @@ export async function getBranchProfileData(
     throw new Error("BRANCH_NOT_FOUND");
   }
 
-  const { start, end, label } = currentMonthBounds();
+  const start = periodStart(period);
+  const end = new Date(start.getTime() + period * 86_400_000);
+  const label = `últimos ${period} dias`;
 
   // 2. Lead metrics for the period.
   const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -141,9 +135,8 @@ export async function getBranchProfileData(
   const converted = Number(metricsRaw?.leadsConvertidos ?? 0);
   const lost = Number(metricsRaw?.leadsPerdidos ?? 0);
 
-  // 2b. Tendência diária de leads (últimos 7 dias) para os cards
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  // 2b. Tendência diária de leads (últimos N dias) para os cards
+  const trendStart = periodStart(period);
   const dailyRows = await db
     .select({
       day: sql<string>`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date::text`,
@@ -154,14 +147,14 @@ export async function getBranchProfileData(
       and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.branchId, branchId),
-        gte(schema.leads.createdAt, sevenDaysAgo),
+        gte(schema.leads.createdAt, trendStart),
       ),
     )
     .groupBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`)
     .orderBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`);
 
   const leadsTrend: number[] = [];
-  for (let i = 6; i >= 0; i -= 1) {
+  for (let i = period - 1; i >= 0; i -= 1) {
     const d = new Date(Date.now() - i * 86_400_000);
     const isoDate = brazilDayKey(d);
     const row = dailyRows.find((r) => r.day === isoDate);

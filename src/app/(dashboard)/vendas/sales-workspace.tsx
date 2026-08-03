@@ -16,7 +16,8 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkExportSalesAction } from "@/features/sales/actions";
 import { formatCurrency, formatDate } from "@/features/quotes/utils";
-import { monthlyCounts, monthlySums } from "@/shared/trends";
+import { dailyCounts, dailySums } from "@/shared/trends";
+import type { PeriodValue } from "@/shared/period";
 
 type SaleRow = {
   id: string;
@@ -38,10 +39,12 @@ export function SalesWorkspace({
   sales,
   totalRevenue,
   currentRole,
+  period,
 }: {
   sales: SaleRow[];
   totalRevenue: number;
   currentRole?: string;
+  period: PeriodValue;
 }) {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "cancelled">("all");
 
@@ -85,13 +88,14 @@ export function SalesWorkspace({
       .filter((s) => s.status === "active")
       .map((s) => new Date(s.saleDate));
     return {
-      total: monthlyCounts(saleDates),
-      active: monthlyCounts(activeDates),
-      revenue: monthlySums(
+      total: dailyCounts(saleDates, period),
+      active: dailyCounts(activeDates, period),
+      revenue: dailySums(
         sales.map((s) => ({ date: new Date(s.saleDate), value: s.saleValue })),
+        period,
       ),
     };
-  }, [sales]);
+  }, [sales, period]);
 
   const columns: ColumnDef<SaleRow>[] = [
     {
@@ -219,7 +223,7 @@ export function SalesWorkspace({
         <StatCard
           label="Total de vendas"
           value={sales.length}
-          sublabel="últimos 6 meses"
+          sublabel={`últimos ${period} dias`}
           sparklineData={salesTrend.total}
           sparklineColor="var(--chart-1)"
           animated

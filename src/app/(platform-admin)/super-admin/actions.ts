@@ -119,6 +119,24 @@ export async function updateGlobalSearchSettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("brokerWorkspaceEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_broker_workspace_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_workspace.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "broker_workspace",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/dashboard");
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateInterfaceMotionSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("interfaceMotionEnabled") === "true" ? "true" : "false";
@@ -550,7 +568,7 @@ export async function updateUserProfileSettingsAction(formData: FormData) {
     createdAt: now,
   });
   revalidatePath("/super-admin/settings");
-  revalidatePath("/perfil");
+  revalidatePath("/settings");
 }
 
 export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {

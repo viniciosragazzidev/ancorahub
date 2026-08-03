@@ -35,12 +35,14 @@ import {
 import { GoalForm } from "./goal-form";
 import type { GoalRecord, TeamMemberOption } from "@/features/goals/queries";
 import type { GoalActionState } from "@/features/goals/schema";
-import { monthlyCounts } from "@/shared/trends";
+import { dailyCounts } from "@/shared/trends";
+import type { PeriodValue } from "@/shared/period";
 
 type GoalsManagerProps = {
   goals: GoalRecord[];
   teamMembers: TeamMemberOption[];
   branches: { id: string; name: string }[];
+  period: PeriodValue;
 };
 
 const targetTypeLabels: Record<string, string> = {
@@ -213,7 +215,7 @@ function GoalCard({
   );
 }
 
-export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps) {
+export function GoalsManager({ goals, teamMembers, branches, period }: GoalsManagerProps) {
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
   const [filterScope, setFilterScope] = useState<string>("all");
@@ -248,12 +250,12 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
       .filter((g) => g.scope === "broker" && g.active)
       .map((g) => g.createdAt);
     return {
-      total: monthlyCounts(allCreated),
-      active: monthlyCounts(activeCreated),
-      brokers: monthlyCounts(brokerActiveCreated),
-      periods: monthlyCounts(allCreated),
+      total: dailyCounts(allCreated, period),
+      active: dailyCounts(activeCreated, period),
+      brokers: dailyCounts(brokerActiveCreated, period),
+      periods: dailyCounts(allCreated, period),
     };
-  }, [goals]);
+  }, [goals, period]);
 
   return (
     <div className="space-y-6">
@@ -262,7 +264,7 @@ export function GoalsManager({ goals, teamMembers, branches }: GoalsManagerProps
         <StatCard
           label="Metas cadastradas"
           value={goals.length}
-          sublabel="últimos 6 meses"
+          sublabel={`últimos ${period} dias`}
           sparklineData={goalsTrend.total}
           sparklineColor="var(--chart-1)"
           animated

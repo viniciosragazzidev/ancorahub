@@ -1,16 +1,26 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { PeriodSelect } from "@/components/period-select";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { parsePeriod, periodStart } from "@/shared/period";
 import { SalesWorkspace } from "./sales-workspace";
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const period = parsePeriod((await searchParams).period);
 
   // Build conditions with scope filtering
-  const conditions = [eq(schema.sales.tenantId, context.tenantId)];
+  const conditions = [
+    eq(schema.sales.tenantId, context.tenantId),
+    gte(schema.sales.saleDate, periodStart(period)),
+  ];
 
   if (context.role === "broker") {
     conditions.push(eq(schema.sales.brokerId, context.userId));
@@ -54,7 +64,11 @@ export default async function SalesPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
+      <DashboardHeader
+        breadcrumb="Operação comercial"
+        title="Vendas"
+        rightSlot={<PeriodSelect value={period} />}
+      />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -77,6 +91,7 @@ export default async function SalesPage() {
           }))}
           totalRevenue={totalRevenue}
           currentRole={context.role}
+          period={period}
         />
       </main>
     </>

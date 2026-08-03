@@ -5,6 +5,7 @@ import { and, count, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
+import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -116,18 +117,15 @@ function yesterdayBounds() {
   };
 }
 
-function monthBounds() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return { start, end };
-}
-
-function lastMonthBounds() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const end = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { start, end };
+/**
+ * Janelas rolling do período: `[periodStart - days, periodStart]` (anterior) e
+ * `[periodStart, now]` (atual). Mesma janela de `periodStart`/`fillTrendDays`.
+ */
+function periodBounds(days: PeriodValue, now: Date = new Date()) {
+  const start = periodStart(days, now);
+  const prevStart = new Date(start);
+  prevStart.setDate(prevStart.getDate() - days);
+  return { start, prevStart };
 }
 
 function tenantScope(context: TenantContext) {
@@ -138,13 +136,16 @@ function tenantScope(context: TenantContext) {
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 
-async function getNocKpis(context: TenantContext): Promise<NocKpis> {
+async function getNocKpis(
+  context: TenantContext,
+  period: PeriodValue = DEFAULT_PERIOD,
+): Promise<NocKpis> {
   const db = getDatabase();
   const scope = tenantScope(context);
   const today = todayBounds();
   const yesterday = yesterdayBounds();
-  const month = monthBounds();
-  const lastMonth = lastMonthBounds();
+  const { start, prevStart } = periodBounds(period);
+  const end = new Date();
 
   function baseLeadWhere(start: Date, end: Date) {
     const base = and(
@@ -197,23 +198,23 @@ async function getNocKpis(context: TenantContext): Promise<NocKpis> {
         ),
       ),
 
-    // Month conversion metrics
+    // Period conversion metrics
     db
       .select({
         total: count(),
         converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
       })
       .from(schema.leads)
-      .where(baseLeadWhere(month.start, month.end)),
+      .where(baseLeadWhere(start, end)),
 
-    // Last month conversion
+    // Previous period conversion
     db
       .select({
         total: count(),
         converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
       })
       .from(schema.leads)
-      .where(baseLeadWhere(lastMonth.start, lastMonth.end)),
+      .where(baseLeadWhere(prevStart, start)),
 
     // Avg first contact time today (seconds)
     db
@@ -241,7 +242,7 @@ async function getNocKpis(context: TenantContext): Promise<NocKpis> {
         ),
       ),
 
-    // Avg ticket this month
+    // Avg ticket this period
     db
       .select({ avg: sql<number>`coalesce(avg(${schema.sales.saleValue}::numeric), 0)` })
       .from(schema.sales)
@@ -249,14 +250,14 @@ async function getNocKpis(context: TenantContext): Promise<NocKpis> {
       .where(
         and(
           eq(schema.sales.tenantId, scope.tenantId),
-          gte(schema.sales.saleDate, month.start),
-          lt(schema.sales.saleDate, month.end),
+          gte(schema.sales.saleDate, start),
+          lt(schema.sales.saleDate, end),
           eq(schema.sales.status, "active"),
           ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
         ),
       ),
 
-    // Avg ticket last month
+    // Avg ticket previous period
     db
       .select({ avg: sql<number>`coalesce(avg(${schema.sales.saleValue}::numeric), 0)` })
       .from(schema.sales)
@@ -264,8 +265,8 @@ async function getNocKpis(context: TenantContext): Promise<NocKpis> {
       .where(
         and(
           eq(schema.sales.tenantId, scope.tenantId),
-          gte(schema.sales.saleDate, lastMonth.start),
-          lt(schema.sales.saleDate, lastMonth.end),
+          gte(schema.sales.saleDate, prevStart),
+          lt(schema.sales.saleDate, start),
           eq(schema.sales.status, "active"),
           ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
         ),
@@ -294,16 +295,15 @@ async function getNocKpis(context: TenantContext): Promise<NocKpis> {
 
 // ─── Lead Flow (7 days) ────────────────────────────────────────────────────────
 
-async function getLeadFlow(context: TenantContext): Promise<LeadFlowDay[]> {
+async function getLeadFlow(context: TenantContext, period: PeriodValue): Promise<LeadFlowDay[]> {
   const db = getDatabase();
   const scope = tenantScope(context);
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const start = periodStart(period);
 
   const baseWhere = and(
     eq(schema.leads.tenantId, scope.tenantId),
-    gte(schema.leads.createdAt, sevenDaysAgo),
+    gte(schema.leads.createdAt, start),
     ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
   );
 
@@ -321,7 +321,7 @@ async function getLeadFlow(context: TenantContext): Promise<LeadFlowDay[]> {
 
   // Pad missing days
   const result: LeadFlowDay[] = [];
-  for (let i = 6; i >= 0; i--) {
+  for (let i = period - 1; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86_400_000);
     const isoDate = brazilDayKey(d);
     const row = rows.find((r) => r.day === isoDate);
@@ -338,11 +338,11 @@ async function getLeadFlow(context: TenantContext): Promise<LeadFlowDay[]> {
 
 // ─── Status Distribution ──────────────────────────────────────────────────────
 
-async function getStatusDistribution(context: TenantContext): Promise<StatusBucket[]> {
+async function getStatusDistribution(context: TenantContext, period: PeriodValue): Promise<StatusBucket[]> {
   const db = getDatabase();
   const scope = tenantScope(context);
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
+  const start = periodStart(period);
 
   const rows = await db
     .select({
@@ -353,7 +353,7 @@ async function getStatusDistribution(context: TenantContext): Promise<StatusBuck
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
-        gte(schema.leads.createdAt, thirtyDaysAgo),
+        gte(schema.leads.createdAt, start),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
       ),
     )
@@ -373,12 +373,11 @@ async function getStatusDistribution(context: TenantContext): Promise<StatusBuck
 
 // ─── First Contact Trend (7 days) ────────────────────────────────────────────
 
-async function getFirstContactTrend(context: TenantContext): Promise<number[]> {
+async function getFirstContactTrend(context: TenantContext, period: PeriodValue): Promise<number[]> {
   const db = getDatabase();
   const scope = tenantScope(context);
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const start = periodStart(period);
 
   const rows = await db
     .select({
@@ -389,7 +388,7 @@ async function getFirstContactTrend(context: TenantContext): Promise<number[]> {
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
-        gte(schema.leads.createdAt, sevenDaysAgo),
+        gte(schema.leads.createdAt, start),
         isNotNull(schema.leads.firstContactAt),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
       ),
@@ -398,7 +397,7 @@ async function getFirstContactTrend(context: TenantContext): Promise<number[]> {
     .orderBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`);
 
   const result: number[] = [];
-  for (let i = 6; i >= 0; i--) {
+  for (let i = period - 1; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86_400_000);
     const isoDate = brazilDayKey(d);
     const row = rows.find((r) => r.day === isoDate);
@@ -409,12 +408,11 @@ async function getFirstContactTrend(context: TenantContext): Promise<number[]> {
 
 // ─── Ticket Trend (7 days) ────────────────────────────────────────────────────
 
-async function getTicketTrend(context: TenantContext): Promise<number[]> {
+async function getTicketTrend(context: TenantContext, period: PeriodValue): Promise<number[]> {
   const db = getDatabase();
   const scope = tenantScope(context);
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  const start = periodStart(period);
 
   const rows = await db
     .select({
@@ -426,7 +424,7 @@ async function getTicketTrend(context: TenantContext): Promise<number[]> {
     .where(
       and(
         eq(schema.sales.tenantId, scope.tenantId),
-        gte(schema.sales.saleDate, sevenDaysAgo),
+        gte(schema.sales.saleDate, start),
         eq(schema.sales.status, "active"),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
       ),
@@ -435,7 +433,7 @@ async function getTicketTrend(context: TenantContext): Promise<number[]> {
     .orderBy(sql`date_trunc('day', ${schema.sales.saleDate} AT TIME ZONE 'America/Sao_Paulo')::date`);
 
   const result: number[] = [];
-  for (let i = 6; i >= 0; i--) {
+  for (let i = period - 1; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86_400_000);
     const isoDate = brazilDayKey(d);
     const row = rows.find((r) => r.day === isoDate);
@@ -533,9 +531,10 @@ async function getTeamPerformance(context: TenantContext): Promise<TeamMemberPer
 
 // ─── Recent Activity Feed ─────────────────────────────────────────────────────
 
-async function getRecentActivity(context: TenantContext): Promise<ActivityItem[]> {
+async function getRecentActivity(context: TenantContext, period: PeriodValue): Promise<ActivityItem[]> {
   const db = getDatabase();
   const scope = tenantScope(context);
+  const start = periodStart(period);
 
   // Lead interactions (status changes, quote generated)
   const interactions = await db
@@ -557,6 +556,7 @@ async function getRecentActivity(context: TenantContext): Promise<ActivityItem[]
       and(
         eq(schema.leads.tenantId, scope.tenantId),
         sql`${schema.leadInteractions.tipo} = ANY(ARRAY['status_change','quote_generated','service_started']::lead_interaction_type[])`,
+        gte(schema.leadInteractions.createdAt, start),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
       ),
     )
@@ -666,18 +666,18 @@ async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> 
   });
 }
 
-export async function getNocData(context: TenantContext): Promise<NocData> {
+export async function getNocData(context: TenantContext, period: PeriodValue = DEFAULT_PERIOD): Promise<NocData> {
   const [kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth, firstContactTrend, ticketTrend] =
     await Promise.all([
-      getNocKpis(context),
-      getLeadFlow(context),
-      getStatusDistribution(context),
+      getNocKpis(context, period),
+      getLeadFlow(context, period),
+      getStatusDistribution(context, period),
       getHourlyActivity(context),
       getTeamPerformance(context),
-      getRecentActivity(context),
+      getRecentActivity(context, period),
       getBranchHealth(context),
-      getFirstContactTrend(context),
-      getTicketTrend(context),
+      getFirstContactTrend(context, period),
+      getTicketTrend(context, period),
     ]);
 
   return { kpis, leadFlow, statusDistribution, hourlyActivity, teamPerformance, recentActivity, branchHealth, firstContactTrend, ticketTrend };

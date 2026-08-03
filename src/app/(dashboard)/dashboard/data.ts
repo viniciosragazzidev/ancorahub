@@ -5,6 +5,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, ne, or, sql } from "dri
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { DEFAULT_PERIOD, fillTrendDays, periodDaysAgoSql, periodStart, type PeriodValue } from "@/shared/period";
 
 const activeLeadStatuses = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -19,7 +20,7 @@ export type BrokerDashboardData = {
   trend: LeadTrend;
 };
 
-export async function getBrokerDashboardData(): Promise<BrokerDashboardData> {
+export async function getBrokerDashboardData(period: PeriodValue = DEFAULT_PERIOD): Promise<BrokerDashboardData> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const [user, membership, leads, trendRaw] = await Promise.all([
@@ -51,7 +52,7 @@ export async function getBrokerDashboardData(): Promise<BrokerDashboardData> {
         and(
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, context.userId),
-          gte(schema.leads.createdAt, sql`now() - interval '29 days'`),
+          gte(schema.leads.createdAt, periodDaysAgoSql(period)),
         ),
       )
       .groupBy(sql`1`)
@@ -73,20 +74,8 @@ export async function getBrokerDashboardData(): Promise<BrokerDashboardData> {
     overdueCount: distributedLeads.filter((lead) => lead.assignedAt && nowMs - lead.assignedAt.getTime() > 15 * 60 * 1000).length,
   };
 
-  // Fill missing days with zeros
   const trendMap = new Map(trendRaw.map((r) => [r.date, r]));
-  const trend: LeadTrend = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    const existing = trendMap.get(key);
-    trend.push({
-      date: key,
-      leads: existing?.leads ?? 0,
-      converted: existing?.converted ?? 0,
-    });
-  }
+  const trend = fillTrendDays(period, trendMap);
 
   return {
     userName: user[0]?.name ?? "Corretor",
@@ -123,7 +112,7 @@ export type ManagerDashboardData = {
   trend: LeadTrend;
 };
 
-export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
+export async function getManagerDashboardData(period: PeriodValue = DEFAULT_PERIOD): Promise<ManagerDashboardData> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const [branch, members, leads, trendRaw] = await Promise.all([
@@ -141,7 +130,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
         and(
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.branchId, context.branchId!),
-          gte(schema.leads.createdAt, sql`now() - interval '29 days'`),
+          gte(schema.leads.createdAt, periodDaysAgoSql(period)),
         ),
       )
       .groupBy(sql`1`)
@@ -152,18 +141,7 @@ export async function getManagerDashboardData(): Promise<ManagerDashboardData> {
   const stalled = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status) && now - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000).length;
 
   const trendMap = new Map(trendRaw.map((r) => [r.date, r]));
-  const trend: LeadTrend = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    const existing = trendMap.get(key);
-    trend.push({
-      date: key,
-      leads: existing?.leads ?? 0,
-      converted: existing?.converted ?? 0,
-    });
-  }
+  const trend = fillTrendDays(period, trendMap);
 
   return { branchName: branch[0]?.branchName ?? "Unidade não identificada", teamSize: members.length, activeMembers: members.filter((member) => member.status === "active").length, leadsTotal: leads.length, newLeads: leads.filter((lead) => lead.status === "new").length, inContact: leads.filter((lead) => lead.status === "in_contact").length, unassigned: leads.filter((lead) => !lead.corretorId).length, unworked, stalled, branchId: context.branchId!, autoDistribute: branch[0]?.autoDistribute ?? true, trend };
 }
@@ -179,7 +157,7 @@ export type DirectorDashboardData = {
   trend: LeadTrend;
 };
 
-export async function getDirectorDashboardData(): Promise<DirectorDashboardData> {
+export async function getDirectorDashboardData(period: PeriodValue = DEFAULT_PERIOD): Promise<DirectorDashboardData> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const [user, tenant, leads, branches, members, trendRaw] = await Promise.all([
@@ -199,7 +177,7 @@ export async function getDirectorDashboardData(): Promise<DirectorDashboardData>
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
-          gte(schema.leads.createdAt, sql`now() - interval '29 days'`),
+          gte(schema.leads.createdAt, periodDaysAgoSql(period)),
         ),
       )
       .groupBy(sql`1`)
@@ -216,18 +194,7 @@ export async function getDirectorDashboardData(): Promise<DirectorDashboardData>
 
   // Fill missing days with zeros
   const trendMap = new Map(trendRaw.map((r) => [r.date, r]));
-  const trend: LeadTrend = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    const existing = trendMap.get(key);
-    trend.push({
-      date: key,
-      leads: existing?.leads ?? 0,
-      converted: existing?.converted ?? 0,
-    });
-  }
+  const trend = fillTrendDays(period, trendMap);
 
   return { user: user[0], tenant: tenant[0], totals: { leads: leads.length, activeLeads: active.length, converted: leads.filter((lead) => lead.status === "converted").length, branches: branches.length, members: members.length, activeBrokers: members.filter((member) => member.role === "broker" && member.status === "active").length, unworked, stalled }, funnel, trend, branches: branches.map((branch) => { const branchLeads = leads.filter((lead) => lead.branchId === branch.id); const converted = branchLeads.filter((lead) => lead.status === "converted").length; return { name: branch.name, leads: branchLeads.length, activeLeads: branchLeads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status)).length, conversion: branchLeads.length ? `${((converted / branchLeads.length) * 100).toFixed(1)}%` : "0,0%" }; }) };
 }

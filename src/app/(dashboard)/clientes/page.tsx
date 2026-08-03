@@ -1,14 +1,21 @@
 import { and, count, desc, eq, gte, sql, countDistinct } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { PeriodSelect } from "@/components/period-select";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { parsePeriod, periodStart } from "@/shared/period";
 import { ClientesList } from "./clientes-list";
 
 export const dynamic = "force-dynamic";
 
-export default async function CustomersPage() {
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const period = parsePeriod((await searchParams).period);
 
   // Scope filter based on role
   const clientScope = context.role === "broker"
@@ -22,7 +29,7 @@ export default async function CustomersPage() {
       ? eq(schema.leads.branchId, context.branchId)
       : undefined;
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const periodStartDate = periodStart(period);
 
   // Parallel queries for metrics and client list
   const [
@@ -48,26 +55,26 @@ export default async function CustomersPage() {
       .from(schema.clients)
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.clients.branchId, schema.branches.id))
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope))
+      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, periodStartDate)))
       .orderBy(desc(schema.clients.convertedAt)),
 
     // Total clients
     db
       .select({ total: count() })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope)),
+      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, periodStartDate))),
 
     // Total leads (for conversion rate)
     db
       .select({ total: count() })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope)),
+      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, periodStartDate))),
 
     // Distinct brokers with clients
     db
       .select({ total: countDistinct(schema.clients.corretorId) })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope)),
+      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, periodStartDate))),
 
     // Upcoming renewals (clients with active customers whose contract anniversary is within 30 days)
     db
@@ -91,7 +98,7 @@ export default async function CustomersPage() {
         and(
           eq(schema.clients.tenantId, context.tenantId),
           clientScope,
-          gte(schema.clients.convertedAt, thirtyDaysAgo),
+          gte(schema.clients.convertedAt, periodStartDate),
         ),
       ),
   ]);
@@ -115,7 +122,7 @@ export default async function CustomersPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />
+      <DashboardHeader breadcrumb="Pós-venda" title="Clientes" rightSlot={<PeriodSelect value={period} />} />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
@@ -126,7 +133,7 @@ export default async function CustomersPage() {
           </p>
         </section>
         */}
-        <ClientesList clients={clients} metrics={metrics} />
+        <ClientesList clients={clients} metrics={metrics} period={period} />
       </main>
     </>
   );

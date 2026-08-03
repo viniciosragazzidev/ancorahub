@@ -1,7 +1,8 @@
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { PeriodSelect } from "@/components/period-select";
 import { ViewScopeContext } from "@/components/ownership-context";
 import {
   ArrowUpRight,
@@ -17,15 +18,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
+import { parsePeriod, periodStart } from "@/shared/period";
 import { ExportButtons } from "./_components/export-buttons";
 import { SpreadsheetSection } from "./_components/spreadsheet-section";
 import { Sparkline } from "@/components/dashboard/sparkline";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const period = parsePeriod((await searchParams).period);
+  const reportStart = periodStart(period);
   const canExport = hasCapability(context.role, "exportar_relatorios", context.jobTitle);
   const leadScope = context.role === "broker"
     ? eq(schema.leads.corretorId, context.userId)
@@ -44,21 +52,20 @@ export default async function ReportsPage() {
       db
         .select({ count: count() })
         .from(schema.leads)
-        .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope)),
+        .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, reportStart))),
       db
         .select({ count: count() })
         .from(schema.clients)
-        .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope)),
+        .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, reportStart))),
       db
         .select({ count: count() })
         .from(schema.sales)
         .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-        .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope)),
+        .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.sales.saleDate, reportStart))),
     ]);
 
-  // Get this month's sales revenue
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const monthlyRevenue = await db
+  // Get the period's sales revenue
+  const periodRevenue = await db
     .select({
       total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
     })
@@ -70,58 +77,53 @@ export default async function ReportsPage() {
         eq(schema.leads.tenantId, context.tenantId),
         leadScope,
         eq(schema.sales.status, "active"),
-        sql`to_char(${schema.sales.saleDate}, 'YYYY-MM') = ${currentMonth}`,
+        gte(schema.sales.saleDate, reportStart),
       ),
     );
 
-  // Monthly trends (últimos 6 meses) para os cards do resumo
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-  sixMonthsAgo.setDate(1);
-  sixMonthsAgo.setHours(0, 0, 0, 0);
-
-  const [leadsByMonth, clientsByMonth, salesByMonth, revenueByMonth] = await Promise.all([
+  // Daily trends (N dias) para os cards do resumo
+  const [leadsByDay, clientsByDay, salesByDay, revenueByDay] = await Promise.all([
     db
-      .select({ month: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM')`, count: count() })
+      .select({ day: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`, count: count() })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, sql`${schema.leads.createdAt} >= ${sixMonthsAgo.toISOString()}`))
-      .groupBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM')`),
+      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, reportStart)))
+      .groupBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`),
     db
-      .select({ month: sql<string>`to_char(${schema.clients.convertedAt}, 'YYYY-MM')`, count: count() })
+      .select({ day: sql<string>`to_char(${schema.clients.convertedAt}, 'YYYY-MM-DD')`, count: count() })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, sql`${schema.clients.convertedAt} >= ${sixMonthsAgo.toISOString()}`))
-      .groupBy(sql`to_char(${schema.clients.convertedAt}, 'YYYY-MM')`),
+      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, reportStart)))
+      .groupBy(sql`to_char(${schema.clients.convertedAt}, 'YYYY-MM-DD')`),
     db
-      .select({ month: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM')`, count: count() })
+      .select({ day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`, count: count() })
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, sql`${schema.sales.saleDate} >= ${sixMonthsAgo.toISOString()}`))
-      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM')`),
+      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.sales.saleDate, reportStart)))
+      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
     db
-      .select({ month: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM')`, total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')` })
+      .select({ day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`, total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')` })
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, eq(schema.sales.status, "active"), sql`${schema.sales.saleDate} >= ${sixMonthsAgo.toISOString()}`))
-      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM')`),
+      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, eq(schema.sales.status, "active"), gte(schema.sales.saleDate, reportStart)))
+      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
   ]);
 
-  function fillMonthSeries(rows: Array<{ month: string; count?: number; total?: string }>) {
-    const map = new Map(rows.map((row) => [row.month, row]));
+  function fillDaySeries(rows: Array<{ day: string; count?: number; total?: string }>) {
+    const map = new Map(rows.map((row) => [row.day, row]));
     const result: number[] = [];
-    for (let i = 5; i >= 0; i -= 1) {
+    for (let i = period - 1; i >= 0; i -= 1) {
       const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
       const row = map.get(key);
       result.push(row ? Number(row.count ?? row.total ?? 0) : 0);
     }
     return result;
   }
 
-  const leadsTrend = fillMonthSeries(leadsByMonth);
-  const clientsTrend = fillMonthSeries(clientsByMonth);
-  const salesTrend = fillMonthSeries(salesByMonth);
-  const revenueTrend = fillMonthSeries(revenueByMonth);
+  const leadsTrend = fillDaySeries(leadsByDay);
+  const clientsTrend = fillDaySeries(clientsByDay);
+  const salesTrend = fillDaySeries(salesByDay);
+  const revenueTrend = fillDaySeries(revenueByDay);
 
   const totalLeads = leadCount[0]?.count ?? 0;
   const totalClients = clientCount[0]?.count ?? 0;
@@ -130,11 +132,7 @@ export default async function ReportsPage() {
     totalLeads > 0
       ? ((totalClients / totalLeads) * 100).toFixed(1)
       : "0,0";
-  const revenue = parseFloat(monthlyRevenue[0]?.total ?? "0");
-  const monthlyLabel = new Intl.DateTimeFormat("pt-BR", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
+  const revenue = parseFloat(periodRevenue[0]?.total ?? "0");
 
   const reportCards = [
     {
@@ -177,7 +175,7 @@ export default async function ReportsPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Gestão comercial" title="Relatórios" />
+      <DashboardHeader breadcrumb="Gestão comercial" title="Relatórios" rightSlot={<PeriodSelect value={period} />} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração.
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -193,7 +191,7 @@ export default async function ReportsPage() {
         <section className="rounded-xl border border-border/60 bg-gradient-to-br from-card to-muted/30 p-5 shadow-none">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ChartBar className="size-3.5" />
-            <span>Resumo do período — {monthlyLabel}</span>
+            <span>Resumo do período — últimos {period} dias</span>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             {[
@@ -222,7 +220,7 @@ export default async function ReportsPage() {
                 sparkColor: "var(--chart-4)",
               },
               {
-                label: "Receita (mês)",
+                label: `Receita (${period}d)`,
                 value: revenue.toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",

@@ -52,7 +52,9 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { PeriodSelect } from "@/components/period-select";
 import { INITIAL_DIMENSION } from "@/components/ui/chart";
+import { DEFAULT_PERIOD, type PeriodValue } from "@/shared/period";
 import type {
   DirectorDashboardData,
   ManagerDashboardData,
@@ -62,9 +64,9 @@ import type {
 // ─── Props ──────────────────────────────────────────────────────────────────
 
 type RoleProps =
-  | { role: "director"; data: DirectorDashboardData }
-  | { role: "manager"; data: ManagerDashboardData }
-  | { role: "broker"; data: BrokerDashboardData };
+  | { role: "director"; data: DirectorDashboardData; period?: PeriodValue }
+  | { role: "manager"; data: ManagerDashboardData; period?: PeriodValue }
+  | { role: "broker"; data: BrokerDashboardData; period?: PeriodValue };
 
 // ─── Status Helper ───────────────────────────────────────────────────────────
 
@@ -1083,7 +1085,12 @@ export default function NocDashboardContent(props: RoleProps) {
       <DashboardHeader
         breadcrumb={breadcrumb}
         title={title}
-        rightSlot={<NocHeaderSlot />}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <PeriodSelect value={props.period ?? DEFAULT_PERIOD} />
+            <NocHeaderSlot />
+          </div>
+        }
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {props.role === "director" && <DirectorNocContent data={props.data} />}

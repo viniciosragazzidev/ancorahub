@@ -2,19 +2,26 @@ import { redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
+import { PeriodSelect } from "@/components/period-select";
 import { getNocData } from "@/features/noc/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { parsePeriod } from "@/shared/period";
 import { NocClient } from "./noc-client";
 import { NocHeaderSlot } from "./noc-client";
 
-export default async function NocPage() {
+export default async function NocPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const context = await getRequiredTenantContext();
+  const period = parsePeriod((await searchParams).period);
 
   if (context.role === "broker") {
     redirect("/access-denied");
   }
 
-  const data = await getNocData(context);
+  const data = await getNocData(context, period);
 
   return (
     <>
@@ -24,6 +31,7 @@ export default async function NocPage() {
         rightSlot={
           <div className="flex items-center gap-2">
             <NextUrgentLeadButton />
+            <PeriodSelect value={period} />
             <NocHeaderSlot />
           </div>
         }
