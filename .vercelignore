@@ -1,0 +1,5 @@
+# Local design reference only. It is not part of the AncoraHub application.
+latitude-llm-reference/
+
+# User supplied visual references are reviewed locally and must not be deployed.
+NewDesignRefs/
