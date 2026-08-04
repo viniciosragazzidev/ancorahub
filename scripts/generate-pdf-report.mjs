@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 
-// Ler o SVG da logo e converter para Data URI em Base64 para garantir a renderização cristalina no PDF
+// Extrair a imagem PNG de alta resolução (3126x886 px) diretamente contida dentro do logo.svg
 const logoSvgPath = path.join(process.cwd(), "public/logo.svg");
 const logoSvgContent = fs.readFileSync(logoSvgPath, "utf8");
 
@@ -24,7 +24,7 @@ const htmlContent = `<!DOCTYPE html>
   <title>Âncora CRM — Apresentação da Plataforma, Plano de Implantação & Custos</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
+    
     @page {
       size: A4;
       margin: 8mm 10mm 8mm 10mm;
@@ -375,7 +375,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Apresentação da Plataforma Atual</div>
-      <div>Página 1 de 11</div>
+      <div>Página 1 de 12</div>
     </div>
   </div>
 
@@ -459,7 +459,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Apresentação da Plataforma Atual</div>
-      <div>Página 2 de 11</div>
+      <div>Página 2 de 12</div>
     </div>
   </div>
 
@@ -522,7 +522,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Documento de Alinhamento Executivo</div>
-      <div>Página 3 de 11</div>
+      <div>Página 3 de 12</div>
     </div>
   </div>
 
@@ -614,7 +614,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Documento de Alinhamento Executivo</div>
-      <div>Página 4 de 11</div>
+      <div>Página 4 de 12</div>
     </div>
   </div>
 
@@ -699,7 +699,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Documento de Alinhamento Executivo</div>
-      <div>Página 5 de 11</div>
+      <div>Página 5 de 12</div>
     </div>
   </div>
 
@@ -779,7 +779,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Documento de Alinhamento Executivo</div>
-      <div>Página 6 de 11</div>
+      <div>Página 6 de 12</div>
     </div>
   </div>
 
@@ -875,7 +875,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Documento de Alinhamento Executivo</div>
-      <div>Página 7 de 11</div>
+      <div>Página 7 de 12</div>
     </div>
   </div>
 
@@ -929,7 +929,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Documento de Alinhamento Executivo</div>
-      <div>Página 8 de 11</div>
+      <div>Página 8 de 12</div>
     </div>
   </div>
 
@@ -1031,7 +1031,7 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Relatório Interno para a Diretoria</div>
-      <div>Página 9 de 11</div>
+      <div>Página 9 de 12</div>
     </div>
   </div>
 
@@ -1175,11 +1175,11 @@ const htmlContent = `<!DOCTYPE html>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Relatório Interno para a Diretoria</div>
-      <div>Página 10 de 11</div>
+      <div>Página 10 de 12</div>
     </div>
   </div>
 
-  <!-- PÁGINA 11: RESULTADOS ESPERADOS COM A IMPLANTAÇÃO DO ÂNCORA CRM -->
+  <!-- PÁGINA 11: RESULTADOS ESPERADOS COM A IMPLANTAÇÃO DO ÂNCORA CRM - PARTE 1 -->
   <div class="page">
     <div>
       <div class="header">
@@ -1195,77 +1195,148 @@ const htmlContent = `<!DOCTYPE html>
       <div class="hero-box" style="background: #f0fdf4; border-color: #bbf7d0;">
         <div class="hero-title" style="color: #166534;">🏆 Resultados Esperados com a Implantação do Âncora CRM</div>
         <div class="hero-text" style="color: #14532d;">
-          A implantação do Âncora CRM não é apenas uma mudança de sistema, mas uma <strong>transformação operacional na Âncora Saúde</strong>. O objetivo é aumentar a conversão de contratos, otimizar a rotina dos corretores e dar total controle à Diretoria.
+          A implantação do Âncora CRM representa uma evolução na forma como a Âncora Saúde gerencia sua operação comercial. Além de organizar processos, a plataforma reduz desperdícios, aumenta a produtividade da equipe e oferece informações em tempo real para decisões estratégicas. O objetivo não é apenas informatizar a operação, mas criar uma estrutura capaz de crescer com segurança, mantendo qualidade no atendimento e controle total da gestão.
         </div>
       </div>
 
-      <h2>Os 4 Pilares de Impacto no Negócio da Âncora Saúde</h2>
+      <h2>💰 Principais Ganhos para a Operação</h2>
       <div class="grid-2">
-        <div class="card" style="background: #f0f9ff; border-color: #bae6fd;">
-          <h3 style="color: #0369a1;">⚡ 1. Agilidade & Redução do Tempo de Resposta</h3>
-          <p>Redução do tempo de primeiro atendimento ao lead de horas para <strong>poucos segundos</strong>. Resumos de IA aceleram a montagem de cotações em até 70%.</p>
+        <div class="card">
+          <h3>📈 1. Maior Aproveitamento dos Leads</h3>
+          <p style="margin-bottom: 4px;">Cada oportunidade passa a ser acompanhada desde a entrada até a conclusão da negociação. Com distribuição automática, alertas de SLA e acompanhamento da gestão, reduzimos significativamente o risco de leads esquecidos ou sem atendimento.</p>
+          <div style="font-size: 9px; color: #166534; background: #f0fdf4; padding: 4px 6px; border-radius: 4px; border-left: 2.5px solid #166534;">
+            <strong>Impacto esperado:</strong> Redução da perda de oportunidades • Maior aproveitamento do investimento em tráfego pago • Aumento da conversão sem necessidade de gerar mais leads.
+          </div>
         </div>
-        <div class="card" style="background: #f0fdf4; border-color: #bbf7d0;">
-          <h3 style="color: #15803d;">🛡️ 2. Zero Perda de Leads (Retenção 100%)</h3>
-          <p>Eliminação de leads esquecidos via distribuição por plantão e alertas automáticos de SLA. Nenhum lead fica sem acompanhamento.</p>
+
+        <div class="card">
+          <h3>⏱️ 2. Economia de Tempo da Equipe</h3>
+          <p style="margin-bottom: 4px;">O corretor passa a trabalhar em uma única plataforma. Conversas, documentos, tarefas, histórico, cotações e informações do cliente ficam centralizados em um único ambiente. A Inteligência Artificial auxilia na qualificação, resume conversas e agiliza tarefas repetitivas.</p>
+          <div style="font-size: 9px; color: #0369a1; background: #f0f9ff; padding: 4px 6px; border-radius: 4px; border-left: 2.5px solid #0284c7;">
+            <strong>Impacto esperado:</strong> Menos tempo procurando informações • Menos retrabalho • Mais tempo dedicado à venda.
+          </div>
         </div>
-        <div class="card" style="background: #faf5ff; border-color: #e9d5ff;">
-          <h3 style="color: #7e22ce;">💰 3. Redução do CAC & Alta Eficiência</h3>
-          <p>Custo de automação por contrato vendido inferior a <strong>R$ 1,00 a R$ 2,00</strong>, com aproveitamento máximo do tráfego pago da Âncora Saúde.</p>
+
+        <div class="card">
+          <h3>👥 3. Aumento da Produtividade sem Aumentar a Equipe</h3>
+          <p style="margin-bottom: 4px;">Ao eliminar atividades operacionais repetitivas, cada corretor consegue atender mais clientes durante o dia. O crescimento da operação deixa de depender exclusivamente da contratação de novos colaboradores.</p>
+          <div style="font-size: 9px; color: #7e22ce; background: #faf5ff; padding: 4px 6px; border-radius: 4px; border-left: 2.5px solid #9333ea;">
+            <strong>Impacto esperado:</strong> Mais atendimentos por corretor • Melhor aproveitamento da equipe atual • Crescimento sustentável da operação.
+          </div>
         </div>
-        <div class="card" style="background: #fffbeb; border-color: #fde68a;">
-          <h3 style="color: #b45309;">📊 4. Governança Executiva & Transparência</h3>
-          <p>Painéis em tempo real para a Diretoria com métricas de conversão por filial, desempenho da equipe e controle total do pipeline.</p>
+
+        <div class="card">
+          <h3>📊 4. Gestão Baseada em Dados</h3>
+          <p style="margin-bottom: 4px;">A Diretoria e os Gestores deixam de depender de planilhas e informações descentralizadas. Todos os indicadores passam a estar disponíveis em tempo real.</p>
+          <div style="font-size: 9px; color: #9a3412; background: #fff7ed; padding: 4px 6px; border-radius: 4px; border-left: 2.5px solid #ea580c;">
+            <strong>Impacto esperado:</strong> Decisões mais rápidas • Identificação imediata de gargalos • Acompanhamento preciso do desempenho por unidade, gestor e corretor.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🔒 5. Segurança Patrimonial da Empresa</h3>
+          <p style="margin-bottom: 4px;">O conhecimento comercial deixa de ficar armazenado em celulares pessoais ou conversas isoladas. Todo o histórico permanece dentro da empresa.</p>
+          <div style="font-size: 9px; color: #1e40af; background: #eff6ff; padding: 4px 6px; border-radius: 4px; border-left: 2.5px solid #2563eb;">
+            <strong>Impacto esperado:</strong> Maior proteção das informações • Continuidade da operação mesmo com mudanças na equipe • Conformidade com a LGPD e maior segurança dos dados.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>💸 6. Redução de Custos Operacionais</h3>
+          <p style="margin-bottom: 4px;">O CRM substitui controles paralelos, reduz retrabalho e automatiza diversas atividades da operação comercial. Além disso, a infraestrutura da plataforma possui baixo custo fixo mensal e cresce conforme a necessidade da empresa.</p>
+          <div style="font-size: 9px; color: #166534; background: #f0fdf4; padding: 4px 6px; border-radius: 4px; border-left: 2.5px solid #166534;">
+            <strong>Impacto esperado:</strong> Menor custo operacional • Redução de processos manuais • Maior retorno sobre o investimento em tecnologia.
+          </div>
         </div>
       </div>
 
-      <h2>Antes vs. Depois da Implantação do Âncora CRM</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Processo Operacional</th>
-            <th>Antes (Processo Atual)</th>
-            <th class="text-right">Depois (Com Âncora CRM)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="bold">Atendimento Inicial ao Lead</td>
-            <td>Demorado ou dependente da disponibilidade manual do corretor</td>
-            <td class="text-right bold" style="color: #15803d;">Imediato via IA com pré-qualificação em segundos</td>
-          </tr>
-          <tr>
-            <td class="bold">Distribuição de Leads</td>
-            <td>Manual, descentralizada e suscetível a erros ou atrasos</td>
-            <td class="text-right bold" style="color: #15803d;">Plantão multiunidade automático por regra transparente</td>
-          </tr>
-          <tr>
-            <td class="bold">Histórico do Cliente & Documentos</td>
-            <td>Disperso nos celulares pessoais dos corretores</td>
-            <td class="text-right bold" style="color: #15803d;">Centralizado e protegido na nuvem da Âncora Saúde (LGPD)</td>
-          </tr>
-          <tr>
-            <td class="bold">Acompanhamento da Gestão</td>
-            <td>Baseado em planilhas ou relatórios manuais defasados</td>
-            <td class="text-right bold" style="color: #15803d;">Dashboard executivo em tempo real com métricas precisas</td>
-          </tr>
-          <tr style="background-color: #ecfdf5;">
-            <td class="bold">Custo de Automação / Contrato Fechado</td>
-            <td>Alto custo de mensalidades por usuário de CRMs de mercado</td>
-            <td class="text-right bold" style="color: #15803d;">R$ 0,83 a R$ 1,97 por contrato vendido</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="hero-box" style="background: #f8fafc; border-color: #0284c7; text-align: center; padding: 14px; margin-top: 8px;">
-        <div style="font-size: 13px; font-weight: 700; color: #0369a1; margin-bottom: 3px;">Recomendação à Diretoria da Âncora Saúde</div>
-        <div style="font-size: 10.5px; color: #334155;">"Aprovar o início imediato da Etapa 1 (Preparação e Piloto com 5 a 10 corretores) para validar na prática todos os ganhos operacionais e financeiros apresentados."</div>
+      <div class="card" style="margin-top: 4px;">
+        <h3>🤖 7. Automação Inteligente com Baixo Custo</h3>
+        <p style="margin-bottom: 4px;">A qualificação automática de leads utilizando WhatsApp Oficial e Inteligência Artificial possui custo extremamente reduzido quando comparado ao atendimento totalmente manual. Mesmo em cenários de grande volume de atendimento, o custo operacional por contrato permanece muito baixo, tornando a automação financeiramente viável.</p>
       </div>
     </div>
 
     <div class="footer">
       <div>Âncora Saúde | Âncora CRM — Relatório Interno para a Diretoria</div>
-      <div>Página 11 de 11</div>
+      <div>Página 11 de 12</div>
+    </div>
+  </div>
+
+  <!-- PÁGINA 12: RESUMO EXECUTIVO DOS BENEFÍCIOS & VISÃO ESTRATÉGICA -->
+  <div class="page">
+    <div>
+      <div class="header">
+        <div class="brand">
+          <img src="${logoPngDataUri}" class="brand-img" alt="Âncora Saúde Logo" />
+        </div>
+        <div class="doc-meta">
+          <div><strong>Apresentado a:</strong> Diretoria da Âncora Saúde</div>
+          <div><strong>Agosto de 2026</strong></div>
+        </div>
+      </div>
+
+      <h2>📊 Resumo Executivo dos Benefícios</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 35%;">Indicador</th>
+            <th style="width: 65%;">Resultado Esperado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Aproveitamento dos Leads</td>
+            <td>Redução significativa de perdas e maior conversão</td>
+          </tr>
+          <tr>
+            <td class="bold">Tempo de Atendimento</td>
+            <td>Atendimento inicial praticamente imediato</td>
+          </tr>
+          <tr>
+            <td class="bold">Produtividade</td>
+            <td>Mais atendimentos por corretor utilizando a mesma equipe</td>
+          </tr>
+          <tr>
+            <td class="bold">Gestão</td>
+            <td>Indicadores em tempo real para tomada de decisão</td>
+          </tr>
+          <tr>
+            <td class="bold">Segurança</td>
+            <td>Centralização de informações e conformidade com LGPD</td>
+          </tr>
+          <tr>
+            <td class="bold">Custos Operacionais</td>
+            <td>Redução de retrabalho e processos manuais</td>
+          </tr>
+          <tr style="background-color: #ecfdf5;">
+            <td class="bold">Crescimento</td>
+            <td class="bold" style="color: #15803d;">Plataforma preparada para expansão da operação</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>🎯 Visão Estratégica</h2>
+      <div class="hero-box" style="background: #f8fafc; border-color: #bae6fd; padding: 14px; margin-bottom: 12px;">
+        <div style="font-size: 11px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          Mais do que um sistema de CRM, o <strong>Âncora CRM será a plataforma central da operação comercial da Âncora Saúde</strong>.
+        </div>
+        <div style="font-size: 11px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          Cada atendimento, negociação, documento, indicador e interação ficará concentrado em um único ambiente, proporcionando maior eficiência operacional, controle gerencial e capacidade de crescimento.
+        </div>
+        <div style="font-size: 11px; color: #334155; line-height: 1.5;">
+          A expectativa é que, com a evolução contínua da plataforma, a empresa consiga atender um volume maior de clientes, elevar a produtividade da equipe e tomar decisões cada vez mais rápidas, sempre apoiadas por dados confiáveis e processos padronizados.
+        </div>
+      </div>
+
+      <div class="hero-box" style="background: #f0fdf4; border-color: #10b981; text-align: center; padding: 14px; margin-top: 10px;">
+        <div style="font-size: 13px; font-weight: 700; color: #166534; margin-bottom: 3px;">Recomendação à Diretoria da Âncora Saúde</div>
+        <div style="font-size: 10.5px; color: #14532d;">"Aprovar o início imediato da Etapa 1 (Preparação e Piloto com 5 a 10 corretores) para consolidar a transformação comercial e tecnológica da corretora."</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>Âncora Saúde | Âncora CRM — Relatório Interno para a Diretoria</div>
+      <div>Página 12 de 12</div>
     </div>
   </div>
 
@@ -1274,12 +1345,12 @@ const htmlContent = `<!DOCTYPE html>
 
 async function generatePDF() {
   const outputPath = path.join(process.cwd(), "Relatorio_Custos_Infraestrutura_AncoraHub.pdf");
-
+  
   const browser = await chromium.launch();
   const page = await browser.newPage();
-
+  
   await page.setContent(htmlContent, { waitUntil: "networkidle" });
-
+  
   await page.pdf({
     path: outputPath,
     format: "A4",
@@ -1293,7 +1364,7 @@ async function generatePDF() {
   });
 
   await browser.close();
-  console.log(`Master PDF de 11 páginas gerado com sucesso em: ${outputPath}`);
+  console.log(`Master PDF de 12 páginas gerado com sucesso em: ${outputPath}`);
 }
 
 generatePDF().catch(err => {
