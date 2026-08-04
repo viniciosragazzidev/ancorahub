@@ -193,6 +193,12 @@
       "skillPath": "skills/in-progress/loop-me/SKILL.md",
       "computedHash": "9494fca20a03e23e207ca3c8f13073665371563441f97354fe4a534ab8708ed8"
     },
+    "make-interfaces-feel-better": {
+      "source": "jakubkrehel/make-interfaces-feel-better",
+      "sourceType": "github",
+      "skillPath": "skills/make-interfaces-feel-better/SKILL.md",
+      "computedHash": "ee95073d274bd8f792f917a2b2c2963d46c1b31c81723e6ef3c63ffe33bd681c"
+    },
     "migrate-to-shoehorn": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -336,6 +342,12 @@
       "sourceType": "github",
       "skillPath": "skills/deprecated/ubiquitous-language/SKILL.md",
       "computedHash": "36cde503a83a11b0fdcc76646a9922ab1c0fb0b6305cc5c08e492a0113c5cb3d"
+    },
+    "voxel-icon": {
+      "source": "BIAsia/voxel-icon",
+      "sourceType": "github",
+      "skillPath": "skill/voxel-icon/SKILL.md",
+      "computedHash": "d3363206b2b319414cccbb743450f9283eee0675435a7fd8bd98893d7345a3ab"
     },
     "wayfinder": {
       "source": "mattpocock/skills",

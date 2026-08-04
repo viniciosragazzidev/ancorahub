@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
@@ -58,6 +58,11 @@ export default async function SuperAdminSettingsPage() {
     "lead_distribution_jobs_lease_seconds",
     "lead_distribution_jobs_recovery_minutes",
     "feature_lead_intake_outbox_enabled",
+    "feature_waha_cadence_enabled",
+    "feature_waha_ai_enabled",
+    "waha_cadence_max_attempts",
+    "waha_cadence_retry_base_seconds",
+    "waha_cadence_lease_seconds",
     "lead_intake_outbox_max_attempts",
     "lead_intake_outbox_retry_base_seconds",
     "lead_intake_outbox_lease_seconds",
@@ -109,6 +114,11 @@ export default async function SuperAdminSettingsPage() {
   const leadEffectOutboxMaxAttempts = settingMap.get("lead_intake_outbox_max_attempts") ?? "8";
   const leadEffectOutboxRetryBaseSeconds = settingMap.get("lead_intake_outbox_retry_base_seconds") ?? "60";
   const leadEffectOutboxLeaseSeconds = settingMap.get("lead_intake_outbox_lease_seconds") ?? "120";
+  const wahaCadenceEnabled = settingMap.get("feature_waha_cadence_enabled") === "true";
+  const wahaAiEnabled = settingMap.get("feature_waha_ai_enabled") === "true";
+  const wahaMaxAttempts = settingMap.get("waha_cadence_max_attempts") ?? "5";
+  const wahaRetryBaseSeconds = settingMap.get("waha_cadence_retry_base_seconds") ?? "60";
+  const wahaLeaseSeconds = settingMap.get("waha_cadence_lease_seconds") ?? "120";
 
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
@@ -543,6 +553,11 @@ export default async function SuperAdminSettingsPage() {
                 </form>
                 <form action={runLeadEffectOutboxAction} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">Executa uma passagem segura pelos efeitos pendentes e registra a intervenção na auditoria.</p><Button type="submit" variant="outline">Processar efeitos agora</Button></form>
               </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Cadência WAHA</CardTitle><CardDescription>Controle global do relay na VPS e das respostas de IA. O canal oficial Meta não é alterado.</CardDescription></CardHeader>
+              <CardContent><form action={updateWahaCadenceSettingsAction} className="grid gap-3 md:grid-cols-3"><label className="flex items-center gap-2 text-sm md:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={wahaCadenceEnabled} className="size-4" /><span><span className="font-medium">Cadências habilitadas</span><span className="block text-xs text-muted-foreground">Pausa a fila sem apagar histórico.</span></span></label><label className="flex items-center gap-2 text-sm md:col-span-3"><input type="checkbox" name="aiEnabled" value="true" defaultChecked={wahaAiEnabled} className="size-4" /><span><span className="font-medium">IA após mensagem recebida</span><span className="block text-xs text-muted-foreground">Mantém ações de baixo risco.</span></span></label><label className="grid gap-1 text-xs font-medium">Tentativas<Input name="maxAttempts" type="number" min={1} max={10} defaultValue={wahaMaxAttempts} /></label><label className="grid gap-1 text-xs font-medium">Retry (segundos)<Input name="retryBaseSeconds" type="number" min={15} max={3600} defaultValue={wahaRetryBaseSeconds} /></label><label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" type="number" min={30} max={900} defaultValue={wahaLeaseSeconds} /></label><div className="md:col-span-3"><Button type="submit">Salvar cadência WAHA</Button></div></form></CardContent>
             </Card>
 
             <Card className="border-border bg-card shadow-none">

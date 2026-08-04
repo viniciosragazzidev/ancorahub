@@ -330,9 +330,11 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
   const [customer] = await db
     .select({
       id: schema.activeCustomers.id,
+      clientId: schema.activeCustomers.clientId,
       leadId: schema.activeCustomers.leadId,
       brokerId: schema.activeCustomers.brokerId,
       branchId: schema.activeCustomers.branchId,
+      status: schema.activeCustomers.status,
     })
     .from(schema.activeCustomers)
     .where(
@@ -349,6 +351,9 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
     .limit(1);
 
   if (!customer) return { error: "Cliente não encontrado ou fora do seu escopo." };
+
+  if (!hasPermission(context.role, "alterar_status_lead")) return { error: "Você não pode atualizar a renovação." };
+  if (customer.status === "cancelled") return { error: "Não é possível atualizar a renovação de um cliente cancelado." };
 
   const now = new Date();
   await db
@@ -370,7 +375,7 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
   });
 
   revalidatePath("/clientes");
+  if (customer.clientId) revalidatePath(`/clientes/${customer.clientId}`);
   revalidatePath("/vendas");
   return { success: true };
 }
-

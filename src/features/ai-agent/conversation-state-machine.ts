@@ -24,6 +24,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation } from "@/features/qualification-engine/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 
 export type ConversationStatus =
   | "NEW"
@@ -35,7 +36,7 @@ export type ConversationStatus =
   | "CLOSED"
   | "FAILED";
 
-type AiTransport = "meta" | "openwa";
+type AiTransport = "meta" | "openwa" | "waha";
 
 async function sendAiOutbound(input: {
   tenantId: string;
@@ -43,11 +44,17 @@ async function sendAiOutbound(input: {
   body: string;
   transport: AiTransport;
   openWaSessionId?: string | null;
+  wahaRunId?: string | null;
 }) {
   if (input.transport === "openwa") {
     if (!input.openWaSessionId) return { status: "failed" as const, messageId: null };
     const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
     return { status: "sent" as const, messageId: sent.messageId ?? null };
+  }
+  if (input.transport === "waha") {
+    if (!input.wahaRunId) return { status: "failed" as const, messageId: null };
+    const messageId = await enqueueWahaAiReply({ tenantId: input.tenantId, runId: input.wahaRunId, body: input.body });
+    return { status: "sent" as const, messageId };
   }
   const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
   if (!channel) return { status: "skipped_no_channel" as const, messageId: null };
@@ -307,6 +314,7 @@ export async function processInboundAiResponse({
   whatsappMessageId,
   transport = "meta",
   openWaSessionId,
+  wahaRunId,
 }: {
   tenantId: string;
   leadId: string;
@@ -318,6 +326,7 @@ export async function processInboundAiResponse({
   whatsappMessageId?: string | null;
   transport?: AiTransport;
   openWaSessionId?: string | null;
+  wahaRunId?: string | null;
 }) {
   const db = getDatabase();
 
@@ -459,7 +468,7 @@ export async function processInboundAiResponse({
       messageId = `quick_reply_${crypto.randomUUID()}`;
       await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: template.body, sentAt: now });
       try {
-        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId });
+        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId, wahaRunId });
         deliveryStatus = sent.status;
         if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       } catch (error) {
@@ -516,7 +525,7 @@ export async function processInboundAiResponse({
     });
     let deliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId, wahaRunId });
       deliveryStatus = sent.status;
       if (sent.messageId) {
         await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId })
@@ -612,7 +621,7 @@ export async function processInboundAiResponse({
 
     // 2. Send fallback message to WhatsApp
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId, wahaRunId });
       if (sent.status === "sent") {
         console.info("[ai-wpp] fallback.sent", { tenantId, leadId, phone });
       } else {
@@ -689,7 +698,7 @@ export async function processInboundAiResponse({
 
     let fallbackDeliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId, wahaRunId });
       if (sent.status === "sent") {
         await db.update(schema.whatsappMessages)
           .set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
@@ -900,7 +909,7 @@ export async function processInboundAiResponse({
   // 8. Tentar enviar mensagem de saída pelo provedor da Meta se canal ativo
   let deliveryStatus = "failed";
   try {
-    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId });
+    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId });
     if (sent.status === "sent") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       deliveryStatus = "sent";

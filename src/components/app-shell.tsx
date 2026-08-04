@@ -69,8 +69,8 @@ export function AppShell({
       className="min-h-dvh overflow-hidden"
       style={
         {
-          "--sidebar-width": "15rem",
-          "--header-height": "3.75rem",
+          "--sidebar-width": "16rem",
+          "--header-height": "4rem",
           ...(branding?.brandColor
             ? {
                 "--primary": branding.brandColor,
@@ -90,7 +90,7 @@ export function AppShell({
         <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
       )}
       <SidebarInset
-        className="min-h-0 h-dvh bg-background overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+        className="min-h-0 h-dvh bg-muted/25 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] dark:bg-background max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
         style={{
           scrollPaddingTop: "var(--header-height)",
           scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",

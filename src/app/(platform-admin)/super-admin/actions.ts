@@ -276,6 +276,27 @@ export async function runLeadEffectOutboxAction() {
   revalidatePath("/leads/distribuicao");
 }
 
+export async function updateWahaCadenceSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const now = new Date();
+  const values = {
+    enabled: formData.get("enabled") === "true" ? "true" : "false",
+    aiEnabled: formData.get("aiEnabled") === "true" ? "true" : "false",
+    maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 5, 1, 10),
+    retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
+    leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
+  };
+  await Promise.all([
+    setSystemSetting("feature_waha_cadence_enabled", values.enabled, now),
+    setSystemSetting("feature_waha_ai_enabled", values.aiEnabled, now),
+    setSystemSetting("waha_cadence_max_attempts", values.maxAttempts, now),
+    setSystemSetting("waha_cadence_retry_base_seconds", values.retryBaseSeconds, now),
+    setSystemSetting("waha_cadence_lease_seconds", values.leaseSeconds, now),
+  ]);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_cadence.settings_updated", targetType: "system_settings", targetId: "waha_cadence", metadata: values, createdAt: now });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function setTenantStatusAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "");
   const status = String(formData.get("status") ?? "");

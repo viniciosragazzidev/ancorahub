@@ -1,0 +1,29 @@
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    environment:
+      WHATSAPP_API_KEY: ${WAHA_API_KEY}
+    volumes:
+      - waha_sessions:/app/.sessions
+    expose:
+      - "3000"
+
+  relay:
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      WAHA_RELAY_SHARED_SECRET: ${WAHA_RELAY_SHARED_SECRET}
+      WAHA_API_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY}
+    volumes:
+      - relay_data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - waha
+
+volumes:
+  waha_sessions:
+  relay_data:

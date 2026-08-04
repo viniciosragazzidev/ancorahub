@@ -22,6 +22,7 @@ import { parsePeriod, periodStart } from "@/shared/period";
 import { ExportButtons } from "./_components/export-buttons";
 import { SpreadsheetSection } from "./_components/spreadsheet-section";
 import { Sparkline } from "@/components/dashboard/sparkline";
+import { InternalReportDocuments } from "./_components/internal-report-documents";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default async function ReportsPage({
   const period = parsePeriod((await searchParams).period);
   const reportStart = periodStart(period);
   const canExport = hasCapability(context.role, "exportar_relatorios", context.jobTitle);
+  const internalDocuments = canExport ? await db.select({ id: schema.internalReportDocuments.id, title: schema.internalReportDocuments.title, filename: schema.internalReportDocuments.filename, createdAt: schema.internalReportDocuments.createdAt }).from(schema.internalReportDocuments).where(eq(schema.internalReportDocuments.tenantId, context.tenantId)).orderBy(sql`${schema.internalReportDocuments.createdAt} desc`).limit(20) : [];
   const leadScope = context.role === "broker"
     ? eq(schema.leads.corretorId, context.userId)
     : context.role === "manager" && context.branchId
@@ -268,6 +270,7 @@ export default async function ReportsPage({
 
         {/* Planilhas importadas */}
         <SpreadsheetSection />
+        {canExport && <InternalReportDocuments documents={internalDocuments} />}
 
         {/* Report Cards Grid */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

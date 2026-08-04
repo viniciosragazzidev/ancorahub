@@ -1643,6 +1643,180 @@ export const whatsappMessages = pgTable(
   (table) => [index("whatsapp_messages_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt), uniqueIndex("whatsapp_messages_message_unique").on(table.tenantId, table.messageId)],
 );
 
+/** Private documents uploaded for internal reporting, never exposed through a public URL. */
+export const internalReportDocuments = pgTable(
+  "internal_report_documents",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    filename: text("filename").notNull(),
+    storageKey: text("storage_key").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    checksumSha256: text("checksum_sha256").notNull(),
+    uploadedBy: text("uploaded_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt,
+  },
+  (table) => [index("internal_report_documents_tenant_created_idx").on(table.tenantId, table.createdAt)],
+);
+
+/** Platform-owned WAHA sessions. They never contain tenant credentials. */
+export const wahaNumbers = pgTable(
+  "waha_numbers",
+  {
+    id: text("id").primaryKey(),
+    relaySessionId: text("relay_session_id").notNull(),
+    displayPhoneNumber: text("display_phone_number").notNull(),
+    status: text("status").notNull().default("pending"),
+    maxMessagesPerHour: integer("max_messages_per_hour").notNull().default(60),
+    minIntervalSeconds: integer("min_interval_seconds").notNull().default(45),
+    lastHealthAt: timestamp("last_health_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("waha_numbers_relay_session_unique").on(table.relaySessionId),
+    uniqueIndex("waha_numbers_display_phone_unique").on(table.displayPhoneNumber),
+    index("waha_numbers_status_idx").on(table.status),
+  ],
+);
+
+/** Tenant-owned cadence aggregate. Published versions are immutable. */
+export const wahaCadences = pgTable(
+  "waha_cadences",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("draft"),
+    activeVersionId: text("active_version_id"),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("waha_cadences_tenant_status_idx").on(table.tenantId, table.status),
+    index("waha_cadences_branch_idx").on(table.tenantId, table.branchId),
+  ],
+);
+
+export const wahaCadenceVersions = pgTable(
+  "waha_cadence_versions",
+  {
+    id: text("id").primaryKey(),
+    cadenceId: text("cadence_id").notNull().references(() => wahaCadences.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    status: text("status").notNull().default("draft"),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "restrict" }),
+    definition: jsonb("definition").notNull().default({}),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("waha_cadence_versions_unique").on(table.cadenceId, table.version),
+    index("waha_cadence_versions_tenant_status_idx").on(table.tenantId, table.status),
+  ],
+);
+
+/** A recipient is referenced by CRM record, so the cadence store never needs a raw phone copy. */
+export const wahaCadenceRuns = pgTable(
+  "waha_cadence_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    cadenceId: text("cadence_id").notNull().references(() => wahaCadences.id, { onDelete: "cascade" }),
+    versionId: text("version_id").notNull().references(() => wahaCadenceVersions.id, { onDelete: "restrict" }),
+    wahaNumberId: text("waha_number_id").notNull().references(() => wahaNumbers.id, { onDelete: "restrict" }),
+    recipientType: text("recipient_type").notNull(),
+    recipientId: text("recipient_id").notNull(),
+    contactPhoneHash: text("contact_phone_hash").notNull(),
+    status: text("status").notNull().default("queued"),
+    currentStep: integer("current_step").notNull().default(0),
+    nextActionAt: timestamp("next_action_at", { withTimezone: true }),
+    inboundAt: timestamp("inbound_at", { withTimezone: true }),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("waha_cadence_runs_version_recipient_unique").on(table.versionId, table.recipientType, table.recipientId),
+    index("waha_cadence_runs_tenant_status_due_idx").on(table.tenantId, table.status, table.nextActionAt),
+    index("waha_cadence_runs_phone_hash_idx").on(table.contactPhoneHash, table.status),
+  ],
+);
+
+/** Durable outbound work for the WAHA relay. Message bodies remain in the immutable version definition. */
+export const wahaDeliveryOutbox = pgTable(
+  "waha_delivery_outbox",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    runId: text("run_id").notNull().references(() => wahaCadenceRuns.id, { onDelete: "cascade" }),
+    wahaNumberId: text("waha_number_id").notNull().references(() => wahaNumbers.id, { onDelete: "restrict" }),
+    stepIndex: integer("step_index").notNull(),
+    kind: text("kind").notNull().default("cadence"),
+    messageBody: text("message_body"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    status: text("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+    providerMessageId: text("provider_message_id"),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    lockedBy: text("locked_by"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("waha_delivery_outbox_tenant_idempotency_unique").on(table.tenantId, table.idempotencyKey),
+    index("waha_delivery_outbox_due_idx").on(table.status, table.runAfter),
+    index("waha_delivery_outbox_run_idx").on(table.runId, table.createdAt),
+  ],
+);
+
+/** Global suppression is a one-way normalized-phone hash, never an address book. */
+export const wahaSuppressions = pgTable(
+  "waha_suppressions",
+  {
+    id: text("id").primaryKey(),
+    phoneHash: text("phone_hash").notNull(),
+    reason: text("reason").notNull(),
+    source: text("source").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+  },
+  (table) => [uniqueIndex("waha_suppressions_phone_unique").on(table.phoneHash)],
+);
+
+export const wahaWebhookEvents = pgTable(
+  "waha_webhook_events",
+  {
+    id: text("id").primaryKey(),
+    externalEventId: text("external_event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    status: text("status").notNull().default("received"),
+    errorCode: text("error_code"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("waha_webhook_events_external_unique").on(table.externalEventId)],
+);
+
 export const aiConversations = pgTable(
   "ai_conversations",
   {

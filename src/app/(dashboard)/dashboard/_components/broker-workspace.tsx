@@ -14,6 +14,7 @@ import {
   Warning,
 } from "@/components/huge-icons";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,10 +64,13 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
       />
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 p-4 lg:gap-6 lg:p-6">
-        <section aria-labelledby="workspace-greeting" className="flex flex-col gap-1">
-          <p className="text-xs font-medium text-muted-foreground">{data.viewer.branchName}</p>
-          <h1 className="text-2xl font-semibold tracking-tight" id="workspace-greeting">Bom dia, {firstName}</h1>
-          <p className="text-sm text-muted-foreground">Veja o que importa agora e continue o atendimento sem perder contexto.</p>
+        <section aria-labelledby="workspace-greeting" className="relative py-2 sm:py-3">
+          <div className="relative z-10 flex max-w-2xl flex-col gap-1 pr-28 lg:pr-0">
+            <p className="text-xs font-medium text-muted-foreground">{data.viewer.branchName}</p>
+            <h1 className="text-2xl font-semibold tracking-tight" id="workspace-greeting">Bom dia, {firstName}</h1>
+            <p className="text-sm text-muted-foreground">Veja o que importa agora e continue o atendimento sem perder contexto.</p>
+          </div>
+          <VoxelIllustration className="absolute right-1 top-1/2 hidden size-28 -translate-y-1/2 opacity-75 lg:block dark:opacity-70" name="ocean-anchor" />
         </section>
 
         {nextAction ? (
@@ -139,7 +143,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)]">
           <Card variant="subtle">
             <CardHeader className="flex-row items-start justify-between gap-3"><div><CardTitle>Inbox operacional</CardTitle><CardDescription>Mensagens, pendências e alertas que merecem atenção.</CardDescription></div><Button render={<Link href="/notificacoes" />} size="sm" variant="ghost"><Bell aria-hidden="true" /> {data.today.unreadNotifications}</Button></CardHeader>
-            <CardContent>{data.inbox.length ? <div className="divide-y divide-border/60">{data.inbox.map((item) => <Link className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0" href={item.href} key={item.id}><Badge className="mt-0.5 shrink-0" variant={item.severity === "critical" ? "destructive" : item.severity === "warning" ? "warning" : "outline"}>{sourceLabels[item.source]}</Badge><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium group-hover:text-primary">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.description}</span></span><ArrowRight aria-hidden="true" className="mt-0.5 size-4 text-muted-foreground group-hover:text-primary" /></Link>)}</div> : <EmptyWorkspaceState icon={Bell} message="Nenhum alerta novo. As atualizações aparecerão aqui." />}</CardContent>
+            <CardContent>{data.inbox.length ? <div className="divide-y divide-border/60">{data.inbox.map((item) => <Link className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0" href={item.href} key={item.id}><Badge className="mt-0.5 shrink-0" variant={item.severity === "critical" ? "destructive" : item.severity === "warning" ? "warning" : "outline"}>{sourceLabels[item.source]}</Badge><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium group-hover:text-primary">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.description}</span></span><ArrowRight aria-hidden="true" className="mt-0.5 size-4 text-muted-foreground group-hover:text-primary" /></Link>)}</div> : <EmptyWorkspaceState icon={Bell} illustration="empty-inbox" message="Nenhum alerta novo. As atualizações aparecerão aqui." />}</CardContent>
           </Card>
           <Card variant="subtle">
             <CardHeader><CardTitle>Ações rápidas</CardTitle><CardDescription>Atalhos para o trabalho diário.</CardDescription></CardHeader>
@@ -164,8 +168,8 @@ function QuickAction({ href, icon: Icon, label }: { href: string; icon: typeof T
   return <Button className="justify-start" render={<Link href={href} />} variant="outline"><Icon aria-hidden="true" className="size-4" /> {label}<ArrowRight aria-hidden="true" className="ml-auto size-4" /></Button>;
 }
 
-function EmptyWorkspaceState({ icon: Icon, message }: { icon: typeof Target; message: string }) {
-  return <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border px-4 py-7 text-center"><Icon aria-hidden="true" className="size-5 text-muted-foreground" /><p className="max-w-sm text-sm text-muted-foreground">{message}</p></div>;
+function EmptyWorkspaceState({ icon: Icon, illustration, message }: { icon: typeof Target; illustration?: "empty-inbox"; message: string }) {
+  return <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border px-4 py-7 text-center">{illustration ? <VoxelIllustration className="size-20" name={illustration} /> : <Icon aria-hidden="true" className="size-5 text-muted-foreground" />}<p className="max-w-sm text-sm text-muted-foreground">{message}</p></div>;
 }
 
 function readableNextAction(title: string, kind: NonNullable<BrokerWorkspaceData["nextAction"]>["kind"]) {

@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OwnershipContext } from "@/components/ownership-context";
+import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import {
   Table,
   TableBody,
@@ -216,6 +217,7 @@ export function DocumentsWorkspace({
             <CardContent>
               {pendingDocs.length === 0 ? (
                 <div className="flex flex-col items-center py-10 text-center border border-dashed rounded-lg">
+                  <VoxelIllustration className="mb-2 size-20" name="document-review" />
                   <CheckCircle className="size-8 text-emerald-500 mb-2" />
                   <p className="font-semibold text-sm">Tudo em dia!</p>
                   <p className="text-xs text-muted-foreground">Nenhum documento aguardando aprovação.</p>

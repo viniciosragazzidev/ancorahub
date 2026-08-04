@@ -16,6 +16,7 @@ import { Phone, Clock, Buildings, CalendarCheck, ShieldCheck, FileText, Currency
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
+import { CustomerRenewalStatus } from "@/features/post-sale/components/customer-renewal-status";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 
 export const dynamic = "force-dynamic";
@@ -110,6 +111,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         status: schema.activeCustomers.status,
         coverageStartDate: schema.activeCustomers.coverageStartDate,
         contractAnniversary: schema.activeCustomers.contractAnniversary,
+        expirationDate: schema.activeCustomers.expirationDate,
+        renewalStatus: schema.activeCustomers.renewalStatus,
+        renewalNotes: schema.activeCustomers.renewalNotes,
         cancellationDate: schema.activeCustomers.cancellationDate,
         cancellationReason: schema.activeCustomers.cancellationReason,
         createdAt: schema.activeCustomers.createdAt,
@@ -137,10 +141,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
   ]);
 
   const totalSalesValue = sales.reduce((sum, s) => sum + parseFloat(s.saleValue || "0"), 0);
-  const anniversarySoon = activeCustomer?.contractAnniversary
+  const renewalDate = activeCustomer?.expirationDate ?? activeCustomer?.contractAnniversary;
+  const anniversarySoon = renewalDate
     ? (() => {
       const today = new Date();
-      const anniversary = new Date(`${activeCustomer.contractAnniversary}T00:00:00`);
+      const anniversary = new Date(`${renewalDate}T00:00:00`);
       const diffDays = Math.ceil((anniversary.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       return diffDays;
     })()
@@ -164,8 +169,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold tracking-tight text-foreground">{client.name}</h1>
-                  <Badge variant="success" className="rounded-full">
-                    Cliente ativo
+                  <Badge variant={activeCustomer?.status === "cancelled" ? "destructive" : "success"} className="rounded-full">
+                    {activeCustomer?.status === "cancelled" ? "Cliente cancelado" : "Cliente ativo"}
                   </Badge>
                   {anniversaryIsUpcoming && (
                     <Badge variant="warning" className="rounded-full">
@@ -353,6 +358,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                       )}
                     </div>
                   )}
+                  <CustomerRenewalStatus
+                    activeCustomerId={activeCustomer.id}
+                    initialStatus={activeCustomer.renewalStatus}
+                    initialNotes={activeCustomer.renewalNotes}
+                    disabled={activeCustomer.status === "cancelled"}
+                  />
                 </CardContent>
               </Card>
             )}
