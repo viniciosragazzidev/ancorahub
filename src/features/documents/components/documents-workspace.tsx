@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
   Plus,
   Trash,
@@ -16,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { OwnershipContext } from "@/components/ownership-context";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import {
@@ -150,6 +152,123 @@ export function DocumentsWorkspace({
     });
   };
 
+  const columns: ColumnDef<PendingDoc>[] = [
+    ...(role !== "broker"
+      ? [
+          {
+            id: "select",
+            header: () => (
+              <Checkbox
+                aria-label="Selecionar todos"
+                checked={multiSelect.isAllSelected}
+                onCheckedChange={multiSelect.selectAll}
+                onClick={(event) => event.stopPropagation()}
+              />
+            ),
+            cell: ({ row }) => (
+              <Checkbox
+                aria-label={`Selecionar ${row.original.leadNome}`}
+                checked={multiSelect.isSelected(row.original.id)}
+                onCheckedChange={() => multiSelect.toggle(row.original.id)}
+                onClick={(event) => event.stopPropagation()}
+              />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+          } satisfies ColumnDef<PendingDoc>,
+        ]
+      : []),
+    {
+      accessorKey: "leadNome",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Lead" />,
+      cell: ({ row }) => (
+        <a
+          href={`/leads/${row.original.leadId}`}
+          className="text-xs font-semibold text-foreground hover:text-primary hover:underline leading-snug"
+        >
+          {row.original.leadNome}
+        </a>
+      ),
+    },
+    {
+      accessorKey: "filename",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Documento" />,
+      cell: ({ row }) => (
+        <a
+          href={row.original.fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-foreground hover:text-primary hover:underline"
+        >
+          {row.original.filename} <Eye className="size-3" />
+        </a>
+      ),
+    },
+    {
+      accessorKey: "requirementName",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo Requisitado" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.requirementName ?? "Avulso"}</span>
+      ),
+    },
+    {
+      id: "ownership",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Responsável / unidade" />,
+      cell: ({ row }) => (
+        <OwnershipContext
+          brokerName={row.original.corretorNome}
+          branchName={row.original.branchName}
+          emptyLabel="Não informado"
+          className="text-xs"
+        />
+      ),
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Data de Envio" />,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(new Date(row.original.createdAt))}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="text-right">
+          {role === "broker" ? (
+            <span className="text-xs capitalize text-muted-foreground">{row.original.status}</span>
+          ) : (
+            <div className="flex justify-end gap-1.5">
+              <Button
+                size="icon-xs"
+                variant="outline"
+                className="border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10"
+                onClick={() => handleReviewDoc(row.original.id, row.original.leadId, "approved")}
+                title="Aprovar"
+              >
+                <CheckCircle className="size-3.5" />
+              </Button>
+              <Button
+                size="icon-xs"
+                variant="destructive"
+                onClick={() => handleReviewDoc(row.original.id, row.original.leadId, "rejected")}
+                title="Rejeitar"
+              >
+                <XCircle className="size-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {role === "director" && (
@@ -207,115 +326,27 @@ export function DocumentsWorkspace({
             </SelectionToolbar>
           )}
 
-          <Card className="border-border bg-card shadow-none">
-            <CardHeader>
-              <CardTitle>Fila de Pendências</CardTitle>
-              <CardDescription>
-                Abaixo estão listados os documentos aguardando revisão.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pendingDocs.length === 0 ? (
-                <div className="flex flex-col items-center py-10 text-center border border-dashed rounded-lg">
-                  <VoxelIllustration className="mb-2 size-20" name="document-review" />
-                  <CheckCircle className="size-8 text-emerald-500 mb-2" />
-                  <p className="font-semibold text-sm">Tudo em dia!</p>
-                  <p className="text-xs text-muted-foreground">Nenhum documento aguardando aprovação.</p>
+          <DataTable
+            columns={columns}
+            data={pendingDocs}
+            searchPlaceholder="Buscar por lead, documento ou tipo..."
+            showColumnToggle={true}
+            showPagination={true}
+            pageSize={10}
+            emptyState={
+              pendingDocs.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+                  <VoxelIllustration className="size-20" name="document-review" />
+                  <div className="max-w-sm space-y-1.5">
+                    <p className="text-sm font-semibold text-foreground">Tudo em dia!</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Nenhum documento aguardando aprovação.
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="overflow-hidden rounded-xl border">
-                  <Table>
-                    <TableHeader className="bg-muted/40">
-                      <TableRow>
-                        {role !== "broker" && <TableHead className="w-10">
-                          <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                            <Checkbox
-                              aria-label="Selecionar todos"
-                              checked={multiSelect.isAllSelected}
-                              onCheckedChange={multiSelect.selectAll}
-                            />
-                          </div>
-                        </TableHead>}
-                        <TableHead>Lead</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Tipo Requisitado</TableHead>
-                        <TableHead>Responsável / unidade</TableHead>
-                        <TableHead>Data de Envio</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingDocs.map((doc) => (
-                        <TableRow
-                          key={doc.id}
-                          data-selected={multiSelect.isSelected(doc.id) || undefined}
-                          className="data-[selected]:bg-primary/[0.04]"
-                        >
-                          {role !== "broker" && <TableCell>
-                            <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                              <Checkbox
-                                aria-label={`Selecionar ${doc.leadNome}`}
-                                checked={multiSelect.isSelected(doc.id)}
-                                onCheckedChange={() => multiSelect.toggle(doc.id)}
-                              />
-                            </div>
-                          </TableCell>}
-                          <TableCell className="font-medium">
-                            <a href={`/leads/${doc.leadId}`} className="text-primary hover:underline">
-                              {doc.leadNome}
-                            </a>
-                          </TableCell>
-                          <TableCell>
-                            <a
-                              href={doc.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline"
-                            >
-                              {doc.filename} <Eye className="size-3" />
-                            </a>
-                          </TableCell>
-                          <TableCell>{doc.requirementName ?? "Avulso"}</TableCell>
-                          <TableCell><OwnershipContext brokerName={doc.corretorNome} branchName={doc.branchName} emptyLabel="Não informado" /></TableCell>
-                          <TableCell>
-                            {new Intl.DateTimeFormat("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }).format(new Date(doc.createdAt))}
-                          </TableCell>
-                          <TableCell className={role === "broker" ? "text-sm capitalize" : "text-right"}>
-                            {role === "broker" ? doc.status : (
-                            <div className="flex justify-end gap-1.5">
-                              <Button
-                                size="icon-xs"
-                                variant="outline"
-                                className="text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/10"
-                                onClick={() => handleReviewDoc(doc.id, doc.leadId, "approved")}
-                                title="Aprovar"
-                              >
-                                <CheckCircle className="size-3.5" />
-                              </Button>
-                              <Button
-                                size="icon-xs"
-                                variant="destructive"
-                                onClick={() => handleReviewDoc(doc.id, doc.leadId, "rejected")}
-                                title="Rejeitar"
-                              >
-                                <XCircle className="size-3.5" />
-                              </Button>
-                            </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              ) : undefined
+            }
+          />
         </div>
       )}
 

@@ -36,7 +36,7 @@ export function MetaCloudSetupCard({ enabled, configured, missing, companyAccoun
     </CardHeader>
     <CardContent className="space-y-4">
       <div aria-live="polite" className={`rounded-lg border p-4 ${status.tone}`}>
-        <p className="text-xs font-medium uppercase tracking-wide opacity-80">Status operacional</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Status operacional</p>
         <p className="mt-1 text-lg font-semibold">{status.label}</p>
       </div>
       {!enabled ? <p className="text-sm text-muted-foreground">A capacidade foi desativada globalmente pelo Super-admin.</p> : null}

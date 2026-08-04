@@ -47,11 +47,76 @@ function respond(response, status, data) {
   response.end(JSON.stringify(data));
 }
 
+async function waha(path, options = {}) {
+  const response = await fetch(`${wahaUrl}${path}`, {
+    ...options,
+    headers: { "x-api-key": wahaKey, ...(options.headers ?? {}) },
+    signal: AbortSignal.timeout(15_000),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(`waha_${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+function sessionStatus(value) {
+  const status = String(value?.status ?? value?.session?.status ?? "").toUpperCase();
+  if (status === "WORKING") return "active";
+  if (status === "STOPPED") return "paused";
+  if (status === "FAILED") return "error";
+  if (status === "SCAN_QR_CODE" || status === "STARTING") return "connecting";
+  return "offline";
+}
+
+async function sessionState(sessionId, includeQr = true) {
+  const session = await waha(`/api/sessions/${encodeURIComponent(sessionId)}`);
+  const status = sessionStatus(session);
+  let qrCode = null;
+  if (includeQr && status === "connecting") {
+    const qr = await waha(`/api/${encodeURIComponent(sessionId)}/auth/qr?format=image`, { headers: { accept: "application/json" } }).catch(() => null);
+    qrCode = typeof qr?.data === "string" ? qr.data : null;
+  }
+  const me = status === "active"
+    ? await waha(`/api/sessions/${encodeURIComponent(sessionId)}/me`).catch(() => null)
+    : null;
+  const displayPhoneNumber = typeof me?.id === "string" ? me.id.replace(/@.+$/, "") : null;
+  return { sessionId, status, displayPhoneNumber, qrCode };
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === "GET" && request.url === "/v1/health") {
     const raw = "";
     if (!validSignature(request.headers, raw)) return respond(response, 401, { errorCode: "invalid_signature" });
     return respond(response, 200, { status: "ok", sessions: [] });
+  }
+  if (request.method === "POST" && request.url === "/v1/sessions") {
+    const raw = await readBody(request);
+    if (!validSignature(request.headers, raw)) return respond(response, 401, { errorCode: "invalid_signature" });
+    const payload = JSON.parse(raw || "{}");
+    if (!/^[a-z0-9-]{8,120}$/.test(payload?.sessionId ?? "")) return respond(response, 400, { errorCode: "invalid_request" });
+    try {
+      await waha("/api/sessions/", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: payload.sessionId }) }).catch(async (error) => {
+        if (error.status !== 409) throw error;
+      });
+      await waha(`/api/sessions/${encodeURIComponent(payload.sessionId)}/start`, { method: "POST", headers: { "content-type": "application/json" } }).catch(() => null);
+      return respond(response, 200, await sessionState(payload.sessionId));
+    } catch { return respond(response, 502, { errorCode: "waha_unavailable" }); }
+  }
+  const sessionMatch = request.url?.match(/^\/v1\/sessions\/([a-z0-9-]+)(?:\/(pause|resume))?$/);
+  if (sessionMatch) {
+    const raw = request.method === "GET" ? "" : await readBody(request);
+    if (!validSignature(request.headers, raw)) return respond(response, 401, { errorCode: "invalid_signature" });
+    const [, sessionId, operation] = sessionMatch;
+    try {
+      if (request.method === "POST" && operation === "pause") await waha(`/api/sessions/${sessionId}/stop`, { method: "POST", headers: { "content-type": "application/json" } });
+      else if (request.method === "POST" && operation === "resume") await waha(`/api/sessions/${sessionId}/start`, { method: "POST", headers: { "content-type": "application/json" } });
+      else if (request.method === "DELETE" && !operation) { await waha(`/api/sessions/${sessionId}/logout`, { method: "POST", headers: { "content-type": "application/json" } }).catch(() => null); await waha(`/api/sessions/${sessionId}`, { method: "DELETE" }); return respond(response, 200, { sessionId, status: "offline", displayPhoneNumber: null, qrCode: null }); }
+      else if (request.method !== "GET") return respond(response, 405, { errorCode: "method_not_allowed" });
+      return respond(response, 200, await sessionState(sessionId));
+    } catch { return respond(response, 502, { errorCode: "waha_unavailable" }); }
   }
   if (request.method !== "POST" || request.url !== "/v1/messages") return respond(response, 404, { errorCode: "not_found" });
   const raw = await readBody(request);

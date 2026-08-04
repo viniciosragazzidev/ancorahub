@@ -1668,6 +1668,11 @@ export const wahaNumbers = pgTable(
     id: text("id").primaryKey(),
     relaySessionId: text("relay_session_id").notNull(),
     displayPhoneNumber: text("display_phone_number").notNull(),
+    tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "restrict" }),
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "restrict" }),
+    scope: text("scope").notNull().default("platform"),
+    label: text("label"),
+    capabilities: jsonb("capabilities").$type<{ inbound: boolean; cadence: boolean; ai: boolean }>().notNull().default({ inbound: true, cadence: false, ai: false }),
     status: text("status").notNull().default("pending"),
     maxMessagesPerHour: integer("max_messages_per_hour").notNull().default(60),
     minIntervalSeconds: integer("min_interval_seconds").notNull().default(45),
@@ -1681,6 +1686,7 @@ export const wahaNumbers = pgTable(
     uniqueIndex("waha_numbers_relay_session_unique").on(table.relaySessionId),
     uniqueIndex("waha_numbers_display_phone_unique").on(table.displayPhoneNumber),
     index("waha_numbers_status_idx").on(table.status),
+    index("waha_numbers_tenant_scope_idx").on(table.tenantId, table.branchId, table.status),
   ],
 );
 

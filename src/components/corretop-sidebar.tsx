@@ -53,7 +53,9 @@ import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 
-type SidebarItem = { label: string; icon: typeof House; url: string; permission: PermissionKey };
+import { Sparkle } from "@phosphor-icons/react";
+
+type SidebarItem = { label: string; icon: typeof House | typeof Sparkle; url: string; permission: PermissionKey };
 type SidebarSection = { label: string; items: SidebarItem[] };
 
 const navSections: SidebarSection[] = [
@@ -64,6 +66,7 @@ const navSections: SidebarSection[] = [
       { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
       { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
       { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
+      { label: "Assistente IA", icon: Sparkle, url: "/assistente", permission: "acessar_conversas" },
     ],
   },
   {

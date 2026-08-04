@@ -297,6 +297,16 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateWahaConnectionSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("connectionsEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_waha_connections_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_connections.settings_updated", targetType: "system_settings", targetId: "waha_connections", metadata: { enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/settings/whatsapp");
+}
+
 export async function setTenantStatusAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "");
   const status = String(formData.get("status") ?? "");

@@ -20,6 +20,10 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     await db.update(schema.wahaWebhookEvents).set({ status: "ignored", errorCode: "unknown_session", processedAt: new Date() }).where(eq(schema.wahaWebhookEvents.id, registered.id));
     return { processed: 0, ignored: "unknown_session" as const };
   }
+  if (!number.capabilities.inbound && event.type === "message.inbound") {
+    await db.update(schema.wahaWebhookEvents).set({ status: "ignored", errorCode: "inbound_disabled", processedAt: new Date() }).where(eq(schema.wahaWebhookEvents.id, registered.id));
+    return { processed: 0, ignored: "inbound_disabled" as const };
+  }
 
   if (event.type === "session.status") {
     await db.update(schema.wahaNumbers).set({ status: event.sessionStatus ?? "offline", lastHealthAt: new Date(), updatedAt: new Date() }).where(eq(schema.wahaNumbers.id, number.id));
@@ -56,7 +60,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // Client-only runs remain visible to the team. The existing AI state machine is
   // lead-centric, so it only answers after a tenant-scoped lead is resolved.
-  if (leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
+  if (leadId && number.capabilities.ai && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
     const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
     await processInboundAiResponse({ tenantId: run.tenantId, leadId, phone: event.message.from, userMessageBody: event.message.body, communicationChannelId: null, providerMessageId: event.message.id, transport: "waha", wahaRunId: run.id });
   }

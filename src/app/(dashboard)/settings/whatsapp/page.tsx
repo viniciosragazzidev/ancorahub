@@ -5,18 +5,19 @@ import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/se
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { and, asc, eq } from "drizzle-orm";
-import { getWhatsAppConnection } from "../whatsapp-actions";
 import { WhatsAppPage } from "../whatsapp-page";
+import { WahaConnectionsCard } from "../_components/waha-connections-card";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { listOwnWahaConnections } from "@/features/waha-cadence/connection-service";
 
 export default async function WhatsAppSettingsPage({ searchParams }: { searchParams: Promise<{ returnTo?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role === "broker") redirect("/settings");
-  const { returnTo: requestedReturnTo } = await searchParams;
-  const returnTo = requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//") ? requestedReturnTo : undefined;
+  await searchParams;
   const db = getDatabase();
 
-  const [initial, metaEnabled, channels, branches] = await Promise.all([
-    getWhatsAppConnection(),
+  const wahaConnectionsEnabled = (await getSystemSetting("feature_waha_connections_enabled")) === "true";
+  const [metaEnabled, channels, branches, wahaConnections] = await Promise.all([
     isMetaCloudWhatsAppEnabled(),
     db.select({
       id: schema.communicationChannels.id,
@@ -41,6 +42,7 @@ export default async function WhatsAppSettingsPage({ searchParams }: { searchPar
     context.role === "director"
       ? db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"))).orderBy(asc(schema.branches.name))
       : Promise.resolve([] as { id: string; name: string }[]),
+    wahaConnectionsEnabled ? listOwnWahaConnections().catch(() => []) : Promise.resolve([]),
   ]);
 
   const companyAccount = channels.find((channel) => channel.branchId === null && channel.isDefault) ?? channels.find((channel) => channel.branchId === null) ?? null;
@@ -48,9 +50,8 @@ export default async function WhatsAppSettingsPage({ searchParams }: { searchPar
   return <>
     <DashboardHeader breadcrumb="Configurações" title="Integração WhatsApp" />
     <WhatsAppPage
-      initial={initial}
-      returnTo={returnTo}
       official={{ ...getMetaCloudConfigurationState({ includeEmbeddedSignup: false }), enabled: metaEnabled, canConfigure: false, branches, channels, companyAccount }}
+      waha={(context.role === "director" || context.role === "manager") ? <WahaConnectionsCard connections={wahaConnections} enabled={wahaConnectionsEnabled} role={context.role} /> : null}
     />
   </>;
 }

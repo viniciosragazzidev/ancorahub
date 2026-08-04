@@ -52,11 +52,12 @@ export async function createCadenceDraft(actor: Actor, input: { cadenceId: strin
   assertDirector(actor);
   const definition = cadenceDefinitionSchema.parse(input.definition);
   const db = getDatabase();
-  const [cadence] = await db.select({ id: schema.wahaCadences.id }).from(schema.wahaCadences)
+  const [cadence] = await db.select({ id: schema.wahaCadences.id, branchId: schema.wahaCadences.branchId }).from(schema.wahaCadences)
     .where(and(eq(schema.wahaCadences.id, input.cadenceId), eq(schema.wahaCadences.tenantId, actor.tenantId), inArray(schema.wahaCadences.status, ["draft", "paused", "active"]))).limit(1);
   if (!cadence) throw new Error("Cadência não encontrada.");
-  const [number] = await db.select({ id: schema.wahaNumbers.id, status: schema.wahaNumbers.status }).from(schema.wahaNumbers)
+  const [number] = await db.select({ id: schema.wahaNumbers.id, status: schema.wahaNumbers.status, tenantId: schema.wahaNumbers.tenantId, branchId: schema.wahaNumbers.branchId, capabilities: schema.wahaNumbers.capabilities }).from(schema.wahaNumbers)
     .where(eq(schema.wahaNumbers.id, input.wahaNumberId)).limit(1);
+  if (!number || number.tenantId !== actor.tenantId || (number.branchId && number.branchId !== cadence.branchId) || !number.capabilities.cadence) throw new Error("Número WAHA não autorizado para esta cadência.");
   if (!number || number.status !== "active") throw new Error("Selecione um número WAHA ativo da frota.");
   const rows = await db.select({ version: schema.wahaCadenceVersions.version }).from(schema.wahaCadenceVersions)
     .where(and(eq(schema.wahaCadenceVersions.cadenceId, cadence.id), eq(schema.wahaCadenceVersions.tenantId, actor.tenantId)));
@@ -169,6 +170,7 @@ async function processDelivery(row: typeof schema.wahaDeliveryOutbox.$inferSelec
   if (!run) throw new Error("Execução não está disponível.");
   const [version] = await db.select().from(schema.wahaCadenceVersions).where(and(eq(schema.wahaCadenceVersions.id, run.versionId), eq(schema.wahaCadenceVersions.tenantId, row.tenantId), eq(schema.wahaCadenceVersions.status, "published"))).limit(1);
   const [number] = await db.select().from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.id, row.wahaNumberId), eq(schema.wahaNumbers.status, "active"))).limit(1);
+  if (number && !number.capabilities.cadence && row.kind === "cadence") throw new Error("Cadência desativada para este número.");
   if (!version || !number) throw new Error("Versão ou número WAHA indisponível.");
   const definition = cadenceDefinitionSchema.parse(version.definition);
   const step = row.kind === "ai_reply" ? null : definition.steps[row.stepIndex];

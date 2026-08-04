@@ -42,6 +42,17 @@ export const relaySendRequestSchema = z.object({
   body: z.string().min(1).max(1_000),
 }).strict();
 
+export const relaySessionCreateSchema = z.object({
+  sessionId: z.string().regex(/^[a-z0-9-]{8,120}$/),
+}).strict();
+
+export const relaySessionStateSchema = z.object({
+  sessionId: z.string().min(1).max(120),
+  status: z.enum(["pending", "connecting", "active", "paused", "offline", "error"]),
+  displayPhoneNumber: z.string().max(40).nullable(),
+  qrCode: z.string().max(2_000_000).nullable(),
+}).strict();
+
 export const wahaWebhookSchema = z.object({
   eventId: z.string().min(1).max(200),
   type: z.enum(eventTypes),

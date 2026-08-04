@@ -386,6 +386,20 @@
       "when": 1785701100000,
       "tag": "0102_internal_report_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1785701200000,
+      "tag": "0103_waha_connection_scopes",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1785701300000,
+      "tag": "0104_waha_number_capabilities",
+      "breakpoints": true
     }
   ]
 }
