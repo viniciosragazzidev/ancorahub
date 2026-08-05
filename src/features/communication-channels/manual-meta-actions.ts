@@ -333,3 +333,40 @@ export async function reactivateManualMetaLeadAdsSourceAction(formData: FormData
   });
   revalidatePath("/settings/meta");
 }
+
+export async function updateMetaLeadAdSourceDistributionAction(input: {
+  sourceId: string;
+  distributionMode: "direct_leads" | "duty_plantao" | "unit_branch";
+  branchId?: string | null;
+}) {
+  const context = await requireLeadAdsAccess();
+  const db = getDatabase();
+  const [source] = await db
+    .select({ id: schema.metaLeadAdSources.id })
+    .from(schema.metaLeadAdSources)
+    .where(and(eq(schema.metaLeadAdSources.id, input.sourceId), eq(schema.metaLeadAdSources.tenantId, context.tenantId)))
+    .limit(1);
+
+  if (!source) throw new Error("Fonte de Lead Ads não encontrada.");
+
+  await db
+    .update(schema.metaLeadAdSources)
+    .set({
+      distributionMode: input.distributionMode,
+      branchId: input.branchId ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.metaLeadAdSources.id, source.id));
+
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "meta_lead_ads_source",
+    entidadeId: source.id,
+    acao: "meta_lead_ads.distribution_updated",
+  });
+
+  revalidatePath("/settings/meta");
+  revalidatePath("/leads/distribuicao");
+  return { success: true };
+}

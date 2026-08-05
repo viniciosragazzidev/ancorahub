@@ -173,12 +173,12 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         const lead = normalizeMetaLead(leadRecord);
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
         if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
-        const directToLeads = await getSystemSetting("feature_meta_lead_ads_direct_to_leads").then((val) => val !== "false").catch(() => true);
+        const bypassPlantao = source.distributionMode === "direct_leads";
         const result = await createLeadFromWebhookSync({
-          tenantId: source.tenantId, branchId: source.branchId, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
+          tenantId: source.tenantId, branchId: source.branchId ?? null, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
-          bypassPlantao: directToLeads,
+          bypassPlantao,
           leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, ad: lead.adId, form: lead.formId, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: entry.id } },
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);

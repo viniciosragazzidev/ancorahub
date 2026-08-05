@@ -18,7 +18,7 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
   const db = getDatabase();
   const leadAdsConfig = getMetaLeadAdsConfigurationState();
 
-  const [identity, leadAdsEnabled, channels, leadAdSources] = await Promise.all([
+  const [identity, leadAdsEnabled, channels, leadAdSources, branches] = await Promise.all([
     getMetaLeadAdsPlatformIdentity(),
     isMetaLeadAdsEnabled(context.tenantId),
     db
@@ -42,6 +42,8 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
         id: schema.metaLeadAdSources.id,
         pageId: schema.metaLeadAdSources.pageId,
         status: schema.metaLeadAdSources.status,
+        distributionMode: schema.metaLeadAdSources.distributionMode,
+        branchId: schema.metaLeadAdSources.branchId,
         lastWebhookAt: schema.metaLeadAdSources.lastWebhookAt,
         lastLeadAt: schema.metaLeadAdSources.lastLeadAt,
         lastError: schema.metaLeadAdSources.lastError,
@@ -49,6 +51,13 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
       .from(schema.metaLeadAdSources)
       .where(eq(schema.metaLeadAdSources.tenantId, context.tenantId))
       .orderBy(desc(schema.metaLeadAdSources.updatedAt)),
+    db
+      .select({
+        id: schema.branches.id,
+        name: schema.branches.name,
+      })
+      .from(schema.branches)
+      .where(eq(schema.branches.tenantId, context.tenantId)),
   ]);
 
   return {
@@ -58,5 +67,6 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
     identity,
     channel: channels[0] ?? null,
     leadAdSources,
+    branches,
   };
 }

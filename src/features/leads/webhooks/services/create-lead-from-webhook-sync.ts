@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { lpFormPayloadSchema } from "../schemas/lp-form-payload.schema";
 import type { ReceiveLeadWebhookResult } from "../types/lead-webhook.types";
 import { hashNormalizedWebhookPayload, normalizeLeadEmail, normalizeLeadName, normalizeLeadPhone } from "../utils/lead-webhook.utils";
+import { notifyLeadArrived } from "@/features/notifications/send-push-helper";
 import { enqueueLeadEffect, enqueueLeadEffectTx } from "./lead-effect-outbox";
 import { resolveLeadWebhookIdempotency } from "./resolve-lead-webhook-idempotency";
 import { resolveWebhookBranch, WebhookBranchNotFoundError } from "./resolve-webhook-branch";
@@ -130,6 +131,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
   if ("conflict" in committed) return { success: false, code: "IDEMPOTENCY_CONFLICT" };
   if (committed.duplicate) return { success: true, leadId: committed.leadId, duplicate: true };
+
+  void notifyLeadArrived(leadId, tenantId, branchId, normalizedName, `sync-intake:${leadId}`).catch((err) => console.error("[createLeadFromWebhookSync] notifyLeadArrived error:", err));
 
   if (qualificationEngineEnabled && !bypassPlantao) {
     const qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId }).catch(() => ({ started: false as const, reason: "failed" as const }));

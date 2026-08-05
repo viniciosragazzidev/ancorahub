@@ -16,6 +16,7 @@ import {
   discoverManualMetaLeadAdsAssetsAction,
   pauseManualMetaLeadAdsSourceAction,
   reactivateManualMetaLeadAdsSourceAction,
+  updateMetaLeadAdSourceDistributionAction,
   type ManualMetaActionState,
 } from "../manual-meta-actions";
 
@@ -26,13 +27,83 @@ type Props = {
   leadAdsMissingServerConfig: string[];
   identity: { partnerName: string; businessId: string; supportWhatsApp: string };
   channel: { status: string; displayPhoneNumber: string | null; verifiedName: string | null } | null;
-  leadAdSources: Array<{ id: string; pageId: string; status: string; lastWebhookAt: Date | null; lastLeadAt: Date | null; lastError: string | null }>;
+  branches: Array<{ id: string; name: string }>;
+  leadAdSources: Array<{ id: string; pageId: string; status: string; distributionMode: string; branchId: string | null; lastWebhookAt: Date | null; lastLeadAt: Date | null; lastError: string | null }>;
 };
 
 const initialConnectionState: ManualMetaActionState = {};
 
 function date(value: Date | null) {
   return value ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Ainda não recebido";
+}
+
+function SourceDistributionSelector({
+  source,
+  branches,
+}: {
+  source: Props["leadAdSources"][number];
+  branches: Props["branches"];
+}) {
+  const [pending, startTransition] = useTransition();
+  const [mode, setMode] = useState(source.distributionMode || "direct_leads");
+  const [branchId, setBranchId] = useState(source.branchId || "");
+
+  const handleUpdateMode = (newMode: string, newBranchId?: string | null) => {
+    setMode(newMode);
+    startTransition(async () => {
+      try {
+        await updateMetaLeadAdSourceDistributionAction({
+          sourceId: source.id,
+          distributionMode: newMode as "direct_leads" | "duty_plantao" | "unit_branch",
+          branchId: newBranchId !== undefined ? newBranchId : branchId || null,
+        });
+        toast.success("Regra de distribuição atualizada com sucesso!");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Erro ao atualizar distribuição.");
+      }
+    });
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/60 mt-2 w-full">
+      <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+        <span>Destino dos Leads:</span>
+        <select
+          className="h-8 rounded-md border border-input bg-background px-2 text-xs font-normal"
+          value={mode}
+          disabled={pending}
+          onChange={(e) => handleUpdateMode(e.target.value)}
+        >
+          <option value="direct_leads">🌐 Lista Geral de Leads (/leads) — Sem Plantão</option>
+          <option value="duty_plantao">⚡ Fila do Plantão ao Vivo (Geral)</option>
+          <option value="unit_branch">🏢 Plantão de Unidade Específica...</option>
+        </select>
+      </label>
+
+      {mode === "unit_branch" && (
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+          <span>Unidade:</span>
+          <select
+            className="h-8 rounded-md border border-input bg-background px-2 text-xs font-normal"
+            value={branchId}
+            disabled={pending}
+            onChange={(e) => {
+              const val = e.target.value;
+              setBranchId(val);
+              handleUpdateMode(mode, val || null);
+            }}
+          >
+            <option value="">Matriz / Sem unidade</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
 }
 
 function CopyValue({ label, value }: { label: string; value: string }) {
@@ -116,19 +187,24 @@ export function MetaManualIntegrationWorkspace(props: Props) {
         </CardHeader>
         <CardContent className="space-y-2">
           {props.leadAdSources.length ? props.leadAdSources.map((source) => (
-            <div key={source.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">Página {source.pageId}</span>
-                <Badge variant={source.status === "active" ? "success" : "outline"}>{source.status === "active" ? "Ativa" : "Removida"}</Badge>
+            <div key={source.id} className="flex flex-col gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 w-full">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">Página {source.pageId}</span>
+                  <Badge variant={source.status === "active" ? "success" : "outline"}>{source.status === "active" ? "Ativa" : "Removida"}</Badge>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">Último lead: {date(source.lastLeadAt)}</span>
+                  {source.status === "active" ? (
+                    <Button variant="outline" size="sm" type="button" disabled={removing} onClick={() => removeSource(source.id)}>{removing ? "Removendo…" : "Remover"}</Button>
+                  ) : (
+                    <Button variant="default" size="sm" type="button" disabled={removing} onClick={() => reactivateSource(source.pageId)}>{removing ? "Reativando…" : "Reativar"}</Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">Último lead: {date(source.lastLeadAt)}</span>
-                {source.status === "active" ? (
-                  <Button variant="outline" size="sm" type="button" disabled={removing} onClick={() => removeSource(source.id)}>{removing ? "Removendo…" : "Remover"}</Button>
-                ) : (
-                  <Button variant="default" size="sm" type="button" disabled={removing} onClick={() => reactivateSource(source.pageId)}>{removing ? "Reativando…" : "Reativar"}</Button>
-                )}
-              </div>
+              {source.status === "active" ? (
+                <SourceDistributionSelector source={source} branches={props.branches} />
+              ) : null}
             </div>
           )) : <p className="text-sm text-muted-foreground">Nenhuma Página ativa ainda.</p>}
         </CardContent>

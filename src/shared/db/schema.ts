@@ -2782,6 +2782,7 @@ export const metaLeadAdSources = pgTable(
     adAccountId: text("ad_account_id"),
     leadWebhookCredentialId: text("lead_webhook_credential_id").notNull().references(() => leadWebhookCredentials.id, { onDelete: "restrict" }),
     status: text("status").notNull().default("active"),
+    distributionMode: text("distribution_mode").notNull().default("direct_leads"),
     lastWebhookAt: timestamp("last_webhook_at", { withTimezone: true }),
     lastLeadAt: timestamp("last_lead_at", { withTimezone: true }),
     lastError: text("last_error"),
