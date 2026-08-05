@@ -97,7 +97,9 @@ export type LeadWorkspaceItem = {
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
 
-const kanbanStatuses = ["new", "in_contact", "quote_sent", "negotiation", "converted"];
+// One view of the server-enforced lead state machine. The terminal "lost" stage
+// stays out of the operational board and remains available through filters/history.
+const kanbanStatuses = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted"];
 
 function loadKanbanConfig(): { ordered: string[]; hidden: string[] } | null {
   if (typeof window === "undefined") return null;
@@ -134,6 +136,11 @@ const kanbanTone: Record<string, { dot: string; column: string; count: string }>
     column: "border-sky-500/20 bg-sky-500/[0.035]",
     count: "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300",
   },
+  distributed: {
+    dot: "bg-blue-500",
+    column: "border-blue-500/20 bg-blue-500/[0.035]",
+    count: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  },
   in_contact: {
     dot: "bg-violet-500",
     column: "border-violet-500/20 bg-violet-500/[0.035]",
@@ -148,6 +155,16 @@ const kanbanTone: Record<string, { dot: string; column: string; count: string }>
     dot: "bg-orange-500",
     column: "border-orange-500/20 bg-orange-500/[0.035]",
     count: "border-orange-500/25 bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  },
+  documentation_pending: {
+    dot: "bg-rose-500",
+    column: "border-rose-500/20 bg-rose-500/[0.035]",
+    count: "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  },
+  under_analysis: {
+    dot: "bg-cyan-500",
+    column: "border-cyan-500/20 bg-cyan-500/[0.035]",
+    count: "border-cyan-500/25 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
   },
   converted: {
     dot: "bg-emerald-500",
@@ -812,6 +829,9 @@ function KanbanColumn({
           {leads.length}
         </Badge>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+        {leads.length === 1 ? "1 oportunidade nesta etapa" : `${leads.length} oportunidades nesta etapa`}
+      </p>
 
       <div className="mt-3 space-y-3 overflow-y-auto" style={{ maxHeight: "calc(80vh - 7rem)" }}>
         {leads.map((lead) => (
@@ -819,7 +839,8 @@ function KanbanColumn({
         ))}
         {!leads.length ? (
           <div className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-8 text-center">
-            <p className="text-xs font-medium text-muted-foreground">Sem leads nesta etapa</p>
+            <p className="text-xs font-medium text-muted-foreground">Nenhum lead nesta etapa</p>
+            <p className="mt-1 text-xs text-muted-foreground">Arraste as colunas para organizar sua visão.</p>
           </div>
         ) : null}
       </div>

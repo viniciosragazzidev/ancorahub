@@ -75,7 +75,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
           required
         >
           <option value="PF">PF (Pessoa Física)</option>
-          <option value="PME">PME (Pessoa Jurídica / PME)</option>
+          <option value="PJ">PJ (Pessoa Jurídica)</option>
         </select>
       </div>
 
@@ -118,10 +118,10 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       )}
 
       {/* ── PME-specific fields ─────────────────────────────────────────────── */}
-      {tipo === "PME" && (
+      {(tipo === "PJ" || tipo === "PME") && (
         <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
-            <p className="text-sm font-semibold">Dados da empresa (PME)</p>
+            <p className="text-sm font-semibold">Dados da empresa</p>
             <p className="text-xs text-muted-foreground mt-0.5">Informações sobre a pessoa jurídica contratante.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">

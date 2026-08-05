@@ -144,7 +144,13 @@ export default async function LeadsPage({
     ? eq(schema.leads.branchId, filters.branch)
     : null;
 
-  const tipoFilter = filters.tipo === "PF" || filters.tipo === "PME" ? eq(schema.leads.tipo, filters.tipo) : null;
+  const tipoFilter = filters.tipo === "PF"
+    ? eq(schema.leads.tipo, "PF")
+    : filters.tipo === "PJ"
+      ? inArray(schema.leads.tipo, ["PJ", "PME"])
+      : filters.tipo === "PME"
+        ? eq(schema.leads.tipo, "PME")
+        : null;
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;

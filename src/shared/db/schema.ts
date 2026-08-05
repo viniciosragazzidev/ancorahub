@@ -350,6 +350,7 @@ export const leads = pgTable(
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id),
     branchId: text("branch_id").references(() => branches.id),
+    companyId: text("company_id"),
     corretorId: text("corretor_id").references(() => user.id),
     planId: text("plan_id"),
     nome: text("nome").notNull(),
@@ -402,9 +403,30 @@ export const leads = pgTable(
     index("leads_tenant_qualification_state_idx").on(table.tenantId, table.qualificationState),
     index("leads_branch_queue_distribution_idx").on(table.branchId, table.queueId, table.distributionStatus),
     index("leads_corretor_status_idx").on(table.corretorId, table.status),
+    index("leads_tenant_company_idx").on(table.tenantId, table.companyId),
     index("leads_webhook_credential_idx").on(table.webhookCredentialId),
     uniqueIndex("leads_credential_external_id_unique").on(table.webhookCredentialId, table.externalId).where(sql`${table.externalId} IS NOT NULL`),
     uniqueIndex("leads_tenant_source_external_id_unique").on(table.tenantId, table.sourceChannel, table.externalId).where(sql`${table.externalId} IS NOT NULL AND ${table.sourceChannel} <> 'landing_page'`),
+  ],
+);
+
+export const companies = pgTable(
+  "companies",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    legalName: text("legal_name"),
+    cnpj: text("cnpj"),
+    employeeCount: integer("employee_count"),
+    createdBy: text("created_by").notNull().references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("companies_tenant_branch_idx").on(table.tenantId, table.branchId),
+    uniqueIndex("companies_tenant_cnpj_unique").on(table.tenantId, table.cnpj).where(sql`${table.cnpj} IS NOT NULL`),
   ],
 );
 
@@ -3239,6 +3261,56 @@ export const passwordResetRequests = pgTable(
   ],
 );
 
+export const proposalStatusValues = [
+  "rascunho",
+  "em_revisao",
+  "enviada",
+  "visualizada",
+  "negociacao",
+  "aprovada",
+  "perdida",
+  "expirada",
+] as const;
+
+export const proposalStatus = pgEnum("proposal_status", proposalStatusValues);
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    quoteId: text("quote_id")
+      .references(() => quotes.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    status: proposalStatus("status").notNull().default("rascunho"),
+    version: integer("version").notNull().default(1),
+    validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+    notes: text("notes"),
+    documentIds: jsonb("document_ids").notNull().default([]),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    convertedAt: timestamp("converted_at", { withTimezone: true }),
+    convertedSaleId: text("converted_sale_id").references(() => sales.id, { onDelete: "set null" }),
+    totalMonthly: numeric("total_monthly", { precision: 12, scale: 2 }).notNull().default("0"),
+    beneficiaryCount: integer("beneficiary_count").notNull().default(0),
+    leadName: text("lead_name").notNull(),
+    leadPhone: text("lead_phone"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("proposals_tenant_lead_idx").on(table.tenantId, table.leadId),
+    index("proposals_status_idx").on(table.status),
+  ],
+);
+
 export type TenantRole = (typeof tenantRoleValues)[number];
 export type TenantStatus = (typeof tenantStatusValues)[number];
 export type PasswordResetRequestStatus = "requested" | "approved" | "rejected" | "completed";
+export type ProposalStatus = (typeof proposalStatusValues)[number];

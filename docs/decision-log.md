@@ -467,3 +467,17 @@ estagnação. A central `/conversas` continua a única experiência de chat. Sem
 oficial disponível, o sistema não simula envio interno: mantém o fluxo auditado para
 o WhatsApp autorizado. O Super-admin controla a capacidade globalmente e cada
 alteração fica em `platform_audit_logs`.
+
+## DEC-071 — Perfil comercial PF/PJ e Kanban único
+
+**Estado:** Aceita
+**Data:** 2026-08-05
+
+O CRM mantém um único funil, com a mesma máquina de estados já aprovada. Novos
+cadastros empresariais usam `PJ`; o valor histórico `PME` continua legível e é
+agrupado como PJ. Uma empresa é sempre pertencente ao tenant, vinculada por CNPJ
+normalizado quando disponível, e não concede acesso novo a um corretor. O Kanban é
+somente uma visualização operacional desse funil: não cria etapas paralelas, não move
+uma venda manualmente para convertida e preserva as validações, timeline e auditoria
+do serviço de status existente. O Super-admin pode desligar a visualização comercial
+pela configuração global sem apagar empresas ou leads.

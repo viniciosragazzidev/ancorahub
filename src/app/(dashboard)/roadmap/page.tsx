@@ -62,6 +62,7 @@ export default async function RoadmapPage() {
   const settingsMap = new Map(settingsList.map((s) => [s.key, s.value]));
 
   const centralAtencaoEnabled = settingsMap.get("feature_central_atencao_enabled") !== "false"; // default true
+  const commercialWorkspaceEnabled = settingsMap.get("feature_commercial_workspace_enabled") !== "false";
   const stagnantDaysStr = settingsMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const stagnantDays = parseInt(stagnantDaysStr, 10);
 
@@ -215,6 +216,17 @@ export default async function RoadmapPage() {
                   >
                     <option value="true">Ativada (Live)</option>
                     <option value="false">Desativada</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-medium text-muted-foreground">CRM comercial</span>
+                  <select
+                    name="commercialWorkspaceEnabled"
+                    defaultValue={commercialWorkspaceEnabled ? "true" : "false"}
+                    className="rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="true">Ativado</option>
+                    <option value="false">Desativado</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">

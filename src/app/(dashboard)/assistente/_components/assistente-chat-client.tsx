@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // -----------------------------------------------------------------------------
 // TYPES & INTERFACES
@@ -407,34 +408,34 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
 
         {/* CONTROLES SUPERIORES */}
         <div className="flex items-center gap-2">
-          {/* Seletor de Contexto do Lead */}
-          <div className="relative hidden md:block">
-            <select
-              value={selectedLeadId}
-              onChange={(e) => setSelectedLeadId(e.target.value)}
-              className="h-8 rounded-md border border-input bg-card px-2.5 pr-7 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-sky-500"
+            {/* Seletor de Contexto do Lead */}
+            <div className="relative hidden md:block">
+              <select
+                value={selectedLeadId}
+                onChange={(e) => setSelectedLeadId(e.target.value)}
+                className="h-8 rounded-md border border-input bg-card px-2.5 pr-7 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+                {MOCK_LEAD_CONTEXTS.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 active:scale-[0.95] transition-transform duration-100" onClick={handleClearChat}><Trash size={16} /></Button>} />
+                <TooltipContent>Limpar histórico da conversa</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs font-medium active:scale-[0.97] transition-all duration-100"
+              onClick={() => setShowSidePanel(!showSidePanel)}
             >
-              {MOCK_LEAD_CONTEXTS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  📌 {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClearChat}><Trash size={16} /></Button>} />
-              <TooltipContent>Limpar histórico da conversa</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs font-medium"
-            onClick={() => setShowSidePanel(!showSidePanel)}
-          >
             <SlidersHorizontal size={14} />
             <span className="hidden sm:inline">{showSidePanel ? "Ocultar Painel MCP" : "Painel MCP"}</span>
           </Button>
@@ -447,7 +448,8 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
       <div className="flex flex-1 overflow-hidden">
         {/* CHAT FEED CONTAINER */}
         <div className="relative flex flex-1 flex-col justify-between overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+          <ScrollArea className="flex-1 min-h-0" id="chat-messages-scroll-area">
+            <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto w-full">
             {messages.length === 0 ? (
               /* ESTADO INICIAL / WELCOME HERO (AIDA: INTEREST) */
               <motion.div
@@ -477,7 +479,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                       <button
                         key={cmd.command}
                         onClick={() => handleSelectCommand(cmd)}
-                        className="group flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3.5 text-left transition-all hover:border-sky-500/50 hover:bg-sky-500/5 hover:shadow-sm"
+                        className="group flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3.5 text-left transition-all hover:border-sky-500/50 hover:bg-sky-500/5 hover:shadow-sm active:scale-[0.98] active:translate-y-[0.5px] duration-150"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:bg-sky-500/10 group-hover:text-sky-500">
@@ -604,6 +606,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
               </div>
             )}
           </div>
+        </ScrollArea>
 
           {/* ----------------------------------------------------------------------------- */}
           {/* DOCK DE ENTRADA / INPUT BAR */}
@@ -617,37 +620,41 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-4 right-4 mb-2 max-h-60 overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-lg z-30"
+                    className="absolute bottom-full left-4 right-4 mb-2 z-30"
                   >
-                    <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Comandos de Atalho MCP
-                    </div>
-                    {PRESET_COMMANDS.map((cmd) => (
-                      <button
-                        key={cmd.command}
-                        onClick={() => handleSelectCommand(cmd)}
-                        className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-colors hover:bg-muted"
-                      >
-                        <div className="flex items-center gap-2">
-                          <cmd.icon size={16} className="text-sky-500" />
-                          <span className="font-semibold text-foreground">{cmd.label}</span>
-                          <span className="text-[11px] text-muted-foreground">{cmd.description}</span>
+                    <ScrollArea className="max-h-60 rounded-xl border border-border bg-card shadow-lg">
+                      <div className="p-1.5">
+                        <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          Comandos de Atalho MCP
                         </div>
-                        <span className="font-mono text-[10px] text-muted-foreground">{cmd.command}</span>
-                      </button>
-                    ))}
+                        {PRESET_COMMANDS.map((cmd) => (
+                          <button
+                            key={cmd.command}
+                            onClick={() => handleSelectCommand(cmd)}
+                            className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-all hover:bg-muted active:scale-[0.98] active:translate-y-[0.5px]"
+                          >
+                            <div className="flex items-center gap-2">
+                              <cmd.icon size={16} className="text-sky-500" />
+                              <span className="font-semibold text-foreground">{cmd.label}</span>
+                              <span className="text-[11px] text-muted-foreground">{cmd.description}</span>
+                            </div>
+                            <span className="font-mono text-[10px] text-muted-foreground">{cmd.command}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollArea>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {/* CHIPS DE ATALHO RÁPIDO ABAIXO DA ENTRADA */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase shrink-0">Atalhos:</span>
                 {PRESET_COMMANDS.slice(0, 4).map((cmd) => (
                   <button
                     key={cmd.command}
                     onClick={() => handleSelectCommand(cmd)}
-                    className="shrink-0 rounded-full border border-border/80 bg-card px-2.5 py-0.5 text-[11px] text-muted-foreground transition-all hover:border-sky-500/40 hover:text-sky-500"
+                    className="shrink-0 rounded-full border border-border/80 bg-card px-2.5 py-0.5 text-[11px] text-muted-foreground transition-all hover:border-sky-500/40 hover:text-sky-500 active:scale-[0.95] active:translate-y-[0.5px]"
                   >
                     {cmd.label}
                   </button>
@@ -673,7 +680,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                   size="icon"
                   onClick={() => handleSendMessage()}
                   disabled={!inputValue.trim() || isTyping}
-                  className="absolute right-1.5 h-8 w-8 rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40"
+                  className="absolute right-1.5 h-8 w-8 rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 active:scale-[0.95] active:translate-y-[0.5px] transition-all duration-100"
                 >
                   <PaperPlaneRight size={16} weight="fill" />
                 </Button>
@@ -697,103 +704,109 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
               animate={{ width: 320, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="hidden lg:flex h-full flex-col border-l border-border/60 bg-card/50 backdrop-blur-sm overflow-y-auto p-4 space-y-6"
+              className="hidden lg:flex h-full flex-col border-l border-border/60 bg-card/50 backdrop-blur-sm overflow-hidden"
             >
-              {/* CABEÇALHO DO PAINEL */}
-              <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                <div className="flex items-center gap-2">
-                  <Database size={18} className="text-sky-500" />
-                  <h3 className="text-xs font-semibold">Ferramentas MCP Ativas</h3>
-                </div>
-                <Badge variant="outline" className="text-[9.5px]">8 Online</Badge>
-              </div>
-
-              {/* LISTA DE FERRAMENTAS MCP DISPONÍVEIS */}
-              <div className="space-y-2.5">
-                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Servidor MCP Interno (/lib/mcp)
-                </div>
-
-                <div className="space-y-2 text-xs">
-                  <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
-                    <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
-                      <span>mcp:quote_calculator</span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              <ScrollArea className="flex-1 h-full" id="mcp-inspector-scroll-area">
+                <div className="flex flex-col min-h-full justify-between gap-6 p-4">
+                  <div className="space-y-6">
+                    {/* CABEÇALHO DO PAINEL */}
+                    <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                       <div className="flex items-center gap-2">
+                         <Database size={18} className="text-sky-500" />
+                         <h3 className="text-xs font-semibold">Ferramentas MCP Ativas</h3>
+                       </div>
+                       <Badge variant="outline" className="text-[9.5px]">8 Online</Badge>
                     </div>
-                    <p className="text-[10.5px] text-muted-foreground">Calcula cotações PME/Adesão com regras de faixa etária e operadoras.</p>
+
+                    {/* LISTA DE FERRAMENTAS MCP DISPONÍVEIS */}
+                    <div className="space-y-2.5">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Servidor MCP Interno (/lib/mcp)
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
+                          <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
+                            <span>mcp:quote_calculator</span>
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          </div>
+                          <p className="text-[10.5px] text-muted-foreground">Calcula cotações PME/Adesão com regras de faixa etária e operadoras.</p>
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
+                          <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
+                            <span>mcp:leads_query</span>
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          </div>
+                          <p className="text-[10.5px] text-muted-foreground">Busca e sintetiza a ficha completa 360º de qualquer lead cadastrado.</p>
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
+                          <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
+                            <span>mcp:sla_checker</span>
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          </div>
+                          <p className="text-[10.5px] text-muted-foreground">Monitora SLA do plantão e redistribui leads estagnados automaticamente.</p>
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
+                          <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
+                            <span>mcp:waha_cadence</span>
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          </div>
+                          <p className="text-[10.5px] text-muted-foreground">Agenda réguas de mensagens no WhatsApp via VPS WAHA dedicada.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CARD DE CONTEXTO ATIVO DO LEAD */}
+                    <div className="space-y-2 border-t border-border/60 pt-4">
+                      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Lead em Foco no Atendimento
+                      </div>
+                      <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="text-xs font-bold text-foreground">Carlos Eduardo Silva</h4>
+                            <p className="text-[10.5px] text-sky-500 font-medium">Bradesco PME • 4 Vidas</p>
+                          </div>
+                          <Badge className="bg-sky-500/20 text-sky-400 border-sky-500/30 text-[9px]">Quente</Badge>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground space-y-1 pt-1 border-t border-border/40">
+                          <div className="flex justify-between">
+                            <span>Etapa Atual:</span>
+                            <strong className="text-foreground">Cotação Enviada</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Último Contato:</span>
+                            <strong className="text-foreground">Há 12 minutos</strong>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Filial Responsável:</span>
+                            <strong className="text-foreground">Filial Jardins</strong>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
-                    <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
-                      <span>mcp:leads_query</span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  {/* STATUS DE SEGURANÇA E PERFORMANCE */}
+                  <div className="rounded-xl border border-border bg-background/50 p-3 space-y-2 text-[10.5px] mt-auto">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Provedor de IA:</span>
+                      <span className="font-semibold text-foreground">DeepSeek V3.1 (OpenRouter)</span>
                     </div>
-                    <p className="text-[10.5px] text-muted-foreground">Busca e sintetiza a ficha completa 360º de qualquer lead cadastrado.</p>
-                  </div>
-
-                  <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
-                    <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
-                      <span>mcp:sla_checker</span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Latência Média:</span>
+                      <span className="font-semibold text-emerald-500">~24 ms</span>
                     </div>
-                    <p className="text-[10.5px] text-muted-foreground">Monitora SLA do plantão e redistribui leads estagnados automaticamente.</p>
-                  </div>
-
-                  <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1">
-                    <div className="flex items-center justify-between font-mono text-[11px] font-medium text-sky-400">
-                      <span>mcp:waha_cadence</span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                    </div>
-                    <p className="text-[10.5px] text-muted-foreground">Agenda réguas de mensagens no WhatsApp via VPS WAHA dedicada.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD DE CONTEXTO ATIVO DO LEAD */}
-              <div className="space-y-2 border-t border-border/60 pt-4">
-                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Lead em Foco no Atendimento
-                </div>
-                <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-xs font-bold text-foreground">Carlos Eduardo Silva</h4>
-                      <p className="text-[10.5px] text-sky-500 font-medium">Bradesco PME • 4 Vidas</p>
-                    </div>
-                    <Badge className="bg-sky-500/20 text-sky-400 border-sky-500/30 text-[9px]">Quente</Badge>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground space-y-1 pt-1 border-t border-border/40">
-                    <div className="flex justify-between">
-                      <span>Etapa Atual:</span>
-                      <strong className="text-foreground">Cotação Enviada</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Último Contato:</span>
-                      <strong className="text-foreground">Há 12 minutos</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Filial Responsável:</span>
-                      <strong className="text-foreground">Filial Jardins</strong>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Multi-tenant RLS:</span>
+                      <span className="font-semibold text-emerald-500">Isolado por Corretora</span>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* STATUS DE SEGURANÇA E PERFORMANCE */}
-              <div className="rounded-xl border border-border bg-background/50 p-3 space-y-2 text-[10.5px] mt-auto">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Provedor de IA:</span>
-                  <span className="font-semibold text-foreground">DeepSeek V3.1 (OpenRouter)</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Latência Média:</span>
-                  <span className="font-semibold text-emerald-500">~24 ms</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Multi-tenant RLS:</span>
-                  <span className="font-semibold text-emerald-500">Isolado por Corretora</span>
-                </div>
-              </div>
+              </ScrollArea>
             </motion.aside>
           )}
         </AnimatePresence>

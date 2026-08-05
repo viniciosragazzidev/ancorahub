@@ -50,6 +50,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-029E | Plantão tem cobertura mínima configurável e não bloqueia a distribuição quando incompleto. | Escalados abaixo do mínimo → alerta operacional; corretores elegíveis já escalados continuam concorrendo à distribuição. | DEC-061 |
 | BR-029F | Remover plantão significa arquivar, nunca apagar o histórico. | Arquivamento → regra e atribuições ativas saem da operação; restauração reativa somente a regra e mantém auditoria. | DEC-061 |
 | BR-029G | Criar plantão para várias unidades gera regras independentes por unidade e fila. | Diretor seleciona unidades e filas ativas → regras, auditorias e coberturas locais são criadas atomicamente; Gestor só pode criar para a própria unidade. | DEC-062 |
+| BR-029H | Empresa PJ pertence ao tenant e pode ser compartilhada apenas dentro do escopo permitido. | Cadastro de lead PJ com CNPJ válido → reutiliza ou cria empresa no tenant; corretor enxerga somente empresas com oportunidade própria. | DEC-071 |
 
 ## Cotação, documentos e venda
 
