@@ -14,6 +14,7 @@ import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER } from "./types";
 import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
 import { configureMetaLeadAdsSource, isMetaLeadAdsEnabled, pauseMetaLeadAdsSource } from "./meta-lead-ads";
+import { ensureMetaLeadAdsSchema } from "./manual-meta-queries";
 
 export type MetaLeadAdsDiscoveryState = {
   error?: string;
@@ -339,6 +340,7 @@ export async function updateMetaLeadAdSourceDistributionAction(input: {
   distributionMode: "direct_leads" | "duty_plantao" | "unit_branch";
   branchId?: string | null;
 }) {
+  await ensureMetaLeadAdsSchema();
   const context = await requireLeadAdsAccess();
   const db = getDatabase();
   const [source] = await db

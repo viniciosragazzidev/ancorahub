@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -10,11 +10,25 @@ import { isMetaLeadAdsEnabled } from "./meta-lead-ads";
 import { getMetaLeadAdsPlatformIdentity } from "./meta-lead-ads-platform";
 import { META_CLOUD_PROVIDER } from "./types";
 
+let schemaEnsured = false;
+
+export async function ensureMetaLeadAdsSchema() {
+  if (schemaEnsured) return;
+  try {
+    const db = getDatabase();
+    await db.execute(sql`ALTER TABLE meta_lead_ad_sources ADD COLUMN IF NOT EXISTS distribution_mode text DEFAULT 'direct_leads'`);
+    schemaEnsured = true;
+  } catch (err) {
+    console.error("[ensureMetaLeadAdsSchema] Failed DDL execution:", err);
+  }
+}
+
 /**
  * Read model for the guided Meta setup. The caller provides only the trusted
  * server-side session context; no tenant identifier crosses the browser boundary.
  */
 export async function getManualMetaIntegrationWorkspaceData(context: TenantContext) {
+  await ensureMetaLeadAdsSchema();
   const db = getDatabase();
   const leadAdsConfig = getMetaLeadAdsConfigurationState();
 
