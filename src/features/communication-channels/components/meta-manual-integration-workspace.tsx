@@ -14,6 +14,7 @@ import {
   confirmManualMetaLeadAdsAssetsAction,
   connectManualMetaConnectionAction,
   discoverManualMetaLeadAdsAssetsAction,
+  pauseManualMetaLeadAdsSourceAction,
   type ManualMetaActionState,
 } from "../manual-meta-actions";
 
@@ -80,9 +81,43 @@ function AssetSelect({ label, value, onChange, items }: { label: string; value: 
 
 export function MetaManualIntegrationWorkspace(props: Props) {
   const [connection, connectAction, connecting] = useActionState(connectManualMetaConnectionAction, initialConnectionState);
+  const [removing, startRemoving] = useTransition();
   const connected = props.channel?.status === "active";
+  const removeSource = (sourceId: string) => startRemoving(async () => {
+    try {
+      const formData = new FormData();
+      formData.set("sourceId", sourceId);
+      await pauseManualMetaLeadAdsSourceAction(formData);
+      toast.success("Página removida. O histórico de leads foi preservado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível remover esta Página.");
+    }
+  });
+
   return <Tabs defaultValue="lead-ads" className="gap-5"><TabsList variant="line"><TabsTrigger value="lead-ads">Lead Ads</TabsTrigger><TabsTrigger value="whatsapp">WhatsApp</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList>
-    <TabsContent value="lead-ads" className="pt-4"><LeadAdsWizard props={props} /><Card className="mt-4 border-border shadow-none"><CardHeader><CardTitle className="text-base">Páginas conectadas</CardTitle><CardDescription>Uma Página só pode pertencer a uma empresa. Pausar interrompe novos recebimentos e preserva o histórico.</CardDescription></CardHeader><CardContent className="space-y-2">{props.leadAdSources.length ? props.leadAdSources.map((source) => <div key={source.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"><span className="font-medium">Página {source.pageId}</span><Badge variant={source.status === "active" ? "success" : "outline"}>{source.status === "active" ? "Ativa" : "Pausada"}</Badge><span className="text-xs text-muted-foreground">Último lead: {date(source.lastLeadAt)}</span></div>) : <p className="text-sm text-muted-foreground">Nenhuma Página ativa ainda.</p>}</CardContent></Card></TabsContent>
+    <TabsContent value="lead-ads" className="pt-4">
+      <LeadAdsWizard props={props} />
+      <Card className="mt-4 border-border shadow-none">
+        <CardHeader>
+          <CardTitle className="text-base">Páginas conectadas</CardTitle>
+          <CardDescription>Uma Página só pode pertencer a uma empresa. Remover interrompe novos recebimentos e preserva o histórico.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {props.leadAdSources.length ? props.leadAdSources.map((source) => (
+            <div key={source.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">Página {source.pageId}</span>
+                <Badge variant={source.status === "active" ? "success" : "outline"}>{source.status === "active" ? "Ativa" : "Removida"}</Badge>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">Último lead: {date(source.lastLeadAt)}</span>
+                {source.status === "active" ? <Button variant="outline" size="sm" type="button" disabled={removing} onClick={() => removeSource(source.id)}>{removing ? "Removendo…" : "Remover"}</Button> : null}
+              </div>
+            </div>
+          )) : <p className="text-sm text-muted-foreground">Nenhuma Página ativa ainda.</p>}
+        </CardContent>
+      </Card>
+    </TabsContent>
     <TabsContent value="whatsapp" className="pt-4"><Card className="border-border shadow-none"><CardHeader><CardTitle>WhatsApp oficial</CardTitle><CardDescription>Esta trilha permanece separada de Lead Ads e continua usando as credenciais do número oficial da empresa.</CardDescription></CardHeader><CardContent><form action={connectAction} className="grid gap-4 md:grid-cols-2"><Field name="businessId" label="Business Manager ID" /><Field name="wabaId" label="WhatsApp Business Account ID" /><Field name="phoneNumberId" label="Phone Number ID" /><Field name="accessToken" label="Access Token" secret />{connection.error ? <p className="text-sm text-destructive md:col-span-2">{connection.error}</p> : null}<Button className="w-fit" disabled={connecting} type="submit">{connecting ? "Validando…" : connected ? "Atualizar WhatsApp" : "Conectar WhatsApp"}</Button></form></CardContent></Card></TabsContent>
     <TabsContent value="status" className="pt-4"><Card className="border-border shadow-none"><CardContent className="grid gap-4 p-5 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Lead Ads</p><p className="mt-1 font-medium">{props.leadAdSources.some((source) => source.status === "active") ? "Recebendo leads" : "Aguardando ativação"}</p></div><div><p className="text-xs text-muted-foreground">WhatsApp</p><p className="mt-1 font-medium">{connected ? `${props.channel?.verifiedName ?? "Número conectado"} • ${props.channel?.displayPhoneNumber ?? ""}` : "Não conectado"}</p></div></CardContent></Card></TabsContent>
   </Tabs>;

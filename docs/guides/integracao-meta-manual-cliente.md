@@ -88,9 +88,9 @@ O mesmo teste pode ser reenviado para verificar que o sistema não cria um lead 
 
 Nesses casos, não compartilhe token nem tente criar um CRM manualmente. Informe apenas o nome e o ID da Página ao suporte da Ancora Hub pelo WhatsApp **+55 21 95930-7782**.
 
-## Como pausar ou trocar uma Página
+## Como remover ou trocar uma Página
 
-O Diretor pode pausar a fonte na lista **Páginas conectadas** dentro de `/settings/meta`. A pausa interrompe novos recebimentos e preserva o histórico de leads. Para trocar de Página, pause a atual, compartilhe a nova Página e repita as Partes 2 e 3.
+O Diretor pode clicar em **Remover** ao lado da Página na lista **Páginas conectadas** dentro de `/settings/meta`. A remoção interrompe novos recebimentos e preserva o histórico de leads. Para conectar a mesma Página novamente, basta buscá-la e ativá-la outra vez. Para trocar de Página, remova a atual, compartilhe a nova Página e repita as Partes 2 e 3.
 
 ## Segurança e privacidade
 

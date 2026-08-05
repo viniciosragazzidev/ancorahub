@@ -304,7 +304,7 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
 }
 
 export async function pauseManualMetaLeadAdsSourceAction(formData: FormData) {
-  const context = await requireManualMetaAccess();
+  const context = await requireLeadAdsAccess();
   const sourceId = String(formData.get("sourceId") ?? "").trim();
   if (!sourceId) throw new Error("Fonte de captação inválida.");
   await pauseMetaLeadAdsSource({ tenantId: context.tenantId, sourceId, actorUserId: context.userId });
