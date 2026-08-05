@@ -49,9 +49,21 @@ function firstField(fields: MetaLeadField[], names: string[]) {
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
 export function normalizeMetaLead(record: MetaLeadAdRecord) {
   const fields = record.field_data ?? [];
-  const nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
-  const telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
-  const email = firstField(fields, ["email", "email_address", "e_mail"]);
+  let nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
+  let telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
+  let email = firstField(fields, ["email", "email_address", "e_mail"]);
+
+  // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
+  if (nome.includes("<test lead:") || nome.includes("dummy data")) {
+    nome = "Lead de Teste Meta";
+  }
+  if (telefone.includes("<test lead:") || telefone.includes("dummy data")) {
+    telefone = "+5511999999999";
+  }
+  if (email.includes("<test lead:") || email.includes("dummy data")) {
+    email = "teste.meta@ancorahub.com.br";
+  }
+
   return {
     nome, telefone, email,
     externalId: record.id ?? "",
