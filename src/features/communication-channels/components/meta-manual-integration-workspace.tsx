@@ -15,6 +15,7 @@ import {
   connectManualMetaConnectionAction,
   discoverManualMetaLeadAdsAssetsAction,
   pauseManualMetaLeadAdsSourceAction,
+  reactivateManualMetaLeadAdsSourceAction,
   type ManualMetaActionState,
 } from "../manual-meta-actions";
 
@@ -94,6 +95,17 @@ export function MetaManualIntegrationWorkspace(props: Props) {
     }
   });
 
+  const reactivateSource = (pageId: string) => startRemoving(async () => {
+    try {
+      const formData = new FormData();
+      formData.set("pageId", pageId);
+      await reactivateManualMetaLeadAdsSourceAction(formData);
+      toast.success("Página reativada com sucesso!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível reativar esta Página.");
+    }
+  });
+
   return <Tabs defaultValue="lead-ads" className="gap-5"><TabsList variant="line"><TabsTrigger value="lead-ads">Lead Ads</TabsTrigger><TabsTrigger value="whatsapp">WhatsApp</TabsTrigger><TabsTrigger value="status">Status</TabsTrigger></TabsList>
     <TabsContent value="lead-ads" className="pt-4">
       <LeadAdsWizard props={props} />
@@ -111,7 +123,11 @@ export function MetaManualIntegrationWorkspace(props: Props) {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">Último lead: {date(source.lastLeadAt)}</span>
-                {source.status === "active" ? <Button variant="outline" size="sm" type="button" disabled={removing} onClick={() => removeSource(source.id)}>{removing ? "Removendo…" : "Remover"}</Button> : null}
+                {source.status === "active" ? (
+                  <Button variant="outline" size="sm" type="button" disabled={removing} onClick={() => removeSource(source.id)}>{removing ? "Removendo…" : "Remover"}</Button>
+                ) : (
+                  <Button variant="default" size="sm" type="button" disabled={removing} onClick={() => reactivateSource(source.pageId)}>{removing ? "Reativando…" : "Reativar"}</Button>
+                )}
               </div>
             </div>
           )) : <p className="text-sm text-muted-foreground">Nenhuma Página ativa ainda.</p>}

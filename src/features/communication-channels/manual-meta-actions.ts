@@ -288,7 +288,11 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
   const db = getDatabase();
   const pageIds = [...new Set(selected.pageIds)];
   for (const pageId of pageIds) {
-    await subscribePageToLeadgen(pageId);
+    try {
+      await subscribePageToLeadgen(pageId);
+    } catch (err) {
+      console.warn(`[confirmManualMetaLeadAdsAssetsAction] Warning subscribing page ${pageId}:`, err);
+    }
   }
   for (const pageId of pageIds) {
     await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId, adAccountId: selected.adAccountId || null, actorUserId: context.userId });
@@ -308,5 +312,24 @@ export async function pauseManualMetaLeadAdsSourceAction(formData: FormData) {
   const sourceId = String(formData.get("sourceId") ?? "").trim();
   if (!sourceId) throw new Error("Fonte de captação inválida.");
   await pauseMetaLeadAdsSource({ tenantId: context.tenantId, sourceId, actorUserId: context.userId });
+  revalidatePath("/settings/meta");
+}
+
+export async function reactivateManualMetaLeadAdsSourceAction(formData: FormData) {
+  const context = await requireLeadAdsAccess();
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  if (!pageId) throw new Error("Página inválida.");
+  try {
+    await subscribePageToLeadgen(pageId);
+  } catch (err) {
+    console.warn(`[reactivateManualMetaLeadAdsSourceAction] Warning subscribing page ${pageId}:`, err);
+  }
+  await configureMetaLeadAdsSource({
+    tenantId: context.tenantId,
+    branchId: null,
+    pageId,
+    adAccountId: null,
+    actorUserId: context.userId,
+  });
   revalidatePath("/settings/meta");
 }
