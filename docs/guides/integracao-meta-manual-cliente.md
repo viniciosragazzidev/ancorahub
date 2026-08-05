@@ -44,7 +44,7 @@ A Ancora Hub irá:
 
 1. localizar a Página compartilhada no Portfólio Empresarial `Ancora Hub`;
 2. atribuí-la ao usuário técnico que usa a integração;
-3. garantir que a credencial técnica tenha acesso a `leads_retrieval`, `pages_show_list` e `pages_read_engagement`;
+3. garantir que a credencial técnica tenha acesso a `leads_retrieval`, `pages_show_list`, `pages_read_engagement` e `pages_manage_metadata`;
 4. atualizar a credencial de produção, quando necessário;
 5. avisar o Diretor que a Página está disponível para ativação.
 
@@ -58,7 +58,7 @@ Após a confirmação da Ancora Hub:
 2. Abra **Configurações → Integrações → Integração Meta** ou acesse `/settings/meta`.
 3. Na área **Lead Ads**, clique em **Buscar ativos autorizados**.
 4. Marque a Página encontrada.
-5. Clique em **Ativar Página**.
+5. Clique em **Ativar Página**. O AncoraHub associa automaticamente o aplicativo `Corretop API Oficial` à Página para receber formulários e só conclui a ativação depois da confirmação da Meta.
 
 Uma Página só pode ficar ligada a uma empresa do AncoraHub por vez. Depois da ativação, o sistema registra a origem Meta e direciona os novos leads para a fila central da empresa.
 

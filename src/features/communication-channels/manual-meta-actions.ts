@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { discoverMetaLeadAdsAssets, getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
+import { discoverMetaLeadAdsAssets, getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribePageToLeadgen, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
 import { getMetaCloudServerConfig, getMetaLeadAdsConfigurationState } from "./meta-cloud-config";
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
 import { isMetaCloudWhatsAppEnabled } from "./service";
@@ -286,7 +286,11 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
     throw new Error("Um dos ativos selecionados não está autorizado para a plataforma. Busque novamente antes de confirmar.");
   }
   const db = getDatabase();
-  for (const pageId of [...new Set(selected.pageIds)]) {
+  const pageIds = [...new Set(selected.pageIds)];
+  for (const pageId of pageIds) {
+    await subscribePageToLeadgen(pageId);
+  }
+  for (const pageId of pageIds) {
     await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId, adAccountId: selected.adAccountId || null, actorUserId: context.userId });
   }
   const now = new Date();

@@ -133,6 +133,13 @@ Enquanto o OAuth/Embedded Signup de Marketing não estiver liberado, cada client
 
 Lead Ads deixa de solicitar token ou identificadores técnicos ao Diretor. A plataforma exibe somente o nome do parceiro, Business ID e suporte; depois de o cliente compartilhar ativos na Meta e liberar o app Corretop API Oficial em Acesso a Leads, o servidor descobre ativos usando a credencial técnica central. O Diretor seleciona uma ou mais Páginas e elas entram na fila central do tenant. A descoberta é permitida apenas para tenants explicitamente habilitados no piloto pelo Super-admin; cada confirmação revalida a seleção contra a Meta e é auditada. WhatsApp permanece em trilha independente.
 
+## DEC-071 — Inscrição automática de Página para Meta Lead Ads
+
+**Estado:** Aceita
+**Data:** 2026-08-05
+
+Após validar que a Página foi compartilhada e ainda está visível à credencial técnica central, a ativação no AncoraHub inscreve o aplicativo Corretop API Oficial no evento `leadgen` pelo servidor. A fonte local só é criada ou reativada quando a Meta confirma a inscrição. O Diretor não recebe, informa ou visualiza token; a falha externa interrompe a ativação, preserva a configuração anterior e é apresentada sem segredos.
+
 ## Pendentes bloqueantes
 
 | ID | Decisão necessária | Impacto | Dono sugerido |

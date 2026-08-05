@@ -88,6 +88,24 @@ export async function discoverMetaLeadAdsAssets(): Promise<MetaLeadAdsAssets> {
   return { pages, adAccounts, pixels, datasets };
 }
 
+/** Subscribes the platform app to Lead Ads events for an already-authorized Page. */
+export async function subscribePageToLeadgen(pageId: string) {
+  const config = getMetaLeadAdsServerConfig();
+  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}/subscribed_apps`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${config.accessToken}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "subscribed_fields=leadgen",
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({})) as { success?: boolean } & MetaApiErrorResponse;
+  if (!response.ok || !payload.success) throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a inscriÃ§Ã£o da PÃ¡gina para receber formulÃ¡rios.", response.status, payload.error?.code);
+  return payload;
+}
+
 export async function sendMetaCloudText(input: { phoneNumberId: string; accessToken: string; to: string; body: string }) {
   return graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
     method: "POST",
