@@ -7,7 +7,13 @@ import {
   PERIOD_OPTIONS,
   type PeriodValue,
 } from "@/shared/period";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Seletor de período 7/14/30/90 persistido em `?period=N`.
@@ -16,8 +22,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
  * apenas sobrescreve `period`, fazendo `router.push`. Requer estar num Client
  * Component sob `<Suspense>` (uso de `useSearchParams`), conforme o padrão das
  * páginas / leia o guia de linking/navigating.
- *
- * O ToggleGroup do Base UI usa `value` como array mesmo em single-select.
  */
 export function PeriodSelect({
   value,
@@ -43,29 +47,31 @@ export function PeriodSelect({
   }
 
   return (
-    <ToggleGroup
-      size="sm"
-      aria-label={label}
-      value={[String(value)] as readonly string[]}
-      onValueChange={(groupValue) => {
-        const next = groupValue?.[0];
-        if (!next) return;
-        if (includeAll && next === "all") {
+    <Select
+      value={String(value)}
+      onValueChange={(val) => {
+        if (!val) return;
+        if (includeAll && val === "all") {
           select("all");
           return;
         }
-        const num = Number.parseInt(next, 10);
+        const num = Number.parseInt(val, 10);
         if ((PERIOD_OPTIONS as readonly number[]).includes(num)) {
           select(num as PeriodValue);
         }
       }}
     >
-      {includeAll ? <ToggleGroupItem value="all">Geral</ToggleGroupItem> : null}
-      {PERIOD_OPTIONS.map((p) => (
-        <ToggleGroupItem key={p} value={String(p)}>
-          {p}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+      <SelectTrigger className="w-32 text-xs bg-card" aria-label={label}>
+        <SelectValue placeholder="Selecione o período" />
+      </SelectTrigger>
+      <SelectContent>
+        {includeAll ? <SelectItem value="all">Geral</SelectItem> : null}
+        {PERIOD_OPTIONS.map((p) => (
+          <SelectItem key={p} value={String(p)}>
+            {p} dias
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
