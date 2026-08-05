@@ -13,16 +13,16 @@ import {
   TrendUp,
   Users,
 } from "@/components/huge-icons";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { ExportButtons } from "./_components/export-buttons";
 import { SpreadsheetSection } from "./_components/spreadsheet-section";
-import { Sparkline } from "@/components/dashboard/sparkline";
 import { InternalReportDocuments } from "./_components/internal-report-documents";
+import { ReportTrendCharts } from "./_components/report-trend-charts";
 
 export const dynamic = "force-dynamic";
 
@@ -36,35 +36,67 @@ export default async function ReportsPage({
   const period = parsePeriod((await searchParams).period);
   const reportStart = periodStart(period);
   const canExport = hasCapability(context.role, "exportar_relatorios", context.jobTitle);
-  const internalDocuments = canExport ? await db.select({ id: schema.internalReportDocuments.id, title: schema.internalReportDocuments.title, filename: schema.internalReportDocuments.filename, createdAt: schema.internalReportDocuments.createdAt }).from(schema.internalReportDocuments).where(eq(schema.internalReportDocuments.tenantId, context.tenantId)).orderBy(sql`${schema.internalReportDocuments.createdAt} desc`).limit(20) : [];
-  const leadScope = context.role === "broker"
-    ? eq(schema.leads.corretorId, context.userId)
-    : context.role === "manager" && context.branchId
-      ? eq(schema.leads.branchId, context.branchId)
-      : undefined;
-  const clientScope = context.role === "broker"
-    ? eq(schema.clients.corretorId, context.userId)
-    : context.role === "manager" && context.branchId
-      ? eq(schema.clients.branchId, context.branchId)
-      : undefined;
+  const internalDocuments = canExport
+    ? await db
+        .select({
+          id: schema.internalReportDocuments.id,
+          title: schema.internalReportDocuments.title,
+          filename: schema.internalReportDocuments.filename,
+          createdAt: schema.internalReportDocuments.createdAt,
+        })
+        .from(schema.internalReportDocuments)
+        .where(eq(schema.internalReportDocuments.tenantId, context.tenantId))
+        .orderBy(sql`${schema.internalReportDocuments.createdAt} desc`)
+        .limit(20)
+    : [];
+  const leadScope =
+    context.role === "broker"
+      ? eq(schema.leads.corretorId, context.userId)
+      : context.role === "manager" && context.branchId
+        ? eq(schema.leads.branchId, context.branchId)
+        : undefined;
+  const clientScope =
+    context.role === "broker"
+      ? eq(schema.clients.corretorId, context.userId)
+      : context.role === "manager" && context.branchId
+        ? eq(schema.clients.branchId, context.branchId)
+        : undefined;
 
   // Fetch aggregate stats
-  const [leadCount, clientCount, saleCount] =
-    await Promise.all([
-      db
-        .select({ count: count() })
-        .from(schema.leads)
-        .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, reportStart))),
-      db
-        .select({ count: count() })
-        .from(schema.clients)
-        .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, reportStart))),
-      db
-        .select({ count: count() })
-        .from(schema.sales)
-        .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-        .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.sales.saleDate, reportStart))),
-    ]);
+  const [leadCount, clientCount, saleCount] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
+          gte(schema.leads.createdAt, reportStart),
+        ),
+      ),
+    db
+      .select({ count: count() })
+      .from(schema.clients)
+      .where(
+        and(
+          eq(schema.clients.tenantId, context.tenantId),
+          clientScope,
+          gte(schema.clients.convertedAt, reportStart),
+        ),
+      ),
+    db
+      .select({ count: count() })
+      .from(schema.sales)
+      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+      .where(
+        and(
+          eq(schema.sales.tenantId, context.tenantId),
+          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
+          gte(schema.sales.saleDate, reportStart),
+        ),
+      ),
+  ]);
 
   // Get the period's sales revenue
   const periodRevenue = await db
@@ -86,26 +118,62 @@ export default async function ReportsPage({
   // Daily trends (N dias) para os cards do resumo
   const [leadsByDay, clientsByDay, salesByDay, revenueByDay] = await Promise.all([
     db
-      .select({ day: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`, count: count() })
+      .select({
+        day: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
+        count: count(),
+      })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, reportStart)))
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
+          gte(schema.leads.createdAt, reportStart),
+        ),
+      )
       .groupBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`),
     db
-      .select({ day: sql<string>`to_char(${schema.clients.convertedAt}, 'YYYY-MM-DD')`, count: count() })
+      .select({
+        day: sql<string>`to_char(${schema.clients.convertedAt}, 'YYYY-MM-DD')`,
+        count: count(),
+      })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, reportStart)))
+      .where(
+        and(
+          eq(schema.clients.tenantId, context.tenantId),
+          clientScope,
+          gte(schema.clients.convertedAt, reportStart),
+        ),
+      )
       .groupBy(sql`to_char(${schema.clients.convertedAt}, 'YYYY-MM-DD')`),
     db
       .select({ day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`, count: count() })
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.sales.saleDate, reportStart)))
+      .where(
+        and(
+          eq(schema.sales.tenantId, context.tenantId),
+          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
+          gte(schema.sales.saleDate, reportStart),
+        ),
+      )
       .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
     db
-      .select({ day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`, total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')` })
+      .select({
+        day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`,
+        total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
+      })
       .from(schema.sales)
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope, eq(schema.sales.status, "active"), gte(schema.sales.saleDate, reportStart)))
+      .where(
+        and(
+          eq(schema.sales.tenantId, context.tenantId),
+          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
+          eq(schema.sales.status, "active"),
+          gte(schema.sales.saleDate, reportStart),
+        ),
+      )
       .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
   ]);
 
@@ -130,17 +198,25 @@ export default async function ReportsPage({
   const totalLeads = leadCount[0]?.count ?? 0;
   const totalClients = clientCount[0]?.count ?? 0;
   const totalSales = saleCount[0]?.count ?? 0;
-  const conversionRate =
-    totalLeads > 0
-      ? ((totalClients / totalLeads) * 100).toFixed(1)
-      : "0,0";
+  const conversionRate = totalLeads > 0 ? ((totalClients / totalLeads) * 100).toFixed(1) : "0,0";
   const revenue = parseFloat(periodRevenue[0]?.total ?? "0");
+  const trendData = leadsTrend.map((_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (period - 1 - index));
+
+    return {
+      date: date.toISOString().slice(0, 10),
+      leads: leadsTrend[index] ?? 0,
+      clients: clientsTrend[index] ?? 0,
+      sales: salesTrend[index] ?? 0,
+      revenue: revenueTrend[index] ?? 0,
+    };
+  });
 
   const reportCards = [
     {
       title: "Relatório de Comissões",
-      description:
-        "Exporte o cronograma de repasses por período, filial e corretor.",
+      description: "Exporte o cronograma de repasses por período, filial e corretor.",
       icon: CurrencyCircleDollar,
       href: "/vendas",
       action: "Abrir vendas",
@@ -148,8 +224,7 @@ export default async function ReportsPage({
     },
     {
       title: "Metas Comerciais",
-      description:
-        "Acompanhe o progresso das metas por corretor, equipe ou filial.",
+      description: "Acompanhe o progresso das metas por corretor, equipe ou filial.",
       icon: Target,
       href: "/metas",
       action: "Ver metas",
@@ -157,8 +232,7 @@ export default async function ReportsPage({
     },
     {
       title: "Funil de Vendas",
-      description:
-        "Visualize a distribuição de leads por estágio do funil comercial.",
+      description: "Visualize a distribuição de leads por estágio do funil comercial.",
       icon: TrendUp,
       href: "/dashboard",
       action: "Ver dashboard",
@@ -166,8 +240,7 @@ export default async function ReportsPage({
     },
     {
       title: "Desempenho da Equipe",
-      description:
-        "Acompanhe leads, contatos e conversões da equipe em tempo real.",
+      description: "Acompanhe leads, contatos e conversões da equipe em tempo real.",
       icon: Users,
       href: "/equipe",
       action: "Ver equipe",
@@ -177,7 +250,11 @@ export default async function ReportsPage({
 
   return (
     <>
-      <DashboardHeader breadcrumb="Gestão comercial" title="Relatórios" rightSlot={<PeriodSelect value={period} />} />
+      <DashboardHeader
+        breadcrumb="Gestão comercial"
+        title="Relatórios"
+        rightSlot={<PeriodSelect value={period} />}
+      />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração.
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -189,82 +266,83 @@ export default async function ReportsPage({
         </section> */}
         <ViewScopeContext role={context.role} />
 
-        {/* KPI Banner */}
-        <section className="rounded-xl border border-border/60 bg-gradient-to-br from-card to-muted/30 p-5 shadow-none">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <ChartBar className="size-3.5" />
-            <span>Resumo do período — últimos {period} dias</span>
+        <section aria-labelledby="reports-overview-title">
+          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <ChartBar className="size-3.5" aria-hidden="true" />
+            <h2 id="reports-overview-title" className="font-medium text-foreground">
+              Visão do período
+            </h2>
+            <span aria-hidden="true">•</span>
+            <span>Últimos {period} dias</span>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-            {[
-              { label: "Leads", value: totalLeads, color: "text-chart-1", sparkline: leadsTrend, sparkColor: "var(--chart-1)" },
-              {
-                label: "Clientes",
-                value: totalClients,
-                color: "text-chart-5",
-                sparkline: clientsTrend,
-                sparkColor: "var(--chart-5)",
-              },
-              {
-                label: "Vendas",
-                value: totalSales,
-                color: "text-chart-2",
-                sparkline: salesTrend,
-                sparkColor: "var(--chart-2)",
-              },
-              {
-                label: "Conversão",
-                value: `${conversionRate}%`,
-                color: "text-chart-4",
-                sparkline: leadsTrend.map((value, index) =>
-                  value > 0 ? Math.round((clientsTrend[index] / value) * 100) : 0,
-                ),
-                sparkColor: "var(--chart-4)",
-              },
-              {
-                label: `Receita (${period}d)`,
-                value: revenue.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                }),
-                color: "text-success",
-                sparkline: revenueTrend,
-                sparkColor: "var(--success)",
-              },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-lg bg-background/60 p-3 text-center backdrop-blur-sm"
-              >
-                <p className={`text-lg font-bold tabular-nums ${stat.color}`}>
-                  {stat.value}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {stat.label}
-                </p>
-                <Sparkline data={stat.sparkline} color={stat.sparkColor} className="mt-2 h-7" />
-              </div>
-            ))}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard
+              label="Leads recebidos"
+              value={totalLeads}
+              sublabel={`Nos últimos ${period} dias`}
+              icon={Users}
+              iconClassName="bg-chart-1/10 text-chart-1"
+              sparklineData={leadsTrend}
+              sparklineColor="var(--chart-1)"
+            />
+            <StatCard
+              label="Clientes convertidos"
+              value={totalClients}
+              sublabel="Leads que viraram clientes"
+              icon={Target}
+              iconClassName="bg-chart-5/10 text-chart-5"
+              sparklineData={clientsTrend}
+              sparklineColor="var(--chart-5)"
+            />
+            <StatCard
+              label="Vendas registradas"
+              value={totalSales}
+              sublabel="Registros do período"
+              icon={TrendUp}
+              iconClassName="bg-chart-2/10 text-chart-2"
+              sparklineData={salesTrend}
+              sparklineColor="var(--chart-2)"
+            />
+            <StatCard
+              label="Conversão"
+              value={`${conversionRate}%`}
+              sublabel="Clientes em relação aos leads"
+              icon={ChartBar}
+              iconClassName="bg-chart-4/10 text-chart-4"
+              sparklineData={leadsTrend.map((value, index) =>
+                value > 0 ? Math.round((clientsTrend[index] / value) * 100) : 0,
+              )}
+              sparklineColor="var(--chart-4)"
+            />
+            <StatCard
+              label="Receita ativa"
+              value={revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              sublabel="Vendas ativas no período"
+              icon={CurrencyCircleDollar}
+              iconClassName="bg-success/10 text-success"
+              sparklineData={revenueTrend}
+              sparklineColor="var(--success)"
+            />
           </div>
         </section>
 
+        <ReportTrendCharts data={trendData} period={period} />
+
         {/* Quick Export Card */}
         {canExport && (
-          <Card className="min-w-0 overflow-visible border-border bg-card shadow-none">
-            <CardHeader className="min-h-16 py-1">
+          <Card className="min-w-0 overflow-visible">
+            <CardHeader>
               <div className="flex items-center gap-2">
                 <FileArrowDown className="size-4 text-primary" />
                 <div>
                   <CardTitle>Exportação rápida</CardTitle>
-                  <CardDescription>
-                    Baixe relatórios em CSV para análise externa.
-                  </CardDescription>
+                  <CardDescription>Baixe relatórios em CSV para análise externa.</CardDescription>
                 </div>
               </div>
             </CardHeader>
-          <CardContent className="min-h-14 pb-4 pt-0">
-            <ExportButtons />
-          </CardContent>
+            <CardContent>
+              <ExportButtons />
+            </CardContent>
           </Card>
         )}
 
@@ -272,39 +350,42 @@ export default async function ReportsPage({
         <SpreadsheetSection />
         {canExport && <InternalReportDocuments documents={internalDocuments} />}
 
-        {/* Report Cards Grid */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {reportCards.map((report) => {
-            const Icon = report.icon;
-            return (
-              <Link
-                key={report.title}
-                href={report.href}
-                className="group relative overflow-hidden rounded-xl border border-border/70 bg-card p-5 shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-sm hover:shadow-primary/5"
-              >
-                <div className="flex items-start justify-between">
-                  <div
-                    className={`flex size-10 items-center justify-center rounded-lg ${report.color}/10`}
+        <section aria-labelledby="report-shortcuts-title">
+          <div className="mb-3">
+            <h2 id="report-shortcuts-title" className="text-base font-semibold tracking-tight">
+              Análises por área
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Acesse os detalhes que explicam os números deste resumo.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {reportCards.map((report) => {
+              const Icon = report.icon;
+              return (
+                <Card key={report.title} variant="compact" className="group p-0">
+                  <Link
+                    href={report.href}
+                    className="flex h-full flex-col p-5 focus-visible:outline-none"
                   >
-                    <Icon className={`size-5 ${report.color}`} />
-                  </div>
-                  <ArrowUpRight className="size-4 text-muted-foreground opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                </div>
-                <h3 className="mt-3 text-sm font-semibold">{report.title}</h3>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {report.description}
-                </p>
-                <div className="mt-3">
-                  <Badge
-                    variant="outline"
-                    className="rounded-md text-xs font-normal transition-colors group-hover:border-primary/30 group-hover:text-primary"
-                  >
-                    {report.action}
-                  </Badge>
-                </div>
-              </Link>
-            );
-          })}
+                    <div className="flex items-start justify-between">
+                      <div
+                        className={`flex size-10 items-center justify-center rounded-md ${report.color}/10`}
+                      >
+                        <Icon className={`size-5 ${report.color}`} />
+                      </div>
+                      <ArrowUpRight className="size-4 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none" />
+                    </div>
+                    <h3 className="mt-3 text-sm font-semibold">{report.title}</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      {report.description}
+                    </p>
+                    <span className="mt-4 text-xs font-medium text-primary">{report.action}</span>
+                  </Link>
+                </Card>
+              );
+            })}
+          </div>
         </section>
       </main>
     </>

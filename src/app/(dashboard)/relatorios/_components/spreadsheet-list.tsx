@@ -2,7 +2,16 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ChartBar, Copy, Eye, LinkSimple, PencilSimple, ShieldCheck, Trash, X } from "@/components/huge-icons";
+import {
+  ChartBar,
+  Copy,
+  Eye,
+  LinkSimple,
+  PencilSimple,
+  ShieldCheck,
+  Trash,
+  X,
+} from "@/components/huge-icons";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,55 +40,65 @@ export function SpreadsheetList({
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleDelete = useCallback(async (id: string) => {
-    setDeletingId(id);
-    const result = await deleteSpreadsheetAction(id);
-    setDeletingId(null);
-    if (result.success) {
-      toast.success("Planilha excluída.");
-      onRefresh();
-      if (viewingId === id) setViewingId(null);
-    } else {
-      toast.error(result.error ?? "Erro ao excluir.");
-    }
-  }, [onRefresh, viewingId]);
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setDeletingId(id);
+      const result = await deleteSpreadsheetAction(id);
+      setDeletingId(null);
+      if (result.success) {
+        toast.success("Planilha excluída.");
+        onRefresh();
+        if (viewingId === id) setViewingId(null);
+      } else {
+        toast.error(result.error ?? "Erro ao excluir.");
+      }
+    },
+    [onRefresh, viewingId],
+  );
 
-  const handleRename = useCallback(async (id: string) => {
-    if (!editName.trim()) return;
-    const formData = new FormData();
-    formData.set("id", id);
-    formData.set("name", editName.trim());
-    const result = await renameSpreadsheetAction({}, formData);
-    if (result.success) {
-      toast.success("Renomeada.");
-      setEditingId(null);
-      onRefresh();
-    } else {
-      toast.error(result.error ?? "Erro ao renomear.");
-    }
-  }, [editName, onRefresh]);
+  const handleRename = useCallback(
+    async (id: string) => {
+      if (!editName.trim()) return;
+      const formData = new FormData();
+      formData.set("id", id);
+      formData.set("name", editName.trim());
+      const result = await renameSpreadsheetAction({}, formData);
+      if (result.success) {
+        toast.success("Renomeada.");
+        setEditingId(null);
+        onRefresh();
+      } else {
+        toast.error(result.error ?? "Erro ao renomear.");
+      }
+    },
+    [editName, onRefresh],
+  );
 
-  const handleRevokeLink = useCallback(async (id: string) => {
-    const result = await revokePublicLinkAction(id);
-    if (result.success) {
-      toast.success("Link público revogado.");
-      onRefresh();
-    } else {
-      toast.error(result.error ?? "Erro ao revogar link.");
-    }
-  }, [onRefresh]);
+  const handleRevokeLink = useCallback(
+    async (id: string) => {
+      const result = await revokePublicLinkAction(id);
+      if (result.success) {
+        toast.success("Link público revogado.");
+        onRefresh();
+      } else {
+        toast.error(result.error ?? "Erro ao revogar link.");
+      }
+    },
+    [onRefresh],
+  );
 
   if (spreadsheets.length === 0) return null;
 
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <ChartBar className="size-4 text-primary" />
           <div>
             <CardTitle>Planilhas importadas</CardTitle>
             <CardDescription>
-              {spreadsheets.length} planilha{spreadsheets.length !== 1 ? "s" : ""} — clique para visualizar.
+              {spreadsheets.length} planilha{spreadsheets.length !== 1 ? "s" : ""} — clique para
+              visualizar.
             </CardDescription>
           </div>
         </div>
@@ -132,8 +151,8 @@ export function SpreadsheetList({
                     >
                       <p className="text-sm font-medium">{s.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {s.rowCount} linha{s.rowCount !== 1 ? "s" : ""} ·{" "}
-                        {s.columns.length} coluna{s.columns.length !== 1 ? "s" : ""} ·{" "}
+                        {s.rowCount} linha{s.rowCount !== 1 ? "s" : ""} · {s.columns.length} coluna
+                        {s.columns.length !== 1 ? "s" : ""} ·{" "}
                         {new Intl.DateTimeFormat("pt-BR", {
                           day: "numeric",
                           month: "short",
@@ -239,10 +258,7 @@ export function SpreadsheetList({
                   className="overflow-hidden"
                 >
                   <div className="border-t border-border pt-2">
-                    <SpreadsheetTableViewer
-                      spreadsheetId={s.id}
-                      columns={s.columns}
-                    />
+                    <SpreadsheetTableViewer spreadsheetId={s.id} columns={s.columns} />
                   </div>
                 </motion.div>
               )}
