@@ -106,8 +106,8 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.85fr)]">
           <Card variant="subtle">
             <CardHeader className="flex-row items-start justify-between gap-3">
-              <div><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
-              <Button render={<Link href="/minha-fila" />} size="sm" variant="ghost">Ver fila <ArrowRight aria-hidden="true" /></Button>
+              <div className="min-w-0 flex-1"><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
+              <Button render={<Link href="/minha-fila" />} size="sm" variant="ghost" className="shrink-0">Ver fila <ArrowRight aria-hidden="true" /></Button>
             </CardHeader>
             <CardContent>
               {data.queue.length ? <div className="divide-y divide-border/60">
@@ -123,7 +123,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
 
           <div className="grid gap-5">
             <Card variant="subtle">
-              <CardHeader className="flex-row items-start justify-between gap-3"><div><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Button render={<Link href="/tarefas" />} size="sm" variant="ghost">Ver todas</Button></CardHeader>
+              <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Button render={<Link href="/tarefas" />} size="sm" variant="ghost" className="shrink-0">Ver todas</Button></CardHeader>
               <CardContent>
                 {data.agenda.length ? <div className="grid gap-2">{data.agenda.map((task) => <div className="flex items-center gap-2.5 rounded-md border border-border/60 bg-background/40 px-3 py-2.5" key={task.id}>
                   <span className={cn("size-2 shrink-0 rounded-full", isOverdue(task.dueAt) ? "bg-destructive" : task.priority === "urgent" ? "bg-warning" : "bg-primary")} />
@@ -134,7 +134,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
             </Card>
 
             <Card variant="subtle">
-              <CardHeader className="flex-row items-start justify-between gap-3"><div><CardTitle>Minha meta</CardTitle><CardDescription>Progresso individual do período vigente.</CardDescription></div><Button render={<Link href="/minha-meta" />} size="sm" variant="ghost">Detalhes</Button></CardHeader>
+              <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Minha meta</CardTitle><CardDescription>Progresso individual do período vigente.</CardDescription></div><Button render={<Link href="/minha-meta" />} size="sm" variant="ghost" className="shrink-0">Detalhes</Button></CardHeader>
               <CardContent>{data.goal ? <div className="space-y-3"><div className="flex items-end justify-between gap-3"><div><p className="text-sm font-medium">{data.goal.name}</p><p className="text-xs text-muted-foreground">{data.goal.currentValue} de {data.goal.targetValue}</p></div><strong className="text-lg tabular-nums">{Math.round(data.goal.percentage)}%</strong></div><Progress value={Math.min(100, Math.max(0, data.goal.percentage))} /></div> : <EmptyWorkspaceState icon={Target} message="Nenhuma meta individual ativa neste período." />}</CardContent>
             </Card>
           </div>
@@ -142,7 +142,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.7fr)]">
           <Card variant="subtle">
-            <CardHeader className="flex-row items-start justify-between gap-3"><div><CardTitle>Inbox operacional</CardTitle><CardDescription>Mensagens, pendências e alertas que merecem atenção.</CardDescription></div><Button render={<Link href="/notificacoes" />} size="sm" variant="ghost"><Bell aria-hidden="true" /> {data.today.unreadNotifications}</Button></CardHeader>
+            <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Inbox operacional</CardTitle><CardDescription>Mensagens, pendências e alertas que merecem atenção.</CardDescription></div><Button render={<Link href="/notificacoes" />} size="sm" variant="ghost" className="shrink-0 max-w-24"><Bell aria-hidden="true" /> <span className="truncate">{data.today.unreadNotifications}</span></Button></CardHeader>
             <CardContent>{data.inbox.length ? <div className="divide-y divide-border/60">{data.inbox.map((item) => <Link className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0" href={item.href} key={item.id}><Badge className="mt-0.5 shrink-0" variant={item.severity === "critical" ? "destructive" : item.severity === "warning" ? "warning" : "outline"}>{sourceLabels[item.source]}</Badge><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium group-hover:text-primary">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.description}</span></span><ArrowRight aria-hidden="true" className="mt-0.5 size-4 text-muted-foreground group-hover:text-primary" /></Link>)}</div> : <EmptyWorkspaceState icon={Bell} illustration="empty-inbox" message="Nenhum alerta novo. As atualizações aparecerão aqui." />}</CardContent>
           </Card>
           <Card variant="subtle">

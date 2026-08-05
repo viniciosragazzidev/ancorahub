@@ -3310,7 +3310,86 @@ export const proposals = pgTable(
   ],
 );
 
+export const automationStatusValues = ["rascunho", "teste", "publicado", "pausado", "encerrado"] as const;
+export const automationStatus = pgEnum("automation_status", automationStatusValues);
+
+export const automationLogStatusValues = ["pending", "processing", "completed", "failed", "dead_letter"] as const;
+export const automationLogStatus = pgEnum("automation_log_status", automationLogStatusValues);
+
+export const crmAutomations = pgTable(
+  "crm_automations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    triggerType: text("trigger_type").notNull(),
+    status: automationStatus("status").notNull().default("rascunho"),
+    version: integer("version").notNull().default(1),
+    description: text("description"),
+    configuration: jsonb("configuration").notNull().default({}),
+    templateBody: text("template_body").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("crm_automations_tenant_idx").on(table.tenantId, table.status),
+  ],
+);
+
+export const crmAutomationLogs = pgTable(
+  "crm_automation_logs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    automationId: text("automation_id")
+      .notNull()
+      .references(() => crmAutomations.id, { onDelete: "cascade" }),
+    leadId: text("lead_id")
+      .references(() => leads.id, { onDelete: "cascade" }),
+    clientId: text("client_id")
+      .references(() => clients.id, { onDelete: "cascade" }),
+    status: automationLogStatus("status").notNull().default("pending"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(5),
+    lastError: text("last_error"),
+    runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("crm_automation_logs_run_idx").on(table.status, table.runAfter),
+  ],
+);
+
+export const whatsappFlows = pgTable(
+  "whatsapp_flows",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    triggerType: text("trigger_type").notNull(),
+    status: text("status").notNull().default("active"),
+    configuration: jsonb("configuration").notNull().default({}),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("whatsapp_flows_tenant_idx").on(table.tenantId),
+  ],
+);
+
 export type TenantRole = (typeof tenantRoleValues)[number];
 export type TenantStatus = (typeof tenantStatusValues)[number];
 export type PasswordResetRequestStatus = "requested" | "approved" | "rejected" | "completed";
 export type ProposalStatus = (typeof proposalStatusValues)[number];
+export type AutomationStatus = (typeof automationStatusValues)[number];
+export type AutomationLogStatus = (typeof automationLogStatusValues)[number];

@@ -313,6 +313,14 @@ export async function changeLeadStatus(
     );
   }
 
+  if (newStatus === "lost") {
+    const { triggerInstantAutomation } = await import("@/features/automations/engine");
+    void triggerInstantAutomation(lead.tenantId, lead.id, "lead_perdido").catch(console.error);
+  } else if (newStatus === "distributed" || newStatus === "novo") {
+    const { triggerInstantAutomation } = await import("@/features/automations/engine");
+    void triggerInstantAutomation(lead.tenantId, lead.id, "alerta_primeiro_atendimento").catch(console.error);
+  }
+
   return {
     success: true,
     previousStatus,

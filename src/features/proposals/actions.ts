@@ -425,6 +425,9 @@ export async function convertProposalToSaleAction(
         .set({ status: "converted", stageEnteredAt: now })
         .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
 
+      const { triggerInstantAutomation } = await import("@/features/automations/engine");
+      void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
+
       // Add Lead interaction audit log
       await tx.insert(schema.leadInteractions).values({
         id: randomUUID(),

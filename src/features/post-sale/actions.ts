@@ -231,6 +231,8 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
     }
 
     await tx.update(schema.leads).set({ status: "converted", stageEnteredAt: now }).where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+    const { triggerInstantAutomation } = await import("@/features/automations/engine");
+    void triggerInstantAutomation(context.tenantId, lead.id, "venda_realizada").catch(console.error);
     const metadata: Record<string, unknown> = {
       saleId,
       policyNumber: input.policyNumber,

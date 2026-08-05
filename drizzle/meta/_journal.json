@@ -414,6 +414,13 @@
       "when": 1786033800000,
       "tag": "0106_commercial_companies",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1786033900000,
+      "tag": "0108_automations_foundation",
+      "breakpoints": true
     }
   ]
 }
