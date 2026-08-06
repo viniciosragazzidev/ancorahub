@@ -45,8 +45,8 @@ const PAGE_SIZE = 10;
 const MAX_BATCH = 10;
 
 function Feedback({ state }: { state: DistributionActionState }) {
-  if (state.success && state.message) toast.success(state.message);
   if (state.error) toast.error(state.error);
+  else if (state.message) toast[state.success ? "success" : "warning"](state.message);
   return null;
 }
 

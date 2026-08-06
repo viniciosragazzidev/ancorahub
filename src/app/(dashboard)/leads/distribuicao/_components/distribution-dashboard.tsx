@@ -71,9 +71,10 @@ type BrokerItem = {
 
 function ActionFeedback({ state }: { state: BranchActionState }) {
   useEffect(() => {
-    if (state.success) toast.success("Configuração atualizada.");
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+    else if (state.message) toast.success(state.message);
+    else if (state.success) toast.success("Configuração atualizada.");
+  }, [state.error, state.message, state.success]);
   return null;
 }
 

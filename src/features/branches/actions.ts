@@ -11,7 +11,7 @@ import { requireRole } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
-export type BranchActionState = { success?: boolean; error?: string };
+export type BranchActionState = { success?: boolean; error?: string; message?: string };
 
 const branchInput = z.object({
   name: z.string().trim().min(2, "Informe um nome de filial válido.").max(100),
@@ -230,18 +230,14 @@ export async function toggleBrokerAvailabilityAction(
         .update(schema.tenantMemberships)
         .set({ availabilityStatus: nextStatus, updatedAt: new Date() })
         .where(eq(schema.tenantMemberships.id, membership.id));
-      await tx
-        .insert(schema.auditLogs)
-        .values({
-          id: randomUUID(),
-          userId: context.userId,
-          entidade: "tenant_membership",
-          entidadeId: membership.id,
-          acao:
-            nextStatus === "paused"
-              ? "pausou_recebimento_de_leads"
-              : "reativou_recebimento_de_leads",
-        });
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "tenant_membership",
+        entidadeId: membership.id,
+        acao:
+          nextStatus === "paused" ? "pausou_recebimento_de_leads" : "reativou_recebimento_de_leads",
+      });
     });
     revalidatePath("/leads/distribuicao");
     revalidatePath("/dashboard");
@@ -292,6 +288,7 @@ export async function setBrokersAvailabilityAction(
     ) {
       return { error: "Você só pode controlar corretores da sua filial." };
     }
+    let updated = 0;
     await db.transaction(async (tx) => {
       for (const membership of memberships) {
         const shouldUpdate =
@@ -299,6 +296,7 @@ export async function setBrokersAvailabilityAction(
             ? membership.availabilityStatus === "available"
             : membership.availabilityStatus === "paused";
         if (!shouldUpdate) continue;
+        updated += 1;
         await tx
           .update(schema.tenantMemberships)
           .set({ availabilityStatus: target.data, updatedAt: new Date() })
@@ -317,7 +315,13 @@ export async function setBrokersAvailabilityAction(
     });
     revalidatePath("/leads/distribuicao");
     revalidatePath("/dashboard");
-    return { success: true };
+    return {
+      success: true,
+      message:
+        updated > 0
+          ? `${updated} corretor(es) atualizado(s).`
+          : "Nenhum corretor precisava de alteração.",
+    };
   } catch (error) {
     return actionError(error);
   }

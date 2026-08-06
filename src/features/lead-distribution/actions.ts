@@ -78,26 +78,22 @@ export async function saveDistributionPolicyAction(
         })
         .where(eq(schema.leadDistributionPolicies.id, existing.id));
     else
-      await db
-        .insert(schema.leadDistributionPolicies)
-        .values({
-          id: randomUUID(),
-          tenantId: context.tenantId,
-          enabled: true,
-          policy: parsed.data,
-          updatedBy: context.userId,
-          createdAt: now,
-          updatedAt: now,
-        });
-    await db
-      .insert(schema.auditLogs)
-      .values({
+      await db.insert(schema.leadDistributionPolicies).values({
         id: randomUUID(),
-        userId: context.userId,
-        entidade: "lead_distribution_policy",
-        entidadeId: existing?.id ?? context.tenantId,
-        acao: "distribution_policy.updated",
+        tenantId: context.tenantId,
+        enabled: true,
+        policy: parsed.data,
+        updatedBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
       });
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "lead_distribution_policy",
+      entidadeId: existing?.id ?? context.tenantId,
+      acao: "distribution_policy.updated",
+    });
     refreshDistribution();
     return { success: true };
   } catch (error) {
@@ -139,15 +135,13 @@ export async function retryLeadEffectAction(formData: FormData) {
     effectId: effect.id,
   });
   if (!retried) throw new Error("Este efeito não está disponível para reprocessamento.");
-  await getDatabase()
-    .insert(schema.auditLogs)
-    .values({
-      id: randomUUID(),
-      userId: context.userId,
-      entidade: "lead_effect_outbox",
-      entidadeId: effect.id,
-      acao: "lead_effect.retry_requested",
-    });
+  await getDatabase().insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "lead_effect_outbox",
+    entidadeId: effect.id,
+    acao: "lead_effect.retry_requested",
+  });
   refreshDistribution();
 }
 
