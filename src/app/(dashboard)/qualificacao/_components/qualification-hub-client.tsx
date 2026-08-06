@@ -68,6 +68,74 @@ type SimMemory = {
   email?: string;
 };
 
+// --- Context & NLP Helpers for Web Simulator ---
+
+const GREETING_WORDS = new Set([
+  "ola", "olá", "oi", "oie", "opa", "salve", "bom dia", "boa tarde", "boa noite",
+  "tudo bem", "tudo bom", "como vai", "hei", "hey", "alo", "alô"
+]);
+
+function isPureGreeting(text: string): boolean {
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s]/gi, "");
+
+  return GREETING_WORDS.has(normalized) || normalized.split(" ").every((w) => GREETING_WORDS.has(w));
+}
+
+function parseInputForFields(text: string, currentMemory: SimMemory): Partial<SimMemory> {
+  const extracted: Partial<SimMemory> = {};
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 1. Name Pattern
+  const nameMatch = trimmed.match(/(?:meu nome e|meu nome é|me chamo|sou o|sou a|eu sou|me chamo de)\s+([A-ZÀ-Úa-zà-ú\s]+)/i);
+  if (nameMatch?.[1]) {
+    extracted.nome = nameMatch[1].trim();
+  }
+
+  // 2. Email Pattern
+  const emailMatch = trimmed.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (emailMatch?.[1]) {
+    extracted.email = emailMatch[1].trim();
+  }
+
+  // 3. Plan Type Pattern
+  if (/\b(individual|pf|para mim|so para mim|só para mim|minha pessoa)\b/i.test(lower)) {
+    extracted.plano = "Individual";
+    if (!currentMemory.vidas) extracted.vidas = "1 pessoa";
+  } else if (/\b(familiar|familia|família|para minha familia|para minha família)\b/i.test(lower)) {
+    extracted.plano = "Familiar";
+  } else if (/\b(pme|pj|empresarial|empresa|para minha empresa|coletivo|cnpj)\b/i.test(lower)) {
+    extracted.plano = "Empresarial (PME)";
+  }
+
+  // 4. Lives Pattern
+  const livesMatch = trimmed.match(/(\d+)\s*(?:pessoas|vidas|dependentes|integrantes)?/i);
+  if (livesMatch?.[1] && Number(livesMatch[1]) > 0 && Number(livesMatch[1]) < 500 && !extracted.idade) {
+    if (lower.includes("pessoa") || lower.includes("vida") || lower.includes("integrante") || !currentMemory.vidas) {
+      extracted.vidas = `${livesMatch[1]} ${Number(livesMatch[1]) === 1 ? "pessoa" : "pessoas"}`;
+    }
+  }
+
+  // 5. Age Pattern
+  const ageMatch = trimmed.match(/(\d+)\s*(?:anos|ano)/i);
+  if (ageMatch?.[1]) {
+    extracted.idade = `${ageMatch[1]} anos`;
+  }
+
+  // 6. City Pattern
+  const cityMatch = trimmed.match(/(?:moro em|sou de|na cidade de|em)\s+([A-ZÀ-Úa-zà-ú\s]+)/i);
+  if (cityMatch?.[1]) {
+    extracted.cidade = cityMatch[1].trim();
+  }
+
+  return extracted;
+}
+
 export function QualificationHubClient({ settings, testNumbers: initialTestNumbers }: QualificationHubProps) {
   const [enabled, setEnabled] = useState(settings?.enabled ?? false);
   const [pauseMode, setPauseMode] = useState(settings?.pauseMode ?? "handoff_active");
@@ -91,7 +159,6 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
   const [resetReason, setResetReason] = useState("");
 
   // Web Simulator State Engine
-  const [stepIndex, setStepIndex] = useState(0);
   const [simMemory, setSimMemory] = useState<SimMemory>({});
   const [simMessages, setSimMessages] = useState<Array<{ sender: "user" | "bot"; text: string }>>([
     { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
@@ -177,9 +244,8 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
     }
   };
 
-  // Dynamic Interactive Simulator Logic
+  // Context-Aware Simulator Processor
   const handleRestartSimulator = () => {
-    setStepIndex(0);
     setSimMemory({});
     setSimMessages([
       { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
@@ -190,65 +256,91 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
   const handleSimSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!simInput.trim()) return;
-    const text = simInput.trim();
-    setSimMessages((prev) => [...prev, { sender: "user", text }]);
+    const userText = simInput.trim();
+    setSimMessages((prev) => [...prev, { sender: "user", text: userText }]);
     setSimInput("");
 
     setTimeout(() => {
-      let botReply = "";
-      let nextStep = stepIndex;
-
-      if (stepIndex === 0) {
-        // Step 0: Name input
-        setSimMemory((prev) => ({ ...prev, nome: text }));
-        botReply = `Prazer, ${text}! Para quantas pessoas você busca o plano de saúde (Individual, Familiar ou PME)?`;
-        nextStep = 1;
-      } else if (stepIndex === 1) {
-        // Step 1: Plan type
-        setSimMemory((prev) => ({ ...prev, plano: text }));
-        botReply = "Entendido! Quantas pessoas serão incluídas no plano?";
-        nextStep = 2;
-      } else if (stepIndex === 2) {
-        // Step 2: Lives count
-        setSimMemory((prev) => ({ ...prev, vidas: text }));
-        botReply = "Perfeito! Qual a idade da(s) pessoa(s) que será(ão) incluída(s)?";
-        nextStep = 3;
-      } else if (stepIndex === 3) {
-        // Step 3: Age
-        setSimMemory((prev) => ({ ...prev, idade: text }));
-        botReply = "Ótimo! Em qual cidade e estado você pretende contratar o plano?";
-        nextStep = 4;
-      } else if (stepIndex === 4) {
-        // Step 4: City
-        setSimMemory((prev) => ({ ...prev, cidade: text }));
-        botReply = "Perfeito! E para finalizar, qual o seu melhor e-mail para enviarmos a cotação comparativa?";
-        nextStep = 5;
-      } else if (stepIndex === 5) {
-        // Step 5: Email
-        setSimMemory((prev) => ({ ...prev, email: text }));
-        botReply = `${handoffMessage} Um de nossos especialistas entrará em contato em instantes!`;
-        nextStep = 6;
-      } else {
-        botReply = "Sua qualificação já foi concluída! Estamos transferindo seu atendimento para um corretor especializado.";
+      // 1. Check if message is a pure greeting
+      if (isPureGreeting(userText)) {
+        const nextPrompt = simMemory.nome
+          ? `Olá ${simMemory.nome}! Tudo bem? ` + getNextQuestionPrompt(simMemory)
+          : "Olá! Tudo bem? Para começarmos a cotação, qual é o seu nome completo?";
+        setSimMessages((prev) => [...prev, { sender: "bot", text: nextPrompt }]);
+        return;
       }
 
-      setStepIndex(nextStep);
-      setSimMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
-    }, 400);
+      // 2. Parse input for structured fields
+      const extracted = parseInputForFields(userText, simMemory);
+
+      // If no explicit field was extracted by pattern, use fallback based on expected missing field
+      const updatedMemory: SimMemory = { ...simMemory, ...extracted };
+
+      if (!updatedMemory.nome) {
+        // First message is treated as name if not pure greeting
+        updatedMemory.nome = userText;
+      } else if (!updatedMemory.plano && !extracted.plano) {
+        if (!simMemory.plano) updatedMemory.plano = userText;
+      } else if (!updatedMemory.vidas && !extracted.vidas) {
+        if (!simMemory.vidas) updatedMemory.vidas = userText;
+      } else if (!updatedMemory.idade && !extracted.idade) {
+        if (!simMemory.idade) updatedMemory.idade = userText;
+      } else if (!updatedMemory.cidade && !extracted.cidade) {
+        if (!simMemory.cidade) updatedMemory.cidade = userText;
+      } else if (!updatedMemory.email && !extracted.email) {
+        if (!simMemory.email) updatedMemory.email = userText;
+      }
+
+      setSimMemory(updatedMemory);
+
+      // 3. Formulate Contextual Response based on what fields remain missing
+      const botResponse = generateContextualBotReply(updatedMemory, handoffMessage);
+      setSimMessages((prev) => [...prev, { sender: "bot", text: botResponse }]);
+    }, 450);
   };
 
-  // Calculate dynamic simulator score
-  const collectedCount = Object.keys(simMemory).length;
+  function getNextQuestionPrompt(mem: SimMemory): string {
+    if (!mem.nome) return "Para começarmos, qual é o seu nome completo?";
+    if (!mem.plano) return `Prazer, ${mem.nome}! Para quantas pessoas você busca o plano de saúde (Individual, Familiar ou PME)?`;
+    if (!mem.vidas) return "Entendido! Quantas pessoas serão incluídas no plano?";
+    if (!mem.idade) return "Perfeito! Qual a idade das pessoas que serão incluídas?";
+    if (!mem.cidade) return "Ótimo! Em qual cidade e estado você pretende contratar o plano?";
+    if (!mem.email) return "Excelente! Para finalizar, qual o seu melhor e-mail para envio da cotação?";
+    return `${handoffMessage} Um de nossos especialistas entrará em contato em instantes!`;
+  }
+
+  function generateContextualBotReply(mem: SimMemory, handoffMsg: string): string {
+    if (!mem.plano) {
+      return `Prazer, ${mem.nome}! Para quantas pessoas você busca o plano de saúde (Individual, Familiar ou PME)?`;
+    }
+    if (!mem.vidas) {
+      return `Entendido, plano ${mem.plano}! Quantas pessoas serão incluídas no plano?`;
+    }
+    if (!mem.idade) {
+      return `Perfeito! Qual a idade da(s) pessoa(s) que será(ão) incluída(s)?`;
+    }
+    if (!mem.cidade) {
+      return `Ótimo! Em qual cidade e estado você pretende contratar o plano?`;
+    }
+    if (!mem.email) {
+      return `Perfeito, ${mem.cidade}! E para finalizar, qual o seu melhor e-mail para enviarmos a cotação comparativa?`;
+    }
+    return `${handoffMsg} Todos os dados foram coletados com sucesso!`;
+  }
+
+  // Calculate dynamic simulator score and active step title
+  const collectedFieldsList = Object.keys(simMemory).filter((k) => Boolean(simMemory[k as keyof SimMemory]));
+  const collectedCount = collectedFieldsList.length;
   const currentScore = Math.min(100, collectedCount * 18 + (collectedCount === 6 ? 10 : 0));
-  const stepTitles = [
-    "1. Coleta de Nome do Cliente",
-    "2. Coleta do Tipo de Plano",
-    "3. Coleta de Quantidade de Vidas",
-    "4. Coleta da Idade",
-    "5. Coleta da Cidade de Atendimento",
-    "6. Coleta do E-mail para Cotação",
-    "Qualificação Concluída (Handoff)",
-  ];
+
+  const activeStepTitle =
+    !simMemory.nome ? "1. Coleta do Nome do Cliente"
+      : !simMemory.plano ? "2. Coleta do Tipo de Plano"
+        : !simMemory.vidas ? "3. Coleta de Quantidade de Vidas"
+          : !simMemory.idade ? "4. Coleta da Idade"
+            : !simMemory.cidade ? "5. Coleta da Cidade de Atendimento"
+              : !simMemory.email ? "6. Coleta do E-mail para Cotação"
+                : "Qualificação Concluída (Handoff)";
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -350,7 +442,7 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
         </div>
 
         {/* Tabbed Configuration Sections */}
-        <Tabs defaultValue="overview" className="w-full space-y-4">
+        <Tabs defaultValue="simulator" className="w-full space-y-4">
           <TabsList className="w-full justify-start overflow-x-auto border-b border-border/60 bg-transparent p-0">
             <TabsTrigger value="overview" className="gap-2 text-xs font-semibold py-2.5">
               <SlidersHorizontal className="size-3.5" />
@@ -366,7 +458,7 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
             </TabsTrigger>
             <TabsTrigger value="simulator" className="gap-2 text-xs font-semibold py-2.5">
               <MessageSquare className="size-3.5" />
-              Simulador Web
+              Simulador Web (Contexto IA)
             </TabsTrigger>
             <TabsTrigger value="memory_reset" className="gap-2 text-xs font-semibold py-2.5">
               <RotateCcw className="size-3.5" />
@@ -570,14 +662,14 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
             </Card>
           </TabsContent>
 
-          {/* ─── TAB 4: SIMULADOR WEB DINÂMICO ─── */}
+          {/* ─── TAB 4: SIMULADOR WEB (CONTEXTO IA) ─── */}
           <TabsContent value="simulator" className="space-y-6 pt-2">
             <div className="grid gap-6 lg:grid-cols-12">
-              <Card variant="subtle" className="lg:col-span-7 flex flex-col h-[520px] rounded-xl border-border/80 overflow-hidden">
+              <Card variant="subtle" className="lg:col-span-7 flex flex-col h-[530px] rounded-xl border-border/80 overflow-hidden">
                 <CardHeader className="border-b pb-3 bg-muted/20 flex flex-row items-center justify-between">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <MessageSquare className="size-4 text-primary" />
-                    Simulador Interno de WhatsApp
+                    Simulador de WhatsApp (IA com Contexto)
                   </CardTitle>
                   <Button
                     variant="outline"
@@ -609,7 +701,7 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
                 </div>
                 <form onSubmit={handleSimSendMessage} className="border-t p-3 flex gap-2 bg-card">
                   <Input
-                    placeholder="Responda à pergunta da IA..."
+                    placeholder="Converse naturalmente com a IA..."
                     value={simInput}
                     onChange={(e) => setSimInput(e.target.value)}
                     className="text-xs"
@@ -620,7 +712,7 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
                 </form>
               </Card>
 
-              <Card variant="subtle" className="lg:col-span-5 h-[520px] rounded-xl border-border/80 overflow-y-auto">
+              <Card variant="subtle" className="lg:col-span-5 h-[530px] rounded-xl border-border/80 overflow-y-auto">
                 <CardHeader className="border-b pb-3 bg-muted/20">
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Bot className="size-4 text-primary" />
@@ -630,11 +722,9 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
                 <CardContent className="space-y-4 pt-4 text-xs">
                   <div>
                     <span className="font-semibold text-muted-foreground uppercase text-[10px]">
-                      Etapa do Fluxo
+                      Etapa do Fluxo (IA Contextual)
                     </span>
-                    <p className="font-medium text-foreground mt-0.5">
-                      {stepTitles[Math.min(stepIndex, stepTitles.length - 1)]}
-                    </p>
+                    <p className="font-medium text-foreground mt-0.5">{activeStepTitle}</p>
                   </div>
 
                   <div>
@@ -642,7 +732,7 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
                       Memória Estruturada
                     </span>
                     <div className="mt-1 rounded-lg border border-border/60 bg-muted/30 p-2.5 font-mono text-[11px] space-y-1">
-                      {Object.keys(simMemory).length === 0 ? (
+                      {collectedCount === 0 ? (
                         <p className="text-muted-foreground italic">Nenhum dado coletado ainda.</p>
                       ) : (
                         Object.entries(simMemory).map(([k, v]) => (
