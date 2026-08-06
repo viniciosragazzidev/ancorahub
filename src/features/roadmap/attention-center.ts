@@ -28,18 +28,20 @@ export type AttentionCenterData = {
 
 type Aggregate = { count: number; oldestAt: string | null };
 
-function leadScope(tenantId: string, role: "director" | "manager" | "broker", branchId: string | null, userId: string) {
+import type { TenantRole } from "@/shared/db/schema";
+
+function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string) {
   const conditions = [eq(schema.leads.tenantId, tenantId)];
-  if (role === "manager" && branchId) conditions.push(eq(schema.leads.branchId, branchId));
+  if ((role === "manager" || role === "supervisor") && branchId) conditions.push(eq(schema.leads.branchId, branchId));
   if (role === "broker") conditions.push(eq(schema.leads.corretorId, userId));
   return and(...conditions);
 }
 
-function taskScope(role: "director" | "manager" | "broker", branchId: string | null, userId: string) {
+function taskScope(role: TenantRole, branchId: string | null, userId: string) {
   if (role === "broker") {
     return or(eq(schema.leadTasks.assignedTo, userId), eq(schema.leadTaskAssignees.userId, userId));
   }
-  if (role === "manager" && branchId) return eq(schema.leads.branchId, branchId);
+  if ((role === "manager" || role === "supervisor") && branchId) return eq(schema.leads.branchId, branchId);
   return undefined;
 }
 

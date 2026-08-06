@@ -7,13 +7,13 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "group/badge inline-flex h-5.5 w-fit shrink-0 items-center justify-center gap-1 rounded-full border border-transparent px-2.5 py-0.5 font-mono text-[11px] font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 motion-reduce:transition-none [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex h-5.5 w-fit shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 py-0.5 text-[11px] font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 motion-reduce:transition-none [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
-          "bg-muted/80 text-foreground/80 border border-border/60 [a]:hover:bg-muted",
+          "bg-muted/70 text-foreground/80 border border-border/70 [a]:hover:bg-muted",
         success:
           "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 dark:border-emerald-500/30 dark:bg-emerald-500/15 [a]:hover:bg-emerald-500/20",
         warning:

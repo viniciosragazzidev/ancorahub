@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 
 export function TeamInviteForm({
   action,
@@ -37,43 +37,50 @@ export function TeamInviteForm({
       <input name="role" type="hidden" value={role} />
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Papel a convidar</legend>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {canInviteManager ? (
             <button
               aria-pressed={role === "manager"}
-              className="rounded-lg border border-border bg-muted/30 p-3 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+              className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
               onClick={() => setRole("manager")}
               type="button"
             >
-              <span className="block text-sm font-medium">Gestor</span>
-              <span className="text-xs text-muted-foreground">Acompanha a operação.</span>
+              <span className="block text-xs font-medium">Gestor</span>
+              <span className="text-[10px] text-muted-foreground">Multi-unidade.</span>
             </button>
           ) : null}
           <button
+            aria-pressed={role === "supervisor"}
+            className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+            onClick={() => setRole("supervisor")}
+            type="button"
+          >
+            <span className="block text-xs font-medium">Supervisor</span>
+            <span className="text-[10px] text-muted-foreground">Sua unidade.</span>
+          </button>
+          <button
             aria-pressed={role === "broker"}
-            className="rounded-lg border border-border bg-muted/30 p-3 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+            className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
             onClick={() => setRole("broker")}
             type="button"
           >
-            <span className="block text-sm font-medium">Corretor</span>
-            <span className="text-xs text-muted-foreground">Opera a própria carteira.</span>
+            <span className="block text-xs font-medium">Corretor</span>
+            <span className="text-[10px] text-muted-foreground">Carteira própria.</span>
           </button>
         </div>
       </fieldset>
       <div className="space-y-2">
         <Label htmlFor="team-branch">Filial</Label>
-        <select
-          className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm"
+        <AppSelect
           id="team-branch"
           name="branchId"
           required
-        >
-          {branches.filter(Boolean).map((branch) => (
-            <option key={branch.id} value={branch.id}>
-              {branch.name}
-            </option>
-          ))}
-        </select>
+          options={branches.filter(Boolean).map((branch) => ({
+            value: branch.id,
+            label: branch.name,
+          }))}
+          defaultValue={branches[0]?.id}
+        />
       </div>
       <Button className="w-full" type="submit">
         Enviar convite

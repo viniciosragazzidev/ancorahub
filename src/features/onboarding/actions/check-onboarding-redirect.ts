@@ -10,6 +10,7 @@ import type { TenantRole } from "@/shared/db/schema";
 const ROLE_DASHBOARD: Record<TenantRole, string> = {
   director: "/dashboard",
   manager: "/dashboard",
+  supervisor: "/dashboard",
   broker: "/minha-fila",
 };
 

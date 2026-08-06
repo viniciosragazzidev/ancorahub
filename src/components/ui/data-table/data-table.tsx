@@ -123,7 +123,7 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl">
+      <div className="overflow-hidden rounded-xl bg-card">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-transparent border-b border-border">

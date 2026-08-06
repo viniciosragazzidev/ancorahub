@@ -39,3 +39,11 @@ next-env.d.ts
 apps/browser-extension/dist/
 public/downloads/
 /reports/agent/
+
+# Local visual reference used only during the Latitude redesign.
+/latitude-llm-reference/
+
+# Temporary reference repos & build artifacts
+/temp_deskcomm_crm/
+/tmp/
+

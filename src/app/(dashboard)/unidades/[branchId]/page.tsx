@@ -2,19 +2,26 @@ import { notFound, redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeriodSelect } from "@/components/period-select";
 import { UnitProfileHeader } from "@/features/branches/components/unit-profile-header";
 import { UnitMetricsCards } from "@/features/branches/components/unit-metrics-cards";
 import { UnitMembersTable } from "@/features/branches/components/unit-members-table";
 import { UnitTopBrokers } from "@/features/branches/components/unit-top-brokers";
 import { getBranchProfileData } from "@/features/branches/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { parsePeriod } from "@/shared/period";
 
 type Props = {
   params: Promise<{ branchId: string }>;
+  searchParams: Promise<{ period?: string }>;
 };
 
-export default async function UnitProfilePage({ params }: Props) {
+export default async function UnitProfilePage({
+  params,
+  searchParams,
+}: Props) {
   const context = await getRequiredTenantContext();
+  const period = parsePeriod((await searchParams).period);
 
   const { branchId } = await params;
 
@@ -27,7 +34,7 @@ export default async function UnitProfilePage({ params }: Props) {
 
   let data: Awaited<ReturnType<typeof getBranchProfileData>>;
   try {
-    data = await getBranchProfileData(branchId);
+    data = await getBranchProfileData(branchId, period);
   } catch (err) {
     if (err instanceof Error && err.message === "BRANCH_NOT_FOUND") {
       notFound();
@@ -50,7 +57,7 @@ export default async function UnitProfilePage({ params }: Props) {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Unidade" title={branch.name} />
+      <DashboardHeader breadcrumb="Unidade" title={branch.name} rightSlot={<PeriodSelect value={period} />} />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {/* Page header with actions */}
         <UnitProfileHeader

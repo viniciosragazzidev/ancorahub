@@ -14,6 +14,12 @@
       "documents": ["docs/architecture/modules/leads.md", "docs/business-rules.md", "docs/decision-log.md"]
     },
     {
+      "id": "broker-workspace",
+      "keywords": ["workspace", "próxima ação", "proxima acao", "meu dia", "inbox operacional", "corretor"],
+      "paths": ["src/features/broker-workspace", "src/app/(dashboard)/dashboard"],
+      "documents": ["docs/product/corretor-resume-dashboard-plan.md", "docs/business-rules.md", "docs/decision-log.md", "docs/ux-audit-2026-07-13.md"]
+    },
+    {
       "id": "ai-agent",
       "keywords": ["ia", "ai", "whatsapp", "quick reply", "qualificação", "qualificacao", "handoff"],
       "paths": ["src/features/ai-agent", "src/features/ai-qualification"],

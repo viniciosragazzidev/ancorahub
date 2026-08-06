@@ -86,6 +86,25 @@ export function dailyCounts(
 }
 
 /**
+ * Últimos N dias somando `value` por dia (mais antigo → hoje).
+ */
+export function dailySums(
+  entries: Array<{ date: Date | string; value: number }>,
+  days = 7,
+): number[] {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const sums = new Array<number>(days).fill(0);
+  for (const entry of entries) {
+    const d = toDate(entry.date);
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diffDays = Math.floor((now.getTime() - dayStart) / 86_400_000);
+    if (diffDays >= 0 && diffDays < days) sums[days - 1 - diffDays] += entry.value;
+  }
+  return sums;
+}
+
+/**
  * Soma acumulada de uma série (progressão cumulativa).
  */
 export function cumulative(values: number[]): number[] {

@@ -1,0 +1,8 @@
+# Local design reference only. It is not part of the AncoraHub application.
+latitude-llm-reference/
+
+# User supplied visual references are reviewed locally and must not be deployed.
+NewDesignRefs/
+
+# Deskcomm is a local architecture reference, never an AncoraHub deploy input.
+temp_deskcomm_crm/

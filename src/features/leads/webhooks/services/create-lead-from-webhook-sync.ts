@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { lpFormPayloadSchema } from "../schemas/lp-form-payload.schema";
 import type { ReceiveLeadWebhookResult } from "../types/lead-webhook.types";
 import { hashNormalizedWebhookPayload, normalizeLeadEmail, normalizeLeadName, normalizeLeadPhone } from "../utils/lead-webhook.utils";
+import { notifyLeadArrived } from "@/features/notifications/send-push-helper";
 import { enqueueLeadEffect, enqueueLeadEffectTx } from "./lead-effect-outbox";
 import { resolveLeadWebhookIdempotency } from "./resolve-lead-webhook-idempotency";
 import { resolveWebhookBranch, WebhookBranchNotFoundError } from "./resolve-webhook-branch";
@@ -22,6 +23,7 @@ export type CreateLeadFromWebhookSyncInput = {
   payload: unknown;
   idempotencyKey: string | null;
   requestMetadata: { requestId: string; userAgent: string | null; receivedAt: Date };
+  bypassPlantao?: boolean;
   leadSource?: {
     channel: string;
     externalId: string;
@@ -76,6 +78,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   const normalizedPhone = normalizeLeadPhone(data.telefone);
   const normalizedEmail = normalizeLeadEmail(data.email);
   const qualificationEngineEnabled = await getSystemSetting("feature_qualification_engine_enabled").then((value) => value === "true").catch(() => false);
+  const bypassPlantao = input.bypassPlantao ?? (await getSystemSetting(`feature_${input.leadSource?.channel ?? "webhook"}_bypass_plantao`).then((v) => v === "true").catch(() => false));
+  const distStatus = bypassPlantao ? "unassigned" : "queued";
   const leadId = randomUUID();
   const now = new Date();
 
@@ -96,7 +100,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
     await tx.insert(schema.leads).values({
       id: leadId, tenantId, branchId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
-      origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: "queued",
+      origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: distStatus,
       consentimentoLgpd: false, webhookCredentialId: credentialId, createdAt: now,
       ...(input.leadSource ? {
         externalId: input.leadSource.externalId,
@@ -110,16 +114,16 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     });
     await tx.insert(schema.leadInteractions).values({
       id: randomUUID(), leadId, userId: createdByUserId, tipo: "note",
-      conteudo: "Lead recebido via landing page; distribuição e notificações foram registradas para processamento seguro.",
+      conteudo: bypassPlantao ? "Lead recebido e direcionado diretamente para a lista geral de leads." : "Lead recebido via landing page; distribuição e notificações foram registradas para processamento seguro.",
     });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: createdByUserId, entidade: "lead", entidadeId: leadId, acao: "lead.webhook.received" });
     await tx.insert(schema.leadDistributionEvents).values({
-      id: randomUUID(), tenantId, leadId, toBranchId: branchId, action: "queued", source: "webhook", strategy: "outbox",
-      reason: "Lead recebido e aguardando distribuição idempotente.", actorId: createdByUserId, createdAt: now,
+      id: randomUUID(), tenantId, leadId, toBranchId: branchId, action: distStatus, source: "webhook", strategy: "outbox",
+      reason: bypassPlantao ? "Lead direcionado diretamente para a lista geral de leads." : "Lead recebido e aguardando distribuição idempotente.", actorId: createdByUserId, createdAt: now,
     });
     await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));
     await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "NOTIFY_LEAD_ARRIVED", idempotencyKey: `lead-intake:${deliveryId}:arrival`, payload: { branchId, leadName: normalizedName } });
-    if (!qualificationEngineEnabled) {
+    if (!qualificationEngineEnabled && !bypassPlantao) {
       await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
     }
     return { duplicate: false as const, leadId };
@@ -128,7 +132,9 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   if ("conflict" in committed) return { success: false, code: "IDEMPOTENCY_CONFLICT" };
   if (committed.duplicate) return { success: true, leadId: committed.leadId, duplicate: true };
 
-  if (qualificationEngineEnabled) {
+  void notifyLeadArrived(leadId, tenantId, branchId, normalizedName, `sync-intake:${leadId}`).catch((err) => console.error("[createLeadFromWebhookSync] notifyLeadArrived error:", err));
+
+  if (qualificationEngineEnabled && !bypassPlantao) {
     const qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId }).catch(() => ({ started: false as const, reason: "failed" as const }));
     if (!qualificationStart.started) {
       await enqueueLeadEffect({ tenantId, leadId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${leadId}:distribution-fallback`, payload: { branchId, leadName: normalizedName } }).catch(() => undefined);

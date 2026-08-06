@@ -119,6 +119,24 @@ export async function updateGlobalSearchSettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("brokerWorkspaceEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_broker_workspace_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_workspace.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "broker_workspace",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/dashboard");
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateInterfaceMotionSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("interfaceMotionEnabled") === "true" ? "true" : "false";
@@ -136,6 +154,18 @@ export async function updateInterfaceMotionSettingsAction(formData: FormData) {
   });
 
   revalidatePath("/");
+  revalidatePath("/super-admin/settings");
+}
+
+export async function updateR2StorageSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("r2StorageEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_r2_storage_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "r2_storage_feature.updated",
+    targetType: "system_settings", targetId: "r2_storage", metadata: { enabled }, createdAt: now,
+  });
   revalidatePath("/super-admin/settings");
 }
 
@@ -244,6 +274,37 @@ export async function runLeadEffectOutboxAction() {
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.run_requested", targetType: "lead_effect_outbox", targetId: "global", metadata: result, createdAt: new Date() });
   revalidatePath("/super-admin/settings");
   revalidatePath("/leads/distribuicao");
+}
+
+export async function updateWahaCadenceSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const now = new Date();
+  const values = {
+    enabled: formData.get("enabled") === "true" ? "true" : "false",
+    aiEnabled: formData.get("aiEnabled") === "true" ? "true" : "false",
+    maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 5, 1, 10),
+    retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
+    leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
+  };
+  await Promise.all([
+    setSystemSetting("feature_waha_cadence_enabled", values.enabled, now),
+    setSystemSetting("feature_waha_ai_enabled", values.aiEnabled, now),
+    setSystemSetting("waha_cadence_max_attempts", values.maxAttempts, now),
+    setSystemSetting("waha_cadence_retry_base_seconds", values.retryBaseSeconds, now),
+    setSystemSetting("waha_cadence_lease_seconds", values.leaseSeconds, now),
+  ]);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_cadence.settings_updated", targetType: "system_settings", targetId: "waha_cadence", metadata: values, createdAt: now });
+  revalidatePath("/super-admin/settings");
+}
+
+export async function updateWahaConnectionSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("connectionsEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_waha_connections_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_connections.settings_updated", targetType: "system_settings", targetId: "waha_connections", metadata: { enabled }, createdAt: now });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/settings/whatsapp");
 }
 
 export async function setTenantStatusAction(formData: FormData) {
@@ -467,6 +528,28 @@ export async function updateQuickReplySettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+const AI_MEMORY_RESET_MODES = ["never", "before_each_message", "before_each_session", "manual"] as const;
+
+export async function updateAiMemoryResetSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const mode = String(formData.get("aiMemoryResetMode") ?? "before_each_session").trim();
+  if (!(AI_MEMORY_RESET_MODES as readonly string[]).includes(mode)) {
+    throw new Error("Modo de reset de memória inválido.");
+  }
+  const now = new Date();
+  await setSystemSetting("ai_memory_reset_mode", mode, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "update_ai_memory_reset_settings",
+    targetType: "system_settings",
+    targetId: "ai_memory_reset_mode",
+    metadata: { mode },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateAgentTrainingCenterSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("agentTrainingCenterEnabled") === "true" ? "true" : "false";
@@ -521,6 +604,24 @@ export async function updateTeamMemberProfileSettingsAction(formData: FormData) 
   });
   revalidatePath("/super-admin/settings");
   revalidatePath("/equipe");
+}
+
+export async function updateUserProfileSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("userProfileEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_user_profile_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "user_profile.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "user_profile",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/settings");
 }
 
 export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {

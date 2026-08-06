@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Globe, LinkSimple, Megaphone, Plug, WhatsappLogo } from "@/components/huge-icons";
+import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -89,9 +90,12 @@ function IntegrationTile({ integration }: { integration: IntegrationCard }) {
 export function IntegrationsCatalog() {
   return (
     <section aria-labelledby="integrations-catalog-title" className="mx-auto w-full max-w-6xl space-y-5">
-      <div className="max-w-2xl">
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/60 px-4 py-3 sm:px-5">
+        <div className="max-w-2xl">
         <h2 id="integrations-catalog-title" className="text-lg font-semibold tracking-tight">Integrações</h2>
         <p className="mt-1 text-sm text-muted-foreground">Conecte os canais que fazem parte da sua operação. Cada integração abre uma área própria de configuração e acompanhamento.</p>
+        </div>
+        <VoxelIllustration className="hidden size-20 shrink-0 sm:block" name="integration-hub" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {integrationCatalogEntries.map((integration) => <IntegrationTile integration={integration} key={integration.name} />)}

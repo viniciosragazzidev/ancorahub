@@ -12,6 +12,7 @@ import {
   Pause,
   SlidersHorizontal,
   SignOut,
+  UserCircle,
 } from "@/components/huge-icons";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -33,7 +34,7 @@ import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 import { getPendingFeedbackCountAction } from "@/features/leads/feedback-queries";
 import { Badge } from "@/components/ui/badge";
 
-type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey };
+type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey; requiresFeature?: boolean };
 
 const allBrokerItems: BrokerSidebarItem[] = [
   { label: "Resumo", icon: House, url: "/corretor/resumo", permission: "acessar_dashboard" },
@@ -45,6 +46,7 @@ const allBrokerItems: BrokerSidebarItem[] = [
   { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
   { label: "Minha meta", icon: ChartLineUp, url: "/minha-meta", permission: "ver_meta_propria" },
   { label: "Notificações", icon: Bell, url: "/notificacoes", permission: "acessar_notificacoes" },
+  { label: "Meu perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais", requiresFeature: true },
   { label: "Configurações", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
 ];
 
@@ -100,6 +102,9 @@ export function CorretorSidebar() {
   const jobTitle = user?.jobTitle ?? null;
 
   const visibleItems = allBrokerItems.filter((item) => {
+    if (item.requiresFeature && !user?.userProfileEnabled) {
+      return false;
+    }
     if (
       jobTitle === "marketing" &&
       ["/conversas", "/tarefas", "/documentos", "/clientes", "/vendas", "/checklist", "/minha-fila", "/corretor/resumo", "/minha-meta"].some(

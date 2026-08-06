@@ -4,6 +4,43 @@ Este documento registra todas as funcionalidades e melhorias de engenharia adici
 
 ---
 
+## 03/08/2026 - Seletor de período 7/14/30/90 nas rotas de dados
+
+- Seletor de período persistido em `?period=N` (ToggleGroup pills) nas rotas do
+  núcleo: `/dashboard`, `/gestor`, `/noc`, `/vendas`, `/leads`, `/clientes`,
+  `/relatorios`, `/metas`, `/unidades/[branchId]` e `/financeiro`.
+- Janelas agregadas fixas (all-time, 7d, 30d, 6 meses, mês atual) uniformizadas
+  em um único controle por rota; janelas operacionais (hoje/ontem, SLA, horário,
+  health) permanecem fixas.
+- `/leads`: o seletor filtra a lista e o contador (`createdAt >= periodStart`).
+- `/financeiro`: opção extra `all` (total geral) além de 7/14/30/90; resumo,
+  comissões, vendas e tendência seguem o período (série diária N dias; mensal de
+  6 meses apenas com `all`).
+- NOC: KPIs de conversão e ticket médio comparam período atual vs período
+  anterior (rolling), em vez de mês atual vs mês anterior.
+- Helpers compartilhados em `src/shared/period.ts` (`parsePeriod`, `periodStart`,
+  `periodDaysAgoSql`, `fillTrendDays`) e séries diárias em `src/shared/trends.ts`
+  (`dailyCounts`, `dailySums`).
+
+## 03/08/2026 - Área "Meu perfil" para todos os usuários
+
+- Nova rota `/perfil` acessível a qualquer papel autenticado, com abas de visão
+  geral, segurança, sessões ativas e registro de atividades.
+- Edição do nome e da foto de perfil (upload de imagem com validação de formato
+  e tamanho, suporte a remoção) com auditoria das alterações.
+- Resumo dos dados pessoais (nome profissional, telefone, CPF, código interno) a
+  partir do `broker_profiles`, quando aplicável.
+- Alteração de senha com validação e revogação das demais sessões; atalho para
+  gestão de 2FA e passkeys já existentes em `/settings?tab=seguranca`.
+- Listagem e revogação de sessões ativas pelo próprio usuário, sem expor tokens
+  ao cliente; encerramento em massa das demais sessões.
+- Histórico das últimas atividades da conta a partir da auditoria, com rótulos
+  amigáveis para as ações mais comuns.
+- Controle global pelo Super-admin (`feature_user_profile_enabled`): desativar
+  bloqueia a rota e remove os atalhos de menu sem apagar histórico nem auditoria.
+- Atalhos de "Meu perfil" adicionados ao menu do usuário e à navegação do
+  corretor, condicionados à flag global.
+
 ## 27/07/2026 - Continuidade da qualificação do agente
 
 - O extrator passou a reconhecer respostas naturais como `Pessoa física` e

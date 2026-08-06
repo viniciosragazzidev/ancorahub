@@ -13,7 +13,6 @@ export function ExportButtons() {
     <div className="flex flex-wrap gap-3">
       <Button
         size="sm"
-        variant="outline"
         onClick={() => {
           window.open(
             `/api/internal/export/commissions?startMonth=${currentMonth}&endMonth=${currentMonth}&format=csv`,
@@ -21,13 +20,7 @@ export function ExportButtons() {
           );
         }}
       >
-        <FileArrowDown /> Comissões (CSV)
-      </Button>
-      <Button size="sm" variant="outline" disabled>
-        <FileArrowDown /> Leads (CSV)
-      </Button>
-      <Button size="sm" variant="outline" disabled>
-        <FileArrowDown /> Vendas (CSV)
+        <FileArrowDown /> Baixar comissões (CSV)
       </Button>
     </div>
   );

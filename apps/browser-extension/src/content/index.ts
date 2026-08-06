@@ -2,10 +2,52 @@ import { DefaultWhatsAppWebAdapter } from "./whatsapp-adapter";
 import { mountPanel, type MountedPanel } from "./panel-mount";
 import type { ResolveState } from "../shared/types";
 
-type ApiResult = { ok: boolean; body: Record<string, unknown> };
+type ApiResult = { ok: boolean; status: number; body: Record<string, unknown> };
 
 const adapter = new DefaultWhatsAppWebAdapter();
-const request = (path: string, method: "POST" | "GET", body?: unknown) => new Promise<ApiResult>((resolve) => chrome.runtime.sendMessage({ type: "API_REQUEST", payload: { path, method, body } }, resolve));
+
+// Se o service worker estiver em cold start, a resposta pode demorar. Este
+// limite garante que a promise nunca fique pendurada quando o canal é encerrado
+// (ex.: aba fechada) e o callback de sendMessage não chega a ser invocado.
+const REQUEST_TIMEOUT_MS = 15000;
+
+const request = (path: string, method: "POST" | "GET", body?: unknown) =>
+  new Promise<ApiResult>((resolve) => {
+    let settled = false;
+    let timer: number | undefined;
+    const finish = (result: ApiResult) => {
+      if (!settled) {
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(result);
+      }
+    };
+    try {
+      chrome.runtime.sendMessage({ type: "API_REQUEST", payload: { path, method, body } }, (response) => {
+        // Ler lastError suprime o log "Unchecked runtime.lastError" e trata
+        // canais encerrados como resposta vazia em vez de lançar erro.
+        if (chrome.runtime.lastError || !response || typeof response !== "object" || !("ok" in response)) {
+          finish({ ok: false, status: 0, body: {} });
+          return;
+        }
+        finish(response);
+      });
+      timer = window.setTimeout(() => finish({ ok: false, status: 0, body: {} }), REQUEST_TIMEOUT_MS);
+    } catch {
+      finish({ ok: false, status: 0, body: {} });
+    }
+  });
+
+function openLeadInCrm(leadId: string) {
+  try {
+    chrome.runtime.sendMessage({ type: "OPEN_CRM_LEAD", payload: { leadId } }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch {
+    // Canal encerrado ou contexto inválido — ignora.
+  }
+}
+
 let panel: MountedPanel | null = null;
 let lastPhone = "";
 let lastResolved: ResolveState | null = null;
@@ -20,7 +62,7 @@ async function quickReplies(leadId: string, version: number, goal: "ASK_MISSING_
 function getPanel() {
   if (panel && !panel.isMounted()) panel = null;
   panel ??= mountPanel(
-    (leadId) => chrome.runtime.sendMessage({ type: "OPEN_CRM_LEAD", payload: { leadId } }),
+    (leadId) => openLeadInCrm(leadId),
     quickReplies,
     async (text) => { await adapter.insertComposerText(text); },
   );
@@ -44,6 +86,9 @@ async function sync() {
   getPanel()?.renderLead(state);
 }
 
-void sync();
-adapter.observeConversationChange(() => void sync());
-window.setInterval(() => void sync(), 1500);
+// Garante que falhas internas (ex.: adapter lendo React interno do WhatsApp)
+// não virem rejeições não tratadas no console da página.
+const safeSync = () => { void sync().catch(() => undefined); };
+void safeSync();
+adapter.observeConversationChange(safeSync);
+window.setInterval(safeSync, 1500);

@@ -10,6 +10,7 @@ import {
   Trash,
 } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
+import { AppSelect } from "@/components/ui/select";
 import { DocumentStatusBadge } from "@/components/status-badges";
 import { confirmDocumentUploadAction, deleteDocumentAction } from "@/features/documents/actions";
 
@@ -229,7 +230,21 @@ export function LeadDocumentsSection({
                   {req.required && <span className="text-[10px] text-destructive font-bold uppercase">Obrigatório</span>}
                 </div>
                 {req.description && <p className="text-muted-foreground">{req.description}</p>}
-                {req.appliesPerBeneficiary && beneficiaries?.length ? <select aria-label={`Beneficiário do requisito ${req.name}`} className="mt-2 h-8 rounded-md border border-input bg-background px-2 text-xs" value={selectedBeneficiaryId ?? ""} onChange={(event) => setSelectedBeneficiaryByRequirement((current) => ({ ...current, [req.id]: event.target.value }))}>{beneficiaries.map((beneficiary) => <option key={beneficiary.id} value={beneficiary.id}>{beneficiary.name}{beneficiary.isHolder ? " (Titular)" : ""}</option>)}</select> : null}
+                {req.appliesPerBeneficiary && beneficiaries?.length ? (
+                  <AppSelect
+                    aria-label={`Beneficiário do requisito ${req.name}`}
+                    size="sm"
+                    className="mt-2 w-48"
+                    value={selectedBeneficiaryId ?? ""}
+                    onValueChange={(val) =>
+                      setSelectedBeneficiaryByRequirement((current) => ({ ...current, [req.id]: val }))
+                    }
+                    options={beneficiaries.map((b) => ({
+                      value: b.id,
+                      label: `${b.name}${b.isHolder ? " (Titular)" : ""}`,
+                    }))}
+                  />
+                ) : null}
                 {req.appliesPerBeneficiary && beneficiaries?.length && persisted.length ? (
                   <div className="mt-2 flex flex-wrap gap-1.5" aria-label={`Andamento de ${req.name} por beneficiário`}>
                     {beneficiaries.map((beneficiary) => {
@@ -302,13 +317,37 @@ export function LeadDocumentsSection({
           <h4 className="font-heading text-xs font-semibold">Documentos Adicionais (Avulsos)</h4>
           <div className="flex flex-wrap items-center gap-2">
           <label className="grid gap-1 text-[11px] font-medium text-muted-foreground">Pessoa
-            <select aria-label="Pessoa do documento adicional" className="h-7 rounded-md border border-input bg-background px-2 text-xs text-foreground" value={selectedAvulsoBeneficiaryId} onChange={(event) => setSelectedAvulsoBeneficiaryId(event.target.value)} disabled={!beneficiaries?.length}>
-              {beneficiaries?.length ? beneficiaries.map((beneficiary) => <option key={beneficiary.id} value={beneficiary.id}>{beneficiary.name}{beneficiary.isHolder ? " (Titular)" : " (Dependente)"}</option>) : <option value="">Cadastre o titular primeiro</option>}
-            </select>
+            <AppSelect
+              aria-label="Pessoa do documento adicional"
+              size="sm"
+              className="w-48"
+              value={selectedAvulsoBeneficiaryId}
+              onValueChange={setSelectedAvulsoBeneficiaryId}
+              disabled={!beneficiaries?.length}
+              options={
+                beneficiaries?.length
+                  ? beneficiaries.map((b) => ({
+                      value: b.id,
+                      label: `${b.name}${b.isHolder ? " (Titular)" : " (Dependente)"}`,
+                    }))
+                  : [{ value: "", label: "Cadastre o titular primeiro" }]
+              }
+            />
           </label>
-          <select aria-label="Categoria do documento" className="h-7 rounded-md border border-input bg-background px-2 text-xs" value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="outros">Outros</option><option value="identificacao">Identificação</option><option value="proposta">Proposta</option><option value="contratacao">Contratação</option><option value="pos_venda">Pós-venda</option>
-          </select>
+          <AppSelect
+            aria-label="Categoria do documento"
+            size="sm"
+            className="w-36 mt-4"
+            value={category}
+            onValueChange={setCategory}
+            options={[
+              { value: "outros", label: "Outros" },
+              { value: "identificacao", label: "Identificação" },
+              { value: "proposta", label: "Proposta" },
+              { value: "contratacao", label: "Contratação" },
+              { value: "pos_venda", label: "Pós-venda" },
+            ]}
+          />
           <label className="relative inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-border px-2.5 text-xs font-medium hover:bg-muted transition-colors gap-1">
             <input
               type="file"

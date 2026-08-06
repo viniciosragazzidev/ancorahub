@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 import { disconnectWhatsAppTenantAction, connectWhatsAppTenantAction, validateWhatsAppTenantAction } from "./actions";
 
 type Tenant = { id: string; name: string; status: string };
@@ -38,7 +39,7 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
     <Card className="border-transparent bg-transparent shadow-none">
       <CardHeader><CardTitle>Contas empresariais</CardTitle><CardDescription>O Super Admin valida e associa um único canal oficial a cada tenant. Nenhum token é exibido depois do salvamento.</CardDescription></CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-border/60 bg-card">
           <table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="px-5 py-3 font-medium">Empresa</th><th className="px-3 py-3 font-medium">Canal</th><th className="px-3 py-3 font-medium">Status</th><th className="px-5 py-3 font-medium">Último webhook</th></tr></thead><tbody>{tenants.map((tenant) => { const connection = connectionByTenant.get(tenant.id); return <tr className="border-b border-border last:border-0" key={tenant.id}><td className="px-5 py-3 font-medium">{tenant.name}</td><td className="px-3 py-3 text-muted-foreground">{connection?.displayPhoneNumber ?? "Não conectado"}</td><td className="px-3 py-3"><span className={connection?.status === "active" ? "text-success" : "text-muted-foreground"}>{connection?.status === "active" ? "Conectado" : connection ? "Pausado" : "Não conectado"}</span></td><td className="px-5 py-3 text-muted-foreground">{formatDate(connection?.lastWebhookAt ?? null)}</td></tr>; })}</tbody></table>
         </div>
       </CardContent>
@@ -48,7 +49,17 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
       <CardHeader><CardTitle>Configurar canal oficial</CardTitle><CardDescription>Selecione a empresa, valide os dados diretamente na Meta e só então salve a conexão.</CardDescription></CardHeader>
       <CardContent>
         <form action={submit} className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-1.5 lg:col-span-2"><Label htmlFor="tenantId">Empresa</Label><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" id="tenantId" name="tenantId" onChange={(event) => setTenantId(event.target.value)} value={tenantId} required>{tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.status}</option>)}</select></div>
+          <div className="space-y-1.5 lg:col-span-2">
+            <Label htmlFor="tenantId">Empresa</Label>
+            <AppSelect
+              id="tenantId"
+              name="tenantId"
+              value={tenantId}
+              onValueChange={setTenantId}
+              required
+              options={tenants.map((t) => ({ value: t.id, label: `${t.name} · ${t.status}` }))}
+            />
+          </div>
           {selectedConnection ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm lg:col-span-2"><p className="font-medium">Esta empresa já possui um canal</p><p className="mt-1 text-muted-foreground">Uma nova conexão substituirá somente após validação e não pode usar um número associado a outro tenant.</p></div> : null}
           <div className="space-y-1.5"><Label htmlFor="displayName">Nome do canal</Label><Input id="displayName" name="displayName" placeholder="Canal Oficial" required /></div>
           <div className="space-y-1.5"><Label htmlFor="displayPhoneNumber">Número exibido</Label><Input id="displayPhoneNumber" name="displayPhoneNumber" placeholder="+55 21 99449-6129" required /></div>

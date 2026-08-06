@@ -1,6 +1,7 @@
 "use client"
 
 import { AncoraLogo } from "@/components/ancora-logo"
+import { VoxelIllustration } from "@/components/illustrations/voxel-illustration"
 import { ArrowRight, Compass } from "@/components/huge-icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,21 +29,26 @@ export function OnboardingHero({ steps, onDismiss, onNavigate }: OnboardingHeroP
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <AncoraLogo className="h-7 w-28 object-contain object-left" />
-        <Badge variant="outline" className="ml-auto text-[10px]">
-          Configuração inicial
-        </Badge>
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <AncoraLogo className="h-7 w-28 object-contain object-left" />
+            <Badge variant="outline" className="ml-auto text-[10px]">
+              Configuração inicial
+            </Badge>
+          </div>
+
+          <h1 className="mt-6 max-w-[22ch] text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+            Prepare sua corretora para começar
+          </h1>
+
+          <p className="mt-3 max-w-prose text-base leading-relaxed text-muted-foreground">
+            Configure a estrutura inicial do tenant, organize sua equipe e deixe o
+            ambiente pronto para operar.
+          </p>
+        </div>
+        <VoxelIllustration className="mt-1 hidden size-24 shrink-0 sm:block" name="onboarding-compass" />
       </div>
-
-      <h1 className="mt-2 max-w-[22ch] text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-        Prepare sua corretora para começar
-      </h1>
-
-      <p className="max-w-prose text-base leading-relaxed text-muted-foreground">
-        Configure a estrutura inicial do tenant, organize sua equipe e deixe o
-        ambiente pronto para operar.
-      </p>
 
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         {hasPendingSteps && firstPending && (

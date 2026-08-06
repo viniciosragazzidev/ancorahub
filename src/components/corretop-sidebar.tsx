@@ -19,10 +19,12 @@ import {
   Megaphone,
   Monitor,
   Note,
+  Redistribute,
   SignOut,
   SlidersHorizontal,
   Target,
   Users,
+  UserCircle,
   WifiHigh,
 } from "@/components/huge-icons";
 import { AncoraLogo } from "@/components/ancora-logo";
@@ -52,7 +54,9 @@ import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 
-type SidebarItem = { label: string; icon: typeof House; url: string; permission: PermissionKey };
+import { Sparkle } from "@phosphor-icons/react";
+
+type SidebarItem = { label: string; icon: typeof House | typeof Sparkle; url: string; permission: PermissionKey };
 type SidebarSection = { label: string; items: SidebarItem[] };
 
 const navSections: SidebarSection[] = [
@@ -63,6 +67,8 @@ const navSections: SidebarSection[] = [
       { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
       { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
       { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
+      { label: "Assistente IA", icon: Sparkle, url: "/assistente", permission: "acessar_conversas" },
+      { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_conversas" },
     ],
   },
   {
@@ -71,6 +77,8 @@ const navSections: SidebarSection[] = [
       { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
       { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
       { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
+      { label: "Redistribuição", icon: Redistribute, url: "/leads/distribuicao", permission: "leads_reassign" },
+      { label: "Plantão", icon: WifiHigh, url: "/leads/distribuicao/plantao", permission: "duty_schedules_manage" },
     ],
   },
   {
@@ -202,7 +210,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           {visibleSections.map((section, sectionIndex) => (
             <div key={section.label} className="w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
               {sectionIndex > 0 ? <div className="mb-3 h-px w-full bg-sidebar-border/55 group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:w-5" /> : null}
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-sidebar-foreground/45 group-data-[collapsible=icon]:sr-only">
+              <p className="mb-1.5 px-2 font-mono text-[10px] font-medium tracking-wider text-sidebar-foreground/50 group-data-[collapsible=icon]:sr-only">
                 {section.label}
               </p>
               <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
@@ -255,6 +263,12 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
+                {user?.userProfileEnabled ? (
+                  <DropdownMenuItem render={<Link href="/settings?tab=conta" prefetch />}>
+                    <UserCircle className="size-4" />
+                    Meu perfil
+                  </DropdownMenuItem>
+                ) : null}
                 {roleKey && user?.permissions?.includes("acessar_configuracoes") ? (
                   <DropdownMenuItem render={<Link href="/settings" prefetch />}>
                     <SlidersHorizontal className="size-4" />

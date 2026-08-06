@@ -5,11 +5,14 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
-function leadScope(tenantId: string, role: "director" | "manager" | "broker", branchId: string | null, userId: string) {
-  const conditions = [eq(schema.leads.tenantId, tenantId)];
-  if (role === "manager" && branchId) conditions.push(eq(schema.leads.branchId, branchId));
-  if (role === "broker") conditions.push(eq(schema.leads.corretorId, userId));
-  return and(...conditions);
+import type { TenantRole } from "@/shared/db/schema";
+
+function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string) {
+  if (role === "director") return eq(schema.leads.tenantId, tenantId);
+  if ((role === "manager" || role === "supervisor") && branchId) {
+    return and(eq(schema.leads.tenantId, tenantId), eq(schema.leads.branchId, branchId));
+  }
+  return and(eq(schema.leads.tenantId, tenantId), eq(schema.leads.corretorId, userId));
 }
 
 export async function GET(request: NextRequest) {

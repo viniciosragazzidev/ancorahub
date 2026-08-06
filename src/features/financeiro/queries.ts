@@ -4,8 +4,11 @@ import { and, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { periodStart, type PeriodValue } from "@/shared/period";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+export type FinanceiroPeriod = PeriodValue | "all";
 
 export type FinancialDashboardData = {
   summary: {
@@ -64,9 +67,12 @@ export type FinancialDashboardData = {
 
 // ─── Query ──────────────────────────────────────────────────────────────────
 
-export async function getFinancialDashboardData(): Promise<FinancialDashboardData> {
+export async function getFinancialDashboardData(
+  period: FinanceiroPeriod = 30,
+): Promise<FinancialDashboardData> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const isAll = period === "all";
 
   // Scope conditions
   const salesConditions = [eq(schema.sales.tenantId, context.tenantId)];
@@ -76,35 +82,20 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     salesConditions.push(eq(schema.leads.branchId, context.branchId));
   }
 
-  // Current period dates
+  // Período atual — janela granular (N dias) ou all-time
   const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const periodStartDate = isAll ? undefined : periodStart(period, now);
+  const dateFilter = isAll ? [] : [gte(schema.sales.saleDate, periodStartDate!)];
 
-  // ── All-time summary ──
-  const [allTimeSummary] = await db
+  // ── Period summary (janela agregada) ──
+  const [periodSummary] = await db
     .select({
       totalRevenue: sql<string>`COALESCE(SUM(${schema.sales.saleValue}), 0)`,
       salesCount: sql<number>`COUNT(*)`,
     })
     .from(schema.sales)
     .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-    .where(and(...salesConditions));
-
-  // ── Period summary ──
-  const periodConditions = [
-    ...salesConditions,
-    gte(schema.sales.saleDate, periodStart),
-    lte(schema.sales.saleDate, periodEnd),
-  ];
-
-  const [periodSummary] = await db
-    .select({
-      revenue: sql<string>`COALESCE(SUM(${schema.sales.saleValue}), 0)`,
-    })
-    .from(schema.sales)
-    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-    .where(and(...periodConditions));
+    .where(and(...salesConditions, ...dateFilter));
 
   // ── Commission totals ──
   const commissionConditions = [eq(schema.sales.tenantId, context.tenantId)];
@@ -121,7 +112,7 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     .from(schema.commissionSchedule)
     .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
     .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-    .where(and(...commissionConditions));
+    .where(and(...commissionConditions, ...dateFilter));
 
   const [pendingComm] = await db
     .select({
@@ -133,6 +124,7 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     .where(
       and(
         ...commissionConditions,
+        ...dateFilter,
         eq(schema.commissionSchedule.status, "pending"),
       ),
     );
@@ -147,6 +139,7 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     .where(
       and(
         ...commissionConditions,
+        ...dateFilter,
         eq(schema.commissionSchedule.status, "paid"),
       ),
     );
@@ -188,7 +181,7 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
     .innerJoin(schema.user, eq(schema.sales.brokerId, schema.user.id))
     .leftJoin(schema.commissionSchedule, eq(schema.sales.id, schema.commissionSchedule.saleId))
-    .where(and(...salesConditions))
+    .where(and(...salesConditions, ...dateFilter))
     .orderBy(desc(schema.sales.createdAt))
     .limit(10);
 
@@ -258,55 +251,93 @@ export async function getFinancialDashboardData(): Promise<FinancialDashboardDat
     .orderBy(desc(schema.activeCustomers.cancellationDate))
     .limit(10);
 
-  // ── Monthly trend (last 6 months) ──
+  // ── Monthly trend ──
   const monthlyTrend: Array<{ month: string; revenue: string; commissions: string }> = [];
-  for (let i = 5; i >= 0; i--) {
-    const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthLabel = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
-    const mStart = new Date(m.getFullYear(), m.getMonth(), 1);
-    const mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59);
+  if (isAll) {
+    // Últimos 6 meses (mensal)
+    for (let i = 5; i >= 0; i--) {
+      const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthLabel = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
+      const mStart = new Date(m.getFullYear(), m.getMonth(), 1);
+      const mEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59);
 
-    const [mRev] = await db
-      .select({ v: sql<string>`COALESCE(SUM(${schema.sales.saleValue}), 0)` })
-      .from(schema.sales)
-      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(
-        and(
-          ...salesConditions,
-          gte(schema.sales.saleDate, mStart),
-          lte(schema.sales.saleDate, mEnd),
-        ),
-      );
+      const [mRev] = await db
+        .select({ v: sql<string>`COALESCE(SUM(${schema.sales.saleValue}), 0)` })
+        .from(schema.sales)
+        .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+        .where(
+          and(
+            ...salesConditions,
+            gte(schema.sales.saleDate, mStart),
+            lte(schema.sales.saleDate, mEnd),
+          ),
+        );
 
-    const [mComm] = await db
-      .select({ v: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)` })
-      .from(schema.commissionSchedule)
-      .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
-      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(
-        and(
-          ...commissionConditions,
-          gte(schema.sales.saleDate, mStart),
-          lte(schema.sales.saleDate, mEnd),
-        ),
-      );
+      const [mComm] = await db
+        .select({ v: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)` })
+        .from(schema.commissionSchedule)
+        .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
+        .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+        .where(
+          and(
+            ...commissionConditions,
+            gte(schema.sales.saleDate, mStart),
+            lte(schema.sales.saleDate, mEnd),
+          ),
+        );
 
-    monthlyTrend.push({
-      month: monthLabel,
-      revenue: mRev?.v ?? "0",
-      commissions: mComm?.v ?? "0",
-    });
+      monthlyTrend.push({
+        month: monthLabel,
+        revenue: mRev?.v ?? "0",
+        commissions: mComm?.v ?? "0",
+      });
+    }
+  } else {
+    // Série diária dos últimos N dias
+    const [revRows, commRows] = await Promise.all([
+      db
+        .select({
+          day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`,
+          total: sql<string>`COALESCE(SUM(${schema.sales.saleValue}), 0)`,
+        })
+        .from(schema.sales)
+        .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+        .where(and(...salesConditions, ...dateFilter))
+        .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
+      db
+        .select({
+          day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`,
+          total: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)`,
+        })
+        .from(schema.commissionSchedule)
+        .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
+        .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+        .where(and(...commissionConditions, ...dateFilter))
+        .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
+    ]);
+    const revMap = new Map(revRows.map((r) => [r.day, r.total]));
+    const commMap = new Map(commRows.map((r) => [r.day, r.total]));
+    for (let i = period - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      monthlyTrend.push({
+        month: key,
+        revenue: revMap.get(key) ?? "0",
+        commissions: commMap.get(key) ?? "0",
+      });
+    }
   }
 
   return {
     summary: {
-      totalRevenue: allTimeSummary?.totalRevenue ?? "0",
+      totalRevenue: periodSummary?.totalRevenue ?? "0",
       totalCommissions: totalComm?.total ?? "0",
       pendingCommissions: pendingComm?.total ?? "0",
       paidCommissions: paidComm?.total ?? "0",
-      salesCount: allTimeSummary?.salesCount ?? 0,
+      salesCount: periodSummary?.salesCount ?? 0,
       activeGoals,
-      periodRevenue: periodSummary?.revenue ?? "0",
+      periodRevenue: periodSummary?.totalRevenue ?? "0",
       periodCommissions: pendingComm?.total ?? "0",
     },
     recentSales: recentSales.map((s) => ({

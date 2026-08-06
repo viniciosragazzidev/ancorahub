@@ -21,11 +21,11 @@ import { Button } from "@/components/ui/button";
 import { dismissTenantOnboarding } from "@/features/onboarding/actions/dismiss-tenant-onboarding";
 import type { TenantOnboarding, TenantOnboardingStep } from "@/features/onboarding/types/onboarding.types";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+import type { TenantRole } from "@/shared/db/schema";
 
 type WelcomeScreenProps = {
   userName: string;
-  role: "director" | "manager" | "broker";
+  role: TenantRole;
   tenantName: string;
   onboarding: TenantOnboarding | null;
 };
@@ -70,6 +70,22 @@ const roleConfig = {
       "Distribua leads para corretores",
       "Acompanhe métricas da filial",
       "Valide documentos e aprovações",
+    ],
+    cta: "Ir para o dashboard",
+    ctaHref: "/dashboard",
+  },
+  supervisor: {
+    label: "Supervisor",
+    icon: Users,
+    warning: "from-amber-500 to-orange-600",
+    warningLight: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+    borderGlow: "shadow-amber-500/20",
+    message:
+      "Acompanhe o desempenho da sua equipe na unidade, garanta o cumprimento de SLA e gerencie os corretores sob sua supervisão.",
+    features: [
+      "Supervisione a fila da sua equipe",
+      "Monitore estouro de SLA em tempo real",
+      "Acompanhe metas e desempenho",
     ],
     cta: "Ir para o dashboard",
     ctaHref: "/dashboard",
@@ -416,7 +432,7 @@ export function WelcomeScreen({
               transition={{ duration: 0.3, delay: 0.5 }}
               className="mt-6 space-y-2.5"
             >
-              {config.features.map((feature, i) => (
+              {config.features.map((feature: string, i: number) => (
                 <FeatureItem key={feature} text={feature} delay={0.5 + i * 0.12} />
               ))}
             </motion.div>

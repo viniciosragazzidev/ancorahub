@@ -8,4 +8,4 @@
 | 2026-07-28 | `completed/2026-07-28-ancorahub-assistant-compose-menu.md` | concluído | Menu contextual no compositor, sugestões manuais e abertura confiável do lead no CRM. |
 | 2026-07-29 | `completed/2026-07-29-mobile-live-leads.md` | concluído | Navegação móvel segura, atualização de fila sem F5 e correção de reatribuição. |
 | 2026-07-29 | `completed/2026-07-29-operational-visual-standardization.md` | concluído | Fundação visual compacta para superfícies operacionais, tabela, cards e kanban de leads. |
-| 2026-08-02 | `active/2026-08-02-firecrawl-operational-redesign.md` | parcial | Fundação global Firecrawl: sidebar grafite, superfícies opacas e primitives consolidados; migração por rota em andamento. |
+| 2026-08-03 | `completed/2026-08-03-broker-workspace.md` | parcial | V1 do cockpit do Corretor, prioridade determinística, rollback global e fluxos operacionais reais. |

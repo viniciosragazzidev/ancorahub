@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateInterfaceMotionSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
@@ -42,7 +43,9 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_enabled", 
     "feature_central_atencao_stagnant_days", 
     "feature_global_search_enabled", 
+    "feature_broker_workspace_enabled",
     "feature_interface_motion_enabled",
+    "feature_r2_storage_enabled",
     "feature_route_onboarding_enabled",
     "feature_whatsapp_meta_cloud_enabled",
     "feature_meta_lead_ads_enabled",
@@ -56,6 +59,12 @@ export default async function SuperAdminSettingsPage() {
     "lead_distribution_jobs_lease_seconds",
     "lead_distribution_jobs_recovery_minutes",
     "feature_lead_intake_outbox_enabled",
+    "feature_waha_cadence_enabled",
+    "feature_waha_connections_enabled",
+    "feature_waha_ai_enabled",
+    "waha_cadence_max_attempts",
+    "waha_cadence_retry_base_seconds",
+    "waha_cadence_lease_seconds",
     "lead_intake_outbox_max_attempts",
     "lead_intake_outbox_retry_base_seconds",
     "lead_intake_outbox_lease_seconds",
@@ -63,11 +72,13 @@ export default async function SuperAdminSettingsPage() {
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
     "feature_ai_quick_reply_enabled",
+    "ai_memory_reset_mode",
     "feature_browser_extension_enabled",
     "feature_agent_training_center_enabled",
     "feature_custom_roles_enabled",
     "feature_performance_ranking_enabled",
     "feature_team_member_profile_enabled",
+    "feature_user_profile_enabled",
     "ai_primary_provider",
     "ai_primary_model",
     "ai_fallback_provider",
@@ -86,7 +97,9 @@ export default async function SuperAdminSettingsPage() {
   const centralEnabled = settingMap.get("feature_central_atencao_enabled") !== "false";
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
+  const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
   const interfaceMotionEnabled = settingMap.get("feature_interface_motion_enabled") !== "false";
+  const r2StorageEnabled = settingMap.get("feature_r2_storage_enabled") !== "false";
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
@@ -104,15 +117,23 @@ export default async function SuperAdminSettingsPage() {
   const leadEffectOutboxMaxAttempts = settingMap.get("lead_intake_outbox_max_attempts") ?? "8";
   const leadEffectOutboxRetryBaseSeconds = settingMap.get("lead_intake_outbox_retry_base_seconds") ?? "60";
   const leadEffectOutboxLeaseSeconds = settingMap.get("lead_intake_outbox_lease_seconds") ?? "120";
+  const wahaCadenceEnabled = settingMap.get("feature_waha_cadence_enabled") === "true";
+  const wahaConnectionsEnabled = settingMap.get("feature_waha_connections_enabled") === "true";
+  const wahaAiEnabled = settingMap.get("feature_waha_ai_enabled") === "true";
+  const wahaMaxAttempts = settingMap.get("waha_cadence_max_attempts") ?? "5";
+  const wahaRetryBaseSeconds = settingMap.get("waha_cadence_retry_base_seconds") ?? "60";
+  const wahaLeaseSeconds = settingMap.get("waha_cadence_lease_seconds") ?? "120";
 
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
+  const aiMemoryResetMode = settingMap.get("ai_memory_reset_mode") ?? "before_each_session";
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
   const agentTrainingCenterEnabled = settingMap.get("feature_agent_training_center_enabled") === "true";
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const performanceRankingEnabled = settingMap.get("feature_performance_ranking_enabled") !== "false";
   const teamMemberProfileEnabled = settingMap.get("feature_team_member_profile_enabled") !== "false";
+  const userProfileEnabled = settingMap.get("feature_user_profile_enabled") !== "false";
   const aiPrimaryProvider = settingMap.get("ai_primary_provider") ?? "groq";
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
@@ -141,6 +162,23 @@ export default async function SuperAdminSettingsPage() {
 
         <Suspense fallback={<div className="flex items-center justify-center py-20 text-sm text-muted-foreground">Carregando configurações...</div>}>
           <SuperAdminSettingsTabs>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Workspace do Corretor</CardTitle>
+                <CardDescription>
+                  Define a home operacional dos corretores. Desativar restaura o dashboard legado sem remover dados, tarefas ou histórico.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerWorkspaceSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="brokerWorkspaceEnabled" value="true" defaultChecked={brokerWorkspaceEnabled} className="size-4" />
+                    <span><span className="font-medium">Habilitar Workspace do Corretor</span><span className="block text-xs text-muted-foreground">A alteração é auditada e reversível pela plataforma.</span></span>
+                  </label>
+                  <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>{brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}</Button>
+                </form>
+              </CardContent>
+            </Card>
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Cargos personalizados</CardTitle>
@@ -194,6 +232,11 @@ export default async function SuperAdminSettingsPage() {
             <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>Perfil administrativo da equipe</CardTitle><CardDescription>Libera a visão de desempenho individual para Diretores e Gestores. Gestores permanecem limitados aos membros e leads da própria unidade; cada acesso fica auditado.</CardDescription></CardHeader>
               <CardContent><form action={updateTeamMemberProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="teamMemberProfileEnabled" value="true" defaultChecked={teamMemberProfileEnabled} className="size-4" /><span><span className="font-medium">Perfis administrativos habilitados</span><span className="block text-xs text-muted-foreground">Desativar remove o atalho e bloqueia a rota sem apagar históricos ou auditoria.</span></span></label><Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>{teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}</Button></form></CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Perfil pessoal do usuário</CardTitle><CardDescription>Libera a área "Meu perfil" para todos os usuários editarem nome, foto, senha, sessões e consultarem o histórico de atividades de sua conta.</CardDescription></CardHeader>
+              <CardContent><form action={updateUserProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="userProfileEnabled" value="true" defaultChecked={userProfileEnabled} className="size-4" /><span><span className="font-medium">Área de perfil habilitada</span><span className="block text-xs text-muted-foreground">Desativar bloqueia a rota e remove o atalho, preservando auditoria e histórico.</span></span></label><Button type="submit" variant={userProfileEnabled ? "outline" : "default"}>{userProfileEnabled ? "Salvar controle" : "Liberar perfil"}</Button></form></CardContent>
             </Card>
 
             <Card className="border-border bg-card shadow-none">
@@ -359,16 +402,16 @@ export default async function SuperAdminSettingsPage() {
                     {/* Provedor Primário */}
                     <div className="space-y-2">
                       <label className="text-sm font-semibold">Provedor Primário</label>
-                      <select
+                      <AppSelect
                         name="primaryProvider"
                         defaultValue={aiPrimaryProvider}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="groq">Groq (Llama 3.3 / Llama 3)</option>
-                        <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                        <option value="google">Google Gemini (Gemini 2.5 Flash)</option>
-                        <option value="openrouter">OpenRouter (Modelos Gratuitos & Diversos)</option>
-                      </select>
+                        options={[
+                          { value: "groq", label: "Groq (Llama 3.3 / Llama 3)" },
+                          { value: "openai", label: "OpenAI (GPT-4o / GPT-4o-mini)" },
+                          { value: "google", label: "Google Gemini (Gemini 2.5 Flash)" },
+                          { value: "openrouter", label: "OpenRouter (Modelos Gratuitos & Diversos)" },
+                        ]}
+                      />
                       <p className="text-xs text-muted-foreground">Provedor principal utilizado para completar requisições.</p>
                     </div>
 
@@ -386,17 +429,17 @@ export default async function SuperAdminSettingsPage() {
                     {/* Provedor de Fallback */}
                     <div className="space-y-2">
                       <label className="text-sm font-semibold">Provedor de Fallback</label>
-                      <select
+                      <AppSelect
                         name="fallbackProvider"
                         defaultValue={aiFallbackProvider}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="none">Nenhum (Disparar erro em caso de falha)</option>
-                        <option value="groq">Groq</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="google">Google Gemini</option>
-                        <option value="openrouter">OpenRouter</option>
-                      </select>
+                        options={[
+                          { value: "none", label: "Nenhum (Disparar erro em caso de falha)" },
+                          { value: "groq", label: "Groq" },
+                          { value: "openai", label: "OpenAI" },
+                          { value: "google", label: "Google Gemini" },
+                          { value: "openrouter", label: "OpenRouter" },
+                        ]}
+                      />
                       <p className="text-xs text-muted-foreground">Provedor utilizado caso o primário retorne erro ou atinja limite.</p>
                     </div>
 
@@ -448,7 +491,18 @@ export default async function SuperAdminSettingsPage() {
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold">Groq API Key</label>
+                        <label className="flex items-center justify-between gap-2 text-xs font-semibold">
+                          Groq API Key
+                          <a
+                            href="https://console.groq.com/docs/models"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                          >
+                            Ver modelos Groq
+                            <span aria-hidden="true">↗</span>
+                          </a>
+                        </label>
                         <Input
                           name="groqApiKey"
                           type="password"
@@ -518,8 +572,20 @@ export default async function SuperAdminSettingsPage() {
             </Card>
 
             <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Cadência WAHA</CardTitle><CardDescription>Controle global do relay na VPS e das respostas de IA. O canal oficial Meta não é alterado.</CardDescription></CardHeader>
+              <CardContent className="pb-0"><p className="text-xs text-muted-foreground">Conexões: <strong>{wahaConnectionsEnabled ? "habilitadas" : "desativadas"}</strong>. Salve a configuração abaixo para alterar este controle.</p></CardContent>
+              <CardContent className="pt-3"><form action={updateWahaConnectionSettingsAction} className="flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="connectionsEnabled" value="true" defaultChecked={wahaConnectionsEnabled} className="size-4" /><span>Permitir conexões de números WAHA</span></label><Button type="submit" variant="outline">Salvar conexões</Button></form></CardContent>
+              <CardContent><form action={updateWahaCadenceSettingsAction} className="grid gap-3 md:grid-cols-3"><label className="flex items-center gap-2 text-sm md:col-span-3"><input type="checkbox" name="enabled" value="true" defaultChecked={wahaCadenceEnabled} className="size-4" /><span><span className="font-medium">Cadências habilitadas</span><span className="block text-xs text-muted-foreground">Pausa a fila sem apagar histórico.</span></span></label><label className="flex items-center gap-2 text-sm md:col-span-3"><input type="checkbox" name="aiEnabled" value="true" defaultChecked={wahaAiEnabled} className="size-4" /><span><span className="font-medium">IA após mensagem recebida</span><span className="block text-xs text-muted-foreground">Mantém ações de baixo risco.</span></span></label><label className="grid gap-1 text-xs font-medium">Tentativas<Input name="maxAttempts" type="number" min={1} max={10} defaultValue={wahaMaxAttempts} /></label><label className="grid gap-1 text-xs font-medium">Retry (segundos)<Input name="retryBaseSeconds" type="number" min={15} max={3600} defaultValue={wahaRetryBaseSeconds} /></label><label className="grid gap-1 text-xs font-medium">Lease (segundos)<Input name="leaseSeconds" type="number" min={30} max={900} defaultValue={wahaLeaseSeconds} /></label><div className="md:col-span-3"><Button type="submit">Salvar cadência WAHA</Button></div></form></CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>CorreTop Assistant</CardTitle><CardDescription>Kill switch global da extensão contextual. Desativar bloqueia novas consultas sem revogar dados históricos ou sessões já registradas.</CardDescription></CardHeader>
               <CardContent><form action={updateExtensionGlobalSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="extensionEnabled" value="true" defaultChecked={browserExtensionEnabled} className="size-4" /><span><span className="font-medium">Extensão habilitada globalmente</span><span className="block text-xs text-muted-foreground">O Diretor ainda controla a ativação por tenant.</span></span></label><Button type="submit">Salvar extensão</Button></form></CardContent>
+              </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Armazenamento de arquivos</CardTitle><CardDescription>Controle global do bucket privado Cloudflare R2. Desativar interrompe uploads e downloads sem apagar registros, objetos ou auditoria.</CardDescription></CardHeader>
+              <CardContent><form action={updateR2StorageSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="r2StorageEnabled" value="true" defaultChecked={r2StorageEnabled} className="size-4" /><span><span className="font-medium">Armazenamento R2 habilitado</span><span className="block text-xs text-muted-foreground">Requer credenciais privadas configuradas no ambiente do servidor.</span></span></label><Button type="submit" variant="outline">Salvar armazenamento</Button></form></CardContent>
             </Card>
 
             <Card className="border-border bg-card shadow-none">
@@ -529,6 +595,28 @@ export default async function SuperAdminSettingsPage() {
             <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>Quick Reply determinístico</CardTitle><CardDescription>Resolve saudações, mídia, opt-out e solicitações humanas antes de chamar a IA. O estado e o cooldown são persistidos.</CardDescription></CardHeader>
               <CardContent><form action={updateQuickReplySettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="quickReplyEnabled" value="true" defaultChecked={aiQuickReplyEnabled} className="size-4" /><span><span className="font-medium">Quick Reply habilitado</span><span className="block text-xs text-muted-foreground">Desative sem apagar eventos, métricas ou templates por tenant.</span></span></label><Button type="submit" variant="outline">Salvar Quick Reply</Button></form></CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Reset de memória do agente de WhatsApp</CardTitle><CardDescription>Controla quando o agente esquece o contexto acumulado (memória estruturada + histórico da conversa). A opção “A cada mensagem” faz o bot responder do zero a cada interação recebida.</CardDescription></CardHeader>
+              <CardContent>
+                <form action={updateAiMemoryResetSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="grid gap-1 text-sm">
+                    <span className="font-medium">Modo de reset de memória</span>
+                    <span className="block text-xs text-muted-foreground">A alteração é auditada e vale para todos os leads.</span>
+                    <AppSelect
+                      name="aiMemoryResetMode"
+                      defaultValue={aiMemoryResetMode}
+                      options={[
+                        { value: "before_each_message", label: "A cada mensagem (responder do zero)" },
+                        { value: "before_each_session", label: "A cada nova sessão (padrão)" },
+                        { value: "never", label: "Nunca resetar (manter contexto)" },
+                        { value: "manual", label: "Somente manual" },
+                      ]}
+                    />
+                  </label>
+                  <Button type="submit" variant="outline">Salvar reset de memória</Button>
+                </form>
+              </CardContent>
             </Card>
             <Card className="border-border bg-card shadow-none">
               <CardHeader>

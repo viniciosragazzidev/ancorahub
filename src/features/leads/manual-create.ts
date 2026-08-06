@@ -24,7 +24,8 @@ const leadInput = z.object({
   telefone: z.string().trim().transform((value) => value.replace(/\D/g, "")).refine((value) => /^(?:55)?(?:[1-9]{2})9\d{8}$/.test(value), "Informe um celular brasileiro válido."),
   email: z.string().trim().email("Informe um e-mail válido.").max(254).optional().or(z.literal("")),
   planoInteresseId: z.string().uuid().optional().or(z.literal("")),
-  tipo: z.enum(["PF", "PME"]).default("PF"),
+  // PME remains accepted for historical records; new registrations use the clearer PJ label.
+  tipo: z.enum(["PF", "PJ", "PME"]).default("PF"),
   consentimentoLgpd: z.literal("true", { message: "O consentimento LGPD é obrigatório." }),
   duplicateConfirmed: z.literal("true").optional(),
   formData: z.string().optional().transform((value) => {
@@ -42,6 +43,11 @@ export type DuplicateLeadNotice = { id: string; nome: string; createdAt: Date; c
 function normalizePhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
   return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
+export function normalizeCnpj(value: string | null | undefined) {
+  const digits = value?.replace(/\D/g, "") ?? "";
+  return digits.length === 14 ? digits : null;
 }
 
 import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-push-helper";
@@ -77,11 +83,36 @@ export async function createManualLead(rawInput: unknown) {
   if (duplicate && input.duplicateConfirmed !== "true") return { duplicate: duplicate as DuplicateLeadNotice };
   const corretorId = context.role === "broker" ? context.userId : await chooseAvailableBroker(context.tenantId, context.branchId);
   const leadId = randomUUID();
+  const cnpj = input.tipo === "PF" ? null : normalizeCnpj(input.formData.cnpj);
+  if (input.tipo !== "PF" && input.formData.cnpj && !cnpj) {
+    throw new Error("Informe um CNPJ com 14 dígitos para a empresa.");
+  }
+  let companyId: string | null = null;
+  if (input.tipo !== "PF" && input.formData.razaoSocial?.trim()) {
+    const [existingCompany] = await db.select({ id: schema.companies.id })
+      .from(schema.companies)
+      .where(and(eq(schema.companies.tenantId, context.tenantId), cnpj ? eq(schema.companies.cnpj, cnpj) : eq(schema.companies.legalName, input.formData.razaoSocial.trim())))
+      .limit(1);
+    companyId = existingCompany?.id ?? randomUUID();
+    if (!existingCompany) {
+      await db.insert(schema.companies).values({
+        id: companyId,
+        tenantId: context.tenantId,
+        branchId: context.branchId,
+        name: input.formData.razaoSocial.trim(),
+        legalName: input.formData.razaoSocial.trim(),
+        cnpj,
+        employeeCount: input.formData.funcionarios ? Number(input.formData.funcionarios) : null,
+        createdBy: context.userId,
+      });
+    }
+  }
   const assigned = Boolean(corretorId);
   await db.insert(schema.leads).values({
     id: leadId,
     tenantId: context.tenantId,
     branchId: context.branchId,
+    companyId,
     corretorId,
     planId: input.planoInteresseId || null,
     nome: input.nome,

@@ -248,7 +248,7 @@ export default function PublicSpreadsheetPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (

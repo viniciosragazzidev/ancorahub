@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "tests", "playwright.config.ts", "services/whatsapp-api/**"]
+  "exclude": ["node_modules", "tests", "playwright.config.ts", "services/whatsapp-api/**", "latitude-llm-reference/**", "temp_deskcomm_crm/**"]
 }

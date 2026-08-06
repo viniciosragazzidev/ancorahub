@@ -10,7 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { importSpreadsheetAction, type SpreadsheetActionState, type ImportedSpreadsheet, type DelimiterOption } from "./spreadsheet-actions";
+import {
+  importSpreadsheetAction,
+  type SpreadsheetActionState,
+  type ImportedSpreadsheet,
+  type DelimiterOption,
+} from "./spreadsheet-actions";
 import { parseCsv } from "@/shared/utils/csv";
 
 type PreviewData = {
@@ -31,10 +36,10 @@ export function SpreadsheetUploader({
 }: {
   onImported: (spreadsheet: ImportedSpreadsheet) => void;
 }) {
-  const [state, action, pending] = useActionState<SpreadsheetActionState & { spreadsheet?: ImportedSpreadsheet }, FormData>(
-    importSpreadsheetAction,
-    {},
-  );
+  const [state, action, pending] = useActionState<
+    SpreadsheetActionState & { spreadsheet?: ImportedSpreadsheet },
+    FormData
+  >(importSpreadsheetAction, {});
 
   // Step 1: file selection
   const [file, setFile] = useState<File | null>(null);
@@ -100,63 +105,66 @@ export function SpreadsheetUploader({
   }
 
   /** Parse the file client-side for preview */
-  const parsePreview = useCallback(async (delim: DelimiterOption) => {
-    if (!file) return;
-    setPreviewLoading(true);
-    setPreview(null);
+  const parsePreview = useCallback(
+    async (delim: DelimiterOption) => {
+      if (!file) return;
+      setPreviewLoading(true);
+      setPreview(null);
 
-    try {
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      const buffer = await file.arrayBuffer();
+      try {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        const buffer = await file.arrayBuffer();
 
-      let allRows: Record<string, unknown>[];
+        let allRows: Record<string, unknown>[];
 
-      if (ext === "csv") {
-        const text = new TextDecoder("utf-8").decode(buffer);
-        allRows = parseCsv(text, delim);
-      } else {
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        if (!sheetName) {
-          toast.error("O arquivo não contém nenhuma planilha.");
+        if (ext === "csv") {
+          const text = new TextDecoder("utf-8").decode(buffer);
+          allRows = parseCsv(text, delim);
+        } else {
+          const workbook = XLSX.read(buffer, { type: "array" });
+          const sheetName = workbook.SheetNames[0];
+          if (!sheetName) {
+            toast.error("O arquivo não contém nenhuma planilha.");
+            setPreviewLoading(false);
+            return;
+          }
+          const sheet = workbook.Sheets[sheetName];
+          allRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+            defval: null,
+          });
+        }
+
+        if (allRows.length === 0) {
+          toast.error("A planilha está vazia.");
           setPreviewLoading(false);
           return;
         }
-        const sheet = workbook.Sheets[sheetName];
-        allRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-          defval: null,
+
+        if (allRows.length > 50_000) {
+          toast.error("A planilha tem mais de 50.000 linhas. Importe um arquivo menor.");
+          setPreviewLoading(false);
+          return;
+        }
+
+        const columns = Object.keys(allRows[0]);
+        if (columns.length === 0) {
+          toast.error("A planilha não tem colunas identificáveis.");
+          setPreviewLoading(false);
+          return;
+        }
+
+        setPreview({
+          columns,
+          rows: allRows.slice(0, 10),
+          totalRows: allRows.length,
         });
+      } catch (err) {
+        toast.error("Erro ao processar o arquivo. Verifique se o formato está correto.");
       }
-
-      if (allRows.length === 0) {
-        toast.error("A planilha está vazia.");
-        setPreviewLoading(false);
-        return;
-      }
-
-      if (allRows.length > 50_000) {
-        toast.error("A planilha tem mais de 50.000 linhas. Importe um arquivo menor.");
-        setPreviewLoading(false);
-        return;
-      }
-
-      const columns = Object.keys(allRows[0]);
-      if (columns.length === 0) {
-        toast.error("A planilha não tem colunas identificáveis.");
-        setPreviewLoading(false);
-        return;
-      }
-
-      setPreview({
-        columns,
-        rows: allRows.slice(0, 10),
-        totalRows: allRows.length,
-      });
-    } catch (err) {
-      toast.error("Erro ao processar o arquivo. Verifique se o formato está correto.");
-    }
-    setPreviewLoading(false);
-  }, [file]);
+      setPreviewLoading(false);
+    },
+    [file],
+  );
 
   // Auto-parse when file or delimiter changes
   useEffect(() => {
@@ -186,14 +194,15 @@ export function SpreadsheetUploader({
   }
 
   return (
-    <Card className="border-border bg-card shadow-none">
+    <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <FileText className="size-4 text-primary" />
           <div>
             <CardTitle>Importar planilha</CardTitle>
             <CardDescription>
-              Faça upload de um arquivo XLSX, XLS ou CSV para visualizar os dados em uma tabela interativa.
+              Faça upload de um arquivo XLSX, XLS ou CSV para visualizar os dados em uma tabela
+              interativa.
             </CardDescription>
           </div>
         </div>
@@ -202,7 +211,10 @@ export function SpreadsheetUploader({
         <div className="space-y-4">
           {/* ── Step 1: Drop zone ── */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
@@ -234,7 +246,10 @@ export function SpreadsheetUploader({
                 </div>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); resetForm(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resetForm();
+                  }}
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 >
                   <Trash className="size-4" />
@@ -244,10 +259,10 @@ export function SpreadsheetUploader({
               <>
                 <FileArrowDown className="size-8 text-muted-foreground" />
                 <div className="text-center">
-                  <p className="text-sm font-medium">Arraste um arquivo ou clique para selecionar</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    XLSX, XLS ou CSV — até 10 MB
+                  <p className="text-sm font-medium">
+                    Arraste um arquivo ou clique para selecionar
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">XLSX, XLS ou CSV — até 10 MB</p>
                 </div>
               </>
             )}
@@ -306,11 +321,13 @@ export function SpreadsheetUploader({
                   <div className="flex items-center gap-2">
                     <CheckCircle className="size-4 text-success" />
                     <span className="text-sm font-medium">
-                      {preview.columns.length} colunas · {preview.totalRows} linha{preview.totalRows !== 1 ? "s" : ""}
+                      {preview.columns.length} colunas · {preview.totalRows} linha
+                      {preview.totalRows !== 1 ? "s" : ""}
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    Mostrando as primeiras {Math.min(10, preview.totalRows)} linha{Math.min(10, preview.totalRows) !== 1 ? "s" : ""}
+                    Mostrando as primeiras {Math.min(10, preview.totalRows)} linha
+                    {Math.min(10, preview.totalRows) !== 1 ? "s" : ""}
                   </span>
                 </div>
 
@@ -339,9 +356,11 @@ export function SpreadsheetUploader({
                         >
                           {preview.columns.map((col) => (
                             <td key={col} className="px-3 py-1 text-xs truncate max-w-48">
-                              {row[col] != null && row[col] !== ""
-                                ? String(row[col])
-                                : <span className="text-muted-foreground/50">—</span>}
+                              {row[col] != null && row[col] !== "" ? (
+                                String(row[col])
+                              ) : (
+                                <span className="text-muted-foreground/50">—</span>
+                              )}
                             </td>
                           ))}
                         </tr>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { updateTenantAiSettingsAction, type AiTenantSettings } from "@/features/ai/tenant-settings-actions";
 
@@ -20,8 +21,53 @@ export function AiSettingsTab({ settings, canEdit }: { settings: Partial<AiTenan
   const value = (key: keyof AiTenantSettings, fallback: string) => String(settings?.[key] ?? (key === "maxQuestions" ? "6" : fallback));
   const objectives = new Set((settings?.objectives as string[] | undefined) ?? ["understand_need", "route_to_broker"]);
   return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Atendimento inteligente</CardTitle><CardDescription>Defina como o assistente conversa com seus leads. As alterações ficam isoladas nesta corretora.</CardDescription></CardHeader><CardContent><form action={formAction} className="grid gap-6">
-    <div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel htmlFor="ai-assistant-name">Nome do assistente</FieldLabel><Input id="ai-assistant-name" name="assistantName" defaultValue={value("assistantName", "Assistente Âncora Corretora")} disabled={!canEdit} /></Field><Field><FieldLabel>Idioma</FieldLabel><select name="language" defaultValue={value("language", "pt-BR")} disabled={!canEdit} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="pt-BR">Português (Brasil)</option><option value="en">English</option><option value="es">Español</option></select></Field></div>
-    <div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel>Estilo da conversa</FieldLabel><select name="tone" defaultValue={value("tone", "friendly")} disabled={!canEdit} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="friendly">Cordial e próximo</option><option value="professional">Profissional</option><option value="direct">Objetivo</option></select></Field><Field><FieldLabel>Forma de tratamento</FieldLabel><select name="formOfAddress" defaultValue={value("formOfAddress", "voce")} disabled={!canEdit} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="voce">Você</option><option value="primeiro_nome">Primeiro nome</option><option value="senhor_senhora">Senhor(a)</option></select></Field></div>
+    <div className="grid gap-4 md:grid-cols-2">
+      <Field>
+        <FieldLabel htmlFor="ai-assistant-name">Nome do assistente</FieldLabel>
+        <Input id="ai-assistant-name" name="assistantName" defaultValue={value("assistantName", "Assistente Âncora Corretora")} disabled={!canEdit} />
+      </Field>
+      <Field>
+        <FieldLabel>Idioma</FieldLabel>
+        <AppSelect
+          name="language"
+          defaultValue={value("language", "pt-BR")}
+          disabled={!canEdit}
+          options={[
+            { value: "pt-BR", label: "Português (Brasil)" },
+            { value: "en", label: "English" },
+            { value: "es", label: "Español" },
+          ]}
+        />
+      </Field>
+    </div>
+    <div className="grid gap-4 md:grid-cols-2">
+      <Field>
+        <FieldLabel>Estilo da conversa</FieldLabel>
+        <AppSelect
+          name="tone"
+          defaultValue={value("tone", "friendly")}
+          disabled={!canEdit}
+          options={[
+            { value: "friendly", label: "Cordial e próximo" },
+            { value: "professional", label: "Profissional" },
+            { value: "direct", label: "Objetivo" },
+          ]}
+        />
+      </Field>
+      <Field>
+        <FieldLabel>Forma de tratamento</FieldLabel>
+        <AppSelect
+          name="formOfAddress"
+          defaultValue={value("formOfAddress", "voce")}
+          disabled={!canEdit}
+          options={[
+            { value: "voce", label: "Você" },
+            { value: "primeiro_nome", label: "Primeiro nome" },
+            { value: "senhor_senhora", label: "Senhor(a)" },
+          ]}
+        />
+      </Field>
+    </div>
     <div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel>Tempo máximo da conversa (minutos)</FieldLabel><Input type="number" min={5} max={1440} name="maxConversationMinutes" defaultValue={value("maxConversationMinutes", "30")} disabled={!canEdit} /></Field><Field><FieldLabel>Máximo de perguntas</FieldLabel><Input type="number" min={1} max={12} name="maxQuestions" defaultValue={value("maxQuestions", "4")} disabled={!canEdit} /></Field></div>
     <label className="flex items-center gap-3 text-sm"><input type="checkbox" name="useEmojis" value="true" defaultChecked={Boolean(settings?.useEmojis)} disabled={!canEdit} /> Usar emojis com moderação</label>
     <div className="grid gap-4 md:grid-cols-2">{([['initialMessage','Mensagem inicial','Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento.'],['finalMessage','Mensagem ao concluir','Obrigado! Um corretor continuará seu atendimento em seguida.'],['handoffMessage','Mensagem ao encaminhar','Vou encaminhar você para um corretor da equipe agora.'],['outOfHoursMessage','Fora do horário','Recebemos sua mensagem. Nossa equipe responderá no próximo horário de atendimento.'],['absenceMessage','Sem corretor disponível','No momento não há um corretor disponível. Deixaremos seu atendimento na fila.']] as const).map(([name,label,fallback]) => <Field key={name}><FieldLabel>{label}</FieldLabel><Textarea name={name} rows={3} defaultValue={value(name as keyof AiTenantSettings, fallback)} disabled={!canEdit} /></Field>)}</div>

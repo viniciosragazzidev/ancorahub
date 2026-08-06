@@ -31,7 +31,7 @@ export default async function WelcomePage() {
   // Load real onboarding data
   const onboarding = await getCurrentTenantOnboarding();
 
-  const role = context.role as "director" | "manager" | "broker";
+  const role = context.role;
 
   // If onboarding is already dismissed/completed and user is going back to /welcome,
   // redirect to the appropriate dashboard
@@ -39,6 +39,7 @@ export default async function WelcomePage() {
     const redirectMap = {
       director: "/dashboard",
       manager: "/dashboard",
+      supervisor: "/dashboard",
       broker: "/minha-fila",
     } as const;
     redirect(redirectMap[role]);

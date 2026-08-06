@@ -1,5 +1,7 @@
 "use client";
 
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -7,6 +9,8 @@ import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
+import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 
 type Branding = {
   brandColor: string | null;
@@ -65,40 +69,43 @@ export function AppShell({
   }, [branding?.brandColor, readableBrandForeground]);
 
   return (
-    <SidebarProvider
-      className="min-h-dvh overflow-hidden"
-      style={
-        {
-          "--sidebar-width": "225px",
-          "--header-height": "4rem",
-          ...(branding?.brandColor
-            ? {
-                "--primary": branding.brandColor,
-                "--primary-foreground": readableBrandForeground,
-                "--ring": branding.brandColor,
-                "--sidebar-primary": branding.brandColor,
-                "--sidebar-primary-foreground": readableBrandForeground,
-                "--sidebar-ring": branding.brandColor,
-              }
-            : {}),
-        } as CSSProperties
-      }
-    >
-      {isFinanceiro ? (
-        <CorreTopFinanceiroSidebar />
-      ) : (
-        <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
-      )}
-      <SidebarInset
-        className="min-h-0 h-dvh bg-background overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
-        style={{
-          scrollPaddingTop: "var(--header-height)",
-          scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
-        }}
+    <OnboardingProvider>
+      <SidebarProvider
+        className="min-h-dvh overflow-hidden"
+        style={
+          {
+            "--sidebar-width": "16rem",
+            "--header-height": "4rem",
+            ...(branding?.brandColor
+              ? {
+                  "--primary": branding.brandColor,
+                  "--primary-foreground": readableBrandForeground,
+                  "--ring": branding.brandColor,
+                  "--sidebar-primary": branding.brandColor,
+                  "--sidebar-primary-foreground": readableBrandForeground,
+                  "--sidebar-ring": branding.brandColor,
+                }
+              : {}),
+          } as CSSProperties
+        }
       >
-        <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-      </SidebarInset>
-      <MobileBottomNav />
-    </SidebarProvider>
+        {isFinanceiro ? (
+          <CorreTopFinanceiroSidebar />
+        ) : (
+          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
+        )}
+        <SidebarInset
+          className="min-h-0 h-dvh bg-muted/25 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] dark:bg-background max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+          style={{
+            scrollPaddingTop: "var(--header-height)",
+            scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
+          }}
+        >
+          <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+        </SidebarInset>
+        <MobileBottomNav />
+        <OnboardingWelcomeDialog />
+      </SidebarProvider>
+    </OnboardingProvider>
   );
 }

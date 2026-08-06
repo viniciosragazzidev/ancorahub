@@ -8,10 +8,11 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_1px_1px_rgb(15_23_42/0.02)] transition-[border-color,background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
-        overview: "gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-[0_1px_1px_rgb(15_23_42/0.02)]",
-        compact: "gap-2.5 rounded-lg border border-border bg-card p-3.5 shadow-none transition-[border-color,background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
-        kanban: "gap-0 overflow-hidden rounded-lg border border-border bg-card p-0 shadow-none transition-[border-color,background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-border-strong motion-reduce:transition-none",
+        default: "gap-4 rounded-lg border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_rgb(15_23_42/0.025)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_2px_4px_rgb(15_23_42/0.05),0_12px_28px_rgb(15_23_42/0.04)] motion-reduce:transition-none",
+        subtle: "gap-4 rounded-lg border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.025)]",
+        overview: "gap-0 overflow-hidden rounded-lg border border-border/80 bg-card p-0 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_rgb(15_23_42/0.025)]",
+        compact: "gap-3 rounded-lg border border-border/80 bg-card p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_6px_18px_rgb(15_23_42/0.035)] motion-reduce:transition-none",
+        kanban: "gap-0 overflow-hidden rounded-lg border border-border/80 bg-card p-0 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_6px_18px_rgb(15_23_42/0.035)] motion-reduce:transition-none",
       },
     },
     defaultVariants: {
@@ -104,7 +105,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center rounded-b-xl px-5 pb-5", className)}
+      className={cn("flex items-center rounded-b-lg px-5 pb-5", className)}
       {...props}
     />
   )

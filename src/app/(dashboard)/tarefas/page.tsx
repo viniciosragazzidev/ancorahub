@@ -2,15 +2,11 @@ import { and, eq, isNull, lt, or } from "drizzle-orm";
 import Link from "next/link";
 
 import { DashboardHeader } from "@/components/dashboard-header";
-import { ListChecks } from "@/components/huge-icons";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContextNote } from "@/components/ui/context-note";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { OwnershipContext } from "@/components/ownership-context";
+import { TasksWorkspace } from "./tasks-workspace";
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ attention?: string; leadId?: string }> }) {
   const { attention, leadId } = await searchParams;
@@ -63,7 +59,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           </Button>
         }
       />
-      <main className="flex min-h-full flex-col gap-3 bg-background px-4 py-3 lg:px-5 lg:py-4">
+      <main className="flex min-h-full flex-col gap-4 bg-background p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
@@ -73,63 +69,20 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         {leadId ? <ContextNote className="max-w-xl" variant="info">Exibindo apenas tarefas do lead selecionado. <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/leads/${leadId}`}>Voltar ao lead</Link></ContextNote> : null}
         {attention === "overdue" ? <ContextNote className="max-w-xl" variant="warning">Exibindo somente tarefas vencidas e ainda não concluídas no seu escopo.</ContextNote> : null}
 
-        <Card variant="overview" className="overflow-hidden">
-          <CardHeader className="px-5 py-4 pb-3">
-            <CardTitle>Minha operação</CardTitle>
-            <CardDescription>Tarefas urgentes podem envolver vários corretores. As demais preservam um responsável claro.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="hidden divide-y divide-border max-[559px]:block">
-              {tasks.map((task) => (
-                <Link key={task.id} href={`/leads/${task.leadId}`} className="block px-4 py-3.5 transition-colors duration-[var(--duration-quick)] ease-out active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={task.completedAt ? "truncate font-medium line-through text-muted-foreground" : "truncate font-medium"}>{task.title}</p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{task.leadName}</p>
-                    </div>
-                    <Badge className={task.priority === "urgent" ? "shrink-0 border-destructive/30 bg-destructive/10 text-destructive" : "shrink-0 border-border"} variant="outline">{task.priority === "urgent" ? "Urgente" : task.priority === "low" ? "Baixa" : "Normal"}</Badge>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>{task.dueAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(task.dueAt) : "Sem prazo"}</span>
-                    <OwnershipContext brokerName={task.assigneeName} branchName={task.branchName} className="truncate text-xs" emptyLabel="Equipe" />
-                  </div>
-                </Link>
-              ))}
-            </div>
-            <Table className="max-[559px]:hidden">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-5">Tarefa</TableHead>
-                  <TableHead>Agendamento</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead className="hidden md:table-cell">Responsável</TableHead>
-                  <TableHead className="pr-5 text-right">Lead</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="pl-5">
-                      <p className={task.completedAt ? "font-medium line-through text-muted-foreground" : "font-medium"}>{task.title}</p>
-                      {task.description ? <p className="mt-1 max-w-lg truncate text-xs text-muted-foreground">{task.description}</p> : null}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{task.dueAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(task.dueAt) : "Sem prazo"}</TableCell>
-                    <TableCell><Badge className={task.priority === "urgent" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border"} variant="outline">{task.priority === "urgent" ? "Urgente" : task.priority === "low" ? "Baixa" : "Normal"}</Badge></TableCell>
-                    <TableCell className="hidden md:table-cell"><OwnershipContext brokerName={task.assigneeName} branchName={task.branchName} emptyLabel="Equipe" /></TableCell>
-                    <TableCell className="pr-5 text-right"><Button render={<Link href={`/leads/${task.leadId}`} />} size="sm" variant="outline">{task.leadName}</Button></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {!tasks.length ? (
-              <div className="flex flex-col items-center gap-2 border-t border-border px-6 py-8 text-center">
-                <span className="grid size-10 place-items-center rounded-full border border-primary/15 bg-primary/[0.06] text-primary" aria-hidden="true"><ListChecks className="size-5" /></span>
-                <p className="font-medium">Nenhuma tarefa no seu escopo</p>
-                <p className="max-w-md text-sm leading-6 text-muted-foreground">Abra um lead para criar o próximo passo e atribuí-lo à equipe.</p>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+        <TasksWorkspace
+          tasks={tasks.map((task) => ({
+            id: task.id,
+            leadId: task.leadId,
+            leadName: task.leadName,
+            title: task.title,
+            description: task.description,
+            priority: task.priority,
+            dueAt: task.dueAt ? task.dueAt.toISOString() : null,
+            completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+            assigneeName: task.assigneeName,
+            branchName: task.branchName,
+          }))}
+        />
       </main>
     </>
   );

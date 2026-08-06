@@ -52,7 +52,9 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { MetricsOverview } from "@/components/dashboard/metrics-overview";
+import { PeriodSelect } from "@/components/period-select";
+import { INITIAL_DIMENSION } from "@/components/ui/chart";
+import { DEFAULT_PERIOD, type PeriodValue } from "@/shared/period";
 import type {
   DirectorDashboardData,
   ManagerDashboardData,
@@ -62,9 +64,9 @@ import type {
 // ─── Props ──────────────────────────────────────────────────────────────────
 
 type RoleProps =
-  | { role: "director"; data: DirectorDashboardData }
-  | { role: "manager"; data: ManagerDashboardData }
-  | { role: "broker"; data: BrokerDashboardData };
+  | { role: "director"; data: DirectorDashboardData; period?: PeriodValue }
+  | { role: "manager"; data: ManagerDashboardData; period?: PeriodValue }
+  | { role: "broker"; data: BrokerDashboardData; period?: PeriodValue };
 
 // ─── Status Helper ───────────────────────────────────────────────────────────
 
@@ -260,7 +262,7 @@ function ActivityFeed({
   }>;
 }) {
   return (
-    <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+    <Card variant="subtle" className="rounded-xl" data-onboarding="director-audit">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -352,20 +354,22 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
   return (
     <div className="space-y-6">
       {/* ─── TOPO: AÇÕES NECESSÁRIAS & PLANTÃO ─── */}
-      <DirectorTopActionHeader data={data} />
+      <div data-onboarding="director-overview">
+        <DirectorTopActionHeader data={data} />
+      </div>
 
       {/* ─── INDICADORES & ANALYTICS ─── */}
-      <section className="space-y-4">
+      <section className="space-y-4" data-onboarding="director-branches">
         <div className="border-b border-border/50 pb-2">
           <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
           <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
         </div>
-        <MetricsOverview columns={4}>
-          <StatCard variant="overview" label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
-          <StatCard variant="overview" label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
-          <StatCard variant="overview" label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
-          <StatCard variant="overview" label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
-        </MetricsOverview>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Leads Totais" value={data.totals.leads} change={`${data.totals.activeLeads} ativos`} sublabel="Carteira do tenant" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard label="Em Atendimento" value={data.totals.activeLeads} change={`${((data.totals.activeLeads / Math.max(1, data.totals.leads)) * 100).toFixed(0)}%`} sublabel="Leads negociando" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-2)" />
+          <StatCard label="Conversões" value={data.totals.converted} change={data.totals.leads > 0 ? `${conversionRate}%` : "0%"} sublabel="Leads finalizados" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard label="Corretores" value={data.totals.activeBrokers} change={`${data.totals.members} cadastrados`} sublabel="Equipe comercial" animated animationDelay={0.24} sparklineData={data.trend.map((t, idx) => Math.round(t.leads * (0.3 + (idx % 3) * 0.05)))} sparklineColor="var(--chart-4)" />
+        </div>
       </section>
 
         {/* Funil Comercial — full width */}
@@ -373,8 +377,9 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
+          data-onboarding="director-commissions"
         >
-          <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-xl">
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -393,7 +398,7 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <AreaChart
                     data={funnelChartData}
                     margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
@@ -572,7 +577,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
     <div className="space-y-6">
 
       {/* ─── ZONA 2: PLANTÃO AO VIVO ─── */}
-      <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 shadow-none">
+      <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 shadow-none" data-onboarding="manager-redistribute-lead">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex size-3">
@@ -593,23 +598,23 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
       </Card>
 
       {/* ─── ZONA 3: INDICADORES NEUTROS ─── */}
-      <section className="space-y-4 pt-2">
+      <section className="space-y-4 pt-2" data-onboarding="manager-sla-monitoring">
         <div className="border-b border-border/50 pb-2">
           <h2 className="text-sm font-bold tracking-tight">Indicadores de Desempenho</h2>
           <p className="text-xs text-muted-foreground">Métricas operacionais da unidade.</p>
         </div>
-        <MetricsOverview columns={5}>
-          <StatCard variant="overview" label="Corretores Ativos" value={data.activeMembers} change={`${teamPercent}%`} sublabel={`${data.teamSize} cadastrados`} animated sparklineData={data.trend.map((t, idx) => Math.round((t.leads + 1) * (0.2 + (idx % 4) * 0.05)))} sparklineColor="var(--chart-1)" />
-          <StatCard variant="overview" label="Leads Novos" value={data.newLeads} change={`${newPercent}% do total`} sublabel={`${data.unassigned} sem resp.`} animated animationDelay={0.08} sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-3)" />
-          <StatCard variant="overview" label="Em Atendimento" value={data.inContact} change={`${contactPercent}%`} sublabel={`de ${data.leadsTotal} totais`} animated animationDelay={0.16} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-4)" />
-          <StatCard variant="overview" label="Não Trabalhados" value={data.unworked} change={data.unworked > 0 ? "urgente" : "ok"} sublabel="Há +15min sem contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.2))} sparklineColor="var(--chart-2)" />
-          <StatCard variant="overview" label="Estagnados" value={data.stalled} change={data.stalled > 0 ? "atenção" : "ok"} sublabel="Há +3 dias sem avanço" animated animationDelay={0.32} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.1))} sparklineColor="var(--chart-5)" />
-        </MetricsOverview>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Corretores Ativos" value={data.activeMembers} change={`${teamPercent}%`} sublabel={`${data.teamSize} cadastrados`} animated sparklineData={data.trend.map((t, idx) => Math.round((t.leads + 1) * (0.2 + (idx % 4) * 0.05)))} sparklineColor="var(--chart-1)" />
+          <StatCard label="Leads Novos" value={data.newLeads} change={`${newPercent}% do total`} sublabel={`${data.unassigned} sem resp.`} animated animationDelay={0.08} sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-3)" />
+          <StatCard label="Em Atendimento" value={data.inContact} change={`${contactPercent}%`} sublabel={`de ${data.leadsTotal} totais`} animated animationDelay={0.16} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-4)" />
+          <StatCard label="Não Trabalhados" value={data.unworked} change={data.unworked > 0 ? "urgente" : "ok"} sublabel="Há +15min sem contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.2))} sparklineColor="var(--chart-2)" />
+          <StatCard label="Estagnados" value={data.stalled} change={data.stalled > 0 ? "atenção" : "ok"} sublabel="Há +3 dias sem avanço" animated animationDelay={0.32} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.1))} sparklineColor="var(--chart-5)" />
+        </div>
       </section>
 
       {/* Team Overview + Bottlenecks */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-4">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7" data-onboarding="manager-team-performance">
+        <Card variant="subtle" className="rounded-xl lg:col-span-4">
           <CardHeader>
             <CardTitle>Visão Geral da Equipe</CardTitle>
             <CardDescription>
@@ -666,7 +671,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-3">
+        <Card variant="subtle" className="rounded-xl lg:col-span-3">
           <CardHeader>
             <CardTitle>Alertas</CardTitle>
             <CardDescription>Pontos que precisam de ação</CardDescription>
@@ -735,7 +740,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
           className="lg:col-span-4"
         >
-          <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-xl">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -749,7 +754,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
             </CardHeader>
             <CardContent>
               <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={INITIAL_DIMENSION}>
                   <BarChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                     <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
                     <XAxis
@@ -776,14 +781,14 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}
           className="lg:col-span-3"
         >
-          <Card className="rounded-xl border-transparent bg-transparent shadow-none h-full">
+          <Card variant="subtle" className="h-full rounded-xl">
             <CardHeader>
               <CardTitle>Distribuição Operacional</CardTitle>
               <CardDescription>Status dos leads na unidade</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center">
               <div className="h-48 w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={INITIAL_DIMENSION}>
                   <PieChart>
                     <Pie
                       data={[
@@ -895,7 +900,7 @@ const activities = [
   return (
     <div className="space-y-6">
       {/* ─── ZONA 2: PLANTÃO AO VIVO ─── */}
-      <Card className="rounded-2xl border border-transparent bg-transparent p-5 shadow-none transition-all duration-200 hover:border-transparent-strong">
+      <Card variant="subtle" className="rounded-2xl transition-all duration-200 hover:border-border">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3.5">
             <Badge variant="outline" className="gap-2 rounded-full border-emerald-500/20 bg-emerald-500/10 px-3 py-1 font-mono text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
@@ -921,18 +926,18 @@ const activities = [
           <h2 className="text-sm font-bold tracking-tight">Indicadores de Desempenho Pessoal</h2>
           <p className="text-xs text-muted-foreground">Métricas da sua carteira comercial.</p>
         </div>
-        <MetricsOverview columns={4}>
-          <StatCard variant="overview" label="Leads Totais" value={data.totals.all} change="Carteira" sublabel="Atribuídos a você" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
-          <StatCard variant="overview" label="Em Atendimento" value={data.totals.active} change={`${activePercent}%`} sublabel="Leads ativos" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-3)" />
-          <StatCard variant="overview" label="Conversões" value={data.totals.converted} change="Finalizados" sublabel="Vendas concluídas" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
-          <StatCard variant="overview" label="SLA Pendente" value={data.pendingStaleness.overdueCount} change={data.pendingStaleness.overdueCount > 0 ? "Atenção" : "Ok"} sublabel="Aguardando primeiro contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.15))} sparklineColor="var(--chart-4)" />
-        </MetricsOverview>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Leads Totais" value={data.totals.all} change="Carteira" sublabel="Atribuídos a você" animated sparklineData={data.trend.map((t) => t.leads)} sparklineColor="var(--chart-1)" />
+          <StatCard label="Em Atendimento" value={data.totals.active} change={`${activePercent}%`} sublabel="Leads ativos" animated animationDelay={0.08} sparklineData={data.trend.map((t) => Math.max(0, t.leads - t.converted))} sparklineColor="var(--chart-3)" />
+          <StatCard label="Conversões" value={data.totals.converted} change="Finalizados" sublabel="Vendas concluídas" animated animationDelay={0.16} sparklineData={data.trend.map((t) => t.converted)} sparklineColor="var(--chart-5)" />
+          <StatCard label="SLA Pendente" value={data.pendingStaleness.overdueCount} change={data.pendingStaleness.overdueCount > 0 ? "Atenção" : "Ok"} sublabel="Aguardando primeiro contato" animated animationDelay={0.24} sparklineData={data.trend.map((t) => Math.round(t.leads * 0.15))} sparklineColor="var(--chart-4)" />
+        </div>
       </section>
 
       {/* ─── ZONA 4: CARTEIRA DE LEADS & EVOLUÇÃO COMERCIAL (SIDE-BY-SIDE) ─── */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
         {/* Minha Carteira de Leads (col-span-5) */}
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-5 flex flex-col justify-between">
+        <Card variant="subtle" className="rounded-xl lg:col-span-5 flex flex-col justify-between">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -970,7 +975,7 @@ const activities = [
         </Card>
 
         {/* Minha Evolução Comercial (col-span-7 - 20% maior que o do lado) */}
-        <Card className="rounded-xl border-transparent bg-transparent shadow-none lg:col-span-7 flex flex-col">
+        <Card variant="subtle" className="rounded-xl lg:col-span-7 flex flex-col">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -991,7 +996,7 @@ const activities = [
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-center">
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={INITIAL_DIMENSION}>
                 <AreaChart data={data.trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="brokerLeadsGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1083,7 +1088,12 @@ export default function NocDashboardContent(props: RoleProps) {
       <DashboardHeader
         breadcrumb={breadcrumb}
         title={title}
-        rightSlot={<NocHeaderSlot />}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <PeriodSelect value={props.period ?? DEFAULT_PERIOD} />
+            <NocHeaderSlot />
+          </div>
+        }
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         {props.role === "director" && <DirectorNocContent data={props.data} />}

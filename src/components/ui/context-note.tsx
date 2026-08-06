@@ -5,7 +5,7 @@ import { CheckCircle, InfoIcon, TriangleAlertIcon, XCircle } from "@/components/
 import { cn } from "@/lib/utils";
 
 const contextNoteVariants = cva(
-  "flex items-start gap-2.5 rounded-[min(var(--radius-md),10px)] border px-3 py-2.5 text-xs leading-5",
+  "flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-xs leading-5",
   {
     variants: {
       variant: {

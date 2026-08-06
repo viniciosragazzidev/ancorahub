@@ -28,6 +28,21 @@ O comportamento comercial do agente é um artefato imutável por tenant. O Diret
 
 ## Decididas
 
+## DEC-059 - Seletor de período 7/14/30/90 nas rotas de dados
+
+**Estado:** Aceita
+**Data:** 2026-08-03
+
+As rotas do núcleo que exibem dados temporais ganham um único seletor de período
+(7/14/30/90 dias) persistido em `?period=N`, uniformizando janeiras agregadas
+fixas (all-time, 7d, 30d, 6 meses, mês atual). Janelas operacionais (hoje/ontem,
+SLA, horário-do-dia, health de filiais) permanecem fixas. Valores fora da
+whitelist caem no fallback de 30 dias — nunca propagam input do cliente. O
+Financeiro mantém uma opção `all` (total geral) além do período numérico;
+`/leads` filtra lista e contador pela janela. Os KPIs do NOC (conversão, ticket
+médio) passam a comparar período atual vs período anterior. Todas as queries
+respeitam o escopo multi-tenant do papel.
+
 ## DEC-052 - Proteção contra saturação de conexões do banco
 
 **Estado:** Aceita
@@ -118,6 +133,13 @@ Enquanto o OAuth/Embedded Signup de Marketing não estiver liberado, cada client
 
 Lead Ads deixa de solicitar token ou identificadores técnicos ao Diretor. A plataforma exibe somente o nome do parceiro, Business ID e suporte; depois de o cliente compartilhar ativos na Meta e liberar o app Corretop API Oficial em Acesso a Leads, o servidor descobre ativos usando a credencial técnica central. O Diretor seleciona uma ou mais Páginas e elas entram na fila central do tenant. A descoberta é permitida apenas para tenants explicitamente habilitados no piloto pelo Super-admin; cada confirmação revalida a seleção contra a Meta e é auditada. WhatsApp permanece em trilha independente.
 
+## DEC-071 — Inscrição automática de Página para Meta Lead Ads
+
+**Estado:** Aceita
+**Data:** 2026-08-05
+
+Após validar que a Página foi compartilhada e ainda está visível à credencial técnica central, a ativação no AncoraHub inscreve o aplicativo Corretop API Oficial no evento `leadgen` pelo servidor. A fonte local só é criada ou reativada quando a Meta confirma a inscrição. O Diretor não recebe, informa ou visualiza token; a falha externa interrompe a ativação, preserva a configuração anterior e é apresentada sem segredos.
+
 ## Pendentes bloqueantes
 
 | ID | Decisão necessária | Impacto | Dono sugerido |
@@ -207,7 +229,7 @@ O funil de leads não tinha transições formalizadas. O seletor de status permi
 - `assumeLeadForInvestigation` continua saltando o pipeline para status `under_analysis` — é uma ação de gestão legítima.
 ## DEC-043 — Armazenamento privado dos documentos de atendimento
 
-**Estado:** Aceita
+**Estado:** Substituída por DEC-069
 **Data:** 2026-07-21
 
 Documentos de leads e clientes não serão gravados no sistema de arquivos local do deploy.
@@ -430,3 +452,39 @@ O ranking comercial usa temporadas por tenant como recorte temporal. Somente uma
 **Data:** 2026-07-29
 
 O perfil administrativo de um membro é uma visão de supervisão, não uma página pública ou uma área de autoatendimento. Diretor pode consultar qualquer membro do próprio tenant. Gestor só pode consultar membro com vínculo na própria unidade, e todas as métricas e listas do perfil recebem o mesmo filtro de unidade. A rota não distingue membro inexistente de membro fora do escopo, evitando revelar a estrutura de equipe. Cada consulta autorizada é registrada na auditoria; o Super Admin pode desativar globalmente a capacidade sem apagar histórico.
+
+## DEC-069 — Armazenamento privado unificado no Cloudflare R2
+
+**Estado:** Aceita
+**Data:** 2026-08-03
+
+O armazenamento persistido de binários do CorreTop passa a usar um único bucket privado Cloudflare R2, na classe Standard. O banco mantém a autoridade sobre metadados, vínculos e autorização; documentos são servidos somente pela rota autenticada do servidor. Como o ambiente ainda não contém objetos a preservar, o bucket Supabase Storage não terá cópia histórica. O prefixo `documents/<tenantId>/` assegura a organização física, mas não substitui a autorização derivada da sessão, tenant, unidade e carteira. A capacidade tem kill switch global `feature_r2_storage_enabled`, controlado e auditado pelo Super-admin, sem apagar objetos ou registros.
+
+## DEC-070 — Workspace do Corretor como home operacional reversível
+
+**Estado:** Aceita
+**Data:** 2026-08-03
+
+`/dashboard` permanece a única entrada por papel. Para Corretores, a capacidade
+`feature_broker_workspace_enabled` troca a visão legada pelo Workspace operacional;
+desativá-la restaura a visão anterior sem apagar dados. A prioridade é calculada no
+servidor por fatos persistidos e ordem determinística: mensagem aguardando resposta,
+SLA vencido/em risco, tarefa vencida, retorno, lead novo, cotação, documentos e
+estagnação. A central `/conversas` continua a única experiência de chat. Sem canal
+oficial disponível, o sistema não simula envio interno: mantém o fluxo auditado para
+o WhatsApp autorizado. O Super-admin controla a capacidade globalmente e cada
+alteração fica em `platform_audit_logs`.
+
+## DEC-071 — Perfil comercial PF/PJ e Kanban único
+
+**Estado:** Aceita
+**Data:** 2026-08-05
+
+O CRM mantém um único funil, com a mesma máquina de estados já aprovada. Novos
+cadastros empresariais usam `PJ`; o valor histórico `PME` continua legível e é
+agrupado como PJ. Uma empresa é sempre pertencente ao tenant, vinculada por CNPJ
+normalizado quando disponível, e não concede acesso novo a um corretor. O Kanban é
+somente uma visualização operacional desse funil: não cria etapas paralelas, não move
+uma venda manualmente para convertida e preserva as validações, timeline e auditoria
+do serviço de status existente. O Super-admin pode desligar a visualização comercial
+pela configuração global sem apagar empresas ou leads.

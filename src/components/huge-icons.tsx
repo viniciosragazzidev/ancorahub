@@ -130,6 +130,7 @@ const aliases: Record<string, string> = {
   SignOut: "Logout01Icon",
   SlidersHorizontal: "SlidersHorizontalIcon",
   SquaresFour: "DashboardSquare01Icon",
+  Sparkle: "SparklesIcon",
   SunDim: "Sun03Icon",
   Target: "Target01Icon",
   Trash: "Delete02Icon",
@@ -138,6 +139,7 @@ const aliases: Record<string, string> = {
   TriangleAlertIcon: "Alert02Icon",
   UserList: "UserListIcon",
   UserPlus: "UserAdd01Icon",
+  UserCircle: "UserCircleIcon",
   Users: "UserGroupIcon",
   UsersThree: "UserGroupIcon",
   UserSwitch: "UserSwitchIcon",
@@ -150,6 +152,7 @@ const aliases: Record<string, string> = {
   XIcon: "Cancel01Icon",
   CircleCheckIcon: "CheckmarkCircle02Icon",
   ArrowsClockwise: "RefreshIcon",
+  Redistribute: "ArrowDataTransferHorizontalIcon",
   HelpCircle: "HelpCircleIcon",
   Megaphone: "MegaphoneIcon",
   ShareAll: "ShareAllIcon",
@@ -378,6 +381,7 @@ export const TrendUp = staticAnimated("TrendUp");
 export const TriangleAlertIcon = staticAnimated("TriangleAlertIcon");
 export const UserList = staticAnimated("UserList");
 export const UserPlus = staticAnimated("UserPlus");
+export const UserCircle = staticAnimated("UserCircle");
 export const UserSwitch = staticAnimated("UserSwitch");
 export const Warning = staticAnimated("Warning");
 export const WarningCircle = staticAnimated("WarningCircle");
@@ -386,3 +390,5 @@ export const WifiHigh = staticAnimated("WifiHigh");
 
 export const Megaphone = staticAnimated("Megaphone");
 export const ShareAll = staticAnimated("ShareAll");
+export const Sparkle = staticAnimated("Sparkle");
+export const Redistribute = staticAnimated("Redistribute");

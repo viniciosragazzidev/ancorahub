@@ -7,16 +7,19 @@ import { headers } from "next/headers";
 import type { TenantRole } from "@/shared/db/schema";
 import { listEffectiveCapabilities } from "@/features/custom-roles/service";
 import type { PermissionKey } from "@/shared/auth/permissions";
+import { isUserProfileEnabled } from "@/features/user-profile/feature";
 
 const ROLE_REDIRECT: Record<TenantRole, string> = {
   director: "/dashboard",
   manager: "/dashboard",
+  supervisor: "/dashboard",
   broker: "/dashboard",
 };
 
 const ROLE_LABELS: Record<TenantRole, string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
 };
 
@@ -29,6 +32,7 @@ export type UserDisplayInfo = {
   redirectLogout: string;
   isPlatformAdmin?: boolean;
   activeRoleOverride?: string | null;
+  userProfileEnabled?: boolean;
 };
 
 export async function getRoleRedirect(): Promise<string> {
@@ -116,6 +120,7 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
   const permissions = membership
     ? await listEffectiveCapabilities({ tenantId: membership.tenantId, role: role ?? membership.role, jobTitle: jobTitle, customRoleId: membership.customRoleId })
     : [];
+  const userProfileEnabled = await isUserProfileEnabled();
 
   return {
     name: session.user.name,
@@ -126,5 +131,6 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
     redirectLogout,
     isPlatformAdmin,
     activeRoleOverride,
+    userProfileEnabled,
   };
 }

@@ -7,14 +7,16 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
+import type { TenantRole } from "@/shared/db/schema";
+
 const memberUserIdSchema = z.string().uuid();
 
-type Viewer = { role: "director" | "manager" | "broker"; branchId: string | null };
+type Viewer = { role: TenantRole; branchId: string | null };
 
-/** A manager can inspect only a member whose membership belongs to the same unit. */
+/** A manager or supervisor can inspect a member whose membership belongs to the same unit. */
 export function canViewTeamMemberProfile(viewer: Viewer, memberBranchId: string | null) {
   if (viewer.role === "director") return true;
-  return viewer.role === "manager" && viewer.branchId !== null && viewer.branchId === memberBranchId;
+  return (viewer.role === "manager" || viewer.role === "supervisor") && viewer.branchId !== null && viewer.branchId === memberBranchId;
 }
 
 export async function isTeamMemberProfileEnabled() {
@@ -26,7 +28,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
   if (!parsedUserId.success) return null;
 
   const context = await getRequiredTenantContext();
-  if (context.role !== "director" && context.role !== "manager") return null;
+  if (context.role !== "director" && context.role !== "manager" && context.role !== "supervisor") return null;
   if (!(await isTeamMemberProfileEnabled())) return null;
 
   const db = getDatabase();

@@ -10,14 +10,15 @@ import { FileArrowDown } from "@/components/huge-icons";
 import { SaleStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkExportSalesAction } from "@/features/sales/actions";
 import { formatCurrency, formatDate } from "@/features/quotes/utils";
-import { monthlyCounts, monthlySums } from "@/shared/trends";
+import { dailyCounts, dailySums } from "@/shared/trends";
+import type { PeriodValue } from "@/shared/period";
 
 type SaleRow = {
   id: string;
@@ -39,10 +40,12 @@ export function SalesWorkspace({
   sales,
   totalRevenue,
   currentRole,
+  period,
 }: {
   sales: SaleRow[];
   totalRevenue: number;
   currentRole?: string;
+  period: PeriodValue;
 }) {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "cancelled">("all");
 
@@ -86,13 +89,14 @@ export function SalesWorkspace({
       .filter((s) => s.status === "active")
       .map((s) => new Date(s.saleDate));
     return {
-      total: monthlyCounts(saleDates),
-      active: monthlyCounts(activeDates),
-      revenue: monthlySums(
+      total: dailyCounts(saleDates, period),
+      active: dailyCounts(activeDates, period),
+      revenue: dailySums(
         sales.map((s) => ({ date: new Date(s.saleDate), value: s.saleValue })),
+        period,
       ),
     };
-  }, [sales]);
+  }, [sales, period]);
 
   const columns: ColumnDef<SaleRow>[] = [
     {
@@ -125,9 +129,9 @@ export function SalesWorkspace({
         const sale = row.original;
         return (
           <div>
-            <p className="font-medium text-xs text-foreground">{sale.leadName}</p>
+            <p className="font-semibold text-xs text-foreground leading-snug">{sale.leadName}</p>
             {sale.clientName && (
-              <p className="text-[11px] text-muted-foreground">{sale.clientName}</p>
+              <p className="text-xs text-muted-foreground">{sale.clientName}</p>
             )}
           </div>
         );
@@ -138,14 +142,18 @@ export function SalesWorkspace({
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Corretor" />
       ),
-      cell: ({ row }) => row.original.brokerName ?? "—",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.brokerName ?? "—"}</span>
+      ),
     },
     {
       accessorKey: "branchName",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Filial" />
       ),
-      cell: ({ row }) => row.original.branchName ?? "—",
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.branchName ?? "—"}</span>
+      ),
     },
     {
       accessorKey: "planName",
@@ -158,7 +166,7 @@ export function SalesWorkspace({
           <div>
             <span className="text-xs text-foreground">{sale.planName ?? "—"}</span>
             {sale.carrierName && (
-              <span className="ml-1 text-[11px] text-muted-foreground">({sale.carrierName})</span>
+              <span className="ml-1 text-xs text-muted-foreground">({sale.carrierName})</span>
             )}
           </div>
         );
@@ -212,18 +220,16 @@ export function SalesWorkspace({
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <MetricsOverview columns={4}>
+      <div className="grid gap-3 sm:grid-cols-4">
         <StatCard
-          variant="overview"
           label="Total de vendas"
           value={sales.length}
-          sublabel="últimos 6 meses"
+          sublabel={`últimos ${period} dias`}
           sparklineData={salesTrend.total}
           sparklineColor="var(--chart-1)"
           animated
         />
         <StatCard
-          variant="overview"
           label="Vendas ativas"
           value={activeSales}
           sublabel="em andamento"
@@ -233,7 +239,6 @@ export function SalesWorkspace({
           animationDelay={0.06}
         />
         <StatCard
-          variant="overview"
           label="Receita total"
           value={formatCurrency(totalRevenue)}
           sublabel="acumulado no período"
@@ -243,7 +248,6 @@ export function SalesWorkspace({
           animationDelay={0.12}
         />
         <StatCard
-          variant="overview"
           label="Comissão a repassar"
           value={formatCurrency(totalRevenue)}
           sublabel="gerada nas vendas"
@@ -252,7 +256,7 @@ export function SalesWorkspace({
           animated
           animationDelay={0.18}
         />
-      </MetricsOverview>
+      </div>
 
       {/* Bulk selection toolbar */}
       <SelectionToolbar
@@ -311,16 +315,18 @@ export function SalesWorkspace({
         }
         headerSlot={
           <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "cancelled")}
-              className="h-9 rounded-md border border-input bg-background px-3 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            <AppSelect
               aria-label="Filtrar por status"
-            >
-              <option value="all">Todas as vendas</option>
-              <option value="active">Ativas</option>
-              <option value="cancelled">Canceladas</option>
-            </select>
+              size="sm"
+              className="w-40"
+              value={statusFilter}
+              onValueChange={(val) => setStatusFilter(val as "all" | "active" | "cancelled")}
+              options={[
+                { value: "all", label: "Todas as vendas" },
+                { value: "active", label: "Ativas" },
+                { value: "cancelled", label: "Canceladas" },
+              ]}
+            />
 
             <Button
               size="sm"

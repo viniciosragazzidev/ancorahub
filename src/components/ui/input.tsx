@@ -128,7 +128,7 @@ function Input({
         : { defaultValue })}
       onChange={handleChange}
       className={cn(
-        "h-10 w-full min-w-0 rounded-lg border border-border bg-input px-3 py-2 text-sm text-foreground transition-[background-color,border-color,box-shadow,opacity] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-foreground placeholder:text-muted-foreground hover:border-border-strong focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 motion-reduce:transition-none dark:bg-input dark:border-border",
+        "h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground shadow-[inset_0_1px_1px_rgb(15_23_42/0.02)] transition-[background-color,border-color,box-shadow] duration-200 ease-out outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-foreground placeholder:text-muted-foreground hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 motion-reduce:transition-none dark:bg-card dark:border-border",
         className,
       )}
       {...props}

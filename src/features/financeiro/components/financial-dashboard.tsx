@@ -24,6 +24,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import {
   Card,
   CardContent,
@@ -33,19 +34,25 @@ import {
 } from "@/components/ui/card";
 import Link from "next/link";
 import { formatCurrency, formatCurrencyCompact } from "@/features/quotes/utils";
+import type { FinanceiroPeriod } from "@/features/financeiro/queries";
 import type { FinancialDashboardData } from "@/features/financeiro/queries";
 
 type Props = {
   data: FinancialDashboardData;
   role: string;
+  period?: FinanceiroPeriod;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
 function formatMonth(month: string): string {
-  const [y, m] = month.split("-");
   const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  if (month.length === 10) {
+    const [y, m, d] = month.split("-");
+    return `${months[parseInt(m, 10) - 1]} ${d}/${y.slice(2)}`;
+  }
+  const [y, m] = month.split("-");
   return `${months[parseInt(m, 10) - 1]}/${y.slice(2)}`;
 }
 
@@ -141,9 +148,14 @@ function SummaryCard({
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export function FinancialDashboard({ data, role }: Props) {
+export function FinancialDashboard({ data, role, period = 30 }: Props) {
   const { summary, recentSales, pendingSchedules, activeGoals, monthlyTrend, chargebackQueue } =
     data;
+
+  const isAll = period === "all";
+  const trendSubtitle = isAll
+    ? "Últimos 6 meses — Receita bruta e comissões acumuladas"
+    : `Últimos ${period} dias — Receita bruta e comissões acumuladas`;
 
   const chartData = monthlyTrend.map((m) => ({
     month: formatMonth(m.month),
@@ -203,9 +215,7 @@ export function FinancialDashboard({ data, role }: Props) {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Receita vs Comissões</CardTitle>
-                  <CardDescription>
-                    Últimos 6 meses — Receita bruta e comissões acumuladas
-                  </CardDescription>
+                  <CardDescription>{trendSubtitle}</CardDescription>
                 </div>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5">
@@ -221,7 +231,7 @@ export function FinancialDashboard({ data, role }: Props) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <AreaChart
                     data={chartData}
                     margin={{ top: 4, right: 4, left: -16, bottom: 0 }}
@@ -298,7 +308,11 @@ export function FinancialDashboard({ data, role }: Props) {
           <Card className="border-transparent bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Resumo do período</CardTitle>
-              <CardDescription>Mês atual ({monthlyTrend[monthlyTrend.length - 1]?.month ?? "—"})</CardDescription>
+              <CardDescription>
+                {isAll
+                  ? "Total geral"
+                  : `Últimos ${period} dias (${monthlyTrend[monthlyTrend.length - 1]?.month ?? "—"})`}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border/40 bg-muted/20 p-4">

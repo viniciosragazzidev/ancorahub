@@ -7,7 +7,6 @@ import {
   buildMemoryContext,
   COLLECTIBLE_FIELDS,
   createEmptyMemory,
-  isCoreQualificationComplete,
   type ConversationMemory,
 } from "./memory";
 import { createSafeFallbackResponse } from "./ai-response-schema";
@@ -16,7 +15,6 @@ import {
   runGuardrailPipeline,
 } from "./guardrails";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
-import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
@@ -24,6 +22,9 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation } from "@/features/qualification-engine/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
+import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
+
 
 export type ConversationStatus =
   | "NEW"
@@ -35,7 +36,38 @@ export type ConversationStatus =
   | "CLOSED"
   | "FAILED";
 
-type AiTransport = "meta" | "openwa";
+type AiTransport = "meta" | "openwa" | "waha";
+
+type AiMessage = { role: "user" | "assistant"; content: string };
+
+/**
+ * Decisão pura do reset de memória por mensagem.
+ *
+ * Quando o modo é "before_each_message", o agente responde do zero:
+ * a memória base é zerada (createEmptyMemory) e o contexto enviado à IA
+ * contém apenas a mensagem atual (sem histórico).
+ *
+ * Em qualquer outro modo (before_each_session, never, manual), preserva-se
+ * a memória armazenada e o histórico formatado.
+ */
+export function resolveMemoryResetContext(input: {
+  resetMode: string | undefined;
+  storedMemory: ConversationMemory | null;
+  formattedHistory: AiMessage[];
+  currentMessage: string;
+  historyAlreadyContainsCurrentMessage: boolean;
+}): { resetMemoryEachMessage: boolean; baseMemory: ConversationMemory; aiMessages: AiMessage[] } {
+  const resetMemoryEachMessage = (input.resetMode ?? "before_each_session") === "before_each_message";
+  const baseMemory: ConversationMemory = resetMemoryEachMessage
+    ? createEmptyMemory()
+    : input.storedMemory ?? createEmptyMemory();
+  const aiMessages: AiMessage[] = resetMemoryEachMessage
+    ? [{ role: "user", content: input.currentMessage }]
+    : input.historyAlreadyContainsCurrentMessage
+      ? input.formattedHistory
+      : [...input.formattedHistory, { role: "user", content: input.currentMessage }];
+  return { resetMemoryEachMessage, baseMemory, aiMessages };
+}
 
 async function sendAiOutbound(input: {
   tenantId: string;
@@ -43,11 +75,17 @@ async function sendAiOutbound(input: {
   body: string;
   transport: AiTransport;
   openWaSessionId?: string | null;
+  wahaRunId?: string | null;
 }) {
   if (input.transport === "openwa") {
     if (!input.openWaSessionId) return { status: "failed" as const, messageId: null };
     const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
     return { status: "sent" as const, messageId: sent.messageId ?? null };
+  }
+  if (input.transport === "waha") {
+    if (!input.wahaRunId) return { status: "failed" as const, messageId: null };
+    const messageId = await enqueueWahaAiReply({ tenantId: input.tenantId, runId: input.wahaRunId, body: input.body });
+    return { status: "sent" as const, messageId };
   }
   const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
   if (!channel) return { status: "skipped_no_channel" as const, messageId: null };
@@ -146,6 +184,13 @@ async function _runEnsure() {
     sql`CREATE INDEX IF NOT EXISTS ai_quick_reply_events_tenant_created_idx ON ai_quick_reply_events (tenant_id, created_at)`,
     sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS qualification_status text NOT NULL DEFAULT 'pending'`,
     sql`ALTER TYPE availability_status ADD VALUE IF NOT EXISTS 'offline'`,
+    sql`CREATE TABLE IF NOT EXISTS ai_qualification_followup_rules (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, name text NOT NULL, enabled boolean NOT NULL DEFAULT true, trigger text NOT NULL, delay_minutes integer NOT NULL DEFAULT 120, max_attempts integer NOT NULL DEFAULT 3, minimum_interval_minutes integer NOT NULL DEFAULT 60, allowed_days jsonb NOT NULL DEFAULT '[1,2,3,4,5]', allowed_start_time text NOT NULL DEFAULT '08:00', allowed_end_time text NOT NULL DEFAULT '18:00', timezone text NOT NULL DEFAULT 'America/Sao_Paulo', message_mode text NOT NULL DEFAULT 'fixed', fixed_message text, template_id text, stop_conditions jsonb NOT NULL DEFAULT '["client_responded","human_taken","lead_closed","sale_completed","opt_out"]', destination_status text, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS ai_qualification_tool_permissions (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, tool_name text NOT NULL, category text NOT NULL, permission text NOT NULL DEFAULT 'allowed', allowed_stage_transitions jsonb, max_calls_per_session integer NOT NULL DEFAULT 10, requires_human_confirmation boolean NOT NULL DEFAULT false, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS ai_qualification_destination_rules (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, temperature_class text NOT NULL, destination_type text NOT NULL, destination_target_id text, priority text NOT NULL DEFAULT 'normal', sla_minutes integer NOT NULL DEFAULT 15, fallback_destination_type text NOT NULL DEFAULT 'manager', criteria_conditions jsonb, sort_order integer NOT NULL DEFAULT 0, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS broker_eligibility_profiles (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, user_id text NOT NULL, allowed_lead_types jsonb NOT NULL DEFAULT '["hot","warm","cold"]', specialties jsonb NOT NULL DEFAULT '["individual","familiar","empresarial","pme"]', operators jsonb NOT NULL DEFAULT '["unimed","hapvida"]', max_simultaneous_capacity integer NOT NULL DEFAULT 15, daily_limit integer NOT NULL DEFAULT 40, participates_in_duty boolean NOT NULL DEFAULT true, receives_off_hours boolean NOT NULL DEFAULT false, active boolean NOT NULL DEFAULT true, paused boolean NOT NULL DEFAULT false, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS ai_qualification_closing_states (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, session_id text NOT NULL, lead_id text, qualification_completed_at timestamp WITH TIME ZONE, closing_message_queued_at timestamp WITH TIME ZONE, closing_message_sent_at timestamp WITH TIME ZONE, closing_message_id text, closing_message_status text NOT NULL DEFAULT 'pending', distribution_executed_at timestamp WITH TIME ZONE, handoff_created_at timestamp WITH TIME ZONE, post_closing_notice_sent_at timestamp WITH TIME ZONE, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS ai_qualification_system_messages (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, category text NOT NULL, message_text text NOT NULL, template_id text, variables jsonb, active boolean NOT NULL DEFAULT true, created_at timestamp WITH TIME ZONE DEFAULT now(), updated_at timestamp WITH TIME ZONE DEFAULT now())`,
+    sql`CREATE TABLE IF NOT EXISTS ai_qualification_alerts (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL, alert_type text NOT NULL, level text NOT NULL DEFAULT 'warning', status text NOT NULL DEFAULT 'active', message text NOT NULL, suggested_action text, created_at timestamp WITH TIME ZONE DEFAULT now(), resolved_at timestamp WITH TIME ZONE, resolved_by text)`,
   ];
 
   for (const stmt of stmts) {
@@ -307,6 +352,7 @@ export async function processInboundAiResponse({
   whatsappMessageId,
   transport = "meta",
   openWaSessionId,
+  wahaRunId,
 }: {
   tenantId: string;
   leadId: string;
@@ -318,6 +364,7 @@ export async function processInboundAiResponse({
   whatsappMessageId?: string | null;
   transport?: AiTransport;
   openWaSessionId?: string | null;
+  wahaRunId?: string | null;
 }) {
   const db = getDatabase();
 
@@ -362,6 +409,18 @@ export async function processInboundAiResponse({
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
     console.log(`[ai-agent] Conversa ${conversation.id} está ${conversation.status}. IA não responde.`);
+    const postClosingResult = await handlePostClosingInboundMessage(tenantId, conversation.id);
+    if (postClosingResult.noticeSent && postClosingResult.messageText) {
+      await sendAiOutbound({
+        tenantId,
+        phone,
+        body: postClosingResult.messageText,
+        transport,
+        openWaSessionId,
+        wahaRunId,
+      });
+      return { status: "sent_post_closing_notice" };
+    }
     return { status: `ignored_${conversation.status}` };
   }
 
@@ -435,7 +494,16 @@ export async function processInboundAiResponse({
   const historyAlreadyContainsCurrentMessage = Boolean(sourceIdentifier) && pastMessages.some((message) => message.messageId === sourceIdentifier);
 
   // 5. Quick Reply gate: deterministic, tenant-template based, and before AI.
-  const currentMemory: ConversationMemory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
+  // Reset de memória geral: se ai_memory_reset_mode === "before_each_message", o agente
+  // responde do zero a cada mensagem (memória zerada + apenas a mensagem atual no contexto).
+  const memoryResetMode = (await getSystemSetting("ai_memory_reset_mode")) ?? "before_each_session";
+  const { baseMemory: currentMemory, aiMessages } = resolveMemoryResetContext({
+    resetMode: memoryResetMode,
+    storedMemory: conversation.memory as ConversationMemory | null,
+    formattedHistory,
+    currentMessage: userMessageBody,
+    historyAlreadyContainsCurrentMessage,
+  });
   const hasPriorMessages = pastMessages.some((message) => !sourceIdentifier || message.messageId !== sourceIdentifier);
   const automationState: ConversationAutomationState = conversation.status === "HUMAN_ACTIVE" ? "HUMAN_IN_PROGRESS" : conversation.status === "WAITING_HUMAN" ? "WAITING_HUMAN" : "AI_ACTIVE";
   const quickReplyEnabled = (await getSystemSetting("feature_ai_quick_reply_enabled")) !== "false";
@@ -459,7 +527,7 @@ export async function processInboundAiResponse({
       messageId = `quick_reply_${crypto.randomUUID()}`;
       await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: template.body, sentAt: now });
       try {
-        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId });
+        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId, wahaRunId });
         deliveryStatus = sent.status;
         if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       } catch (error) {
@@ -498,8 +566,12 @@ export async function processInboundAiResponse({
   const memoryContext = buildMemoryContext(updatedMemory);
   const qualification = evaluateQualification(updatedMemory, behavior.policy);
 
+  // 6b. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
+  const tenantConfig = await loadTenantAiAgentConfig(tenantId);
+
   if (detectHumanTransferRequest(userMessageBody)) {
-    const handoffMessage = "Claro. Vou encaminhar seu atendimento para um corretor da equipe agora.";
+    const handoffMessage = tenantConfig.handoffMessage
+      || "Claro. Vou encaminhar seu atendimento para um corretor da equipe agora.";
     const messageId = `ai_msg_handoff_${crypto.randomUUID()}`;
     await db.insert(schema.whatsappMessages).values({
       id: messageId,
@@ -516,7 +588,7 @@ export async function processInboundAiResponse({
     });
     let deliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId, wahaRunId });
       deliveryStatus = sent.status;
       if (sent.messageId) {
         await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId })
@@ -534,11 +606,17 @@ export async function processInboundAiResponse({
     return { status: "transferred_to_human", deliveryStatus, reply: handoffMessage };
   }
 
+  // 6c. IA desativada para o tenant: silêncio. Pedidos explícitos de humano
+  // (bloco acima) são sempre honrados, mesmo com a IA desligada.
+  if (!tenantConfig.enabled) {
+    console.info("[ai-wpp] ai_disabled_by_tenant", { tenantId, leadId });
+    return { status: "ignored_ai_disabled" };
+  }
+
   // 7. Detectar idioma da mensagem do usuário
   const detectedLanguage = detectLanguage(userMessageBody);
 
-  // 7b. Carregar configurações do tenant
-  const tenantConfig = await loadTenantAiAgentConfig(tenantId);
+  // 7b. tenantConfig já carregado no step 6b
 
   // 7c. Buscar nome do tenant para personalizar o prompt
   const [tenantInfo] = await db
@@ -548,11 +626,12 @@ export async function processInboundAiResponse({
     .limit(1);
 
   // 8. Chamar gerador de resposta da IA com contexto de memória + configs tenant
+  // No modo de reset por mensagem, o contexto enviado à IA contém apenas a mensagem atual.
   const aiResult = await generateAiResponse({
     tenantId,
     leadName: lead?.nome,
     leadType: lead?.tipo,
-    messages: historyAlreadyContainsCurrentMessage ? formattedHistory : [...formattedHistory, { role: "user", content: userMessageBody }],
+    messages: aiMessages,
     preferredLanguage: detectedLanguage,
     memoryContext,
     tenantConfig,
@@ -563,7 +642,8 @@ export async function processInboundAiResponse({
   // handoff is deterministic so an incorrect model question cannot reopen the
   // questionnaire after the e-mail was received.
   if (qualification.missingFields.length === 0) {
-    const handoffMessage = "Obrigado! Já tenho os dados necessários. Vou encaminhar seu atendimento para um corretor da equipe agora.";
+    const handoffMessage = tenantConfig.handoffMessage
+      || "Obrigado! Já tenho os dados necessários. Vou encaminhar seu atendimento para um corretor da equipe agora.";
     aiResult.content = handoffMessage;
     aiResult.shouldTransferToHuman = true;
     aiResult.transferReason = "Qualificação concluída";
@@ -612,7 +692,7 @@ export async function processInboundAiResponse({
 
     // 2. Send fallback message to WhatsApp
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId, wahaRunId });
       if (sent.status === "sent") {
         console.info("[ai-wpp] fallback.sent", { tenantId, leadId, phone });
       } else {
@@ -689,7 +769,7 @@ export async function processInboundAiResponse({
 
     let fallbackDeliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId, wahaRunId });
       if (sent.status === "sent") {
         await db.update(schema.whatsappMessages)
           .set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
@@ -900,7 +980,7 @@ export async function processInboundAiResponse({
   // 8. Tentar enviar mensagem de saída pelo provedor da Meta se canal ativo
   let deliveryStatus = "failed";
   try {
-    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId });
+    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId });
     if (sent.status === "sent") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       deliveryStatus = "sent";

@@ -1,4 +1,4 @@
-export type GuideRole = "director" | "manager" | "broker";
+export type GuideRole = "director" | "manager" | "supervisor" | "broker";
 
 export type GuideSection = {
   id: string;
@@ -208,5 +208,6 @@ export const guideSections: GuideSection[] = [
 export const guideRoleLabels: Record<GuideRole, string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
 };

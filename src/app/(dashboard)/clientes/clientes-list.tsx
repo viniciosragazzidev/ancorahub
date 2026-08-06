@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { OwnershipContext } from "@/components/ownership-context";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { StatCard } from "@/components/dashboard/metric-card";
-import { MetricsOverview } from "@/components/dashboard/metrics-overview";
 
 /* ─── Types ─── */
 
@@ -50,7 +49,7 @@ export const columns: ColumnDef<ClientItem>[] = [
           <UserAvatar seed={client.email || client.name} name={client.name} size="sm" className="size-8" />
           <div>
             <p className="text-xs font-semibold text-foreground leading-snug">{client.name}</p>
-            <Badge variant="outline" className="text-[9px] px-1 py-0 font-medium text-muted-foreground mt-0.5">
+            <Badge variant="outline" className="text-[10px] px-1 py-0 font-medium text-muted-foreground mt-0.5">
               Cliente Ativo
             </Badge>
           </div>
@@ -67,7 +66,7 @@ export const columns: ColumnDef<ClientItem>[] = [
       const client = row.original;
       return (
         <div className="flex flex-col text-xs text-muted-foreground">
-          {client.email && <span className="font-mono text-foreground/80 truncate max-w-[220px]">{client.email}</span>}
+          {client.email && <span className="font-mono text-muted-foreground truncate max-w-[220px]">{client.email}</span>}
           <span className="font-mono">{client.phone}</span>
         </div>
       );
@@ -130,37 +129,39 @@ export const columns: ColumnDef<ClientItem>[] = [
 export function ClientesList({
   clients,
   metrics,
+  period,
 }: {
   clients: ClientItem[];
   metrics: ClientsMetrics;
+  period: number;
 }) {
   const conversionTrend = clients.reduce<number[]>((acc, client) => {
     const convertedAt = new Date(client.convertedAt).getTime();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    for (let index = 0; index < 7; index += 1) {
+    for (let index = 0; index < period; index += 1) {
       const date = new Date(today);
-      date.setDate(today.getDate() - (6 - index));
+      date.setDate(today.getDate() - (period - 1 - index));
       const dayStart = date.getTime();
       const dayEnd = dayStart + 24 * 60 * 60 * 1000;
       if (convertedAt >= dayStart && convertedAt < dayEnd) acc[index] += 1;
     }
 
     return acc;
-  }, Array.from({ length: 7 }, () => 0));
+  }, Array.from({ length: period }, () => 0));
 
   return (
     <div className="flex flex-col gap-6">
-      <MetricsOverview columns={4}>
-        <StatCard variant="overview" label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos 30 dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
-        <StatCard variant="overview" label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
-        <StatCard variant="overview" label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
-        <StatCard variant="overview" label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={conversionTrend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" />
-      </MetricsOverview>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos ${period} dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
+        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
+        <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
+        <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={conversionTrend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" />
+      </div>
 
       {/* Container de Tabela - Padrão /equipe */}
-      <Card variant="overview" className="overflow-hidden">
+      <Card className="border-transparent bg-transparent shadow-none">
         <CardHeader className="border-b border-border/50 p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>

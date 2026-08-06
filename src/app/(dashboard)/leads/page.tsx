@@ -20,6 +20,8 @@ import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { redirect } from "next/navigation";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
+import { parsePeriod, periodStart } from "@/shared/period";
+import { PeriodSelect } from "@/components/period-select";
 
 export default async function LeadsPage({
   searchParams,
@@ -36,6 +38,7 @@ export default async function LeadsPage({
     corretor?: string;
     page?: string;
     pageSize?: string;
+    period?: string;
   }>;
 }) {
   const context = await getRequiredTenantContext();
@@ -52,6 +55,7 @@ export default async function LeadsPage({
 
   const filters = await searchParams;
   const db = getDatabase();
+  const period = parsePeriod(filters.period);
 
   // Pagination parameters
   const pageParam = parseInt(filters.page ?? "1", 10);
@@ -140,13 +144,20 @@ export default async function LeadsPage({
     ? eq(schema.leads.branchId, filters.branch)
     : null;
 
-  const tipoFilter = filters.tipo === "PF" || filters.tipo === "PME" ? eq(schema.leads.tipo, filters.tipo) : null;
+  const tipoFilter = filters.tipo === "PF"
+    ? eq(schema.leads.tipo, "PF")
+    : filters.tipo === "PJ"
+      ? inArray(schema.leads.tipo, ["PJ", "PME"])
+      : filters.tipo === "PME"
+        ? eq(schema.leads.tipo, "PME")
+        : null;
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
 
   const where = and(
     eq(schema.leads.tenantId, context.tenantId),
+    gte(schema.leads.createdAt, periodStart(period)),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
     ...(branchFilter ? [branchFilter] : []),
@@ -276,6 +287,7 @@ export default async function LeadsPage({
         title="Leads"
         rightSlot={
           <div className="flex items-center gap-2">
+            <PeriodSelect value={period} />
             <NextUrgentLeadButton />
             <BulkLeadImportDialog branches={branches} role={context.role} jobTitle={context.jobTitle} branchId={context.branchId} />
             <ManualLeadSheet initiallyOpen={filters.new === "1"} plans={plans} />

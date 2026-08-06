@@ -25,6 +25,7 @@ export async function updateSystemSettingsAction(formData: FormData) {
   }
 
   const enabledStr = formData.get("centralAtencaoEnabled");
+  const commercialWorkspaceEnabledStr = formData.get("commercialWorkspaceEnabled");
   const stagnantDaysStr = formData.get("stagnantDays");
 
   const enabled = enabledStr === "true" ? "true" : "false";
@@ -32,6 +33,7 @@ export async function updateSystemSettingsAction(formData: FormData) {
   const stagnantDaysVal = isNaN(stagnantDays) || stagnantDays < 1 ? "3" : stagnantDays.toString();
 
   await setSetting("feature_central_atencao_enabled", enabled);
+  await setSetting("feature_commercial_workspace_enabled", commercialWorkspaceEnabledStr === "false" ? "false" : "true");
   await setSetting("feature_central_atencao_stagnant_days", stagnantDaysVal);
 
   // Log in platform audit logs
@@ -44,6 +46,7 @@ export async function updateSystemSettingsAction(formData: FormData) {
     targetId: "central_atencao",
     metadata: {
       enabled,
+      commercialWorkspaceEnabled: commercialWorkspaceEnabledStr === "false" ? "false" : "true",
       stagnantDays: stagnantDaysVal,
     },
     createdAt: new Date(),

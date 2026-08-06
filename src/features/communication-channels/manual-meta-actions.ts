@@ -7,13 +7,14 @@ import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { discoverMetaLeadAdsAssets, getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
+import { discoverMetaLeadAdsAssets, getMetaBusiness, getMetaPhoneNumber, getMetaWaba, getMetaWabaPhoneNumbers, subscribePageToLeadgen, subscribeWabaToApp, validateMetaMarketingResource } from "./meta-cloud-client";
 import { getMetaCloudServerConfig, getMetaLeadAdsConfigurationState } from "./meta-cloud-config";
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER } from "./types";
 import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
 import { configureMetaLeadAdsSource, isMetaLeadAdsEnabled, pauseMetaLeadAdsSource } from "./meta-lead-ads";
+import { ensureMetaLeadAdsSchema } from "./manual-meta-queries";
 
 export type MetaLeadAdsDiscoveryState = {
   error?: string;
@@ -286,7 +287,15 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
     throw new Error("Um dos ativos selecionados não está autorizado para a plataforma. Busque novamente antes de confirmar.");
   }
   const db = getDatabase();
-  for (const pageId of [...new Set(selected.pageIds)]) {
+  const pageIds = [...new Set(selected.pageIds)];
+  for (const pageId of pageIds) {
+    try {
+      await subscribePageToLeadgen(pageId);
+    } catch (err) {
+      console.warn(`[confirmManualMetaLeadAdsAssetsAction] Warning subscribing page ${pageId}:`, err);
+    }
+  }
+  for (const pageId of pageIds) {
     await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId, adAccountId: selected.adAccountId || null, actorUserId: context.userId });
   }
   const now = new Date();
@@ -300,9 +309,66 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
 }
 
 export async function pauseManualMetaLeadAdsSourceAction(formData: FormData) {
-  const context = await requireManualMetaAccess();
+  const context = await requireLeadAdsAccess();
   const sourceId = String(formData.get("sourceId") ?? "").trim();
   if (!sourceId) throw new Error("Fonte de captação inválida.");
   await pauseMetaLeadAdsSource({ tenantId: context.tenantId, sourceId, actorUserId: context.userId });
   revalidatePath("/settings/meta");
+}
+
+export async function reactivateManualMetaLeadAdsSourceAction(formData: FormData) {
+  const context = await requireLeadAdsAccess();
+  const pageId = String(formData.get("pageId") ?? "").trim();
+  if (!pageId) throw new Error("Página inválida.");
+  try {
+    await subscribePageToLeadgen(pageId);
+  } catch (err) {
+    console.warn(`[reactivateManualMetaLeadAdsSourceAction] Warning subscribing page ${pageId}:`, err);
+  }
+  await configureMetaLeadAdsSource({
+    tenantId: context.tenantId,
+    branchId: null,
+    pageId,
+    adAccountId: null,
+    actorUserId: context.userId,
+  });
+  revalidatePath("/settings/meta");
+}
+
+export async function updateMetaLeadAdSourceDistributionAction(input: {
+  sourceId: string;
+  distributionMode: "direct_leads" | "duty_plantao" | "unit_branch";
+  branchId?: string | null;
+}) {
+  await ensureMetaLeadAdsSchema();
+  const context = await requireLeadAdsAccess();
+  const db = getDatabase();
+  const [source] = await db
+    .select({ id: schema.metaLeadAdSources.id })
+    .from(schema.metaLeadAdSources)
+    .where(and(eq(schema.metaLeadAdSources.id, input.sourceId), eq(schema.metaLeadAdSources.tenantId, context.tenantId)))
+    .limit(1);
+
+  if (!source) throw new Error("Fonte de Lead Ads não encontrada.");
+
+  await db
+    .update(schema.metaLeadAdSources)
+    .set({
+      distributionMode: input.distributionMode,
+      branchId: input.branchId ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.metaLeadAdSources.id, source.id));
+
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "meta_lead_ads_source",
+    entidadeId: source.id,
+    acao: "meta_lead_ads.distribution_updated",
+  });
+
+  revalidatePath("/settings/meta");
+  revalidatePath("/leads/distribuicao");
+  return { success: true };
 }

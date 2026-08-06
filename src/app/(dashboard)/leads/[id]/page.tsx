@@ -84,6 +84,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       branchId: schema.leads.branchId,
       planId: schema.leads.planId,
       motivoPerda: schema.leads.motivoPerda,
+      lossCategory: schema.leads.lossCategory,
+      slaBreachedAt: schema.leads.slaBreachedAt,
+      firstContactLatencySeconds: schema.leads.firstContactLatencySeconds,
       consentimentoLgpd: schema.leads.consentimentoLgpd,
       createdAt: schema.leads.createdAt,
       assignedAt: schema.leads.assignedAt,
@@ -157,7 +160,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
 
         {/* Profile Cover & Header Card */}
-        <div className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-none sm:px-5">
+        <div className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-none sm:px-5" data-onboarding="lead-profile">
           {/* Subtle brand color cover warning */}
           <div className="hidden" />
 
@@ -210,6 +213,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
         </div>
+
+        {/* SLA Diagnostic & Loss Audit Card */}
+        {lead.status === "lost" || lead.lossCategory ? (
+          <Card className="border-destructive/30 bg-destructive/5 shadow-none">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">
+                  {lead.lossCategory === "unattended_sla"
+                    ? "Estouro de SLA"
+                    : lead.lossCategory === "response_delay"
+                    ? "Atraso no Atendimento"
+                    : "Lead Perdido"}
+                </Badge>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  {lead.lossCategory === "unattended_sla"
+                    ? "Perda por Falta de Atendimento (SLA Expirado)"
+                    : lead.lossCategory === "response_delay"
+                    ? "Perda por Demora de Resposta"
+                    : "Lead Encerrado sem Venda"}
+                </CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                {lead.motivoPerda ? `Motivo: ${lead.motivoPerda}` : "Atendimento não iniciado a tempo ou sem resposta oportuna ao cliente."}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : null}
 
         {/* Main operational area */}
         <div className="min-w-0 space-y-5">
@@ -396,7 +426,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </TabsContent>
 
             <TabsContent value="history" className="mt-4">
-              <Card className="border-border bg-card shadow-sm">
+              <Card className="border-border bg-card shadow-sm" data-onboarding="lead-timeline">
                 <CardContent className="pt-6">
                   <LeadTimeline leadId={lead.id} interactions={interactions} />
                 </CardContent>
@@ -404,7 +434,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </TabsContent>
 
             <TabsContent value="tasks" className="mt-4" id="tarefas">
-              <Card className="border-border bg-card shadow-sm">
+              <Card className="border-border bg-card shadow-sm" data-onboarding="create-follow-up">
                 <CardContent className="pt-6">
                   <LeadTasks assignees={context.role === "broker" ? [{ id: context.userId, name: lead.corretorNome ?? "Eu" }] : brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />
                 </CardContent>

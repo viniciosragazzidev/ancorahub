@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
+import { INITIAL_DIMENSION } from "@/components/ui/chart"
 import { ShimmerSkeleton } from "@/components/unlumen-ui/shimmer-skeleton"
 
 type FunnelDatum = { stage: string; volume: number }
@@ -17,7 +18,7 @@ export function FunnelChart({ data }: { data: FunnelDatum[] }) {
   if (!isHydrated) return <ShimmerSkeleton className="h-72" rounded="lg" />
 
   return (
-    <ResponsiveContainer height="100%" minHeight={288} minWidth={0} width="100%">
+    <ResponsiveContainer height="100%" minHeight={288} minWidth={0} initialDimension={INITIAL_DIMENSION} width="100%">
       <BarChart data={data} margin={{ top: 4, right: 2, left: -20, bottom: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
         <XAxis axisLine={false} dataKey="stage" tick={{ fill: "var(--muted-foreground)", fontSize: 12 }} tickLine={false} />

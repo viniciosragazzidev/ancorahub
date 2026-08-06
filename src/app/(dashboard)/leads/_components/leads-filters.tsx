@@ -189,7 +189,7 @@ export function LeadsFilters({
                     {[
                       { label: "Todos", val: "" },
                       { label: "PF", val: "PF" },
-                      { label: "PME", val: "PME" },
+                      { label: "PJ", val: "PJ" },
                     ].map((opt) => (
                       <button
                         key={opt.label}
@@ -423,7 +423,7 @@ export function LeadsFilters({
           )}
           {tipo && (
             <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Tipo: {tipo}
+              Tipo: {tipo === "PME" ? "PJ" : tipo}
             </Badge>
           )}
           {origem && (
@@ -456,5 +456,4 @@ export function LeadsFilters({
     </div>
   );
 }
-
 

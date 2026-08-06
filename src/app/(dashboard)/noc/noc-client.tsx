@@ -43,6 +43,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { ChartLineUp, SlidersHorizontal } from "@/components/huge-icons";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import { formatCurrency } from "@/features/quotes/utils";
 import type { NocData } from "@/features/noc/queries";
 import { NocHeatmap } from "@/features/noc/components/noc-heatmap";
@@ -137,7 +138,7 @@ function BranchHealthTable({ branches }: { branches: NocData["branchHealth"] }) 
     : branches;
 
   return (
-    <Card className="overflow-hidden rounded-xl border-transparent bg-transparent shadow-none">
+    <Card className="overflow-hidden">
       <CardHeader className="gap-4 border-b border-border/60 pb-4 md:flex-row md:items-end md:justify-between">
         <div>
           <CardTitle>Saúde das unidades</CardTitle>
@@ -253,7 +254,7 @@ export function NocClient({ data }: NocClientProps) {
       value: `${kpis.conversionRateMonth}%`,
       change: formatDelta(kpis.conversionRateMonth - kpis.conversionRateLastMonth, "pp"),
       trend: kpis.conversionRateMonth >= kpis.conversionRateLastMonth ? "up" as const : "down" as const,
-      description: `Mês anterior: ${kpis.conversionRateLastMonth}%`,
+      description: `Período anterior: ${kpis.conversionRateLastMonth}%`,
       sparklineData: leadFlow.map((day) => day.conversoes),
       sparklineColor: "var(--chart-5)",
     },
@@ -271,7 +272,7 @@ export function NocClient({ data }: NocClientProps) {
       value: formatCurrency(kpis.avgTicketMonth, { maximumFractionDigits: 0 }),
       change: formatDelta(ticketDelta),
       trend: ticketDelta >= 0 ? "up" as const : "down" as const,
-      description: `Mês anterior: ${formatCurrency(kpis.avgTicketLastMonth, { maximumFractionDigits: 0 })}`,
+      description: `Período anterior: ${formatCurrency(kpis.avgTicketLastMonth, { maximumFractionDigits: 0 })}`,
       sparklineData: ticketTrend,
       sparklineColor: "var(--chart-2)",
     },
@@ -338,7 +339,7 @@ export function NocClient({ data }: NocClientProps) {
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Lead Flow Area Chart */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}>
-          <Card className="min-w-0 rounded-xl border-transparent bg-transparent shadow-none">
+          <Card className="min-w-0">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -363,7 +364,7 @@ export function NocClient({ data }: NocClientProps) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <AreaChart data={leadFlow} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <defs>
                       <linearGradient id="leadsGradient" x1="0" x2="0" y1="0" y2="1">
@@ -395,7 +396,7 @@ export function NocClient({ data }: NocClientProps) {
 
         {/* Status Distribution Pie */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}>
-          <Card className="min-w-0 rounded-xl border-transparent bg-transparent shadow-none">
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Distribuição por Status</CardTitle>
               <CardDescription>Leads por etapa nos últimos 30 dias</CardDescription>
@@ -406,7 +407,7 @@ export function NocClient({ data }: NocClientProps) {
               ) : (
                 <>
                   <div className="flex h-64 items-center justify-center">
-                    <ResponsiveContainer height="100%" width="100%">
+                    <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                       <PieChart>
                         <Pie
                           cx="50%"
@@ -455,14 +456,14 @@ export function NocClient({ data }: NocClientProps) {
       <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {/* Hourly Activity */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}>
-          <Card className="min-w-0 rounded-xl border-transparent bg-transparent shadow-none">
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Atividade Hoje</CardTitle>
               <CardDescription>Leads recebidos e contatos por hora</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-56">
-                <ResponsiveContainer height="100%" width="100%">
+                <ResponsiveContainer height="100%" width="100%" initialDimension={INITIAL_DIMENSION}>
                   <BarChart data={hourlyActivity} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
                     <XAxis axisLine={false} dataKey="hora" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} />
@@ -479,7 +480,7 @@ export function NocClient({ data }: NocClientProps) {
         </motion.div>
 
         {/* Team Performance */}
-        <Card className="min-w-0 rounded-xl border-transparent bg-transparent shadow-none">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Desempenho da Equipe</CardTitle>
             <CardDescription>Corretores — leads e conversões hoje</CardDescription>
@@ -522,7 +523,7 @@ export function NocClient({ data }: NocClientProps) {
         </Card>
 
         {/* System Health (static) */}
-        <Card className="min-w-0 rounded-xl border-transparent bg-transparent shadow-none">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Status dos Serviços</CardTitle>
             <CardDescription>Saúde atual da infraestrutura</CardDescription>
@@ -560,7 +561,7 @@ export function NocClient({ data }: NocClientProps) {
       </section>
 
       {/* Recent Activity Feed */}
-      <Card className="rounded-xl border-transparent bg-transparent shadow-none">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>

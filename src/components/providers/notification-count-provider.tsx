@@ -43,18 +43,28 @@ export function NotificationCountProvider({
         if (!cancelled && typeof data.count === "number") {
           setUnreadCount(data.count);
         }
-      } catch {
+      } catch (err: unknown) {
+        if (
+          (err instanceof Error && err.name === "AbortError") ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
+          return;
+        }
         // Silently fail — subscription will catch updates
-      } finally {
-        // Initial fetch complete
       }
     };
 
-    fetchInitial();
+    void fetchInitial();
 
     return () => {
       cancelled = true;
-      controller.abort();
+      if (!controller.signal.aborted) {
+        try {
+          controller.abort("component_unmounted");
+        } catch {
+          // ignore
+        }
+      }
     };
   }, []);
 

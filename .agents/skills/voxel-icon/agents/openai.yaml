@@ -1,0 +1,4 @@
+interface:
+  display_name: "Voxel Icon"
+  short_description: "Create still voxel icons and four-frame loops"
+  default_prompt: "Use $voxel-icon to create a native-color isometric voxel icon, using a four-frame loop only when I explicitly request motion."

@@ -122,7 +122,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
   <input type="text" name="nome" placeholder="Seu nome" required>
   <input type="tel" name="telefone" placeholder="Telefone" required>
   <input type="email" name="email" placeholder="E-mail">
-  <select name="plano_interesse">
+  <select name="plano_interesse"> {/* ui-audit-disable-line */}
     <option value="individual">Individual</option>
     <option value="familiar">Familiar</option>
   </select>

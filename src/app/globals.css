@@ -51,39 +51,39 @@
 :root {
   color-scheme: light;
   /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
-  --surface-base: oklch(0.992 0.002 95);
+  --surface-base: oklch(0.985 0.001 260);
   /* Lvl 0: Base Canvas (#f5f5f3) */
   --surface-card: oklch(1 0 0);
   /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: oklch(0.970 0.003 95);
+  --surface-secondary: oklch(0.970 0.002 260);
   /* Lvl 2: Recessed / Input (#eeeee9) */
   --surface-elevated: oklch(1.000 0 0);
   /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
-  --background: oklch(0.992 0.002 95);
-  --foreground: oklch(0.180 0.005 95);
+  --background: oklch(0.985 0.001 260);
+  --foreground: oklch(0.170 0.012 260);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.180 0.005 95);
+  --card-foreground: oklch(0.170 0.012 260);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.180 0.005 95);
+  --popover-foreground: oklch(0.170 0.012 260);
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca ─────────────────────── */
-  --primary: oklch(0.180 0.005 95);
-  --primary-foreground: oklch(0.985 0.002 95);
+  --primary: oklch(0.560 0.190 255);
+  --primary-foreground: oklch(0.990 0 0);
 
-  --secondary: oklch(0.970 0.003 95);
-  --secondary-foreground: oklch(0.180 0.005 95);
+  --secondary: oklch(0.965 0.003 260);
+  --secondary-foreground: oklch(0.220 0.012 260);
 
-  --accent: oklch(0.620 0.165 155);
+  --accent: oklch(0.955 0.024 255);
   /* Ramp Esmeralda da Marca (#15A46B) */
-  --accent-foreground: oklch(0.990 0 0);
+  --accent-foreground: oklch(0.420 0.150 255);
 
-  --muted: oklch(0.970 0.003 95);
-  --muted-foreground: oklch(0.480 0.008 95);
-  --muted-text: oklch(0.580 0.008 95);
+  --muted: oklch(0.965 0.003 260);
+  --muted-foreground: oklch(0.480 0.014 260);
+  --muted-text: oklch(0.580 0.012 260);
 
   /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
   --warning: oklch(0.660 0.165 75);
@@ -95,27 +95,25 @@
   --destructive: oklch(0.580 0.200 25);
   /* Erro e Ação Destrutiva */
 
-  --border: oklch(0.915 0.003 95);
+  --border: oklch(0.890 0.004 260);
   /* Bordas suaves 1px */
-  --border-strong: oklch(0.830 0.006 95);
-  --input: oklch(1 0 0);
-  --ring: oklch(0.180 0.005 95);
+  --border-strong: oklch(0.820 0.006 260);
+  --input: oklch(0.960 0.003 260);
+  --ring: oklch(0.560 0.190 255);
 
-  /* A navegação acompanha a aparência escolhida. No modo claro ela é uma
-     superfície elevada neutra; o grafite é reservado ao modo escuro. */
-  --sidebar: oklch(0.998 0.001 95);
-  --sidebar-foreground: oklch(0.180 0.005 95);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.962 0.003 95);
-  --sidebar-accent-foreground: oklch(0.180 0.005 95);
-  --sidebar-warning: color-mix(in oklch, var(--primary) 9%, var(--sidebar));
-  --sidebar-warning-foreground: oklch(0.180 0.005 95);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.220 0.012 260);
+  --sidebar-primary: oklch(0.560 0.190 255);
+  --sidebar-primary-foreground: oklch(0.990 0 0);
+  --sidebar-accent: oklch(0.955 0.024 255);
+  --sidebar-accent-foreground: oklch(0.420 0.150 255);
+  --sidebar-warning: oklch(0.965 0.003 260);
+  --sidebar-warning-foreground: oklch(0.220 0.012 260);
+  --sidebar-border: oklch(0.890 0.004 260);
+  --sidebar-ring: oklch(0.560 0.190 255);
 
-  --ct-blue: oklch(0.180 0.005 95);
-  --ct-blue-strong: oklch(0.120 0.005 95);
+  --ct-blue: oklch(0.560 0.190 255);
+  --ct-blue-strong: oklch(0.460 0.180 255);
 
   /* ── Camada 4: Paleta de Gráficos em OKLCH (L = 0.64, C = 0.16) ─────────── */
   --chart-1: oklch(0.640 0.160 260);
@@ -258,43 +256,43 @@
   --sync-error: var(--destructive);
   --sync-surface: var(--muted);
   --dashboard-canvas: oklch(0.965 0.003 95);
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 }
 
 .dark {
   color-scheme: dark;
   /* ── Camada 1: Fundação Neutra Dark (Contraste Dobrado) ───────────────── */
-  --surface-base: oklch(0.135 0.004 260);
+  --surface-base: oklch(0.150 0.008 260);
   /* Lvl 0: Base Canvas (#0d0f12) */
-  --surface-card: oklch(0.175 0.004 260);
+  --surface-card: oklch(0.190 0.009 260);
   /* Lvl 1: Card Surface (#16191d) */
-  --surface-secondary: oklch(0.215 0.006 260);
+  --surface-secondary: oklch(0.230 0.011 260);
   /* Lvl 2: Recessed / Active (#20242a) */
-  --surface-elevated: oklch(0.280 0.010 260);
+  --surface-elevated: oklch(0.255 0.012 260);
   /* Lvl 3: Elevated Popover (#292e36) */
   --surface-overlay: oklch(0.280 0.010 260);
 
-  --background: oklch(0.135 0.004 260);
-  --foreground: oklch(0.960 0.003 260);
+  --background: oklch(0.150 0.008 260);
+  --foreground: oklch(0.940 0.006 260);
 
-  --card: oklch(0.175 0.004 260);
-  --card-foreground: oklch(0.960 0.003 260);
+  --card: oklch(0.190 0.009 260);
+  --card-foreground: oklch(0.940 0.006 260);
 
-  --popover: oklch(0.205 0.005 260);
-  --popover-foreground: oklch(0.960 0.003 260);
+  --popover: oklch(0.220 0.011 260);
+  --popover-foreground: oklch(0.940 0.006 260);
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca Dark ───────────────── */
-  --primary: oklch(0.960 0.003 260);
-  --primary-foreground: oklch(0.140 0.005 260);
+  --primary: oklch(0.690 0.170 255);
+  --primary-foreground: oklch(0.140 0.010 260);
 
-  --secondary: oklch(0.215 0.006 260);
+  --secondary: oklch(0.240 0.008 260);
   --secondary-foreground: oklch(0.960 0.003 260);
 
-  --accent: oklch(0.720 0.180 155);
+  --accent: oklch(0.280 0.055 255);
   /* Ramp Esmeralda da Marca Dark (#47D18C) */
-  --accent-foreground: oklch(0.120 0.005 260);
+  --accent-foreground: oklch(0.760 0.130 255);
 
-  --muted: oklch(0.215 0.006 260);
+  --muted: oklch(0.240 0.008 260);
   --muted-foreground: oklch(0.720 0.008 260);
   --muted-text: oklch(0.580 0.010 260);
 
@@ -308,19 +306,19 @@
   --border: oklch(0.290 0.008 260);
   /* Bordas nítidas sem empastamento */
   --border-strong: oklch(0.380 0.010 260);
-  --input: oklch(0.175 0.004 260);
+  --input: oklch(0.290 0.008 260);
   --ring: oklch(0.960 0.003 260);
 
-  --sidebar: oklch(0.115 0.004 260);
-  --sidebar-foreground: oklch(0.900 0.003 260);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.180 0.005 260);
-  --sidebar-accent-foreground: oklch(0.980 0.002 260);
-  --sidebar-warning: color-mix(in oklch, var(--primary) 20%, transparent);
-  --sidebar-warning-foreground: oklch(0.980 0.002 260);
-  --sidebar-border: oklch(0.245 0.006 260);
-  --sidebar-ring: var(--ring);
+  --sidebar: oklch(0.170 0.009 260);
+  --sidebar-foreground: oklch(0.910 0.006 260);
+  --sidebar-primary: oklch(0.690 0.170 255);
+  --sidebar-primary-foreground: oklch(0.140 0.010 260);
+  --sidebar-accent: oklch(0.280 0.055 255);
+  --sidebar-accent-foreground: oklch(0.760 0.130 255);
+  --sidebar-warning: oklch(0.230 0.011 260);
+  --sidebar-warning-foreground: oklch(0.910 0.006 260);
+  --sidebar-border: oklch(0.290 0.010 260);
+  --sidebar-ring: oklch(0.690 0.170 255);
 
   --ct-blue: oklch(0.960 0.003 260);
   --ct-blue-strong: oklch(0.960 0.003 260);
@@ -351,35 +349,6 @@
 
 * {
   box-sizing: border-box;
-}
-
-/* Shared workspace canvas for every authenticated route. */
-[data-slot="app-content"] > main {
-  isolation: isolate;
-  padding: clamp(1rem, 1.8vw, 1.5rem);
-  gap: 1rem;
-}
-
-[data-slot="app-content"] [data-slot="card"] {
-  border-color: var(--border);
-}
-
-/* Legacy transparent Cards were being used as ad-hoc layout wrappers. In the
-   operational workspace they become real, consistent surfaces instead of
-   disappearing against the canvas. */
-[data-slot="app-content"] [data-slot="card"].bg-transparent {
-  background-color: var(--card) !important;
-  border-color: var(--border) !important;
-  box-shadow: 0 1px 1px rgb(15 23 42 / 0.02) !important;
-}
-
-[data-slot="app-content"] [data-slot="table-container"] {
-  border-radius: var(--radius-lg);
-  box-shadow: 0 1px 1px rgb(15 23 42 / 0.02);
-}
-
-[data-slot="app-content"] [data-slot="metrics-overview"] {
-  background: var(--border);
 }
 
 html {
@@ -456,6 +425,37 @@ body {
 [data-slot="app-content"] [data-slot="table-container"],
 [data-slot="app-content"] [data-slot="scroll-area"] {
   max-inline-size: 100%;
+}
+
+/* Latitude workspace rules. These are intentionally slot-based so every
+   operational route receives the same density without replacing its domain
+   components or changing its data flow. */
+[data-slot="app-content"] > main {
+  min-height: 100%;
+}
+
+[data-slot="app-content"] [data-slot="card"] [data-slot="card-header"] {
+  min-width: 0;
+}
+
+[data-slot="app-content"] [data-slot="table-container"] {
+  background: var(--card);
+}
+
+[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-cell"]:first-child,
+[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-head"]:first-child {
+  padding-left: 1rem;
+}
+
+[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-cell"]:last-child,
+[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-head"]:last-child {
+  padding-right: 1rem;
+}
+
+/* A light, neutral page canvas and a disciplined elevation model make status
+   color and the tenant brand the only strong color on a busy operational page. */
+[data-slot="app-content"] .bg-background {
+  background-color: var(--background);
 }
 
 @layer base {

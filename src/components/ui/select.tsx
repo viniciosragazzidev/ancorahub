@@ -13,6 +13,26 @@ type SelectContextValue = {
 
 const SelectContext = React.createContext<SelectContextValue | null>(null)
 
+function extractLabelsFromChildren(node: React.ReactNode, map: Map<string, React.ReactNode>) {
+  if (!node) return;
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement(child)) return;
+
+    const props = child.props as Record<string, any> | undefined;
+    if (props) {
+      if (props.value !== undefined && props.children !== undefined) {
+        const valStr = String(props.value);
+        if (!map.has(valStr)) {
+          map.set(valStr, props.children);
+        }
+      }
+      if (props.children) {
+        extractLabelsFromChildren(props.children, map);
+      }
+    }
+  });
+}
+
 function Select<Value, Multiple extends boolean | undefined = false>({ children, labels: predefinedLabels, ...props }: SelectPrimitive.Root.Props<Value, Multiple> & { labels?: Record<string, React.ReactNode> }) {
   const [registeredLabels, setRegisteredLabels] = React.useState<Map<string, React.ReactNode>>(new Map())
   const register = React.useCallback((value: string, label: React.ReactNode) => {
@@ -25,13 +45,21 @@ function Select<Value, Multiple extends boolean | undefined = false>({ children,
   }, [])
 
   const labels = React.useMemo(() => {
-    if (!predefinedLabels) return registeredLabels
-    const merged = new Map(registeredLabels)
-    for (const [key, value] of Object.entries(predefinedLabels)) {
-      if (!merged.has(key)) merged.set(key, value)
+    const map = new Map<string, React.ReactNode>()
+    extractLabelsFromChildren(children, map)
+
+    if (predefinedLabels) {
+      for (const [key, value] of Object.entries(predefinedLabels)) {
+        map.set(key, value)
+      }
     }
-    return merged
-  }, [registeredLabels, predefinedLabels])
+
+    for (const [key, value] of registeredLabels.entries()) {
+      map.set(key, value)
+    }
+
+    return map
+  }, [children, predefinedLabels, registeredLabels])
 
   return (
     <SelectContext.Provider value={{ labels, register }}>
@@ -62,7 +90,12 @@ function SelectValue({ className, children, placeholder, ...props }: SelectPrimi
             if (value === null || value === undefined || value === "") {
               return placeholder ?? null
             }
-            return context.labels.get(value) ?? placeholder ?? null
+            const valStr = String(value)
+            const label = context.labels.get(valStr)
+            if (label !== undefined && label !== null && label !== "") {
+              return label
+            }
+            return placeholder ?? valStr
           }
         }
         : { children })}
@@ -85,7 +118,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "flex w-fit items-center justify-between gap-1.5 rounded-md border border-input bg-card py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-[inset_0_1px_1px_rgb(15_23_42/0.02)] transition-colors outline-none select-none hover:border-border-strong focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-md *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -127,7 +160,7 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
-          className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className)}
+          className={cn("relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-[0_12px_30px_rgb(15_23_42/0.12)] duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className)}
           {...props}
         >
           <SelectScrollUpButton />
@@ -236,6 +269,87 @@ function SelectScrollDownButton({
   )
 }
 
+export type SelectOption = {
+  value: string;
+  label: React.ReactNode;
+  disabled?: boolean;
+};
+
+export type AppSelectProps = {
+  name?: string;
+  id?: string;
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  required?: boolean;
+  size?: "sm" | "default";
+  className?: string;
+  triggerClassName?: string;
+  contentClassName?: string;
+  "aria-label"?: string;
+};
+
+function AppSelect({
+  name,
+  id,
+  value: controlledValue,
+  defaultValue,
+  onValueChange,
+  options,
+  placeholder = "Selecione...",
+  disabled,
+  required,
+  size = "default",
+  className,
+  triggerClassName,
+  contentClassName,
+  "aria-label": ariaLabel,
+}: AppSelectProps) {
+  const [internalValue, setInternalValue] = React.useState<string>(
+    controlledValue ?? defaultValue ?? ""
+  );
+
+  const currentValue = controlledValue !== undefined ? controlledValue : internalValue;
+
+  const handleChange = (nextValue: string | null) => {
+    const val = nextValue ?? "";
+    if (controlledValue === undefined) {
+      setInternalValue(val);
+    }
+    onValueChange?.(val);
+  };
+
+  return (
+    <div className={cn("relative inline-block w-full", className)}>
+      {name ? <input type="hidden" name={name} value={currentValue} required={required} /> : null}
+      <Select
+        value={currentValue}
+        onValueChange={handleChange}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          size={size}
+          aria-label={ariaLabel}
+          className={cn("w-full", triggerClassName)}
+        >
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className={contentClassName}>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export {
   Select,
   SelectContent,
@@ -247,4 +361,6 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  AppSelect,
 }
+

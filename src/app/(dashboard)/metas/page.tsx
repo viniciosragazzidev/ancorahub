@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Target } from "@/components/huge-icons";
 import { ViewScopeContext } from "@/components/ownership-context";
+import { PeriodSelect } from "@/components/period-select";
 import { Button } from "@/components/ui/button";
 import { GoalsManager } from "@/features/goals/components/goals-manager";
 import {
@@ -12,10 +13,16 @@ import {
 } from "@/features/goals/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
+import { parsePeriod } from "@/shared/period";
 import Link from "next/link";
 
-export default async function GoalsPage() {
+export default async function GoalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const context = await getRequiredTenantContext();
+  const period = parsePeriod((await searchParams).period);
   if (!hasPermission(context.role, "gerenciar_metas")) redirect("/access-denied");
 
   const [goals, teamMembers, branches] = await Promise.all([
@@ -29,7 +36,12 @@ export default async function GoalsPage() {
       <DashboardHeader
         breadcrumb="Gestão comercial"
         title="Metas"
-        rightSlot={context.role === "director" ? <Button render={<Link href="/metas/desempenho" />} size="sm"><Target className="size-4" /> Temporadas e ranking</Button> : undefined}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <PeriodSelect value={period} />
+            {context.role === "director" ? <Button render={<Link href="/metas/desempenho" />} size="sm"><Target className="size-4" /> Temporadas e ranking</Button> : undefined}
+          </div>
+        }
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <div>
@@ -48,6 +60,7 @@ export default async function GoalsPage() {
           goals={goals}
           teamMembers={teamMembers}
           branches={branches}
+          period={period}
         />
       </main>
     </>

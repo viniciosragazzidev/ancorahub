@@ -50,6 +50,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-029E | Plantão tem cobertura mínima configurável e não bloqueia a distribuição quando incompleto. | Escalados abaixo do mínimo → alerta operacional; corretores elegíveis já escalados continuam concorrendo à distribuição. | DEC-061 |
 | BR-029F | Remover plantão significa arquivar, nunca apagar o histórico. | Arquivamento → regra e atribuições ativas saem da operação; restauração reativa somente a regra e mantém auditoria. | DEC-061 |
 | BR-029G | Criar plantão para várias unidades gera regras independentes por unidade e fila. | Diretor seleciona unidades e filas ativas → regras, auditorias e coberturas locais são criadas atomicamente; Gestor só pode criar para a própria unidade. | DEC-062 |
+| BR-029H | Empresa PJ pertence ao tenant e pode ser compartilhada apenas dentro do escopo permitido. | Cadastro de lead PJ com CNPJ válido → reutiliza ou cria empresa no tenant; corretor enxerga somente empresas com oportunidade própria. | DEC-071 |
 
 ## Cotação, documentos e venda
 
@@ -98,7 +99,10 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-058 | O canal oficial de WhatsApp é resolvido pelo `phone_number_id` previamente registrado pela Meta, e nunca por identificador de tenant enviado pelo navegador ou webhook. | Webhook assinado → encontra canal ativo pelo identificador da Meta; somente então persiste mensagens do tenant correspondente. | DEC-033 |
 | BR-059 | Tokens de canal oficial permanecem exclusivamente no servidor, cifrados em repouso, e não entram em logs de auditoria ou respostas de API. | Embedded Signup concluído → token é cifrado antes da persistência; UI recebe somente estado e metadados permitidos. | DEC-033 |
 | BR-060 | Enquanto a migração estiver ativa, o canal Meta oficial tem precedência para envio na unidade; OpenWA é fallback somente quando não há canal oficial ativo. | Envio de mensagem → seleciona canal Meta ativo por tenant/unidade/owner; sem canal oficial, usa conexão legada existente. | DEC-033 |
+| BR-060A | Número WAHA pertence a um único escopo operacional. | Diretor cria número para toda a empresa; Gestor cria número somente para sua unidade; o servidor deriva escopo da sessão, registra auditoria e impede uso cruzado. | ADR-0038 |
 | BR-061 | Enquanto o chat interno estiver em desenvolvimento, ele não pode sugerir sincronização de mensagens. O Corretor inicia o atendimento pelo fluxo auditado e é direcionado ao WhatsApp pessoal pelo telefone autorizado do lead. | Lead distribuído → Corretor inicia atendimento → status e auditoria são persistidos → `wa.me` abre o WhatsApp Web ou o app conforme o dispositivo. | DEC-009 / DEC-033 |
+| BR-066 | O Workspace do Corretor é uma composição da própria carteira e não uma nova fonte de autorização. | A home recebe tenant, unidade, papel e corretor exclusivamente da sessão; qualquer item de prioridade, Inbox, tarefa, documento ou conversa fora da carteira não é retornado. | DEC-070 |
+| BR-067 | Próxima ação é determinística e não depende da IA. | Mensagem aguardando resposta → SLA vencido/em risco → tarefa vencida → retorno → lead novo → cotação/documento pendente → estagnação; prazo e antiguidade resolvem empates. | DEC-070 |
 
 ## Regras que exigem decisão antes do código
 

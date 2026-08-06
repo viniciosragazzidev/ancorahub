@@ -9,20 +9,11 @@ import { Button } from "@/components/ui/button";
 import { CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 
 const initialState: LeadCreateState = {};
 
 type PlanOption = { id: string; name: string; carrierName: string };
-
-function groupPlansByCarrier(plans: PlanOption[]) {
-  const groups = new Map<string, PlanOption[]>();
-  for (const plan of plans) {
-    const carrier = plan.carrierName;
-    if (!groups.has(carrier)) groups.set(carrier, []);
-    groups.get(carrier)!.push(plan);
-  }
-  return groups;
-}
 
 export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
   const [state, action, pending] = useActionState(createManualLeadAction, initialState);
@@ -35,7 +26,13 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
   const [cnpj, setCnpj] = useState("");
   const [funcionarios, setFuncionarios] = useState("");
 
-  const groups = groupPlansByCarrier(plans);
+  const planOptions = [
+    { value: "", label: "Ainda não definido" },
+    ...plans.map((p) => ({
+      value: p.id,
+      label: `${p.carrierName} — ${p.name}`,
+    })),
+  ];
 
   return (
     <form action={action} onSubmit={() => toast.info("Salvando lead e distribuindo a oportunidade...")} className="space-y-4">
@@ -53,30 +50,26 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="lead-plan">Plano de interesse <span className="text-muted-foreground">(opcional)</span></Label>
-        <select className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm" id="lead-plan" name="planoInteresseId">
-          <option value="">Ainda não definido</option>
-          {Array.from(groups.entries()).map(([carrier, carrierPlans]) => (
-            <optgroup key={carrier} label={carrier}>
-              {carrierPlans.map((plan) => (
-                <option key={plan.id} value={plan.id}>{plan.name}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <AppSelect
+          id="lead-plan"
+          name="planoInteresseId"
+          options={planOptions}
+          placeholder="Selecione um plano..."
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="lead-type">Tipo do Lead</Label>
-        <select
-          className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm"
+        <AppSelect
           id="lead-type"
           name="tipo"
           value={tipo}
-          onChange={(e) => setTipo(e.target.value)}
+          onValueChange={setTipo}
+          options={[
+            { value: "PF", label: "PF (Pessoa Física)" },
+            { value: "PJ", label: "PJ (Pessoa Jurídica)" },
+          ]}
           required
-        >
-          <option value="PF">PF (Pessoa Física)</option>
-          <option value="PME">PME (Pessoa Jurídica / PME)</option>
-        </select>
+        />
       </div>
 
       {/* ── PF-specific fields ─────────────────────────────────────────────── */}
@@ -118,10 +111,10 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       )}
 
       {/* ── PME-specific fields ─────────────────────────────────────────────── */}
-      {tipo === "PME" && (
+      {(tipo === "PJ" || tipo === "PME") && (
         <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
-            <p className="text-sm font-semibold">Dados da empresa (PME)</p>
+            <p className="text-sm font-semibold">Dados da empresa</p>
             <p className="text-xs text-muted-foreground mt-0.5">Informações sobre a pessoa jurídica contratante.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">

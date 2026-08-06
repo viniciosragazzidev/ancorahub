@@ -7,7 +7,7 @@ import { WhatsappLogo } from "@/components/huge-icons";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getDatabase, schema } from "@/shared/db";
-import { AccountTab } from "./_components/account-tab";
+import { MinhaContaTab } from "./_components/minha-conta-tab";
 import { EmpresaTab } from "./_components/empresa-tab";
 import { IntegrationsTab } from "./_components/integrations-tab";
 import { SecurityTab } from "./_components/security-tab";
@@ -59,7 +59,7 @@ export default async function SettingsPage() {
   ) : undefined;
 
   const whatsapp = <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>WhatsApp pessoal de atendimento</CardTitle><CardDescription>Conecte somente o número usado por você. A conexão é isolada por usuário e não altera a identidade da corretora.</CardDescription></CardHeader><CardContent><Button render={<a href="/settings/whatsapp" />}><WhatsappLogo /> Configurar meu WhatsApp</Button></CardContent></Card>;
-  const account = <AccountTab name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} />;
+  const account = <MinhaContaTab name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} />;
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
   const extension = <ExtensionTab />;
 

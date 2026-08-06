@@ -34,10 +34,10 @@ export interface EmptyStateProps {
 /* ─── Variant styles ─── */
 
 const variantStyles: Record<EmptyStateVariant, string> = {
-  default: "rounded-xl border border-dashed border-border/80 bg-muted/30 px-6 py-10",
-  card: "rounded-xl border border-dashed border-border/80 bg-muted/30 px-6 py-14",
+  default: "rounded-lg border border-dashed border-border/80 bg-card px-6 py-10 shadow-[inset_0_1px_0_rgb(255_255_255/0.35)]",
+  card: "rounded-lg border border-dashed border-border/80 bg-card px-6 py-14 shadow-[inset_0_1px_0_rgb(255_255_255/0.35)]",
   ghost: "",
-  inline: "flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs text-muted-foreground bg-muted/50",
+  inline: "flex items-center gap-2 rounded-md px-3 py-2.5 text-xs text-muted-foreground bg-muted/50",
 };
 
 /* ─── Loading skeleton ─── */
@@ -106,7 +106,7 @@ export function EmptyState({
       {Icon && (
         <span
           className={cn(
-            "grid place-items-center rounded-full bg-muted text-muted-foreground",
+            "grid place-items-center rounded-full border border-border/70 bg-muted text-muted-foreground",
             variant === "ghost" ? "size-10" : "size-11",
           )}
         >
