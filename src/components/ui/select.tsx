@@ -13,6 +13,26 @@ type SelectContextValue = {
 
 const SelectContext = React.createContext<SelectContextValue | null>(null)
 
+function extractLabelsFromChildren(node: React.ReactNode, map: Map<string, React.ReactNode>) {
+  if (!node) return;
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement(child)) return;
+
+    const props = child.props as Record<string, any> | undefined;
+    if (props) {
+      if (props.value !== undefined && props.children !== undefined) {
+        const valStr = String(props.value);
+        if (!map.has(valStr)) {
+          map.set(valStr, props.children);
+        }
+      }
+      if (props.children) {
+        extractLabelsFromChildren(props.children, map);
+      }
+    }
+  });
+}
+
 function Select<Value, Multiple extends boolean | undefined = false>({ children, labels: predefinedLabels, ...props }: SelectPrimitive.Root.Props<Value, Multiple> & { labels?: Record<string, React.ReactNode> }) {
   const [registeredLabels, setRegisteredLabels] = React.useState<Map<string, React.ReactNode>>(new Map())
   const register = React.useCallback((value: string, label: React.ReactNode) => {
@@ -25,13 +45,21 @@ function Select<Value, Multiple extends boolean | undefined = false>({ children,
   }, [])
 
   const labels = React.useMemo(() => {
-    if (!predefinedLabels) return registeredLabels
-    const merged = new Map(registeredLabels)
-    for (const [key, value] of Object.entries(predefinedLabels)) {
-      if (!merged.has(key)) merged.set(key, value)
+    const map = new Map<string, React.ReactNode>()
+    extractLabelsFromChildren(children, map)
+
+    if (predefinedLabels) {
+      for (const [key, value] of Object.entries(predefinedLabels)) {
+        map.set(key, value)
+      }
     }
-    return merged
-  }, [registeredLabels, predefinedLabels])
+
+    for (const [key, value] of registeredLabels.entries()) {
+      map.set(key, value)
+    }
+
+    return map
+  }, [children, predefinedLabels, registeredLabels])
 
   return (
     <SelectContext.Provider value={{ labels, register }}>
@@ -62,7 +90,12 @@ function SelectValue({ className, children, placeholder, ...props }: SelectPrimi
             if (value === null || value === undefined || value === "") {
               return placeholder ?? null
             }
-            return context.labels.get(value) ?? placeholder ?? null
+            const valStr = String(value)
+            const label = context.labels.get(valStr)
+            if (label !== undefined && label !== null && label !== "") {
+              return label
+            }
+            return placeholder ?? valStr
           }
         }
         : { children })}

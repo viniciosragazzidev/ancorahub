@@ -1,4 +1,3 @@
-import { getSystemSetting } from "@/features/system-settings/queries";
 import {
   validateAiResponse,
   createSafeFallbackResponse,
@@ -6,6 +5,7 @@ import {
   type AiStructuredResponse,
 } from "./ai-response-schema";
 import { buildAgentSystemPrompt, type TenantAiAgentConfig } from "./tenant-config";
+import { createAiRouter, type AiProviderId } from "./model-router";
 
 export type AiChatMessage = {
   role: "system" | "user" | "assistant";
@@ -38,9 +38,6 @@ export function detectHumanTransferRequest(text: string): boolean {
     !/pessoa\s+fisica|pessoa\s+juridica/.test(normalized);
 }
 
-const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "openrouter/auto";
-const LEGACY_OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet";
 
 // ─── Language detection ──────────────────────────────────────────────────────
 
@@ -114,9 +111,6 @@ function safeProviderError(value: unknown) {
     .slice(0, 300);
 }
 
-function isUnavailableModelResponse(status: number, body: string) {
-  return status === 404 && /no endpoints found|model not found|no available endpoints/i.test(body);
-}
 
 const LANGUAGE_INSTRUCTION = `
 IDIOMA — REGRA ABSOLUTA:
@@ -194,14 +188,9 @@ export async function generateAiResponse({
 }): Promise<AiAgentResponse> {
   const startTime = Date.now();
   const explicitHumanRequest = detectHumanTransferRequest(messages[messages.length - 1]?.content ?? "");
-  let apiKey = process.env.OPENROUTER_API_KEY || "";
-  if (!apiKey && (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL)) {
-    try {
-      apiKey = (await getSystemSetting(`openrouter_key_${tenantId}`)) || "";
-    } catch {
-      apiKey = "";
-    }
-  }
+  // Roteador automático entre Groq e OpenRouter — se um falhar (créditos,
+  // rate-limit, modelo indisponível), o outro assume. Nunca fica sem resposta.
+  const router = await createAiRouter(tenantId);
 
   // Use tenant config to build dynamic system prompt (Phase 4)
   const systemMessage = customPrompt
@@ -220,8 +209,8 @@ export async function generateAiResponse({
     ...messages.slice(-15).map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  if (!apiKey) {
-    // Fallback gracioso caso a chave OpenRouter não esteja configurada
+  if (router.providers.length === 0) {
+    // Fallback gracioso caso nenhum provedor de IA esteja configurado
     const lastUserMsg = messages[messages.length - 1]?.content.toLowerCase() || "";
     const isQuotationOrHuman = explicitHumanRequest || lastUserMsg.includes("cotação") || lastUserMsg.includes("humano") || lastUserMsg.includes("atendente");
     const fallback = createSafeFallbackResponse(leadName, memoryContext);
@@ -244,55 +233,18 @@ export async function generateAiResponse({
     };
   }
 
-  async function callModel(): Promise<{ response: Response; model: string }> {
-    const configuredModel = (await getSystemSetting(`openrouter_model_${tenantId}`))?.trim();
-    const requestedModel = configuredModel || DEFAULT_OPENROUTER_MODEL;
-    const modelsToTry = requestedModel === LEGACY_OPENROUTER_MODEL
-      ? [DEFAULT_OPENROUTER_MODEL]
-      : [requestedModel, DEFAULT_OPENROUTER_MODEL];
-    let model = modelsToTry[0];
-    let response: Response | undefined;
-    let errText = "";
-
-    for (const candidate of modelsToTry) {
-      model = candidate;
-      response = await fetch(OPENROUTER_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
-          "X-Title": "Âncora Corretora CRM AI Agent",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: candidate,
-          messages: payloadMessages,
-          temperature: 0.3, // Lower temperature for more predictable JSON output
-          max_tokens: 400,  // Slightly higher to accommodate JSON wrapping
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (response.ok) break;
-      errText = await response.text();
-      if (!isUnavailableModelResponse(response.status, errText) || candidate === modelsToTry[modelsToTry.length - 1]) break;
-      console.warn("[ai-wpp] openrouter.model_fallback", {
-        tenantId,
-        from: candidate,
-        to: DEFAULT_OPENROUTER_MODEL,
-        status: response.status,
-      });
-    }
-
-    if (!response || !response.ok) {
-      throw { status: response?.status ?? 502, errText: errText || `OpenRouter HTTP ${response?.status}` };
-    }
-
-    return { response, model };
+  async function callModel(): Promise<{ response: Response; model: string; provider: AiProviderId }> {
+    const result = await router.call({
+      messages: payloadMessages,
+      temperature: 0.3, // Lower temperature for more predictable JSON output
+      maxTokens: 400,   // Slightly higher to accommodate JSON wrapping
+      responseFormat: { type: "json_object" },
+    });
+    return { response: result.response, model: result.model, provider: result.provider };
   }
 
   try {
-    const { response, model } = await callModel();
+    const { response, model, provider } = await callModel();
     const latencyMs = Date.now() - startTime;
     const data = await response.json();
     const rawContent: string = data.choices?.[0]?.message?.content || "";
@@ -316,21 +268,15 @@ export async function generateAiResponse({
           { role: "user", content: JSON_CORRECTION_PROMPT },
         ];
 
-        const retryResponse = await fetch(OPENROUTER_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
-            "X-Title": "Âncora Corretora CRM AI Agent",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            messages: correctionMessages,
-            temperature: 0.2,
-            max_tokens: 400,
-          }),
+        // Retry de correção também passa pelo roteador, preferindo o provedor
+        // que já respondeu nesta conversa.
+        const retryResult = await router.call({
+          messages: correctionMessages,
+          temperature: 0.2,
+          maxTokens: 400,
+          prefer: { provider, model },
         });
+        const retryResponse = retryResult.response;
 
         if (retryResponse.ok) {
           const retryData = await retryResponse.json();
@@ -386,21 +332,15 @@ export async function generateAiResponse({
           { role: "user", content: LANGUAGE_CORRECTION_PROMPT },
         ];
 
-        const correctionResponse = await fetch(OPENROUTER_ENDPOINT, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
-            "X-Title": "Âncora Corretora CRM AI Agent",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            messages: correctionMessages,
-            temperature: 0.3,
-            max_tokens: 400,
-          }),
+        // Correção de idioma também passa pelo roteador com preferência pelo
+        // provedor que já respondeu.
+        const correctionResult = await router.call({
+          messages: correctionMessages,
+          temperature: 0.3,
+          maxTokens: 400,
+          prefer: { provider, model },
         });
+        const correctionResponse = correctionResult.response;
 
         if (correctionResponse.ok) {
           const correctionData = await correctionResponse.json();
@@ -460,26 +400,26 @@ export async function generateAiResponse({
     const latencyMs = Date.now() - startTime;
     if (typeof error === "object" && error !== null && "status" in error && "errText" in error) {
       const { status, errText } = error as { status: number; errText: string };
-      const safeError = safeProviderError(errText || `OpenRouter HTTP ${status}`);
-      console.error("[ai-wpp] openrouter.failed", { tenantId, model: DEFAULT_OPENROUTER_MODEL, status, error: safeError, latencyMs });
+      const safeError = safeProviderError(errText || `Erro HTTP na chamada de IA (HTTP ${status})`);
+      console.error("[ai-wpp] ai.failed", { tenantId, status, error: safeError, latencyMs });
       return {
         success: false,
-        modelUsed: DEFAULT_OPENROUTER_MODEL,
+        modelUsed: "ai-router",
         promptTokens: 0,
         completionTokens: 0,
         totalTokens: 0,
         estimatedCost: "0",
         latencyMs,
         shouldTransferToHuman: true,
-        transferReason: `Erro HTTP OpenRouter: ${status}`,
+        transferReason: `Erro HTTP na chamada de IA: ${status}`,
         error: safeError,
         detectedLanguage: "pt-BR",
       };
     }
-    console.error("[ai-wpp] openrouter.exception", { tenantId, latencyMs, error: safeProviderError(error) });
+    console.error("[ai-wpp] ai.exception", { tenantId, latencyMs, error: safeProviderError(error) });
     return {
       success: false,
-      modelUsed: "openrouter/auto",
+      modelUsed: "ai-router",
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,

@@ -528,6 +528,28 @@ export async function updateQuickReplySettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+const AI_MEMORY_RESET_MODES = ["never", "before_each_message", "before_each_session", "manual"] as const;
+
+export async function updateAiMemoryResetSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const mode = String(formData.get("aiMemoryResetMode") ?? "before_each_session").trim();
+  if (!(AI_MEMORY_RESET_MODES as readonly string[]).includes(mode)) {
+    throw new Error("Modo de reset de memória inválido.");
+  }
+  const now = new Date();
+  await setSystemSetting("ai_memory_reset_mode", mode, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "update_ai_memory_reset_settings",
+    targetType: "system_settings",
+    targetId: "ai_memory_reset_mode",
+    metadata: { mode },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateAgentTrainingCenterSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("agentTrainingCenterEnabled") === "true" ? "true" : "false";

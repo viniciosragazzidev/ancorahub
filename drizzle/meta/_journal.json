@@ -428,6 +428,20 @@
       "when": 1786034000000,
       "tag": "0109_ai_qualification_hub",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1786035000000,
+      "tag": "0110_add_lead_loss_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1786122000000,
+      "tag": "0111_add_lead_sla_metrics",
+      "breakpoints": true
     }
   ]
 }

@@ -63,7 +63,7 @@ export async function resetQualificationSessionMemory(
           qualificationStatus: "pending",
           qualificationProfileKey: null,
           qualificationCompletedAt: null,
-          qualificationDetails: null,
+          qualificationDetails: {},
           updatedAt: now,
         })
         .where(and(eq(schema.leads.id, data.leadId), eq(schema.leads.tenantId, tenantId)));

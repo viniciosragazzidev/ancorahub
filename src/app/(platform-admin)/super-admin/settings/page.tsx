@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
@@ -72,6 +72,7 @@ export default async function SuperAdminSettingsPage() {
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
     "feature_ai_quick_reply_enabled",
+    "ai_memory_reset_mode",
     "feature_browser_extension_enabled",
     "feature_agent_training_center_enabled",
     "feature_custom_roles_enabled",
@@ -126,6 +127,7 @@ export default async function SuperAdminSettingsPage() {
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled = settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
+  const aiMemoryResetMode = settingMap.get("ai_memory_reset_mode") ?? "before_each_session";
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
   const agentTrainingCenterEnabled = settingMap.get("feature_agent_training_center_enabled") === "true";
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
@@ -489,7 +491,18 @@ export default async function SuperAdminSettingsPage() {
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold">Groq API Key</label>
+                        <label className="flex items-center justify-between gap-2 text-xs font-semibold">
+                          Groq API Key
+                          <a
+                            href="https://console.groq.com/docs/models"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                          >
+                            Ver modelos Groq
+                            <span aria-hidden="true">↗</span>
+                          </a>
+                        </label>
                         <Input
                           name="groqApiKey"
                           type="password"
@@ -582,6 +595,28 @@ export default async function SuperAdminSettingsPage() {
             <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>Quick Reply determinístico</CardTitle><CardDescription>Resolve saudações, mídia, opt-out e solicitações humanas antes de chamar a IA. O estado e o cooldown são persistidos.</CardDescription></CardHeader>
               <CardContent><form action={updateQuickReplySettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="quickReplyEnabled" value="true" defaultChecked={aiQuickReplyEnabled} className="size-4" /><span><span className="font-medium">Quick Reply habilitado</span><span className="block text-xs text-muted-foreground">Desative sem apagar eventos, métricas ou templates por tenant.</span></span></label><Button type="submit" variant="outline">Salvar Quick Reply</Button></form></CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Reset de memória do agente de WhatsApp</CardTitle><CardDescription>Controla quando o agente esquece o contexto acumulado (memória estruturada + histórico da conversa). A opção “A cada mensagem” faz o bot responder do zero a cada interação recebida.</CardDescription></CardHeader>
+              <CardContent>
+                <form action={updateAiMemoryResetSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="grid gap-1 text-sm">
+                    <span className="font-medium">Modo de reset de memória</span>
+                    <span className="block text-xs text-muted-foreground">A alteração é auditada e vale para todos os leads.</span>
+                    <AppSelect
+                      name="aiMemoryResetMode"
+                      defaultValue={aiMemoryResetMode}
+                      options={[
+                        { value: "before_each_message", label: "A cada mensagem (responder do zero)" },
+                        { value: "before_each_session", label: "A cada nova sessão (padrão)" },
+                        { value: "never", label: "Nunca resetar (manter contexto)" },
+                        { value: "manual", label: "Somente manual" },
+                      ]}
+                    />
+                  </label>
+                  <Button type="submit" variant="outline">Salvar reset de memória</Button>
+                </form>
+              </CardContent>
             </Card>
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
