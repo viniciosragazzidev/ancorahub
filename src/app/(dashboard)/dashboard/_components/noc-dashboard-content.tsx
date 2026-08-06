@@ -262,7 +262,7 @@ function ActivityFeed({
   }>;
 }) {
   return (
-    <Card variant="subtle" className="rounded-xl">
+    <Card variant="subtle" className="rounded-xl" data-onboarding="director-audit">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -354,10 +354,12 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
   return (
     <div className="space-y-6">
       {/* ─── TOPO: AÇÕES NECESSÁRIAS & PLANTÃO ─── */}
-      <DirectorTopActionHeader data={data} />
+      <div data-onboarding="director-overview">
+        <DirectorTopActionHeader data={data} />
+      </div>
 
       {/* ─── INDICADORES & ANALYTICS ─── */}
-      <section className="space-y-4">
+      <section className="space-y-4" data-onboarding="director-branches">
         <div className="border-b border-border/50 pb-2">
           <h2 className="text-sm font-bold tracking-tight">Indicadores & Analytics</h2>
           <p className="text-xs text-muted-foreground">Desempenho do funil e distribuição de conversões.</p>
@@ -375,6 +377,7 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
+          data-onboarding="director-commissions"
         >
           <Card variant="subtle" className="rounded-xl">
             <CardHeader>
@@ -574,7 +577,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
     <div className="space-y-6">
 
       {/* ─── ZONA 2: PLANTÃO AO VIVO ─── */}
-      <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 shadow-none">
+      <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 shadow-none" data-onboarding="manager-redistribute-lead">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="relative flex size-3">
@@ -595,7 +598,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
       </Card>
 
       {/* ─── ZONA 3: INDICADORES NEUTROS ─── */}
-      <section className="space-y-4 pt-2">
+      <section className="space-y-4 pt-2" data-onboarding="manager-sla-monitoring">
         <div className="border-b border-border/50 pb-2">
           <h2 className="text-sm font-bold tracking-tight">Indicadores de Desempenho</h2>
           <p className="text-xs text-muted-foreground">Métricas operacionais da unidade.</p>
@@ -610,7 +613,7 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
       </section>
 
       {/* Team Overview + Bottlenecks */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-7" data-onboarding="manager-team-performance">
         <Card variant="subtle" className="rounded-xl lg:col-span-4">
           <CardHeader>
             <CardTitle>Visão Geral da Equipe</CardTitle>

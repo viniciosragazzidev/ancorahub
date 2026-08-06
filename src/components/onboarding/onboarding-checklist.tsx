@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useNextStep } from "nextstepjs";
+import { useRouter, usePathname } from "next/navigation";
 import { CheckCircle2, Circle, Sparkles, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,21 +12,22 @@ type ChecklistItem = {
   id: string;
   label: string;
   tourKey?: string;
+  targetRoute?: string;
   completed: boolean;
 };
 
 export function OnboardingChecklist() {
   const { startNextStep } = useNextStep();
+  const router = useRouter();
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   const [items, setItems] = useState<ChecklistItem[]>([
     { id: "1", label: "Complete seu perfil", completed: true },
-    { id: "2", label: "Conheça sua fila de leads", tourKey: "broker-welcome", completed: false },
-    { id: "3", label: "Abra seu primeiro atendimento", tourKey: "broker-lead-profile", completed: false },
-    { id: "4", label: "Crie uma tarefa de retorno", tourKey: "broker-lead-profile", completed: false },
-    { id: "5", label: "Simule uma cotação", tourKey: "broker-quotation", completed: false },
-    { id: "6", label: "Conheça sua agenda do dia", tourKey: "broker-welcome", completed: false },
+    { id: "2", label: "Conheça sua fila de leads", tourKey: "broker-welcome", targetRoute: "/dashboard", completed: false },
+    { id: "3", label: "Abra seu primeiro atendimento", tourKey: "broker-lead-profile", targetRoute: "/leads", completed: false },
+    { id: "4", label: "Conheça sua agenda do dia", tourKey: "broker-welcome", targetRoute: "/dashboard", completed: false },
   ]);
 
   if (dismissed) return null;
@@ -35,12 +37,16 @@ export function OnboardingChecklist() {
 
   if (progressPercent === 100) return null;
 
-  const toggleItem = (id: string, tourKey?: string) => {
+  const toggleItem = (id: string, tourKey?: string, targetRoute?: string) => {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)),
     );
     if (tourKey) {
-      startNextStep(tourKey);
+      if (targetRoute && pathname !== targetRoute && !pathname.startsWith(targetRoute)) {
+        router.push(targetRoute);
+      } else {
+        startNextStep(tourKey);
+      }
     }
   };
 
@@ -92,7 +98,7 @@ export function OnboardingChecklist() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => toggleItem(item.id, item.tourKey)}
+                onClick={() => toggleItem(item.id, item.tourKey, item.targetRoute)}
                 className={cn(
                   "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors duration-150",
                   item.completed

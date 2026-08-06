@@ -1,7 +1,8 @@
 "use client";
 
 import { useNextStep } from "nextstepjs";
-import { HelpCircle, Play, BookOpen, MessageSquare, RefreshCw, ChevronRight } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { HelpCircle, Play, BookOpen, MessageSquare, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +16,16 @@ import {
 
 export function OnboardingHelpButton() {
   const { startNextStep } = useNextStep();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleStartTour = (tourKey: string, requiredRoute?: string) => {
+    if (requiredRoute && pathname !== requiredRoute && !pathname.startsWith(requiredRoute)) {
+      router.push(requiredRoute);
+      return;
+    }
+    startNextStep(tourKey);
+  };
 
   return (
     <DropdownMenu>
@@ -38,34 +49,23 @@ export function OnboardingHelpButton() {
 
         <DropdownMenuGroup>
           <DropdownMenuItem
-            onClick={() => startNextStep("broker-welcome")}
+            onClick={() => handleStartTour("broker-welcome", "/dashboard")}
             className="flex items-center justify-between text-xs font-medium"
           >
             <div className="flex items-center gap-2">
               <Play className="size-3.5 text-primary" />
-              <span>Tour da Fila de Leads</span>
+              <span>Tour da Fila & Dashboard</span>
             </div>
             <ChevronRight className="size-3 text-muted-foreground" />
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            onClick={() => startNextStep("broker-lead-profile")}
+            onClick={() => handleStartTour("broker-lead-profile", "/leads")}
             className="flex items-center justify-between text-xs font-medium"
           >
             <div className="flex items-center gap-2">
               <BookOpen className="size-3.5 text-sky-500" />
               <span>Como atender um lead</span>
-            </div>
-            <ChevronRight className="size-3 text-muted-foreground" />
-          </DropdownMenuItem>
-
-          <DropdownMenuItem
-            onClick={() => startNextStep("broker-quotation")}
-            className="flex items-center justify-between text-xs font-medium"
-          >
-            <div className="flex items-center gap-2">
-              <RefreshCw className="size-3.5 text-emerald-500" />
-              <span>Como gerar cotação</span>
             </div>
             <ChevronRight className="size-3 text-muted-foreground" />
           </DropdownMenuItem>
