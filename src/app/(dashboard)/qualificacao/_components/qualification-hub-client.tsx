@@ -271,10 +271,24 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
     setSimInput("");
     setSimIsLoading(true);
 
-    // Update memory locally (for real-time inspector display)
+    // --- Smart memory extraction for the Inspector panel ---
     const extracted = parseInputForFields(userText, simMemory);
     const updatedMemory: SimMemory = { ...simMemory, ...extracted };
-    if (!updatedMemory.nome && !isPureGreeting(userText)) {
+
+    // Only treat first message as "nome" if:
+    // - nome not yet collected
+    // - not a greeting
+    // - not a question (doesn't end with "?" and no interrogative words)
+    // - looks like a name: 2-40 chars, no special chars, not a single-word question
+    const looksLikeName = (text: string) => {
+      const t = text.trim();
+      if (t.endsWith("?")) return false;
+      if (/^(como|que|o que|oque|hã|hein|ahn|né|sim|não|nao|ok|certo|beleza|entendi)$/i.test(t)) return false;
+      if (t.split(" ").length > 6) return false; // too long to be a name
+      return t.length >= 2 && t.length <= 60;
+    };
+
+    if (!updatedMemory.nome && !isPureGreeting(userText) && looksLikeName(userText)) {
       updatedMemory.nome = userText;
     }
     setSimMemory(updatedMemory);
@@ -285,23 +299,20 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: newConversation,
-          memory: updatedMemory as Record<string, string>,
+          memory: Object.fromEntries(
+            Object.entries(updatedMemory).filter(([, v]) => Boolean(v))
+          ),
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
-        throw new Error(err.error ?? "Falha na API do simulador");
-      }
-
       const data = await res.json() as {
         reply: string;
-        modelUsed: string;
-        latencyMs: number;
-        shouldTransferToHuman: boolean;
+        modelUsed?: string;
+        shouldTransferToHuman?: boolean;
+        error?: string;
       };
 
-      const botReply = data.reply;
+      const botReply = data.reply ?? "Desculpe, não consegui gerar uma resposta.";
       setSimConversation((prev) => [...prev, { role: "assistant", content: botReply }]);
       setSimMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
     } catch (err) {
@@ -309,7 +320,7 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
       toast.error(`Simulador: ${errorMsg}`);
       setSimMessages((prev) => [
         ...prev,
-        { sender: "bot", text: "Ops! Não consegui conectar com a IA agora. Verifique se a chave OpenRouter está configurada." },
+        { sender: "bot", text: "Ops! Não consegui conectar com a IA agora. Tente novamente." },
       ]);
     } finally {
       setSimIsLoading(false);
