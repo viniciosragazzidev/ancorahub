@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Sparkles,
   Power,
@@ -9,12 +10,16 @@ import {
   SlidersHorizontal,
   Plus,
   Trash2,
-  CheckCircle2,
   MessageSquare,
   Bot,
   Send,
+  ShieldCheck,
+  Layers,
+  Check,
+  RefreshCw,
 } from "lucide-react";
 
+import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +59,15 @@ type QualificationHubProps = {
   }>;
 };
 
+type SimMemory = {
+  nome?: string;
+  plano?: string;
+  vidas?: string;
+  idade?: string;
+  cidade?: string;
+  email?: string;
+};
+
 export function QualificationHubClient({ settings, testNumbers: initialTestNumbers }: QualificationHubProps) {
   const [enabled, setEnabled] = useState(settings?.enabled ?? false);
   const [pauseMode, setPauseMode] = useState(settings?.pauseMode ?? "handoff_active");
@@ -62,8 +76,10 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
     settings?.initialMessage ??
       "Olá! Sou o assistente virtual da Âncora Corretora. Vou fazer algumas perguntas rápidas para preparar seu atendimento."
   );
+  const [handoffMessage, setHandoffMessage] = useState(
+    settings?.handoffMessage ?? "Vou encaminhar você para um corretor da equipe agora."
+  );
   const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
 
   // Test numbers state
   const [testNumbers, setTestNumbers] = useState(initialTestNumbers);
@@ -73,33 +89,33 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
   // Memory reset state
   const [resetLeadId, setResetLeadId] = useState("");
   const [resetReason, setResetReason] = useState("");
-  const [resetStatus, setResetStatus] = useState<string | null>(null);
 
-  // Web Simulator state
+  // Web Simulator State Engine
+  const [stepIndex, setStepIndex] = useState(0);
+  const [simMemory, setSimMemory] = useState<SimMemory>({});
   const [simMessages, setSimMessages] = useState<Array<{ sender: "user" | "bot"; text: string }>>([
-    { sender: "bot", text: initialMessage },
+    { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
   ]);
   const [simInput, setSimInput] = useState("");
 
   const handleSaveSettings = async () => {
     setIsSaving(true);
-    setFeedback(null);
     try {
       await updateQualificationSettingsAction({
         enabled,
         pauseMode: pauseMode as "finish_active" | "handoff_active" | "pause_immediately",
         assistantName,
         initialMessage,
-        handoffMessage: settings?.handoffMessage ?? "Vou encaminhar você para um corretor da equipe agora.",
+        handoffMessage,
         outOfHoursMessage: settings?.outOfHoursMessage ?? "Fora do horário",
         absenceMessage: settings?.absenceMessage ?? "Sem corretores",
         tone: settings?.tone ?? "friendly",
         useEmojis: settings?.useEmojis ?? false,
         timeoutMinutes: settings?.timeoutMinutes ?? 30,
       });
-      setFeedback("Configurações salvas com sucesso.");
+      toast.success("Configurações da qualificação salvas com sucesso!");
     } catch (err) {
-      setFeedback("Erro ao salvar configurações.");
+      toast.error("Erro ao salvar configurações da qualificação.");
     } finally {
       setIsSaving(false);
     }
@@ -107,7 +123,10 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
 
   const handleAddTestNumber = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPhone || !newLabel) return;
+    if (!newPhone || !newLabel) {
+      toast.error("Preencha o número e a identificação.");
+      return;
+    }
     try {
       const added = await addTestNumberAction({
         phoneNumber: newPhone,
@@ -120,8 +139,9 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
       setTestNumbers((prev) => [...prev, added]);
       setNewPhone("");
       setNewLabel("");
+      toast.success("Número de teste cadastrado.");
     } catch (err) {
-      console.error(err);
+      toast.error("Erro ao cadastrar número de teste.");
     }
   };
 
@@ -129,14 +149,18 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
     try {
       await removeTestNumberAction(id);
       setTestNumbers((prev) => prev.filter((t) => t.id !== id));
+      toast.success("Número de teste removido.");
     } catch (err) {
-      console.error(err);
+      toast.error("Erro ao remover número de teste.");
     }
   };
 
   const handleResetMemory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetLeadId || !resetReason) return;
+    if (!resetLeadId || !resetReason) {
+      toast.error("Informe o ID do lead e o motivo do reset.");
+      return;
+    }
     try {
       await resetMemoryAction({
         leadId: resetLeadId,
@@ -145,12 +169,22 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
         preserveLeadRecord: true,
         preserveCommercialProfile: true,
       });
-      setResetStatus("Memória da IA reiniciada com sucesso para o lead.");
+      toast.success("Memória da IA reiniciada com sucesso para o lead.");
       setResetLeadId("");
       setResetReason("");
     } catch (err) {
-      setResetStatus("Erro ao reiniciar memória do lead.");
+      toast.error("Erro ao reiniciar memória do lead.");
     }
+  };
+
+  // Dynamic Interactive Simulator Logic
+  const handleRestartSimulator = () => {
+    setStepIndex(0);
+    setSimMemory({});
+    setSimMessages([
+      { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
+    ]);
+    setSimInput("");
   };
 
   const handleSimSendMessage = (e: React.FormEvent) => {
@@ -161,325 +195,521 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
     setSimInput("");
 
     setTimeout(() => {
-      setSimMessages((prev) => [
-        ...prev,
-        {
-          sender: "bot",
-          text: "Entendido! Em qual cidade você pretende contratar o plano?",
-        },
-      ]);
-    }, 600);
+      let botReply = "";
+      let nextStep = stepIndex;
+
+      if (stepIndex === 0) {
+        // Step 0: Name input
+        setSimMemory((prev) => ({ ...prev, nome: text }));
+        botReply = `Prazer, ${text}! Para quantas pessoas você busca o plano de saúde (Individual, Familiar ou PME)?`;
+        nextStep = 1;
+      } else if (stepIndex === 1) {
+        // Step 1: Plan type
+        setSimMemory((prev) => ({ ...prev, plano: text }));
+        botReply = "Entendido! Quantas pessoas serão incluídas no plano?";
+        nextStep = 2;
+      } else if (stepIndex === 2) {
+        // Step 2: Lives count
+        setSimMemory((prev) => ({ ...prev, vidas: text }));
+        botReply = "Perfeito! Qual a idade da(s) pessoa(s) que será(ão) incluída(s)?";
+        nextStep = 3;
+      } else if (stepIndex === 3) {
+        // Step 3: Age
+        setSimMemory((prev) => ({ ...prev, idade: text }));
+        botReply = "Ótimo! Em qual cidade e estado você pretende contratar o plano?";
+        nextStep = 4;
+      } else if (stepIndex === 4) {
+        // Step 4: City
+        setSimMemory((prev) => ({ ...prev, cidade: text }));
+        botReply = "Perfeito! E para finalizar, qual o seu melhor e-mail para enviarmos a cotação comparativa?";
+        nextStep = 5;
+      } else if (stepIndex === 5) {
+        // Step 5: Email
+        setSimMemory((prev) => ({ ...prev, email: text }));
+        botReply = `${handoffMessage} Um de nossos especialistas entrará em contato em instantes!`;
+        nextStep = 6;
+      } else {
+        botReply = "Sua qualificação já foi concluída! Estamos transferindo seu atendimento para um corretor especializado.";
+      }
+
+      setStepIndex(nextStep);
+      setSimMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
+    }, 400);
   };
 
+  // Calculate dynamic simulator score
+  const collectedCount = Object.keys(simMemory).length;
+  const currentScore = Math.min(100, collectedCount * 18 + (collectedCount === 6 ? 10 : 0));
+  const stepTitles = [
+    "1. Coleta de Nome do Cliente",
+    "2. Coleta do Tipo de Plano",
+    "3. Coleta de Quantidade de Vidas",
+    "4. Coleta da Idade",
+    "5. Coleta da Cidade de Atendimento",
+    "6. Coleta do E-mail para Cotação",
+    "Qualificação Concluída (Handoff)",
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header com Status em Tempo Real */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/80 bg-card p-5 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Bot className="size-6" />
+    <div className="flex flex-col min-h-screen">
+      <DashboardHeader
+        breadcrumb="Gestão de Operação"
+        title="Qualificação IA"
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <Badge variant={enabled ? "success" : "secondary"} className="gap-1 px-2 py-1 text-xs">
+              <span className={`size-2 rounded-full ${enabled ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
+              {enabled ? "IA Ativa" : "Pausada"}
+            </Badge>
+
+            <Button onClick={handleSaveSettings} disabled={isSaving} size="sm" className="gap-1.5 text-xs font-semibold">
+              <Sparkles className="size-3.5" />
+              {isSaving ? "Salvando..." : "Salvar Alterações"}
+            </Button>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-foreground">
-                Central de Qualificação por IA
-              </h1>
-              <Badge variant={enabled ? "success" : "secondary"}>
-                {enabled ? "● IA Ativa" : "Pausada"}
-              </Badge>
+        }
+      />
+
+      <main className="flex-1 p-4 lg:p-6 space-y-6 max-w-7xl w-full mx-auto">
+        {/* Metric Cards Top Overview */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card variant="subtle" className="rounded-xl border-border/80">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Estado da IA
+              </CardTitle>
+              <Power className={`size-4 ${enabled ? "text-emerald-500" : "text-muted-foreground"}`} />
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xl font-bold tracking-tight text-foreground">
+                  {enabled ? "Ativada" : "Pausada"}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={(e) => setEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
+                </label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Controle central do robô por tenant</p>
+            </CardContent>
+          </Card>
+
+          <Card variant="subtle" className="rounded-xl border-border/80">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Modo de Pausa
+              </CardTitle>
+              <ShieldCheck className="size-4 text-primary" />
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <span className="text-sm font-bold tracking-tight text-foreground truncate block">
+                {pauseMode === "handoff_active"
+                  ? "Transferir para Humano"
+                  : pauseMode === "finish_active"
+                    ? "Concluir Atuais"
+                    : "Pausar Imediatamente"}
+              </span>
+              <p className="text-[11px] text-muted-foreground">Tratamento seguro em transições</p>
+            </CardContent>
+          </Card>
+
+          <Card variant="subtle" className="rounded-xl border-border/80">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Números de Teste
+              </CardTitle>
+              <Phone className="size-4 text-sky-500" />
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <span className="text-xl font-bold tracking-tight text-foreground">
+                {testNumbers.length} cadastrados
+              </span>
+              <p className="text-[11px] text-muted-foreground">Devs isolados das métricas reais</p>
+            </CardContent>
+          </Card>
+
+          <Card variant="subtle" className="rounded-xl border-border/80">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Versão da Configuração
+              </CardTitle>
+              <Layers className="size-4 text-amber-500" />
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <span className="text-xl font-bold tracking-tight text-foreground">
+                v{settings?.version ?? 1} Publicada
+              </span>
+              <p className="text-[11px] text-muted-foreground">Auditável e rastreável no banco</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabbed Configuration Sections */}
+        <Tabs defaultValue="overview" className="w-full space-y-4">
+          <TabsList className="w-full justify-start overflow-x-auto border-b border-border/60 bg-transparent p-0">
+            <TabsTrigger value="overview" className="gap-2 text-xs font-semibold py-2.5">
+              <SlidersHorizontal className="size-3.5" />
+              Visão Geral & Ativação
+            </TabsTrigger>
+            <TabsTrigger value="prompts" className="gap-2 text-xs font-semibold py-2.5">
+              <Bot className="size-3.5" />
+              Identidade & Saudações
+            </TabsTrigger>
+            <TabsTrigger value="test_environment" className="gap-2 text-xs font-semibold py-2.5">
+              <Phone className="size-3.5" />
+              Números de Teste Dev
+            </TabsTrigger>
+            <TabsTrigger value="simulator" className="gap-2 text-xs font-semibold py-2.5">
+              <MessageSquare className="size-3.5" />
+              Simulador Web
+            </TabsTrigger>
+            <TabsTrigger value="memory_reset" className="gap-2 text-xs font-semibold py-2.5">
+              <RotateCcw className="size-3.5" />
+              Reset de Memória
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ─── TAB 1: VISÃO GERAL & ATIVAÇÃO ─── */}
+          <TabsContent value="overview" className="space-y-6 pt-2">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card variant="subtle" className="rounded-xl border-border/80">
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Power className="size-4 text-primary" />
+                    Ativação da Qualificação por IA
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Ative ou pause o robô para todo o tenant. O servidor valida a chave antes de responder a qualquer mensagem.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border border-border/60 p-4 bg-card">
+                    <div>
+                      <p className="text-xs font-bold text-foreground">Status do Atendimento por IA</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {enabled ? "A IA está processando qualificação de novos leads." : "Qualificação por IA desativada."}
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={(e) => setEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                    </label>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs font-semibold">Regra de Transição no Desligamento</Label>
+                    <Select value={pauseMode} onValueChange={(val) => setPauseMode(val ?? "handoff_active")}>
+                      <SelectTrigger className="w-full text-xs">
+                        <SelectValue placeholder="Selecione o modo de pausa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="handoff_active" className="text-xs">
+                          Pausar imediatamente e transferir conversas para atendimento humano
+                        </SelectItem>
+                        <SelectItem value="finish_active" className="text-xs">
+                          Concluir conversas em andamento e não iniciar novas
+                        </SelectItem>
+                        <SelectItem value="pause_immediately" className="text-xs">
+                          Pausar imediatamente sem transferir
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card variant="subtle" className="rounded-xl border-border/80">
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <ShieldCheck className="size-4 text-primary" />
+                    Segurança & Multi-Tenant
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Regras ativas de integridade e escopo de acesso comercial.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-xs">
+                  <div className="flex items-start gap-2.5 rounded-lg border border-border/40 p-3 bg-muted/20">
+                    <Check className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Isolamento Estrito por Tenant</p>
+                      <p className="text-[11px] text-muted-foreground">Toda mensagem passa pela validação de tenantId no servidor.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 rounded-lg border border-border/40 p-3 bg-muted/20">
+                    <Check className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-foreground">Auditoria Imutável</p>
+                      <p className="text-[11px] text-muted-foreground">Todas as alterações de versão e resets são gravados em logs.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Controle, teste, ative, pause e edite todo o comportamento do robô de atendimento do tenant.
-            </p>
-          </div>
-        </div>
+          </TabsContent>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 text-xs">
-            <Power className="size-4 text-muted-foreground" />
-            <span className="font-medium">Qualificação por IA</span>
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-              className="size-4 rounded accent-primary cursor-pointer"
-            />
-          </div>
-          <Button onClick={handleSaveSettings} disabled={isSaving} size="sm" className="gap-2">
-            <Sparkles className="size-4" />
-            {isSaving ? "Salvando..." : "Salvar Configuração"}
-          </Button>
-        </div>
-      </div>
-
-      {feedback && (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 text-xs text-primary font-medium">
-          <CheckCircle2 className="size-4" />
-          {feedback}
-        </div>
-      )}
-
-      {/* Navegação por Abas da Central */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="w-full justify-start overflow-x-auto border-b border-border/60 bg-transparent p-0">
-          <TabsTrigger value="overview" className="gap-2 text-xs font-semibold">
-            <SlidersHorizontal className="size-3.5" />
-            Visão Geral & Ativação
-          </TabsTrigger>
-          <TabsTrigger value="test_environment" className="gap-2 text-xs font-semibold">
-            <Phone className="size-3.5" />
-            Números de Teste Dev
-          </TabsTrigger>
-          <TabsTrigger value="simulator" className="gap-2 text-xs font-semibold">
-            <MessageSquare className="size-3.5" />
-            Simulador Web
-          </TabsTrigger>
-          <TabsTrigger value="memory_reset" className="gap-2 text-xs font-semibold">
-            <RotateCcw className="size-3.5" />
-            Reset de Memória
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ─── ABA 1: VISÃO GERAL & ATIVAÇÃO ─── */}
-        <TabsContent value="overview" className="space-y-6 pt-4">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card variant="subtle">
+          {/* ─── TAB 2: IDENTIDADE & PROMPTS ─── */}
+          <TabsContent value="prompts" className="space-y-6 pt-2">
+            <Card variant="subtle" className="rounded-xl border-border/80">
               <CardHeader>
-                <CardTitle className="text-base font-bold">Modo de Pausa da IA</CardTitle>
-                <CardDescription>
-                  O que deve acontecer com as conversas em andamento quando a qualificação for desativada?
+                <CardTitle className="text-sm font-bold">Identidade do Assistente & Respostas Padrão</CardTitle>
+                <CardDescription className="text-xs">
+                  Configure o nome, saudação e mensagem de transferência apresentados no WhatsApp.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Select value={pauseMode} onValueChange={(val) => setPauseMode(val ?? "handoff_active")}>
-                  <SelectTrigger className="w-full text-xs">
-                    <SelectValue placeholder="Selecione o modo de pausa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="handoff_active" className="text-xs">
-                      Pausar e transferir conversas ativas para humanos
-                    </SelectItem>
-                    <SelectItem value="finish_active" className="text-xs">
-                      Concluir conversas atuais e não iniciar novas
-                    </SelectItem>
-                    <SelectItem value="pause_immediately" className="text-xs">
-                      Pausar imediatamente sem transferir
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  O backend valida essa flag antes de cada mensagem no WhatsApp. Nenhuma IA responde quando desativado.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card variant="subtle">
-              <CardHeader>
-                <CardTitle className="text-base font-bold">Identidade & Mensagem Inicial</CardTitle>
-                <CardDescription>Nome do assistente e saudação enviada ao lead.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 max-w-md">
                   <Label className="text-xs font-semibold">Nome do Assistente Virtual</Label>
-                  <Input value={assistantName} onChange={(e) => setAssistantName(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Saudação Inicial no WhatsApp</Label>
-                  <Textarea
-                    rows={3}
-                    value={initialMessage}
-                    onChange={(e) => setInitialMessage(e.target.value)}
+                  <Input
+                    value={assistantName}
+                    onChange={(e) => setAssistantName(e.target.value)}
+                    className="text-xs"
                   />
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Saudação Inicial (Primeiro Contato)</Label>
+                    <Textarea
+                      rows={4}
+                      value={initialMessage}
+                      onChange={(e) => setInitialMessage(e.target.value)}
+                      className="text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Mensagem de Transferência Humana</Label>
+                    <Textarea
+                      rows={4}
+                      value={handoffMessage}
+                      onChange={(e) => setHandoffMessage(e.target.value)}
+                      className="text-xs leading-relaxed"
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        {/* ─── ABA 2: NÚMEROS DE TESTE DEV ─── */}
-        <TabsContent value="test_environment" className="space-y-6 pt-4">
-          <Card variant="subtle">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Cadastro de Números de Teste Autorizados</CardTitle>
-              <CardDescription>
-                Números cadastrados aqui possuem isolamento total: não afetam métricas comerciais reais, não distribuem para a fila de corretores e aceitam comandos administrativos (`/reset`, `/status`, `/restart`).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <form onSubmit={handleAddTestNumber} className="flex flex-col sm:flex-row gap-3">
-                <Input
-                  placeholder="Número (ex: +5571999999999)"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  className="sm:w-64"
-                />
-                <Input
-                  placeholder="Identificação (ex: Celular do Dev Vinicios)"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="submit" className="gap-2">
-                  <Plus className="size-4" /> Cadastrar Número
-                </Button>
-              </form>
-
-              <div className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Números Autorizados ({testNumbers.length})
-                </h4>
-                {testNumbers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Nenhum número de teste cadastrado.</p>
-                ) : (
-                  <div className="divide-y border rounded-lg">
-                    {testNumbers.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between p-3 text-xs">
-                        <div>
-                          <p className="font-semibold text-foreground">{t.label}</p>
-                          <p className="font-mono text-muted-foreground">{t.phoneNumber}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">Isolado de Métricas</Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveTestNumber(t.id)}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ─── ABA 3: SIMULADOR WEB ─── */}
-        <TabsContent value="simulator" className="space-y-6 pt-4">
-          <div className="grid gap-6 lg:grid-cols-12">
-            <Card variant="subtle" className="lg:col-span-7 flex flex-col h-[500px]">
-              <CardHeader className="border-b pb-3">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <MessageSquare className="size-4 text-primary" />
-                  Simulador de Atendimento WhatsApp
+          {/* ─── TAB 3: NÚMEROS DE TESTE DEV ─── */}
+          <TabsContent value="test_environment" className="space-y-6 pt-2">
+            <Card variant="subtle" className="rounded-xl border-border/80">
+              <CardHeader>
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Phone className="size-4 text-sky-500" />
+                  Números de Teste de Desenvolvedor & QA
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  Cadastre números para testar o bot sem contaminar métricas de conversão reais nem enviar leads de teste para corretores.
+                </CardDescription>
               </CardHeader>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {simMessages.map((m, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
+              <CardContent className="space-y-6">
+                <form onSubmit={handleAddTestNumber} className="flex flex-col sm:flex-row gap-3">
+                  <Input
+                    placeholder="Telefone (ex: +5571999999999)"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    className="sm:w-64 text-xs"
+                  />
+                  <Input
+                    placeholder="Identificação (ex: Celular Dev Vinicios)"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    className="flex-1 text-xs"
+                  />
+                  <Button type="submit" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <Plus className="size-3.5" /> Cadastrar Número
+                  </Button>
+                </form>
+
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Números Autorizados ({testNumbers.length})
+                  </h4>
+                  {testNumbers.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">Nenhum número de teste cadastrado.</p>
+                  ) : (
+                    <div className="divide-y border rounded-xl overflow-hidden bg-card">
+                      {testNumbers.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between p-3 text-xs">
+                          <div>
+                            <p className="font-semibold text-foreground">{t.label}</p>
+                            <p className="font-mono text-muted-foreground text-[11px]">{t.phoneNumber}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              Isolado de Métricas
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveTestNumber(t.id)}
+                              className="size-7 text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ─── TAB 4: SIMULADOR WEB DINÂMICO ─── */}
+          <TabsContent value="simulator" className="space-y-6 pt-2">
+            <div className="grid gap-6 lg:grid-cols-12">
+              <Card variant="subtle" className="lg:col-span-7 flex flex-col h-[520px] rounded-xl border-border/80 overflow-hidden">
+                <CardHeader className="border-b pb-3 bg-muted/20 flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <MessageSquare className="size-4 text-primary" />
+                    Simulador Interno de WhatsApp
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRestartSimulator}
+                    className="gap-1.5 text-xs h-7 px-2.5"
                   >
+                    <RefreshCw className="size-3" /> Reiniciar Conversa
+                  </Button>
+                </CardHeader>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-card">
+                  {simMessages.map((m, idx) => (
                     <div
-                      className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                        m.sender === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted border border-border/60 text-foreground"
-                      }`}
+                      key={idx}
+                      className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      {m.text}
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed ${
+                          m.sender === "user"
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "bg-muted/80 border border-border/60 text-foreground"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleSimSendMessage} className="border-t p-3 flex gap-2 bg-card">
+                  <Input
+                    placeholder="Responda à pergunta da IA..."
+                    value={simInput}
+                    onChange={(e) => setSimInput(e.target.value)}
+                    className="text-xs"
+                  />
+                  <Button type="submit" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <Send className="size-3.5" /> Enviar
+                  </Button>
+                </form>
+              </Card>
+
+              <Card variant="subtle" className="lg:col-span-5 h-[520px] rounded-xl border-border/80 overflow-y-auto">
+                <CardHeader className="border-b pb-3 bg-muted/20">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Bot className="size-4 text-primary" />
+                    Inspetor de Estado & Diagnóstico
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4 text-xs">
+                  <div>
+                    <span className="font-semibold text-muted-foreground uppercase text-[10px]">
+                      Etapa do Fluxo
+                    </span>
+                    <p className="font-medium text-foreground mt-0.5">
+                      {stepTitles[Math.min(stepIndex, stepTitles.length - 1)]}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold text-muted-foreground uppercase text-[10px]">
+                      Memória Estruturada
+                    </span>
+                    <div className="mt-1 rounded-lg border border-border/60 bg-muted/30 p-2.5 font-mono text-[11px] space-y-1">
+                      {Object.keys(simMemory).length === 0 ? (
+                        <p className="text-muted-foreground italic">Nenhum dado coletado ainda.</p>
+                      ) : (
+                        Object.entries(simMemory).map(([k, v]) => (
+                          <p key={k}>
+                            <span className="text-primary font-semibold">{k}</span>: &quot;{v}&quot;
+                          </p>
+                        ))
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-              <form onSubmit={handleSimSendMessage} className="border-t p-3 flex gap-2">
-                <Input
-                  placeholder="Digite como se fosse um cliente..."
-                  value={simInput}
-                  onChange={(e) => setSimInput(e.target.value)}
-                  className="text-xs"
-                />
-                <Button type="submit" size="sm" className="gap-1.5">
-                  <Send className="size-3.5" /> Enviar
-                </Button>
-              </form>
-            </Card>
 
-            <Card variant="subtle" className="lg:col-span-5 h-[500px] overflow-y-auto">
-              <CardHeader className="border-b pb-3">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <Bot className="size-4 text-primary" />
-                  Inspetor de Estado & Memória
+                  <div>
+                    <span className="font-semibold text-muted-foreground uppercase text-[10px]">
+                      Score da Qualificação
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant={currentScore >= 70 ? "success" : currentScore >= 40 ? "secondary" : "outline"}>
+                        {currentScore} pontos ({currentScore >= 70 ? "Lead Quente" : currentScore >= 40 ? "Morno" : "Início"})
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* ─── TAB 5: RESET DE MEMÓRIA ─── */}
+          <TabsContent value="memory_reset" className="space-y-6 pt-2">
+            <Card variant="subtle" className="rounded-xl border-border/80 max-w-2xl">
+              <CardHeader>
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <RotateCcw className="size-4 text-destructive" />
+                  Reset Administrativo da Memória da IA
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  Reinicie a qualificação de um lead sem apagar o histórico de auditoria nem o cadastro comercial.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 pt-4 text-xs">
-                <div>
-                  <span className="font-semibold text-muted-foreground uppercase text-[10px]">
-                    Etapa Atual
-                  </span>
-                  <p className="font-medium text-foreground">1. Coletar Cidade de Atendimento</p>
-                </div>
-
-                <div>
-                  <span className="font-semibold text-muted-foreground uppercase text-[10px]">
-                    Dados Coletados
-                  </span>
-                  <div className="mt-1 rounded bg-muted/40 p-2 font-mono text-[11px] space-y-1">
-                    <p>plano: &quot;individual&quot;</p>
-                    <p>pessoas: &quot;1&quot;</p>
-                    <p>cidade: &quot;Salvador&quot;</p>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleResetMemory} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">ID do Lead</Label>
+                    <Input
+                      placeholder="ID do lead"
+                      value={resetLeadId}
+                      onChange={(e) => setResetLeadId(e.target.value)}
+                      className="text-xs"
+                    />
                   </div>
-                </div>
-
-                <div>
-                  <span className="font-semibold text-muted-foreground uppercase text-[10px]">
-                    Score Calculado
-                  </span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="success">85 pontos (Quente)</Badge>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Motivo do Reset</Label>
+                    <Input
+                      placeholder="Ex: Reinício para teste dev"
+                      value={resetReason}
+                      onChange={(e) => setResetReason(e.target.value)}
+                      className="text-xs"
+                    />
                   </div>
-                </div>
+                  <Button type="submit" variant="destructive" size="sm" className="gap-1.5 text-xs font-semibold">
+                    <RotateCcw className="size-3.5" /> Executar Reset da Memória
+                  </Button>
+                </form>
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
-
-        {/* ─── ABA 4: RESET DE MEMÓRIA ─── */}
-        <TabsContent value="memory_reset" className="space-y-6 pt-4">
-          <Card variant="subtle">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Reset Administrativo de Memória</CardTitle>
-              <CardDescription>
-                Reinicie a sessão da IA de um lead específico sem apagar o cadastro do cliente nem a auditoria imutável do sistema.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form onSubmit={handleResetMemory} className="space-y-4 max-w-md">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">ID do Lead</Label>
-                  <Input
-                    placeholder="ID do lead a ser resetado"
-                    value={resetLeadId}
-                    onChange={(e) => setResetLeadId(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Motivo do Reset</Label>
-                  <Input
-                    placeholder="Ex: Reset de teste durante atendimento dev"
-                    value={resetReason}
-                    onChange={(e) => setResetReason(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" variant="destructive" className="gap-2">
-                  <RotateCcw className="size-4" /> Resetar Memória da IA
-                </Button>
-              </form>
-
-              {resetStatus && (
-                <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 text-xs text-primary font-medium">
-                  <CheckCircle2 className="size-4" />
-                  {resetStatus}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }

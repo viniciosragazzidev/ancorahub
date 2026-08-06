@@ -17,9 +17,5 @@ export default async function QualificacaoPage() {
     getTenantTestNumbers(context.tenantId),
   ]);
 
-  return (
-    <div className="space-y-6">
-      <QualificationHubClient settings={settings} testNumbers={testNumbers} />
-    </div>
-  );
+  return <QualificationHubClient settings={settings} testNumbers={testNumbers} />;
 }
