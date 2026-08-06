@@ -29,7 +29,8 @@
     "agent:record": "tsx scripts/agent/generate-implementation-record.ts",
     "build:extension": "node scripts/build-browser-extension.mjs",
     "deploy:preview": "vercel",
-    "deploy:prod": "vercel --prod"
+    "deploy:prod": "vercel --prod",
+    "ui:audit": "tsx scripts/ui/audit-ui-components.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.17",

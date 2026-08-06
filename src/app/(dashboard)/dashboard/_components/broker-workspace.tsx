@@ -104,7 +104,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
           <TodayLink count={data.today.pendingProposals} href="/leads" icon={Target} label="Cotações para acompanhar" tone="normal" />
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.85fr)]">
+        <section className="grid gap-5">
           <Card variant="subtle" data-onboarding="lead-queue">
             <CardHeader className="flex-row items-start justify-between gap-3">
               <div className="min-w-0 flex-1"><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
@@ -122,9 +122,9 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
             </CardContent>
           </Card>
 
-          <div className="grid gap-5">
-            <OnboardingChecklist />
+          <OnboardingChecklist />
 
+          <div className="grid gap-5 lg:grid-cols-2">
             <Card variant="subtle" data-onboarding="daily-tasks">
               <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Button render={<Link href="/tarefas" />} size="sm" variant="ghost" className="shrink-0">Ver todas</Button></CardHeader>
               <CardContent>

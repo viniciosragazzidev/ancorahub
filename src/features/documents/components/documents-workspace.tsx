@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { OwnershipContext } from "@/components/ownership-context";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
@@ -436,34 +437,28 @@ export function DocumentsWorkspace({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="carrierId">Operadora vinculada (Opcional)</Label>
-                  <select
+                  <AppSelect
                     id="carrierId"
                     name="carrierId"
-                    className="flex h-9 w-full rounded-lg border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  >
-                    <option value="">Todas as operadoras</option>
-                    {carriers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Todas as operadoras"
+                    options={[
+                      { value: "", label: "Todas as operadoras" },
+                      ...carriers.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="planId">Plano específico (Opcional)</Label>
-                  <select
+                  <AppSelect
                     id="planId"
                     name="planId"
-                    className="flex h-9 w-full rounded-lg border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  >
-                    <option value="">Todos os planos</option>
-                    {plans.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.carrierName} - {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Todos os planos"
+                    options={[
+                      { value: "", label: "Todos os planos" },
+                      ...plans.map((p) => ({ value: p.id, label: `${p.carrierName} - ${p.name}` })),
+                    ]}
+                  />
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">

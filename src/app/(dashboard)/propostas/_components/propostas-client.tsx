@@ -211,7 +211,7 @@ export function PropostasClient({
   return (
     <div className="space-y-6">
       {/* Overview stats cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3" data-onboarding="quote-results">
         <Card className="border border-border/60 shadow-sm bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -273,7 +273,7 @@ export function PropostasClient({
             <Sheet open={createOpen} onOpenChange={setCreateOpen}>
               <SheetTrigger
                 render={
-                  <Button size="sm" className="gap-2 text-xs">
+                  <Button size="sm" className="gap-2 text-xs" data-onboarding="generate-quote-pdf">
                     <Plus className="h-4 w-4" /> Criar Proposta
                   </Button>
                 }
@@ -285,7 +285,7 @@ export function PropostasClient({
                     Monte uma nova proposta para o lead selecionado definindo validade, cotacao e documentos.
                   </SheetDescription>
                 </SheetHeader>
-                <form onSubmit={handleCreateSubmit} className="space-y-4 pt-4">
+                <form onSubmit={handleCreateSubmit} className="space-y-4 pt-4" data-onboarding="quote-beneficiaries">
                   <div className="space-y-1">
                     <Label htmlFor="leadId" className="text-xs">
                       Lead correspondente

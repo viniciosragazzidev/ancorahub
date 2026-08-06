@@ -236,6 +236,87 @@ function SelectScrollDownButton({
   )
 }
 
+export type SelectOption = {
+  value: string;
+  label: React.ReactNode;
+  disabled?: boolean;
+};
+
+export type AppSelectProps = {
+  name?: string;
+  id?: string;
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  required?: boolean;
+  size?: "sm" | "default";
+  className?: string;
+  triggerClassName?: string;
+  contentClassName?: string;
+  "aria-label"?: string;
+};
+
+function AppSelect({
+  name,
+  id,
+  value: controlledValue,
+  defaultValue,
+  onValueChange,
+  options,
+  placeholder = "Selecione...",
+  disabled,
+  required,
+  size = "default",
+  className,
+  triggerClassName,
+  contentClassName,
+  "aria-label": ariaLabel,
+}: AppSelectProps) {
+  const [internalValue, setInternalValue] = React.useState<string>(
+    controlledValue ?? defaultValue ?? ""
+  );
+
+  const currentValue = controlledValue !== undefined ? controlledValue : internalValue;
+
+  const handleChange = (nextValue: string | null) => {
+    const val = nextValue ?? "";
+    if (controlledValue === undefined) {
+      setInternalValue(val);
+    }
+    onValueChange?.(val);
+  };
+
+  return (
+    <div className={cn("relative inline-block w-full", className)}>
+      {name ? <input type="hidden" name={name} value={currentValue} required={required} /> : null}
+      <Select
+        value={currentValue}
+        onValueChange={handleChange}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          size={size}
+          aria-label={ariaLabel}
+          className={cn("w-full", triggerClassName)}
+        >
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className={contentClassName}>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export {
   Select,
   SelectContent,
@@ -247,4 +328,6 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  AppSelect,
 }
+

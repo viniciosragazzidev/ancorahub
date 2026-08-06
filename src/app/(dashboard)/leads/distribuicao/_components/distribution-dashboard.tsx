@@ -20,6 +20,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppSelect } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   toggleAcceptingLeadsAction,
@@ -127,7 +128,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
-    <Card className="border-transparent bg-transparent shadow-none">
+    <Card className="border-transparent bg-transparent shadow-none" data-onboarding="manager-sla-monitoring">
       <CardHeader className="gap-4 border-b border-border">
         <div>
           <CardTitle>Corretores da unidade</CardTitle>
@@ -138,16 +139,28 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
             <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input aria-label="Buscar corretor" className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15" onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por nome, ID ou e-mail..." value={search} />
           </div>
-          <select aria-label="Filtrar por filial" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" onChange={(event) => { setBranch(event.target.value); setPage(1); }} value={branch}>
-            <option value="all">Todas as filiais</option>
-            {branches.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-          <select aria-label="Filtrar por status" className="h-9 rounded-lg border border-input bg-background px-3 text-sm" onChange={(event) => { setStatus(event.target.value as typeof status); setPage(1); }} value={status}>
-            <option value="all">Todos os status</option>
-            <option value="available">Recebendo leads</option>
-            <option value="paused">Pausados</option>
-            <option value="offline">Offline</option>
-          </select>
+          <AppSelect
+            aria-label="Filtrar por filial"
+            className="w-full sm:w-44"
+            value={branch}
+            onValueChange={(val) => { setBranch(val); setPage(1); }}
+            options={[
+              { value: "all", label: "Todas as filiais" },
+              ...branches.map((item) => ({ value: item, label: item })),
+            ]}
+          />
+          <AppSelect
+            aria-label="Filtrar por status"
+            className="w-full sm:w-44"
+            value={status}
+            onValueChange={(val) => { setStatus(val as typeof status); setPage(1); }}
+            options={[
+              { value: "all", label: "Todos os status" },
+              { value: "available", label: "Recebendo leads" },
+              { value: "paused", label: "Pausados" },
+              { value: "offline", label: "Offline" },
+            ]}
+          />
         </div>
       </CardHeader>
       <CardContent className="p-0">

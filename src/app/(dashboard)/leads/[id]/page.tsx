@@ -157,7 +157,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
 
         {/* Profile Cover & Header Card */}
-        <div className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-none sm:px-5">
+        <div className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-none sm:px-5" data-onboarding="lead-profile">
           {/* Subtle brand color cover warning */}
           <div className="hidden" />
 
@@ -396,7 +396,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </TabsContent>
 
             <TabsContent value="history" className="mt-4">
-              <Card className="border-border bg-card shadow-sm">
+              <Card className="border-border bg-card shadow-sm" data-onboarding="lead-timeline">
                 <CardContent className="pt-6">
                   <LeadTimeline leadId={lead.id} interactions={interactions} />
                 </CardContent>
@@ -404,7 +404,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </TabsContent>
 
             <TabsContent value="tasks" className="mt-4" id="tarefas">
-              <Card className="border-border bg-card shadow-sm">
+              <Card className="border-border bg-card shadow-sm" data-onboarding="create-follow-up">
                 <CardContent className="pt-6">
                   <LeadTasks assignees={context.role === "broker" ? [{ id: context.userId, name: lead.corretorNome ?? "Eu" }] : brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />
                 </CardContent>

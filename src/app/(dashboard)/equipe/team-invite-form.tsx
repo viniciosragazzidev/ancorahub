@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 
 export function TeamInviteForm({
   action,
@@ -62,18 +62,16 @@ export function TeamInviteForm({
       </fieldset>
       <div className="space-y-2">
         <Label htmlFor="team-branch">Filial</Label>
-        <select
-          className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm"
+        <AppSelect
           id="team-branch"
           name="branchId"
           required
-        >
-          {branches.filter(Boolean).map((branch) => (
-            <option key={branch.id} value={branch.id}>
-              {branch.name}
-            </option>
-          ))}
-        </select>
+          options={branches.filter(Boolean).map((branch) => ({
+            value: branch.id,
+            label: branch.name,
+          }))}
+          defaultValue={branches[0]?.id}
+        />
       </div>
       <Button className="w-full" type="submit">
         Enviar convite

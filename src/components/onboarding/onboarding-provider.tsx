@@ -16,6 +16,8 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       <NextStep
         steps={allOnboardingTours}
         cardComponent={OnboardingCard}
+        overlayZIndex={9999}
+        clickThroughOverlay={false}
         onStart={(tourName) => {
           if (tourName) {
             void updateUserTourProgressAction({

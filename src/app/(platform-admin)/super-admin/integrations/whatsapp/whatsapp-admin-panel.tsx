@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 import { disconnectWhatsAppTenantAction, connectWhatsAppTenantAction, validateWhatsAppTenantAction } from "./actions";
 
 type Tenant = { id: string; name: string; status: string };
@@ -48,7 +49,17 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
       <CardHeader><CardTitle>Configurar canal oficial</CardTitle><CardDescription>Selecione a empresa, valide os dados diretamente na Meta e só então salve a conexão.</CardDescription></CardHeader>
       <CardContent>
         <form action={submit} className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-1.5 lg:col-span-2"><Label htmlFor="tenantId">Empresa</Label><select className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" id="tenantId" name="tenantId" onChange={(event) => setTenantId(event.target.value)} value={tenantId} required>{tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name} · {tenant.status}</option>)}</select></div>
+          <div className="space-y-1.5 lg:col-span-2">
+            <Label htmlFor="tenantId">Empresa</Label>
+            <AppSelect
+              id="tenantId"
+              name="tenantId"
+              value={tenantId}
+              onValueChange={setTenantId}
+              required
+              options={tenants.map((t) => ({ value: t.id, label: `${t.name} · ${t.status}` }))}
+            />
+          </div>
           {selectedConnection ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm lg:col-span-2"><p className="font-medium">Esta empresa já possui um canal</p><p className="mt-1 text-muted-foreground">Uma nova conexão substituirá somente após validação e não pode usar um número associado a outro tenant.</p></div> : null}
           <div className="space-y-1.5"><Label htmlFor="displayName">Nome do canal</Label><Input id="displayName" name="displayName" placeholder="Canal Oficial" required /></div>
           <div className="space-y-1.5"><Label htmlFor="displayPhoneNumber">Número exibido</Label><Input id="displayPhoneNumber" name="displayPhoneNumber" placeholder="+55 21 99449-6129" required /></div>

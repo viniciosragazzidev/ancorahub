@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppSelect } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { newRoadmapItems, roadmapDays, roadmapItems, type RoadmapStatus } from "@/features/roadmap/roadmap-data";
 import { getSystemSettings } from "@/features/system-settings/queries";
@@ -209,25 +210,25 @@ export default async function RoadmapPage() {
               <form action={updateSystemSettingsAction} className="flex flex-wrap items-end gap-4">
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-medium text-muted-foreground">Central de Atenção</span>
-                  <select
+                  <AppSelect
                     name="centralAtencaoEnabled"
                     defaultValue={centralAtencaoEnabled ? "true" : "false"}
-                    className="rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
-                  >
-                    <option value="true">Ativada (Live)</option>
-                    <option value="false">Desativada</option>
-                  </select>
+                    options={[
+                      { value: "true", label: "Ativada (Live)" },
+                      { value: "false", label: "Desativada" },
+                    ]}
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-medium text-muted-foreground">CRM comercial</span>
-                  <select
+                  <AppSelect
                     name="commercialWorkspaceEnabled"
                     defaultValue={commercialWorkspaceEnabled ? "true" : "false"}
-                    className="rounded-md border border-border bg-background px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
-                  >
-                    <option value="true">Ativado</option>
-                    <option value="false">Desativado</option>
-                  </select>
+                    options={[
+                      { value: "true", label: "Ativado" },
+                      { value: "false", label: "Desativado" },
+                    ]}
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <span className="text-[11px] font-medium text-muted-foreground">Dias para Estagnação</span>

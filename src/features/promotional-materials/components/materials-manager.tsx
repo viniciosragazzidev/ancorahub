@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Eye, EyeSlash, PencilSimple, Plus, Trash, X } from "@/components/huge-icons";
 import {
@@ -200,32 +201,29 @@ export function MaterialsManager({ materials }: { materials: Material[] }) {
 
               <label className="grid gap-1.5 text-sm">
                 <span>Categoria *</span>
-                <select
-                  className={selectClassName}
+                <AppSelect
                   name="category"
                   value={formData.category}
-                  onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
+                  onValueChange={(val) => setFormData((p) => ({ ...p, category: val }))}
                   required
-                >
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  options={Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
+                    value: key,
+                    label,
+                  }))}
+                />
               </label>
 
               <label className="grid gap-1.5 text-sm">
                 <span>Status</span>
-                <select
-                  className={selectClassName}
+                <AppSelect
                   name="active"
                   value={formData.active}
-                  onChange={(e) => setFormData((p) => ({ ...p, active: e.target.value }))}
-                >
-                  <option value="true">Ativo</option>
-                  <option value="false">Inativo</option>
-                </select>
+                  onValueChange={(val) => setFormData((p) => ({ ...p, active: val }))}
+                  options={[
+                    { value: "true", label: "Ativo" },
+                    { value: "false", label: "Inativo" },
+                  ]}
+                />
               </label>
 
               <label className="grid gap-1.5 text-sm sm:col-span-2">

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   confirmManualMetaLeadAdsAssetsAction,
@@ -148,7 +149,19 @@ function LeadAdsWizard({ props }: { props: Props }) {
 }
 
 function AssetSelect({ label, value, onChange, items }: { label: string; value: string; onChange(value: string): void; items: Asset[] }) {
-  return <label className="grid gap-1.5 text-sm font-medium">{label}<select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Não selecionar agora</option>{items.map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>;
+  return (
+    <label className="grid gap-1.5 text-sm font-medium">
+      {label}
+      <AppSelect
+        value={value}
+        onValueChange={onChange}
+        options={[
+          { value: "", label: "Não selecionar agora" },
+          ...items.map((item) => ({ value: item.id, label: item.name || item.id })),
+        ]}
+      />
+    </label>
+  );
 }
 
 export function MetaManualIntegrationWorkspace(props: Props) {

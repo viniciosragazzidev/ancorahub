@@ -7,6 +7,7 @@ import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -168,20 +169,22 @@ export default function SuperAdminDashboardPage() {
               <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/40 border-b border-border/45">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Tabela</label>
-                  <select
-                    className="h-8 rounded-md border border-input bg-background px-2 text-xs font-semibold text-foreground focus:ring-1 focus:ring-primary outline-none"
+                  <AppSelect
+                    size="sm"
+                    className="w-56"
                     value={selectedTable}
-                    onChange={(e) => setSelectedTable(e.target.value)}
-                  >
-                    <option value="tenants">tenants (Empresas)</option>
-                    <option value="user">user (Contas)</option>
-                    <option value="leads">leads (Clientes potenciais)</option>
-                    <option value="auditLogs">audit_logs (Operacional)</option>
-                    <option value="platformAuditLogs">platform_audit_logs (Admin)</option>
-                    <option value="session">session (Login BetterAuth)</option>
-                    <option value="leadInteractions">lead_interactions (Históricos)</option>
-                    <option value="leadDocuments">lead_documents (Documentos)</option>
-                  </select>
+                    onValueChange={setSelectedTable}
+                    options={[
+                      { value: "tenants", label: "tenants (Empresas)" },
+                      { value: "user", label: "user (Contas)" },
+                      { value: "leads", label: "leads (Clientes potenciais)" },
+                      { value: "auditLogs", label: "audit_logs (Operacional)" },
+                      { value: "platformAuditLogs", label: "platform_audit_logs (Admin)" },
+                      { value: "session", label: "session (Login BetterAuth)" },
+                      { value: "leadInteractions", label: "lead_interactions (Históricos)" },
+                      { value: "leadDocuments", label: "lead_documents (Documentos)" },
+                    ]}
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1">

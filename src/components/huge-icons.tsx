@@ -130,6 +130,7 @@ const aliases: Record<string, string> = {
   SignOut: "Logout01Icon",
   SlidersHorizontal: "SlidersHorizontalIcon",
   SquaresFour: "DashboardSquare01Icon",
+  Sparkle: "SparklesIcon",
   SunDim: "Sun03Icon",
   Target: "Target01Icon",
   Trash: "Delete02Icon",
@@ -151,6 +152,7 @@ const aliases: Record<string, string> = {
   XIcon: "Cancel01Icon",
   CircleCheckIcon: "CheckmarkCircle02Icon",
   ArrowsClockwise: "RefreshIcon",
+  Redistribute: "ArrowDataTransferHorizontalIcon",
   HelpCircle: "HelpCircleIcon",
   Megaphone: "MegaphoneIcon",
   ShareAll: "ShareAllIcon",
@@ -388,3 +390,5 @@ export const WifiHigh = staticAnimated("WifiHigh");
 
 export const Megaphone = staticAnimated("Megaphone");
 export const ShareAll = staticAnimated("ShareAll");
+export const Sparkle = staticAnimated("Sparkle");
+export const Redistribute = staticAnimated("Redistribute");

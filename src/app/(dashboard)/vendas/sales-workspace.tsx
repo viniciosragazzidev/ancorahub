@@ -10,6 +10,7 @@ import { FileArrowDown } from "@/components/huge-icons";
 import { SaleStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { StatCard } from "@/components/dashboard/metric-card";
@@ -314,16 +315,18 @@ export function SalesWorkspace({
         }
         headerSlot={
           <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "cancelled")}
-              className="h-9 rounded-md border border-input bg-background px-3 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            <AppSelect
               aria-label="Filtrar por status"
-            >
-              <option value="all">Todas as vendas</option>
-              <option value="active">Ativas</option>
-              <option value="cancelled">Canceladas</option>
-            </select>
+              size="sm"
+              className="w-40"
+              value={statusFilter}
+              onValueChange={(val) => setStatusFilter(val as "all" | "active" | "cancelled")}
+              options={[
+                { value: "all", label: "Todas as vendas" },
+                { value: "active", label: "Ativas" },
+                { value: "cancelled", label: "Canceladas" },
+              ]}
+            />
 
             <Button
               size="sm"

@@ -19,6 +19,7 @@ import {
   Megaphone,
   Monitor,
   Note,
+  Redistribute,
   SignOut,
   SlidersHorizontal,
   Target,
@@ -75,6 +76,8 @@ const navSections: SidebarSection[] = [
       { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
       { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
       { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
+      { label: "Redistribuição", icon: Redistribute, url: "/leads/distribuicao", permission: "leads_reassign" },
+      { label: "Plantão", icon: WifiHigh, url: "/leads/distribuicao/plantao", permission: "duty_schedules_manage" },
     ],
   },
   {

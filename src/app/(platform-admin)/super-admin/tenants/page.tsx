@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { CreateTenantForm } from "@/features/platform-admin/components/create-tenant-form";
@@ -117,15 +118,17 @@ export default async function SuperAdminTenantsPage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="plan" className="text-xs">Plano de Licença</Label>
-                  <select
+                  <AppSelect
                     name="subscriptionPlan"
                     id="plan"
-                    className="h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm"
-                  >
-                    <option value="starter">Iniciante (Starter)</option>
-                    <option value="growth">Crescimento (Growth)</option>
-                    <option value="enterprise">Corporativo (Enterprise)</option>
-                  </select>
+                    size="sm"
+                    defaultValue="starter"
+                    options={[
+                      { value: "starter", label: "Iniciante (Starter)" },
+                      { value: "growth", label: "Crescimento (Growth)" },
+                      { value: "enterprise", label: "Corporativo (Enterprise)" },
+                    ]}
+                  />
                 </div>
                 <Button size="sm" type="submit" className="w-full text-xs font-semibold h-8 mt-2">
                   Criar Empresa

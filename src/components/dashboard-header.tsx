@@ -25,7 +25,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-10 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-border/80 bg-card/95 px-5 shadow-[0_1px_0_rgb(15_23_42/0.02)] backdrop-blur-sm lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
+      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-border/80 bg-none px-5 shadow-[0_1px_0_rgb(15_23_42/0.02)] backdrop-blur-sm lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
 

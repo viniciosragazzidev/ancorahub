@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
@@ -399,16 +400,16 @@ export default async function SuperAdminSettingsPage() {
                     {/* Provedor Primário */}
                     <div className="space-y-2">
                       <label className="text-sm font-semibold">Provedor Primário</label>
-                      <select
+                      <AppSelect
                         name="primaryProvider"
                         defaultValue={aiPrimaryProvider}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="groq">Groq (Llama 3.3 / Llama 3)</option>
-                        <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
-                        <option value="google">Google Gemini (Gemini 2.5 Flash)</option>
-                        <option value="openrouter">OpenRouter (Modelos Gratuitos & Diversos)</option>
-                      </select>
+                        options={[
+                          { value: "groq", label: "Groq (Llama 3.3 / Llama 3)" },
+                          { value: "openai", label: "OpenAI (GPT-4o / GPT-4o-mini)" },
+                          { value: "google", label: "Google Gemini (Gemini 2.5 Flash)" },
+                          { value: "openrouter", label: "OpenRouter (Modelos Gratuitos & Diversos)" },
+                        ]}
+                      />
                       <p className="text-xs text-muted-foreground">Provedor principal utilizado para completar requisições.</p>
                     </div>
 
@@ -426,17 +427,17 @@ export default async function SuperAdminSettingsPage() {
                     {/* Provedor de Fallback */}
                     <div className="space-y-2">
                       <label className="text-sm font-semibold">Provedor de Fallback</label>
-                      <select
+                      <AppSelect
                         name="fallbackProvider"
                         defaultValue={aiFallbackProvider}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="none">Nenhum (Disparar erro em caso de falha)</option>
-                        <option value="groq">Groq</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="google">Google Gemini</option>
-                        <option value="openrouter">OpenRouter</option>
-                      </select>
+                        options={[
+                          { value: "none", label: "Nenhum (Disparar erro em caso de falha)" },
+                          { value: "groq", label: "Groq" },
+                          { value: "openai", label: "OpenAI" },
+                          { value: "google", label: "Google Gemini" },
+                          { value: "openrouter", label: "OpenRouter" },
+                        ]}
+                      />
                       <p className="text-xs text-muted-foreground">Provedor utilizado caso o primário retorne erro ou atinja limite.</p>
                     </div>
 

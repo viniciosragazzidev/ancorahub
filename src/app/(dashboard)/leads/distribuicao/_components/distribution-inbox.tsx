@@ -6,29 +6,260 @@ import { ArrowRight, CheckCircle, MagicWand, UserList } from "@/components/huge-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { assignLeadToBrokerAction, distributeLeadBatchAction, distributeLeadAutomaticallyAction, routeAndAssignLeadAction, routeLeadToBranchAction, type DistributionActionState } from "@/features/lead-distribution/actions";
+import { AppSelect } from "@/components/ui/select";
+import {
+  assignLeadToBrokerAction,
+  distributeLeadBatchAction,
+  distributeLeadAutomaticallyAction,
+  routeAndAssignLeadAction,
+  routeLeadToBranchAction,
+  type DistributionActionState,
+} from "@/features/lead-distribution/actions";
 
 type Lead = { id: string; name: string; phone: string; branchId: string | null; distributionStatus: string; createdAt: string };
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string; branchId: string | null; activeLeads: number; availabilityStatus: "available" | "paused" | "offline" };
 
-function Feedback({ state }: { state: DistributionActionState }) { if (state.success && state.message) toast.success(state.message); if (state.error) toast.error(state.error); return null; }
-
-function ActionForm({ action, children, fields }: { action: (previous: DistributionActionState, formData: FormData) => Promise<DistributionActionState>; children: React.ReactNode; fields: Record<string, string> }) {
-  const [state, formAction, pending] = useActionState(action, {});
-  return <form action={formAction} className="flex flex-wrap items-center gap-2">{Object.entries(fields).map(([name, value]) => <input key={name} name={name} type="hidden" value={value} />)}<Button disabled={pending} size="sm" type="submit" variant="outline">{children}</Button><Feedback state={state} /></form>;
+function Feedback({ state }: { state: DistributionActionState }) {
+  if (state.success && state.message) toast.success(state.message);
+  if (state.error) toast.error(state.error);
+  return null;
 }
 
-export function DistributionInbox({ role, leads, branches, brokers }: { role: string; leads: Lead[]; branches: Branch[]; brokers: Broker[] }) {
+function ActionForm({
+  action,
+  children,
+  fields,
+}: {
+  action: (previous: DistributionActionState, formData: FormData) => Promise<DistributionActionState>;
+  children: React.ReactNode;
+  fields: Record<string, string>;
+}) {
+  const [state, formAction, pending] = useActionState(action, {});
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
+      {Object.entries(fields).map(([name, value]) => (
+        <input key={name} name={name} type="hidden" value={value} />
+      ))}
+      <Button disabled={pending} size="sm" type="submit" variant="outline">
+        {children}
+      </Button>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function DistributionInbox({
+  role,
+  leads,
+  branches,
+  brokers,
+}: {
+  role: string;
+  leads: Lead[];
+  branches: Branch[];
+  brokers: Broker[];
+}) {
   const [selected, setSelected] = useState<string[]>([]);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const managerBranchId = role === "manager" ? (branches[0]?.id ?? "") : "";
   const [brokerByLead, setBrokerByLead] = useState<Record<string, string>>({});
-  const selectable = leads.filter((lead) => lead.distributionStatus === "unassigned" || lead.distributionStatus === "queued" || lead.distributionStatus === "returned_to_queue");
-  function toggle(id: string) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]); }
+  const selectable = leads.filter(
+    (lead) =>
+      lead.distributionStatus === "unassigned" ||
+      lead.distributionStatus === "queued" ||
+      lead.distributionStatus === "returned_to_queue"
+  );
+  function toggle(id: string) {
+    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  }
   const stateAction = useActionState(distributeLeadBatchAction, {});
   const [batchState, batchAction, batchPending] = stateAction;
-  return <Card className="border-transparent bg-transparent shadow-none"><CardHeader className="border-b border-border"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle className="flex items-center gap-2"><UserList className="size-4 text-primary" /> Inbox geral e fila de distribuição</CardTitle><CardDescription className="mt-1">Leads sem corretor ficam aqui até serem enviados para uma unidade e uma fila.</CardDescription></div>{selected.length ? <form action={batchAction} className="flex flex-wrap items-center gap-2"><input name="leadIds" type="hidden" value={selected.join(",")} />{role === "director" ? <><select aria-label="Unidade de destino" className="h-8 rounded-lg border border-input bg-background px-2 text-xs" name="branchId" value={branchId} onChange={(event) => setBranchId(event.target.value)}>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></> : <input name="branchId" type="hidden" value={managerBranchId} />}<Button disabled={batchPending} size="sm" type="submit"><ArrowRight /> Enviar selecionados</Button><Feedback state={batchState} /></form> : null}</div></CardHeader><CardContent className="p-0">{!selectable.length ? <div className="flex flex-col items-center gap-2 p-10 text-center"><CheckCircle className="size-7 text-success" /><p className="text-sm font-medium">Inbox em dia</p><p className="text-xs text-muted-foreground">Não há leads aguardando unidade ou corretor neste escopo.</p></div> : <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-10 pl-5"><input aria-label="Selecionar todos" checked={selected.length === selectable.length} onChange={() => setSelected(selected.length === selectable.length ? [] : selectable.map((lead) => lead.id))} type="checkbox" /></TableHead><TableHead>Lead</TableHead><TableHead>Destino atual</TableHead><TableHead>Status</TableHead><TableHead className="pr-5 text-right">Próxima ação</TableHead></TableRow></TableHeader><TableBody>{selectable.map((lead) => { const leadBrokers = brokers.filter((broker) => broker.branchId === lead.branchId && broker.availabilityStatus === "available"); return <TableRow key={lead.id}><TableCell className="pl-5"><input aria-label={`Selecionar ${lead.name}`} checked={selected.includes(lead.id)} onChange={() => toggle(lead.id)} type="checkbox" /></TableCell><TableCell><p className="font-medium">{lead.name}</p><p className="text-xs text-muted-foreground">{lead.phone}</p></TableCell><TableCell><span className="text-sm text-muted-foreground">{branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral"}</span></TableCell><TableCell><Badge variant={lead.distributionStatus === "queued" || lead.distributionStatus === "returned_to_queue" ? "warning" : "outline"}>{lead.distributionStatus === "queued" ? "Aguardando corretor" : lead.distributionStatus === "returned_to_queue" ? "Devolvido à fila" : "Aguardando unidade"}</Badge></TableCell>                      <TableCell className="pr-5"><div className="flex flex-wrap justify-end gap-2"><ActionForm action={routeLeadToBranchAction} fields={{ leadId: lead.id, branchId }}><ArrowRight /> Enviar</ActionForm>{lead.branchId ? <><select aria-label={`Corretor para ${lead.name}`} className="h-8 max-w-36 rounded-lg border border-input bg-background px-2 text-xs" value={brokerByLead[lead.id] ?? ""} onChange={(event) => setBrokerByLead((current) => ({ ...current, [lead.id]: event.target.value }))}><option value="">Corretor</option>{leadBrokers.map((broker) => <option key={broker.id} value={broker.id}>{broker.name}</option>)}</select>{brokerByLead[lead.id] ? <ActionForm action={assignLeadToBrokerAction} fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id] }}><UserList /> Atribuir</ActionForm> : null}<ActionForm action={distributeLeadAutomaticallyAction} fields={{ leadId: lead.id }}><MagicWand /> Auto</ActionForm></> : role === "director" ? <><select aria-label={`Corretor para ${lead.name}`} className="h-8 max-w-36 rounded-lg border border-input bg-background px-2 text-xs" value={brokerByLead[lead.id] ?? ""} onChange={(event) => setBrokerByLead((current) => ({ ...current, [lead.id]: event.target.value }))}><option value="">Corretor</option>{brokers.filter((broker) => broker.branchId === branchId && broker.availabilityStatus === "available").map((broker) => <option key={broker.id} value={broker.id}>{broker.name}</option>)}</select>{brokerByLead[lead.id] ? <ActionForm action={routeAndAssignLeadAction} fields={{ leadId: lead.id, branchId, brokerId: brokerByLead[lead.id] }}><UserList /> Rotear + Atribuir</ActionForm> : null}</> : null}</div></TableCell></TableRow>; })}</TableBody></Table></div>}</CardContent></Card>;
+
+  return (
+    <Card className="border-transparent bg-transparent shadow-none" data-onboarding="manager-team-performance">
+      <CardHeader className="border-b border-border">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <UserList className="size-4 text-primary" /> Inbox geral e fila de distribuição
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Leads sem corretor ficam aqui até serem enviados para uma unidade e uma fila.
+            </CardDescription>
+          </div>
+          {selected.length ? (
+            <form action={batchAction} className="flex flex-wrap items-center gap-2">
+              <input name="leadIds" type="hidden" value={selected.join(",")} />
+              {role === "director" ? (
+                <AppSelect
+                  aria-label="Unidade de destino"
+                  name="branchId"
+                  value={branchId}
+                  onValueChange={setBranchId}
+                  size="sm"
+                  className="w-40"
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                />
+              ) : (
+                <input name="branchId" type="hidden" value={managerBranchId} />
+              )}
+              <Button disabled={batchPending} size="sm" type="submit">
+                <ArrowRight /> Enviar selecionados
+              </Button>
+              <Feedback state={batchState} />
+            </form>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {!selectable.length ? (
+          <div className="flex flex-col items-center gap-2 p-10 text-center">
+            <CheckCircle className="size-7 text-success" />
+            <p className="text-sm font-medium">Inbox em dia</p>
+            <p className="text-xs text-muted-foreground">
+              Não há leads aguardando unidade ou corretor neste escopo.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10 pl-5">
+                    <input
+                      aria-label="Selecionar todos"
+                      checked={selected.length === selectable.length}
+                      onChange={() =>
+                        setSelected(selected.length === selectable.length ? [] : selectable.map((lead) => lead.id))
+                      }
+                      type="checkbox"
+                    />
+                  </TableHead>
+                  <TableHead>Lead</TableHead>
+                  <TableHead>Destino atual</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="pr-5 text-right">Próxima ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectable.map((lead) => {
+                  const leadBrokers = brokers.filter(
+                    (broker) => broker.branchId === lead.branchId && broker.availabilityStatus === "available"
+                  );
+                  return (
+                    <TableRow key={lead.id}>
+                      <TableCell className="pl-5">
+                        <input
+                          aria-label={`Selecionar ${lead.name}`}
+                          checked={selected.includes(lead.id)}
+                          onChange={() => toggle(lead.id)}
+                          type="checkbox"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <p className="font-medium">{lead.name}</p>
+                        <p className="text-xs text-muted-foreground">{lead.phone}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            lead.distributionStatus === "queued" || lead.distributionStatus === "returned_to_queue"
+                              ? "warning"
+                              : "outline"
+                          }
+                        >
+                          {lead.distributionStatus === "queued"
+                            ? "Aguardando corretor"
+                            : lead.distributionStatus === "returned_to_queue"
+                            ? "Devolvido à fila"
+                            : "Aguardando unidade"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="pr-5" data-onboarding="manager-redistribute-lead">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <ActionForm action={routeLeadToBranchAction} fields={{ leadId: lead.id, branchId }}>
+                            <ArrowRight /> Enviar
+                          </ActionForm>
+                          {lead.branchId ? (
+                            <>
+                              <AppSelect
+                                aria-label={`Corretor para ${lead.name}`}
+                                size="sm"
+                                className="w-36"
+                                value={brokerByLead[lead.id] ?? ""}
+                                onValueChange={(val) =>
+                                  setBrokerByLead((current) => ({ ...current, [lead.id]: val }))
+                                }
+                                placeholder="Corretor..."
+                                options={[
+                                  { value: "", label: "Corretor" },
+                                  ...leadBrokers.map((b) => ({ value: b.id, label: b.name })),
+                                ]}
+                              />
+                              {brokerByLead[lead.id] ? (
+                                <ActionForm
+                                  action={assignLeadToBrokerAction}
+                                  fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id] }}
+                                >
+                                  <UserList /> Atribuir
+                                </ActionForm>
+                              ) : null}
+                              <ActionForm
+                                action={distributeLeadAutomaticallyAction}
+                                fields={{ leadId: lead.id }}
+                              >
+                                <MagicWand /> Auto
+                              </ActionForm>
+                            </>
+                          ) : role === "director" ? (
+                            <>
+                              <AppSelect
+                                aria-label={`Corretor para ${lead.name}`}
+                                size="sm"
+                                className="w-36"
+                                value={brokerByLead[lead.id] ?? ""}
+                                onValueChange={(val) =>
+                                  setBrokerByLead((current) => ({ ...current, [lead.id]: val }))
+                                }
+                                placeholder="Corretor..."
+                                options={[
+                                  { value: "", label: "Corretor" },
+                                  ...brokers
+                                    .filter((b) => b.branchId === branchId && b.availabilityStatus === "available")
+                                    .map((b) => ({ value: b.id, label: b.name })),
+                                ]}
+                              />
+                              {brokerByLead[lead.id] ? (
+                                <ActionForm
+                                  action={routeAndAssignLeadAction}
+                                  fields={{
+                                    leadId: lead.id,
+                                    branchId,
+                                    brokerId: brokerByLead[lead.id],
+                                  }}
+                                >
+                                  <UserList /> Rotear + Atribuir
+                                </ActionForm>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
