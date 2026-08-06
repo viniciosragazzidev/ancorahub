@@ -117,6 +117,9 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
   };
 }
 
+import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
+import { getOpenWaSessionStatus, sendOpenWaText } from "@/lib/integrations/openwa";
+
 export async function sendWhatsAppTestMessage(
   tenantId: string,
   actorUserId: string,
@@ -130,27 +133,72 @@ export async function sendWhatsAppTestMessage(
     throw new Error("Número de destino inválido. Informe o código de país e DDD (ex: 5571999999999).");
   }
 
-  const messageId = `wamid.test_${randomUUID().slice(0, 12)}`;
-  const now = new Date();
   const maskedDestination = maskPhoneNumber(data.destinationNumber);
+  const now = new Date();
 
-  // Record audit log
+  let messageId = `wamid.test_${randomUUID().slice(0, 12)}`;
+  let acceptedByMeta = false;
+  let initialStatus: "sent" | "delivered" | "read" | "failed" = "failed";
+  let delivered = false;
+  let errorReason: string | null = null;
+
+  // 1. Tenta envio pelo canal oficial Meta Cloud API
+  try {
+    const officialChannel = await getPreferredMetaCloudChannel({ tenantId, userId: actorUserId });
+    if (officialChannel) {
+      const sent = await sendMetaCloudChannelText({
+        channel: officialChannel,
+        to: normalizedNumber,
+        body: data.messageText,
+      });
+      messageId = sent.messageId || messageId;
+      acceptedByMeta = true;
+      initialStatus = "sent";
+      delivered = true;
+    } else {
+      // 2. Se não houver Meta Cloud API, tenta conexão WAHA/OpenWA
+      const [connection] = await db
+        .select({
+          sessionId: schema.whatsappConnections.sessionId,
+          status: schema.whatsappConnections.status,
+          active: schema.whatsappConnections.chatInternoAtivo,
+        })
+        .from(schema.whatsappConnections)
+        .where(eq(schema.whatsappConnections.tenantId, tenantId))
+        .limit(1);
+
+      if (connection?.sessionId && (connection.status === "ready" || connection.status === "active")) {
+        const sent = await sendOpenWaText(connection.sessionId, normalizedNumber, data.messageText);
+        messageId = sent.messageId || messageId;
+        acceptedByMeta = true;
+        initialStatus = "sent";
+        delivered = true;
+      } else {
+        errorReason = "Nenhum canal ativo de WhatsApp (Meta Cloud API ou Sessão WhatsApp) foi encontrado ou está pronto para envio neste tenant. Configure a conexão no painel de WhatsApp.";
+      }
+    }
+  } catch (err) {
+    console.error("[whatsapp-diagnostic] Error dispatching test message:", err);
+    errorReason = err instanceof Error ? err.message : "Falha na transmissão da mensagem via provedor WhatsApp.";
+  }
+
+  // Registrar log de auditoria
   await db.insert(schema.auditLogs).values({
     id: randomUUID(),
     userId: actorUserId,
     entidade: "whatsapp_test_message",
     entidadeId: messageId,
-    acao: `whatsapp.test_sent:${maskedDestination}`,
+    acao: `whatsapp.test_sent:${maskedDestination}:${acceptedByMeta ? "success" : "failed"}`,
   });
 
   return {
-    acceptedByMeta: true,
+    acceptedByMeta,
     messageId,
     timestamp: now,
-    initialStatus: "sent",
-    delivered: true,
+    initialStatus,
+    delivered,
     read: false,
-    errorReason: null,
+    errorReason,
     estimatedCostBrl: data.messageType === "approved_template" ? 0.08 : 0.03,
     messageCategory: data.messageType === "approved_template" ? "UTILITY" : "SERVICE",
     templateUsed: data.templateId ?? null,

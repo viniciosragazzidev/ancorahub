@@ -106,6 +106,11 @@ export async function ensureAiTablesExist() {
 
 async function _runEnsure() {
   const db = getDatabase();
+  try {
+    await db.execute(sql`SET client_min_messages TO WARNING;`);
+  } catch {
+    // Ignora se a conexão/driver não suportar SET client_min_messages
+  }
   const stmts = [
     sql`CREATE TABLE IF NOT EXISTS ai_conversations (
       id text PRIMARY KEY NOT NULL,
