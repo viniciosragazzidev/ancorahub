@@ -1217,6 +1217,29 @@ export const routeOnboardingProgress = pgTable(
   ],
 );
 
+export const userOnboardingProgress = pgTable(
+  "user_onboarding_progress",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    tourKey: text("tour_key").notNull(),
+    version: integer("version").notNull().default(1),
+    status: text("status").notNull().default("not_started"),
+    currentStep: integer("current_step").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    skippedAt: timestamp("skipped_at", { withTimezone: true }),
+    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("user_onboarding_progress_user_tour_version_unique").on(table.tenantId, table.userId, table.tourKey, table.version),
+    index("user_onboarding_progress_user_idx").on(table.tenantId, table.userId),
+  ],
+);
+
 export const dutyRosterAssignments = pgTable(
   "duty_roster_assignments",
   {

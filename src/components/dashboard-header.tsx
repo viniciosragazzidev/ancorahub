@@ -1,5 +1,7 @@
 "use client";
 
+"use client";
+
 import { BookOpen } from "@/components/huge-icons";
 import Link from "next/link";
 
@@ -8,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch } from "@/components/global-search";
 import { NotificationPopover } from "@/components/notification-popover";
 import { AnimatedPageTitle } from "@/components/motion/animated-page-title";
+import { OnboardingHelpButton } from "@/components/onboarding/onboarding-help-button";
 
 type DashboardHeaderProps = {
   breadcrumb: string;
@@ -37,6 +40,7 @@ export function DashboardHeader({
         ) : null}
         <div className="max-[559px]:hidden"><GlobalSearch /></div>
         <div className="max-[559px]:hidden"><ThemeToggle /></div>
+        <OnboardingHelpButton />
         <Button aria-label="Abrir guia do sistema" title="Guia do sistema" render={<Link href="/guia" />} size="icon" variant="ghost" className={`size-9 rounded-lg transition-colors hover:bg-muted/60 ${rightSlot ? "max-[559px]:hidden" : ""}`}>
           <BookOpen aria-hidden="true" className="size-4" />
         </Button>

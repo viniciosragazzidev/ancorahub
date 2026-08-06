@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import { BrokerAvailabilityButton } from "@/app/(dashboard)/minha-fila/_components/broker-availability";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
+import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { BrokerWorkspaceActionButtons, BrokerWorkspaceTaskCompleteButton } from "./broker-workspace-actions";
 
 const sourceLabels = {
@@ -93,7 +94,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
           <ContextNote title="Sua fila está em dia" variant="success">Não há atendimento ou tarefa prioritária neste momento.</ContextNote>
         )}
 
-        <section aria-labelledby="today-title" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <section aria-labelledby="today-title" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-onboarding="sla-indicator">
           <h2 className="sr-only" id="today-title">Meu dia</h2>
           <TodayLink count={data.today.awaitingResponse} href="/conversas" icon={ChatCircleText} label="Conversas aguardando" tone="warning" />
           <TodayLink count={data.today.overdueTasks} href="/tarefas?attention=overdue" icon={Warning} label="Tarefas vencidas" tone="critical" />
@@ -104,7 +105,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(20rem,0.85fr)]">
-          <Card variant="subtle">
+          <Card variant="subtle" data-onboarding="lead-queue">
             <CardHeader className="flex-row items-start justify-between gap-3">
               <div className="min-w-0 flex-1"><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
               <Button render={<Link href="/minha-fila" />} size="sm" variant="ghost" className="shrink-0">Ver fila <ArrowRight aria-hidden="true" /></Button>
@@ -122,7 +123,9 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
           </Card>
 
           <div className="grid gap-5">
-            <Card variant="subtle">
+            <OnboardingChecklist />
+
+            <Card variant="subtle" data-onboarding="daily-tasks">
               <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Button render={<Link href="/tarefas" />} size="sm" variant="ghost" className="shrink-0">Ver todas</Button></CardHeader>
               <CardContent>
                 {data.agenda.length ? <div className="grid gap-2">{data.agenda.map((task) => <div className="flex items-center gap-2.5 rounded-md border border-border/60 bg-background/40 px-3 py-2.5" key={task.id}>
