@@ -160,10 +160,12 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
 
   // Web Simulator State Engine
   const [simMemory, setSimMemory] = useState<SimMemory>({});
+  const [simConversation, setSimConversation] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [simMessages, setSimMessages] = useState<Array<{ sender: "user" | "bot"; text: string }>>([
     { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
   ]);
   const [simInput, setSimInput] = useState("");
+  const [simIsLoading, setSimIsLoading] = useState(false);
 
   const handleSaveSettings = async () => {
     setIsSaving(true);
@@ -244,59 +246,74 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
     }
   };
 
-  // Context-Aware Simulator Processor
+  // Context-Aware Simulator Processor — uses real AI via API
   const handleRestartSimulator = () => {
     setSimMemory({});
+    setSimConversation([]);
     setSimMessages([
       { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
     ]);
     setSimInput("");
   };
 
-  const handleSimSendMessage = (e: React.FormEvent) => {
+  const handleSimSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!simInput.trim()) return;
+    if (!simInput.trim() || simIsLoading) return;
     const userText = simInput.trim();
+
+    const newConversation: Array<{ role: "user" | "assistant"; content: string }> = [
+      ...simConversation,
+      { role: "user", content: userText },
+    ];
+
+    setSimConversation(newConversation);
     setSimMessages((prev) => [...prev, { sender: "user", text: userText }]);
     setSimInput("");
+    setSimIsLoading(true);
 
-    setTimeout(() => {
-      // 1. Check if message is a pure greeting
-      if (isPureGreeting(userText)) {
-        const nextPrompt = simMemory.nome
-          ? `Olá ${simMemory.nome}! Tudo bem? ` + getNextQuestionPrompt(simMemory)
-          : "Olá! Tudo bem? Para começarmos a cotação, qual é o seu nome completo?";
-        setSimMessages((prev) => [...prev, { sender: "bot", text: nextPrompt }]);
-        return;
+    // Update memory locally (for real-time inspector display)
+    const extracted = parseInputForFields(userText, simMemory);
+    const updatedMemory: SimMemory = { ...simMemory, ...extracted };
+    if (!updatedMemory.nome && !isPureGreeting(userText)) {
+      updatedMemory.nome = userText;
+    }
+    setSimMemory(updatedMemory);
+
+    try {
+      const res = await fetch("/api/qualificacao/simulador", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newConversation,
+          memory: updatedMemory as Record<string, string>,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
+        throw new Error(err.error ?? "Falha na API do simulador");
       }
 
-      // 2. Parse input for structured fields
-      const extracted = parseInputForFields(userText, simMemory);
+      const data = await res.json() as {
+        reply: string;
+        modelUsed: string;
+        latencyMs: number;
+        shouldTransferToHuman: boolean;
+      };
 
-      // If no explicit field was extracted by pattern, use fallback based on expected missing field
-      const updatedMemory: SimMemory = { ...simMemory, ...extracted };
-
-      if (!updatedMemory.nome) {
-        // First message is treated as name if not pure greeting
-        updatedMemory.nome = userText;
-      } else if (!updatedMemory.plano && !extracted.plano) {
-        if (!simMemory.plano) updatedMemory.plano = userText;
-      } else if (!updatedMemory.vidas && !extracted.vidas) {
-        if (!simMemory.vidas) updatedMemory.vidas = userText;
-      } else if (!updatedMemory.idade && !extracted.idade) {
-        if (!simMemory.idade) updatedMemory.idade = userText;
-      } else if (!updatedMemory.cidade && !extracted.cidade) {
-        if (!simMemory.cidade) updatedMemory.cidade = userText;
-      } else if (!updatedMemory.email && !extracted.email) {
-        if (!simMemory.email) updatedMemory.email = userText;
-      }
-
-      setSimMemory(updatedMemory);
-
-      // 3. Formulate Contextual Response based on what fields remain missing
-      const botResponse = generateContextualBotReply(updatedMemory, handoffMessage);
-      setSimMessages((prev) => [...prev, { sender: "bot", text: botResponse }]);
-    }, 450);
+      const botReply = data.reply;
+      setSimConversation((prev) => [...prev, { role: "assistant", content: botReply }]);
+      setSimMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Erro ao conectar com a IA.";
+      toast.error(`Simulador: ${errorMsg}`);
+      setSimMessages((prev) => [
+        ...prev,
+        { sender: "bot", text: "Ops! Não consegui conectar com a IA agora. Verifique se a chave OpenRouter está configurada." },
+      ]);
+    } finally {
+      setSimIsLoading(false);
+    }
   };
 
   function getNextQuestionPrompt(mem: SimMemory): string {
@@ -698,16 +715,26 @@ export function QualificationHubClient({ settings, testNumbers: initialTestNumbe
                       </div>
                     </div>
                   ))}
+                  {simIsLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted/80 border border-border/60 rounded-2xl px-4 py-3 flex items-center gap-1.5">
+                        <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                        <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                        <span className="size-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <form onSubmit={handleSimSendMessage} className="border-t p-3 flex gap-2 bg-card">
                   <Input
-                    placeholder="Converse naturalmente com a IA..."
+                    placeholder={simIsLoading ? "IA processando..." : "Converse naturalmente com a IA..."}
                     value={simInput}
                     onChange={(e) => setSimInput(e.target.value)}
+                    disabled={simIsLoading}
                     className="text-xs"
                   />
-                  <Button type="submit" size="sm" className="gap-1.5 text-xs font-semibold">
-                    <Send className="size-3.5" /> Enviar
+                  <Button type="submit" size="sm" disabled={simIsLoading} className="gap-1.5 text-xs font-semibold">
+                    <Send className="size-3.5" /> {simIsLoading ? "..." : "Enviar"}
                   </Button>
                 </form>
               </Card>
