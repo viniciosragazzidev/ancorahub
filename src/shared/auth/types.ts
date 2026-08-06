@@ -1,7 +1,7 @@
 import type { TenantRole } from "@/shared/db/schema";
 import type { CustomRoleScope } from "@/features/custom-roles/catalog";
 
-export const tenantRoles = ["director", "manager", "broker"] as const;
+export const tenantRoles = ["director", "manager", "supervisor", "broker"] as const;
 
 export type TenantContext = {
   userId: string;

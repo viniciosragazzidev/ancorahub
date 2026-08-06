@@ -20,8 +20,8 @@ const createUserInput = z.object({
   // accidentally send the title (e.g. "marketing") as role; normalize that
   // value server-side so only the two supported access profiles reach the
   // permission guard. A manager request still goes through requireCanCreateRole.
-  role: z.preprocess((value) => value === "manager" ? "manager" : "broker", z.enum(["manager", "broker"])),
-  jobTitle: z.enum(["director", "manager", "broker", "marketing", "finance", "operations", "support"]).default("broker"),
+  role: z.preprocess((value) => value === "manager" ? "manager" : value === "supervisor" ? "supervisor" : "broker", z.enum(["manager", "supervisor", "broker"])),
+  jobTitle: z.enum(["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"]).default("broker"),
   branchId: z.string().uuid(),
 });
 

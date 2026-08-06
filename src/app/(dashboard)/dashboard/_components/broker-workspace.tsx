@@ -27,6 +27,10 @@ import { cn } from "@/lib/utils";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { BrokerWorkspaceActionButtons, BrokerWorkspaceTaskCompleteButton } from "./broker-workspace-actions";
 
+// Altura máxima (px) da lista do card "Minha fila prioritária" antes de ativar o scroll.
+// Ajuste aqui o valor padrão ou passe `queueMaxHeight` no <BrokerWorkspace>.
+const MINHA_FILA_MAX_HEIGHT_PX = 280;
+
 const sourceLabels = {
   message: "Mensagem",
   task: "Tarefa",
@@ -45,7 +49,13 @@ function isOverdue(value: Date | null) {
   return value !== null && value.getTime() < Date.now();
 }
 
-export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
+export function BrokerWorkspace({
+  data,
+  queueMaxHeight = MINHA_FILA_MAX_HEIGHT_PX,
+}: {
+  data: BrokerWorkspaceData;
+  queueMaxHeight?: number;
+}) {
   const firstName = data.viewer.name.split(" ")[0] || "Corretor";
   const nextAction = data.nextAction;
 
@@ -105,12 +115,12 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
         </section>
 
         <section className="grid gap-5">
-          <Card variant="subtle" data-onboarding="lead-queue">
+          <Card variant="subtle" data-onboarding="lead-queue" className="overflow-hidden">
             <CardHeader className="flex-row items-start justify-between gap-3">
               <div className="min-w-0 flex-1"><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
               <Button render={<Link href="/minha-fila" />} size="sm" variant="ghost" className="shrink-0">Ver fila <ArrowRight aria-hidden="true" /></Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-y-auto overscroll-contain pr-1" style={{ maxHeight: queueMaxHeight }}>
               {data.queue.length ? <div className="divide-y divide-border/60">
                 {data.queue.map((lead) => <Link className="group flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-primary" href={`/leads/${lead.id}`} key={lead.id}>
                   <span className={cn("size-2 shrink-0 rounded-full", lead.nextAction?.severity === "critical" ? "bg-destructive" : lead.nextAction?.severity === "warning" ? "bg-warning" : "bg-muted-foreground")} />
@@ -122,10 +132,10 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
             </CardContent>
           </Card>
 
-          <OnboardingChecklist />
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <OnboardingChecklist />
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card variant="subtle" data-onboarding="daily-tasks">
+            <Card variant="subtle" data-onboarding="daily-tasks" className="h-full">
               <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Button render={<Link href="/tarefas" />} size="sm" variant="ghost" className="shrink-0">Ver todas</Button></CardHeader>
               <CardContent>
                 {data.agenda.length ? <div className="grid gap-2">{data.agenda.map((task) => <div className="flex items-center gap-2.5 rounded-md border border-border/60 bg-background/40 px-3 py-2.5" key={task.id}>
@@ -136,7 +146,7 @@ export function BrokerWorkspace({ data }: { data: BrokerWorkspaceData }) {
               </CardContent>
             </Card>
 
-            <Card variant="subtle">
+            <Card variant="subtle" className="h-full">
               <CardHeader className="flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Minha meta</CardTitle><CardDescription>Progresso individual do período vigente.</CardDescription></div><Button render={<Link href="/minha-meta" />} size="sm" variant="ghost" className="shrink-0">Detalhes</Button></CardHeader>
               <CardContent>{data.goal ? <div className="space-y-3"><div className="flex items-end justify-between gap-3"><div><p className="text-sm font-medium">{data.goal.name}</p><p className="text-xs text-muted-foreground">{data.goal.currentValue} de {data.goal.targetValue}</p></div><strong className="text-lg tabular-nums">{Math.round(data.goal.percentage)}%</strong></div><Progress value={Math.min(100, Math.max(0, data.goal.percentage))} /></div> : <EmptyWorkspaceState icon={Target} message="Nenhuma meta individual ativa neste período." />}</CardContent>
             </Card>

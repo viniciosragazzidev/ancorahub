@@ -72,6 +72,8 @@ function reloadAfterDeploymentUpdate() {
   window.setTimeout(() => window.location.reload(), 250);
 }
 
+import type { TenantRole } from "@/shared/db/schema";
+
 export function DocumentsWorkspace({
   role,
   carriers,
@@ -79,7 +81,7 @@ export function DocumentsWorkspace({
   initialRequirements,
   initialPendingDocs,
 }: {
-  role: "director" | "manager" | "broker";
+  role: TenantRole;
   carriers: Carrier[];
   plans: Plan[];
   initialRequirements: Requirement[];

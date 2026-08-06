@@ -34,8 +34,10 @@ export async function isCustomRolesEnabled(tenantId: string) {
   return setting?.enabled === true;
 }
 
+import type { TenantRole } from "@/shared/db/schema";
+
 /** Resolves the effective capability server-side. A custom role replaces, never augments, legacy grants. */
-export async function hasEffectiveCapability(input: { tenantId: string; role: "director" | "manager" | "broker"; jobTitle: string; customRoleId: string | null; permission: PermissionKey }) {
+export async function hasEffectiveCapability(input: { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null; permission: PermissionKey }) {
   if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) {
     return hasCapability(input.role, input.permission, input.jobTitle);
   }
@@ -47,7 +49,7 @@ export async function hasEffectiveCapability(input: { tenantId: string; role: "d
   return Boolean(grant);
 }
 
-export async function listEffectiveCapabilities(input: { tenantId: string; role: "director" | "manager" | "broker"; jobTitle: string; customRoleId: string | null }) {
+export async function listEffectiveCapabilities(input: { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null }) {
   if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) {
     return (Object.keys(PERMISSIONS) as PermissionKey[]).filter((permission) => hasCapability(input.role, permission, input.jobTitle));
   }

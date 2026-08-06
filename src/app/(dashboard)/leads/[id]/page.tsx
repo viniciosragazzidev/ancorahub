@@ -84,6 +84,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       branchId: schema.leads.branchId,
       planId: schema.leads.planId,
       motivoPerda: schema.leads.motivoPerda,
+      lossCategory: schema.leads.lossCategory,
+      slaBreachedAt: schema.leads.slaBreachedAt,
+      firstContactLatencySeconds: schema.leads.firstContactLatencySeconds,
       consentimentoLgpd: schema.leads.consentimentoLgpd,
       createdAt: schema.leads.createdAt,
       assignedAt: schema.leads.assignedAt,
@@ -210,6 +213,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
         </div>
+
+        {/* SLA Diagnostic & Loss Audit Card */}
+        {lead.status === "lost" || lead.lossCategory ? (
+          <Card className="border-destructive/30 bg-destructive/5 shadow-none">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">
+                  {lead.lossCategory === "unattended_sla"
+                    ? "Estouro de SLA"
+                    : lead.lossCategory === "response_delay"
+                    ? "Atraso no Atendimento"
+                    : "Lead Perdido"}
+                </Badge>
+                <CardTitle className="text-sm font-semibold text-foreground">
+                  {lead.lossCategory === "unattended_sla"
+                    ? "Perda por Falta de Atendimento (SLA Expirado)"
+                    : lead.lossCategory === "response_delay"
+                    ? "Perda por Demora de Resposta"
+                    : "Lead Encerrado sem Venda"}
+                </CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                {lead.motivoPerda ? `Motivo: ${lead.motivoPerda}` : "Atendimento não iniciado a tempo ou sem resposta oportuna ao cliente."}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : null}
 
         {/* Main operational area */}
         <div className="min-w-0 space-y-5">

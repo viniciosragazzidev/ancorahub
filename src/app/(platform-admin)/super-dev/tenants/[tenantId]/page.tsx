@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPlatformTenant, getTenantBranches, getTenantMembers } from "@/features/platform-admin/service";
 import { ArrowRight } from "@/components/huge-icons";
 
-const roleLabel = { director: "Diretor", manager: "Gestor", broker: "Corretor" } as const;
+const roleLabel = { director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" } as const;
 
 export default async function SuperDevTenantDetailPage({
   params,

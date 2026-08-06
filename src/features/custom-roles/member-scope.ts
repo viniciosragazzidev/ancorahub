@@ -3,6 +3,7 @@ import type { CustomRoleScope } from "./catalog";
 export type TeamJobTitle =
   | "director"
   | "manager"
+  | "supervisor"
   | "broker"
   | "marketing"
   | "finance"
@@ -19,6 +20,7 @@ export function requiresMemberBranch(input: {
   customRoleScope?: CustomRoleScope | null;
 }) {
   return input.jobTitle === "manager"
+    || input.jobTitle === "supervisor"
     || input.jobTitle === "broker"
     || input.customRoleScope === "branch";
 }

@@ -12,12 +12,14 @@ import { isUserProfileEnabled } from "@/features/user-profile/feature";
 const ROLE_REDIRECT: Record<TenantRole, string> = {
   director: "/dashboard",
   manager: "/dashboard",
+  supervisor: "/dashboard",
   broker: "/dashboard",
 };
 
 const ROLE_LABELS: Record<TenantRole, string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
 };
 

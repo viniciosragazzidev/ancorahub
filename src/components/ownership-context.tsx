@@ -7,8 +7,10 @@ type OwnershipContextProps = {
   emptyLabel?: string;
 };
 
+import type { TenantRole } from "@/shared/db/schema";
+
 type ViewScopeContextProps = {
-  role: "director" | "manager" | "broker";
+  role: TenantRole;
   branchName?: string | null;
   className?: string;
 };
@@ -21,7 +23,7 @@ export function OwnershipContext({ brokerName, branchName, className, emptyLabel
 export function ViewScopeContext({ role, branchName, className }: ViewScopeContextProps) {
   const label = role === "director"
     ? "Visão consolidada · Todas as unidades"
-    : role === "manager"
+    : (role === "manager" || role === "supervisor")
       ? `Unidade: ${branchName ?? "não identificada"}`
       : `Unidade: ${branchName ?? "minha unidade"}`;
 

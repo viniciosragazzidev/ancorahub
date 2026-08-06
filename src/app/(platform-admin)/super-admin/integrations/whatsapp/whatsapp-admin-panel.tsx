@@ -39,7 +39,7 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
     <Card className="border-transparent bg-transparent shadow-none">
       <CardHeader><CardTitle>Contas empresariais</CardTitle><CardDescription>O Super Admin valida e associa um único canal oficial a cada tenant. Nenhum token é exibido depois do salvamento.</CardDescription></CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-border/60 bg-card">
           <table className="w-full text-sm"><thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="px-5 py-3 font-medium">Empresa</th><th className="px-3 py-3 font-medium">Canal</th><th className="px-3 py-3 font-medium">Status</th><th className="px-5 py-3 font-medium">Último webhook</th></tr></thead><tbody>{tenants.map((tenant) => { const connection = connectionByTenant.get(tenant.id); return <tr className="border-b border-border last:border-0" key={tenant.id}><td className="px-5 py-3 font-medium">{tenant.name}</td><td className="px-3 py-3 text-muted-foreground">{connection?.displayPhoneNumber ?? "Não conectado"}</td><td className="px-3 py-3"><span className={connection?.status === "active" ? "text-success" : "text-muted-foreground"}>{connection?.status === "active" ? "Conectado" : connection ? "Pausado" : "Não conectado"}</span></td><td className="px-5 py-3 text-muted-foreground">{formatDate(connection?.lastWebhookAt ?? null)}</td></tr>; })}</tbody></table>
         </div>
       </CardContent>

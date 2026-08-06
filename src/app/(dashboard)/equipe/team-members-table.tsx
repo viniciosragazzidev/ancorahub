@@ -18,13 +18,15 @@ import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkToggleTeamMemberStatusAction } from "./actions";
 import { TeamMemberActions } from "./member-actions";
 
+import type { TenantRole } from "@/shared/db/schema";
+
 type BranchOption = { id: string; name: string };
 type TeamMember = {
   id: string;
   userId: string | null;
   name: string | null;
   email: string;
-  role: "director" | "manager" | "broker";
+  role: TenantRole;
   jobTitle: string;
   status: "pending" | "active" | "disabled";
   branchId: string | null;
@@ -35,7 +37,7 @@ type TeamMember = {
 type Props = {
   members: TeamMember[];
   branches: BranchOption[];
-  currentRole: "director" | "manager" | "broker";
+  currentRole: TenantRole;
   currentBranchId: string | null;
   currentUserId: string;
   canViewProfile: boolean;

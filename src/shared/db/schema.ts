@@ -19,10 +19,10 @@ export const tenantStatusValues = ["active", "inactive", "delinquent"] as const;
 export const branchStatusValues = ["active", "inactive"] as const;
 export const membershipStatusValues = ["active", "inactive"] as const;
 export const availabilityStatusValues = ["available", "paused", "offline"] as const;
-export const tenantRoleValues = ["director", "manager", "broker"] as const;
+export const tenantRoleValues = ["director", "manager", "supervisor", "broker"] as const;
 export const customRoleStatusValues = ["draft", "active", "archived"] as const;
 export const customRoleScopeValues = ["none", "own", "branch", "tenant"] as const;
-export const teamJobTitleValues = ["director", "manager", "broker", "marketing", "finance", "operations", "support"] as const;
+export const teamJobTitleValues = ["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"] as const;
 export const userStatusValues = ["pending", "active", "disabled"] as const;
 export const leadStatusValues = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"] as const;
 export const leadOriginValues = ["manual", "webhook"] as const;
@@ -381,6 +381,9 @@ export const leads = pgTable(
     consentimentoLgpd: boolean("consentimento_lgpd").notNull().default(false),
     formData: jsonb("form_data").notNull().default({}),
     motivoPerda: text("motivo_perda"),
+    lossCategory: text("loss_category"),
+    slaBreachedAt: timestamp("sla_breached_at", { withTimezone: true }),
+    firstContactLatencySeconds: integer("first_contact_latency_seconds"),
     externalId: text("external_id"),
     capturedAt: timestamp("captured_at", { withTimezone: true }),
     sourceChannel: text("source_channel").notNull().default("landing_page"),
@@ -2205,6 +2208,7 @@ export const tenantMemberships = pgTable(
       .notNull()
       .references(() => user.id),
     branchId: text("branch_id"),
+    supervisorId: text("supervisor_id").references(() => user.id, { onDelete: "set null" }),
     role: tenantRole("role").notNull(),
     jobTitle: text("job_title").notNull().default("broker"),
     customRoleId: text("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
@@ -2218,6 +2222,7 @@ export const tenantMemberships = pgTable(
     index("tenant_memberships_tenant_id_idx").on(table.tenantId),
     index("tenant_memberships_user_id_idx").on(table.userId),
     index("tenant_memberships_branch_id_idx").on(table.branchId),
+    index("tenant_memberships_supervisor_id_idx").on(table.supervisorId),
     index("tenant_memberships_custom_role_idx").on(table.customRoleId),
     unique("tenant_memberships_tenant_user_unique").on(
       table.tenantId,
@@ -2228,6 +2233,33 @@ export const tenantMemberships = pgTable(
       foreignColumns: [branches.id, branches.tenantId],
       name: "tenant_memberships_branch_tenant_fk",
     }),
+  ],
+);
+
+export const tenantManagerBranches = pgTable(
+  "tenant_manager_branches",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    branchId: text("branch_id")
+      .notNull()
+      .references(() => branches.id, { onDelete: "cascade" }),
+    createdAt,
+  },
+  (table) => [
+    index("tenant_manager_branches_tenant_idx").on(table.tenantId),
+    index("tenant_manager_branches_user_idx").on(table.userId),
+    index("tenant_manager_branches_branch_idx").on(table.branchId),
+    unique("tenant_manager_branches_user_branch_unique").on(
+      table.tenantId,
+      table.userId,
+      table.branchId,
+    ),
   ],
 );
 

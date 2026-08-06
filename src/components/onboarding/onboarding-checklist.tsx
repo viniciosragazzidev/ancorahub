@@ -45,7 +45,7 @@ export function OnboardingChecklist() {
   };
 
   return (
-    <Card className="relative overflow-hidden border-border/80 bg-card/95 shadow-sm backdrop-blur-xs">
+    <Card variant="subtle" className="relative h-full overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary" />

@@ -37,13 +37,15 @@ export async function generateNextInternalCode(tx: any, tenantId: string): Promi
  * Generates a cryptographically secure token, hashes it, invalidates previous invitations,
  * and saves the new invitation details to the database.
  */
+import type { CreatableTeamRole } from "@/shared/auth/team-permissions";
+
 export async function createBrokerInvitation(
   tx: any,
   tenantId: string,
   branchId: string,
   brokerProfileId: string,
   email: string,
-  role: "manager" | "broker" = "broker",
+  role: CreatableTeamRole = "broker",
   jobTitle: string = role,
 ) {
   // Set all previous invitations for this broker to REPLACED

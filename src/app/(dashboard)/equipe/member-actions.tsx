@@ -14,13 +14,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { deleteTeamMemberAction, toggleTeamMemberStatusAction, updateTeamMemberAction, transferLeadsAction, resendInviteAction, revokeInviteAction, type TeamActionState } from "./actions";
 
+import type { TenantRole } from "@/shared/db/schema";
+
 type BranchOption = { id: string; name: string };
 type TeamMember = {
   id: string;
   userId: string | null;
   name: string | null;
   email: string;
-  role: "director" | "manager" | "broker";
+  role: TenantRole;
   jobTitle: string;
   status: "pending" | "active" | "disabled";
   branchId: string | null;
@@ -31,7 +33,7 @@ type TeamMember = {
 type Props = {
   member: TeamMember;
   branches: BranchOption[];
-  currentRole: "director" | "manager" | "broker";
+  currentRole: TenantRole;
   currentBranchId: string | null;
   currentUserId: string;
   allMembers?: TeamMember[];
@@ -41,6 +43,7 @@ type Props = {
 const roleLabel: Record<TeamMember["role"], string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
 };
 

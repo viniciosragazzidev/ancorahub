@@ -34,7 +34,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
   if (!profile) redirect("/access-denied");
 
   const { member, metrics, recentLeads, recentRedistributions } = profile;
-  const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", broker: "Corretor" }[member.role]);
+  const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
   const firstContactRate = metrics.leads.total > 0 ? Math.round(((metrics.leads.total - metrics.leads.withoutFirstContact) / metrics.leads.total) * 100) : 0;
 
   return <>

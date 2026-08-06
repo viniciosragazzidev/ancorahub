@@ -6,7 +6,14 @@ import { ArrowRight, CheckCircle, MagicWand, UserList } from "@/components/huge-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { AppSelect } from "@/components/ui/select";
 import {
   assignLeadToBrokerAction,
@@ -17,9 +24,22 @@ import {
   type DistributionActionState,
 } from "@/features/lead-distribution/actions";
 
-type Lead = { id: string; name: string; phone: string; branchId: string | null; distributionStatus: string; createdAt: string };
+type Lead = {
+  id: string;
+  name: string;
+  phone: string;
+  branchId: string | null;
+  distributionStatus: string;
+  createdAt: string;
+};
 type Branch = { id: string; name: string };
-type Broker = { id: string; name: string; branchId: string | null; activeLeads: number; availabilityStatus: "available" | "paused" | "offline" };
+type Broker = {
+  id: string;
+  name: string;
+  branchId: string | null;
+  activeLeads: number;
+  availabilityStatus: "available" | "paused" | "offline";
+};
 
 function Feedback({ state }: { state: DistributionActionState }) {
   if (state.success && state.message) toast.success(state.message);
@@ -32,7 +52,10 @@ function ActionForm({
   children,
   fields,
 }: {
-  action: (previous: DistributionActionState, formData: FormData) => Promise<DistributionActionState>;
+  action: (
+    previous: DistributionActionState,
+    formData: FormData,
+  ) => Promise<DistributionActionState>;
   children: React.ReactNode;
   fields: Record<string, string>;
 }) {
@@ -69,17 +92,19 @@ export function DistributionInbox({
     (lead) =>
       lead.distributionStatus === "unassigned" ||
       lead.distributionStatus === "queued" ||
-      lead.distributionStatus === "returned_to_queue"
+      lead.distributionStatus === "returned_to_queue",
   );
   function toggle(id: string) {
-    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    setSelected((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
   }
   const stateAction = useActionState(distributeLeadBatchAction, {});
   const [batchState, batchAction, batchPending] = stateAction;
 
   return (
-    <Card className="border-transparent bg-transparent shadow-none" data-onboarding="manager-team-performance">
-      <CardHeader className="border-b border-border">
+    <Card variant="overview" data-onboarding="manager-team-performance">
+      <CardHeader className="border-b border-border px-5 pb-4 pt-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
@@ -115,8 +140,10 @@ export function DistributionInbox({
       </CardHeader>
       <CardContent className="p-0">
         {!selectable.length ? (
-          <div className="flex flex-col items-center gap-2 p-10 text-center">
-            <CheckCircle className="size-7 text-success" />
+          <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
+            <span className="grid size-9 place-items-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle aria-hidden="true" className="size-5" />
+            </span>
             <p className="text-sm font-medium">Inbox em dia</p>
             <p className="text-xs text-muted-foreground">
               Não há leads aguardando unidade ou corretor neste escopo.
@@ -132,7 +159,11 @@ export function DistributionInbox({
                       aria-label="Selecionar todos"
                       checked={selected.length === selectable.length}
                       onChange={() =>
-                        setSelected(selected.length === selectable.length ? [] : selectable.map((lead) => lead.id))
+                        setSelected(
+                          selected.length === selectable.length
+                            ? []
+                            : selectable.map((lead) => lead.id),
+                        )
                       }
                       type="checkbox"
                     />
@@ -146,7 +177,9 @@ export function DistributionInbox({
               <TableBody>
                 {selectable.map((lead) => {
                   const leadBrokers = brokers.filter(
-                    (broker) => broker.branchId === lead.branchId && broker.availabilityStatus === "available"
+                    (broker) =>
+                      broker.branchId === lead.branchId &&
+                      broker.availabilityStatus === "available",
                   );
                   return (
                     <TableRow key={lead.id}>
@@ -164,13 +197,15 @@ export function DistributionInbox({
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-muted-foreground">
-                          {branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral"}
+                          {branches.find((branch) => branch.id === lead.branchId)?.name ??
+                            "Inbox geral"}
                         </span>
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant={
-                            lead.distributionStatus === "queued" || lead.distributionStatus === "returned_to_queue"
+                            lead.distributionStatus === "queued" ||
+                            lead.distributionStatus === "returned_to_queue"
                               ? "warning"
                               : "outline"
                           }
@@ -178,13 +213,16 @@ export function DistributionInbox({
                           {lead.distributionStatus === "queued"
                             ? "Aguardando corretor"
                             : lead.distributionStatus === "returned_to_queue"
-                            ? "Devolvido à fila"
-                            : "Aguardando unidade"}
+                              ? "Devolvido à fila"
+                              : "Aguardando unidade"}
                         </Badge>
                       </TableCell>
                       <TableCell className="pr-5" data-onboarding="manager-redistribute-lead">
                         <div className="flex flex-wrap justify-end gap-2">
-                          <ActionForm action={routeLeadToBranchAction} fields={{ leadId: lead.id, branchId }}>
+                          <ActionForm
+                            action={routeLeadToBranchAction}
+                            fields={{ leadId: lead.id, branchId }}
+                          >
                             <ArrowRight /> Enviar
                           </ActionForm>
                           {lead.branchId ? (
@@ -232,7 +270,11 @@ export function DistributionInbox({
                                 options={[
                                   { value: "", label: "Corretor" },
                                   ...brokers
-                                    .filter((b) => b.branchId === branchId && b.availabilityStatus === "available")
+                                    .filter(
+                                      (b) =>
+                                        b.branchId === branchId &&
+                                        b.availabilityStatus === "available",
+                                    )
                                     .map((b) => ({ value: b.id, label: b.name })),
                                 ]}
                               />

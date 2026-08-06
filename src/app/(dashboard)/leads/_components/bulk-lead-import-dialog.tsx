@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { importLeadsFromCsvAction } from "@/features/leads/bulk-import";
 
+import type { TenantRole } from "@/shared/db/schema";
+
 type Branch = { id: string; name: string };
-export function BulkLeadImportDialog({ branches, role, jobTitle, branchId }: { branches: Branch[]; role: "director" | "manager" | "broker"; jobTitle: string; branchId: string | null }) {
+export function BulkLeadImportDialog({ branches, role, jobTitle, branchId }: { branches: Branch[]; role: TenantRole; jobTitle: string; branchId: string | null }) {
   const router = useRouter();
   const isCentralMarketing = jobTitle === "marketing" && branchId === null;
   const canChooseBranch = role === "director" || isCentralMarketing;
-  const canImport = role === "director" || role === "manager" || isCentralMarketing;
+  const canImport = role === "director" || role === "manager" || role === "supervisor" || isCentralMarketing;
   const [open, setOpen] = useState(false); const [selectedBranch, setSelectedBranch] = useState(branchId ?? ""); const [selectedTipo, setSelectedTipo] = useState("PF"); const [file, setFile] = useState<File | null>(null); const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false); const [result, setResult] = useState<{ imported: number; duplicates: number; errors: Array<{ row: number; message: string }> } | null>(null);
   function downloadTemplate() { const blob = new Blob(["nome,telefone,email,campanha,tipo\nMaria da Silva,5521999999999,maria@exemplo.com,Campanha de Vendas,PF\nEmpresa Exemplo,5511988888888,contato@exemplo.com.br,Campanha PME,PME\n"], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url;    anchor.download = "modelo-leads-ancora.csv"; anchor.click(); URL.revokeObjectURL(url); }
   async function submit(event: React.FormEvent) { event.preventDefault(); if (!file) return toast.error("Selecione um arquivo CSV."); if (!consent) return toast.error("Confirme que possui base legal para importar os contatos."); setBusy(true); setResult(null); const data = new FormData(); data.set("file", file); data.set("branchId", selectedBranch); data.set("tipo", selectedTipo); data.set("consentimento", "true"); const response = await importLeadsFromCsvAction(data); setBusy(false); if (!response.success) return toast.error(response.error); const imported = response.imported ?? 0; const duplicates = response.duplicates ?? 0; const errors = response.errors ?? []; setResult({ imported, duplicates, errors }); toast.success(`${imported} lead(s) importado(s).`); setOpen(false); setFile(null); setConsent(false); setResult(null); router.refresh(); }

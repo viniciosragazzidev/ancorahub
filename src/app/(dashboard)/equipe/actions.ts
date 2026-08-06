@@ -28,7 +28,7 @@ type PendingInvite = {
 
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
-const memberRole = z.enum(["manager", "broker"]);
+const memberRole = z.enum(["manager", "supervisor", "broker"]);
 const memberJobTitle = z.enum(schema.teamJobTitleValues);
 
 const updateMemberInput = z.object({
