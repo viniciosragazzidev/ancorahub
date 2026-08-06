@@ -68,6 +68,7 @@ const navSections: SidebarSection[] = [
       { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
       { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
       { label: "Assistente IA", icon: Sparkle, url: "/assistente", permission: "acessar_conversas" },
+      { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_conversas" },
     ],
   },
   {

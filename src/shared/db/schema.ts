@@ -459,6 +459,7 @@ export const aiQualificationConfigs = pgTable(
     businessDays: text("business_days"),
     requiredFields: jsonb("required_fields"),
     customInstructions: text("custom_instructions"),
+    pauseMode: text("pause_mode").notNull().default("handoff_active"),
     version: integer("version").notNull().default(1),
     timeoutMinutes: integer("timeout_minutes").notNull().default(30),
     maxRetries: integer("max_retries").notNull().default(2),
@@ -467,6 +468,28 @@ export const aiQualificationConfigs = pgTable(
     updatedAt,
   },
   (table) => [uniqueIndex("ai_qualification_configs_tenant_unique").on(table.tenantId)],
+);
+
+/** Developer and QA authorized test numbers for isolated testing without affecting real metrics. */
+export const aiQualificationTestNumbers = pgTable(
+  "ai_qualification_test_numbers",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    phoneNumber: text("phone_number").notNull(),
+    label: text("label").notNull(),
+    ownerUserId: text("owner_user_id").references(() => user.id, { onDelete: "set null" }),
+    active: boolean("active").notNull().default(true),
+    autoResetMode: text("auto_reset_mode").notNull().default("before_each_session"),
+    isolatedFromMetrics: boolean("isolated_from_metrics").notNull().default(true),
+    isolatedFromQueues: boolean("isolated_from_queues").notNull().default(true),
+    allowTestCommands: boolean("allow_test_commands").notNull().default(true),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("ai_qualification_test_numbers_tenant_phone_unique").on(table.tenantId, table.phoneNumber),
+  ],
 );
 
 /** One active qualification state per lead; the JSON payload contains only answers, never secrets. */

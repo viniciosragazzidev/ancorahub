@@ -16,11 +16,11 @@ import {
 } from "@/components/ui/table";
 import { AppSelect } from "@/components/ui/select";
 import {
+  assignLeadBatchToBrokerAction,
   assignLeadToBrokerAction,
   distributeLeadBatchAction,
   distributeLeadAutomaticallyAction,
   routeAndAssignLeadAction,
-  routeLeadToBranchAction,
   type DistributionActionState,
 } from "@/features/lead-distribution/actions";
 
@@ -91,14 +91,19 @@ export function DistributionInbox({
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const managerBranchId = role === "manager" ? (branches[0]?.id ?? "") : "";
   const [brokerByLead, setBrokerByLead] = useState<Record<string, string>>({});
+  const [batchBrokerId, setBatchBrokerId] = useState("");
   const [unitFilter, setUnitFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const selectable = leads.filter(
-    (lead) =>
-      lead.distributionStatus === "unassigned" ||
-      lead.distributionStatus === "queued" ||
-      lead.distributionStatus === "returned_to_queue",
+  const selectable = useMemo(
+    () =>
+      leads.filter(
+        (lead) =>
+          lead.distributionStatus === "unassigned" ||
+          lead.distributionStatus === "queued" ||
+          lead.distributionStatus === "returned_to_queue",
+      ),
+    [leads],
   );
   const filtered = useMemo(
     () =>
@@ -112,37 +117,41 @@ export function DistributionInbox({
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const unitBrokers = brokers.filter(
+    (broker) => broker.branchId === branchId && broker.availabilityStatus === "available",
+  );
 
   function toggle(id: string) {
-    setSelected((current) => {
-      if (current.includes(id)) return current.filter((item) => item !== id);
-      if (current.length >= MAX_BATCH) {
-        toast.error(`Máximo de ${MAX_BATCH} leads por envio.`);
-        return current;
-      }
-      return [...current, id];
-    });
+    if (selected.includes(id)) {
+      setSelected(selected.filter((item) => item !== id));
+      return;
+    }
+    if (selected.length >= MAX_BATCH) {
+      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`);
+      return;
+    }
+    setSelected([...selected, id]);
   }
 
   function toggleVisible() {
-    setSelected((current) => {
-      const visibleIds = visible.map((lead) => lead.id);
-      if (visibleIds.every((id) => current.includes(id))) {
-        return current.filter((id) => !visibleIds.includes(id));
-      }
-      const missing = visibleIds.filter((id) => !current.includes(id));
-      if (current.length + missing.length > MAX_BATCH) {
-        toast.error(`Máximo de ${MAX_BATCH} leads por envio.`);
-        return current;
-      }
-      return [...current, ...missing];
-    });
+    const visibleIds = visible.map((lead) => lead.id);
+    if (visibleIds.every((id) => selected.includes(id))) {
+      setSelected(selected.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    const missing = visibleIds.filter((id) => !selected.includes(id));
+    if (selected.length + missing.length > MAX_BATCH) {
+      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`);
+      return;
+    }
+    setSelected([...selected, ...missing]);
   }
 
   function changeUnitFilter(value: string) {
     setUnitFilter(value);
     setPage(1);
     setSelected([]);
+    setBatchBrokerId("");
     if (value !== "all") setBranchId(value);
   }
 
@@ -152,8 +161,23 @@ export function DistributionInbox({
     setSelected([]);
   }
 
+  function changeBatchUnit(value: string) {
+    setBranchId(value);
+    setBatchBrokerId("");
+  }
+
   const stateAction = useActionState(distributeLeadBatchAction, {});
   const [batchState, batchAction, batchPending] = stateAction;
+  const [assignState, assignAction, assignPending] = useActionState(
+    assignLeadBatchToBrokerAction,
+    {},
+  );
+
+  function clearBatchUi() {
+    setSelected([]);
+    setBrokerByLead({});
+    setBatchBrokerId("");
+  }
 
   return (
     <Card variant="overview" data-onboarding="manager-team-performance">
@@ -168,26 +192,65 @@ export function DistributionInbox({
             </CardDescription>
           </div>
           {selected.length ? (
-            <form action={batchAction} className="flex flex-wrap items-center gap-2">
-              <input name="leadIds" type="hidden" value={selected.join(",")} />
-              {role === "director" ? (
-                <AppSelect
-                  aria-label="Unidade de destino"
+            <div className="flex flex-col items-end gap-2">
+              <form
+                action={batchAction}
+                className="flex flex-wrap items-center gap-2"
+                onSubmit={clearBatchUi}
+              >
+                <input name="leadIds" type="hidden" value={selected.join(",")} />
+                {role === "director" ? (
+                  <AppSelect
+                    aria-label="Unidade de destino"
+                    name="branchId"
+                    value={branchId}
+                    onValueChange={changeBatchUnit}
+                    size="sm"
+                    className="w-40"
+                    options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                  />
+                ) : (
+                  <input name="branchId" type="hidden" value={managerBranchId} />
+                )}
+                <Button disabled={batchPending} size="sm" type="submit">
+                  <ArrowRight /> Enviar selecionados ({selected.length}/{MAX_BATCH})
+                </Button>
+                <Feedback state={batchState} />
+              </form>
+              <form
+                action={assignAction}
+                className="flex flex-wrap items-center justify-end gap-2"
+                onSubmit={clearBatchUi}
+              >
+                <input name="leadIds" type="hidden" value={selected.join(",")} />
+                <input
                   name="branchId"
-                  value={branchId}
-                  onValueChange={setBranchId}
-                  size="sm"
-                  className="w-40"
-                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                  type="hidden"
+                  value={role === "director" ? branchId : managerBranchId}
                 />
-              ) : (
-                <input name="branchId" type="hidden" value={managerBranchId} />
-              )}
-              <Button disabled={batchPending} size="sm" type="submit">
-                <ArrowRight /> Enviar selecionados ({selected.length}/{MAX_BATCH})
-              </Button>
-              <Feedback state={batchState} />
-            </form>
+                <AppSelect
+                  aria-label="Corretor em massa"
+                  size="sm"
+                  className="w-44"
+                  value={batchBrokerId}
+                  onValueChange={setBatchBrokerId}
+                  placeholder="Corretor..."
+                  options={[
+                    { value: "", label: "Corretor..." },
+                    ...unitBrokers.map((b) => ({ value: b.id, label: b.name })),
+                  ]}
+                />
+                <Button
+                  disabled={assignPending || !batchBrokerId}
+                  size="sm"
+                  type="submit"
+                  variant="outline"
+                >
+                  <UserList /> Atribuir selecionados
+                </Button>
+                <Feedback state={assignState} />
+              </form>
+            </div>
           ) : null}
         </div>
         <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
@@ -315,12 +378,6 @@ export function DistributionInbox({
                         </TableCell>
                         <TableCell className="pr-5" data-onboarding="manager-redistribute-lead">
                           <div className="flex flex-wrap justify-end gap-2">
-                            <ActionForm
-                              action={routeLeadToBranchAction}
-                              fields={{ leadId: lead.id, branchId }}
-                            >
-                              <ArrowRight /> Enviar
-                            </ActionForm>
                             {lead.branchId ? (
                               <>
                                 <AppSelect

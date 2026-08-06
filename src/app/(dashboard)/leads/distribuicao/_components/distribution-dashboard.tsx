@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  setBrokersAvailabilityAction,
   toggleAcceptingLeadsAction,
   toggleAutoDistributeAction,
   toggleBrokerAvailabilityAction,
@@ -143,6 +144,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
   const [status, setStatus] = useState<"all" | "available" | "paused" | "offline">("all");
   const [branch, setBranch] = useState("all");
   const [page, setPage] = useState(1);
+  const [selectedBrokers, setSelectedBrokers] = useState<string[]>([]);
   const pageSize = 25;
   const branches = useMemo(
     () =>
@@ -167,6 +169,23 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const [bulkState, bulkAction, bulkPending] = useActionState(setBrokersAvailabilityAction, {});
+
+  function toggleBrokerSelection(id: string) {
+    setSelectedBrokers((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
+
+  function toggleVisibleBrokers() {
+    const visibleIds = visible.map((broker) => broker.id);
+    setSelectedBrokers((current) => {
+      if (visibleIds.every((id) => current.includes(id))) {
+        return current.filter((id) => !visibleIds.includes(id));
+      }
+      return [...current, ...visibleIds.filter((id) => !current.includes(id))];
+    });
+  }
 
   return (
     <Card variant="overview" data-onboarding="manager-sla-monitoring">
@@ -187,6 +206,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
+                setSelectedBrokers([]);
               }}
               placeholder="Buscar por nome, ID ou e-mail..."
               value={search}
@@ -199,6 +219,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
             onValueChange={(val) => {
               setBranch(val);
               setPage(1);
+              setSelectedBrokers([]);
             }}
             options={[
               { value: "all", label: "Todas as filiais" },
@@ -212,6 +233,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
             onValueChange={(val) => {
               setStatus(val as typeof status);
               setPage(1);
+              setSelectedBrokers([]);
             }}
             options={[
               { value: "all", label: "Todos os status" },
@@ -230,11 +252,56 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
           </span>
           <span>Até 25 por página</span>
         </div>
+        {selectedBrokers.length ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/20 px-4 py-2.5">
+            <p className="text-xs text-muted-foreground">
+              <strong className="font-semibold text-foreground">{selectedBrokers.length}</strong>{" "}
+              corretor{selectedBrokers.length === 1 ? "" : "es"} selecionado
+              {selectedBrokers.length === 1 ? "" : "s"}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <form action={bulkAction} onSubmit={() => setSelectedBrokers([])}>
+                <input type="hidden" name="brokerIds" value={selectedBrokers.join(",")} />
+                <input type="hidden" name="target" value="paused" />
+                <Button disabled={bulkPending} size="xs" type="submit" variant="outline">
+                  <Pause /> Pausar selecionados
+                </Button>
+              </form>
+              <form action={bulkAction} onSubmit={() => setSelectedBrokers([])}>
+                <input type="hidden" name="brokerIds" value={selectedBrokers.join(",")} />
+                <input type="hidden" name="target" value="available" />
+                <Button disabled={bulkPending} size="xs" type="submit" variant="outline">
+                  <CheckCircle /> Retomar selecionados
+                </Button>
+              </form>
+              <Button
+                size="xs"
+                type="button"
+                variant="ghost"
+                onClick={() => setSelectedBrokers([])}
+              >
+                Limpar
+              </Button>
+              <ActionFeedback state={bulkState} />
+            </div>
+          </div>
+        ) : null}
         {visible.length ? (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10 pl-4">
+                    <input
+                      aria-label="Selecionar corretores da página"
+                      checked={
+                        visible.length > 0 &&
+                        visible.every((broker) => selectedBrokers.includes(broker.id))
+                      }
+                      onChange={toggleVisibleBrokers}
+                      type="checkbox"
+                    />
+                  </TableHead>
                   <TableHead className="pl-4">Corretor</TableHead>
                   <TableHead>Filial</TableHead>
                   <TableHead>Status</TableHead>
@@ -245,6 +312,14 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
               <TableBody>
                 {visible.map((broker) => (
                   <TableRow key={broker.id}>
+                    <TableCell className="pl-4">
+                      <input
+                        aria-label={`Selecionar ${broker.name}`}
+                        checked={selectedBrokers.includes(broker.id)}
+                        onChange={() => toggleBrokerSelection(broker.id)}
+                        type="checkbox"
+                      />
+                    </TableCell>
                     <TableCell className="max-w-[280px] pl-4">
                       <p className="truncate text-sm font-medium">{broker.name}</p>
                       <p className="truncate font-mono text-[11px] text-muted-foreground">
