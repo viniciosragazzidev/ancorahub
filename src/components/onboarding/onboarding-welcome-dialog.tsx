@@ -25,10 +25,11 @@ export function OnboardingWelcomeDialog() {
           setUserName(info.name.split(" ")[0]);
         }
 
+        const role = info?.roleKey || info?.role;
         let targetTour = "broker-welcome";
-        if (info?.isPlatformAdmin || info?.role === "director") {
+        if (info?.isPlatformAdmin || role === "director" || role === "Diretor") {
           targetTour = "director-welcome";
-        } else if (info?.role === "manager") {
+        } else if (role === "manager" || role === "Gestor" || role === "supervisor" || role === "Supervisor") {
           targetTour = "manager-welcome";
         }
         setRoleTourKey(targetTour);
@@ -90,7 +91,7 @@ export function OnboardingWelcomeDialog() {
             </h2>
 
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Aqui você acompanha seus leads, atendimentos, tarefas, cotações e documentos em um único lugar.
+              Aqui você acompanha seus leads, atendimentos, tarefas e documentos em um único lugar.
             </p>
           </motion.div>
 

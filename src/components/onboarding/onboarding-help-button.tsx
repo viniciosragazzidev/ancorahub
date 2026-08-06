@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useNextStep } from "nextstepjs";
 import { useRouter, usePathname } from "next/navigation";
 import { HelpCircle, Play, BookOpen, MessageSquare, ChevronRight } from "lucide-react";
@@ -13,11 +14,32 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getUserDisplayInfo } from "@/shared/auth/actions";
 
 export function OnboardingHelpButton() {
   const { startNextStep } = useNextStep();
   const router = useRouter();
   const pathname = usePathname();
+  const [welcomeTourKey, setWelcomeTourKey] = useState("broker-welcome");
+
+  useEffect(() => {
+    async function resolveTourKey() {
+      try {
+        const info = await getUserDisplayInfo();
+        const role = info?.roleKey || info?.role;
+        if (info?.isPlatformAdmin || role === "director" || role === "Diretor") {
+          setWelcomeTourKey("director-welcome");
+        } else if (role === "manager" || role === "Gestor" || role === "supervisor" || role === "Supervisor") {
+          setWelcomeTourKey("manager-welcome");
+        } else {
+          setWelcomeTourKey("broker-welcome");
+        }
+      } catch (err) {
+        console.error("Failed to resolve user role for help tours:", err);
+      }
+    }
+    void resolveTourKey();
+  }, []);
 
   const handleStartTour = (tourKey: string, requiredRoute?: string) => {
     if (requiredRoute && pathname !== requiredRoute && !pathname.startsWith(requiredRoute)) {
@@ -49,12 +71,12 @@ export function OnboardingHelpButton() {
 
         <DropdownMenuGroup>
           <DropdownMenuItem
-            onClick={() => handleStartTour("broker-welcome", "/dashboard")}
+            onClick={() => handleStartTour(welcomeTourKey, "/dashboard")}
             className="flex items-center justify-between text-xs font-medium"
           >
             <div className="flex items-center gap-2">
               <Play className="size-3.5 text-primary" />
-              <span>Tour da Fila & Dashboard</span>
+              <span>Tour do Dashboard</span>
             </div>
             <ChevronRight className="size-3 text-muted-foreground" />
           </DropdownMenuItem>
