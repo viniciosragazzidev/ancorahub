@@ -206,7 +206,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           {visibleSections.map((section, sectionIndex) => (
             <div key={section.label} className="w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
               {sectionIndex > 0 ? <div className="mb-3 h-px w-full bg-sidebar-border/55 group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:w-5" /> : null}
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-sidebar-foreground/45 group-data-[collapsible=icon]:sr-only">
+              <p className="mb-1.5 px-2 font-mono text-[10px] font-medium tracking-wider text-sidebar-foreground/50 group-data-[collapsible=icon]:sr-only">
                 {section.label}
               </p>
               <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
