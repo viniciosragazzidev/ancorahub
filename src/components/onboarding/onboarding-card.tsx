@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import type { CardComponentProps } from "nextstepjs";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,15 @@ export function OnboardingCard({
 }: CardComponentProps) {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === totalSteps - 1;
+
+  useEffect(() => {
+    if (step.selector) {
+      const target = document.querySelector(step.selector);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [step.selector, currentStep]);
 
   return (
     <AnimatePresence mode="wait">
