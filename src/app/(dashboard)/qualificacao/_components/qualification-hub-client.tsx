@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Sparkles,
@@ -645,17 +646,17 @@ export function QualificationHubClient({
                 <div className="space-y-3 pt-2 text-xs">
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Canal conectado:</span>
-                    <span className="font-semibold text-emerald-600">
+                    <span className={cn("font-semibold", initialDiagnostic.channelConnected ? "text-emerald-600" : "text-amber-600")}>
                       {initialDiagnostic.channelConnected ? "Conectado" : "Desconectado"}
                     </span>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Número oficial:</span>
-                    <span className="font-mono">{initialDiagnostic.officialNumber}</span>
+                    <span className="font-mono">{initialDiagnostic.officialNumber ?? "Não configurado"}</span>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Nome exibido:</span>
-                    <span className="font-medium">{initialDiagnostic.displayName}</span>
+                    <span className="font-medium">{initialDiagnostic.displayName ?? "Não configurado"}</span>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Phone Number ID:</span>
@@ -663,11 +664,17 @@ export function QualificationHubClient({
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Status do Webhook:</span>
-                    <Badge variant="outline" className="text-[10px]">Active</Badge>
+                    <Badge variant={initialDiagnostic.webhookStatus === "active" ? "default" : "outline"} className="text-[10px]">
+                      {initialDiagnostic.webhookStatus === "active" ? "Ativo" : "Não configurado"}
+                    </Badge>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Token Meta API:</span>
-                    <span className="text-emerald-600 font-semibold">Válido (45 dias)</span>
+                    <span className={cn("font-semibold", initialDiagnostic.tokenStatus === "valid" ? "text-emerald-600" : "text-muted-foreground")}>
+                      {initialDiagnostic.tokenStatus === "valid"
+                        ? `Válido ${initialDiagnostic.tokenExpirationDays ? `(${initialDiagnostic.tokenExpirationDays} dias)` : ""}`
+                        : "Não configurado"}
+                    </span>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Latência média:</span>

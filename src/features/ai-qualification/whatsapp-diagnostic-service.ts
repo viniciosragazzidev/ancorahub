@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -60,12 +60,23 @@ export function maskPhoneNumber(phone: string): string {
 export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<WhatsAppConnectionDiagnostic> {
   const db = getDatabase();
 
-  const [conn] = await db
+  // 1. Busca canal oficial Meta Cloud API
+  const [metaChannel] = await db
+    .select()
+    .from(schema.communicationChannels)
+    .where(and(eq(schema.communicationChannels.tenantId, tenantId), eq(schema.communicationChannels.provider, "meta_cloud")))
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+    .limit(1);
+
+  // 2. Busca conexão WhatsApp WAHA/OpenWA
+  const [wahaConn] = await db
     .select()
     .from(schema.whatsappConnections)
     .where(eq(schema.whatsappConnections.tenantId, tenantId))
+    .orderBy(desc(schema.whatsappConnections.updatedAt))
     .limit(1);
 
+  // 3. Busca últimas mensagens recebidas e enviadas
   const [lastInbound] = await db
     .select()
     .from(schema.whatsappMessages)
@@ -80,23 +91,57 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
     .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
     .limit(1);
 
-  const channelConnected = Boolean(conn?.status === "active" || conn?.sessionId);
-  const wabaId = conn?.sessionId ? `WABA_${conn.sessionId.slice(-6)}` : null;
-  const phoneNumberId = conn?.sessionId ?? null;
-  const officialNumber = conn?.sessionName ?? "+55 (71) 99999-0000";
-  const displayName = conn?.sessionName ?? "Âncora CRM WhatsApp";
+  const isMetaConnected = Boolean(metaChannel && (metaChannel.status === "active" || metaChannel.status === "connected") && metaChannel.phoneNumberId);
+  const isWahaConnected = Boolean(wahaConn && (wahaConn.status === "ready" || wahaConn.status === "active" || wahaConn.status === "connected"));
 
-  const webhookStatus: WhatsAppConnectionDiagnostic["webhookStatus"] = conn ? "active" : "unconfigured";
-  const tokenStatus: WhatsAppConnectionDiagnostic["tokenStatus"] = conn ? "valid" : "unconfigured";
+  const channelConnected = isMetaConnected || isWahaConnected;
+
+  let officialNumber: string | null = null;
+  let displayName: string | null = null;
+  let wabaId: string | null = null;
+  let phoneNumberId: string | null = null;
+  let tokenStatus: WhatsAppConnectionDiagnostic["tokenStatus"] = "unconfigured";
+  let tokenExpirationDays: number | null = null;
+
+  if (metaChannel) {
+    officialNumber = metaChannel.displayPhoneNumber || metaChannel.phoneNumberId || null;
+    displayName = metaChannel.verifiedName || "WhatsApp Oficial (Meta Cloud)";
+    wabaId = metaChannel.wabaId ?? null;
+    phoneNumberId = metaChannel.phoneNumberId ?? null;
+    tokenStatus = metaChannel.status === "active" ? "valid" : "invalid";
+    if (metaChannel.tokenExpiresAt) {
+      const diffMs = metaChannel.tokenExpiresAt.getTime() - Date.now();
+      tokenExpirationDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    } else {
+      tokenExpirationDays = 60;
+    }
+  } else if (wahaConn) {
+    officialNumber = wahaConn.sessionName || (wahaConn.sessionId ? `Sessão ${wahaConn.sessionId}` : null);
+    displayName = wahaConn.sessionName ? `WhatsApp (${wahaConn.sessionName})` : "Sessão WhatsApp WAHA";
+    wabaId = wahaConn.sessionId ? `WAHA_${wahaConn.sessionId.slice(-6)}` : null;
+    phoneNumberId = wahaConn.sessionId ?? null;
+    tokenStatus = isWahaConnected ? "valid" : "unconfigured";
+    tokenExpirationDays = null;
+  }
+
+  const webhookStatus: WhatsAppConnectionDiagnostic["webhookStatus"] = channelConnected ? "active" : "unconfigured";
 
   let overallHealth: WhatsAppConnectionDiagnostic["overallHealth"] = "disabled";
-  if (!conn) {
+  if (!metaChannel && !wahaConn) {
     overallHealth = "incomplete_config";
   } else if (!channelConnected) {
     overallHealth = "unstable";
   } else {
     overallHealth = "connected";
   }
+
+  // Calcula a latência média real dos logs de IA
+  const [latencyRow] = await db
+    .select({
+      avgLatency: sql<number>`coalesce(avg(${schema.aiAttendanceLogs.latencyMs}), 240)::int`,
+    })
+    .from(schema.aiAttendanceLogs)
+    .where(eq(schema.aiAttendanceLogs.tenantId, tenantId));
 
   return {
     channelConnected,
@@ -107,11 +152,11 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
     phoneNumberId,
     webhookStatus,
     tokenStatus,
-    tokenExpirationDays: 45,
+    tokenExpirationDays,
     lastMessageReceivedAt: lastInbound?.createdAt ?? null,
     lastMessageSentAt: lastOutbound?.createdAt ?? null,
     lastError: lastOutbound?.providerErrorMessage ?? null,
-    averageLatencyMs: 240,
+    averageLatencyMs: latencyRow?.avgLatency ?? 240,
     configVersion: 1,
     overallHealth,
   };
