@@ -1,25 +1,24 @@
 {
-  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/internal/sla",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/internal/reminders",
-      "schedule": "1-59/2 * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/internal/jobs/distribution",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/internal/jobs/lead-effects",
-      "schedule": "1-59/2 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/internal/jobs/whatsapp",
-      "schedule": "1-59/2 * * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }
