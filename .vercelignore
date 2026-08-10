@@ -6,3 +6,6 @@ NewDesignRefs/
 
 # Deskcomm is a local architecture reference, never an AncoraHub deploy input.
 temp_deskcomm_crm/
+
+# Architecture graph artifacts are regenerated locally for engineering work.
+graphify-out/

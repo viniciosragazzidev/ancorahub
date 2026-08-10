@@ -4,7 +4,7 @@ import vm from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
 describe("PWA cache policy", () => {
-  it("never sends App Router flight requests through a cache strategy", async () => {
+  it("does not intercept App Router flight requests", async () => {
     const worker = readFileSync(resolve(process.cwd(), "public/sw.js"), "utf8");
     const handlers = new Map<string, (event: { request: Request; respondWith: (response: Promise<Response>) => void }) => void>();
     const cacheMatch = vi.fn();
@@ -35,8 +35,8 @@ describe("PWA cache policy", () => {
       respondWith: (response) => { responsePromise = response; },
     });
 
-    await expect(responsePromise).resolves.toHaveProperty("ok", true);
-    expect(networkFetch).toHaveBeenCalledTimes(1);
+    expect(responsePromise).toBeUndefined();
+    expect(networkFetch).not.toHaveBeenCalled();
     expect(cacheMatch).not.toHaveBeenCalled();
   });
 });

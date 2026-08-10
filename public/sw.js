@@ -2,7 +2,7 @@
 // Versão: 1.0.1
 // Incremente CACHE_VERSION para forçar atualização do cache.
 
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 const STATIC_CACHE = `corretop-static-v${CACHE_VERSION}`;
 const ASSET_CACHE = `corretop-assets-v${CACHE_VERSION}`;
 
@@ -73,7 +73,9 @@ self.addEventListener("fetch", (event) => {
 
   // Não cachear requisições de API ou Next.js internas
   if (isDynamicAppRequest(request, url) || isNavigation(request)) {
-    event.respondWith(fetch(request).catch(() => new Response(null, { status: 503 })));
+    // Do not take ownership of navigations or App Router flight/API streams.
+    // The browser's default network path avoids interrupting streamed RSC
+    // responses during a service-worker update.
     return;
   }
 

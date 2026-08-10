@@ -20,6 +20,7 @@ import {
   Megaphone,
   Monitor,
   Note,
+  Plug,
   Redistribute,
   SignOut,
   SlidersHorizontal,
@@ -104,6 +105,7 @@ const navSections: SidebarSection[] = [
     label: "Administração",
     items: [
       { label: "Marketing", icon: Megaphone, url: "/marketing", permission: "acessar_campanhas_meta" },
+      { label: "Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
       { label: "Unidades", icon: Buildings, url: "/filiais", permission: "gerenciar_filiais" },
       { label: "Parâmetros", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
       { label: "Guia do Sistema", icon: BookOpen, url: "/guia", permission: "acessar_guia" },
