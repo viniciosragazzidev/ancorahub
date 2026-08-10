@@ -53,7 +53,7 @@ export const guideSections: GuideSection[] = [
     description: "Centralize a conversa com o cliente e mantenha o contexto do lead à mão.",
     icon: "ChatCircleText",
     audience: ["director", "manager", "broker"],
-    links: [{ label: "Abrir Conversas", href: "/conversas" }, { label: "Conectar WhatsApp", href: "/settings/whatsapp" }],
+    links: [{ label: "Abrir Conversas", href: "/conversas" }, { label: "Conectar WhatsApp", href: "/integrations/whatsapp" }],
     steps: [
       { title: "Escolha uma conversa", description: "Pesquise pelo nome, telefone ou e-mail. A lista mostra a última mensagem e o status do atendimento." },
       { title: "Leia antes de responder", description: "O histórico fica no centro da tela, enquanto o perfil do cliente reúne contato, responsável, plano e consentimento." },

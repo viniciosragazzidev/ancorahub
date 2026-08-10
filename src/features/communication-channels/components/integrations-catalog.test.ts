@@ -8,7 +8,7 @@ describe("integration catalog", () => {
     const planned = integrationCatalogEntries.filter((entry) => entry.status === "planned");
 
     expect(available.map((entry) => entry.href)).toEqual(expect.arrayContaining([
-      "/settings/meta",
+      "/integrations/meta",
       "/settings?tab=integracoes",
     ]));
     expect(planned.every((entry) => entry.href === undefined)).toBe(true);

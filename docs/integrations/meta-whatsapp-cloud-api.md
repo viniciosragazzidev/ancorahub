@@ -55,7 +55,7 @@ Assine inicialmente `messages`. Depois habilite `message_template_status_update`
 
 ## 4. Configuração manual guiada por empresa
 
-Enquanto o Embedded Signup estiver em transição, o Diretor pode concluir a associação da conta do cliente diretamente em **Configurações → Integrações → Meta Business** (`/settings/meta`). O assistente mostra o tutorial, permite copiar a URL do callback, valida WABA e Phone Number ID com a Graph API antes de salvar e exibe diagnóstico, histórico auditado e dados de marketing opcionais.
+Enquanto o Embedded Signup estiver em transição, o Diretor pode concluir a associação da conta do cliente diretamente em **Integrações → Meta Business** (`/integrations/meta`). O assistente mostra o tutorial, permite copiar a URL do callback, valida WABA e Phone Number ID com a Graph API antes de salvar e exibe diagnóstico, histórico auditado e dados de marketing opcionais.
 
 O Diretor precisa apenas dos dados que pertencem à empresa cliente:
 
@@ -71,7 +71,7 @@ O App ID é informado para conferência. App Secret, Verify Token e chave de cri
 
 1. Faça deploy com as variáveis configuradas.
 2. Entre como Super-admin em `/super-admin/settings` e ative **WhatsApp oficial da Meta**.
-3. Entre como Diretor da corretora em `/settings/meta`.
+3. Entre como Diretor da corretora em `/integrations/meta`.
 4. Siga **Como configurar?**, informe os IDs e o token da conta cliente e clique em **Testar conexão**.
 5. Ao validar, clique em **Conectar Meta**. O AncoraHub valida WABA/número, assina a WABA no app e cifra o token antes de ativar o canal.
 6. Envie uma mensagem de teste para um lead de teste cujo telefone esteja registrado na corretora.

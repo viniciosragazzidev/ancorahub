@@ -55,7 +55,7 @@ A Ancora Hub irá:
 Após a confirmação da Ancora Hub:
 
 1. Entre no AncoraHub com o perfil de **Diretor**.
-2. Abra **Configurações → Integrações → Integração Meta** ou acesse `/settings/meta`.
+2. Abra **Integrações → Meta Business** ou acesse `/integrations/meta`.
 3. Na área **Lead Ads**, clique em **Buscar ativos autorizados**.
 4. Marque a Página encontrada.
 5. Clique em **Ativar Página**. O AncoraHub associa automaticamente o aplicativo `Corretop API Oficial` à Página para receber formulários e só conclui a ativação depois da confirmação da Meta.
@@ -90,7 +90,7 @@ Nesses casos, não compartilhe token nem tente criar um CRM manualmente. Informe
 
 ## Como remover ou trocar uma Página
 
-O Diretor pode clicar em **Remover** ao lado da Página na lista **Páginas conectadas** dentro de `/settings/meta`. A remoção interrompe novos recebimentos e preserva o histórico de leads. Para conectar a mesma Página novamente, basta buscá-la e ativá-la outra vez. Para trocar de Página, remova a atual, compartilhe a nova Página e repita as Partes 2 e 3.
+O Diretor pode clicar em **Remover** ao lado da Página na lista **Páginas conectadas** dentro de `/integrations/meta`. A remoção interrompe novos recebimentos e preserva o histórico de leads. Para conectar a mesma Página novamente, basta buscá-la e ativá-la outra vez. Para trocar de Página, remova a atual, compartilhe a nova Página e repita as Partes 2 e 3.
 
 ## Segurança e privacidade
 

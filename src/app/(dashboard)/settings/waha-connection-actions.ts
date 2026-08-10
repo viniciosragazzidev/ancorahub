@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { changeOwnWahaConnection, createOwnWahaConnection, refreshOwnWahaConnection, updateOwnWahaCapabilities } from "@/features/waha-cadence/connection-service";
 
 function done() {
-  revalidatePath("/settings/whatsapp");
+  revalidatePath("/integrations/whatsapp");
   revalidatePath("/settings");
 }
 

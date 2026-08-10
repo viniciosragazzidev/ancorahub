@@ -229,7 +229,7 @@ export async function updateMetaCloudWhatsAppSettingsAction(formData: FormData) 
     targetType: "system_settings", targetId: "whatsapp_meta_cloud", metadata: { enabled }, createdAt: now,
   });
   revalidatePath("/super-admin/settings");
-  revalidatePath("/settings/whatsapp");
+  revalidatePath("/integrations/whatsapp");
 }
 
 export async function updateMetaLeadAdsSettingsAction(formData: FormData) {
@@ -242,7 +242,7 @@ export async function updateMetaLeadAdsSettingsAction(formData: FormData) {
     targetType: "system_settings", targetId: "meta_lead_ads", metadata: { enabled }, createdAt: now,
   });
   revalidatePath("/super-admin/settings");
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
 }
 
 export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData) {
@@ -255,7 +255,7 @@ export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData
     setSystemSetting(META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp, input.supportWhatsApp, now),
   ]);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.platform_identity_updated", targetType: "system_settings", targetId: "meta_lead_ads_identity", metadata: input, createdAt: now });
-  revalidatePath("/super-admin/settings"); revalidatePath("/settings/meta");
+  revalidatePath("/super-admin/settings"); revalidatePath("/integrations/meta");
 }
 
 export async function updateMetaLeadAdsPilotAction(tenantId: string, formData: FormData) {
@@ -270,7 +270,7 @@ export async function updateMetaLeadAdsPilotAction(tenantId: string, formData: F
   const now = new Date();
   await setSystemSetting(key, JSON.stringify(next), now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.tenant_pilot_updated", targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now });
-  revalidatePath("/super-admin/settings"); revalidatePath("/settings/meta");
+  revalidatePath("/super-admin/settings"); revalidatePath("/integrations/meta");
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
@@ -356,7 +356,7 @@ export async function updateWahaConnectionSettingsAction(formData: FormData) {
   await setSystemSetting("feature_waha_connections_enabled", enabled, now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_connections.settings_updated", targetType: "system_settings", targetId: "waha_connections", metadata: { enabled }, createdAt: now });
   revalidatePath("/super-admin/settings");
-  revalidatePath("/settings/whatsapp");
+  revalidatePath("/integrations/whatsapp");
 }
 
 export async function setTenantStatusAction(formData: FormData) {

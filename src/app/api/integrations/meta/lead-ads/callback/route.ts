@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
               window.opener.postMessage({ type: 'META_AUTH_SUCCESS', code: '${code}', assets: assets }, '*');
               setTimeout(() => window.close(), 1000);
             } else {
-              window.location.href = '/settings/meta';
+              window.location.href = '/integrations/meta';
             }
           </script>
         </div>

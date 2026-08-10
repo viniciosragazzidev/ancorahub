@@ -51,7 +51,7 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
     await db.insert(schema.communicationChannels).values({ id: channelId, ...values, isDefault: true, createdBy: context.userId, createdAt: now });
   }
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channelId, acao: existing ? "meta_cloud_channel_reconnected" : "meta_cloud_channel_connected" });
-  revalidatePath("/settings/whatsapp"); revalidatePath("/conversas");
+  revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
   return { success: true, channelId, displayPhoneNumber: phone.display_phone_number ?? null };
 }
 
@@ -63,5 +63,5 @@ export async function setMetaCloudChannelStatusAction(channelId: string, active:
   if (!channel) throw new Error("Canal oficial não encontrado.");
   await db.update(schema.communicationChannels).set({ status: active ? "active" : "inactive", updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channelId));
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: active ? "meta_cloud_channel_activated" : "meta_cloud_channel_deactivated" });
-  revalidatePath("/settings/whatsapp"); revalidatePath("/conversas");
+  revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
 }

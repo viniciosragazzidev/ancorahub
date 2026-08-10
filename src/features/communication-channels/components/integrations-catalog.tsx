@@ -16,22 +16,22 @@ type IntegrationCard = {
 export const integrationCatalogEntries: IntegrationCard[] = [
   {
     name: "Meta Business",
-    description: "Centralize os recursos da Meta em um só lugar: Lead Ads, ativos de marketing e WhatsApp oficial.",
-    href: "/settings/meta",
+    description: "Configure a captação de formulários Meta e acompanhe as Páginas que alimentam a operação.",
+    href: "/integrations/meta",
     icon: Globe,
     status: "available",
   },
   {
     name: "Facebook Lead Ads",
     description: "Receba formulários de anúncios diretamente na fila central da empresa.",
-    href: "/settings/meta",
+    href: "/integrations/meta",
     icon: Megaphone,
     status: "available",
   },
   {
     name: "WhatsApp oficial",
     description: "Conecte o número corporativo para atendimento, templates e notificações.",
-    href: "/settings/meta",
+    href: "/integrations/whatsapp",
     icon: WhatsappLogo,
     status: "available",
   },

@@ -175,8 +175,8 @@ export async function connectManualMetaConnectionAction(_previous: ManualMetaAct
       else await tx.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, createdBy: context.userId, createdAt: now, ...settingsValues });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: channelId, acao: samePhone ? "meta_manual.reconnected" : "meta_manual.connected" });
     });
-    revalidatePath("/settings/meta");
-    revalidatePath("/settings/whatsapp");
+    revalidatePath("/integrations/meta");
+    revalidatePath("/integrations/whatsapp");
     revalidatePath("/conversas");
     return { success: true, result: resultFrom(inspected) };
   } catch (error) {
@@ -204,7 +204,7 @@ export async function syncManualMetaConnectionAction(): Promise<ManualMetaAction
       await tx.update(schema.metaIntegrationSettings).set({ lastSyncedAt: now, lastError: null, updatedAt: now }).where(eq(schema.metaIntegrationSettings.id, settings.id));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: channel.id, acao: "meta_manual.synchronized" });
     });
-    revalidatePath("/settings/meta");
+    revalidatePath("/integrations/meta");
     return { success: true, result: resultFrom(inspected) };
   } catch (error) {
     return { error: sanitizeError(error) };
@@ -222,8 +222,8 @@ export async function disconnectManualMetaConnectionAction(): Promise<ManualMeta
       await tx.update(schema.communicationChannels).set({ status: "inactive", isDefault: false, updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channel.id));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: channel.id, acao: "meta_manual.disconnected" });
     });
-    revalidatePath("/settings/meta");
-    revalidatePath("/settings/whatsapp");
+    revalidatePath("/integrations/meta");
+    revalidatePath("/integrations/whatsapp");
     return { success: true };
   } catch (error) {
     return { error: sanitizeError(error) };
@@ -238,7 +238,7 @@ export async function completeManualMetaTutorialAction() {
   if (existing) await db.update(schema.metaIntegrationSettings).set({ tutorialCompletedAt: now, updatedAt: now }).where(eq(schema.metaIntegrationSettings.id, existing.id));
   else await db.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, tutorialCompletedAt: now, createdBy: context.userId, createdAt: now, updatedAt: now });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: context.tenantId, acao: "meta_manual.tutorial_completed" });
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
 }
 
 export async function configureManualMetaLeadAdsSourceAction(formData: FormData) {
@@ -256,7 +256,7 @@ export async function configureManualMetaLeadAdsSourceAction(formData: FormData)
     if (!branch) throw new Error("Selecione uma unidade ativa da sua empresa.");
   }
   await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: input.branchId, pageId: input.pageId, adAccountId: input.adAccountId || null, actorUserId: context.userId });
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
 }
 
 export async function discoverManualMetaLeadAdsAssetsAction(): Promise<MetaLeadAdsDiscoveryState> {
@@ -304,7 +304,7 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
   if (settings) await db.update(schema.metaIntegrationSettings).set(values).where(eq(schema.metaIntegrationSettings.id, settings.id));
   else await db.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, createdBy: context.userId, createdAt: now, ...values });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_lead_ads_source", entidadeId: context.tenantId, acao: "meta_lead_ads.assets_confirmed" });
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
   return { success: true };
 }
 
@@ -313,7 +313,7 @@ export async function pauseManualMetaLeadAdsSourceAction(formData: FormData) {
   const sourceId = String(formData.get("sourceId") ?? "").trim();
   if (!sourceId) throw new Error("Fonte de captação inválida.");
   await pauseMetaLeadAdsSource({ tenantId: context.tenantId, sourceId, actorUserId: context.userId });
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
 }
 
 export async function reactivateManualMetaLeadAdsSourceAction(formData: FormData) {
@@ -332,7 +332,7 @@ export async function reactivateManualMetaLeadAdsSourceAction(formData: FormData
     adAccountId: null,
     actorUserId: context.userId,
   });
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
 }
 
 export async function updateMetaLeadAdSourceDistributionAction(input: {
@@ -368,7 +368,7 @@ export async function updateMetaLeadAdSourceDistributionAction(input: {
     acao: "meta_lead_ads.distribution_updated",
   });
 
-  revalidatePath("/settings/meta");
+  revalidatePath("/integrations/meta");
   revalidatePath("/leads/distribuicao");
   return { success: true };
 }

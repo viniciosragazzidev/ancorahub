@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { CheckCircle, ShieldWarning } from "@/components/huge-icons";
+import { ArrowSquareOut, CheckCircle, ShieldWarning } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
@@ -64,6 +64,13 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
               <p><strong className="block text-foreground">Governança</strong><span className="text-muted-foreground">Templates, janela e políticas da Meta.</span></p>
             </div>
             <MetaCloudSetupCard companyAccount={official.companyAccount} configured={official.configured} enabled={official.enabled} missing={official.missing} />
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader><CardTitle>Como conectar o WhatsApp Oficial</CardTitle><CardDescription>Use este roteiro se a empresa ainda não possui um número oficial conectado.</CardDescription></CardHeader>
+          <CardContent className="space-y-4 text-sm leading-6 text-muted-foreground">
+            <ol className="list-decimal space-y-2 pl-5"><li>Na Meta, confirme que você administra o Portfólio Empresarial, a conta WhatsApp Business e o número corporativo.</li><li>Crie ou use o usuário do sistema autorizado e gere o token com as permissões de WhatsApp necessárias.</li><li>Envie ao suporte técnico apenas os IDs de negócio, WABA e número pelo canal aprovado. Nunca envie App Secret, senha ou código de autenticação.</li></ol>
+            <a className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href="https://business.facebook.com/wa/manage/" rel="noreferrer" target="_blank">Abrir WhatsApp Manager da Meta <ArrowSquareOut aria-hidden="true" className="size-3.5" /></a>
           </CardContent>
         </Card>
         {waha}
