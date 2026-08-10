@@ -6,7 +6,7 @@ vi.mock("./meta-cloud-config", () => ({
   getMetaLeadAdsServerConfig: () => ({ accessToken: "platform-token", graphVersion: "v25.0" }),
 }));
 
-import { buildMetaCloudTemplatePayload, subscribePageToLeadgen } from "./meta-cloud-client";
+import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, subscribePageToLeadgen } from "./meta-cloud-client";
 
 describe("Meta Cloud template payload", () => {
   it("sends names for the named broker invitation body variables", () => {
@@ -64,5 +64,39 @@ describe("Meta Cloud template payload", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "Permissão de Página ausente", code: 10 } }), { status: 403 })));
 
     await expect(subscribePageToLeadgen("123456789")).rejects.toThrow("Permissão de Página ausente");
+  });
+
+  it("uses only the selected Page when retrying a Lead Ads subscription", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Token da Página necessário", code: 210 } }), { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "page-token" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(subscribePageToLeadgen("123456789")).resolves.toEqual({ success: true });
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://graph.facebook.com/v25.0/123456789/subscribed_apps",
+      "https://graph.facebook.com/v25.0/123456789?fields=access_token",
+      "https://graph.facebook.com/v25.0/123456789/subscribed_apps",
+    ]);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("me/accounts"))).toBe(false);
+  });
+
+  it("validates only the requested Page instead of listing assets from every tenant", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "123456789", name: "Página do tenant atual" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(discoverMetaLeadAdsAssets("123456789")).resolves.toEqual({
+      pages: [{ id: "123456789", name: "Página do tenant atual" }],
+      adAccounts: [],
+      pixels: [],
+      datasets: [],
+    });
+    expect(fetchMock).toHaveBeenCalledWith("https://graph.facebook.com/v25.0/123456789?fields=id,name", {
+      headers: { Accept: "application/json", Authorization: "Bearer platform-token" },
+      cache: "no-store",
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("me/accounts"))).toBe(false);
   });
 });

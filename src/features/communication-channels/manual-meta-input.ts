@@ -28,3 +28,14 @@ export const manualMetaLeadAdsSourceInputSchema = z.object({
 });
 
 export type ManualMetaLeadAdsSourceInput = z.infer<typeof manualMetaLeadAdsSourceInputSchema>;
+
+/**
+ * The current tenant is derived from the authenticated server session. The
+ * Director supplies only the Page owned by that tenant; no tenant identifier
+ * is ever accepted from the browser.
+ */
+export const manualMetaLeadAdsDiscoveryInputSchema = z.object({
+  pageId: metaIdSchema,
+});
+
+export type ManualMetaLeadAdsDiscoveryInput = z.infer<typeof manualMetaLeadAdsDiscoveryInputSchema>;

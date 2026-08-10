@@ -3,7 +3,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -12,7 +11,7 @@ import { getMetaCloudServerConfig, getMetaLeadAdsConfigurationState } from "./me
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER } from "./types";
-import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
+import { manualMetaConnectionInputSchema, manualMetaLeadAdsDiscoveryInputSchema, manualMetaLeadAdsSourceInputSchema, type ManualMetaConnectionInput } from "./manual-meta-input";
 import { configureMetaLeadAdsSource, isMetaLeadAdsEnabled, pauseMetaLeadAdsSource } from "./meta-lead-ads";
 import { ensureMetaLeadAdsSchema } from "./manual-meta-queries";
 
@@ -259,48 +258,41 @@ export async function configureManualMetaLeadAdsSourceAction(formData: FormData)
   revalidatePath("/integrations/meta");
 }
 
-export async function discoverManualMetaLeadAdsAssetsAction(): Promise<MetaLeadAdsDiscoveryState> {
+export async function discoverManualMetaLeadAdsAssetsAction(input: unknown): Promise<MetaLeadAdsDiscoveryState> {
   try {
-    await requireLeadAdsAccess();
+    const context = await requireLeadAdsAccess();
+    const requested = manualMetaLeadAdsDiscoveryInputSchema.parse(input);
     const config = getMetaLeadAdsConfigurationState();
     if (!config.configured) throw new Error("A credencial técnica da plataforma ainda não está pronta.");
-    const assets = await discoverMetaLeadAdsAssets();
+    const assets = await discoverMetaLeadAdsAssets(requested.pageId);
+    await getDatabase().insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "meta_lead_ads_discovery",
+      entidadeId: context.tenantId,
+      acao: assets.pages.length ? "meta_lead_ads.page_validated" : "meta_lead_ads.page_not_authorized",
+    });
     return { assets };
   } catch (error) {
     return { error: sanitizeError(error) };
   }
 }
 
-const selectedAssetSchema = z.object({
-  pageIds: z.array(z.string().regex(/^\d{5,40}$/)).min(1, "Selecione ao menos uma Página."),
-  adAccountId: z.string().regex(/^(?:act_)?\d{5,40}$/).optional().or(z.literal("")),
-  pixelId: z.string().regex(/^\d{5,40}$/).optional().or(z.literal("")),
-  datasetId: z.string().regex(/^\d{5,40}$/).optional().or(z.literal("")),
-});
+const selectedAssetSchema = manualMetaLeadAdsDiscoveryInputSchema;
 
 export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
   const context = await requireLeadAdsAccess();
   const selected = selectedAssetSchema.parse(input);
-  const discovered = await discoverMetaLeadAdsAssets();
-  const allowed = (items: Array<{ id: string }>, id: string) => !id || items.some((item) => item.id === id);
-  if (selected.pageIds.some((pageId) => !allowed(discovered.pages, pageId)) || !allowed(discovered.adAccounts, selected.adAccountId ?? "") || !allowed(discovered.pixels, selected.pixelId ?? "") || !allowed(discovered.datasets, selected.datasetId ?? "")) {
-    throw new Error("Um dos ativos selecionados não está autorizado para a plataforma. Busque novamente antes de confirmar.");
+  const discovered = await discoverMetaLeadAdsAssets(selected.pageId);
+  if (!discovered.pages.some((page) => page.id === selected.pageId)) {
+    throw new Error("Esta Página não está autorizada para a sua empresa. Confira o compartilhamento com a Ancora Hub e tente novamente.");
   }
   const db = getDatabase();
-  const pageIds = [...new Set(selected.pageIds)];
-  for (const pageId of pageIds) {
-    try {
-      await subscribePageToLeadgen(pageId);
-    } catch (err) {
-      console.warn(`[confirmManualMetaLeadAdsAssetsAction] Warning subscribing page ${pageId}:`, err);
-    }
-  }
-  for (const pageId of pageIds) {
-    await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId, adAccountId: selected.adAccountId || null, actorUserId: context.userId });
-  }
+  await subscribePageToLeadgen(selected.pageId);
+  await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId: selected.pageId, adAccountId: null, actorUserId: context.userId });
   const now = new Date();
   const [settings] = await db.select({ id: schema.metaIntegrationSettings.id }).from(schema.metaIntegrationSettings).where(eq(schema.metaIntegrationSettings.tenantId, context.tenantId)).limit(1);
-  const values = { adAccountId: selected.adAccountId || null, pixelId: selected.pixelId || null, datasetId: selected.datasetId || null, lastSyncedAt: now, lastError: null, updatedAt: now };
+  const values = { adAccountId: null, pixelId: null, datasetId: null, lastSyncedAt: now, lastError: null, updatedAt: now };
   if (settings) await db.update(schema.metaIntegrationSettings).set(values).where(eq(schema.metaIntegrationSettings.id, settings.id));
   else await db.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, createdBy: context.userId, createdAt: now, ...values });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_lead_ads_source", entidadeId: context.tenantId, acao: "meta_lead_ads.assets_confirmed" });

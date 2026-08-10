@@ -8,7 +8,7 @@ Não é necessário — e não é permitido — enviar senha do Facebook, App Se
 
 | Responsável | O que faz |
 | --- | --- |
-| **Diretor da empresa** | Compartilha a Página que recebe os formulários e, no AncoraHub, escolhe a Página que vai gerar leads. |
+| **Diretor da empresa** | Compartilha a Página que recebe os formulários e, no AncoraHub, informa o ID da Página que vai gerar leads. |
 | **Ancora Hub / Super-admin** | Confere o acesso técnico da plataforma, atualiza a credencial quando necessário e confirma que a Página apareceu para o Diretor. |
 | **Gestor e Corretor** | Não precisam configurar a integração. Eles recebem e trabalham os leads depois da ativação. |
 
@@ -56,9 +56,9 @@ Após a confirmação da Ancora Hub:
 
 1. Entre no AncoraHub com o perfil de **Diretor**.
 2. Abra **Integrações → Meta Business** ou acesse `/integrations/meta`.
-3. Na área **Lead Ads**, clique em **Buscar ativos autorizados**.
-4. Marque a Página encontrada.
-5. Clique em **Ativar Página**. O AncoraHub associa automaticamente o aplicativo `Corretop API Oficial` à Página para receber formulários e só conclui a ativação depois da confirmação da Meta.
+3. Na área **Lead Ads**, informe o **ID da Página do Facebook** que foi compartilhada. Não informe o ID da empresa no AncoraHub: a empresa é identificada automaticamente pelo seu login.
+4. Clique em **Validar Página**. O AncoraHub consulta apenas esse ID; Páginas de outras empresas nunca são listadas.
+5. Confirme o nome da Página retornada e clique em **Ativar Página**. O AncoraHub associa automaticamente o aplicativo `Corretop API Oficial` à Página para receber formulários e só conclui a ativação depois da confirmação da Meta.
 
 Uma Página só pode ficar ligada a uma empresa do AncoraHub por vez. Depois da ativação, o sistema registra a origem Meta e direciona os novos leads para a fila central da empresa.
 
@@ -82,8 +82,8 @@ O mesmo teste pode ser reenviado para verificar que o sistema não cria um lead 
 
 ### O Diretor deve aguardar a Ancora Hub quando
 
-- o botão **Buscar ativos autorizados** informa “Nenhuma Página encontrada”;
-- a Página aparece na Meta, mas não no AncoraHub;
+- a validação informa “Página não autorizada”;
+- a Página aparece na Meta, mas não é validada no AncoraHub;
 - houve troca de Página, de portfólio empresarial ou de usuário técnico.
 
 Nesses casos, não compartilhe token nem tente criar um CRM manualmente. Informe apenas o nome e o ID da Página ao suporte da Ancora Hub pelo WhatsApp **+55 21 95930-7782**.

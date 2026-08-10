@@ -13,7 +13,9 @@
 - A autorização segue derivada do contexto de sessão e da capability `acessar_integracao_meta`.
 - Tokens e demais credenciais privadas continuam sendo inseridos apenas no formulário protegido e não aparecem no guia, nos links ou em logs de interface.
 - Lead Ads continua dependente do kill switch e do piloto individual liberado pelo Super-admin.
+- A validação de Lead Ads recebe somente o ID de uma Página. O tenant continua derivado da sessão e a credencial central não lista mais a carteira inteira de ativos visíveis na Meta.
 
 ## Validação
 
-- A preencher após type-check, teste do catálogo e build remoto.
+- `npx vitest run src/features/communication-channels/meta-cloud-client.test.ts src/features/communication-channels/manual-meta-input.test.ts --reporter=dot` — 9 testes aprovados, incluindo a regressão que bloqueia `me/accounts` na descoberta.
+- `npx tsc --noEmit --pretty false` — aprovado.

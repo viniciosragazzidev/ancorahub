@@ -69,23 +69,22 @@ async function leadAdsRequest<T>(path: string): Promise<T> {
   return payload;
 }
 
-/** Returns only non-sensitive asset labels and IDs authorized for the platform credential. */
-export async function discoverMetaLeadAdsAssets(): Promise<MetaLeadAdsAssets> {
-  const list = async (path: string) => {
-    try {
-      return (await leadAdsRequest<{ data?: MetaAsset[] }>(path)).data ?? [];
-    } catch (error) {
-      if (error instanceof MetaCloudApiError && [400, 403].includes(error.status)) return [];
-      throw error;
+/**
+ * Validates one Page explicitly named by the authenticated tenant. Never use
+ * collection endpoints here: a shared technical credential can see assets
+ * belonging to several customer businesses.
+ */
+export async function discoverMetaLeadAdsAssets(pageId: string): Promise<MetaLeadAdsAssets> {
+  try {
+    const page = await leadAdsRequest<MetaAsset>(`${encodeURIComponent(pageId)}?fields=id,name`);
+    if (page.id !== pageId) return { pages: [], adAccounts: [], pixels: [], datasets: [] };
+    return { pages: [{ id: page.id, name: page.name }], adAccounts: [], pixels: [], datasets: [] };
+  } catch (error) {
+    if (error instanceof MetaCloudApiError && [400, 403, 404].includes(error.status)) {
+      return { pages: [], adAccounts: [], pixels: [], datasets: [] };
     }
-  };
-  const [pages, adAccounts, pixels, datasets] = await Promise.all([
-    list("me/accounts?fields=id,name&limit=100"),
-    list("me/adaccounts?fields=id,name&limit=100"),
-    list("me/adspixels?fields=id,name&limit=100"),
-    list("me/datasets?fields=id,name&limit=100"),
-  ]);
-  return { pages, adAccounts, pixels, datasets };
+    throw error;
+  }
 }
 
 /** Subscribes the platform app to Lead Ads events for an already-authorized Page. */
@@ -113,15 +112,14 @@ export async function subscribePageToLeadgen(pageId: string) {
     const errorCode = payload.error?.code;
     if (errorCode === 210 || response.status === 403) {
       try {
-        const pagesRes = await fetch(`https://graph.facebook.com/${config.graphVersion}/me/accounts?fields=id,access_token&limit=100`, {
+        const pageRes = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}?fields=access_token`, {
           headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` },
           cache: "no-store",
         });
-        if (pagesRes.ok) {
-          const pagesPayload = await pagesRes.json().catch(() => ({})) as { data?: Array<{ id: string; access_token?: string }> };
-          const matched = pagesPayload.data?.find((p) => p.id === pageId);
-          if (matched?.access_token) {
-            const retryResult = await postSubscription(matched.access_token);
+        if (pageRes.ok) {
+          const pagePayload = await pageRes.json().catch(() => ({})) as { access_token?: string };
+          if (pagePayload.access_token) {
+            const retryResult = await postSubscription(pagePayload.access_token);
             response = retryResult.response;
             payload = retryResult.payload;
           }

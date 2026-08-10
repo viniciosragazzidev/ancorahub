@@ -8,6 +8,7 @@ import { ArrowSquareOut, CheckCircle, Copy, Warning } from "@/components/huge-ic
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import {
   confirmManualMetaLeadAdsAssetsAction,
@@ -114,26 +115,21 @@ function MetaLink({ href, children }: { href: string; children: ReactNode }) {
 }
 
 function LeadAdsWizard({ props }: { props: Props }) {
-  const [discovery, setDiscovery] = useState<{ pages: Asset[]; adAccounts: Asset[]; pixels: Asset[]; datasets: Asset[] } | null>(null);
-  const [selectedPages, setSelectedPages] = useState<string[]>([]);
-  const [adAccountId, setAdAccountId] = useState("");
-  const [pixelId, setPixelId] = useState("");
-  const [datasetId, setDatasetId] = useState("");
+  const [discovery, setDiscovery] = useState<{ pages: Asset[] } | null>(null);
+  const [pageId, setPageId] = useState("");
   const [pending, startTransition] = useTransition();
 
   const discover = () => startTransition(async () => {
-    const result = await discoverManualMetaLeadAdsAssetsAction();
+    const result = await discoverManualMetaLeadAdsAssetsAction({ pageId });
     if (result.error) { toast.error(result.error); return; }
     setDiscovery(result.assets ?? null);
-    setSelectedPages([]);
-    toast.success(result.assets?.pages.length ? "Ativos autorizados encontrados." : "Nenhuma Página foi encontrada ainda.");
+    toast.success(result.assets?.pages.length ? "Página autorizada encontrada." : "Esta Página não foi autorizada para esta empresa.");
   });
   const confirm = () => startTransition(async () => {
     try {
-      await confirmManualMetaLeadAdsAssetsAction({ pageIds: selectedPages, adAccountId, pixelId, datasetId });
-      toast.success("Páginas ativadas. Novos leads entrarão na fila central.");
+      await confirmManualMetaLeadAdsAssetsAction({ pageId });
+      toast.success("Página ativada. Novos leads entrarão na fila central desta empresa.");
       setDiscovery(null);
-      setSelectedPages([]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível ativar os ativos.");
     }
@@ -146,25 +142,24 @@ function LeadAdsWizard({ props }: { props: Props }) {
     <Card className="border-primary/20 bg-primary/5 shadow-none"><CardContent className="flex gap-3 p-4"><CheckCircle className="mt-0.5 size-5 shrink-0 text-primary" /><div><p className="text-sm font-semibold">O resultado esperado</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Ao terminar, cada novo formulário Meta cria um lead na fila central desta empresa. WhatsApp não é necessário para esta integração.</p></div></CardContent></Card>
     <Card className="border-border shadow-none"><CardHeader><Badge variant="info" className="w-fit">Passo 1 de 4</Badge><CardTitle className="mt-2">Compartilhe a Página com a Ancora Hub</CardTitle><CardDescription>Faça isso no Portfólio Empresarial que é dono da Página dos anúncios — não no portfólio da Ancora Hub.</CardDescription></CardHeader><CardContent className="grid gap-4"><ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground"><li>Abra as configurações do negócio da Meta.</li><li>Vá em <strong className="text-foreground">Usuários → Parceiros</strong> e escolha adicionar um parceiro.</li><li>Informe o Business ID da Ancora Hub, selecione a Página que recebe formulários e confirme o acesso.</li><li>Em <strong className="text-foreground">Integrações → Acesso a leads</strong>, mantenha o acesso à Página liberado.</li></ol><div className="grid gap-4 sm:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Parceiro</p><CopyValue label="nome do parceiro" value={props.identity.partnerName} /></div><div><p className="mb-2 text-sm font-medium">Business ID da Ancora Hub</p><CopyValue label="Business ID" value={props.identity.businessId} /></div></div><MetaLink href="https://business.facebook.com/settings/">Abrir Configurações do negócio da Meta</MetaLink></CardContent></Card>
     <Card className="border-border shadow-none"><CardHeader><Badge variant="info" className="w-fit">Passo 2 de 4</Badge><CardTitle className="mt-2">Aguarde a confirmação técnica</CardTitle><CardDescription>A Ancora Hub confirma que a Página foi compartilhada e que a credencial técnica consegue ler os formulários.</CardDescription></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground"><p>Não cole token, App ID, segredo do aplicativo ou o nome do CRM em uma tela da Meta. Esta parte é feita pela plataforma.</p><p>Quando o suporte confirmar, volte aqui para buscar a Página. Se precisar, informe apenas o nome e o ID da Página pelo WhatsApp {props.identity.supportWhatsApp}.</p></CardContent></Card>
-    <Card className="border-border shadow-none"><CardHeader><Badge variant="info" className="w-fit">Passo 3 de 4</Badge><CardTitle className="mt-2">Busque a Página autorizada</CardTitle><CardDescription>O AncoraHub consulta a Meta com a credencial técnica central. Apenas Páginas efetivamente compartilhadas aparecem na lista.</CardDescription></CardHeader><CardContent><Button onClick={discover} disabled={pending}>{pending ? "Buscando…" : "Buscar ativos autorizados"}</Button>{discovery && !discovery.pages.length ? <div className="mt-4 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm"><p className="font-medium">Nenhuma Página encontrada</p><p className="mt-1 leading-6 text-muted-foreground">Confira o parceiro, a Página compartilhada e o Acesso a leads. Se estiver tudo correto, aguarde a confirmação técnica e tente novamente. Não envie token ao suporte.</p></div> : null}</CardContent></Card>
-    {discovery?.pages.length ? <Card className="border-border shadow-none"><CardHeader><Badge variant="info" className="w-fit">Passo 4 de 4</Badge><CardTitle className="mt-2">Escolha e ative</CardTitle><CardDescription>As Páginas selecionadas passam a enviar novos leads para a fila central. Conta, Pixel e Dataset são opcionais e só preparam relatórios futuros.</CardDescription></CardHeader><CardContent className="space-y-5"><fieldset className="space-y-2"><legend className="text-sm font-medium">Páginas para receber Lead Ads</legend>{discovery.pages.map((page) => <label key={page.id} className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"><input type="checkbox" checked={selectedPages.includes(page.id)} onChange={(event) => setSelectedPages((current) => event.target.checked ? [...current, page.id] : current.filter((id) => id !== page.id))} /><span className="min-w-0 flex-1 truncate">{page.name || "Página sem nome"}</span><span className="text-xs text-muted-foreground">{page.id}</span></label>)}</fieldset><div className="grid gap-4 md:grid-cols-3"><AssetSelect label="Conta de anúncios" value={adAccountId} onChange={setAdAccountId} items={discovery.adAccounts} /><AssetSelect label="Pixel" value={pixelId} onChange={setPixelId} items={discovery.pixels} /><AssetSelect label="Dataset" value={datasetId} onChange={setDatasetId} items={discovery.datasets} /></div><Button onClick={confirm} disabled={pending || !selectedPages.length}>{pending ? "Ativando…" : `Ativar ${selectedPages.length || "as"} Página${selectedPages.length === 1 ? "" : "s"}`}</Button><p className="text-sm text-muted-foreground">Depois da ativação, envie um formulário fictício pela <MetaLink href="https://developers.facebook.com/tools/lead-ads-testing/">ferramenta de teste de Lead Ads</MetaLink> e confirme a origem Meta Lead Ads na lista de Leads.</p></CardContent></Card> : null}
+    <Card className="border-border shadow-none">
+      <CardHeader>
+        <Badge variant="info" className="w-fit">Passo 3 de 4</Badge>
+        <CardTitle className="mt-2">Informe a Página desta empresa</CardTitle>
+        <CardDescription>Por segurança, o sistema valida somente o ID da Página que você informar. A lista de ativos de outras empresas nunca é exibida.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <label className="grid max-w-xl gap-1.5 text-sm font-medium" htmlFor="meta-lead-ads-page-id">
+          ID da Página do Facebook
+          <Input id="meta-lead-ads-page-id" inputMode="numeric" onChange={(event) => setPageId(event.target.value)} placeholder="Ex.: 123456789012345" value={pageId} />
+        </label>
+        <p className="max-w-2xl text-sm text-muted-foreground">Use o ID da Página compartilhada com a Ancora Hub. Este campo não pede o ID da sua empresa no AncoraHub: a empresa é identificada automaticamente pela sua sessão.</p>
+        <Button onClick={discover} disabled={pending || !pageId.trim()}>{pending ? "Validando…" : "Validar Página"}</Button>
+        {discovery && !discovery.pages.length ? <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm"><p className="font-medium">Página não autorizada</p><p className="mt-1 leading-6 text-muted-foreground">Confira o ID informado, o compartilhamento com a Ancora Hub e o Acesso a leads. Depois, tente novamente.</p></div> : null}
+      </CardContent>
+    </Card>
+    {discovery?.pages.length ? <Card className="border-border shadow-none"><CardHeader><Badge variant="info" className="w-fit">Passo 4 de 4</Badge><CardTitle className="mt-2">Ative esta Página</CardTitle><CardDescription>A Página abaixo foi validada para esta empresa. Ao ativar, novos formulários entram na fila central.</CardDescription></CardHeader><CardContent className="space-y-5"><div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"><span className="min-w-0 flex-1 truncate font-medium">{discovery.pages[0].name || "Página sem nome"}</span><span className="text-xs text-muted-foreground">{discovery.pages[0].id}</span></div><Button onClick={confirm} disabled={pending}>{pending ? "Ativando…" : "Ativar Página"}</Button><p className="text-sm text-muted-foreground">Depois da ativação, envie um formulário fictício pela <MetaLink href="https://developers.facebook.com/tools/lead-ads-testing/">ferramenta de teste de Lead Ads</MetaLink> e confirme a origem Meta Lead Ads na lista de Leads.</p></CardContent></Card> : null}
   </div>;
-}
-
-function AssetSelect({ label, value, onChange, items }: { label: string; value: string; onChange(value: string): void; items: Asset[] }) {
-  return (
-    <label className="grid gap-1.5 text-sm font-medium">
-      {label}
-      <AppSelect
-        value={value}
-        onValueChange={onChange}
-        options={[
-          { value: "", label: "Não selecionar agora" },
-          ...items.map((item) => ({ value: item.id, label: item.name || item.id })),
-        ]}
-      />
-    </label>
-  );
 }
 
 export function MetaManualIntegrationWorkspace(props: Props) {

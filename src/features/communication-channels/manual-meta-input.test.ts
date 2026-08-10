@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { manualMetaConnectionInputSchema, manualMetaLeadAdsSourceInputSchema } from "./manual-meta-input";
+import { manualMetaConnectionInputSchema, manualMetaLeadAdsDiscoveryInputSchema, manualMetaLeadAdsSourceInputSchema } from "./manual-meta-input";
 
 const validInput = {
   businessId: "1234567890",
@@ -27,5 +27,11 @@ describe("manual Meta connection input", () => {
   it("accepts a lead ads page mapping without accepting a client token", () => {
     expect(manualMetaLeadAdsSourceInputSchema.safeParse({ pageId: "1234567890", adAccountId: "act_1234567891", branchId: null }).success).toBe(true);
     expect(manualMetaLeadAdsSourceInputSchema.safeParse({ pageId: "page-name", adAccountId: "", branchId: null }).success).toBe(false);
+  });
+
+  it("accepts only a Page ID for scoped Lead Ads validation", () => {
+    expect(manualMetaLeadAdsDiscoveryInputSchema.safeParse({ pageId: "1234567890" }).success).toBe(true);
+    expect(manualMetaLeadAdsDiscoveryInputSchema.safeParse({ pageId: "1234567890", tenantId: "other-tenant" }).success).toBe(true);
+    expect(manualMetaLeadAdsDiscoveryInputSchema.parse({ pageId: "1234567890", tenantId: "other-tenant" })).toEqual({ pageId: "1234567890" });
   });
 });
