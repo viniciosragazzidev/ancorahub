@@ -59,12 +59,42 @@ function copyCookies(source: NextResponse, target: NextResponse) {
   source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
 }
 
+function hasSupabaseSessionCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some((cookie) => cookie.name.startsWith("sb-") && cookie.name.includes("auth-token"));
+}
+
+async function getSafeSupabaseResponse(request: NextRequest) {
+  const fallback = NextResponse.next({ request: { headers: request.headers } });
+
+  // Better Auth is the CRM access authority. Do not make every App Router
+  // navigation wait for Supabase when the browser has no Supabase session.
+  // This prevents an external token refresh from leaving the entire product on
+  // its loading boundary.
+  if (!hasSupabaseSessionCookie(request)) return fallback;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      updateSession(request),
+      new Promise<NextResponse>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), 1_500);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestId = request.headers.get("x-request-id") ?? randomUUID();
   request.headers.set("x-request-id", requestId);
   request.headers.set("x-pathname", pathname);
-  const supabaseResponse = await updateSession(request);
+  const supabaseResponse = await getSafeSupabaseResponse(request);
   const session = request.cookies.get("better-auth.session_token")
     ?? request.cookies.get("__Secure-better-auth.session_token")
     ?? request.cookies.get("better-auth.session_token.value");
