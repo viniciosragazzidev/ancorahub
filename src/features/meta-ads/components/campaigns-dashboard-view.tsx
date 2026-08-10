@@ -62,7 +62,7 @@ export function CampaignsDashboardView({
 
       {/* ─── TABELA DE CAMPANHAS ─── */}
       <Card className="border-transparent bg-transparent shadow-none">
-        <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
           <div>
             <CardTitle className="text-base font-bold">Desempenho Comercial por Campanha</CardTitle>
             <CardDescription className="text-xs">

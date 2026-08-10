@@ -67,41 +67,44 @@ function SourceDistributionSelector({
 
   return (
     <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/60 mt-2 w-full">
-      <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         <span>Destino dos Leads:</span>
-        <select
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs font-normal"
-          value={mode}
+        <AppSelect
+          aria-label="Destino dos leads"
+          className="w-64"
           disabled={pending}
-          onChange={(e) => handleUpdateMode(e.target.value)}
-        >
-          <option value="direct_leads">🌐 Lista Geral de Leads (/leads) — Sem Plantão</option>
-          <option value="duty_plantao">⚡ Fila do Plantão ao Vivo (Geral)</option>
-          <option value="unit_branch">🏢 Plantão de Unidade Específica...</option>
-        </select>
-      </label>
+          onValueChange={handleUpdateMode}
+          options={[
+            { value: "direct_leads", label: "Lista geral de leads — sem plantão" },
+            { value: "duty_plantao", label: "Fila do plantão ao vivo" },
+            { value: "unit_branch", label: "Plantão de unidade específica" },
+          ]}
+          size="sm"
+          triggerClassName="h-8 bg-background text-xs font-normal"
+          value={mode}
+        />
+      </div>
 
       {mode === "unit_branch" && (
-        <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <span>Unidade:</span>
-          <select
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs font-normal"
-            value={branchId}
+          <AppSelect
+            aria-label="Unidade de destino"
+            className="w-52"
             disabled={pending}
-            onChange={(e) => {
-              const val = e.target.value;
-              setBranchId(val);
-              handleUpdateMode(mode, val || null);
+            onValueChange={(value) => {
+              setBranchId(value);
+              handleUpdateMode(mode, value || null);
             }}
-          >
-            <option value="">Matriz / Sem unidade</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            options={[
+              { value: "", label: "Matriz / sem unidade" },
+              ...branches.map((item) => ({ value: item.id, label: item.name })),
+            ]}
+            size="sm"
+            triggerClassName="h-8 bg-background text-xs font-normal"
+            value={branchId}
+          />
+        </div>
       )}
     </div>
   );

@@ -27,6 +27,7 @@ import { resetPlatformUserRouteOnboarding } from "@/features/onboarding/route-on
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
+import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
 
 function boundedDistributionSetting(value: FormDataEntryValue | null, fallback: number, min: number, max: number) {
   const parsed = Number(value);
@@ -132,6 +133,39 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
     targetId: "broker_workspace",
     metadata: { enabled },
     createdAt: now,
+  });
+  revalidatePath("/dashboard");
+  revalidatePath("/super-admin/settings");
+}
+
+export async function updateCleanUiOperationalSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("cleanUiOperationalEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting(CLEAN_UI_FEATURE, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "clean_ui_operational.global_feature_updated",
+    targetType: "system_settings", targetId: "clean_ui_operational", metadata: { enabled }, createdAt: now,
+  });
+  revalidatePath("/dashboard");
+  revalidatePath("/super-admin/settings");
+}
+
+export async function updateCleanUiOperationalLegacyTenantAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const now = new Date();
+  const current = await getSystemSetting(CLEAN_UI_LEGACY_TENANTS_SETTING);
+  let tenantIds: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(current ?? "[]");
+    if (Array.isArray(parsed)) tenantIds = parsed.filter((value): value is string => typeof value === "string");
+  } catch { /* start from a safe empty exception list */ }
+  const updated = input.enabled === "true" ? [...new Set([...tenantIds, input.tenantId])] : tenantIds.filter((tenantId) => tenantId !== input.tenantId);
+  await setSystemSetting(CLEAN_UI_LEGACY_TENANTS_SETTING, JSON.stringify(updated), now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "clean_ui_operational.tenant_fallback_updated",
+    targetType: "tenant", targetId: input.tenantId, metadata: { usingLegacyLayout: input.enabled === "true" }, createdAt: now,
   });
   revalidatePath("/dashboard");
   revalidatePath("/super-admin/settings");

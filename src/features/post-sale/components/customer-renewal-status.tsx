@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppSelect } from "@/components/ui/select";
 import { updateCustomerRenewalStatusAction } from "@/features/post-sale/actions";
 
 const renewalOptions = [
@@ -56,15 +57,15 @@ export function CustomerRenewalStatus({
     <div className="space-y-3 border-t border-border/40 pt-3">
       <div className="space-y-1.5">
         <Label htmlFor={`renewal-status-${activeCustomerId}`}>Andamento</Label>
-        <select
-          id={`renewal-status-${activeCustomerId}`}
-          value={status}
-          onChange={(event) => setStatus(event.target.value as RenewalStatus)}
+        <AppSelect
+          aria-label="Andamento da renovação"
           disabled={disabled || pending}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {renewalOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
+          id={`renewal-status-${activeCustomerId}`}
+          onValueChange={(value) => setStatus(value as RenewalStatus)}
+          options={renewalOptions.map((option) => ({ value: option.value, label: option.label }))}
+          triggerClassName="h-9 w-full bg-background text-sm shadow-xs"
+          value={status}
+        />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={`renewal-notes-${activeCustomerId}`}>Observação</Label>

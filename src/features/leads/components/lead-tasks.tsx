@@ -50,7 +50,7 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
 
   return (
     <Card className="border-border bg-card shadow-none">
-      <CardHeader className="flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <CardTitle className="flex items-center gap-2">
             <ListChecks className="size-5 text-primary" />

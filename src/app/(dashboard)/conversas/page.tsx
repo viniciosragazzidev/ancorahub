@@ -253,7 +253,8 @@ export default async function ConversationsPage({ searchParams }: { searchParams
           </nav>
         ) : undefined}
       />
-      <main className="min-w-0 min-h-0 flex-1 bg-background p-3 lg:p-4">
+      <main className="mx-auto min-h-0 w-full max-w-[1200px] flex-1 bg-background p-3 lg:p-5">
+        <div className="h-full min-h-[calc(100dvh-8.5rem)] overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_10px_28px_rgb(15_23_42/0.04)]">
         {officialBrokerTab ? <OfficialBrokerConversations enabled={officialBrokerMessagesEnabled} conversations={officialBrokerConversations} /> : <ConversationsWorkspace
           role={context.role}
           branches={branches}
@@ -262,6 +263,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
           userId={context.userId}
           tenantId={context.tenantId}
         />}
+        </div>
       </main>
     </>
   );

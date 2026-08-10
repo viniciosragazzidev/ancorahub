@@ -8,11 +8,11 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-4 rounded-lg border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_rgb(15_23_42/0.025)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_2px_4px_rgb(15_23_42/0.05),0_12px_28px_rgb(15_23_42/0.04)] motion-reduce:transition-none",
-        subtle: "gap-4 rounded-lg border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgb(15_23_42/0.025)]",
-        overview: "gap-0 overflow-hidden rounded-lg border border-border/80 bg-card p-0 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_8px_24px_rgb(15_23_42/0.025)]",
-        compact: "gap-3 rounded-lg border border-border/80 bg-card p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_6px_18px_rgb(15_23_42/0.035)] motion-reduce:transition-none",
-        kanban: "gap-0 overflow-hidden rounded-lg border border-border/80 bg-card p-0 shadow-[0_1px_2px_rgb(15_23_42/0.03)] transition-[border-color,box-shadow] duration-200 hover:border-border-strong hover:shadow-[0_6px_18px_rgb(15_23_42/0.035)] motion-reduce:transition-none",
+        default: "gap-4 rounded-xl border border-border/80 bg-card p-5 transition-[border-color,background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-card/95 motion-reduce:transition-none",
+        subtle: "gap-4 rounded-xl border border-border/70 bg-card/80 p-5",
+        overview: "gap-0 overflow-hidden rounded-xl border border-border/80 bg-card p-0",
+        compact: "gap-3 rounded-xl border border-border/70 bg-card p-4 transition-[border-color,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
+        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 transition-[border-color,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
       },
     },
     defaultVariants: {
@@ -47,7 +47,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header grid auto-rows-min items-start gap-1 p-0 pb-1 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+        "group/card-header grid auto-rows-min items-start gap-1.5 p-0 pb-1 has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
         className
       )}
       {...props}
@@ -60,7 +60,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-sans text-base font-semibold tracking-tight text-foreground",
+        "font-sans text-[15px] font-semibold tracking-[-0.015em] text-foreground",
         className
       )}
       {...props}

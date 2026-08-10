@@ -39,6 +39,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppSelect } from "@/components/ui/select";
 
 // -----------------------------------------------------------------------------
 // TYPES & INTERFACES
@@ -409,19 +410,15 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
         {/* CONTROLES SUPERIORES */}
         <div className="flex items-center gap-2">
             {/* Seletor de Contexto do Lead */}
-            <div className="relative hidden md:block">
-              <select
-                value={selectedLeadId}
-                onChange={(e) => setSelectedLeadId(e.target.value)}
-                className="h-8 rounded-md border border-input bg-card px-2.5 pr-7 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-sky-500"
-              >
-                {MOCK_LEAD_CONTEXTS.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <AppSelect
+              aria-label="Contexto do lead"
+              className="hidden w-48 md:block"
+              onValueChange={setSelectedLeadId}
+              options={MOCK_LEAD_CONTEXTS.map((context) => ({ value: context.id, label: context.name }))}
+              size="sm"
+              triggerClassName="h-8 rounded-lg bg-card px-2.5 text-xs font-medium"
+              value={selectedLeadId}
+            />
 
             <TooltipProvider>
               <Tooltip>

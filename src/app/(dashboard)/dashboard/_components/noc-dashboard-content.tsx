@@ -10,7 +10,6 @@ import {
   ChartLineUp,
   CheckCircle,
   Circle,
-  Globe,
   Handshake,
   Lightning,
   Phone,
@@ -128,15 +127,6 @@ function DirectorTopActionHeader({ data }: { data: DirectorDashboardData }) {
       icon: Users,
       critical: false,
     },
-    {
-      label: "Parâmetros do Tenant",
-      value: "OK",
-      description: "Integrações & Segurança",
-      href: "/settings",
-      badge: "Sistema",
-      icon: Globe,
-      critical: false,
-    },
   ] as const;
 
   return (
@@ -148,7 +138,7 @@ function DirectorTopActionHeader({ data }: { data: DirectorDashboardData }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
@@ -1095,7 +1085,7 @@ export default function NocDashboardContent(props: RoleProps) {
           </div>
         }
       />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-5 bg-background p-4 lg:gap-6 lg:p-6">
         {props.role === "director" && <DirectorNocContent data={props.data} />}
         {props.role === "manager" && <ManagerNocContent data={props.data} />}
         {props.role === "broker" && <BrokerNocContent data={props.data} />}

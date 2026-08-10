@@ -295,7 +295,7 @@ export default async function LeadsPage({
         }
       />
       <LeadsLiveSync />
-      <main className="flex min-h-0 flex-1 flex-col gap-6 bg-background p-4 pb-8 lg:p-6">
+      <main className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-5 bg-background p-4 pb-8 lg:gap-6 lg:p-6">
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}
 
@@ -398,6 +398,7 @@ export default async function LeadsPage({
             </div>
           </div>
         )}
+
       </main>
     </>
   );

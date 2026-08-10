@@ -3,7 +3,6 @@
 import {
   Bell,
   ChartLineUp,
-  ChatCircleText,
   ClipboardText,
   Handshake,
   House,
@@ -39,7 +38,6 @@ type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; 
 const allBrokerItems: BrokerSidebarItem[] = [
   { label: "Resumo", icon: House, url: "/corretor/resumo", permission: "acessar_dashboard" },
   { label: "Minha fila", icon: ListChecks, url: "/minha-fila", permission: "acessar_leads" },
-  { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
   { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
   { label: "Checklist", icon: ClipboardText, url: "/checklist", permission: "acessar_documentos" },
   { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
@@ -107,7 +105,7 @@ export function CorretorSidebar() {
     }
     if (
       jobTitle === "marketing" &&
-      ["/conversas", "/tarefas", "/documentos", "/clientes", "/vendas", "/checklist", "/minha-fila", "/corretor/resumo", "/minha-meta"].some(
+      ["/tarefas", "/documentos", "/clientes", "/vendas", "/checklist", "/minha-fila", "/corretor/resumo", "/minha-meta"].some(
         (path) => item.url === path || item.url.startsWith(path + "/")
       )
     ) {

@@ -310,7 +310,7 @@ export default async function LeadDistributionPage() {
         />
         {/* Monitoramento — saúde do processamento assíncrono */}
         <Card>
-          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div>
               <CardTitle>Automação da fila</CardTitle>
               <CardDescription>
@@ -358,7 +358,7 @@ export default async function LeadDistributionPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div>
               <CardTitle>Efeitos pendentes do intake</CardTitle>
               <CardDescription>

@@ -8,7 +8,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto rounded-lg border border-border/80 bg-card shadow-[0_1px_2px_rgb(15_23_42/0.035)]"
+      className="relative w-full overflow-x-auto rounded-xl border border-border/80 bg-card"
     >
       <table
         data-slot="table"
@@ -23,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("border-b border-border bg-muted/45 [&_tr]:border-b-0", className)}
+      className={cn("border-b border-border bg-muted/35 [&_tr]:border-b-0", className)}
       {...props}
     />
   )
@@ -57,7 +57,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-border/70 transition-[background-color] duration-150 ease-out hover:bg-muted/55 focus-within:bg-muted/50 data-[state=selected]:bg-accent/70 motion-reduce:transition-none",
+        "border-b border-border/70 transition-[background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-muted/55 focus-within:bg-muted/50 data-[state=selected]:bg-accent/70 motion-reduce:transition-none",
         className
       )}
       {...props}

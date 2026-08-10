@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -37,7 +38,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -213,12 +213,16 @@ export function QualificationHubClient({
   stats: initialStats,
   alerts: initialAlerts,
 }: QualificationHubProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [enabled, setEnabled] = useState(settings?.enabled ?? false);
   const [pauseMode, setPauseMode] = useState(settings?.pauseMode ?? "handoff_active");
-  const [assistantName, setAssistantName] = useState(settings?.assistantName ?? "Assistente Âncora Corretora");
+  const [assistantName, setAssistantName] = useState(settings?.assistantName ?? "Assistente AncoraHub");
   const [initialMessage, setInitialMessage] = useState(
     settings?.initialMessage ??
-      "Olá! Sou o assistente virtual da Âncora Corretora. Vou fazer algumas perguntas rápidas para preparar seu atendimento."
+      "Olá! Sou o assistente virtual do AncoraHub. Vou fazer algumas perguntas rápidas para preparar seu atendimento."
   );
   const [handoffMessage, setHandoffMessage] = useState(
     settings?.handoffMessage ?? "Vou encaminhar você para um corretor da equipe agora."
@@ -238,9 +242,32 @@ export function QualificationHubClient({
   // WhatsApp Test Message State
   const [testDestPhone, setTestDestPhone] = useState("");
   const [testMsgType, setTestMsgType] = useState<"free_text" | "approved_template" | "internal_test">("free_text");
-  const [testMsgText, setTestMsgText] = useState("Teste de conexão do WhatsApp Âncora CRM.");
+  const [testMsgText, setTestMsgText] = useState("Teste de conexão do WhatsApp AncoraHub.");
   const [testResult, setTestResult] = useState<any>(null);
   const [isSendingTest, setIsSendingTest] = useState(false);
+
+  const activeAlertsCount = alerts.filter((a) => a.status === "active").length;
+
+  const tabs = [
+    { id: "overview", label: "Visão Geral", icon: SlidersHorizontal },
+    { id: "whatsapp_diag", label: "WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
+    { id: "followup_rules", label: "Regras de Follow-up", icon: Clock, color: "text-purple-500" },
+    { id: "mcp_governance", label: "Ferramentas & MCP", icon: ShieldAlert, color: "text-amber-500" },
+    { id: "destinations", label: "Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
+    { id: "brokers", label: "Elegibilidade Corretores", icon: UserCheck },
+    { id: "system_messages", label: "Mensagens do Sistema", icon: FileText },
+    { id: "alerts", label: `Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "simulator", label: "Simulador Web", icon: MessageSquare },
+  ];
+
+  const requestedTab = searchParams.get("tab");
+  const activeTab = tabs.some((t) => t.id === requestedTab) ? requestedTab! : "overview";
+
+  const handleSelectTab = (tabId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tabId);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   // Follow-up Rule Form State
   const [newRuleName, setNewRuleName] = useState("");
@@ -421,8 +448,8 @@ export function QualificationHubClient({
   return (
     <div className="flex flex-col min-h-screen">
       <DashboardHeader
-        breadcrumb="Gestão de Operação"
-        title="Central de Qualificação & Operação IA"
+        breadcrumb="Qualificação IA"
+        title="Qualificação IA"
         rightSlot={
           <div className="flex items-center gap-2">
             <Badge variant={enabled ? "success" : "secondary"} className="gap-1 px-2 py-1 text-xs">
@@ -438,7 +465,7 @@ export function QualificationHubClient({
         }
       />
 
-      <main className="flex-1 p-4 lg:p-6 space-y-6 max-w-7xl w-full mx-auto">
+      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         {/* STATS CARDS SUMMARY BAR */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Card variant="subtle" className="rounded-xl border-border/80">
@@ -517,52 +544,64 @@ export function QualificationHubClient({
           </Card>
         </div>
 
-        {/* TABS CONTAINER */}
-        <Tabs defaultValue="overview" className="w-full space-y-4">
-          <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap pb-1">
-            <TabsList className="w-full justify-start border-b border-border/60 bg-transparent p-0">
-              <TabsTrigger value="overview" className="gap-2 text-xs font-semibold py-2.5">
-                <SlidersHorizontal className="size-3.5" />
-                Visão Geral
-              </TabsTrigger>
-              <TabsTrigger value="whatsapp_diag" className="gap-2 text-xs font-semibold py-2.5">
-                <Phone className="size-3.5 text-emerald-500" />
-                WhatsApp Diagnóstico
-              </TabsTrigger>
-              <TabsTrigger value="followup_rules" className="gap-2 text-xs font-semibold py-2.5">
-                <Clock className="size-3.5 text-purple-500" />
-                Regras de Follow-up
-              </TabsTrigger>
-              <TabsTrigger value="mcp_governance" className="gap-2 text-xs font-semibold py-2.5">
-                <ShieldAlert className="size-3.5 text-amber-500" />
-                Ferramentas & MCP
-              </TabsTrigger>
-              <TabsTrigger value="destinations" className="gap-2 text-xs font-semibold py-2.5">
-                <ArrowRightLeft className="size-3.5 text-sky-500" />
-                Destino dos Leads
-              </TabsTrigger>
-              <TabsTrigger value="brokers" className="gap-2 text-xs font-semibold py-2.5">
-                <UserCheck className="size-3.5" />
-                Elegibilidade Corretores
-              </TabsTrigger>
-              <TabsTrigger value="system_messages" className="gap-2 text-xs font-semibold py-2.5">
-                <FileText className="size-3.5" />
-                Mensagens do Sistema
-              </TabsTrigger>
-              <TabsTrigger value="alerts" className="gap-2 text-xs font-semibold py-2.5">
-                <AlertTriangle className="size-3.5 text-rose-500" />
-                Alertas ({alerts.filter((a) => a.status === "active").length})
-              </TabsTrigger>
-              <TabsTrigger value="simulator" className="gap-2 text-xs font-semibold py-2.5">
-                <MessageSquare className="size-3.5" />
-                Simulador Web
-              </TabsTrigger>
-            </TabsList>
+        {/* 2-COLUMN SETTINGS-STYLE LAYOUT */}
+        <div className="grid gap-4 lg:grid-cols-[14.5rem_1fr]">
+          {/* MOBILE HORIZONTAL SUBNAV */}
+          <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
+            <nav className="flex gap-1 pb-1">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => handleSelectTab(tab.id)}
+                    className={cn(
+                      "flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                      isActive
+                        ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    )}
+                  >
+                    <Icon className={cn("size-4", tab.color)} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
           </ScrollArea>
 
-          {/* TAB 1: VISÃO GERAL & ATIVAÇÃO */}
-          <TabsContent value="overview" className="space-y-6 pt-2">
-            <div className="grid gap-6 md:grid-cols-2">
+          {/* DESKTOP SIDEBAR SUBNAV */}
+          <nav className="hidden gap-1 lg:flex lg:flex-col">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleSelectTab(tab.id)}
+                  className={cn(
+                    "flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                    isActive
+                      ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  )}
+                >
+                  <Icon className={cn("size-4", tab.color)} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* ACTIVE TAB CONTENT */}
+          <div className="min-w-0 space-y-6">
+            {/* TAB 1: VISÃO GERAL & ATIVAÇÃO */}
+            {activeTab === "overview" && (
+              <div className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
               <Card variant="subtle" className="rounded-xl border-border/80">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold">Status do Agente e Operação</CardTitle>
@@ -629,10 +668,12 @@ export function QualificationHubClient({
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 2: WHATSAPP DIAGNÓSTICO & TESTES */}
-          <TabsContent value="whatsapp_diag" className="space-y-6 pt-2">
+        {/* TAB 2: WHATSAPP DIAGNÓSTICO & TESTES */}
+        {activeTab === "whatsapp_diag" && (
+          <div className="space-y-6">
             <div className="grid gap-6 md:grid-cols-3">
               <Card variant="subtle" className="rounded-xl border-border/80 md:col-span-1 space-y-4 p-5">
                 <div>
@@ -753,10 +794,12 @@ export function QualificationHubClient({
                 )}
               </Card>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 3: REGRAS DE FOLLOW-UP */}
-          <TabsContent value="followup_rules" className="space-y-6 pt-2">
+        {/* TAB 3: REGRAS DE FOLLOW-UP */}
+        {activeTab === "followup_rules" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -883,10 +926,12 @@ export function QualificationHubClient({
                 ))}
               </div>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 4: GOVERNANÇA MCP */}
-          <TabsContent value="mcp_governance" className="space-y-6 pt-2">
+        {/* TAB 4: GOVERNANÇA MCP */}
+        {activeTab === "mcp_governance" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -949,10 +994,12 @@ export function QualificationHubClient({
                 </table>
               </div>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 5: DESTINO DOS LEADS */}
-          <TabsContent value="destinations" className="space-y-6 pt-2">
+        {/* TAB 5: DESTINO DOS LEADS */}
+        {activeTab === "destinations" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -992,10 +1039,12 @@ export function QualificationHubClient({
                 ))}
               </div>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 6: ELEGIBILIDADE CORRETORES */}
-          <TabsContent value="brokers" className="space-y-6 pt-2">
+        {/* TAB 6: ELEGIBILIDADE CORRETORES */}
+        {activeTab === "brokers" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1029,10 +1078,12 @@ export function QualificationHubClient({
                 ))}
               </div>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 7: MENSAGENS DO SISTEMA */}
-          <TabsContent value="system_messages" className="space-y-6 pt-2">
+        {/* TAB 7: MENSAGENS DO SISTEMA */}
+        {activeTab === "system_messages" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1064,10 +1115,12 @@ export function QualificationHubClient({
                 </div>
               </div>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 8: ALERTAS OPERACIONAIS */}
-          <TabsContent value="alerts" className="space-y-6 pt-2">
+        {/* TAB 8: ALERTAS OPERACIONAIS */}
+        {activeTab === "alerts" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1113,10 +1166,12 @@ export function QualificationHubClient({
                 ))}
               </div>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 9: SIMULADOR WEB */}
-          <TabsContent value="simulator" className="space-y-6 pt-2">
+        {/* TAB 9: SIMULADOR WEB */}
+        {activeTab === "simulator" && (
+          <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-4">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1174,9 +1229,11 @@ export function QualificationHubClient({
                 </div>
               </div>
             </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+          </div>
+        )}
+      </div>
     </div>
+  </div>
+  </div>
   );
 }

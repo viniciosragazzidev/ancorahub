@@ -12,6 +12,8 @@ import { NotificationCountProvider } from "@/components/providers/notification-c
 import { FeedbackToastHandler } from "@/features/leads/components/feedback-toast-handler";
 import { PasskeyToastHandler } from "@/components/passkey-toast-handler";
 import { RouteOnboardingLoader } from "@/features/onboarding/components/route-onboarding-loader";
+import { CommandPalette } from "@/components/command-palette";
+import { ContextualHelpDrawer } from "@/components/contextual-help-drawer";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -63,6 +65,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         <NotificationCountProvider userId={context.userId}>
           <FeedbackToastHandler userId={context.userId} />
           <PasskeyToastHandler userId={context.userId} />
+          <CommandPalette />
+          <ContextualHelpDrawer />
           {children}
         </NotificationCountProvider>
       </RealtimeSyncProvider>

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppSelect } from "@/components/ui/select";
 import { X, SlidersHorizontal, ListChecks } from "@/components/huge-icons";
 
 type Branch = { id: string; name: string };
@@ -157,7 +158,7 @@ export function LeadsFilters({
             )}
           </PopoverTrigger>
 
-          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 sm:w-96 p-0 rounded-2xl border border-border/80 bg-popover shadow-2xl backdrop-blur-2xl">
+          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 rounded-xl border border-border bg-popover p-0 shadow-[0_18px_45px_rgb(15_23_42/0.14)] sm:w-96">
             <div className="flex items-center justify-between border-b border-border/70 p-3.5">
               <div className="flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
@@ -174,7 +175,7 @@ export function LeadsFilters({
                 </Badge>
               ) : (
                 <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
-                  <span className="flex size-1.5 rounded-full bg-primary animate-pulse" />
+                  <span className="flex size-1.5 rounded-full bg-primary" />
                   Ajustar
                 </span>
               )}
@@ -195,7 +196,7 @@ export function LeadsFilters({
                         key={opt.label}
                         type="button"
                         onClick={() => setTipo(opt.val)}
-                        className={`h-7 rounded-md text-xs font-medium transition-all duration-150 ${
+                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
                           tipo === opt.val
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
@@ -220,7 +221,7 @@ export function LeadsFilters({
                         key={opt.label}
                         type="button"
                         onClick={() => setOrigem(opt.val)}
-                        className={`h-7 rounded-md text-xs font-medium transition-all duration-150 ${
+                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
                           origem === opt.val
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
@@ -235,83 +236,61 @@ export function LeadsFilters({
                 {/* Status / Etapa */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Etapa / Status</label>
-                  <div className="relative">
-                    <select
-                      aria-label="Status"
-                      className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                      name="status"
-                      onChange={(event) => setStatus(event.target.value)}
-                      value={status}
-                    >
-                      <option value="">Todos os status</option>
-                      <option value="new">Novos</option>
-                      <option value="distributed">Distribuídos</option>
-                      <option value="in_contact">Em atendimento</option>
-                      <option value="quote_sent">Cotação Enviada</option>
-                      <option value="negotiation">Negociação</option>
-                      <option value="documentation_pending">Doc Pendente</option>
-                      <option value="under_analysis">Em Análise</option>
-                      <option value="converted">Convertidos</option>
-                      <option value="lost">Perdidos</option>
-                    </select>
-                    <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </div>
-                  </div>
+                  <AppSelect
+                    aria-label="Status"
+                    className="h-8.5"
+                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                    onValueChange={setStatus}
+                    options={[
+                      { value: "", label: "Todos os status" },
+                      { value: "new", label: "Novos" },
+                      { value: "distributed", label: "Distribuídos" },
+                      { value: "in_contact", label: "Em atendimento" },
+                      { value: "quote_sent", label: "Cotação enviada" },
+                      { value: "negotiation", label: "Negociação" },
+                      { value: "documentation_pending", label: "Documento pendente" },
+                      { value: "under_analysis", label: "Em análise" },
+                      { value: "converted", label: "Convertidos" },
+                      { value: "lost", label: "Perdidos" },
+                    ]}
+                    value={status}
+                  />
                 </div>
 
                 {/* Qualificação */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status de Qualificação</label>
-                  <div className="relative">
-                    <select
-                      aria-label="Qualificação"
-                      className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                      name="qualification"
-                      onChange={(event) => setQualification(event.target.value)}
-                      value={qualification}
-                    >
-                      <option value="">Todas as qualificações</option>
-                      <option value="unqualified">Sem Qualificação</option>
-                      <option value="warm">Morna (Em Qualificação)</option>
-                      <option value="hot">Quente (Alta Prioridade)</option>
-                      <option value="disqualified">Desqualificado</option>
-                    </select>
-                    <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </div>
-                  </div>
+                  <AppSelect
+                    aria-label="Qualificação"
+                    className="h-8.5"
+                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                    onValueChange={setQualification}
+                    options={[
+                      { value: "", label: "Todas as qualificações" },
+                      { value: "unqualified", label: "Sem qualificação" },
+                      { value: "warm", label: "Morna (em qualificação)" },
+                      { value: "hot", label: "Quente (alta prioridade)" },
+                      { value: "disqualified", label: "Desqualificado" },
+                    ]}
+                    value={qualification}
+                  />
                 </div>
 
                 {/* Filial */}
                 {branches.length > 0 && (
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Filial / Unidade</label>
-                    <div className="relative">
-                      <select
-                        aria-label="Filial"
-                        className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                        name="branch"
-                        onChange={(event) => setBranch(event.target.value)}
-                        value={branch}
-                      >
-                        <option value="">Todas as filiais</option>
-                        {branches.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M6 9l6 6 6-6" />
-                        </svg>
-                      </div>
-                    </div>
+                    <AppSelect
+                      aria-label="Filial"
+                      className="h-8.5"
+                      triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                      onValueChange={setBranch}
+                      options={[
+                        { value: "", label: "Todas as filiais" },
+                        ...branches.map((item) => ({ value: item.id, label: item.name })),
+                      ]}
+                      value={branch}
+                    />
                   </div>
                 )}
 
@@ -319,27 +298,17 @@ export function LeadsFilters({
                 {brokers.length > 0 && (
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Corretor Responsável</label>
-                    <div className="relative">
-                      <select
-                        aria-label="Corretor"
-                        className="h-8.5 w-full appearance-none rounded-lg border border-border/60 bg-muted/30 px-3 text-xs text-foreground font-medium shadow-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                        name="corretor"
-                        onChange={(event) => setCorretor(event.target.value)}
-                        value={corretor}
-                      >
-                        <option value="">Todos os corretores</option>
-                        {brokers.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M6 9l6 6 6-6" />
-                        </svg>
-                      </div>
-                    </div>
+                    <AppSelect
+                      aria-label="Corretor"
+                      className="h-8.5"
+                      triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                      onValueChange={setCorretor}
+                      options={[
+                        { value: "", label: "Todos os corretores" },
+                        ...brokers.map((item) => ({ value: item.id, label: item.name })),
+                      ]}
+                      value={corretor}
+                    />
                   </div>
                 )}
 
@@ -352,7 +321,7 @@ export function LeadsFilters({
                         key={size}
                         type="button"
                         onClick={() => setPageSize(size)}
-                        className={`h-7 rounded-md text-xs font-medium transition-all duration-150 ${
+                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
                           pageSize === size
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"

@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      { source: "/minha-fila", destination: "/leads?tab=minha-fila", permanent: false },
+      { source: "/propostas", destination: "/vendas?tab=propostas", permanent: false },
+      { source: "/unidades", destination: "/filiais", permanent: false },
+      { source: "/materiais-divulgacao", destination: "/marketing?tab=materiais", permanent: false },
+      { source: "/configuracoes/comissoes", destination: "/settings?tab=comissoes", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
 import { ContextNote } from "@/components/ui/context-note";
+import { Card, CardContent } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { TasksWorkspace } from "./tasks-workspace";
@@ -59,7 +60,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           </Button>
         }
       />
-      <main className="flex min-h-full flex-col gap-4 bg-background p-4 lg:p-6">
+      <main className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-5 bg-background p-4 lg:gap-6 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">OPERAÇÃO COMERCIAL</p>
@@ -69,20 +70,24 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         {leadId ? <ContextNote className="max-w-xl" variant="info">Exibindo apenas tarefas do lead selecionado. <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/leads/${leadId}`}>Voltar ao lead</Link></ContextNote> : null}
         {attention === "overdue" ? <ContextNote className="max-w-xl" variant="warning">Exibindo somente tarefas vencidas e ainda não concluídas no seu escopo.</ContextNote> : null}
 
-        <TasksWorkspace
-          tasks={tasks.map((task) => ({
-            id: task.id,
-            leadId: task.leadId,
-            leadName: task.leadName,
-            title: task.title,
-            description: task.description,
-            priority: task.priority,
-            dueAt: task.dueAt ? task.dueAt.toISOString() : null,
-            completedAt: task.completedAt ? task.completedAt.toISOString() : null,
-            assigneeName: task.assigneeName,
-            branchName: task.branchName,
-          }))}
-        />
+        <Card variant="subtle" className="rounded-2xl bg-card/95">
+          <CardContent>
+            <TasksWorkspace
+              tasks={tasks.map((task) => ({
+                id: task.id,
+                leadId: task.leadId,
+                leadName: task.leadName,
+                title: task.title,
+                description: task.description,
+                priority: task.priority,
+                dueAt: task.dueAt ? task.dueAt.toISOString() : null,
+                completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+                assigneeName: task.assigneeName,
+                branchName: task.branchName,
+              }))}
+            />
+          </CardContent>
+        </Card>
       </main>
     </>
   );

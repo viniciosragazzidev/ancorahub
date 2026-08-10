@@ -53,7 +53,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
       <div className="space-y-4">
         <Card className="border-border bg-card shadow-none">
-          <CardHeader className="flex-row items-start justify-between gap-4">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div><CardTitle>WhatsApp Oficial</CardTitle><CardDescription className="mt-1">Canal da Meta para atendimento comercial rastreável e integração com os recursos oficiais.</CardDescription></div>
             <Badge variant={officialReady ? "default" : "secondary"}>{officialReady ? "Pronto" : "Configuração pendente"}</Badge>
           </CardHeader>

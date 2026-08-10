@@ -20,6 +20,8 @@ import { DistributionPolicyPanel } from "./_components/distribution-policy-panel
 import { getAgentTrainingCenter } from "@/features/agent-training/actions";
 import { ExtensionTab } from "./extension/extension-tab";
 
+import { RelatedActions } from "@/components/related-actions";
+
 export default async function SettingsPage() {
   const context = await getRequiredTenantContext();
   const canViewIntegrations = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
@@ -63,5 +65,34 @@ export default async function SettingsPage() {
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
   const extension = <ExtensionTab />;
 
-  return <><DashboardHeader breadcrumb="Configurações" title="Configurações" /><div className="flex flex-1 flex-col gap-6 p-4 lg:p-6"><SettingsTabs account={account} company={context.role === "director" ? company : undefined} unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />} atendimento={atendimento} ai={agentTraining ? <div className="grid gap-6"><AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} /><DistributionPolicyPanel brokers={agentTraining.brokers} canEdit={agentTraining.canEdit} policy={agentTraining.distributionPolicy} /></div> : undefined} whatsapp={whatsapp} integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined} security={<SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} />} extension={extension} tabIds={tabIds} /></div></>;
+  return (
+    <>
+      <DashboardHeader breadcrumb="Administração" title="Parâmetros do Sistema" />
+      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        <SettingsTabs
+          account={account}
+          company={context.role === "director" ? company : undefined}
+          unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />}
+          atendimento={atendimento}
+          ai={agentTraining ? <div className="grid gap-6"><AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} /><DistributionPolicyPanel brokers={agentTraining.brokers} canEdit={agentTraining.canEdit} policy={agentTraining.distributionPolicy} /></div> : undefined}
+          whatsapp={whatsapp}
+          integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined}
+          security={<SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} />}
+          extension={extension}
+          tabIds={tabIds}
+        />
+
+        <RelatedActions
+          title="Configurações Relacionadas"
+          description="Navegação rápida para parâmetros avançados e módulos."
+          links={[
+            { label: "Qualificação & Robô IA", href: "/qualificacao", description: "Prompt, WhatsApp Diagnóstico e MCP" },
+            { label: "Equipe & Corretores", href: "/equipe", description: "Convites de usuários e permissões" },
+            { label: "Regras de Distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
+            { label: "Guia & Manual do Sistema", href: "/guia", description: "Tours e definições de domínio" },
+          ]}
+        />
+      </div>
+    </>
+  );
 }

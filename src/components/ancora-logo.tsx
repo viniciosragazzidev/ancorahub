@@ -5,7 +5,7 @@ type AncoraLogoProps = Omit<ComponentProps<"img">, "alt" | "src"> & {
   src?: string | null;
 };
 
-export function AncoraLogo({ className, alt = "Ancora Corretora", src, ...props }: AncoraLogoProps) {
+export function AncoraLogo({ className, alt = "AncoraHub — Âncora Saúde", src, ...props }: AncoraLogoProps) {
   return (
     <img
       src={src ?? "/logo.webp"}

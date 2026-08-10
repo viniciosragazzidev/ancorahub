@@ -488,3 +488,15 @@ somente uma visualização operacional desse funil: não cria etapas paralelas, 
 uma venda manualmente para convertida e preserva as validações, timeline e auditoria
 do serviço de status existente. O Super-admin pode desligar a visualização comercial
 pela configuração global sem apagar empresas ou leads.
+
+## DEC-072 — Interface operacional simplificada como padrão reversível
+
+**Estado:** Aceita
+**Data:** 2026-08-10
+
+A experiência operacional simplificada é o padrão para todas as empresas. Ela reduz
+informações simultâneas sem remover dados, permissões ou regras comerciais: uma ação
+frequente permanece visível e o restante aparece no contexto necessário. O
+Super-admin pode desligar a capacidade para toda a plataforma ou devolver uma empresa
+específica ao layout anterior. Ambas as alterações são auditadas; o fallback não exige
+migração nem remove histórico.

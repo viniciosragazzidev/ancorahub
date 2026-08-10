@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 
 import {
@@ -64,11 +65,30 @@ const navSections: SidebarSection[] = [
     label: "Visão geral",
     items: [
       { label: "Resumo", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
+    ],
+  },
+  {
+    label: "Comercial",
+    items: [
       { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
       { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
-      { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
-      { label: "Assistente IA", icon: Sparkle, url: "/assistente", permission: "acessar_conversas" },
-      { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_conversas" },
+      { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
+      { label: "Cotações", icon: SlidersHorizontal, url: "/cotacao", permission: "acessar_cotacoes" },
+    ],
+  },
+  {
+    label: "Automação",
+    items: [
+      { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
+      { label: "Automações & Regras", icon: Sparkle, url: "/automacoes", permission: "acessar_configuracoes" },
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
+      { label: "Equipe", icon: Users, url: "/equipe", permission: "convidar_corretor" },
+      { label: "Metas", icon: Target, url: "/metas", permission: "gerenciar_metas" },
+      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
     ],
   },
   {
@@ -76,30 +96,15 @@ const navSections: SidebarSection[] = [
     items: [
       { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
       { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
-      { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
-      { label: "Redistribuição", icon: Redistribute, url: "/leads/distribuicao", permission: "leads_reassign" },
-      { label: "Plantão", icon: WifiHigh, url: "/leads/distribuicao/plantao", permission: "duty_schedules_manage" },
-    ],
-  },
-  {
-    label: "Gestão",
-    items: [
-      { label: "Unidades", icon: Buildings, url: "/filiais", permission: "gerenciar_filiais" },
-      { label: "Equipe", icon: Users, url: "/equipe", permission: "convidar_corretor" },
-      { label: "Metas", icon: Target, url: "/metas", permission: "gerenciar_metas" },
-      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
+      { label: "Catálogo Global", icon: FolderSimple, url: "/catalogo", permission: "acessar_catalogo" },
       { label: "NOC & Alertas", icon: Monitor, url: "/noc", permission: "ver_dashboard_equipe" },
     ],
   },
   {
     label: "Administração",
     items: [
-      { label: "Campanhas Meta", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
-      { label: "Importações Meta", icon: FileArrowDown, url: "/marketing/importacoes", permission: "ver_importacoes_meta" },
-      { label: "Integrações", icon: WifiHigh, url: "/settings/integrations", permission: "acessar_integracao_meta" },
-      { label: "Comissões", icon: CurrencyCircleDollar, url: "/configuracoes/comissoes", permission: "gerenciar_comissoes" },
-      { label: "Catálogo Global", icon: FolderSimple, url: "/catalogo", permission: "acessar_catalogo" },
-      { label: "Materiais", icon: Megaphone, url: "/materiais-divulgacao", permission: "acessar_materiais_divulgacao" },
+      { label: "Marketing", icon: Megaphone, url: "/marketing", permission: "acessar_campanhas_meta" },
+      { label: "Unidades", icon: Buildings, url: "/filiais", permission: "gerenciar_filiais" },
       { label: "Parâmetros", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
       { label: "Guia do Sistema", icon: BookOpen, url: "/guia", permission: "acessar_guia" },
     ],
@@ -125,9 +130,14 @@ const marketingHiddenPaths = [
   "/diretor",
 ];
 
+const brokerHiddenPaths = ["/cotacao", "/automacoes"];
+
 function canShowItem(item: SidebarItem, user: UserDisplayInfo | null, roleKey: UserDisplayInfo["roleKey"]) {
   if (!roleKey) return false;
   if (user?.jobTitle === "marketing" && marketingHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
+    return false;
+  }
+  if (roleKey === "broker" && brokerHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
     return false;
   }
   return user?.permissions?.includes(item.permission) ?? false;
@@ -219,14 +229,21 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   const isActive = pathname === item.url || (item.url !== "/dashboard" && pathname.startsWith(item.url + "/"));
 
                   return (
-                    <SidebarMenuItem key={item.label} className="group-data-[collapsible=icon]:w-full">
+                    <SidebarMenuItem key={item.label} className="relative group-data-[collapsible=icon]:w-full">
+                      {isActive && (
+                        <motion.div
+                          layoutId="sidebar-active-item"
+                          className="absolute inset-0 rounded-lg bg-primary/10 dark:bg-primary/15 border border-primary/20 pointer-events-none"
+                          transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                        />
+                      )}
                       <SidebarMenuButton
                         isActive={isActive}
                         render={<Link href={item.url} onClick={() => isMobile && setOpenMobile(false)} prefetch />}
                         tooltip={item.label}
-                        className="h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
+                        className="relative z-10 h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
                       >
-                        <Icon weight={isActive ? "fill" : "regular"} className="size-4 shrink-0" />
+                        <Icon weight={isActive ? "fill" : "regular"} className="size-4 shrink-0 text-primary" />
                         <span className="truncate">{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

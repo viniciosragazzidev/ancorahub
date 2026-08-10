@@ -1,16 +1,17 @@
-# CorreTop - Sistema de Design Operacional
+# AncoraHub - Sistema de Design Operacional
 
-> Versão 3.0. Tema base: light. Dark mode continua suportado pelos mesmos tokens.
+> Versão 4.0. Tema base: light. Dark mode continua suportado pelos mesmos tokens.
 
 Este documento é a fonte de verdade visual do CorreTop. Se algo estiver diferente daqui, o arquivo precisa ser atualizado antes de criar nova variação de UI.
 
 ## Direção visual
 
-- Produto de operação para corretoras.
-- Interface clara, técnica e confiável.
-- Densidade alta, mas organizada por camadas.
-- Azul CorreTop é o warning principal. Ele aparece com intenção, não em excesso.
-- Status usam cores semânticas próprias. warning nunca deve representar status.
+- CRM operacional premium para corretoras, desenhado para decisão e atendimento contínuo.
+- Hierarquia por camadas: ação atual, contexto essencial e detalhes sob demanda.
+- Densidade confortável: menos blocos concorrentes, mais listas legíveis e áreas de trabalho claras.
+- A marca oceânica aparece apenas em profundidade, ícones de contexto e estados de acolhimento; nunca como ruído decorativo.
+- A sidebar preserva sua cor-base. Ações primárias, seleção, foco e links usam o token de marca; sucesso, atenção e erro permanecem semânticos.
+- Evitar eyebrow/kicker, cards genéricos de ícone + título + texto, bordas laterais coloridas e painéis que pareçam clicáveis sem uma ação real.
 
 ## Regras obrigatórias
 
@@ -33,7 +34,7 @@ O tema trabalha com as mesmas variáveis nos dois modos.
 - Cards e popovers levemente mais elevados que o fundo.
 - Texto principal escuro, nunca preto puro.
 - Borda visível, mas discreta.
-- warning azul para ação principal, foco, seleção e links.
+- Azul de marca para ação principal, foco, seleção e links.
 
 ### Dark mode
 
@@ -62,12 +63,12 @@ O tema trabalha com as mesmas variáveis nos dois modos.
 | Secundário | `--muted-foreground` | metadados e suporte |
 | Inverso | `--primary-foreground` | texto sobre warning |
 
-### warning e semântica
+### Marca e semântica
 
 | Papel | Token | Uso |
 |---|---|---|
-| warning principal | `--primary` | CTA, link ativo, foco |
-| warning suave | `--warning` | hover e seleção leve |
+| Marca principal | `--primary` | CTA, link ativo e foco |
+| Marca suave | `--primary` com transparência | hover e seleção leve |
 | Sucesso | `--success` | confirmação, concluído |
 | Atenção | `--warning` | pendência, alerta moderado |
 | Erro | `--destructive` | falha, remoção, bloqueio |
@@ -77,8 +78,8 @@ O tema trabalha com as mesmas variáveis nos dois modos.
 | Papel | Token | Uso |
 |---|---|---|
 | Texto | `--sidebar-foreground` | navegação e metadados |
-| warning | `--sidebar-warning` | item ativo e hover |
-| warning texto | `--sidebar-warning-foreground` | conteúdo sobre destaque |
+| Destaque | `--sidebar-warning` | item ativo e hover |
+| Texto de destaque | `--sidebar-warning-foreground` | conteúdo sobre destaque |
 | Borda | `--sidebar-border` | divisões e shell |
 | Foco | `--sidebar-ring` | foco e seleção |
 
@@ -100,10 +101,10 @@ O tema trabalha com as mesmas variáveis nos dois modos.
 
 ## Espaçamento e forma
 
-- Raio base: 8 px.
-- Pads e gaps sempre repetidos por escala.
-- Cards, inputs e botões devem seguir o mesmo vocabulário de tamanho.
-- Nenhuma tela deve inventar um raio novo por conta própria.
+- Raio operacional: 12 px para superfícies, 10 px para controles e 999 px apenas para tags curtas.
+- Pads e gaps sempre repetidos por escala de 4, 8, 12, 16, 24 e 32 px.
+- Cards, inputs e botões seguem um único vocabulário de tamanho; superfície tem borda discreta ou elevação, nunca ambos como efeito padrão.
+- Nenhuma tela inventa um raio, sombra ou cor de superfície própria.
 
 ## Motion
 

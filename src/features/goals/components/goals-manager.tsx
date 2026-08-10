@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { StatCard } from "@/components/dashboard/metric-card";
 import {
   Drawer,
@@ -347,28 +348,32 @@ export function GoalsManager({ goals, teamMembers, branches, period }: GoalsMana
             aria-label="Buscar meta"
           />
         </div>
-        <select
-          value={filterScope}
-          onChange={(e) => setFilterScope(e.target.value)}
-          className="h-9 rounded-lg border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        <AppSelect
           aria-label="Filtrar por escopo"
-        >
-          <option value="all">Todos os escopos</option>
-          <option value="broker">Corretor</option>
-          <option value="team">Equipe</option>
-          <option value="branch">Filial</option>
-          <option value="tenant">Corretora</option>
-        </select>
-        <select
-          value={filterActive}
-          onChange={(e) => setFilterActive(e.target.value as "all" | "active" | "inactive")}
-          className="h-9 rounded-lg border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="w-44"
+          onValueChange={setFilterScope}
+          options={[
+            { value: "all", label: "Todos os escopos" },
+            { value: "broker", label: "Corretor" },
+            { value: "team", label: "Equipe" },
+            { value: "branch", label: "Filial" },
+            { value: "tenant", label: "Corretora" },
+          ]}
+          triggerClassName="h-9 rounded-lg bg-input/30 text-sm"
+          value={filterScope}
+        />
+        <AppSelect
           aria-label="Filtrar por status"
-        >
-          <option value="all">Ativas e inativas</option>
-          <option value="active">Ativas</option>
-          <option value="inactive">Inativas</option>
-        </select>
+          className="w-40"
+          onValueChange={(value) => setFilterActive(value as "all" | "active" | "inactive")}
+          options={[
+            { value: "all", label: "Ativas e inativas" },
+            { value: "active", label: "Ativas" },
+            { value: "inactive", label: "Inativas" },
+          ]}
+          triggerClassName="h-9 rounded-lg bg-input/30 text-sm"
+          value={filterActive}
+        />
       </div>
 
       {/* Goals list / empty states */}

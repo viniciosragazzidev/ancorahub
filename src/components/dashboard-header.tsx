@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { BookOpen } from "@/components/huge-icons";
 import Link from "next/link";
 
@@ -10,7 +8,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch } from "@/components/global-search";
 import { NotificationPopover } from "@/components/notification-popover";
 import { AnimatedPageTitle } from "@/components/motion/animated-page-title";
-import { OnboardingHelpButton } from "@/components/onboarding/onboarding-help-button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+
+import { HelpCircle } from "lucide-react";
 
 type DashboardHeaderProps = {
   breadcrumb: string;
@@ -25,10 +25,11 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-border/80 bg-none px-5 shadow-[0_1px_0_rgb(15_23_42/0.02)] backdrop-blur-sm lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
+      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
-
+      <SidebarTrigger className="size-8 shrink-0" />
+      <div className="h-4 w-px bg-border/50 shrink-0 max-[559px]:hidden" />
       <div className="min-w-0 flex-1">
         <AnimatedPageTitle breadcrumb={breadcrumb} title={title} />
       </div>
@@ -40,9 +41,15 @@ export function DashboardHeader({
         ) : null}
         <div className="max-[559px]:hidden"><GlobalSearch /></div>
         <div className="max-[559px]:hidden"><ThemeToggle /></div>
-        <OnboardingHelpButton />
-        <Button aria-label="Abrir guia do sistema" title="Guia do sistema" render={<Link href="/guia" />} size="icon" variant="ghost" className={`size-9 rounded-lg transition-colors hover:bg-muted/60 ${rightSlot ? "max-[559px]:hidden" : ""}`}>
-          <BookOpen aria-hidden="true" className="size-4" />
+        <Button
+          aria-label="Ajuda desta página"
+          title="Ajuda desta página"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-contextual-help"))}
+          size="icon"
+          variant="ghost"
+          className="size-8 rounded-lg transition-colors hover:bg-muted/60"
+        >
+          <HelpCircle className="size-4 text-muted-foreground" />
         </Button>
         <NotificationPopover />
       </div>

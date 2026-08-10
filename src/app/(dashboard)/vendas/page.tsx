@@ -6,6 +6,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { SalesWorkspace } from "./sales-workspace";
+import { RelatedActions } from "@/components/related-actions";
 
 export default async function SalesPage({
   searchParams,
@@ -66,22 +67,10 @@ export default async function SalesPage({
     <>
       <DashboardHeader
         breadcrumb="Operação comercial"
-        title="Vendas"
+        title="Vendas & Fechamentos"
         rightSlot={<PeriodSelect value={period} />}
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        {/* Contexto de página legado, preservado para eventual restauração:
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs font-medium text-primary">COMERCIAL</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Vendas</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Acompanhe as vendas realizadas, os cronogramas de repasse e as comissões dos corretores.
-            </p>
-          </div>
-        </div>
-        */}
-
         <SalesWorkspace
           sales={sales.map((s) => ({
             ...s,
@@ -92,6 +81,17 @@ export default async function SalesPage({
           totalRevenue={totalRevenue}
           currentRole={context.role}
           period={period}
+        />
+
+        <RelatedActions
+          title="Navegação Comercial Relacionada"
+          description="Acesse funções diretas ligadas a vendas e faturamento."
+          links={[
+            { label: "Ver Base de Clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
+            { label: "Tabela de Comissões", href: "/settings?tab=comissoes", description: "Regras de comissionamento por produto" },
+            { label: "Anexar Documentos de Propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
+            { label: "Relatório de Desempenho", href: "/relatorios", description: "Métricas de fechamento por corretor" },
+          ]}
         />
       </main>
     </>

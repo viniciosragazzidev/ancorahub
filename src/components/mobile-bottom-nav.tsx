@@ -13,7 +13,6 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { label: "Conversas", href: "/conversas", icon: ChatCircleText },
   { label: "Leads", href: "/leads", icon: Users },
   { label: "Tarefas", href: "/tarefas", icon: ClipboardText },
 ] as const;

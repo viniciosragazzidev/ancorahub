@@ -18,6 +18,7 @@ import { AvailabilityToggle } from "./availability-toggle";
 import type { BrokerDashboardData } from "@/app/(dashboard)/dashboard/data";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { resolveLeadNextBestAction, NextBestActionInline } from "@/features/next-best-action";
 
 function DashboardShell({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
   if (embedded) return <>{children}</>;
@@ -105,7 +106,7 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
         </Button>
       </header>
 
-      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6 max-w-7xl mx-auto w-full">
+      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6 max-w-[1200px] mx-auto w-full">
         {/* Header Greeting */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -190,7 +191,7 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
         {/* ─── 4. MINHA FILA (Tabela de Atendimento) ─── */}
         <section id="minha-fila">
           <Card className="border-transparent bg-transparent shadow-none">
-            <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
               <div>
                 <CardTitle className="text-base font-bold">Minha Fila de Atendimento</CardTitle>
                 <CardDescription className="text-xs">
@@ -207,43 +208,53 @@ export function BrokerResumeDashboard({ embedded = false, data }: { embedded?: b
                   <TableRow className="bg-muted/30">
                     <TableHead className="pl-4 text-xs font-semibold">Lead</TableHead>
                     <TableHead className="text-xs font-semibold">Status</TableHead>
-                    <TableHead className="text-xs font-semibold">Origem</TableHead>
+                    <TableHead className="text-xs font-semibold">Próxima Ação</TableHead>
                     <TableHead className="text-xs font-semibold">Última Interação</TableHead>
                     <TableHead className="pr-4 text-right text-xs font-semibold">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLeads.map((lead) => (
-                    <TableRow key={lead.id} className="hover:bg-muted/40 transition-colors">
-                      <TableCell className="pl-4">
-                        <div className="flex items-center gap-2.5">
-                          <UserAvatar seed={lead.name} name={lead.name} size="sm" className="size-7" />
-                          <div>
-                            <p className="font-semibold text-xs text-foreground">{lead.name}</p>
-                            <p className="text-[11px] font-mono text-muted-foreground">{lead.phone}</p>
+                  {filteredLeads.map((lead) => {
+                    const action = resolveLeadNextBestAction({
+                      id: lead.id,
+                      name: lead.name,
+                      status: lead.status,
+                      phone: lead.phone,
+                      firstContactCompleted: lead.status !== "new" && lead.status !== "distributed",
+                    }, "broker");
+
+                    return (
+                      <TableRow key={lead.id} className="hover:bg-muted/40 transition-colors">
+                        <TableCell className="pl-4">
+                          <div className="flex items-center gap-2.5">
+                            <UserAvatar seed={lead.name} name={lead.name} size="sm" className="size-7" />
+                            <div>
+                              <p className="font-semibold text-xs text-foreground">{lead.name}</p>
+                              <p className="text-[11px] font-mono text-muted-foreground">{lead.phone}</p>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <LeadStatusBadge status={lead.status} />
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {lead.source === "webhook" ? "Meta Ads" : "Manual"}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-mono">
-                        {lead.lastInteractionAt
-                          ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(
-                              lead.lastInteractionAt
-                            )
-                          : "Sem interação"}
-                      </TableCell>
-                      <TableCell className="pr-4 text-right">
-                        <Button render={<Link href={`/leads/${lead.id}`} />} size="sm" variant="ghost" className="h-8 text-xs gap-1">
-                          Abrir <ArrowRight className="size-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <LeadStatusBadge status={lead.status} />
+                        </TableCell>
+                        <TableCell>
+                          <NextBestActionInline action={action} />
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono">
+                          {lead.lastInteractionAt
+                            ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(
+                                lead.lastInteractionAt
+                              )
+                            : "Sem interação"}
+                        </TableCell>
+                        <TableCell className="pr-4 text-right">
+                          <Button render={<Link href={`/leads/${lead.id}`} />} size="sm" variant="ghost" className="h-8 text-xs gap-1">
+                            Abrir <ArrowRight className="size-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               {!filteredLeads.length && (

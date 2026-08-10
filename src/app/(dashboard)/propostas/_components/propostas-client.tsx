@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppSelect } from "@/components/ui/select";
 import {
   createProposalAction,
   updateProposalStatusAction,
@@ -290,21 +291,18 @@ export function PropostasClient({
                     <Label htmlFor="leadId" className="text-xs">
                       Lead correspondente
                     </Label>
-                    <select
+                    <AppSelect
                       id="leadId"
                       name="leadId"
                       required
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      onValueChange={handleLeadChange}
+                      options={[
+                        { value: "", label: "Selecione um lead..." },
+                        ...leads.map((lead) => ({ value: lead.id, label: lead.name })),
+                      ]}
+                      triggerClassName="h-9 bg-background text-xs shadow-sm"
                       value={selectedLeadId}
-                      onChange={(e) => handleLeadChange(e.target.value)}
-                    >
-                      <option value="">Selecione um Lead...</option>
-                      {leads.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div className="space-y-1">
@@ -324,19 +322,16 @@ export function PropostasClient({
                     <Label htmlFor="quoteId" className="text-xs">
                       Cotacao de origem (calculo financeiro)
                     </Label>
-                    <select
+                    <AppSelect
+                      disabled={loadingLeadData || quotes.length === 0}
                       id="quoteId"
                       name="quoteId"
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      disabled={loadingLeadData || quotes.length === 0}
-                    >
-                      <option value="">Nenhuma (criar proposta manual/zero)</option>
-                      {quotes.map((q) => (
-                        <option key={q.id} value={q.id}>
-                          {q.title}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: "", label: "Nenhuma (criar proposta manual/zero)" },
+                        ...quotes.map((quote) => ({ value: quote.id, label: quote.title })),
+                      ]}
+                      triggerClassName="h-9 bg-background text-xs shadow-sm"
+                    />
                     {quotes.length === 0 && selectedLeadId && !loadingLeadData && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         Nenhuma cotacao criada para este lead ainda.
@@ -483,19 +478,15 @@ export function PropostasClient({
                                   >
                                     <Link className="h-3.5 w-3.5" />
                                   </Button>
-                                  <select
-                                    className="h-7 rounded border border-input bg-background px-2 py-0 text-[10px] shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring select-none"
+                                  <AppSelect
+                                    aria-label="Status da proposta"
+                                    className="w-34"
+                                    onValueChange={(value) => handleStatusChange(proposal.id, value as ProposalStatus)}
+                                    options={Object.entries(statusLabel).map(([value, label]) => ({ value, label }))}
+                                    size="sm"
+                                    triggerClassName="h-7 rounded-md bg-background px-2 text-[10px] shadow-sm"
                                     value={proposal.status}
-                                    onChange={(e) =>
-                                      handleStatusChange(proposal.id, e.target.value as ProposalStatus)
-                                    }
-                                  >
-                                    {Object.entries(statusLabel).map(([value, label]) => (
-                                      <option key={value} value={value}>
-                                        {label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  />
                                   {proposal.status === "aprovada" && !proposal.convertedSaleId && (
                                     <Button
                                       size="sm"
@@ -589,35 +580,37 @@ export function PropostasClient({
                   <Label htmlFor="paymentMethod" className="text-xs">
                     Metodo de Pagamento
                   </Label>
-                  <select
+                  <AppSelect
                     id="paymentMethod"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none"
+                    onValueChange={(value) => setPaymentMethod(value as typeof paymentMethod)}
+                    options={[
+                      { value: "boleto", label: "Boleto" },
+                      { value: "debito_automatico", label: "Débito automático" },
+                      { value: "cartao_credito", label: "Cartão de crédito" },
+                      { value: "desconto_folha", label: "Desconto em folha" },
+                      { value: "outro", label: "Outro" },
+                    ]}
+                    triggerClassName="h-9 bg-background text-xs shadow-sm"
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                  >
-                    <option value="boleto">Boleto</option>
-                    <option value="debito_automatico">Debito Automatico</option>
-                    <option value="cartao_credito">Cartao de Credito</option>
-                    <option value="desconto_folha">Desconto em Folha</option>
-                    <option value="outro">Outro</option>
-                  </select>
+                  />
                 </div>
 
                 <div className="space-y-1">
                   <Label htmlFor="renewalType" className="text-xs">
                     Regra de Renovacao
                   </Label>
-                  <select
+                  <AppSelect
                     id="renewalType"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none"
+                    onValueChange={(value) => setRenewalType(value as typeof renewalType)}
+                    options={[
+                      { value: "reajuste_operadora", label: "Reajuste da operadora" },
+                      { value: "portabilidade", label: "Portabilidade" },
+                      { value: "manutencao", label: "Manutenção" },
+                      { value: "nova_contratacao", label: "Nova contratação" },
+                    ]}
+                    triggerClassName="h-9 bg-background text-xs shadow-sm"
                     value={renewalType}
-                    onChange={(e) => setRenewalType(e.target.value as any)}
-                  >
-                    <option value="reajuste_operadora">Reajuste da Operadora</option>
-                    <option value="portabilidade">Portabilidade</option>
-                    <option value="manutencao">Manutencao</option>
-                    <option value="nova_contratacao">Nova Contratacao</option>
-                  </select>
+                  />
                 </div>
               </div>
 

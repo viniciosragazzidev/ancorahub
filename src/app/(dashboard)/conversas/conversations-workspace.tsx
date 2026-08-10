@@ -31,7 +31,6 @@ import { OwnershipContext } from "@/components/ownership-context";
 import {
   ArrowLeft,
   ArrowSquareOut,
-  Calculator,
   ChatCircleText,
   Clock,
   FileText,
@@ -893,10 +892,6 @@ function ClientProfile({ client }: { client: ConversationItem }) {
 
           <ProfileSection title="Próximas ações">
             <div className="flex flex-col gap-2">
-              <Button className="w-full justify-start gap-2 bg-primary text-primary-foreground hover:bg-primary/90" render={<a href="https://cotadorsimplificado.com.br/" rel="noreferrer" target="_blank" />} size="sm">
-                <Calculator className="size-4 shrink-0" />
-                <span>Nova cotação</span>
-              </Button>
               <Button className="w-full justify-start gap-2" render={<Link href={`/leads/${client.id}`} />} size="sm" variant="outline">
                 <FileText className="size-4 shrink-0" />
                 <span className="truncate">Ver tarefas e documentos</span>

@@ -300,7 +300,7 @@ export default async function MinhaFilaPage() {
           </div>
         }
       />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-5 bg-background p-4 lg:gap-6 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração.
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -323,7 +323,7 @@ export default async function MinhaFilaPage() {
               <div
                 key={stat.label}
                 className={cn(
-                  "group flex flex-col justify-between rounded-xl border border-border/60 bg-card p-4 text-left shadow-none transition-all duration-200 hover:border-border hover:shadow-xs hover:-translate-y-0.5",
+                  "group flex flex-col justify-between rounded-2xl border border-border/70 bg-card p-5 text-left shadow-[0_1px_2px_rgb(15_23_42/0.025)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_10px_24px_rgb(15_23_42/0.05)] motion-reduce:transform-none motion-reduce:transition-none",
                   stat.cardClassName,
                 )}
               >
@@ -346,7 +346,7 @@ export default async function MinhaFilaPage() {
         {/* ─── Quick Action Cards ─── */}
         <section className="grid gap-4 sm:grid-cols-3">
           {/* Tasks */}
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-2xl bg-card/95">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <ClipboardText className="size-5 text-primary" />
@@ -377,7 +377,7 @@ export default async function MinhaFilaPage() {
           </Card>
 
           {/* Conversations */}
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-2xl bg-card/95">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <ChatCircleText className="size-5 text-primary" />
@@ -405,7 +405,7 @@ export default async function MinhaFilaPage() {
           </Card>
 
           {/* Goals */}
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-2xl bg-card/95">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <Target className="size-5 text-primary" />
@@ -441,7 +441,7 @@ export default async function MinhaFilaPage() {
         </section>
 
         {/* Queue */}
-        <Card className="border-transparent bg-transparent shadow-none">
+        <Card variant="subtle" className="rounded-2xl bg-card/95">
           <CardHeader className="pb-0">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>

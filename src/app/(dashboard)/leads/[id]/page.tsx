@@ -18,8 +18,6 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { StartServiceButton } from "./start-service-button";
 import { SupervisionPanel } from "./supervision-panel";
-import { CotarButton } from "./cotar-button";
-import { isExternalQuoteConfigured } from "@/features/quotes/external-quote-config";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -30,6 +28,12 @@ import { getLeadBeneficiaries } from "@/features/post-sale/queries";
 import { maskPhone, maskName } from "@/features/quotes/utils";
 import { Phone, Clock, Share, Buildings, UserPlus, LockKey } from "@/components/huge-icons";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
+import {
+  resolveLeadNextBestAction,
+  NextBestActionCard,
+  NextBestActionBanner,
+  type LeadActionContext,
+} from "@/features/next-best-action";
 
 function getCurrentTimestamp() {
   return Date.now();
@@ -59,10 +63,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const scopeFilter = isMarketing
     ? (isMatrix ? undefined : eq(schema.leads.branchId, context.branchId!))
     : (context.role === "broker"
-        ? eq(schema.leads.corretorId, context.userId)
-        : context.role === "manager" && context.branchId
-          ? eq(schema.leads.branchId, context.branchId)
-          : undefined);
+      ? eq(schema.leads.corretorId, context.userId)
+      : context.role === "manager" && context.branchId
+        ? eq(schema.leads.branchId, context.branchId)
+        : undefined);
 
   const [lead] = await db
     .select({
@@ -157,7 +161,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   return (
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Perfil do Lead" />
-      <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
+      <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-5 bg-background p-4 lg:p-6">
 
         {/* Profile Cover & Header Card */}
         <div className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-none sm:px-5" data-onboarding="lead-profile">
@@ -197,9 +201,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {context.role === "broker" && context.userId === lead.corretorId && lead.status === "distributed" && (
                   <StartServiceButton leadId={lead.id} />
                 )}
-                {lead.status !== "distributed" && (
-                  <CotarButton leadId={lead.id} configured={isExternalQuoteConfigured()} />
-                )}
                 <Badge className={slaUrgent ? "border-warning/30 bg-warning/[0.08] text-warning" : "border-border/80"} variant="outline">
                   {lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento"}
                 </Badge>
@@ -223,15 +224,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   {lead.lossCategory === "unattended_sla"
                     ? "Estouro de SLA"
                     : lead.lossCategory === "response_delay"
-                    ? "Atraso no Atendimento"
-                    : "Lead Perdido"}
+                      ? "Atraso no Atendimento"
+                      : "Lead Perdido"}
                 </Badge>
                 <CardTitle className="text-sm font-semibold text-foreground">
                   {lead.lossCategory === "unattended_sla"
                     ? "Perda por Falta de Atendimento (SLA Expirado)"
                     : lead.lossCategory === "response_delay"
-                    ? "Perda por Demora de Resposta"
-                    : "Lead Encerrado sem Venda"}
+                      ? "Perda por Demora de Resposta"
+                      : "Lead Encerrado sem Venda"}
                 </CardTitle>
               </div>
               <CardDescription className="text-xs">
@@ -244,10 +245,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         {/* Main operational area */}
         <div className="min-w-0 space-y-5">
           <section className="min-w-0 space-y-5">
-          {/* Dense operational content is organized in the tabs below. */}
+            {/* Dense operational content is organized in the tabs below. */}
 
-          {/* Legacy quote block retained below in the Cotações tab. */}
-          {/*
+            {/* Legacy quote block retained below in the Cotações tab. */}
+            {/*
           {false && shouldShowQuotes && (
             <Card className="border-border bg-card shadow-sm" id="cotacao">
               <CardHeader className="pb-3 border-b border-border/40">
@@ -291,128 +292,148 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
 
 
-          <Tabs defaultValue={defaultLeadTab} orientation="horizontal" className="min-h-0 min-w-0 gap-4 overflow-hidden md:grid md:grid-cols-[180px_minmax(0,1fr)] md:gap-5">
-            <TabsList aria-label="Etapas do atendimento" className="h-auto w-full max-w-full min-w-0 flex-row items-stretch gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/70 bg-muted/20 p-2 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:h-fit md:flex-col md:overflow-visible md:[scrollbar-width:auto]" variant="line">
-              <TabsTrigger value="service" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Atendimento</span><span className="text-[11px] font-normal text-muted-foreground">Contato inicial</span></span></TabsTrigger>
-              <TabsTrigger value="documents" disabled={stageRank < 5} className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1">{stageRank < 5 ? <LockKey className="size-3.5 text-muted-foreground" /> : null}<span className="flex flex-col items-start gap-0.5"><span>Documentos {leadDocs.length > 0 ? `(${leadDocs.length})` : ""}</span><span className="text-[11px] font-normal text-muted-foreground">Análise cadastral</span></span></TabsTrigger>
-              <TabsTrigger value="history" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Histórico</span><span className="text-[11px] font-normal text-muted-foreground">Linha do tempo</span></span></TabsTrigger>
-              <TabsTrigger value="tasks" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Tarefas ({tasks.filter(t => !t.completedAt).length})</span><span className="text-[11px] font-normal text-muted-foreground">Próximas ações</span></span></TabsTrigger>
-            </TabsList>
+          {(() => {
+            const qualDetails = lead.qualificationDetails as { status?: string; score?: number } | null;
+            const leadActionCtx: LeadActionContext = {
+              id: lead.id,
+              name: lead.nome,
+              status: lead.status,
+              qualificationStatus: qualDetails?.status ?? null,
+              score: qualDetails?.score ?? null,
+              phone: lead.telefone,
+              hasSlaBreach: Boolean(lead.slaBreachedAt),
+              documentsPendingCount: leadDocs.filter((d) => d.status === "pending" || d.status === "rejected").length,
+              documentsApprovedCount: leadDocs.filter((d) => d.status === "approved").length,
+              totalDocumentsRequired: leadDocs.length,
+              hasCompletedSale: lead.status === "converted",
+              firstContactCompleted: lead.status !== "new" && lead.status !== "distributed",
+            };
+            const leadNextBestAction = resolveLeadNextBestAction(leadActionCtx, context.role, context.jobTitle);
+            return <NextBestActionCard action={leadNextBestAction} className="mb-4" />;
+          })()}
 
-            <TabsContent value="service" className="mt-0 space-y-5">
-              {isManagement && (
-                <SupervisionPanel
-                  leadId={lead.id}
-                  currentStatus={lead.status}
-                  currentOwner={lead.corretorNome}
-                  currentOwnerId={lead.corretorId}
-                  assignedAt={lead.assignedAt}
-                  stageEnteredAt={lead.stageEnteredAt}
-                  serviceStartedAt={lead.serviceStartedAt}
-                  brokers={brokers}
-                  slaFirstContactMinutes={slaMinutes}
-                  tasks={tasks}
-                  isLost={lead.status === "lost"}
-                  currentUserId={context.userId}
-                />
-              )}
-              {!isManagement && (
-                <LeadActionHub
-                  hasPendingDocuments={leadDocs.some((document) => document.status === "pending" || document.status === "rejected")}
-                  leadId={lead.id}
-                  currentOwner={lead.corretorNome}
-                  nextTask={(() => { const task = tasks.find((item) => !item.completedAt); return task ? { title: task.title, dueAt: task.dueAt?.toISOString() ?? null, priority: task.priority, assigneeName: task.assigneeName } : null; })()}
-                  status={lead.status}
-                  isOwner={context.userId === lead.corretorId}
-                  phone={canSeePersonalData ? lead.telefone : null}
-                  canSeePersonalData={canSeePersonalData}
-                  showFeedback={context.role === "broker" && context.userId === lead.corretorId && lead.status !== "lost" && lead.status !== "converted"}
-                />
-              )}
-              <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                Esta é a etapa atual. As próximas etapas são liberadas conforme o status do lead avança.
-              </div>
-              {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges) && (
-                <Card className="border-border bg-card shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Dados da qualificação</CardTitle>
-                    <CardDescription>Dados coletados pelo agente, separados entre atendimento individual e empresarial.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
-                    <div><p className="text-xs text-muted-foreground">Vidas</p><p className="mt-1 font-medium">{qualificationDetails.numberOfLives ?? "Não informado"}</p></div>
-                    {lead.tipo === "PME" ? (
-                      <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
-                    ) : (
-                      <div><p className="text-xs text-muted-foreground">Idades informadas</p><p className="mt-1 font-medium">{qualificationDetails.individualAges ?? "Não informadas"}</p></div>
-                    )}
-                    <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{lead.tipo === "PME" ? "Empresa / PME" : "Pessoa física"}</p></div>
-                  </CardContent>
-                </Card>
-              )}
-              {/* ── Dados adicionais do formulário (PF / PME) ──────────────── */}
-              {(lead.tipo === "PF" && (formData.dependentes || formData.mediaIdades)) && (
-                <Card className="border-border bg-card shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Dados informados no cadastro</CardTitle>
-                    <CardDescription>Informações adicionais coletadas durante a criação do lead.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-                    {formData.dependentes && (
-                      <div><p className="text-xs text-muted-foreground">Dependentes</p><p className="mt-1 font-medium">{formData.dependentes}</p></div>
-                    )}
-                    {formData.mediaIdades && (
-                      <div><p className="text-xs text-muted-foreground">Média de idades</p><p className="mt-1 font-medium">{formData.mediaIdades} anos</p></div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-              {(lead.tipo === "PME" && (formData.razaoSocial || formData.cnpj || formData.funcionarios)) && (
-                <Card className="border-border bg-card shadow-none">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Dados da empresa (PME)</CardTitle>
-                    <CardDescription>Informações da pessoa jurídica contratante.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
-                    {formData.razaoSocial && (
-                      <div><p className="text-xs text-muted-foreground">Razão social</p><p className="mt-1 font-medium">{formData.razaoSocial}</p></div>
-                    )}
-                    {formData.cnpj && (
-                      <div><p className="text-xs text-muted-foreground">CNPJ</p><p className="mt-1 font-medium">{formData.cnpj}</p></div>
-                    )}
-                    {formData.funcionarios && (
-                      <div><p className="text-xs text-muted-foreground">Funcionários</p><p className="mt-1 font-medium">{formData.funcionarios}</p></div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-              {/* ── Origem Meta Ads ──────────────── */}
-              {(lead.origem === "webhook" || lead.sourceCampaign || lead.metaCampaignId) && (
-                <Card className="border-primary/20 bg-primary/5 shadow-none">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">f</span>
-                      <CardTitle className="text-sm font-bold">Origem Meta Ads</CardTitle>
-                    </div>
-                    <CardDescription className="text-xs">Rastreabilidade completa do anúncio até este lead.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-xs sm:grid-cols-3 pt-2">
-                    <div><p className="text-muted-foreground">Origem</p><p className="font-semibold text-foreground mt-0.5">Meta Ads (Lead Ads / Click to WhatsApp)</p></div>
-                    <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceCampaign || "Campanha Meta"}</p></div>
-                    <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceAd || "Anúncio Padrão"}</p></div>
-                    <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceForm || "Formulário Direct"}</p></div>
-                    <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.createdAt)}</p></div>
-                  </CardContent>
-                </Card>
-              )}
-              <div className="grid gap-4 lg:grid-cols-2">
-                <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
-                <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
-              </div>
-              <LeadChat phone={canSeePersonalData ? lead.telefone : null} />
-            </TabsContent>
+            <Tabs defaultValue={defaultLeadTab} orientation="horizontal" className="min-h-0 min-w-0 gap-4 overflow-hidden md:grid md:grid-cols-[180px_minmax(0,1fr)] md:gap-5">
+              <TabsList aria-label="Etapas do atendimento" className="h-auto py-4 w-full max-w-full min-w-0 flex-row items-stretch gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/70 bg-muted/20 p-2 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:h-fit md:flex-col md:overflow-visible md:[scrollbar-width:auto]" variant="line">
+                <TabsTrigger value="service" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Atendimento</span><span className="text-[11px] font-normal text-muted-foreground">Contato inicial</span></span></TabsTrigger>
+                <TabsTrigger value="documents" disabled={stageRank < 5} className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1">{stageRank < 5 ? <LockKey className="size-3.5 text-muted-foreground" /> : null}<span className="flex flex-col items-start gap-0.5"><span>Documentos {leadDocs.length > 0 ? `(${leadDocs.length})` : ""}</span><span className="text-[11px] font-normal text-muted-foreground">Análise cadastral</span></span></TabsTrigger>
+                <TabsTrigger value="history" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Histórico</span><span className="text-[11px] font-normal text-muted-foreground">Linha do tempo</span></span></TabsTrigger>
+                <TabsTrigger value="tasks" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Tarefas ({tasks.filter(t => !t.completedAt).length})</span><span className="text-[11px] font-normal text-muted-foreground">Próximas ações</span></span></TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="documents" className="mt-4">
-              <Card className="border-border bg-card shadow-sm" id="documentos">
+              <TabsContent value="service" className="mt-0 space-y-5">
+                {isManagement && (
+                  <SupervisionPanel
+                    leadId={lead.id}
+                    currentStatus={lead.status}
+                    currentOwner={lead.corretorNome}
+                    currentOwnerId={lead.corretorId}
+                    assignedAt={lead.assignedAt}
+                    stageEnteredAt={lead.stageEnteredAt}
+                    serviceStartedAt={lead.serviceStartedAt}
+                    brokers={brokers}
+                    slaFirstContactMinutes={slaMinutes}
+                    tasks={tasks}
+                    isLost={lead.status === "lost"}
+                    currentUserId={context.userId}
+                  />
+                )}
+                {!isManagement && (
+                  <LeadActionHub
+                    hasPendingDocuments={leadDocs.some((document) => document.status === "pending" || document.status === "rejected")}
+                    leadId={lead.id}
+                    currentOwner={lead.corretorNome}
+                    nextTask={(() => { const task = tasks.find((item) => !item.completedAt); return task ? { title: task.title, dueAt: task.dueAt?.toISOString() ?? null, priority: task.priority, assigneeName: task.assigneeName } : null; })()}
+                    status={lead.status}
+                    isOwner={context.userId === lead.corretorId}
+                    phone={canSeePersonalData ? lead.telefone : null}
+                    canSeePersonalData={canSeePersonalData}
+                    showFeedback={context.role === "broker" && context.userId === lead.corretorId && lead.status !== "lost" && lead.status !== "converted"}
+                  />
+                )}
+                <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                  Esta é a etapa atual. As próximas etapas são liberadas conforme o status do lead avança.
+                </div>
+                {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges) && (
+                  <Card className="border-border bg-card shadow-none">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Dados da qualificação</CardTitle>
+                      <CardDescription>Dados coletados pelo agente, separados entre atendimento individual e empresarial.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+                      <div><p className="text-xs text-muted-foreground">Vidas</p><p className="mt-1 font-medium">{qualificationDetails.numberOfLives ?? "Não informado"}</p></div>
+                      {lead.tipo === "PME" ? (
+                        <div><p className="text-xs text-muted-foreground">Média de idade do grupo</p><p className="mt-1 font-medium">{qualificationDetails.averageAge ? `${qualificationDetails.averageAge} anos` : "Não informada"}</p></div>
+                      ) : (
+                        <div><p className="text-xs text-muted-foreground">Idades informadas</p><p className="mt-1 font-medium">{qualificationDetails.individualAges ?? "Não informadas"}</p></div>
+                      )}
+                      <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{lead.tipo === "PME" ? "Empresa / PME" : "Pessoa física"}</p></div>
+                    </CardContent>
+                  </Card>
+                )}
+                {/* ── Dados adicionais do formulário (PF / PME) ──────────────── */}
+                {(lead.tipo === "PF" && (formData.dependentes || formData.mediaIdades)) && (
+                  <Card className="border-border bg-card shadow-none">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Dados informados no cadastro</CardTitle>
+                      <CardDescription>Informações adicionais coletadas durante a criação do lead.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+                      {formData.dependentes && (
+                        <div><p className="text-xs text-muted-foreground">Dependentes</p><p className="mt-1 font-medium">{formData.dependentes}</p></div>
+                      )}
+                      {formData.mediaIdades && (
+                        <div><p className="text-xs text-muted-foreground">Média de idades</p><p className="mt-1 font-medium">{formData.mediaIdades} anos</p></div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+                {(lead.tipo === "PME" && (formData.razaoSocial || formData.cnpj || formData.funcionarios)) && (
+                  <Card className="border-border bg-card shadow-none">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Dados da empresa (PME)</CardTitle>
+                      <CardDescription>Informações da pessoa jurídica contratante.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+                      {formData.razaoSocial && (
+                        <div><p className="text-xs text-muted-foreground">Razão social</p><p className="mt-1 font-medium">{formData.razaoSocial}</p></div>
+                      )}
+                      {formData.cnpj && (
+                        <div><p className="text-xs text-muted-foreground">CNPJ</p><p className="mt-1 font-medium">{formData.cnpj}</p></div>
+                      )}
+                      {formData.funcionarios && (
+                        <div><p className="text-xs text-muted-foreground">Funcionários</p><p className="mt-1 font-medium">{formData.funcionarios}</p></div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+                {/* ── Origem Meta Ads ──────────────── */}
+                {(lead.origem === "webhook" || lead.sourceCampaign || lead.metaCampaignId) && (
+                  <Card className="border-primary/20 bg-primary/5 shadow-none">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">f</span>
+                        <CardTitle className="text-sm font-bold">Origem Meta Ads</CardTitle>
+                      </div>
+                      <CardDescription className="text-xs">Rastreabilidade completa do anúncio até este lead.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 text-xs sm:grid-cols-3 pt-2">
+                      <div><p className="text-muted-foreground">Origem</p><p className="font-semibold text-foreground mt-0.5">Meta Ads (Lead Ads / Click to WhatsApp)</p></div>
+                      <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceCampaign || "Campanha Meta"}</p></div>
+                      <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceAd || "Anúncio Padrão"}</p></div>
+                      <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceForm || "Formulário Direct"}</p></div>
+                      <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.createdAt)}</p></div>
+                    </CardContent>
+                  </Card>
+                )}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
+                  <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
+                </div>
+                <LeadChat phone={canSeePersonalData ? lead.telefone : null} />
+              </TabsContent>
+
+              <TabsContent value="documents" className="mt-4">
+                <Card className="border-border bg-card shadow-sm" id="documentos">
                   <CardHeader className="pb-3 border-b border-border/40">
                     <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Documentação do atendimento</CardTitle>
                     <CardDescription className="text-xs">Anexe documentos opcionais por titular ou beneficiário. A aprovação é acompanhada pela fila central de Documentos.</CardDescription>
@@ -423,129 +444,129 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Card>
 
 
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="history" className="mt-4">
-              <Card className="border-border bg-card shadow-sm" data-onboarding="lead-timeline">
-                <CardContent className="pt-6">
-                  <LeadTimeline leadId={lead.id} interactions={interactions} />
+              <TabsContent value="history" className="mt-4">
+                <Card className="border-border bg-card shadow-sm" data-onboarding="lead-timeline">
+                  <CardContent className="pt-6">
+                    <LeadTimeline leadId={lead.id} interactions={interactions} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="tasks" className="mt-4" id="tarefas">
+                <Card className="border-border bg-card shadow-sm" data-onboarding="create-follow-up">
+                  <CardContent className="pt-6">
+                    <LeadTasks assignees={context.role === "broker" ? [{ id: context.userId, name: lead.corretorNome ?? "Eu" }] : brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+
+            {/* Info & Actions Grid — contact, management, beneficiaries */}
+            <div className="hidden">
+              {/* About Contact Info Card */}
+              <Card className="border-border/80 bg-card shadow-none">
+                <CardHeader className="border-b border-border/60 pb-3">
+                  <CardTitle className="text-sm font-semibold">Contato e contexto</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Phone className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Telefone</p>
+                      <p className={`mt-0.5 text-sm font-medium text-foreground ${shouldMask ? "blur-[3px] select-none" : ""}`}>
+                        {canSeePersonalData ? (
+                          <a className="text-primary hover:underline font-semibold" href={`tel:${lead.telefone.replace(/\D/g, "")}`}>{lead.telefone}</a>
+                        ) : maskedPhone}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Clock className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">E-mail</p>
+                      <p className={`mt-0.5 text-sm font-medium text-foreground ${shouldMask ? "blur-[3px] select-none" : ""}`}>
+                        {canSeePersonalData && lead.email ? (
+                          <a className="text-primary hover:underline font-semibold" href={`mailto:${lead.email}`}>{lead.email}</a>
+                        ) : canSeePersonalData ? "Não informado" : maskedEmail}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Share className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Origem do Lead</p>
+                      <p className="mt-0.5 text-sm font-medium text-foreground">{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <UserPlus className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo de Lead</p>
+                      <p className="mt-0.5 text-sm font-medium text-foreground">{lead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Buildings className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unidade / Filial</p>
+                      <p className="mt-0.5 text-sm font-semibold text-primary">{lead.branchNome ?? "Geral/Sem filial"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <UserPlus className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Responsável</p>
+                      <p className="mt-0.5 text-sm font-medium text-foreground">{lead.corretorNome ?? "Aguardando distribuição"}</p>
+                    </div>
+                  </div>
+
+                  {lead.motivoPerda && (
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+                      <p className="font-semibold uppercase tracking-wider text-[10px]">Motivo da Perda</p>
+                      <p className="mt-1 font-medium">{lead.motivoPerda}</p>
+                    </div>
+                  )}
+
+                  {!canSeePersonalData && (
+                    <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-muted-foreground leading-relaxed">
+                      O telefone e o e-mail serão liberados somente quando você iniciar o atendimento. Essa ação registra sua responsabilidade pelo lead.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="tasks" className="mt-4" id="tarefas">
-              <Card className="border-border bg-card shadow-sm" data-onboarding="create-follow-up">
-                <CardContent className="pt-6">
-                  <LeadTasks assignees={context.role === "broker" ? [{ id: context.userId, name: lead.corretorNome ?? "Eu" }] : brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+              {/* Person Details (management actions now in SupervisionPanel above) */}
+              <div className="space-y-4">
+                <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} />
+              </div>
 
-          {/* Info & Actions Grid — contact, management, beneficiaries */}
-          <div className="hidden">
-            {/* About Contact Info Card */}
-            <Card className="border-border/80 bg-card shadow-none">
-              <CardHeader className="border-b border-border/60 pb-3">
-                <CardTitle className="text-sm font-semibold">Contato e contexto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 pt-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <Phone className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Telefone</p>
-                    <p className={`mt-0.5 text-sm font-medium text-foreground ${shouldMask ? "blur-[3px] select-none" : ""}`}>
-                      {canSeePersonalData ? (
-                        <a className="text-primary hover:underline font-semibold" href={`tel:${lead.telefone.replace(/\D/g, "")}`}>{lead.telefone}</a>
-                      ) : maskedPhone}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <Clock className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">E-mail</p>
-                    <p className={`mt-0.5 text-sm font-medium text-foreground ${shouldMask ? "blur-[3px] select-none" : ""}`}>
-                      {canSeePersonalData && lead.email ? (
-                        <a className="text-primary hover:underline font-semibold" href={`mailto:${lead.email}`}>{lead.email}</a>
-                      ) : canSeePersonalData ? "Não informado" : maskedEmail}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <Share className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Origem do Lead</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <UserPlus className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo de Lead</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{lead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <Buildings className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unidade / Filial</p>
-                    <p className="mt-0.5 text-sm font-semibold text-primary">{lead.branchNome ?? "Geral/Sem filial"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <UserPlus className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Responsável</p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">{lead.corretorNome ?? "Aguardando distribuição"}</p>
-                  </div>
-                </div>
-
-                {lead.motivoPerda && (
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
-                    <p className="font-semibold uppercase tracking-wider text-[10px]">Motivo da Perda</p>
-                    <p className="mt-1 font-medium">{lead.motivoPerda}</p>
-                  </div>
-                )}
-
-                {!canSeePersonalData && (
-                  <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-muted-foreground leading-relaxed">
-                    O telefone e o e-mail serão liberados somente quando você iniciar o atendimento. Essa ação registra sua responsabilidade pelo lead.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Person Details (management actions now in SupervisionPanel above) */}
-            <div className="space-y-4">
-              <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} />
+              {/* Beneficiaries */}
+              <div className="space-y-4">
+                <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
+              </div>
             </div>
 
-            {/* Beneficiaries */}
-            <div className="space-y-4">
-              <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
-            </div>
-          </div>
-
-          {/* Hidden legacy composition kept out of the operational surface. */}
-          {false && <LeadChat phone={canSeePersonalData ? lead.telefone : null} />}
+            {/* Hidden legacy composition kept out of the operational surface. */}
+            {false && <LeadChat phone={canSeePersonalData ? lead.telefone : null} />}
           </section>
 
           {false && <aside className="space-y-4 xl:sticky xl:top-24">

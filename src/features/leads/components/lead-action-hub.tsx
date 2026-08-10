@@ -61,7 +61,7 @@ export function LeadActionHub({ leadId, status, currentOwner, hasPendingDocument
           </p>
         </div>
         <Button className="w-full shrink-0 whitespace-nowrap sm:w-auto" render={<Link href={primaryAction.href} />} size="sm">
-          <Icon />{primaryAction.label}<ArrowRight />
+          <Icon className="size-4" />{primaryAction.label}<ArrowRight className="size-4" />
         </Button>
       </div>
 
@@ -74,13 +74,13 @@ export function LeadActionHub({ leadId, status, currentOwner, hasPendingDocument
       </div>
 
       <nav aria-label="Atalhos do lead" className="mt-3 flex flex-wrap gap-2">
-        {canSeePersonalData && phone ? <Button className="h-8 px-2.5 text-xs" render={<a href={`tel:${phone.replace(/\D/g, "")}`} />} size="sm" variant="outline"><Phone /> Ligar</Button> : null}
-        {canSeePersonalData && phone ? <Button className="h-8 px-2.5 text-xs" render={<a href={`https://wa.me/${phone.replace(/\D/g, "")}`} rel="noreferrer" target="_blank" />} size="sm" variant="outline"><WhatsappLogo /> WhatsApp</Button> : null}
-        <Button className="h-8 px-2.5 text-xs" render={<Link href={"/conversas?leadId=" + leadId} />} size="sm" variant="outline"><ChatCircleText /> Conversar</Button>
+        {canSeePersonalData && phone ? <Button className="h-8 px-2.5 text-xs" render={<a href={`tel:${phone.replace(/\D/g, "")}`} />} size="sm" variant="outline"><Phone className="size-4" /> Ligar</Button> : null}
+        {canSeePersonalData && phone ? <Button className="h-8 px-2.5 text-xs" render={<a href={`https://wa.me/${phone.replace(/\D/g, "")}`} rel="noreferrer" target="_blank" />} size="sm" variant="outline"><WhatsappLogo className="size-4" /> WhatsApp</Button> : null}
+        <Button className="h-8 px-2.5 text-xs" render={<Link href={"/conversas?leadId=" + leadId} />} size="sm" variant="outline"><ChatCircleText className="size-4" /> Conversar</Button>
         <LeadQuickNote leadId={leadId} />
-        <Button className="h-8 px-2.5 text-xs" render={<Link href={"/tarefas?leadId=" + leadId} />} size="sm" variant="outline"><ListChecks /> Tarefas</Button>
+        <Button className="h-8 px-2.5 text-xs" render={<Link href={"/tarefas?leadId=" + leadId} />} size="sm" variant="outline"><ListChecks className="size-4" /> Tarefas</Button>
         <LeadReminder leadId={leadId} />
-        <Button className="h-8 px-2.5 text-xs" render={<Link href="#documentos" />} size="sm" variant="outline"><FileText /> Documentos{hasPendingDocuments ? " · pendentes" : ""}</Button>
+        <Button className="h-8 px-2.5 text-xs" render={<Link href="#documentos" />} size="sm" variant="outline"><FileText className="size-4" /> Documentos{hasPendingDocuments ? " · pendentes" : ""}</Button>
       </nav>
 
       {/* ─── Feedback accordion ─── */}

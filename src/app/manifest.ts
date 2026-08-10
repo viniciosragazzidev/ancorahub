@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Ancora Corretora CRM",
-    short_name: "Ancora",
-    description: "CRM para corretoras de planos de saúde.",
+    name: "AncoraHub — Âncora Saúde",
+    short_name: "AncoraHub",
+    description: "Plataforma de Gestão de Leads e Qualificação IA da Âncora Saúde.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

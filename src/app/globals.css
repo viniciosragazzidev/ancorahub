@@ -51,7 +51,7 @@
 :root {
   color-scheme: light;
   /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
-  --surface-base: oklch(0.985 0.001 260);
+  --surface-base: oklch(0.978 0.004 235);
   /* Lvl 0: Base Canvas (#f5f5f3) */
   --surface-card: oklch(1 0 0);
   /* Lvl 1: Card Surface (#fafaf9) */
@@ -61,10 +61,10 @@
   /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
-  --background: oklch(0.985 0.001 260);
+  --background: oklch(0.978 0.004 235);
   --foreground: oklch(0.170 0.012 260);
 
-  --card: oklch(1 0 0);
+  --card: oklch(0.998 0.001 235);
   --card-foreground: oklch(0.170 0.012 260);
 
   --popover: oklch(1 0 0);
@@ -81,8 +81,8 @@
   /* Ramp Esmeralda da Marca (#15A46B) */
   --accent-foreground: oklch(0.420 0.150 255);
 
-  --muted: oklch(0.965 0.003 260);
-  --muted-foreground: oklch(0.480 0.014 260);
+  --muted: oklch(0.948 0.007 235);
+  --muted-foreground: oklch(0.455 0.018 245);
   --muted-text: oklch(0.580 0.012 260);
 
   /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
@@ -95,10 +95,10 @@
   --destructive: oklch(0.580 0.200 25);
   /* Erro e Ação Destrutiva */
 
-  --border: oklch(0.890 0.004 260);
+  --border: oklch(0.875 0.008 235);
   /* Bordas suaves 1px */
   --border-strong: oklch(0.820 0.006 260);
-  --input: oklch(0.960 0.003 260);
+  --input: oklch(0.965 0.004 235);
   --ring: oklch(0.560 0.190 255);
 
   --sidebar: oklch(1 0 0);
@@ -255,8 +255,8 @@
   --sync-confirmed: var(--primary);
   --sync-error: var(--destructive);
   --sync-surface: var(--muted);
-  --dashboard-canvas: oklch(0.965 0.003 95);
-  --radius: 0.5rem;
+  --dashboard-canvas: oklch(0.968 0.006 235);
+  --radius: 0.875rem;
 }
 
 .dark {
@@ -329,7 +329,7 @@
   --chart-3: oklch(0.740 0.150 230);
   --chart-4: oklch(0.740 0.150 300);
   --chart-5: oklch(0.740 0.150 65);
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 }
 
 /* Contrast guardrails for legacy status utilities. The light theme must keep
@@ -430,7 +430,7 @@ body {
 /* Latitude workspace rules. These are intentionally slot-based so every
    operational route receives the same density without replacing its domain
    components or changing its data flow. */
-[data-slot="app-content"] > main {
+[data-slot="app-content"]>main {
   min-height: 100%;
 }
 
@@ -442,13 +442,13 @@ body {
   background: var(--card);
 }
 
-[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-cell"]:first-child,
-[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-head"]:first-child {
+[data-slot="app-content"] [data-slot="table-row"]>[data-slot="table-cell"]:first-child,
+[data-slot="app-content"] [data-slot="table-row"]>[data-slot="table-head"]:first-child {
   padding-left: 1rem;
 }
 
-[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-cell"]:last-child,
-[data-slot="app-content"] [data-slot="table-row"] > [data-slot="table-head"]:last-child {
+[data-slot="app-content"] [data-slot="table-row"]>[data-slot="table-cell"]:last-child,
+[data-slot="app-content"] [data-slot="table-row"]>[data-slot="table-head"]:last-child {
   padding-right: 1rem;
 }
 
@@ -456,6 +456,32 @@ body {
    color and the tenant brand the only strong color on a busy operational page. */
 [data-slot="app-content"] .bg-background {
   background-color: var(--background);
+}
+
+/* The operational canvas stays calm. Ocean character appears as depth at the
+   point of orientation, never behind tables or live work. */
+.operational-page,
+.operational-workspace {
+  isolation: isolate;
+}
+
+.workspace-hero {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary) 12%, transparent), transparent 42%),
+    var(--card);
+}
+
+.workspace-priority {
+  position: relative;
+  overflow: hidden;
+}
+
+.operational-workspace [data-slot="tabs-list"] {
+  border-radius: 12px;
+}
+
+.operational-workspace [data-slot="table-container"] {
+  background: color-mix(in oklch, var(--card) 96%, var(--primary));
 }
 
 @layer base {
@@ -1081,4 +1107,334 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLOBAL MOTION DESIGN SYSTEM
+   Propósito: cada interação comunica estado, orienta atenção e dá feedback.
+   Regra: motion ≠ decoração. Toda animação resolve um problema de UX.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Button press / tap feedback ─────────────────────────────────────── */
+
+[data-slot="button"]:not([disabled]):not([aria-disabled="true"]):active {
+  transform: scale(0.965);
+  transition: transform var(--duration-micro) var(--ease-smooth-out);
+}
+
+[data-slot="button"] {
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-micro) var(--ease-smooth-out);
+  will-change: transform;
+}
+
+/* ── 2. Focus ring — consistent, accessible ─────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  transition: outline-offset var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* ── 3. Card hover lift ─────────────────────────────────────────────────── */
+
+[data-slot="card"] {
+  transition:
+    box-shadow var(--duration-fast) var(--ease-smooth-out),
+    border-color var(--duration-fast) var(--ease-smooth-out),
+    transform var(--duration-fast) var(--ease-smooth-out);
+}
+
+[data-slot="card"]:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* ── 4. Skeleton shimmer animation ─────────────────────────────────────── */
+
+.ct-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+}
+
+.ct-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.45) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: ct-shimmer 1.6s var(--ease-linear) infinite;
+}
+
+.dark .ct-skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.35 0.008 260 / 0.4) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes ct-shimmer {
+  from { background-position: 200% center; }
+  to   { background-position: -200% center; }
+}
+
+/* Pulse variant (simpler, for inline placeholders) */
+.ct-skeleton-pulse {
+  animation: ct-pulse 1.8s ease-in-out infinite;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+}
+
+@keyframes ct-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* ── 5. Form field — transition on focus ────────────────────────────────── */
+
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"] {
+  transition:
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    box-shadow   var(--duration-quick) var(--ease-smooth-out),
+    background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+[data-slot="input"]:focus,
+[data-slot="textarea"]:focus,
+[data-slot="select-trigger"][data-state="open"] {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px oklch(from var(--ring) l c h / 0.12);
+}
+
+/* Validation states */
+[data-invalid] [data-slot="input"],
+[data-invalid] [data-slot="textarea"] {
+  border-color: var(--destructive);
+  box-shadow: 0 0 0 3px oklch(from var(--destructive) l c h / 0.10);
+  animation: ct-shake var(--duration-fast) var(--ease-smooth-out);
+}
+
+@keyframes ct-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-4px); }
+  40%       { transform: translateX(4px); }
+  60%       { transform: translateX(-3px); }
+  80%       { transform: translateX(2px); }
+}
+
+/* ── 6. Badge pop-in ────────────────────────────────────────────────────── */
+
+[data-slot="badge"] {
+  animation: ct-badge-pop var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+@keyframes ct-badge-pop {
+  from { opacity: 0; transform: scale(0.78); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── 7. Toast / Sonner slide-in ─────────────────────────────────────────── */
+
+[data-sonner-toast] {
+  animation: ct-toast-in var(--duration-medium) var(--ease-smooth-out) both;
+}
+
+[data-sonner-toast][data-removed="true"] {
+  animation: ct-toast-out var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+@keyframes ct-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes ct-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    max-height: 120px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.95);
+    max-height: 0;
+  }
+}
+
+/* ── 8. Dropdown / Popover reveal ───────────────────────────────────────── */
+
+[data-slot="dropdown-menu-content"],
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="context-menu-content"] {
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin,
+                        var(--radix-popover-content-transform-origin, top left));
+}
+
+[data-slot="dropdown-menu-content"][data-state="open"],
+[data-slot="popover-content"][data-state="open"],
+[data-slot="select-content"][data-state="open"],
+[data-slot="context-menu-content"][data-state="open"] {
+  animation: ct-dropdown-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+[data-slot="dropdown-menu-content"][data-state="closed"],
+[data-slot="popover-content"][data-state="closed"],
+[data-slot="select-content"][data-state="closed"],
+[data-slot="context-menu-content"][data-state="closed"] {
+  animation: ct-dropdown-out var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+@keyframes ct-dropdown-in {
+  from { opacity: 0; transform: scale(0.94) translateY(-4px); filter: blur(1px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    filter: blur(0); }
+}
+
+@keyframes ct-dropdown-out {
+  from { opacity: 1; transform: scale(1)    translateY(0); }
+  to   { opacity: 0; transform: scale(0.96) translateY(-2px); }
+}
+
+/* ── 9. Sheet (drawer) slide-in ─────────────────────────────────────────── */
+
+[data-slot="sheet-content"][data-state="open"] {
+  animation: ct-sheet-in var(--duration-medium) var(--ease-smooth-out) both;
+}
+
+[data-slot="sheet-content"][data-state="closed"] {
+  animation: ct-sheet-out var(--duration-fast) var(--ease-smooth-out) both;
+}
+
+@keyframes ct-sheet-in {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ct-sheet-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(100%); }
+}
+
+/* ── 10. Tab indicator pulse on switch ──────────────────────────────────── */
+
+[data-slot="tabs-indicator"] {
+  transition:
+    left var(--duration-fast) var(--ease-smooth-out),
+    width var(--duration-fast) var(--ease-smooth-out),
+    background-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* ── 11. Sidebar menu item hover ────────────────────────────────────────── */
+
+[data-slot="sidebar-menu-button"] {
+  transition:
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* ── 12. Global loading spinner ─────────────────────────────────────────── */
+
+.ct-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid oklch(from var(--primary) l c h / 0.25);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ct-spin 0.7s linear infinite;
+}
+
+@keyframes ct-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 13. Content fade-up (re-usable reveal class) ───────────────────────── */
+
+.ct-reveal {
+  animation: ct-reveal var(--duration-medium) var(--ease-smooth-out) both;
+}
+
+.ct-reveal-fast {
+  animation: ct-reveal var(--duration-quick) var(--ease-smooth-out) both;
+}
+
+@keyframes ct-reveal {
+  from { opacity: 0; transform: translateY(var(--distance-small)); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger helper: add style="--stagger: N" on children, use ct-stagger on parent */
+.ct-stagger > * {
+  animation: ct-reveal var(--duration-medium) var(--ease-smooth-out) both;
+  animation-delay: calc(var(--stagger, 0) * var(--duration-stagger));
+}
+
+/* ── 14. Icon micro-bounce on interactive elements ──────────────────────── */
+
+[data-slot="sidebar-menu-button"]:hover svg,
+[data-slot="button"]:hover svg {
+  transition: transform var(--duration-quick) var(--ease-smooth-out);
+}
+
+[data-slot="sidebar-menu-button"]:hover svg {
+  transform: scale(1.08);
+}
+
+/* ── 15. Reduced motion — disable all custom animations ─────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+
+  [data-slot="button"]:active,
+  [data-slot="card"]:hover,
+  [data-slot="button"],
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="sidebar-menu-button"],
+  [data-slot="tabs-indicator"] {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .ct-skeleton::after,
+  .ct-skeleton-pulse,
+  .ct-spinner,
+  .ct-reveal,
+  .ct-reveal-fast,
+  .ct-stagger > *,
+  [data-slot="badge"],
+  [data-sonner-toast],
+  [data-slot="sheet-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="popover-content"],
+  [data-slot="select-content"] {
+    animation: none !important;
+    transition: none !important;
+  }
 }

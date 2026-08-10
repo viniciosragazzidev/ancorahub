@@ -273,7 +273,7 @@ export function MetaIntegrationView({
 
       {/* ─── AUDITORIA DE SINCRONIZAÇÕES (LOGS) ─── */}
       <Card className="rounded-xl border border-transparent bg-transparent shadow-none">
-        <CardHeader className="flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
           <div>
             <CardTitle className="text-base font-bold">Logs de Sincronização & Auditoria</CardTitle>
             <CardDescription className="text-xs">Histórico recente de requisições e syncs com a Meta Graph API.</CardDescription>

@@ -1,6 +1,7 @@
 import NocDashboardContent from "./_components/noc-dashboard-content";
 import { BrokerWorkspace } from "./_components/broker-workspace";
 import { getBrokerWorkspaceData, isBrokerWorkspaceEnabled } from "@/features/broker-workspace/queries";
+import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
 import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardData } from "./data";
@@ -21,7 +22,7 @@ export default async function DashboardPage({
   if (context.role === "manager") {
     return <NocDashboardContent role="manager" data={await getManagerDashboardData(period)} period={period} />;
   }
-  if (await isBrokerWorkspaceEnabled()) {
+  if ((await isBrokerWorkspaceEnabled()) && await isCleanUiOperationalEnabled(context.tenantId)) {
     return <BrokerWorkspace data={await getBrokerWorkspaceData()} />;
   }
   return <NocDashboardContent role="broker" data={await getBrokerDashboardData(period)} period={period} />;

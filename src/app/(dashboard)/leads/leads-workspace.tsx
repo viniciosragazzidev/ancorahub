@@ -288,18 +288,6 @@ export function LeadsWorkspace({
           />
         </>
       )}
-      {contextRole === "broker" && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={multiSelect.count === 0}
-          onClick={() => {
-            toast("Funcionalidade em desenvolvimento.");
-          }}
-        >
-          Iniciar atendimento
-        </Button>
-      )}
     </>
   ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers]);
 
@@ -344,9 +332,9 @@ export function LeadsWorkspace({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6">
+    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-5">
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 rounded-2xl border border-border/70 bg-card/80 p-1 sm:grid-cols-3">
         <StatCard
           label="Sem responsável"
           value={unassignedCount}
@@ -406,7 +394,7 @@ export function LeadsWorkspace({
         </div>
 
         <TabsContent value="list" className="mt-4">
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card variant="subtle" className="rounded-2xl bg-card/95">
             <CardContent className="p-0">
               <div className="hidden divide-y divide-border max-[559px]:block">
                 {leads.map((lead) => (
@@ -454,7 +442,7 @@ export function LeadsWorkspace({
                       />
                     </TableHead>
                     <TableHead className="pl-0">Lead</TableHead>
-                    <TableHead>Tipo</TableHead>
+                    <TableHead className={contextRole === "broker" ? "hidden" : ""}>Tipo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Qualificação</TableHead>
                     <TableHead className="hidden md:table-cell">Saúde</TableHead>
@@ -491,7 +479,7 @@ export function LeadsWorkspace({
                           {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
                         </p>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={contextRole === "broker" ? "hidden" : ""}>
                         <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
                           {lead.tipo}
                         </span>
@@ -706,10 +694,6 @@ export function LeadsWorkspace({
                             Conversas
                           </Button>
                         </div>
-                        <Button className="w-full" render={<a href="https://cotadorsimplificado.com.br/" rel="noreferrer" target="_blank" />}>
-                          <ArrowUpRight />
-                          Nova cotação
-                        </Button>
                         {canCall ? (
                           <div className="grid grid-cols-2 gap-2">
                             <Button className="w-full" render={<a href={`tel:${selectedLead.telefone}`} />} variant="outline">
@@ -935,7 +919,7 @@ function SlaBar({ sla }: { sla: NonNullable<SlaInfo> }) {
         <div className="flex items-center gap-2 px-3 py-1.5 cursor-default">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className={`h-full rounded-full transition-[width] duration-500 ${barColor}`}
+              className={`h-full rounded-full transition-[width] duration-[var(--duration-medium)] ease-[var(--ease-smooth-out)] ${barColor}`}
               style={{ width: `${pct}%` }}
             />
           </div>

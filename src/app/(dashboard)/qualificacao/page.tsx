@@ -1,5 +1,6 @@
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
+import { hasCapability } from "@/shared/auth/permissions";
 import { getQualificationTenantSettings } from "@/features/ai-qualification/tenant-settings-service";
 import { getTenantTestNumbers } from "@/features/ai-qualification/test-numbers-service";
 import { getWhatsAppDiagnosticStatus } from "@/features/ai-qualification/whatsapp-diagnostic-service";
@@ -15,8 +16,8 @@ export const dynamic = "force-dynamic";
 
 export default async function QualificacaoPage() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director" && context.role !== "manager") {
-    throw new AuthorizationError("Apenas diretores e gestores têm permissão para acessar a qualificação por IA.");
+  if (!hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)) {
+    throw new AuthorizationError("Apenas diretores, gestores e equipe de marketing têm permissão para acessar a qualificação por IA.");
   }
 
   await ensureAiTablesExist();

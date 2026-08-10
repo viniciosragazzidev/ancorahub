@@ -161,12 +161,6 @@ export function LeadStatusSelector({
           onSelectStatus={handleStatusSelect}
           disabled={pending}
         />
-        <Badge
-          variant={displayedStatus === "lost" ? "destructive" : "outline"}
-          className={`transition-opacity ${state.error ? "t-sync-error" : ""} ${pending ? "t-sync-local" : "t-sync-confirmed"}`}
-        >
-          {pending ? "Sincronizando" : statusLabel(displayedStatus)}
-        </Badge>
         {availableStatuses.length > 0 && (
           <Select value={undefined} onValueChange={handleStatusSelect}>
             <SelectTrigger className="w-[180px]" disabled={pending}>

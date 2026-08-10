@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateCleanUiOperationalSettingsAction, updateCleanUiOperationalLegacyTenantAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
 import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
@@ -44,6 +45,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_stagnant_days", 
     "feature_global_search_enabled", 
     "feature_broker_workspace_enabled",
+    CLEAN_UI_FEATURE,
     "feature_interface_motion_enabled",
     "feature_r2_storage_enabled",
     "feature_route_onboarding_enabled",
@@ -91,13 +93,14 @@ export default async function SuperAdminSettingsPage() {
     "ai_google_api_key",
     "ai_openrouter_api_key",
   ]);
-  const [notificationCapabilities, customRolesPilot, metaLeadAdsPilotTenantIds, tenants] = await Promise.all([getNotificationCapabilityStates(), getCustomRolesPilotTenants(), getMetaLeadAdsPilotTenantIds(), getDatabase().select({ id: schema.tenants.id, name: schema.tenants.name }).from(schema.tenants).orderBy(schema.tenants.name)]);
+  const [notificationCapabilities, customRolesPilot, metaLeadAdsPilotTenantIds, cleanUiLegacyTenantIds, tenants] = await Promise.all([getNotificationCapabilityStates(), getCustomRolesPilotTenants(), getMetaLeadAdsPilotTenantIds(), getCleanUiOperationalLegacyTenantIds(), getDatabase().select({ id: schema.tenants.id, name: schema.tenants.name }).from(schema.tenants).orderBy(schema.tenants.name)]);
   const pilotTenants = customRolesPilot.tenants;
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
   const centralEnabled = settingMap.get("feature_central_atencao_enabled") !== "false";
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
+  const cleanUiOperationalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
   const interfaceMotionEnabled = settingMap.get("feature_interface_motion_enabled") !== "false";
   const r2StorageEnabled = settingMap.get("feature_r2_storage_enabled") !== "false";
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
@@ -177,6 +180,21 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>{brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}</Button>
                 </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Clean UI operacional</CardTitle>
+              <CardDescription>A experiência simplificada é o padrão. Desative globalmente ou por empresa para restaurar o layout anterior, sem alterar dados, permissões ou histórico.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form action={updateCleanUiOperationalSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="cleanUiOperationalEnabled" value="true" defaultChecked={cleanUiOperationalEnabled} className="size-4" /><span><span className="font-medium">Nova interface disponível</span><span className="block text-xs text-muted-foreground">Ativa para todas as empresas, exceto as que forem mantidas no layout anterior abaixo.</span></span></label>
+                  <Button type="submit" variant={cleanUiOperationalEnabled ? "outline" : "default"}>{cleanUiOperationalEnabled ? "Salvar controle" : "Ativar para todas"}</Button>
+                </form>
+                <div className="divide-y divide-border rounded-lg border border-border">
+                  {tenants.map((tenant) => { const usingLegacyLayout = cleanUiLegacyTenantIds.includes(tenant.id); return <form action={updateCleanUiOperationalLegacyTenantAction} key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">{usingLegacyLayout ? "Usa o layout anterior." : "Usa a nova operação."}</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={usingLegacyLayout ? "false" : "true"} /><Button size="sm" type="submit" variant={usingLegacyLayout ? "outline" : "default"}>{usingLegacyLayout ? "Usar nova interface" : "Usar layout anterior"}</Button></form>; })}
+                </div>
               </CardContent>
             </Card>
             <Card className="border-border bg-card shadow-none">
