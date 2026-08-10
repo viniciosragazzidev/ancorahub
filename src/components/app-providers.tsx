@@ -26,20 +26,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }));
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js", {
-        scope: "/",
-        updateViaCache: "none",
-      }).then(
-        (reg) => {
-          // Checks the latest worker on every application boot. This lets a
-          // cache-policy recovery reach already-open CRM sessions promptly.
-          void reg.update();
-          console.log("SW registrado com sucesso:", reg.scope);
-        },
-        (err) => console.error("Falha no SW:", err)
-      );
-    }
+    if (!("serviceWorker" in navigator)) return;
+
+    // Emergency PWA recovery: a previously installed worker can keep an App
+    // Router transition on its loading boundary even after a deployment.
+    // The CRM must always prefer live operational pages over offline caching.
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+      .catch(() => undefined);
   }, []);
 
   return (
