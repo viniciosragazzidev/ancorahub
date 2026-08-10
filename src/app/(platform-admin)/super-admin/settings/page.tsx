@@ -1,9 +1,10 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateCleanUiOperationalSettingsAction, updateCleanUiOperationalLegacyTenantAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateMetaLeadAdsPilotAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updateTenantCustomRolesPilotAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
-import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
-import { getMetaLeadAdsPilotTenantIds, META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
+import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -11,33 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
-import { getDatabase, schema } from "@/shared/db";
-import { eq } from "drizzle-orm";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
 
 export const dynamic = "force-dynamic";
-
-type MissingRelationError = { code?: string; cause?: { code?: string } };
-
-function isMissingCustomRolesSchema(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const databaseError = error as MissingRelationError;
-  return databaseError.code === "42P01" || databaseError.cause?.code === "42P01";
-}
-
-async function getCustomRolesPilotTenants() {
-  try {
-    const tenants = await getDatabase()
-      .select({ id: schema.tenants.id, name: schema.tenants.name, enabled: schema.tenantCustomRoleSettings.enabled })
-      .from(schema.tenants)
-      .leftJoin(schema.tenantCustomRoleSettings, eq(schema.tenantCustomRoleSettings.tenantId, schema.tenants.id))
-      .orderBy(schema.tenants.name);
-    return { tenants, available: true };
-  } catch (error) {
-    if (isMissingCustomRolesSchema(error)) return { tenants: [], available: false };
-    throw error;
-  }
-}
 
 export default async function SuperAdminSettingsPage() {
   const settings = await getSystemSettings([
@@ -93,8 +70,7 @@ export default async function SuperAdminSettingsPage() {
     "ai_google_api_key",
     "ai_openrouter_api_key",
   ]);
-  const [notificationCapabilities, customRolesPilot, metaLeadAdsPilotTenantIds, cleanUiLegacyTenantIds, tenants] = await Promise.all([getNotificationCapabilityStates(), getCustomRolesPilotTenants(), getMetaLeadAdsPilotTenantIds(), getCleanUiOperationalLegacyTenantIds(), getDatabase().select({ id: schema.tenants.id, name: schema.tenants.name }).from(schema.tenants).orderBy(schema.tenants.name)]);
-  const pilotTenants = customRolesPilot.tenants;
+  const [notificationCapabilities] = await Promise.all([getNotificationCapabilityStates()]);
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
   const centralEnabled = settingMap.get("feature_central_atencao_enabled") !== "false";
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
@@ -158,7 +134,7 @@ export default async function SuperAdminSettingsPage() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Parâmetros Globais</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ajuste as configurações gerais da plataforma CorreTop.
+              Ajuste as configurações globais da plataforma CorreTop.
             </p>
           </div>
         </section>
@@ -189,12 +165,10 @@ export default async function SuperAdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <form action={updateCleanUiOperationalSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="cleanUiOperationalEnabled" value="true" defaultChecked={cleanUiOperationalEnabled} className="size-4" /><span><span className="font-medium">Nova interface disponível</span><span className="block text-xs text-muted-foreground">Ativa para todas as empresas, exceto as que forem mantidas no layout anterior abaixo.</span></span></label>
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="cleanUiOperationalEnabled" value="true" defaultChecked={cleanUiOperationalEnabled} className="size-4" /><span><span className="font-medium">Nova interface disponível</span><span className="block text-xs text-muted-foreground">Ativa para todas as empresas. Exceções são gerenciadas no detalhe da empresa.</span></span></label>
                   <Button type="submit" variant={cleanUiOperationalEnabled ? "outline" : "default"}>{cleanUiOperationalEnabled ? "Salvar controle" : "Ativar para todas"}</Button>
                 </form>
-                <div className="divide-y divide-border rounded-lg border border-border">
-                  {tenants.map((tenant) => { const usingLegacyLayout = cleanUiLegacyTenantIds.includes(tenant.id); return <form action={updateCleanUiOperationalLegacyTenantAction} key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">{usingLegacyLayout ? "Usa o layout anterior." : "Usa a nova operação."}</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={usingLegacyLayout ? "false" : "true"} /><Button size="sm" type="submit" variant={usingLegacyLayout ? "outline" : "default"}>{usingLegacyLayout ? "Usar nova interface" : "Usar layout anterior"}</Button></form>; })}
-                </div>
+                <Button render={<Link href="/super-admin/tenants" />} size="sm" variant="ghost">Gerenciar exceções por empresa</Button>
               </CardContent>
             </Card>
             <Card className="border-border bg-card shadow-none">
@@ -215,25 +189,7 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant="outline">Salvar controle</Button>
                 </form>
-                {customRolesPilot.available ? (
-                  <div className="divide-y divide-border rounded-lg border border-border">
-                    {pilotTenants.map((tenant) => (
-                      <form action={updateTenantCustomRolesPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium">{tenant.name}</p>
-                          <p className="text-xs text-muted-foreground">Piloto por tenant e auditoria de alteração.</p>
-                        </div>
-                        <input type="hidden" name="tenantId" value={tenant.id} />
-                        <input type="hidden" name="enabled" value={tenant.enabled ? "false" : "true"} />
-                        <Button size="sm" type="submit" variant={tenant.enabled ? "outline" : "default"}>{tenant.enabled ? "Remover do piloto" : "Liberar piloto"}</Button>
-                      </form>
-                    ))}
-                  </div>
-                ) : (
-                  <p role="status" className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                    A estrutura de cargos ainda está sendo aplicada. As demais configurações permanecem disponíveis.
-                  </p>
-                )}
+                <Button render={<Link href="/super-admin/tenants" />} size="sm" variant="ghost">Gerenciar piloto por empresa</Button>
               </CardContent>
             </Card>
 
@@ -253,7 +209,7 @@ export default async function SuperAdminSettingsPage() {
             </Card>
 
             <Card className="border-border bg-card shadow-none">
-              <CardHeader><CardTitle>Perfil pessoal do usuário</CardTitle><CardDescription>Libera a área "Meu perfil" para todos os usuários editarem nome, foto, senha, sessões e consultarem o histórico de atividades de sua conta.</CardDescription></CardHeader>
+              <CardHeader><CardTitle>Perfil pessoal do usuário</CardTitle><CardDescription>Libera a área &quot;Meu perfil&quot; para todos os usuários editarem nome, foto, senha, sessões e consultarem o histórico de atividades de sua conta.</CardDescription></CardHeader>
               <CardContent><form action={updateUserProfileSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="userProfileEnabled" value="true" defaultChecked={userProfileEnabled} className="size-4" /><span><span className="font-medium">Área de perfil habilitada</span><span className="block text-xs text-muted-foreground">Desativar bloqueia a rota e remove o atalho, preservando auditoria e histórico.</span></span></label><Button type="submit" variant={userProfileEnabled ? "outline" : "default"}>{userProfileEnabled ? "Salvar controle" : "Liberar perfil"}</Button></form></CardContent>
             </Card>
 
@@ -656,8 +612,8 @@ export default async function SuperAdminSettingsPage() {
               <CardContent><form action={updateMetaLeadAdsPlatformIdentityAction} className="grid gap-4 md:grid-cols-3"><label className="grid gap-1 text-sm font-medium">Nome do parceiro<Input name="partnerName" defaultValue={metaLeadAdsPartnerName} /></label><label className="grid gap-1 text-sm font-medium">Business ID público<Input name="businessId" defaultValue={metaLeadAdsBusinessId} inputMode="numeric" /></label><label className="grid gap-1 text-sm font-medium">WhatsApp de suporte<Input name="supportWhatsApp" defaultValue={metaLeadAdsSupportWhatsApp} /></label><div className="md:col-span-3"><Button type="submit">Salvar dados públicos</Button></div></form></CardContent>
             </Card>
             <Card className="border-border bg-card shadow-none">
-              <CardHeader><CardTitle>Piloto de Lead Ads por empresa</CardTitle><CardDescription>O kill switch global preserva fontes e histórico. Esta lista decide quais empresas podem abrir o assistente de descoberta de ativos.</CardDescription></CardHeader>
-              <CardContent className="space-y-2">{tenants.map((tenant) => { const enabled = metaLeadAdsPilotTenantIds.includes(tenant.id); return <form action={updateMetaLeadAdsPilotAction} key={tenant.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"><div><p className="text-sm font-medium">{tenant.name}</p><p className="text-xs text-muted-foreground">{enabled ? "Pode buscar e ativar Páginas." : "Bloqueada fora do piloto."}</p></div><input type="hidden" name="tenantId" value={tenant.id} /><input type="hidden" name="enabled" value={enabled ? "false" : "true"} /><Button size="sm" type="submit" variant={enabled ? "outline" : "default"}>{enabled ? "Remover do piloto" : "Liberar piloto"}</Button></form>; })}</CardContent>
+              <CardHeader><CardTitle>Liberação por empresa</CardTitle><CardDescription>O controle global acima protege toda a plataforma. Para liberar Lead Ads a uma corretora, abra a empresa e use a área “Pilotos e permissões”.</CardDescription></CardHeader>
+              <CardContent><Button render={<Link href="/super-admin/tenants" />} variant="outline">Abrir empresas</Button></CardContent>
             </Card>
           </SuperAdminSettingsTabs>
         </Suspense>

@@ -500,3 +500,16 @@ frequente permanece visível e o restante aparece no contexto necessário. O
 Super-admin pode desligar a capacidade para toda a plataforma ou devolver uma empresa
 específica ao layout anterior. Ambas as alterações são auditadas; o fallback não exige
 migração nem remove histórico.
+
+## DEC-073 — Governança individual centralizada no detalhe da empresa
+
+**Estado:** Aceita
+**Data:** 2026-08-10
+
+Configurações da plataforma mantêm apenas controles globais e dados técnicos
+compartilhados. Liberações que dependem de uma empresa, incluindo piloto de Facebook
+Lead Ads, exceção de interface operacional e piloto de cargos personalizados, ficam
+na página individual do tenant. O Super-admin continua sendo a única autoridade para
+essas alterações; cada ação valida a empresa no servidor, registra auditoria de
+plataforma e pode ser revertida sem excluir histórico. Uma liberação individual não
+substitui nem ignora o kill switch global correspondente.

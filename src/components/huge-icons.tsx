@@ -156,6 +156,8 @@ const aliases: Record<string, string> = {
   HelpCircle: "HelpCircleIcon",
   Megaphone: "MegaphoneIcon",
   ShareAll: "ShareAllIcon",
+  ArrowsOut: "Expand01Icon",
+  ArrowsIn: "Shrink01Icon",
 };
 
 function resolveIcon(name: string): HugeIconProps["icon"] {
@@ -392,3 +394,5 @@ export const Megaphone = staticAnimated("Megaphone");
 export const ShareAll = staticAnimated("ShareAll");
 export const Sparkle = staticAnimated("Sparkle");
 export const Redistribute = staticAnimated("Redistribute");
+export const ArrowsOut = staticAnimated("ArrowsOut");
+export const ArrowsIn = staticAnimated("ArrowsIn");

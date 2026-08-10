@@ -29,6 +29,20 @@ import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
 
+async function requirePlatformTenantTarget(tenantId: string) {
+  const parsedTenantId = z.string().uuid().safeParse(tenantId);
+  if (!parsedTenantId.success) throw new Error("Empresa inválida.");
+
+  const [tenant] = await getDatabase()
+    .select({ id: schema.tenants.id })
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, parsedTenantId.data))
+    .limit(1);
+
+  if (!tenant) throw new Error("Empresa não encontrada.");
+  return tenant.id;
+}
+
 function boundedDistributionSetting(value: FormDataEntryValue | null, fallback: number, min: number, max: number) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= min && parsed <= max ? String(parsed) : String(fallback);
@@ -151,9 +165,10 @@ export async function updateCleanUiOperationalSettingsAction(formData: FormData)
   revalidatePath("/super-admin/settings");
 }
 
-export async function updateCleanUiOperationalLegacyTenantAction(formData: FormData) {
+export async function updateCleanUiOperationalLegacyTenantAction(tenantId: string, formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
-  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
   const now = new Date();
   const current = await getSystemSetting(CLEAN_UI_LEGACY_TENANTS_SETTING);
   let tenantIds: string[] = [];
@@ -161,14 +176,15 @@ export async function updateCleanUiOperationalLegacyTenantAction(formData: FormD
     const parsed: unknown = JSON.parse(current ?? "[]");
     if (Array.isArray(parsed)) tenantIds = parsed.filter((value): value is string => typeof value === "string");
   } catch { /* start from a safe empty exception list */ }
-  const updated = input.enabled === "true" ? [...new Set([...tenantIds, input.tenantId])] : tenantIds.filter((tenantId) => tenantId !== input.tenantId);
+  const updated = input.enabled === "true" ? [...new Set([...tenantIds, targetTenantId])] : tenantIds.filter((storedTenantId) => storedTenantId !== targetTenantId);
   await setSystemSetting(CLEAN_UI_LEGACY_TENANTS_SETTING, JSON.stringify(updated), now);
   await getDatabase().insert(schema.platformAuditLogs).values({
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "clean_ui_operational.tenant_fallback_updated",
-    targetType: "tenant", targetId: input.tenantId, metadata: { usingLegacyLayout: input.enabled === "true" }, createdAt: now,
+    targetType: "tenant", targetId: targetTenantId, metadata: { usingLegacyLayout: input.enabled === "true" }, createdAt: now,
   });
   revalidatePath("/dashboard");
   revalidatePath("/super-admin/settings");
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateInterfaceMotionSettingsAction(formData: FormData) {
@@ -242,18 +258,20 @@ export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData
   revalidatePath("/super-admin/settings"); revalidatePath("/settings/meta");
 }
 
-export async function updateMetaLeadAdsPilotAction(formData: FormData) {
+export async function updateMetaLeadAdsPilotAction(tenantId: string, formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
-  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
   const key = META_LEAD_ADS_PLATFORM_SETTINGS.pilotTenantIds;
   const current = await getSystemSetting(key);
   let ids: string[] = [];
   try { const parsed: unknown = JSON.parse(current ?? "[]"); if (Array.isArray(parsed)) ids = parsed.filter((value): value is string => typeof value === "string"); } catch { /* recover to a safe empty pilot */ }
-  const next = input.enabled === "true" ? [...new Set([...ids, input.tenantId])] : ids.filter((id) => id !== input.tenantId);
+  const next = input.enabled === "true" ? [...new Set([...ids, targetTenantId])] : ids.filter((id) => id !== targetTenantId);
   const now = new Date();
   await setSystemSetting(key, JSON.stringify(next), now);
-  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.tenant_pilot_updated", targetType: "tenant", targetId: input.tenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now });
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.tenant_pilot_updated", targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now });
   revalidatePath("/super-admin/settings"); revalidatePath("/settings/meta");
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateNotificationCapabilityAction(formData: FormData) {
@@ -668,15 +686,17 @@ export async function updateCustomRolesGlobalSettingsAction(formData: FormData) 
   revalidatePath("/equipe/cargos");
 }
 
-export async function updateTenantCustomRolesPilotAction(formData: FormData) {
+export async function updateTenantCustomRolesPilotAction(tenantId: string, formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
-  const input = z.object({ tenantId: z.string().uuid(), enabled: z.enum(["true", "false"]) }).parse({ tenantId: formData.get("tenantId"), enabled: formData.get("enabled") });
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
   const now = new Date();
-  if (input.enabled === "true") await provisionDefaultMarketingRole({ tenantId: input.tenantId, actorUserId: admin.userId });
-  await getDatabase().insert(schema.tenantCustomRoleSettings).values({ tenantId: input.tenantId, enabled: input.enabled === "true", updatedBy: admin.userId, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: schema.tenantCustomRoleSettings.tenantId, set: { enabled: input.enabled === "true", updatedBy: admin.userId, updatedAt: now } });
-  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.tenant_pilot_updated", targetType: "tenant", targetId: input.tenantId, metadata: { enabled: input.enabled }, createdAt: now });
+  if (input.enabled === "true") await provisionDefaultMarketingRole({ tenantId: targetTenantId, actorUserId: admin.userId });
+  await getDatabase().insert(schema.tenantCustomRoleSettings).values({ tenantId: targetTenantId, enabled: input.enabled === "true", updatedBy: admin.userId, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: schema.tenantCustomRoleSettings.tenantId, set: { enabled: input.enabled === "true", updatedBy: admin.userId, updatedAt: now } });
+  await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.tenant_pilot_updated", targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled }, createdAt: now });
   revalidatePath("/super-admin/settings");
   revalidatePath("/equipe/cargos");
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {
