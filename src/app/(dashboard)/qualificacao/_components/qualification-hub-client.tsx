@@ -261,12 +261,21 @@ export function QualificationHubClient({
   ];
 
   const requestedTab = searchParams.get("tab");
-  const activeTab = tabs.some((t) => t.id === requestedTab) ? requestedTab! : "overview";
+  const [selectedTab, setSelectedTab] = useState<string | null>(null);
+
+  const activeTab = selectedTab ?? (tabs.some((t) => t.id === requestedTab) ? requestedTab! : "overview");
 
   const handleSelectTab = (tabId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tabId);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setSelectedTab(tabId);
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tabId);
+      const newUrl = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+      router.replace(newUrl, { scroll: false });
+    } catch (e) {
+      // Fallback
+    }
   };
 
   // Follow-up Rule Form State
