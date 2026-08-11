@@ -19,21 +19,21 @@ export function RouteNotFound({
 }) {
   return (
     <main
-      className="mx-auto flex min-h-[70vh] w-full max-w-xl flex-col items-center justify-center px-4 py-12 text-center"
+      className="mx-auto flex min-h-[75vh] w-full max-w-2xl flex-col items-center justify-center px-4 py-8 text-center"
       aria-labelledby="not-found-title"
     >
-      <div className="relative mb-6 flex items-center justify-center">
+      <div className="relative mb-6 flex items-center justify-center w-full">
         <Image
           src={imageSrc}
           alt="404 - Página não encontrada"
-          width={380}
-          height={320}
+          width={560}
+          height={460}
           priority
-          className="h-auto max-w-[280px] sm:max-w-[360px] object-contain drop-shadow-md transition-transform duration-300 hover:scale-[1.02]"
+          className="h-auto max-w-[360px] sm:max-w-[520px] md:max-w-[580px] object-contain transition-transform duration-300 hover:scale-[1.02]"
         />
       </div>
 
-      <div className="space-y-2.5 max-w-md">
+      <div className="space-y-2.5 max-w-lg">
         <h1 id="not-found-title" className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
           {title}
         </h1>
