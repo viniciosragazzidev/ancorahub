@@ -8,7 +8,9 @@ import {
   Brain,
   CheckCircle,
   Clock,
+  CursorClick,
   Funnel,
+  Hand,
   LinkSimple,
   MagnifyingGlass,
   Play,
@@ -407,7 +409,7 @@ export function WorkflowAutomationStudio({
   );
 
   return (
-    <div className="flex h-[calc(100dvh-12.5rem)] min-h-[34rem] max-h-[60rem] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <div className="flex flex-1 w-full h-full min-h-0 flex-col overflow-hidden bg-card">
       <header className="flex shrink-0 flex-col gap-4 border-b border-border/80 bg-card px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -436,38 +438,46 @@ export function WorkflowAutomationStudio({
         <div className="flex flex-wrap items-center gap-2">
           <div
             aria-label="Modo do cursor"
-            className="inline-flex items-center rounded-lg border border-border/80 bg-muted/40 p-1"
+            className="inline-flex items-center rounded-lg border border-border/80 bg-muted/40 p-1 gap-1"
           >
-            <Button
-              aria-pressed={canvasMode === "move"}
-              title="Mover: arraste uma área vazia para navegar pelo canvas sem alterar os nós."
-              className="h-7 px-2 text-[11px]"
-              size="sm"
-              variant={canvasMode === "move" ? "secondary" : "ghost"}
-              onClick={() => changeCanvasMode("move")}
-            >
-              Mover
-            </Button>
-            <Button
-              aria-pressed={canvasMode === "node"}
-              title="Nós: selecione uma etapa e arraste-a para reorganizar o fluxo."
-              className="h-7 px-2 text-[11px]"
-              size="sm"
-              variant={canvasMode === "node" ? "secondary" : "ghost"}
-              onClick={() => changeCanvasMode("node")}
-            >
-              Nós
-            </Button>
-            <Button
-              aria-pressed={canvasMode === "connect"}
-              title="Conectar: escolha um nó de origem e depois a próxima etapa compatível."
-              className="h-7 px-2 text-[11px]"
-              size="sm"
-              variant={canvasMode === "connect" ? "secondary" : "ghost"}
-              onClick={() => changeCanvasMode("connect")}
-            >
-              Conectar
-            </Button>
+            <HelpTip content="Mover: arraste uma área vazia para navegar pelo canvas sem alterar os nós.">
+              <Button
+                aria-label="Modo Mover"
+                aria-pressed={canvasMode === "move"}
+                size="icon"
+                className="size-7"
+                variant={canvasMode === "move" ? "secondary" : "ghost"}
+                onClick={() => changeCanvasMode("move")}
+              >
+                <Hand className="size-4" />
+              </Button>
+            </HelpTip>
+
+            <HelpTip content="Nós: selecione uma etapa e arraste-a para reorganizar o fluxo.">
+              <Button
+                aria-label="Modo Nós"
+                aria-pressed={canvasMode === "node"}
+                size="icon"
+                className="size-7"
+                variant={canvasMode === "node" ? "secondary" : "ghost"}
+                onClick={() => changeCanvasMode("node")}
+              >
+                <CursorClick className="size-4" />
+              </Button>
+            </HelpTip>
+
+            <HelpTip content="Conectar: escolha um nó de origem e depois a próxima etapa compatível.">
+              <Button
+                aria-label="Modo Conectar"
+                aria-pressed={canvasMode === "connect"}
+                size="icon"
+                className="size-7"
+                variant={canvasMode === "connect" ? "secondary" : "ghost"}
+                onClick={() => changeCanvasMode("connect")}
+              >
+                <LinkSimple className="size-4" />
+              </Button>
+            </HelpTip>
           </div>
           <Button variant="outline" size="sm" onClick={undo} disabled={!history.length}>
             Desfazer

@@ -31,16 +31,18 @@ export default async function AutomacoesPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Automação" title="Automações" />
-      <main className="flex-1 space-y-4 p-4 lg:p-6">
-      <section className="flex flex-col gap-1 border-b border-border/70 pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <p className="text-sm text-muted-foreground">Desenhe regras comerciais por etapas, valide o fluxo e publique somente quando estiver pronto.</p>
-        <p className="text-xs text-muted-foreground">O rascunho permanece local enquanto você edita.</p>
-      </section>
-      <WorkflowAutomationStudio initialWorkflows={workflows} />
-      <details className="rounded-xl border border-border bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">Automações anteriores e histórico de envios</summary>
-        <AutomationsClient initialAutomations={automations} initialLogs={logs} isAdmin={true} />
-      </details>
+      <main className="min-h-0 w-full flex-1 bg-background p-0">
+        <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] w-full overflow-hidden bg-card flex flex-col">
+          <WorkflowAutomationStudio initialWorkflows={workflows} />
+          <details className="border-t border-border bg-card">
+            <summary className="cursor-pointer px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
+              Automações anteriores e histórico de envios
+            </summary>
+            <div className="p-4 border-t border-border/60">
+              <AutomationsClient initialAutomations={automations} initialLogs={logs} isAdmin={true} />
+            </div>
+          </details>
+        </div>
       </main>
     </>
   );
