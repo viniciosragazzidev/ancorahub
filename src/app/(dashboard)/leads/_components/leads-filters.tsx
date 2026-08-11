@@ -181,7 +181,7 @@ export function LeadsFilters({
               )}
             </div>
 
-            <ScrollArea className="max-h-[380px] p-4">
+            <ScrollArea className="max-h-[65dvh] p-4">
               <div className="space-y-4">
                 {/* Tipo (PF / PME) - Segmented Control */}
                 <div className="space-y-1.5">
