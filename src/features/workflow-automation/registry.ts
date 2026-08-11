@@ -1,25 +1,23 @@
-import type { WorkflowNodeDefinition, WorkflowNodeKind } from "./contracts";
+import type { WorkflowNodeDefinition, WorkflowNodeKind, WorkflowPort } from "./contracts";
+
+const contextInput: WorkflowPort = { id: "default", label: "Entrada", direction: "input", dataType: "workflow-context", maxConnections: 1 };
+const contextOutput: WorkflowPort = { id: "default", label: "Continuar", direction: "output", dataType: "workflow-context", maxConnections: 1 };
 
 const definitions: readonly WorkflowNodeDefinition[] = [
-  { kind: "trigger.lead_created", label: "Novo lead", description: "Inicia quando uma oportunidade é recebida.", category: "trigger", editableFields: ["source"], requiredPermissions: ["acessar_leads"] },
-  { kind: "trigger.lead_updated", label: "Lead atualizado", description: "Inicia após uma atualização permitida no lead.", category: "trigger", editableFields: ["fields"], requiredPermissions: ["acessar_leads"] },
-  { kind: "trigger.manual", label: "Execução manual", description: "Inicia apenas em teste ou por ação autorizada.", category: "trigger", editableFields: [], requiredPermissions: ["acessar_configuracoes"] },
-  { kind: "logic.condition", label: "Condição", description: "Encaminha o fluxo conforme regras de dados.", category: "logic", editableFields: ["match", "conditions"], requiredPermissions: [] },
-  { kind: "logic.switch", label: "Escolher caminho", description: "Divide o fluxo por um valor conhecido.", category: "logic", editableFields: ["expression", "cases"], requiredPermissions: [] },
-  { kind: "control.delay", label: "Aguardar", description: "Pausa uma execução para continuar depois.", category: "control", editableFields: ["duration", "timezone"], requiredPermissions: [] },
-  { kind: "crm.create_task", label: "Criar tarefa", description: "Cria uma tarefa rastreável para a equipe.", category: "crm", editableFields: ["title", "dueInMinutes", "assignee"], requiredPermissions: ["acessar_tarefas"] },
-  { kind: "crm.add_tag", label: "Adicionar etiqueta", description: "Inclui uma etiqueta autorizada no lead.", category: "crm", editableFields: ["tag"], requiredPermissions: ["acessar_leads"] },
-  { kind: "crm.notify_manager", label: "Notificar gestor", description: "Cria um alerta interno para a operação.", category: "crm", editableFields: ["message"], requiredPermissions: ["acessar_notificacoes"] },
-  { kind: "ai.classify_lead", label: "Classificar com IA", description: "Propõe uma classificação estruturada; não altera o lead sozinha.", category: "ai", editableFields: ["prompt", "outputSchema"], requiredPermissions: ["acessar_qualificacao_ia"], requiresFeatureFlag: "feature_workflow_ai_nodes_enabled" },
-  { kind: "channel.whatsapp_send", label: "Enviar WhatsApp", description: "Canal externo sujeito a consentimento, janela e aprovação de template.", category: "channel", editableFields: ["template", "message"], requiredPermissions: ["configurar_whatsapp_proprio"], requiresFeatureFlag: "feature_workflow_whatsapp_nodes_enabled", requiresHumanConfirmation: true },
+  { kind: "trigger.lead_created", label: "Novo lead", description: "Inicia quando uma oportunidade é recebida.", category: "trigger", editableFields: ["source"], ports: [{ id: "default", label: "Lead recebido", direction: "output", dataType: "lead", maxConnections: 1 }], requiredPermissions: ["acessar_leads"] },
+  { kind: "trigger.lead_updated", label: "Lead atualizado", description: "Inicia após uma atualização permitida no lead.", category: "trigger", editableFields: ["fields"], ports: [{ id: "default", label: "Lead atualizado", direction: "output", dataType: "lead", maxConnections: 1 }], requiredPermissions: ["acessar_leads"] },
+  { kind: "trigger.manual", label: "Execução manual", description: "Inicia apenas em teste ou por ação autorizada.", category: "trigger", editableFields: [], ports: [{ id: "default", label: "Iniciar", direction: "output", dataType: "workflow-context", maxConnections: 1 }], requiredPermissions: ["acessar_configuracoes"] },
+  { kind: "logic.condition", label: "Condição", description: "Encaminha o fluxo conforme uma regra de dados.", category: "logic", editableFields: ["match"], requiredConfig: ["match"], ports: [contextInput, { id: "true", label: "Sim", direction: "output", dataType: "workflow-context", maxConnections: 1 }, { id: "false", label: "Não", direction: "output", dataType: "workflow-context", maxConnections: 1 }], requiredPermissions: [] },
+  { kind: "logic.switch", label: "Escolher caminho", description: "Divide o fluxo por um valor conhecido.", category: "logic", editableFields: ["expression"], requiredConfig: ["expression"], ports: [contextInput, contextOutput], requiredPermissions: [] },
+  { kind: "control.delay", label: "Aguardar", description: "Pausa uma execução para continuar depois.", category: "control", editableFields: ["duration"], requiredConfig: ["duration"], ports: [contextInput, contextOutput], requiredPermissions: [] },
+  { kind: "crm.create_task", label: "Criar tarefa", description: "Cria uma tarefa rastreável para a equipe.", category: "crm", editableFields: ["title", "dueInMinutes", "assignee"], requiredConfig: ["title"], ports: [contextInput, { id: "default", label: "Tarefa criada", direction: "output", dataType: "task", maxConnections: 1 }], requiredPermissions: ["acessar_tarefas"] },
+  { kind: "crm.add_tag", label: "Adicionar etiqueta", description: "Inclui uma etiqueta autorizada no lead.", category: "crm", editableFields: ["tag"], requiredConfig: ["tag"], ports: [contextInput, { id: "default", label: "Concluído", direction: "output", dataType: "lead", maxConnections: 1 }], requiredPermissions: ["acessar_leads"] },
+  { kind: "crm.notify_manager", label: "Notificar gestor", description: "Cria um alerta interno para a operação.", category: "crm", editableFields: ["message"], requiredConfig: ["message"], ports: [contextInput, { id: "default", label: "Alerta criado", direction: "output", dataType: "void", maxConnections: 1 }], requiredPermissions: ["acessar_notificacoes"] },
+  { kind: "ai.classify_lead", label: "Classificar com IA", description: "Propõe uma classificação estruturada; não altera o lead sozinha.", category: "ai", editableFields: ["prompt"], requiredConfig: ["prompt"], ports: [{ id: "default", label: "Entrada", direction: "input", dataType: "lead", maxConnections: 1 }, { id: "default", label: "Classificação", direction: "output", dataType: "classification", maxConnections: 1 }], requiredPermissions: ["acessar_qualificacao_ia"], requiresFeatureFlag: "feature_workflow_ai_nodes_enabled" },
+  { kind: "channel.whatsapp_send", label: "Enviar WhatsApp", description: "Canal externo sujeito a consentimento, janela e aprovação de template.", category: "channel", editableFields: ["template", "message"], requiredConfig: ["template"], ports: [{ id: "default", label: "Entrada", direction: "input", dataType: "lead", maxConnections: 1 }, { id: "default", label: "Enviado", direction: "output", dataType: "void", maxConnections: 1 }], requiredPermissions: ["configurar_whatsapp_proprio"], requiresFeatureFlag: "feature_workflow_whatsapp_nodes_enabled", requiresHumanConfirmation: true },
 ];
 
 const byKind = new Map(definitions.map((definition) => [definition.kind, definition]));
 
-export function listWorkflowNodeDefinitions() {
-  return definitions;
-}
-
-export function getWorkflowNodeDefinition(kind: WorkflowNodeKind) {
-  return byKind.get(kind);
-}
+export function listWorkflowNodeDefinitions() { return definitions; }
+export function getWorkflowNodeDefinition(kind: WorkflowNodeKind) { return byKind.get(kind); }

@@ -20,11 +20,20 @@ export type WorkflowNode = {
   position: { x: number; y: number };
   config: Record<string, unknown>;
 };
+export type WorkflowPortDirection = "input" | "output";
+export type WorkflowPort = {
+  id: string;
+  label: string;
+  direction: WorkflowPortDirection;
+  dataType: "workflow-context" | "lead" | "task" | "classification" | "void";
+  maxConnections?: number;
+};
 export type WorkflowEdge = {
   id: string;
   source: string;
   target: string;
   sourceHandle?: "default" | "true" | "false" | "error" | string;
+  targetHandle?: "default" | string;
 };
 export type WorkflowDefinition = {
   schemaVersion: 1;
@@ -38,13 +47,15 @@ export type WorkflowNodeDefinition = {
   description: string;
   category: WorkflowNodeCategory;
   editableFields: readonly string[];
+  requiredConfig?: readonly string[];
+  ports: readonly WorkflowPort[];
   requiredPermissions: readonly string[];
   requiresFeatureFlag?: string;
   requiresHumanConfirmation?: boolean;
 };
 
 export type WorkflowValidationIssue = {
-  code: "missing_trigger" | "multiple_triggers" | "invalid_edge" | "unreachable_node" | "cycle" | "unsupported_node" | "protected_action" | "feature_disabled";
+  code: "missing_trigger" | "multiple_triggers" | "invalid_edge" | "invalid_connection" | "unreachable_node" | "cycle" | "unsupported_node" | "protected_action" | "configuration_missing" | "dangling_branch" | "feature_disabled";
   message: string;
   nodeId?: string;
   edgeId?: string;

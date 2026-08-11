@@ -16,4 +16,21 @@ describe("workflow definition validation", () => {
     ], edges: [] });
     expect(issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(["unreachable_node", "protected_action"]));
   });
+
+  it("rejects incomplete configuration and an unconnected condition branch", () => {
+    const issues = validateWorkflowDefinition({ schemaVersion: 1, nodes: [
+      { id: "trigger", kind: "trigger.manual", position: { x: 0, y: 0 }, config: {} },
+      { id: "condition", kind: "logic.condition", position: { x: 200, y: 0 }, config: {} },
+    ], edges: [{ id: "edge", source: "trigger", target: "condition" }] });
+    expect(issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(["configuration_missing", "dangling_branch"]));
+  });
+
+  it("rejects incompatible typed ports during server-side validation", () => {
+    const issues = validateWorkflowDefinition({ schemaVersion: 1, nodes: [
+      { id: "trigger", kind: "trigger.manual", position: { x: 0, y: 0 }, config: {} },
+      { id: "task", kind: "crm.create_task", position: { x: 200, y: 0 }, config: { title: "Retornar" } },
+      { id: "ai", kind: "ai.classify_lead", position: { x: 400, y: 0 }, config: { prompt: "Classificar" } },
+    ], edges: [{ id: "first", source: "trigger", target: "task" }, { id: "second", source: "task", target: "ai" }] });
+    expect(issues.map((issue) => issue.code)).toContain("invalid_connection");
+  });
 });

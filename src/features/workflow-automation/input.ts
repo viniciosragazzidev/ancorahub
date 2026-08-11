@@ -17,6 +17,7 @@ export const workflowDefinitionSchema = z.object({
     source: z.string().trim().min(1).max(100),
     target: z.string().trim().min(1).max(100),
     sourceHandle: z.string().trim().min(1).max(50).optional(),
+    targetHandle: z.string().trim().min(1).max(50).optional(),
   })).max(200),
 }) satisfies z.ZodType<WorkflowDefinition>;
 
