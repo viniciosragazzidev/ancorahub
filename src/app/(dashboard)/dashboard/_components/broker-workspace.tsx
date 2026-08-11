@@ -23,6 +23,7 @@ import { BrokerAvailabilityButton } from "@/app/(dashboard)/minha-fila/_componen
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
 import { BrokerWorkspaceActionButtons, BrokerWorkspaceTaskCompleteButton } from "./broker-workspace-actions";
+import { ScrollContain } from "./scroll-contain";
 
 // Altura máxima (px) da lista do card "Minha fila prioritária" antes de ativar o scroll.
 // Ajuste aqui o valor padrão ou passe `queueMaxHeight` no <BrokerWorkspace>.
@@ -116,15 +117,17 @@ export function BrokerWorkspace({
               <div className="min-w-0 flex-1"><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
               <Button render={<Link href="/minha-fila" />} size="sm" variant="ghost" className="shrink-0">Ver fila <ArrowRight aria-hidden="true" /></Button>
             </CardHeader>
-            <CardContent className="overflow-y-auto overscroll-contain pr-1" style={{ maxHeight: queueMaxHeight }}>
-              {data.queue.length ? <div className="divide-y divide-border/60">
-                {data.queue.map((lead) => <Link className="group flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-primary" href={`/leads/${lead.id}`} key={lead.id}>
-                  <span className={cn("size-2 shrink-0 rounded-full", lead.nextAction?.severity === "critical" ? "bg-destructive" : lead.nextAction?.severity === "warning" ? "bg-warning" : "bg-muted-foreground")} />
-                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{lead.name}</span><span className="block truncate text-xs text-muted-foreground">{lead.nextAction?.description ?? "Sem pendência imediata"}</span></span>
-                  <LeadStatusBadge status={lead.status} />
-                  <ArrowRight aria-hidden="true" className="size-4 text-muted-foreground group-hover:text-primary" />
-                </Link>)}
-              </div> : <EmptyWorkspaceState icon={ListChecks} message="Quando você receber leads, eles aparecerão aqui por prioridade." />}
+            <CardContent className="p-0">
+              <ScrollContain className="px-6 pb-6 pr-5" style={{ maxHeight: queueMaxHeight }}>
+                {data.queue.length ? <div className="divide-y divide-border/60">
+                  {data.queue.map((lead) => <Link className="group flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-primary" href={`/leads/${lead.id}`} key={lead.id}>
+                    <span className={cn("size-2 shrink-0 rounded-full", lead.nextAction?.severity === "critical" ? "bg-destructive" : lead.nextAction?.severity === "warning" ? "bg-warning" : "bg-muted-foreground")} />
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{lead.name}</span><span className="block truncate text-xs text-muted-foreground">{lead.nextAction?.description ?? "Sem pendência imediata"}</span></span>
+                    <LeadStatusBadge status={lead.status} />
+                    <ArrowRight aria-hidden="true" className="size-4 text-muted-foreground group-hover:text-primary" />
+                  </Link>)}
+                </div> : <EmptyWorkspaceState icon={ListChecks} message="Quando você receber leads, eles aparecerão aqui por prioridade." />}
+              </ScrollContain>
             </CardContent>
           </Card>
 

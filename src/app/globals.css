@@ -372,9 +372,7 @@ body {
 }
 
 .app-shell-canvas {
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary) 4%, transparent), transparent 30%),
-    var(--surface-base);
+  background: var(--background);
 }
 
 /* Keyboard access is a system property, not a page-level concern. */
