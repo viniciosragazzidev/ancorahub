@@ -13,6 +13,7 @@ import {
   Hand,
   LinkSimple,
   MagnifyingGlass,
+  Minus,
   Play,
   Plus,
   Trash,
@@ -216,12 +217,61 @@ export function WorkflowAutomationStudio({
   const [redo, setRedo] = React.useState<WorkflowDefinition[]>([]);
   const [canvasMode, setCanvasMode] = React.useState<CanvasMode>("node");
   const canvasRef = React.useRef<HTMLDivElement>(null);
+  const viewportRef = React.useRef<HTMLElement>(null);
+  const [zoom, setZoom] = React.useState(1);
+  const [pan, setPan] = React.useState<{ x: number; y: number }>({ x: 60, y: 40 });
+  const [isPanning, setIsPanning] = React.useState(false);
   const dragRef = React.useRef<{ nodeId: string; offsetX: number; offsetY: number } | null>(null);
-  const panRef = React.useRef<{ startX: number; startY: number; left: number; top: number } | null>(
-    null,
-  );
+  const panStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const selectedNode = definition.nodes.find((node) => node.id === selectedNodeId) ?? null;
   const issues = React.useMemo(() => validateWorkflowDefinition(definition), [definition]);
+
+  const zoomIn = React.useCallback(() => {
+    setZoom((current) => Math.min(2.5, Math.round((current + 0.15) * 100) / 100));
+  }, []);
+
+  const zoomOut = React.useCallback(() => {
+    setZoom((current) => Math.max(0.25, Math.round((current - 0.15) * 100) / 100));
+  }, []);
+
+  const resetZoomPan = React.useCallback(() => {
+    setZoom(1);
+    setPan({ x: 60, y: 40 });
+  }, []);
+
+  React.useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+
+      if (event.ctrlKey || event.metaKey) {
+        const zoomFactor = event.deltaY < 0 ? 1.12 : 0.88;
+        setZoom((prevZoom) => {
+          const nextZoom = Math.min(2.5, Math.max(0.25, prevZoom * zoomFactor));
+          const mouseX = event.clientX - rect.left;
+          const mouseY = event.clientY - rect.top;
+          setPan((prevPan) => ({
+            x: Math.round(mouseX - (mouseX - prevPan.x) * (nextZoom / prevZoom)),
+            y: Math.round(mouseY - (mouseY - prevPan.y) * (nextZoom / prevZoom)),
+          }));
+          return nextZoom;
+        });
+      } else {
+        setPan((prev) => ({
+          x: Math.round(prev.x - event.deltaX),
+          y: Math.round(prev.y - event.deltaY),
+        }));
+      }
+    };
+
+    viewport.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
 
   const updateDefinition = React.useCallback(
     (next: WorkflowDefinition) => {
@@ -270,7 +320,7 @@ export function WorkflowAutomationStudio({
       : selectedNode;
     const position = sourceNode
       ? { x: sourceNode.position.x + 290, y: sourceNode.position.y }
-      : { x: 280, y: 160 + definition.nodes.length * 42 };
+      : { x: Math.round((-pan.x + 240) / zoom), y: Math.round((-pan.y + 160 + definition.nodes.length * 36) / zoom) };
     const node = createWorkflowNode(kind, position);
     let next = { ...definition, nodes: [...definition.nodes, node] };
     if (source && canConnectWorkflowNodes(next, source.nodeId, node.id, source.handle))
@@ -318,27 +368,29 @@ export function WorkflowAutomationStudio({
     setSelectedNodeId(node.id);
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const mouseCanvasX = (event.clientX - rect.left) / zoom;
+    const mouseCanvasY = (event.clientY - rect.top) / zoom;
     dragRef.current = {
       nodeId: node.id,
-      offsetX: event.clientX - rect.left - node.position.x,
-      offsetY: event.clientY - rect.top - node.position.y,
+      offsetX: mouseCanvasX - node.position.x,
+      offsetY: mouseCanvasY - node.position.y,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onCanvasPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const pan = panRef.current;
-    if (pan) {
-      const viewport = canvasRef.current?.parentElement;
-      if (viewport) {
-        viewport.scrollLeft = pan.left - (event.clientX - pan.startX);
-        viewport.scrollTop = pan.top - (event.clientY - pan.startY);
-      }
+    if (isPanning && panStartRef.current) {
+      setPan({
+        x: event.clientX - panStartRef.current.x,
+        y: event.clientY - panStartRef.current.y,
+      });
       return;
     }
     const drag = dragRef.current;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!drag || !rect) return;
+    const mouseCanvasX = (event.clientX - rect.left) / zoom;
+    const mouseCanvasY = (event.clientY - rect.top) / zoom;
     setDefinition((current) => ({
       ...current,
       nodes: current.nodes.map((node) =>
@@ -346,8 +398,8 @@ export function WorkflowAutomationStudio({
           ? {
               ...node,
               position: {
-                x: Math.max(24, event.clientX - rect.left - drag.offsetX),
-                y: Math.max(24, event.clientY - rect.top - drag.offsetY),
+                x: Math.max(16, Math.round(mouseCanvasX - drag.offsetX)),
+                y: Math.max(16, Math.round(mouseCanvasY - drag.offsetY)),
               },
             }
           : node,
@@ -358,20 +410,21 @@ export function WorkflowAutomationStudio({
   };
 
   const onCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (canvasMode !== "move" || event.target !== event.currentTarget) return;
-    const viewport = canvasRef.current?.parentElement;
-    if (!viewport) return;
-    panRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      left: viewport.scrollLeft,
-      top: viewport.scrollTop,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const isBgClick = event.target === event.currentTarget || (event.target as HTMLElement).dataset?.canvasBg === "true";
+    if (canvasMode === "move" || event.button === 1 || isBgClick) {
+      setIsPanning(true);
+      panStartRef.current = {
+        x: event.clientX - pan.x,
+        y: event.clientY - pan.y,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   };
+
   const onCanvasPointerUp = () => {
+    setIsPanning(false);
     dragRef.current = null;
-    panRef.current = null;
+    panStartRef.current = null;
   };
   const changeCanvasMode = (mode: CanvasMode) => {
     setCanvasMode(mode);
@@ -564,39 +617,78 @@ export function WorkflowAutomationStudio({
           </ScrollArea>
         </aside>
         <section
-          className="relative min-h-[38rem] overflow-auto bg-muted/10"
+          ref={viewportRef}
+          className="relative h-full min-h-0 flex-1 overflow-hidden bg-muted/10 select-none touch-none"
           aria-label="Canvas de automação"
         >
+          {/* Floating Studio Controls Bar */}
+          <div className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/90 p-1.5 shadow-md backdrop-blur">
+            <HelpTip content="Diminuir Zoom (Ctrl + Scroll para baixo)">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7"
+                onClick={zoomOut}
+                aria-label="Diminuir Zoom"
+              >
+                <Minus className="size-3.5" />
+              </Button>
+            </HelpTip>
+
+            <span className="w-12 text-center text-xs font-semibold font-mono text-foreground">
+              {Math.round(zoom * 100)}%
+            </span>
+
+            <HelpTip content="Aumentar Zoom (Ctrl + Scroll para cima)">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7"
+                onClick={zoomIn}
+                aria-label="Aumentar Zoom"
+              >
+                <Plus className="size-3.5" />
+              </Button>
+            </HelpTip>
+
+            <div className="h-4 w-px bg-border my-auto mx-0.5" />
+
+            <HelpTip content="Resetar visão e centralizar canvas">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2.5 text-xs font-medium"
+                onClick={resetZoomPan}
+              >
+                Centralizar
+              </Button>
+            </HelpTip>
+
+            <span className="border-l border-border pl-2.5 text-xs text-muted-foreground">
+              {definition.nodes.length} etapas
+            </span>
+          </div>
+
           <div
             ref={canvasRef}
+            data-canvas-bg="true"
             onPointerDown={onCanvasPointerDown}
             onPointerMove={onCanvasPointerMove}
             onPointerUp={onCanvasPointerUp}
             className={cn(
-              "relative min-h-[52rem] min-w-[62rem] bg-[radial-gradient(circle_at_1px_1px,hsl(var(--border))_1px,transparent_0)] bg-[size:18px_18px]",
-              canvasMode === "move" && "cursor-grab active:cursor-grabbing",
+              "absolute inset-0 size-full origin-top-left bg-[radial-gradient(circle_at_1px_1px,hsl(var(--border))_1px,transparent_0)] bg-[size:24px_24px]",
+              canvasMode === "move" && (isPanning ? "cursor-grabbing" : "cursor-grab"),
               canvasMode === "connect" && "cursor-crosshair",
               pendingSource && "cursor-crosshair",
+              canvasMode === "node" && !isPanning && "cursor-default"
             )}
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
+              width: "5000px",
+              height: "4000px",
+            }}
           >
-            <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-xl border border-border bg-card/90 p-1.5 shadow-sm backdrop-blur">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  canvasRef.current?.scrollTo({
-                    left: 0,
-                    top: 0,
-                    behavior: reducedMotion ? "auto" : "smooth",
-                  })
-                }
-              >
-                Centralizar
-              </Button>
-              <span className="border-l border-border px-2 text-xs text-muted-foreground">
-                {definition.nodes.length} etapas
-              </span>
-            </div>
             <svg
               className="pointer-events-none absolute inset-0 size-full overflow-visible"
               aria-hidden="true"
@@ -660,7 +752,7 @@ export function WorkflowAutomationStudio({
             ) : null}
           </div>
         </section>
-        <aside className="min-h-0 overflow-hidden border-l border-border/80 bg-card">
+        <aside className="hidden h-full min-h-0 overflow-hidden border-l border-border/80 bg-card lg:flex lg:flex-col">
           <Inspector
             node={selectedNode}
             issues={issues}

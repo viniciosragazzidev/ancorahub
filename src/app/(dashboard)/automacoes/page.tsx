@@ -31,14 +31,14 @@ export default async function AutomacoesPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Automação" title="Automações" />
-      <main className="min-h-0 w-full flex-1 bg-background p-0">
-        <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] w-full overflow-hidden bg-card flex flex-col">
+      <main className="h-[calc(100dvh-var(--header-height,3.5rem))] max-h-[100vh] w-full flex-1 overflow-hidden bg-background p-0">
+        <div className="h-full w-full overflow-hidden bg-card flex flex-col min-h-0">
           <WorkflowAutomationStudio initialWorkflows={workflows} />
-          <details className="border-t border-border bg-card">
-            <summary className="cursor-pointer px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
+          <details className="border-t border-border bg-card shrink-0">
+            <summary className="cursor-pointer px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
               Automações anteriores e histórico de envios
             </summary>
-            <div className="p-4 border-t border-border/60">
+            <div className="max-h-60 overflow-y-auto p-4 border-t border-border/60">
               <AutomationsClient initialAutomations={automations} initialLogs={logs} isAdmin={true} />
             </div>
           </details>
