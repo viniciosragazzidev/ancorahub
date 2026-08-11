@@ -42,6 +42,7 @@ export const PERMISSIONS = {
   ver_meta_propria: ["broker"],
   ver_meta_equipe: ["manager", "director"],
   exportar_relatorios: ["manager", "director"],
+  exportar_relatorios_operacionais: ["supervisor", "manager", "director"],
   aprovar_documentos: ["manager", "director"],
   configurar_white_label: ["director"],
   alterar_status_lead: ["broker", "manager", "director"],

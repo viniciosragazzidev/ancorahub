@@ -40,6 +40,11 @@
 - **Lead acessível**: lead cuja visibilidade foi confirmada pelo backend para o tenant, unidade, carteira e papel do corretor; telefone sozinho nunca concede acesso.
 - **Sugestão de resposta**: texto gerado ou selecionado pelo backend a partir do contexto autorizado, que pode ser inserido no compositor sem executar o envio.
 
+## Relatórios
+
+- **Relatório operacional supervisionado**: exportação de leads, qualificação, tarefas, distribuição, conversão e desempenho restrita aos corretores ativos vinculados ao Supervisor. Nunca contém valores ou comissões.
+- **Relatório consolidado**: exportação autorizada no escopo do Diretor (tenant) ou Gestor (filial atual), com as limitações da permissão do relatório.
+
 ## Engenharia
 
 - **Engineering Harness**: contrato versionado que orienta descoberta de contexto, execução limitada, verificação e registro de evidências para mudanças no CorreTop.

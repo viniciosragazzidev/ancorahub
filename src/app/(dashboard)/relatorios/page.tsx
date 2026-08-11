@@ -1,4 +1,4 @@
-import { and, count, eq, gte, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -8,7 +8,6 @@ import {
   ArrowUpRight,
   ChartBar,
   CurrencyCircleDollar,
-  FileArrowDown,
   Target,
   TrendUp,
   Users,
@@ -18,8 +17,10 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
+import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
+import { reportRegistry } from "@/features/reports/report-registry";
 import { parsePeriod, periodStart } from "@/shared/period";
-import { ExportButtons } from "./_components/export-buttons";
+import { ReportCenter } from "./_components/report-center";
 import { SpreadsheetSection } from "./_components/spreadsheet-section";
 import { InternalReportDocuments } from "./_components/internal-report-documents";
 import { ReportTrendCharts } from "./_components/report-trend-charts";
@@ -36,6 +37,11 @@ export default async function ReportsPage({
   const period = parsePeriod((await searchParams).period);
   const reportStart = periodStart(period);
   const canExport = hasCapability(context.role, "exportar_relatorios", context.jobTitle);
+  const canGenerateOperational = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
+  const canViewFinancialReports = hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
+  const supervisedBrokerIds = context.role === "supervisor"
+    ? await getSupervisedBrokerIds(context.tenantId, context.userId)
+    : [];
   const internalDocuments = canExport
     ? await db
         .select({
@@ -52,12 +58,20 @@ export default async function ReportsPage({
   const leadScope =
     context.role === "broker"
       ? eq(schema.leads.corretorId, context.userId)
+      : context.role === "supervisor"
+        ? supervisedBrokerIds.length
+          ? inArray(schema.leads.corretorId, supervisedBrokerIds)
+          : eq(schema.leads.id, "__no_supervised_leads__")
       : context.role === "manager" && context.branchId
         ? eq(schema.leads.branchId, context.branchId)
         : undefined;
   const clientScope =
     context.role === "broker"
       ? eq(schema.clients.corretorId, context.userId)
+      : context.role === "supervisor"
+        ? supervisedBrokerIds.length
+          ? inArray(schema.clients.corretorId, supervisedBrokerIds)
+          : eq(schema.clients.id, "__no_supervised_clients__")
       : context.role === "manager" && context.branchId
         ? eq(schema.clients.branchId, context.branchId)
         : undefined;
@@ -99,7 +113,7 @@ export default async function ReportsPage({
   ]);
 
   // Get the period's sales revenue
-  const periodRevenue = await db
+  const periodRevenue = canViewFinancialReports ? await db
     .select({
       total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
     })
@@ -113,7 +127,7 @@ export default async function ReportsPage({
         eq(schema.sales.status, "active"),
         gte(schema.sales.saleDate, reportStart),
       ),
-    );
+    ) : [{ total: "0" }];
 
   // Daily trends (N dias) para os cards do resumo
   const [leadsByDay, clientsByDay, salesByDay, revenueByDay] = await Promise.all([
@@ -158,7 +172,7 @@ export default async function ReportsPage({
         ),
       )
       .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
-    db
+    canViewFinancialReports ? db
       .select({
         day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`,
         total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
@@ -174,7 +188,7 @@ export default async function ReportsPage({
           gte(schema.sales.saleDate, reportStart),
         ),
       )
-      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
+      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`) : Promise.resolve([]),
   ]);
 
   function fillDaySeries(rows: Array<{ day: string; count?: number; total?: string }>) {
@@ -314,7 +328,7 @@ export default async function ReportsPage({
               )}
               sparklineColor="var(--chart-4)"
             />
-            <StatCard
+            {canViewFinancialReports ? <StatCard
               label="Receita ativa"
               value={revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               sublabel="Vendas ativas no período"
@@ -322,29 +336,13 @@ export default async function ReportsPage({
               iconClassName="bg-success/10 text-success"
               sparklineData={revenueTrend}
               sparklineColor="var(--success)"
-            />
+            /> : null}
           </div>
         </section>
 
-        <ReportTrendCharts data={trendData} period={period} />
+        <ReportTrendCharts data={trendData} period={period} showRevenue={canViewFinancialReports} />
 
-        {/* Quick Export Card */}
-        {canExport && (
-          <Card className="min-w-0 overflow-visible">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <FileArrowDown className="size-4 text-primary" />
-                <div>
-                  <CardTitle>Exportação rápida</CardTitle>
-                  <CardDescription>Baixe relatórios em CSV para análise externa.</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ExportButtons />
-            </CardContent>
-          </Card>
-        )}
+        {canGenerateOperational ? <ReportCenter reports={reportRegistry} /> : null}
 
         {/* Planilhas importadas */}
         <SpreadsheetSection />

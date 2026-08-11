@@ -49,7 +49,7 @@ function ChartEmpty({ message }: { message: string }) {
   );
 }
 
-export function ReportTrendCharts({ data, period }: { data: ReportTrend[]; period: number }) {
+export function ReportTrendCharts({ data, period, showRevenue = true }: { data: ReportTrend[]; period: number; showRevenue?: boolean }) {
   const hasCommercialData = data.some((item) => item.leads > 0 || item.clients > 0);
   const hasRevenueData = data.some((item) => item.revenue > 0 || item.sales > 0);
 
@@ -116,7 +116,7 @@ export function ReportTrendCharts({ data, period }: { data: ReportTrend[]; perio
         </CardContent>
       </Card>
 
-      <Card className="xl:col-span-2">
+      {showRevenue ? <Card className="xl:col-span-2">
         <CardHeader>
           <CardTitle>Receita ativa</CardTitle>
           <CardDescription>Valor das vendas ativas registradas no período.</CardDescription>
@@ -188,7 +188,7 @@ export function ReportTrendCharts({ data, period }: { data: ReportTrend[]; perio
             <ChartEmpty message="Ainda não há vendas ativas neste período." />
           )}
         </CardContent>
-      </Card>
+      </Card> : null}
     </section>
   );
 }
