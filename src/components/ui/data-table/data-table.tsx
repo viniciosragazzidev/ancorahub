@@ -123,7 +123,7 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl bg-card">
+      <div className="overflow-hidden rounded-xl border border-border/75 bg-card shadow-[var(--shadow-card)]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-transparent border-b border-border">
@@ -150,7 +150,7 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className={cn("group/row h-12 border-b border-border hover:bg-muted/40", getRowClassName?.(row.original))}
+                    className={cn("group/row h-12 border-b border-border/70 transition-colors duration-[var(--duration-quick)] hover:bg-muted/40 motion-reduce:transition-none", getRowClassName?.(row.original))}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="px-4 py-2.5 text-sm font-normal text-foreground">

@@ -8,11 +8,11 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-4 rounded-xl border border-border/80 bg-card p-5 transition-[border-color,background-color,transform] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-card/95 motion-reduce:transition-none",
-        subtle: "gap-4 rounded-xl border border-border/70 bg-card/80 p-5",
+        default: "gap-4 rounded-xl border border-border/75 bg-card p-5 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-card motion-reduce:transition-none",
+        subtle: "gap-4 rounded-xl border border-border/65 bg-card/85 p-5",
         overview: "gap-0 overflow-hidden rounded-xl border border-border/80 bg-card p-0",
-        compact: "gap-3 rounded-xl border border-border/70 bg-card p-4 transition-[border-color,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
-        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 transition-[border-color,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
+        compact: "gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
+        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
       },
     },
     defaultVariants: {

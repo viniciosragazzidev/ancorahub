@@ -3662,10 +3662,281 @@ export const aiQualificationAlerts = pgTable(
   (table) => [index("ai_qualification_alerts_tenant_idx").on(table.tenantId, table.status)],
 );
 
+/** ─── Tenant Intelligence Layer Tables ────────────────────────────────────── **/
+
+/** Company profile & intelligence settings per tenant. */
+export const tenantIntelligenceProfiles = pgTable(
+  "tenant_intelligence_profiles",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: "cascade" }),
+    tradeName: text("trade_name"),
+    companyName: text("company_name"),
+    cnpj: text("cnpj"),
+    description: text("description"),
+    segment: text("segment").default("Planos de Saúde e Odontológicos"),
+    website: text("website"),
+    phone: text("phone"),
+    email: text("email"),
+    addressStreet: text("address_street"),
+    addressNumber: text("address_number"),
+    addressComplement: text("address_complement"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    addressZip: text("address_zip"),
+    positioning: jsonb("positioning").notNull().default({
+      aboutUs: "",
+      differentials: [],
+      targetAudience: "",
+      regionsServed: [],
+      productsOffered: [],
+      toneOfVoice: "professional",
+    }),
+    serviceConfig: jsonb("service_config").notNull().default({
+      businessHours: "08:00 às 18:00",
+      businessDays: "Segunda a Sexta",
+      channels: ["WhatsApp", "Site", "Telefone"],
+      slaMinutes: 15,
+      supportEmail: "",
+      supportPhone: "",
+    }),
+    commercialRules: jsonb("commercial_rules").notNull().default({
+      operators: [],
+      products: [],
+      rulesSummary: "",
+    }),
+    createdAt,
+    updatedAt,
+  }
+);
+
+/** Structured intelligence profile per branch/unit. */
+export const unitIntelligenceProfiles = pgTable(
+  "unit_intelligence_profiles",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").notNull().references(() => branches.id, { onDelete: "cascade" }),
+    unitName: text("unit_name").notNull(),
+    managerName: text("manager_name"),
+    managerEmail: text("manager_email"),
+    phone: text("phone"),
+    addressStreet: text("address_street"),
+    addressCity: text("address_city"),
+    addressState: text("address_state"),
+    businessHours: text("business_hours"),
+    serviceRegions: jsonb("service_regions").notNull().default([]),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("unit_intel_tenant_branch_unique").on(table.tenantId, table.branchId)]
+);
+
+/** Knowledge collections for grouping documents & sources. */
+export const knowledgeCollections = pgTable(
+  "knowledge_collections",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    color: text("color").default("#3b82f6"),
+    isSystem: boolean("is_system").notNull().default(false),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("knowledge_coll_tenant_slug_unique").on(table.tenantId, table.slug)]
+);
+
+/** Original uploaded files / raw materials. */
+export const knowledgeSources = pgTable(
+  "knowledge_sources",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    fileType: text("file_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    fileUrl: text("file_url").notNull(),
+    hashMd5: text("hash_md5"),
+    category: text("category").notNull().default("general"),
+    status: text("status").notNull().default("uploaded"), // uploaded | parsing | parsed | error
+    errorMessage: text("error_message"),
+    uploadedBy: text("uploaded_by"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("knowledge_sources_tenant_idx").on(table.tenantId, table.status)]
+);
+
+/** Canonical knowledge documents generated after ingestion. */
+export const knowledgeDocuments = pgTable(
+  "knowledge_documents",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    sourceId: text("source_id").references(() => knowledgeSources.id, { onDelete: "set null" }),
+    collectionId: text("collection_id").references(() => knowledgeCollections.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    canonicalContent: text("canonical_content").notNull(),
+    category: text("category").notNull().default("general"),
+    authorityLevel: integer("authority_level").notNull().default(3), // 1 to 5
+    version: integer("version").notNull().default(1),
+    status: text("status").notNull().default("published"), // draft | review | published | archived
+    validFrom: timestamp("valid_from", { withTimezone: true }),
+    validUntil: timestamp("valid_until", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("knowledge_docs_tenant_status_idx").on(table.tenantId, table.status)]
+);
+
+/** Chunks generated for RAG vector & full-text search. */
+export const knowledgeChunks = pgTable(
+  "knowledge_chunks",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    documentId: text("document_id").notNull().references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    text: text("text").notNull(),
+    tokenCount: integer("token_count").notNull().default(0),
+    authorityLevel: integer("authority_level").notNull().default(3),
+    metadata: jsonb("metadata").notNull().default({}),
+    version: integer("version").notNull().default(1),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("knowledge_chunks_tenant_doc_idx").on(table.tenantId, table.documentId)]
+);
+
+/** Suggestions for updating structured CRM data from uploaded materials. */
+export const knowledgeSuggestions = pgTable(
+  "knowledge_suggestions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    sourceId: text("source_id").references(() => knowledgeSources.id, { onDelete: "set null" }),
+    entityType: text("entity_type").notNull(), // company | unit | product | operator
+    entityId: text("entity_id"),
+    title: text("title").notNull(),
+    currentData: jsonb("current_data").notNull().default({}),
+    detectedData: jsonb("detected_data").notNull().default({}),
+    diff: jsonb("diff").notNull().default([]),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected | ignored
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("knowledge_sugg_tenant_status_idx").on(table.tenantId, table.status)]
+);
+
+/** Conflicting facts between official documents. */
+export const knowledgeConflicts = pgTable(
+  "knowledge_conflicts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    docIdA: text("doc_id_a").notNull(),
+    docIdB: text("doc_id_b").notNull(),
+    topic: text("topic").notNull(),
+    factA: text("fact_a").notNull(),
+    factB: text("fact_b").notNull(),
+    status: text("status").notNull().default("open"), // open | resolved | ignored
+    resolvedBy: text("resolved_by"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("knowledge_conflicts_tenant_idx").on(table.tenantId, table.status)]
+);
+
+/** Agent definitions created in Agent Builder. */
+export const agentDefinitions = pgTable(
+  "agent_definitions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    objective: text("objective").notNull(),
+    category: text("category").notNull().default("general"), // qualification | sales | documentation | quote | support
+    modelProvider: text("model_provider").notNull().default("groq"),
+    modelName: text("model_name").notNull().default("llama-3.3-70b-versatile"),
+    temperature: numeric("temperature").notNull().default("0.7"),
+    maxTokens: integer("max_tokens").notNull().default(1024),
+    systemPrompt: text("system_prompt").notNull(),
+    allowedTools: jsonb("allowed_tools").notNull().default([]),
+    allowedCollectionIds: jsonb("allowed_collection_ids").notNull().default([]),
+    memoryScope: text("memory_scope").notNull().default("conversation"), // none | conversation | session | lead
+    outputFormat: text("output_format").notNull().default("markdown"), // markdown | json_schema | classification
+    version: integer("version").notNull().default(1),
+    active: boolean("active").notNull().default(true),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("agent_def_tenant_slug_unique").on(table.tenantId, table.slug)]
+);
+
+/** Evaluation test cases for evaluating agent accuracy & hallucination. */
+export const evaluationTestCases = pgTable(
+  "evaluation_test_cases",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    agentId: text("agent_id").references(() => agentDefinitions.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    inputPrompt: text("input_prompt").notNull(),
+    expectedOutput: text("expected_output").notNull(),
+    forbiddenOutput: text("forbidden_output"),
+    expectedTools: jsonb("expected_tools").notNull().default([]),
+    createdAt,
+    updatedAt,
+  }
+);
+
+/** Evaluation runs comparing agent versions against test cases. */
+export const agentEvaluationRuns = pgTable(
+  "agent_evaluation_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    agentId: text("agent_id").notNull().references(() => agentDefinitions.id, { onDelete: "cascade" }),
+    agentVersion: integer("agent_version").notNull(),
+    totalCases: integer("total_cases").notNull(),
+    passedCases: integer("passed_cases").notNull(),
+    accuracyRate: numeric("accuracy_rate").notNull(), // e.g. 94.0
+    hallucinationRate: numeric("hallucination_rate").notNull(), // e.g. 1.2
+    avgLatencyMs: integer("avg_latency_ms").notNull(),
+    totalCostEst: numeric("total_cost_est").notNull().default("0.00"),
+    runDetails: jsonb("run_details").notNull().default([]),
+    createdAt,
+  }
+);
+
+/** Anonymized conversation examples for few-shot & playbook extraction. */
+export const conversationExamples = pgTable(
+  "conversation_examples",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    channel: text("channel").default("whatsapp"),
+    outcome: text("outcome").notNull().default("converted"), // converted | lost
+    qualityRating: integer("quality_rating").notNull().default(5), // 1-5
+    tags: jsonb("tags").notNull().default([]),
+    anonymizedMessages: jsonb("anonymized_messages").notNull().default([]),
+    extractedPlaybook: jsonb("extracted_playbook").notNull().default({}),
+    createdAt,
+    updatedAt,
+  }
+);
+
 export type TenantRole = (typeof tenantRoleValues)[number];
 export type TenantStatus = (typeof tenantStatusValues)[number];
 export type PasswordResetRequestStatus = "requested" | "approved" | "rejected" | "completed";
 export type ProposalStatus = (typeof proposalStatusValues)[number];
 export type AutomationStatus = (typeof automationStatusValues)[number];
 export type AutomationLogStatus = (typeof automationLogStatusValues)[number];
-

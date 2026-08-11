@@ -26,7 +26,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
+        "fixed inset-0 z-50 bg-foreground/28 backdrop-blur-[2px] transition-[background-color,backdrop-filter,opacity] duration-[var(--dialog-overlay-duration)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
         className
       )}
       {...props}
@@ -46,7 +46,7 @@ function DialogPopup({
       <DialogPrimitive.Popup
         data-slot="dialog-popup"
         className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] min-h-0 w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-visible rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-[0_24px_48px_rgb(15_23_42/0.18)] transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-98 data-starting-style:scale-98 motion-reduce:transition-none sm:w-full sm:p-6 [&>*]:min-w-0",
+        "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] min-h-0 w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-visible rounded-2xl border border-border/80 bg-popover p-5 text-popover-foreground shadow-[var(--shadow-dialog)] transition-[opacity,transform] duration-[var(--dialog-content-duration)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:scale-[0.985] data-starting-style:scale-[0.985] motion-reduce:transition-none sm:w-full sm:p-6 [&>*]:min-w-0",
           className
         )}
         {...props}
@@ -81,7 +81,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-2", className)}
+      className={cn("flex flex-col-reverse border-t border-border/70 pt-4 sm:flex-row sm:justify-end sm:space-x-2", className)}
       {...props}
     />
   )

@@ -95,7 +95,7 @@ export function AppShell({
           <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
         )}
         <SidebarInset
-          className="min-h-0 h-dvh bg-muted/25 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] dark:bg-background max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+          className="app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
           style={{
             scrollPaddingTop: "var(--header-height)",
             scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",

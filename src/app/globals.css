@@ -168,6 +168,11 @@
   --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.10), 0 8px 16px -4px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 8px 16px -4px rgb(0 0 0 / 0.12), 0 16px 32px -8px rgb(0 0 0 / 0.10);
   --shadow-xl: 0 16px 32px -8px rgb(0 0 0 / 0.18), 0 32px 64px -16px rgb(0 0 0 / 0.14);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.025), 0 2px 8px rgb(15 23 42 / 0.025);
+  --shadow-dialog: 0 24px 64px rgb(15 23 42 / 0.16), 0 8px 24px rgb(15 23 42 / 0.08);
+  --dialog-overlay-duration: 180ms;
+  --dialog-content-duration: 220ms;
+  --dialog-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   --zindex-back: -1;
   --zindex-auto: auto;
@@ -363,7 +368,13 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.app-shell-canvas {
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklch, var(--primary) 4%, transparent), transparent 30%),
+    var(--surface-base);
 }
 
 /* Keyboard access is a system property, not a page-level concern. */
