@@ -105,3 +105,36 @@ export async function acknowledgeAlert(tenantId: string, actorUserId: string, al
 
   return getQualificationAlerts(tenantId);
 }
+
+export async function createQualificationAlert(input: {
+  tenantId: string;
+  alertType: "qualified_without_routing" | "queue_no_broker" | "whatsapp_latency_spike";
+  level?: "info" | "warning" | "critical";
+  message: string;
+  suggestedAction?: string;
+}) {
+  await ensureAiTablesExist();
+  const db = getDatabase();
+  const alertId = randomUUID();
+  const now = new Date();
+
+  await db.insert(schema.aiQualificationAlerts).values({
+    id: alertId,
+    tenantId: input.tenantId,
+    alertType: input.alertType,
+    level: input.level ?? "critical",
+    status: "active",
+    message: input.message,
+    suggestedAction: input.suggestedAction ?? null,
+    createdAt: now,
+  });
+
+  console.error(`[CRITICAL_ALERT:${input.alertType}]`, {
+    tenantId: input.tenantId,
+    message: input.message,
+    level: input.level ?? "critical",
+  });
+
+  return alertId;
+}
+

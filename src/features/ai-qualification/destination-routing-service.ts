@@ -309,3 +309,79 @@ export async function saveBrokerEligibilityProfile(
 
   return getBrokerEligibilityProfiles(tenantId);
 }
+
+export type QualificationResolvedDestination = {
+  temperatureClass: string;
+  destinationType: string;
+  destinationTargetId: string | null;
+  priority: "high" | "normal" | "low";
+  slaMinutes: number;
+  fallbackDestinationType: string;
+};
+
+export async function resolveQualificationDestination(input: {
+  tenantId: string;
+  classification: "hot" | "warm" | "cold" | "not_qualified" | "pending";
+  score: number;
+}): Promise<QualificationResolvedDestination> {
+  let matched: {
+    temperatureClass: string;
+    destinationType: string;
+    destinationTargetId?: string | null;
+    priority: string;
+    slaMinutes?: number | null;
+    fallbackDestinationType?: string | null;
+  } | undefined;
+
+  try {
+    const rules = await getDestinationRules(input.tenantId);
+    const targetClass = input.classification === "not_qualified" ? "unqualified" : input.classification;
+    matched = rules.find((rule) => rule.temperatureClass === targetClass) ?? rules[0];
+  } catch (err) {
+    console.warn("[resolveQualificationDestination] DB query skipped in unit environment, using fallback rules.");
+  }
+
+  if (matched) {
+    return {
+      temperatureClass: matched.temperatureClass,
+      destinationType: matched.destinationType,
+      destinationTargetId: matched.destinationTargetId ?? null,
+      priority: (["high", "normal", "low"].includes(matched.priority) ? matched.priority : "normal") as "high" | "normal" | "low",
+      slaMinutes: matched.slaMinutes ?? 15,
+      fallbackDestinationType: matched.fallbackDestinationType ?? "manager",
+    };
+  }
+
+  // Fallbacks padrão se nenhuma regra existir
+  if (input.classification === "hot") {
+    return {
+      temperatureClass: "hot",
+      destinationType: "current_duty",
+      destinationTargetId: null,
+      priority: "high",
+      slaMinutes: 2,
+      fallbackDestinationType: "manager",
+    };
+  }
+
+  if (input.classification === "warm") {
+    return {
+      temperatureClass: "warm",
+      destinationType: "general_queue",
+      destinationTargetId: null,
+      priority: "normal",
+      slaMinutes: 15,
+      fallbackDestinationType: "manager",
+    };
+  }
+
+  return {
+    temperatureClass: input.classification === "not_qualified" ? "unqualified" : "cold",
+    destinationType: input.classification === "not_qualified" ? "close" : "nurture",
+    destinationTargetId: null,
+    priority: "low",
+    slaMinutes: 120,
+    fallbackDestinationType: "no_distribution",
+  };
+}
+

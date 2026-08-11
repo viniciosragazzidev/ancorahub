@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateWorkflowAutomationSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
@@ -22,6 +22,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_stagnant_days", 
     "feature_global_search_enabled", 
     "feature_broker_workspace_enabled",
+    "feature_workflow_automation_enabled",
     CLEAN_UI_FEATURE,
     "feature_interface_motion_enabled",
     "feature_r2_storage_enabled",
@@ -76,6 +77,7 @@ export default async function SuperAdminSettingsPage() {
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
+  const workflowAutomationEnabled = settingMap.get("feature_workflow_automation_enabled") === "true";
   const cleanUiOperationalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
   const interfaceMotionEnabled = settingMap.get("feature_interface_motion_enabled") !== "false";
   const r2StorageEnabled = settingMap.get("feature_r2_storage_enabled") !== "false";
@@ -155,6 +157,23 @@ export default async function SuperAdminSettingsPage() {
                     <span><span className="font-medium">Habilitar Workspace do Corretor</span><span className="block text-xs text-muted-foreground">A alteração é auditada e reversível pela plataforma.</span></span>
                   </label>
                   <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>{brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Automation Builder</CardTitle>
+                <CardDescription>
+                  Libera a publicação de fluxos versionados. Desativar interrompe novas publicações sem apagar rascunhos, versões ou auditoria; nenhum canal externo é ativado por este controle.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateWorkflowAutomationSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="workflowAutomationEnabled" value="true" defaultChecked={workflowAutomationEnabled} className="size-4" />
+                    <span><span className="font-medium">Permitir publicação de fluxos seguros</span><span className="block text-xs text-muted-foreground">IA e WhatsApp permanecem bloqueados por capacidades próprias.</span></span>
+                  </label>
+                  <Button type="submit" variant={workflowAutomationEnabled ? "outline" : "default"}>{workflowAutomationEnabled ? "Salvar controle" : "Liberar piloto"}</Button>
                 </form>
               </CardContent>
             </Card>

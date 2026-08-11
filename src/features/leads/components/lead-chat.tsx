@@ -36,7 +36,7 @@ export function LeadChat({ phone }: { phone: string | null }) {
         }
       />
       <DialogPopup
-        className="h-[min(78vh,42rem)] w-[min(92vw,52rem)] max-w-none overflow-hidden p-0 max-sm:h-[82vh]"
+        className="h-[min(78vh,42rem)] w-[min(92vw,800px)] max-w-[800px] overflow-hidden p-0 max-sm:h-[82vh]"
         overlayClassName="bg-black/65 backdrop-blur-sm"
       >
         <div className="flex h-full min-h-0 flex-col bg-background">

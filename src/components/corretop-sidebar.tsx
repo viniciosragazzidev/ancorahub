@@ -72,6 +72,7 @@ const navSections: SidebarSection[] = [
     label: "Comercial",
     items: [
       { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
+      { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
       { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
       { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
       { label: "Cotações", icon: SlidersHorizontal, url: "/cotacao", permission: "acessar_cotacoes" },
@@ -217,7 +218,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
         ) : null}
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
+      <SidebarContent className="pl-3 pr-1.5 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
         <div className="flex flex-col gap-4 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2">
           {visibleSections.map((section, sectionIndex) => (
             <div key={section.label} className="w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
@@ -256,9 +257,25 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           ))}
         </div>
       </SidebarContent>
-
-      <SidebarFooter className="border-t border-sidebar-border/50 p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3">
+      <SidebarFooter className="border-t border-sidebar-border/50 p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3 space-y-2">
         <SidebarMenu>
+          <SidebarMenuItem className="group-data-[collapsible=icon]:w-full">
+            <SidebarMenuButton
+              onClick={() => {
+                const event = new CustomEvent("open-agent-drawer");
+                window.dispatchEvent(event);
+              }}
+              tooltip="Agente IA (Ctrl+J)"
+              className="w-full h-9 px-3 text-[13px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors rounded-xl group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
+            >
+              <Sparkle weight="fill" className="size-4 shrink-0 text-primary animate-pulse" />
+              <span className="truncate">Agente IA</span>
+              <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/15 text-primary group-data-[collapsible=icon]:hidden">
+                Ctrl+J
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           <SidebarMenuItem className="group-data-[collapsible=icon]:w-full">
             <DropdownMenu>
               <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0!" />}>

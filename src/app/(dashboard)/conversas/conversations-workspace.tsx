@@ -303,7 +303,7 @@ export function ConversationsWorkspace({
   return (
     <section
       aria-label="Central de conversas"
-      className="flex h-[calc(100dvh-var(--header-height)-1.5rem)] min-h-[34rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_18px_50px_-32px_color-mix(in_oklch,var(--foreground)_32%,transparent)]"
+      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
     >
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-5">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">

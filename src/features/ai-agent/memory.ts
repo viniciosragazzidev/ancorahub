@@ -86,9 +86,9 @@ const PLAN_TYPE_PATTERNS = [
 ];
 
 const NUMBER_OF_LIVES_PATTERNS = [
-  /(\d+)\s*(?:pessoas|vidas|familiares|dependentes|pessoal|integrantes)/i,
-  /(?:somos|sou|minha família tem)\s*(\d+)/i,
-  /para\s*(\d+)\s*(?:pessoas|vidas)/i,
+  /(\d+)\s*(?:pessoas?|vidas?|familiares?|dependentes?|pessoal|integrantes?)/i,
+  /(?:somos|sou|minha família tem|seria para|apenas|para)\s*(\d+)/i,
+  /para\s*(\d+)\s*(?:pessoas?|vidas?)/i,
 ];
 
 const AGE_PATTERNS = [

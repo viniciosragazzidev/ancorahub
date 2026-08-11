@@ -312,3 +312,137 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (!chosen) return { status: "queued", leadId, reason: "Todos os corretores elegíveis atingiram a capacidade." };
   return assignLeadToBroker(context, leadId, chosen.id, "automatic", "Distribuição automática da fila", excludeBrokerId);
 }
+
+export async function distributeQualifiedLead(input: {
+  tenantId: string;
+  leadId: string;
+  actorUserId?: string | null;
+}) {
+  const db = getDatabase();
+  const [lead] = await db
+    .select({
+      id: schema.leads.id,
+      nome: schema.leads.nome,
+      branchId: schema.leads.branchId,
+      qualificationStatus: schema.leads.qualificationStatus,
+      qualificationScore: schema.leads.qualificationScore,
+      corretorId: schema.leads.corretorId,
+    })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+    .limit(1);
+
+  if (!lead) return { distributed: false, reason: "lead_not_found" };
+  if (lead.corretorId) return { distributed: true, brokerId: lead.corretorId, reason: "already_assigned" };
+
+  const { resolveQualificationDestination, getBrokerEligibilityProfiles } = await import("@/features/ai-qualification/destination-routing-service");
+
+  const classification = (["hot", "warm", "cold", "not_qualified"].includes(lead.qualificationStatus)
+    ? lead.qualificationStatus
+    : "warm") as "hot" | "warm" | "cold" | "not_qualified";
+
+  const destination = await resolveQualificationDestination({
+    tenantId: input.tenantId,
+    classification,
+    score: lead.qualificationScore ?? 50,
+  });
+
+  if (destination.destinationType === "no_distribution" || destination.destinationType === "close") {
+    await db.update(schema.leads).set({
+      distributionStatus: "closed",
+      updatedAt: new Date(),
+    }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+
+    return { distributed: false, destination, reason: "destination_closed_or_no_distribution" };
+  }
+
+  // Buscar unidade padrão se o lead não possuir branchId
+  let targetBranchId = lead.branchId;
+  if (!targetBranchId) {
+    const [defaultBranch] = await db
+      .select({ id: schema.branches.id })
+      .from(schema.branches)
+      .where(and(eq(schema.branches.tenantId, input.tenantId), eq(schema.branches.status, "active")))
+      .limit(1);
+    targetBranchId = defaultBranch?.id ?? null;
+  }
+
+  if (!targetBranchId) {
+    return { distributed: false, destination, reason: "no_active_branch_found" };
+  }
+
+  // Buscar corretores elegíveis
+  const allBrokers = await db
+    .select({
+      id: schema.user.id,
+      name: schema.user.name,
+      createdAt: schema.user.createdAt,
+    })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, input.tenantId),
+        eq(schema.tenantMemberships.branchId, targetBranchId),
+        eq(schema.tenantMemberships.role, "broker"),
+        eq(schema.tenantMemberships.status, "active"),
+        eq(schema.tenantMemberships.availabilityStatus, "available"),
+        eq(schema.user.active, true),
+        eq(schema.user.status, "active")
+      )
+    );
+
+  const eligibilityProfiles = await getBrokerEligibilityProfiles(input.tenantId);
+
+  const eligibleBrokers = allBrokers.filter((broker) => {
+    const profile = eligibilityProfiles.find((p) => p.userId === broker.id);
+    if (!profile) return true; // sem perfil específico, usa regras globais
+    if (!profile.active || profile.paused) return false;
+    const allowedTypes = (profile.allowedLeadTypes ?? []) as string[];
+    if (allowedTypes.length > 0 && !allowedTypes.includes(classification)) return false;
+    return true;
+  });
+
+  if (eligibleBrokers.length === 0) {
+    // Manter na fila sem perder a qualificação
+    await db.update(schema.leads).set({
+      branchId: targetBranchId,
+      distributionStatus: "queued",
+      updatedAt: new Date(),
+    }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+
+    console.warn("[distribute-qualified] Nenhum corretor elegível disponível. Lead mantido na fila de espera.", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      classification,
+    });
+
+    return { distributed: false, destination, reason: "no_eligible_broker_available" };
+  }
+
+  // Escolher corretor (round-robin / menor carga)
+  const chosenBroker = eligibleBrokers[0];
+
+  const adminContext = {
+    tenantId: input.tenantId,
+    userId: input.actorUserId ?? chosenBroker.id,
+    role: "director" as const,
+    jobTitle: "director",
+    branchId: targetBranchId,
+  };
+
+  const assigned = await assignLeadToBroker(
+    adminContext,
+    input.leadId,
+    chosenBroker.id,
+    "automatic",
+    `Distribuição automática por qualificação (${classification.toUpperCase()})`
+  );
+
+  return {
+    distributed: assigned.status === "assigned",
+    brokerId: chosenBroker.id,
+    destination,
+    assignedResult: assigned,
+  };
+}

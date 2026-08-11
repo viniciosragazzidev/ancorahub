@@ -253,8 +253,8 @@ export default async function ConversationsPage({ searchParams }: { searchParams
           </nav>
         ) : undefined}
       />
-      <main className="mx-auto min-h-0 w-full max-w-[1200px] flex-1 bg-background p-3 lg:p-5">
-        <div className="h-full min-h-[calc(100dvh-8.5rem)] overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_10px_28px_rgb(15_23_42/0.04)]">
+      <main className="min-h-0 w-full flex-1 bg-background p-0">
+        <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] w-full overflow-hidden bg-card">
         {officialBrokerTab ? <OfficialBrokerConversations enabled={officialBrokerMessagesEnabled} conversations={officialBrokerConversations} /> : <ConversationsWorkspace
           role={context.role}
           branches={branches}

@@ -152,6 +152,24 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
   revalidatePath("/super-admin/settings");
 }
 
+export async function updateWorkflowAutomationSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("workflowAutomationEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_workflow_automation_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "workflow_automation.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "workflow_automation",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/automacoes");
+  revalidatePath("/super-admin/settings");
+}
+
 export async function updateCleanUiOperationalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("cleanUiOperationalEnabled") === "true" ? "true" : "false";

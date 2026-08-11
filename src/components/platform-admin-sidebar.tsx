@@ -65,7 +65,7 @@ export function PlatformAdminSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 pt-4">
+      <SidebarContent className="pl-3 pr-1 pt-4 group-data-[collapsible=icon]:px-0">
         <SidebarCollapsibleGroup label="Painel Geral" headerClassName="px-3.5 text-[10px] font-bold uppercase tracking-wider">
           <SidebarMenu className="gap-1">
             <SidebarMenuItem>

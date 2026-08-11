@@ -438,21 +438,24 @@ function DirectorNocContent({ data }: { data: DirectorDashboardData }) {
           <ActivityFeed activities={activities} />
         </div>
 
-        {/* Performance por Unidade — 4 cards 2×2 */}
+        {/* Performance por Unidade — layout fluido (1 unidade = full w) */}
         <div className="flex flex-col gap-3 lg:col-span-3">
           <div>
             <p className="text-sm font-bold tracking-tight">Performance por Unidade</p>
             <p className="text-xs text-muted-foreground">Volume e conversão por filial</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {data.branches.slice(0, 4).map((branch, i) => (
+          <div className={cn("grid gap-3", data.branches.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+            {data.branches.slice(0, 4).map((branch, i, arr) => (
               <motion.div
                 key={branch.name}
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.18, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.06, 0.2) }}
                 whileHover={{ y: -2 }}
-                className="group flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-none transition-all duration-200 hover:border-border hover:shadow-xs"
+                className={cn(
+                  "group flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-none transition-all duration-200 hover:border-border hover:shadow-xs",
+                  arr.length === 3 && i === 2 && "sm:col-span-2"
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs font-semibold leading-tight text-foreground line-clamp-2">{branch.name}</p>

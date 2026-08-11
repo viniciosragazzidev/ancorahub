@@ -369,7 +369,7 @@ function SidebarContent({ className, children, ...props }: React.ComponentProps<
       )}
       {...props}
     >
-      <ScrollArea className="h-full">
+      <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]>div]:pr-2 group-data-[collapsible=icon]:[&>[data-slot=scroll-area-viewport]>div]:pr-0">
         {children}
       </ScrollArea>
     </div>
@@ -465,7 +465,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
     <li
       data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
-      className={cn("group/menu-item relative", className)}
+      className={cn("group/menu-item relative max-w-[200px]", className)}
       {...props}
     />
   )

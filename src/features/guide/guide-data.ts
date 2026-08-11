@@ -21,7 +21,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Comece aqui",
     description: "Entenda o caminho mais simples para colocar sua corretora em operação e saber onde cada tarefa acontece.",
     icon: "RocketLaunch",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir resumo", href: "/dashboard" }, { label: "Abrir configurações", href: "/settings" }],
     steps: [
       { title: "Confira seu espaço de trabalho", description: "Veja o nome e a identidade da sua corretora no menu. O que você enxerga depende do seu papel e da sua carteira." },
@@ -36,7 +36,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Atendimento",
     description: "Cadastre, encontre e avance cada oportunidade sem perder o histórico do atendimento.",
     icon: "Users",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Leads", href: "/leads" }],
     steps: [
       { title: "Encontre o lead", description: "Use a busca ou os filtros para encontrar por nome, telefone, status ou filial. O filtro fica preservado quando você volta para a lista." },
@@ -52,7 +52,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Atendimento",
     description: "Centralize a conversa com o cliente e mantenha o contexto do lead à mão.",
     icon: "ChatCircleText",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Conversas", href: "/conversas" }, { label: "Conectar WhatsApp", href: "/integrations/whatsapp" }],
     steps: [
       { title: "Escolha uma conversa", description: "Pesquise pelo nome, telefone ou e-mail. A lista mostra a última mensagem e o status do atendimento." },
@@ -68,7 +68,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Atendimento",
     description: "Transforme cada decisão em uma ação com prazo, prioridade e responsável.",
     icon: "ClipboardText",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Tarefas", href: "/tarefas" }],
     steps: [
       { title: "Crie a tarefa dentro do lead", description: "Assim ela já nasce ligada ao contexto certo e aparece para as pessoas responsáveis." },
@@ -83,7 +83,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Atendimento",
     description: "Saiba o que falta, envie arquivos e acompanhe a aprovação sem procurar em várias telas.",
     icon: "Note",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Documentos", href: "/documentos" }],
     steps: [
       { title: "Veja o checklist aplicável", description: "Os documentos pedidos dependem da cotação, operadora e plano. Assim você evita pedir arquivos desnecessários." },
@@ -98,7 +98,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Gestão",
     description: "Quando um lead vira venda, acompanhe o cliente ativo e o que acontece depois do fechamento.",
     icon: "Handshake",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Clientes", href: "/clientes" }, { label: "Abrir Vendas", href: "/vendas" }],
     steps: [
       { title: "Converta no momento certo", description: "A conversão transforma o lead em cliente ativo e preserva o vínculo com o histórico comercial." },
@@ -124,6 +124,23 @@ export const guideSections: GuideSection[] = [
     tip: "Permissão e responsabilidade andam juntas: cada pessoa deve enxergar apenas o que precisa para trabalhar bem.",
   },
   {
+    id: "supervisao-equipe",
+    title: "Supervisão da equipe",
+    eyebrow: "Gestão",
+    description: "Acompanhe os corretores vinculados à sua unidade, identifique riscos de atendimento e oriente o próximo passo sem assumir as decisões de distribuição.",
+    icon: "Users",
+    audience: ["supervisor"],
+    links: [{ label: "Abrir equipe", href: "/equipe" }, { label: "Abrir Leads", href: "/leads" }, { label: "Abrir resumo", href: "/dashboard" }],
+    steps: [
+      { title: "Conheça sua equipe", description: "Na sua unidade, consulte os perfis e mantenha claro quais corretores estão sob sua supervisão." },
+      { title: "Acompanhe os sinais de risco", description: "Use Leads, Conversas, Tarefas, Documentos e alertas para encontrar falta de retorno, pendências e atendimentos que precisam de orientação." },
+      { title: "Oriente com contexto", description: "Abra o histórico do lead antes de orientar o corretor. Registre o próximo passo no fluxo adequado para que a informação não fique apenas em conversas paralelas." },
+      { title: "Escalone a exceção certa", description: "Encaminhe para o Gestor ou Diretor os casos que exigem distribuição, reatribuição, mudança de fila ou regra operacional." },
+      { title: "Mantenha a estrutura atualizada", description: "Você pode convidar corretores para a sua unidade. A definição de Gestores, Supervisores, filiais e regras de distribuição permanece com os papéis autorizados." },
+    ],
+    tip: "Supervisor não é uma fila intermediária de aprovação: é o papel que dá visibilidade, orientação e escalonamento rápido à equipe local.",
+  },
+  {
     id: "distribuicao-leads",
     title: "Distribuição de leads",
     eyebrow: "Gestão",
@@ -146,7 +163,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Gestão",
     description: "Configure regras, acompanhe repasses e transforme objetivos comerciais em acompanhamento diário.",
     icon: "Target",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Comissões", href: "/configuracoes/comissoes" }, { label: "Abrir Metas", href: "/metas" }, { label: "Minha meta", href: "/minha-meta" }],
     steps: [
       { title: "Defina a regra de comissão", description: "O Diretor pode configurar percentuais por operadora, plano ou regra geral, incluindo parcelas futuras." },
@@ -177,7 +194,7 @@ export const guideSections: GuideSection[] = [
     eyebrow: "Configuração",
     description: "Use os avisos para agir no momento certo, sem transformar o sistema em uma lista de ruídos.",
     icon: "Bell",
-    audience: ["director", "manager", "broker"],
+    audience: ["director", "manager", "supervisor", "broker"],
     links: [{ label: "Abrir Notificações", href: "/notificacoes" }],
     steps: [
       { title: "Abra a central", description: "Veja alertas relacionados à sua carteira ou ao escopo da sua função." },

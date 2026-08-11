@@ -31,16 +31,18 @@ export function DataTableViewOptions<TData>({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button
-          variant="outline"
-          size="sm"
-          className="ml-auto hidden h-9 lg:flex gap-1 text-xs"
-        >
-          <SlidersHorizontal className="size-3.5" />
-          Colunas
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto hidden h-9 lg:flex gap-1 text-xs"
+          >
+            <SlidersHorizontal className="size-3.5" />
+            Colunas
+          </Button>
+        }
+      />
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="text-xs">Alternar colunas</DropdownMenuLabel>
         <DropdownMenuSeparator />

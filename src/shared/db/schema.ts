@@ -3447,6 +3447,58 @@ export const crmAutomationLogs = pgTable(
   ],
 );
 
+/**
+ * Versioned definitions for the modular Automation Builder. This is intentionally
+ * separate from crmAutomations while the legacy outbound engine is still active.
+ */
+export const workflowAutomations = pgTable(
+  "workflow_automations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    status: automationStatus("status").notNull().default("rascunho"),
+    draftDefinition: jsonb("draft_definition").notNull().default({ schemaVersion: 1, nodes: [], edges: [] }),
+    publishedVersionId: text("published_version_id"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("workflow_automations_tenant_status_idx").on(table.tenantId, table.status),
+    index("workflow_automations_tenant_updated_idx").on(table.tenantId, table.updatedAt),
+  ],
+);
+
+/** Immutable snapshots created only on publication. */
+export const workflowAutomationVersions = pgTable(
+  "workflow_automation_versions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflowAutomations.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    definition: jsonb("definition").notNull(),
+    publishedBy: text("published_by")
+      .notNull()
+      .references(() => user.id),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("workflow_automation_versions_workflow_version_unique").on(table.workflowId, table.version),
+    index("workflow_automation_versions_tenant_workflow_idx").on(table.tenantId, table.workflowId),
+  ],
+);
+
 export const whatsappFlows = pgTable(
   "whatsapp_flows",
   {

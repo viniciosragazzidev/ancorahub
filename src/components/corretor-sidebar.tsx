@@ -128,7 +128,7 @@ export function CorretorSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="p-2">
+      <SidebarContent className="pl-3 pr-1 py-2 group-data-[collapsible=icon]:px-0">
         <SidebarMenu className="gap-1">
           {visibleItems.map((item) => {
             const Icon = item.icon;

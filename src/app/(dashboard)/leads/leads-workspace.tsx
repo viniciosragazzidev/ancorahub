@@ -334,7 +334,7 @@ export function LeadsWorkspace({
   return (
     <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-5">
 
-      <div className="grid gap-3 rounded-2xl border border-border/70 bg-card/80 p-1 sm:grid-cols-3">
+        <div className="grid gap-3 rounded-2xl border border-border/50 bg-card/70 p-1 dark:border-border/70 dark:bg-card/80 sm:grid-cols-3">
         <StatCard
           label="Sem responsável"
           value={unassignedCount}
@@ -394,7 +394,7 @@ export function LeadsWorkspace({
         </div>
 
         <TabsContent value="list" className="mt-4">
-          <Card variant="subtle" className="rounded-2xl bg-card/95">
+          <Card variant="subtle" className="rounded-2xl border-border/50 bg-card/80 dark:border-border/70 dark:bg-card/95">
             <CardContent className="p-0">
               <div className="hidden divide-y divide-border max-[559px]:block">
                 {leads.map((lead) => (

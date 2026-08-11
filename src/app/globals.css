@@ -61,7 +61,7 @@
   /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
-  --background: oklch(0.978 0.004 235);
+  --background: oklch(100% 0.00011 271.152);
   --foreground: oklch(0.170 0.012 260);
 
   --card: oklch(0.998 0.001 235);
@@ -273,7 +273,7 @@
   --surface-overlay: oklch(0.280 0.010 260);
 
   --background: oklch(0.150 0.008 260);
-  --foreground: oklch(0.940 0.006 260);
+  --foreground: oklch(100% 0.00011 271.152);
 
   --card: oklch(0.190 0.009 260);
   --card-foreground: oklch(0.940 0.006 260);
@@ -1167,29 +1167,30 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    oklch(1 0 0 / 0.45) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      oklch(1 0 0 / 0.45) 50%,
+      transparent 100%);
   background-size: 200% 100%;
   animation: ct-shimmer 1.6s var(--ease-linear) infinite;
 }
 
 .dark .ct-skeleton::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    oklch(0.35 0.008 260 / 0.4) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      oklch(0.35 0.008 260 / 0.4) 50%,
+      transparent 100%);
   background-size: 200% 100%;
 }
 
 @keyframes ct-shimmer {
-  from { background-position: 200% center; }
-  to   { background-position: -200% center; }
+  from {
+    background-position: 200% center;
+  }
+
+  to {
+    background-position: -200% center;
+  }
 }
 
 /* Pulse variant (simpler, for inline placeholders) */
@@ -1200,8 +1201,15 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
 }
 
 /* ── 5. Form field — transition on focus ────────────────────────────────── */
@@ -1211,7 +1219,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 [data-slot="select-trigger"] {
   transition:
     border-color var(--duration-quick) var(--ease-smooth-out),
-    box-shadow   var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-quick) var(--ease-smooth-out),
     background-color var(--duration-quick) var(--ease-smooth-out);
 }
 
@@ -1231,11 +1239,27 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-shake {
-  0%, 100% { transform: translateX(0); }
-  20%       { transform: translateX(-4px); }
-  40%       { transform: translateX(4px); }
-  60%       { transform: translateX(-3px); }
-  80%       { transform: translateX(2px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-4px);
+  }
+
+  40% {
+    transform: translateX(4px);
+  }
+
+  60% {
+    transform: translateX(-3px);
+  }
+
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 /* ── 6. Badge pop-in ────────────────────────────────────────────────────── */
@@ -1245,8 +1269,15 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-badge-pop {
-  from { opacity: 0; transform: scale(0.78); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* ── 7. Toast / Sonner slide-in ─────────────────────────────────────────── */
@@ -1265,6 +1296,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
     transform: translateY(8px) scale(0.96);
     filter: blur(2px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1278,6 +1310,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
     transform: translateY(0) scale(1);
     max-height: 120px;
   }
+
   to {
     opacity: 0;
     transform: translateY(-6px) scale(0.95);
@@ -1292,7 +1325,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 [data-slot="select-content"],
 [data-slot="context-menu-content"] {
   transform-origin: var(--radix-dropdown-menu-content-transform-origin,
-                        var(--radix-popover-content-transform-origin, top left));
+      var(--radix-popover-content-transform-origin, top left));
 }
 
 [data-slot="dropdown-menu-content"][data-state="open"],
@@ -1310,13 +1343,29 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-dropdown-in {
-  from { opacity: 0; transform: scale(0.94) translateY(-4px); filter: blur(1px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0);    filter: blur(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+    filter: blur(1px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
 }
 
 @keyframes ct-dropdown-out {
-  from { opacity: 1; transform: scale(1)    translateY(0); }
-  to   { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
 }
 
 /* ── 9. Sheet (drawer) slide-in ─────────────────────────────────────────── */
@@ -1330,13 +1379,27 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-sheet-in {
-  from { opacity: 0; transform: translateX(100%); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes ct-sheet-out {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(100%); }
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
 }
 
 /* ── 10. Tab indicator pulse on switch ──────────────────────────────────── */
@@ -1370,7 +1433,9 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── 13. Content fade-up (re-usable reveal class) ───────────────────────── */
@@ -1384,12 +1449,19 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @keyframes ct-reveal {
-  from { opacity: 0; transform: translateY(var(--distance-small)); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-small));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Stagger helper: add style="--stagger: N" on children, use ct-stagger on parent */
-.ct-stagger > * {
+.ct-stagger>* {
   animation: ct-reveal var(--duration-medium) var(--ease-smooth-out) both;
   animation-delay: calc(var(--stagger, 0) * var(--duration-stagger));
 }
@@ -1427,7 +1499,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   .ct-spinner,
   .ct-reveal,
   .ct-reveal-fast,
-  .ct-stagger > *,
+  .ct-stagger>*,
   [data-slot="badge"],
   [data-sonner-toast],
   [data-slot="sheet-content"],
@@ -1437,4 +1509,10 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
     animation: none !important;
     transition: none !important;
   }
+}
+
+
+
+#tabs-lead-page {
+  min-height: 65px !important;
 }

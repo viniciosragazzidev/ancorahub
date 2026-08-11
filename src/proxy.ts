@@ -7,7 +7,7 @@ import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db";
 
 const protectedPathPrefixes = ["/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos", "/clientes", "/metas", "/relatorios", "/catalogo", "/minha-fila", "/minha-meta", "/notificacoes", "/filiais", "/financeiro", "/configuracoes", "/diretor", "/gestor", "/corretor", "/super-admin", "/checklist", "/materiais-divulgacao", "/marketing"] as const;
-const publicPaths = ["/compartilhado", "/api/public"] as const;
+const publicPaths = ["/compartilhado", "/api/public", "/health"] as const;
 const authPaths = ["/login", "/verify", "/admin/login"] as const;
 
 type SessionLookup = { userId: string; role: string | null; onboardingStatus: string | null } | null;

@@ -31,7 +31,6 @@ import { PersonRecordDetails } from "@/features/customer-record/components/perso
 import {
   resolveLeadNextBestAction,
   NextBestActionCard,
-  NextBestActionBanner,
   type LeadActionContext,
 } from "@/features/next-best-action";
 
@@ -164,12 +163,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-5 bg-background p-4 lg:p-6">
 
         {/* Profile Cover & Header Card */}
-        <div className="rounded-xl border border-border/80 bg-card px-4 py-4 shadow-none sm:px-5" data-onboarding="lead-profile">
-          {/* Subtle brand color cover warning */}
-          <div className="hidden" />
-
+        <Card variant="overview" className="border-border/60 bg-card/80 p-4 shadow-none dark:border-border/80 dark:bg-card sm:p-5" data-onboarding="lead-profile">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            {/* Avatar overlapping cover */}
             <UserAvatar seed={lead.email || lead.nome} name={lead.nome} className="size-11 rounded-xl shrink-0" />
 
             <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -213,7 +208,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* SLA Diagnostic & Loss Audit Card */}
         {lead.status === "lost" || lead.lossCategory ? (
@@ -243,7 +238,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         ) : null}
 
         {/* Main operational area */}
-        <div className="min-w-0 space-y-5">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
           <section className="min-w-0 space-y-5">
             {/* Dense operational content is organized in the tabs below. */}
 
@@ -292,32 +287,32 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
 
 
-          {(() => {
-            const qualDetails = lead.qualificationDetails as { status?: string; score?: number } | null;
-            const leadActionCtx: LeadActionContext = {
-              id: lead.id,
-              name: lead.nome,
-              status: lead.status,
-              qualificationStatus: qualDetails?.status ?? null,
-              score: qualDetails?.score ?? null,
-              phone: lead.telefone,
-              hasSlaBreach: Boolean(lead.slaBreachedAt),
-              documentsPendingCount: leadDocs.filter((d) => d.status === "pending" || d.status === "rejected").length,
-              documentsApprovedCount: leadDocs.filter((d) => d.status === "approved").length,
-              totalDocumentsRequired: leadDocs.length,
-              hasCompletedSale: lead.status === "converted",
-              firstContactCompleted: lead.status !== "new" && lead.status !== "distributed",
-            };
-            const leadNextBestAction = resolveLeadNextBestAction(leadActionCtx, context.role, context.jobTitle);
-            return <NextBestActionCard action={leadNextBestAction} className="mb-4" />;
-          })()}
+            {(() => {
+              const qualDetails = lead.qualificationDetails as { status?: string; score?: number } | null;
+              const leadActionCtx: LeadActionContext = {
+                id: lead.id,
+                name: lead.nome,
+                status: lead.status,
+                qualificationStatus: qualDetails?.status ?? null,
+                score: qualDetails?.score ?? null,
+                phone: lead.telefone,
+                hasSlaBreach: Boolean(lead.slaBreachedAt),
+                documentsPendingCount: leadDocs.filter((d) => d.status === "pending" || d.status === "rejected").length,
+                documentsApprovedCount: leadDocs.filter((d) => d.status === "approved").length,
+                totalDocumentsRequired: leadDocs.length,
+                hasCompletedSale: lead.status === "converted",
+                firstContactCompleted: lead.status !== "new" && lead.status !== "distributed",
+              };
+              const leadNextBestAction = resolveLeadNextBestAction(leadActionCtx, context.role, context.jobTitle);
+              return <NextBestActionCard action={leadNextBestAction} className="mb-4" />;
+            })()}
 
-            <Tabs defaultValue={defaultLeadTab} orientation="horizontal" className="min-h-0 min-w-0 gap-4 overflow-hidden md:grid md:grid-cols-[180px_minmax(0,1fr)] md:gap-5">
-              <TabsList aria-label="Etapas do atendimento" className="h-auto py-4 w-full max-w-full min-w-0 flex-row items-stretch gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/70 bg-muted/20 p-2 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:h-fit md:flex-col md:overflow-visible md:[scrollbar-width:auto]" variant="line">
-                <TabsTrigger value="service" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Atendimento</span><span className="text-[11px] font-normal text-muted-foreground">Contato inicial</span></span></TabsTrigger>
+            <Tabs defaultValue={defaultLeadTab} orientation="horizontal" className="min-h-0 min-w-0 gap-5 overflow-hidden">
+              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="h-30 w-full py-8 max-w-full min-w-0 flex-row items-stretch gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/50 bg-muted/15 p-2 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-border/70 dark:bg-muted/20" variant="line">
+                <TabsTrigger value="service" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left"><span className="flex flex-col items-start gap-0.5"><span>Atendimento</span><span className="text-[11px] font-normal text-muted-foreground">Contato inicial</span></span></TabsTrigger>
                 <TabsTrigger value="documents" disabled={stageRank < 5} className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1">{stageRank < 5 ? <LockKey className="size-3.5 text-muted-foreground" /> : null}<span className="flex flex-col items-start gap-0.5"><span>Documentos {leadDocs.length > 0 ? `(${leadDocs.length})` : ""}</span><span className="text-[11px] font-normal text-muted-foreground">Análise cadastral</span></span></TabsTrigger>
                 <TabsTrigger value="history" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Histórico</span><span className="text-[11px] font-normal text-muted-foreground">Linha do tempo</span></span></TabsTrigger>
-                <TabsTrigger value="tasks" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Tarefas ({tasks.filter(t => !t.completedAt).length})</span><span className="text-[11px] font-normal text-muted-foreground">Próximas ações</span></span></TabsTrigger>
+                <TabsTrigger value="tasks" className="min-w-[132px] py-6 flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Tarefas ({tasks.filter(t => !t.completedAt).length})</span><span className="text-[11px] font-normal text-muted-foreground">Próximas ações</span></span></TabsTrigger>
               </TabsList>
 
               <TabsContent value="service" className="mt-0 space-y-5">
@@ -350,11 +345,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     showFeedback={context.role === "broker" && context.userId === lead.corretorId && lead.status !== "lost" && lead.status !== "converted"}
                   />
                 )}
-                <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-border/50 bg-muted/15 px-4 py-3 text-sm text-muted-foreground dark:border-border/70 dark:bg-muted/20">
                   Esta é a etapa atual. As próximas etapas são liberadas conforme o status do lead avança.
                 </div>
                 {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges) && (
-                  <Card className="border-border bg-card shadow-none">
+                  <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Dados da qualificação</CardTitle>
                       <CardDescription>Dados coletados pelo agente, separados entre atendimento individual e empresarial.</CardDescription>
@@ -372,7 +367,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
                 {/* ── Dados adicionais do formulário (PF / PME) ──────────────── */}
                 {(lead.tipo === "PF" && (formData.dependentes || formData.mediaIdades)) && (
-                  <Card className="border-border bg-card shadow-none">
+                  <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Dados informados no cadastro</CardTitle>
                       <CardDescription>Informações adicionais coletadas durante a criação do lead.</CardDescription>
@@ -388,7 +383,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </Card>
                 )}
                 {(lead.tipo === "PME" && (formData.razaoSocial || formData.cnpj || formData.funcionarios)) && (
-                  <Card className="border-border bg-card shadow-none">
+                  <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Dados da empresa (PME)</CardTitle>
                       <CardDescription>Informações da pessoa jurídica contratante.</CardDescription>
@@ -433,7 +428,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </TabsContent>
 
               <TabsContent value="documents" className="mt-4">
-                <Card className="border-border bg-card shadow-sm" id="documentos">
+                <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card" id="documentos">
                   <CardHeader className="pb-3 border-b border-border/40">
                     <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Documentação do atendimento</CardTitle>
                     <CardDescription className="text-xs">Anexe documentos opcionais por titular ou beneficiário. A aprovação é acompanhada pela fila central de Documentos.</CardDescription>
@@ -447,7 +442,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </TabsContent>
 
               <TabsContent value="history" className="mt-4">
-                <Card className="border-border bg-card shadow-sm" data-onboarding="lead-timeline">
+                <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card" data-onboarding="lead-timeline">
                   <CardContent className="pt-6">
                     <LeadTimeline leadId={lead.id} interactions={interactions} />
                   </CardContent>
@@ -455,7 +450,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </TabsContent>
 
               <TabsContent value="tasks" className="mt-4" id="tarefas">
-                <Card className="border-border bg-card shadow-sm" data-onboarding="create-follow-up">
+                <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card" data-onboarding="create-follow-up">
                   <CardContent className="pt-6">
                     <LeadTasks assignees={context.role === "broker" ? [{ id: context.userId, name: lead.corretorNome ?? "Eu" }] : brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />
                   </CardContent>
@@ -569,8 +564,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {false && <LeadChat phone={canSeePersonalData ? lead.telefone : null} />}
           </section>
 
-          {false && <aside className="space-y-4 xl:sticky xl:top-24">
-            <Card className="border-border/80 bg-card shadow-none">
+          <aside className="space-y-4 xl:sticky xl:top-24">
+            <Card className="border-border/60 bg-card/80 shadow-none dark:border-border/80 dark:bg-card">
               <CardHeader className="border-b border-border/60 pb-3">
                 <CardTitle className="text-sm font-semibold">Dados do lead</CardTitle>
                 <CardDescription className="text-xs">Informações sempre visíveis durante o atendimento.</CardDescription>
@@ -585,7 +580,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {!canSeePersonalData && <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-relaxed text-muted-foreground">O telefone e o e-mail serão liberados quando você iniciar o atendimento.</div>}
               </CardContent>
             </Card>
-          </aside>}
+          </aside>
         </div>
 
       </main>

@@ -20,7 +20,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
-import { evaluateQualification, persistQualificationEvaluation } from "@/features/qualification-engine/service";
+import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion } from "@/features/qualification-engine/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
@@ -630,6 +630,11 @@ export async function processInboundAiResponse({
     .where(eq(schema.tenants.id, tenantId))
     .limit(1);
 
+  const nextPendingQuestion = getNextQualificationQuestion(updatedMemory, behavior.policy);
+  const nextQuestionGuidance = nextPendingQuestion
+    ? `\n\nPERGUNTA OBRIGATÓRIA PENDENTE A FAZER AGORA (Faça APENAS esta pergunta ao cliente de forma natural em português): "${nextPendingQuestion.text}"`
+    : "";
+
   // 8. Chamar gerador de resposta da IA com contexto de memória + configs tenant
   // No modo de reset por mensagem, o contexto enviado à IA contém apenas a mensagem atual.
   const aiResult = await generateAiResponse({
@@ -638,7 +643,7 @@ export async function processInboundAiResponse({
     leadType: lead?.tipo,
     messages: aiMessages,
     preferredLanguage: detectedLanguage,
-    memoryContext,
+    memoryContext: `${memoryContext}${nextQuestionGuidance}`,
     tenantConfig,
     tenantName: tenantInfo?.name,
   });
@@ -962,9 +967,28 @@ export async function processInboundAiResponse({
   }
 
   const persistedQualification = await persistQualificationEvaluation({ tenantId, leadId, conversationId: conversation.id, actorUserId: null, policy: behavior.policy, memory: updatedMemory });
-  if (persistedQualification.state === "QUALIFIED" && (await getSystemSetting("feature_distribution_by_qualification_enabled")) === "true") {
-    await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
+  if (persistedQualification.state === "QUALIFIED") {
+    try {
+      const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+      const distResult = await distributeQualifiedLead({ tenantId, leadId, actorUserId: null });
+
+      const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
+      await executeDeterministicClosing(tenantId, conversation.id, leadId, updatedMemory.customerName?.value);
+
+      console.info("[qualification] completed_and_routed", {
+        tenantId,
+        leadId,
+        conversationId: conversation.id,
+        classification: persistedQualification.classification,
+        score: persistedQualification.score,
+        distributed: distResult.distributed,
+        brokerId: distResult.brokerId ?? null,
+      });
+    } catch (distErr) {
+      console.error("[qualification] error_during_distribution_or_closing", distErr);
+    }
   }
+
 
   // 7. Salvar mensagem da IA no banco
   const messageId = `ai_msg_${crypto.randomUUID()}`;

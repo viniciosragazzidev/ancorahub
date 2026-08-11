@@ -20,6 +20,9 @@ import { retryLeadEffectAction } from "@/features/lead-distribution/actions";
 
 export const dynamic = "force-dynamic";
 
+type DistributionView = "operar" | "configurar" | "saude";
+type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
+
 const activeStatuses = [
   "new",
   "distributed",
@@ -30,7 +33,16 @@ const activeStatuses = [
   "under_analysis",
 ] as const;
 
-export default async function LeadDistributionPage() {
+export default async function LeadDistributionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; status?: string }>;
+}) {
+  const params = await searchParams;
+  const view: DistributionView = params.view === "configurar" || params.view === "saude" ? params.view : "operar";
+  const queueFilter: QueueFilter = params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
+    ? params.status
+    : "all";
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
 
@@ -263,53 +275,129 @@ export default async function LeadDistributionPage() {
   const totalBrokers = [...countsByBranch.values()].reduce((a, b) => a + b, 0);
   const totalAvailable = [...availableByBranch.values()].reduce((a, b) => a + b, 0);
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
+  const queueCards = ([
+    ...(context.role === "director"
+      ? [{ status: "unassigned" as const, title: "Sem unidade", description: "Aguardando encaminhamento do Diretor." }]
+      : []),
+    { status: "queued" as const, title: "Sem corretor", description: "Aguardando atribuição ou distribuição automática." },
+    { status: "returned_to_queue" as const, title: "Devolvidos à fila", description: "Precisam de revisão antes de uma nova atribuição." },
+  ]).map((queue) => {
+    const leads = unassignedLeads.filter((lead) => lead.distributionStatus === queue.status);
+    const oldest = leads[0]?.createdAt;
+    return {
+      ...queue,
+      count: leads.length,
+      oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${oldest.toLocaleDateString("pt-BR")}`,
+    };
+  });
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Distribuição de Leads" />
+      <DashboardHeader breadcrumb="Operação comercial" title="Central de Filas" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        {/* Visão geral — métricas em destaque, ação principal logo abaixo */}
-        <DistributionMetrics
-          metrics={{
-            totalBranches,
-            acceptingBranches,
-            autoDistributeBranches,
-            totalBrokers,
-            totalAvailable,
-            totalNewLeads,
-          }}
-        />
-        <DistributionInbox
-          role={context.role}
-          branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-          brokers={brokers.map((broker) => ({
-            id: broker.id,
-            name: broker.name,
-            branchId: broker.branchId,
-            availabilityStatus: broker.availabilityStatus,
-            activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-          }))}
-          leads={unassignedLeads.map((lead) => ({
-            ...lead,
-            createdAt: lead.createdAt.toISOString(),
-          }))}
-        />
-        {/* Configuração — unidades, corretores e regras de distribuição */}
-        <DistributionPanel
-          branches={enrichedBranches}
-          brokers={brokers.map((broker) => ({
-            id: broker.id,
-            name: broker.name,
-            email: broker.email,
-            branchId: broker.branchId,
-            branchName: broker.branchName,
-            availabilityStatus: broker.availabilityStatus,
-            activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-          }))}
-          canManageAcceptingLeads={context.role === "director"}
-        />
-        {/* Monitoramento — saúde do processamento assíncrono */}
-        <Card>
+        <section className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 shadow-xs sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold">Filas com responsabilidade clara</p>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Opere pendências, ajuste regras ou acompanhe a automação sem misturar decisões de momentos diferentes.
+            </p>
+          </div>
+          <nav aria-label="Seções da Central de Filas" className="flex flex-wrap gap-2">
+            <Button render={<Link href="/leads/distribuicao?view=operar" />} size="sm" variant={view === "operar" ? "default" : "outline"}>
+              Operar filas
+            </Button>
+            <Button render={<Link href="/leads/distribuicao?view=configurar" />} size="sm" variant={view === "configurar" ? "default" : "outline"}>
+              Configurar
+            </Button>
+            <Button render={<Link href="/leads/distribuicao?view=saude" />} size="sm" variant={view === "saude" ? "default" : "outline"}>
+              Saúde da automação
+            </Button>
+          </nav>
+        </section>
+        {view === "operar" ? (
+          <>
+            <DistributionMetrics
+              metrics={{
+                totalBranches,
+                acceptingBranches,
+                autoDistributeBranches,
+                totalBrokers,
+                totalAvailable,
+                totalNewLeads,
+              }}
+            />
+            <section aria-labelledby="filas-de-acao" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="md:col-span-2 xl:col-span-3">
+                <h2 id="filas-de-acao" className="text-base font-semibold">Filas de ação</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Comece pela fila mais antiga que está sob sua responsabilidade.</p>
+              </div>
+              {queueCards.map((queue) => (
+                <Card key={queue.status} variant="overview" className="gap-0">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base">{queue.title}</CardTitle>
+                        <CardDescription className="mt-1">{queue.description}</CardDescription>
+                      </div>
+                      <Badge variant={queue.count > 0 ? "warning" : "success"}>{queue.count}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                    <span className="text-xs text-muted-foreground">{queue.oldestLabel}</span>
+                    <Button render={<Link href={`/leads/distribuicao?view=operar&status=${queue.status}#inbox-distribuicao`} />} size="xs" variant="outline">
+                      Abrir fila
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </section>
+            <div id="inbox-distribuicao">
+              <DistributionInbox
+                key={queueFilter}
+                role={context.role}
+                initialStatusFilter={queueFilter}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                brokers={brokers.map((broker) => ({
+                  id: broker.id,
+                  name: broker.name,
+                  branchId: broker.branchId,
+                  availabilityStatus: broker.availabilityStatus,
+                  activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+                }))}
+                leads={unassignedLeads.map((lead) => ({
+                  ...lead,
+                  createdAt: lead.createdAt.toISOString(),
+                }))}
+              />
+            </div>
+          </>
+        ) : null}
+        {view === "configurar" ? (
+          <>
+            <Card variant="overview">
+              <CardHeader>
+                <CardTitle>Configuração da distribuição</CardTitle>
+                <CardDescription>Altere disponibilidade, capacidade e regras fora da rotina de tratamento da fila. As mudanças afetam os próximos leads recebidos.</CardDescription>
+              </CardHeader>
+            </Card>
+            <DistributionPanel
+              branches={enrichedBranches}
+              brokers={brokers.map((broker) => ({
+                id: broker.id,
+                name: broker.name,
+                email: broker.email,
+                branchId: broker.branchId,
+                branchName: broker.branchName,
+                availabilityStatus: broker.availabilityStatus,
+                activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+              }))}
+              canManageAcceptingLeads={context.role === "director"}
+            />
+          </>
+        ) : null}
+        {view === "saude" ? (
+          <>
+            <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
             <div>
               <CardTitle>Automação da fila</CardTitle>
@@ -412,6 +500,8 @@ export default async function LeadDistributionPage() {
             )}
           </CardContent>
         </Card>
+          </>
+        ) : null}
       </main>
     </>
   );

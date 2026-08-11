@@ -14,6 +14,8 @@ import { PasskeyToastHandler } from "@/components/passkey-toast-handler";
 import { RouteOnboardingLoader } from "@/features/onboarding/components/route-onboarding-loader";
 import { CommandPalette } from "@/components/command-palette";
 import { ContextualHelpDrawer } from "@/components/contextual-help-drawer";
+import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
+import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -46,30 +48,33 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     .limit(1);
 
   return (
-    <AppShell
-      branding={{
-        tenantName: tenant?.name ?? null,
-        brandColor: tenant?.brandColor ?? null,
-        logoUrl: tenant?.logoUrl ?? null,
-      }}
-    >
-      <TenantOnboardingDialogLoader />
-      <DirectorWizardLoader />
-      <RouteOnboardingLoader />
-      <RealtimeSyncProvider
-        tenantId={context.tenantId}
-        userId={context.userId}
-        role={context.role}
-        branchId={context.branchId}
+    <AgentDrawerProvider>
+      <AppShell
+        branding={{
+          tenantName: tenant?.name ?? null,
+          brandColor: tenant?.brandColor ?? null,
+          logoUrl: tenant?.logoUrl ?? null,
+        }}
       >
-        <NotificationCountProvider userId={context.userId}>
-          <FeedbackToastHandler userId={context.userId} />
-          <PasskeyToastHandler userId={context.userId} />
-          <CommandPalette />
-          <ContextualHelpDrawer />
-          {children}
-        </NotificationCountProvider>
-      </RealtimeSyncProvider>
-    </AppShell>
+        <TenantOnboardingDialogLoader />
+        <DirectorWizardLoader />
+        <RouteOnboardingLoader />
+        <RealtimeSyncProvider
+          tenantId={context.tenantId}
+          userId={context.userId}
+          role={context.role}
+          branchId={context.branchId}
+        >
+          <NotificationCountProvider userId={context.userId}>
+            <FeedbackToastHandler userId={context.userId} />
+            <PasskeyToastHandler userId={context.userId} />
+            <CommandPalette />
+            <ContextualHelpDrawer />
+            <AgentDrawer />
+            {children}
+          </NotificationCountProvider>
+        </RealtimeSyncProvider>
+      </AppShell>
+    </AgentDrawerProvider>
   );
 }

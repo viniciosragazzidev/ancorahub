@@ -81,11 +81,13 @@ export function DistributionInbox({
   leads,
   branches,
   brokers,
+  initialStatusFilter = "all",
 }: {
   role: string;
   leads: Lead[];
   branches: Branch[];
   brokers: Broker[];
+  initialStatusFilter?: "all" | "unassigned" | "queued" | "returned_to_queue";
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
@@ -93,7 +95,7 @@ export function DistributionInbox({
   const [brokerByLead, setBrokerByLead] = useState<Record<string, string>>({});
   const [batchBrokerId, setBatchBrokerId] = useState("");
   const [unitFilter, setUnitFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [page, setPage] = useState(1);
   const selectable = useMemo(
     () =>
@@ -156,7 +158,7 @@ export function DistributionInbox({
   }
 
   function changeStatusFilter(value: string) {
-    setStatusFilter(value);
+    setStatusFilter(value as "all" | "unassigned" | "queued" | "returned_to_queue");
     setPage(1);
     setSelected([]);
   }

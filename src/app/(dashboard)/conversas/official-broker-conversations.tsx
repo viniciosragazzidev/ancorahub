@@ -69,7 +69,7 @@ export function OfficialBrokerConversations({ enabled, conversations }: { enable
   }
 
   return (
-    <section aria-label="Conversas oficiais com corretores" className="flex h-[calc(100dvh-var(--header-height)-8.5rem)] min-h-[34rem] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_18px_50px_-32px_color-mix(in_oklch,var(--foreground)_32%,transparent)]">
+    <section aria-label="Conversas oficiais com corretores" className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card">
       <header className="shrink-0 border-b border-border px-4 py-3 lg:px-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0">
