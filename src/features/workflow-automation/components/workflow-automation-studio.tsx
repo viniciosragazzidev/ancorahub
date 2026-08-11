@@ -735,16 +735,20 @@ export function WorkflowAutomationStudio({
                 }}
               />
             ))}
-            <AnimatePresence>
-              {quickAddSource ? (
-                <QuickAdd
-                  query={query}
-                  onQueryChange={setQuery}
-                  onClose={() => setQuickAddSource(null)}
-                  onPick={(kind) => addNode(kind)}
-                />
-              ) : null}
-            </AnimatePresence>
+            {quickAddSource ? (
+              <QuickAdd
+                position={
+                  definition.nodes.find((node) => node.id === quickAddSource.nodeId)
+                    ? {
+                        x: (definition.nodes.find((node) => node.id === quickAddSource.nodeId)?.position.x ?? 300) + 250,
+                        y: definition.nodes.find((node) => node.id === quickAddSource.nodeId)?.position.y ?? 150,
+                      }
+                    : { x: 300, y: 150 }
+                }
+                onClose={() => setQuickAddSource(null)}
+                onPick={(kind) => addNode(kind)}
+              />
+            ) : null}
             {pendingSource ? (
               <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-xl border border-primary/30 bg-card px-3 py-2 text-xs font-medium text-foreground shadow-lg">
                 Saída selecionada. Clique no próximo node para conectar.
@@ -895,45 +899,52 @@ function WorkflowNodeCard({
 }
 
 function QuickAdd({
-  query,
-  onQueryChange,
+  position,
   onClose,
   onPick,
 }: {
-  query: string;
-  onQueryChange: (value: string) => void;
+  position: { x: number; y: number };
   onClose: () => void;
   onPick: (kind: WorkflowNodeKind) => void;
 }) {
+  const [localQuery, setLocalQuery] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    inputRef.current?.focus({ preventScroll: true });
+  }, []);
+
   const items = listWorkflowNodeDefinitions()
     .filter(
       (item) =>
         item.category !== "trigger" &&
         `${item.label} ${item.description}`
           .toLocaleLowerCase("pt-BR")
-          .includes(query.toLocaleLowerCase("pt-BR")),
+          .includes(localQuery.toLocaleLowerCase("pt-BR")),
     )
     .slice(0, 6);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      initial={{ opacity: 0, y: 4, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 6, scale: 0.98 }}
-      transition={{ duration: 0.18 }}
-      className="absolute left-1/2 top-1/2 z-30 w-80 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-popover p-3 shadow-xl"
+      exit={{ opacity: 0, y: 4, scale: 0.96 }}
+      transition={{ duration: 0.15 }}
+      style={{ left: position.x, top: position.y }}
+      className="absolute z-30 w-80 rounded-2xl border border-border bg-popover/95 p-3 shadow-xl backdrop-blur"
     >
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-semibold">Adicionar próximo passo</p>
-        <Button variant="ghost" size="sm" onClick={onClose}>
+        <p className="text-xs font-semibold text-foreground">Adicionar próximo passo</p>
+        <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={onClose}>
           Fechar
         </Button>
       </div>
       <Input
-        autoFocus
-        value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
+        ref={inputRef}
+        value={localQuery}
+        onChange={(event) => setLocalQuery(event.target.value)}
         placeholder="Buscar ação, condição ou espera"
-        className="h-9 text-xs"
+        className="h-8 text-xs"
       />
       <div className="mt-2 space-y-1">
         {items.map((item) => (
@@ -941,19 +952,19 @@ function QuickAdd({
             key={item.kind}
             type="button"
             onClick={() => onPick(item.kind)}
-            className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left hover:bg-muted"
+            className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted"
           >
             <span
               className={cn(
-                "flex size-7 items-center justify-center rounded-lg border",
+                "flex size-6 shrink-0 items-center justify-center rounded-lg border",
                 nodeTone(item.category),
               )}
             >
-              {React.createElement(categoryIcon[item.category], { className: "size-3.5" })}
+              {React.createElement(categoryIcon[item.category], { className: "size-3" })}
             </span>
-            <span>
-              <span className="block text-xs font-semibold">{item.label}</span>
-              <span className="block text-[11px] text-muted-foreground">{item.description}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-semibold text-foreground">{item.label}</span>
+              <span className="block truncate text-[10px] text-muted-foreground">{item.description}</span>
             </span>
           </button>
         ))}
