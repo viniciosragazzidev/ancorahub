@@ -1,38 +1,81 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { useEffect } from "react"
+import { LayoutDashboard, RotateCcw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { buttonVariants } from "@/components/ui/button-variants"
+import { cn } from "@/lib/utils"
 
 type RouteErrorProps = {
   error: Error & { digest?: string }
   unstable_retry: () => void
   title?: string
+  description?: string
+  imageSrc?: string
 }
 
-export function RouteError({ error, unstable_retry, title = "Não foi possível carregar esta área" }: RouteErrorProps) {
+export function RouteError({
+  error,
+  unstable_retry,
+  title = "Ops! Não foi possível carregar esta área",
+  description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o Dashboard.",
+  imageSrc = "/404.png",
+}: RouteErrorProps) {
   useEffect(() => {
     // O digest permite correlacionar o erro no servidor sem expor a mensagem interna.
     if (error.digest) console.error("route_render_error", { digest: error.digest })
   }, [error])
 
   return (
-    <main className="flex min-h-[60vh] items-center justify-center p-6" aria-labelledby="route-error-title">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle id="route-error-title" role="alert">{title}</CardTitle>
-          <CardDescription>
-            O problema pode ser temporário. Tente novamente ou volte para o painel sem expor dados internos do sistema.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button type="button" onClick={unstable_retry}>Tentar novamente</Button>
-          <Button render={<Link href="/dashboard" />} variant="outline">Voltar ao painel</Button>
-          {error.digest ? <p className="basis-full text-xs text-muted-foreground" role="status">Referência: {error.digest}</p> : null}
-        </CardContent>
-      </Card>
+    <main
+      className="mx-auto flex min-h-[75vh] w-full max-w-2xl flex-col items-center justify-center px-4 py-8 text-center"
+      aria-labelledby="route-error-title"
+    >
+      <div className="relative mb-6 flex items-center justify-center w-full">
+        <Image
+          src={imageSrc}
+          alt="Erro ao carregar a página"
+          width={560}
+          height={460}
+          priority
+          className="h-auto max-w-[360px] sm:max-w-[520px] md:max-w-[580px] object-contain transition-transform duration-300 hover:scale-[1.02]"
+        />
+      </div>
+
+      <div className="space-y-2.5 max-w-lg">
+        <h1 id="route-error-title" role="alert" className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
+          {title}
+        </h1>
+        <p className="text-sm text-muted-foreground sm:text-base leading-relaxed">
+          {description}
+        </p>
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Button type="button" size="lg" onClick={unstable_retry} className="gap-2 px-6 shadow-sm hover:shadow transition-all">
+          <RotateCcw className="size-4" />
+          <span>Tentar novamente</span>
+        </Button>
+        <Link
+          href="/dashboard"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "lg" }),
+            "gap-2 px-6 shadow-sm hover:shadow transition-all"
+          )}
+        >
+          <LayoutDashboard className="size-4" />
+          <span>Voltar para o Dashboard</span>
+        </Link>
+      </div>
+
+      {error.digest ? (
+        <p className="mt-4 text-xs text-muted-foreground" role="status">
+          Código de referência: {error.digest}
+        </p>
+      ) : null}
     </main>
   )
 }
