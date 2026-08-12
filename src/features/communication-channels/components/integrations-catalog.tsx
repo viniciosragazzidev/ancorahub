@@ -61,7 +61,11 @@ function IntegrationTile({ integration }: { integration: IntegrationCard }) {
   const content = (
     <Card
       variant="compact"
-      className={integration.status === "available" ? "h-full cursor-pointer hover:bg-muted/30" : "h-full border-dashed opacity-75"}
+      className={
+        integration.status === "available"
+          ? "h-full cursor-pointer transition-all duration-150 hover:border-primary/50 hover:bg-muted/40 hover:shadow-xs active:scale-[0.99]"
+          : "h-full border-dashed opacity-75"
+      }
     >
       <CardHeader className="gap-3 pb-0">
         <div className="flex items-start justify-between gap-3">
@@ -81,10 +85,18 @@ function IntegrationTile({ integration }: { integration: IntegrationCard }) {
   );
 
   if (!integration.href) {
-    return <div aria-disabled="true">{content}</div>;
+    return <div aria-disabled="true" className="h-full">{content}</div>;
   }
 
-  return <Link aria-label={`Abrir integração ${integration.name}`} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" href={integration.href}>{content}</Link>;
+  return (
+    <Link
+      aria-label={`Abrir integração ${integration.name}`}
+      className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      href={integration.href}
+    >
+      {content}
+    </Link>
+  );
 }
 
 export function IntegrationsCatalog() {
@@ -92,13 +104,15 @@ export function IntegrationsCatalog() {
     <section aria-labelledby="integrations-catalog-title" className="mx-auto w-full max-w-6xl space-y-5">
       <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/60 px-4 py-3 sm:px-5">
         <div className="max-w-2xl">
-        <h2 id="integrations-catalog-title" className="text-lg font-semibold tracking-tight">Integrações</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Conecte os canais que fazem parte da sua operação. Cada integração abre uma área própria de configuração e acompanhamento.</p>
+          <h2 id="integrations-catalog-title" className="text-lg font-semibold tracking-tight">Integrações</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Conecte os canais que fazem parte da sua operação. Cada integração abre uma área própria de configuração e acompanhamento.</p>
         </div>
         <VoxelIllustration className="hidden size-20 shrink-0 sm:block" name="integration-hub" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {integrationCatalogEntries.map((integration) => <IntegrationTile integration={integration} key={integration.name} />)}
+        {integrationCatalogEntries.map((integration) => (
+          <IntegrationTile integration={integration} key={integration.name} />
+        ))}
       </div>
     </section>
   );

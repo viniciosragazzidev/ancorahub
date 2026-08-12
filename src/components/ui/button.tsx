@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 
 import { cn } from "@/lib/utils"
@@ -12,13 +13,19 @@ function Button({
   render,
   ...props
 }: ButtonPrimitive.Props & ButtonVariants) {
-  const isNativeButton = !render;
+  if (React.isValidElement(render)) {
+    const renderElement = render as React.ReactElement<{ className?: string }>;
+    return React.cloneElement(renderElement, {
+      className: cn(buttonVariants({ variant, size, className }), renderElement.props.className),
+      ...props,
+    });
+  }
+
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
-      render={render}
-      nativeButton={isNativeButton}
+      nativeButton={!render}
       {...props}
     />
   )
