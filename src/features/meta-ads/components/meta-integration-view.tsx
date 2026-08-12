@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ArrowsClockwise, Globe, Lightning, Power, Warning } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 
 import { confirmMetaConnection, disconnectMetaConnection, getMetaMarketingAttemptAssets, triggerManualMetaSync } from "../actions";
+import { createMetaMarketingOAuthUrl } from "../meta-marketing-oauth-url";
 import type { MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "../types";
 import { MetaAssetsModal } from "./meta-assets-modal";
-
-const DEFAULT_META_APP_ID = "780859815090303";
 
 export function MetaIntegrationView({ connection, logs, canConfigure = true }: { connection: MetaConnectionInfo | null; logs: MetaSyncLogItem[]; canConfigure?: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -22,6 +22,7 @@ export function MetaIntegrationView({ connection, logs, canConfigure = true }: {
   const [assets, setAssets] = useState<MetaDiscoveredAssets | null>(null);
   const [error, setError] = useState<string | null>(null);
   const connectionStartInFlight = useRef(false);
+  const router = useRouter();
   const connected = connection?.status === "connected";
 
   useEffect(() => {
@@ -29,7 +30,13 @@ export function MetaIntegrationView({ connection, logs, canConfigure = true }: {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === "META_MARKETING_AUTH_ERROR") {
         setLoading(false);
-        setError("A Meta não concluiu a autorização. Tente novamente.");
+        const callbackErrors: Record<string, string> = {
+          missing_parameters: "A Meta não retornou todos os dados da autorização. Tente novamente.",
+          token_exchange_failed: "A Meta recusou a autorização. Confira as permissões da conta e tente novamente.",
+          asset_discovery_failed: "A autorização foi aceita, mas não foi possível ler os ativos da Meta. Tente novamente.",
+          authorization_persist_failed: "A autorização foi aceita, mas não foi possível salvá-la. Tente novamente.",
+        };
+        setError(callbackErrors[event.data.errorCode] || "A Meta não concluiu a autorização. Tente novamente.");
       }
       if (event.data?.type === "META_MARKETING_AUTH_SUCCESS" && typeof event.data.attemptId === "string") {
         void getMetaMarketingAttemptAssets(event.data.attemptId)
@@ -63,15 +70,12 @@ export function MetaIntegrationView({ connection, logs, canConfigure = true }: {
       }
 
       const redirectUri = `${window.location.origin}/api/integrations/meta/lead-ads/callback`;
-      const url = new URL("https://www.facebook.com/v25.0/dialog/oauth");
-      url.search = new URLSearchParams({
-        client_id: process.env.NEXT_PUBLIC_META_LEAD_ADS_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID || DEFAULT_META_APP_ID,
-        redirect_uri: redirectUri,
+      const oauthUrl = createMetaMarketingOAuthUrl({
+        appId: process.env.NEXT_PUBLIC_META_LEAD_ADS_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID,
+        redirectUri,
         state: payload.state,
-        response_type: "code",
-        scope: "pages_show_list,pages_read_engagement,pages_manage_metadata,leads_retrieval,ads_read",
-      }).toString();
-      const popup = window.open(url, "MetaMarketingOAuth", "width=600,height=700,scrollbars=yes,status=yes");
+      });
+      const popup = window.open(oauthUrl, "MetaMarketingOAuth", "width=600,height=700,scrollbars=yes,status=yes");
       if (!popup) setError("Permita popups para conectar a Meta.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível iniciar a conexão com a Meta.");
@@ -83,8 +87,16 @@ export function MetaIntegrationView({ connection, logs, canConfigure = true }: {
 
   const confirmAssets = async (payload: { businessId: string; businessName: string; pages: Array<{ id: string; name: string }>; adAccounts: Array<{ id: string; name: string; currency: string }> }) => {
     if (!attemptId) throw new Error("Autorização expirada.");
-    await confirmMetaConnection({ attemptId, ...payload });
-    setAssets(null);
+    try {
+      await confirmMetaConnection({ attemptId, ...payload });
+      setAssets(null);
+      setError(null);
+      router.refresh();
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Não foi possível concluir a conexão com a Meta.";
+      setError(message);
+      throw cause;
+    }
   };
 
   return <div className="space-y-6">

@@ -246,6 +246,7 @@ export async function confirmMetaConnection(payload: {
   await runMetaTenantSync(context.tenantId, "full");
   await consumeMetaConnectionAttempt(attempt.id);
 
+  revalidatePath("/integrations/meta");
   revalidatePath("/settings/integracoes/meta");
   revalidatePath("/marketing/campanhas");
 
@@ -274,6 +275,7 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
     createdAt: new Date(),
   });
 
+  revalidatePath("/integrations/meta");
   revalidatePath("/settings/integracoes/meta");
   return { success: true };
 }
@@ -282,6 +284,7 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
 export async function triggerManualMetaSync(): Promise<{ success: boolean; itemsSynced: number; error?: string }> {
   const context = await getRequiredTenantContext();
   const res = await runMetaTenantSync(context.tenantId, "full");
+  revalidatePath("/integrations/meta");
   revalidatePath("/settings/integracoes/meta");
   revalidatePath("/marketing/campanhas");
   return res;

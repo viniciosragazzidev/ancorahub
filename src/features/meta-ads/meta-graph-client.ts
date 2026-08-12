@@ -2,7 +2,7 @@ import "server-only";
 
 import type { MetaDiscoveredAssets } from "./types";
 
-const GRAPH_API_VERSION = "v20.0";
+const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION?.trim() || "v25.0";
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 export class MetaGraphClient {

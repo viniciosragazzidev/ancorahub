@@ -9,12 +9,27 @@ import { getDatabase, schema } from "@/shared/db";
 
 let authInstance: ReturnType<typeof createAuth> | undefined;
 
+const CANONICAL_PRODUCTION_ORIGIN = "https://crm.ancorasaude.cloud";
+const LEGACY_PRODUCTION_ORIGIN = "https://corretop.vercel.app";
+
+export function getTrustedAuthOrigins() {
+  return Array.from(new Set([
+    CANONICAL_PRODUCTION_ORIGIN,
+    LEGACY_PRODUCTION_ORIGIN,
+    process.env.BETTER_AUTH_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ].filter((origin): origin is string => Boolean(origin))));
+}
+
+function getAuthBaseUrl() {
+  if (process.env.NODE_ENV === "production") return CANONICAL_PRODUCTION_ORIGIN;
+  return process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
+
 function createAuth() {
   return betterAuth({
-    baseURL: process.env.BETTER_AUTH_URL,
-    trustedOrigins: [process.env.BETTER_AUTH_URL, process.env.NEXT_PUBLIC_APP_URL].filter(
-      (origin): origin is string => Boolean(origin),
-    ),
+    baseURL: getAuthBaseUrl(),
+    trustedOrigins: getTrustedAuthOrigins(),
     database: drizzleAdapter(getDatabase(), {
       provider: "pg",
       schema: {
