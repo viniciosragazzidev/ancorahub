@@ -40,6 +40,19 @@ export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStra
   return [...eligible].sort((a, b) => strategy === "round_robin" ? a.createdAt.getTime() - b.createdAt.getTime() : a.activeLeads - b.activeLeads || a.createdAt.getTime() - b.createdAt.getTime())[0] ?? null;
 }
 
+/** Shared final decision for automatic distribution and the dry-run simulator. */
+export function resolveDistributionCandidate(
+  brokers: RankedBroker[],
+  policy: IntelligentDistributionPolicy,
+  strategy: AssignmentStrategy,
+) {
+  const eligible = rankBrokers(brokers, policy);
+  const selected = policy.ranking.enabled
+    ? eligible[0] ?? null
+    : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity");
+  return { eligible, selected };
+}
+
 export function isValidDutyWindow(dayOfWeek: number, startsAt: string, endsAt: string) {
   return dayOfWeek >= 0 && dayOfWeek <= 6 && /^([01]\d|2[0-3]):[0-5]\d$/.test(startsAt) && /^([01]\d|2[0-3]):[0-5]\d$/.test(endsAt) && startsAt < endsAt;
 }

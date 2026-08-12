@@ -1560,6 +1560,25 @@ export const metaCampaigns = pgTable(
 );
 
 /** Conjuntos de anúncios (Ad Sets) */
+/** Tenant-owned entry rule that sends Lead Ads from one Meta campaign into a CRM queue. */
+export const metaCampaignQueueRoutes = pgTable(
+  "meta_campaign_queue_routes",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id").notNull(),
+    queueId: text("queue_id").notNull().references(() => leadQueues.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_campaign_queue_routes_tenant_campaign_unique").on(table.tenantId, table.campaignId),
+    index("meta_campaign_queue_routes_queue_idx").on(table.tenantId, table.queueId),
+  ],
+);
+
 export const metaAdSets = pgTable(
   "meta_ad_sets",
   {

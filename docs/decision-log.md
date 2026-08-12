@@ -513,3 +513,20 @@ na página individual do tenant. O Super-admin continua sendo a única autoridad
 essas alterações; cada ação valida a empresa no servidor, registra auditoria de
 plataforma e pode ser revertida sem excluir histórico. Uma liberação individual não
 substitui nem ignora o kill switch global correspondente.
+
+## DEC-074 — Conexão Meta canônica para aquisição e atribuição comercial
+
+**Estado:** Aceita
+**Data:** 2026-08-12
+
+A integração de Marketing e Lead Ads passa a ter uma única conexão canônica por
+corretora. A conexão confirma explicitamente os ativos autorizados da empresa e
+persiste campanhas, conjuntos, anúncios, formulários, atribuição e snapshots de
+performance no tenant. A captação atual por Página permanece como fallback de
+transição, mas não pode descobrir coleções globais com credencial compartilhada.
+
+O roteamento resolve apenas a fila pelo ativo mais específico disponível e sempre
+delegará elegibilidade, capacidade, SLA e escolha do corretor ao motor central de
+distribuição. A transição é reversível por capacidade global e preserva capturas e
+histórico. Eventos de conversão para a Meta ficam preparados, mas permanecem
+desabilitados até consentimento, contrato de dados e homologação explícita.

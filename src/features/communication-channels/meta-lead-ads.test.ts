@@ -14,7 +14,12 @@ describe("Meta Lead Ads normalization", () => {
         { name: "email", values: ["ana@example.test"] },
         { name: "medical_history", values: ["not persisted here"] },
       ],
-    })).toEqual({ nome: "Ana Lima", telefone: "+55 21 99999-0000", email: "ana@example.test", externalId: "leadgen_123", adId: "ad_1", formId: "form_1", createdTime: "2026-07-31T12:34:56+0000" });
+    })).toEqual({ nome: "Ana Lima", telefone: "+55 21 99999-0000", email: "ana@example.test", externalId: "leadgen_123", campaignId: null, campaignName: null, adId: "ad_1", formId: "form_1", createdTime: "2026-07-31T12:34:56+0000" });
+  });
+
+  it("preserves the campaign identity needed for the queue entry rule", () => {
+    expect(normalizeMetaLead({ id: "leadgen_campaign", campaign_id: "campaign_1", campaign_name: "PME Salvador", field_data: [] }))
+      .toMatchObject({ campaignId: "campaign_1", campaignName: "PME Salvador" });
   });
 
   it("keeps createdTime null when Meta does not send created_time", () => {

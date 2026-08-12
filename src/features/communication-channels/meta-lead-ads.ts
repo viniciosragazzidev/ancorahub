@@ -21,7 +21,7 @@ export type MetaLeadAdsWebhookPayload = {
 };
 
 type MetaLeadField = { name?: string; values?: string[] };
-type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; form_id?: string; field_data?: MetaLeadField[] };
+type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; form_id?: string; campaign_id?: string; campaign_name?: string; field_data?: MetaLeadField[] };
 
 export const META_LEAD_ADS_SOURCE = "meta_lead_ads";
 
@@ -67,6 +67,8 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   return {
     nome, telefone, email,
     externalId: record.id ?? "",
+    campaignId: record.campaign_id ?? null,
+    campaignName: record.campaign_name ?? null,
     adId: record.ad_id ?? null,
     formId: record.form_id ?? null,
     /** ISO 8601 retornado pela Meta — quando o lead foi realmente capturado no anúncio. */
@@ -76,7 +78,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
 
 async function fetchMetaLead(leadgenId: string): Promise<MetaLeadAdRecord> {
   const config = getMetaLeadAdsServerConfig();
-  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,form_id,field_data`, {
+  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,form_id,campaign_id,campaign_name,field_data`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` }, cache: "no-store",
   });
   const payload = await response.json().catch(() => ({})) as MetaLeadAdRecord & { error?: { message?: string; code?: number } };
@@ -175,13 +177,18 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         const lead = normalizeMetaLead(leadRecord);
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
         if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
-        const bypassPlantao = source.distributionMode === "direct_leads";
+        const [campaignRoute] = lead.campaignId ? await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId })
+          .from(schema.metaCampaignQueueRoutes)
+          .innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+          .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, lead.campaignId), eq(schema.metaCampaignQueueRoutes.enabled, true), eq(schema.leadQueues.status, "active")))
+          .limit(1) : [];
+        const bypassPlantao = source.distributionMode === "direct_leads" && !campaignRoute;
         const result = await createLeadFromWebhookSync({
-          tenantId: source.tenantId, branchId: source.branchId ?? null, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
+          tenantId: source.tenantId, branchId: source.branchId ?? null, queueId: campaignRoute?.queueId ?? null, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
           bypassPlantao,
-          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, ad: lead.adId, form: lead.formId, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: entry.id } },
+          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, campaign: lead.campaignId, ad: lead.adId, form: lead.formId, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: entry.id, campaignName: lead.campaignName ?? null } },
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);
         if (!result.success) throw new Error(result.code);

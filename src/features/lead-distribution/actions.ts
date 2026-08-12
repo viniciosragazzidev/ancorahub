@@ -14,6 +14,7 @@ import { enqueueLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { saveDistributionQueue, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -108,6 +109,35 @@ function refreshDistribution() {
   revalidatePath("/leads");
   revalidatePath("/leads/distribuicao");
   revalidatePath("/dashboard");
+}
+
+export async function saveDistributionQueueAction(input: unknown) {
+  try {
+    const result = await saveDistributionQueue(await getRequiredTenantContext(), input);
+    refreshDistribution();
+    return { success: true, id: result.id, message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
+  }
+}
+
+export async function simulateDistributionAction(input: unknown) {
+  try {
+    return { success: true, ...(await simulateDistribution(await getRequiredTenantContext(), input)) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível simular a distribuição." };
+  }
+}
+
+export async function saveMetaCampaignQueueRouteAction(input: unknown) {
+  try {
+    const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), input);
+    refreshDistribution();
+    revalidatePath("/integrations/meta");
+    return { success: true, route, message: "Campanha Meta vinculada Ã  fila." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra da campanha." };
+  }
 }
 
 export async function retryLeadEffectAction(formData: FormData) {

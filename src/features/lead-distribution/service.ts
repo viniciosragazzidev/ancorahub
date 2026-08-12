@@ -5,7 +5,7 @@ import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, rankBrokers, type IntelligentDistributionPolicy } from "./domain";
+import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, rankBrokers, resolveDistributionCandidate, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { notifyNewLead } from "@/features/notifications/send-push-helper";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -308,7 +308,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(rosterBrokerIds?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
   }), intelligentPolicy.value);
-  const chosen = intelligentPolicy.value.ranking.enabled ? ranked[0] ?? null : chooseBroker(ranked, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
+  const decision = resolveDistributionCandidate(ranked, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
+  const chosen = decision.selected;
   if (!chosen) return { status: "queued", leadId, reason: "Todos os corretores elegíveis atingiram a capacidade." };
   return assignLeadToBroker(context, leadId, chosen.id, "automatic", "Distribuição automática da fila", excludeBrokerId);
 }
@@ -326,6 +327,7 @@ export async function distributeQualifiedLead(input: {
       branchId: schema.leads.branchId,
       qualificationStatus: schema.leads.qualificationStatus,
       qualificationScore: schema.leads.qualificationScore,
+      queueId: schema.leads.queueId,
       corretorId: schema.leads.corretorId,
     })
     .from(schema.leads)
@@ -371,6 +373,31 @@ export async function distributeQualifiedLead(input: {
     return { distributed: false, destination, reason: "no_active_branch_found" };
   }
 
+  const [distributionDirector] = await db.select({ id: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.role, "director"), eq(schema.tenantMemberships.status, "active")))
+    .orderBy(asc(schema.tenantMemberships.createdAt)).limit(1);
+  const distributionActorId = input.actorUserId ?? distributionDirector?.id;
+  if (!distributionActorId) return { distributed: false, destination, reason: "no_distribution_actor" };
+  const distributionContext: TenantContext = { tenantId: input.tenantId, userId: distributionActorId, role: "director", jobTitle: "director", branchId: targetBranchId };
+  const routedQualifiedLead = lead.queueId
+    ? { status: "routed" as const }
+    : await routeLeadToBranch(distributionContext, input.leadId, targetBranchId, `Qualification completed (${classification.toUpperCase()})`);
+  if (routedQualifiedLead.status !== "routed") return { distributed: false, destination, reason: `routing_${routedQualifiedLead.status}` };
+  const routedAssignment = await processQueuedLead(distributionContext, input.leadId);
+  return {
+    distributed: routedAssignment.status === "assigned",
+    brokerId: routedAssignment.status === "assigned" ? routedAssignment.brokerId : null,
+    destination,
+    assignedResult: routedAssignment,
+  };
+
+  /*
+   * Legacy direct-assignment path retained temporarily as migration reference.
+   * Qualification now exits through routeLeadToBranch + processQueuedLead above,
+   * so its capacity, roster, policy, audit and fallback rules remain identical
+   * to every other distribution source.
+   */
+
   // Buscar corretores elegíveis
   const allBrokers = await db
     .select({
@@ -383,7 +410,7 @@ export async function distributeQualifiedLead(input: {
     .where(
       and(
         eq(schema.tenantMemberships.tenantId, input.tenantId),
-        eq(schema.tenantMemberships.branchId, targetBranchId),
+        eq(schema.tenantMemberships.branchId, targetBranchId!),
         eq(schema.tenantMemberships.role, "broker"),
         eq(schema.tenantMemberships.status, "active"),
         eq(schema.tenantMemberships.availabilityStatus, "available"),

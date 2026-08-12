@@ -21,6 +21,9 @@
 ## Distribuição de leads
 
 - **Plantão multiunidade**: criação coordenada de regras de plantão independentes para mais de uma unidade. Não é uma regra compartilhada: cada unidade conserva fila, escala, cobertura e histórico próprios.
+- **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.
+- **Decisão de distribuição**: resultado explicável de uma tentativa de roteamento, contendo fila, candidatos elegíveis, estratégia, corretor selecionado — quando houver — e os motivos de exclusão ou fallback.
+- **Fila de espera**: estado recuperável de um lead sem corretor elegível. O lead permanece visível para ação humana e nunca é descartado silenciosamente.
 
 ## Canais de comunicação
 
@@ -29,6 +32,9 @@
 - **Canal de comunicação**: identidade operacional de um provedor associada a um tenant e, opcionalmente, a uma unidade. Para WhatsApp oficial, a chave externa é o `phone_number_id` da Meta.
 - **Canal Meta Cloud**: canal empresarial conectado por Embedded Signup; seu token é cifrado no servidor e nunca é devolvido ao navegador.
 - **Fonte Meta Lead Ads**: vínculo auditável entre uma Página Meta compartilhada e um tenant/unidade. A Página identifica o tenant no webhook; a credencial técnica de leitura é central da plataforma e nunca pertence ao cliente.
+- **Conexão de aquisição Meta**: conexão canônica, pertencente a uma corretora, que autoriza explicitamente os ativos de Marketing usados pelo CRM. Ela é a fonte de campanhas, atribuição e performance; tokens permanecem privados no servidor.
+- **Atribuição Meta**: conjunto imutável de IDs oficiais de Página, conta, campanha, conjunto, anúncio, formulário e leadgen que explica de qual ativo um lead entrou. Nomes servem apenas para leitura.
+- **Regra de entrada Meta**: configuração que resolve uma fila a partir da atribuição de mídia. Ela nunca escolhe um corretor; depois dela, o motor central de distribuição decide elegibilidade, capacidade e responsável.
 - **Catálogo de integrações**: ponto de entrada administrativo que lista conectores disponíveis e planejados. Ele não concede acesso por si só: cada conector conserva sua própria autorização, configuração e controles de capacidade.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
 - **Atendimento externo temporário**: enquanto o chat interno não estiver operacional, o Corretor inicia o atendimento auditado no CorreTop e é direcionado ao WhatsApp pessoal pelo número autorizado do lead. A interface não apresenta mensagens como se estivessem sincronizadas.

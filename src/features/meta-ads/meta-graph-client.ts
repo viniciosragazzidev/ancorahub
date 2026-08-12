@@ -95,18 +95,20 @@ export class MetaGraphClient {
   async fetchCampaigns(adAccountId: string): Promise<Array<{
     id: string;
     name: string;
-    objective: string;
-    status: string;
+    objective?: string;
+    status?: string;
     daily_budget?: string;
     lifetime_budget?: string;
     start_time?: string;
     stop_time?: string;
   }>> {
     const formattedAccountId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
-    const res = await this.fetchApi<{ data: Array<any> }>(`/${formattedAccountId}/campaigns`, {
+    const res = await this.fetchApi<{ data: Array<{
+      id: string; name: string; objective?: string; status?: string; daily_budget?: string; lifetime_budget?: string; start_time?: string; stop_time?: string;
+    }> }>(`/${formattedAccountId}/campaigns`, {
       fields: "id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time",
       limit: "100",
-    }).catch(() => ({ data: [] }));
+    });
     return res.data;
   }
 
@@ -114,13 +116,13 @@ export class MetaGraphClient {
   async fetchAdSets(campaignId: string): Promise<Array<{
     id: string;
     name: string;
-    status: string;
-    targeting?: any;
+    status?: string;
+    targeting?: Record<string, unknown>;
   }>> {
-    const res = await this.fetchApi<{ data: Array<any> }>(`/${campaignId}/adsets`, {
+    const res = await this.fetchApi<{ data: Array<{ id: string; name: string; status?: string; targeting?: Record<string, unknown> }> }>(`/${campaignId}/adsets`, {
       fields: "id,name,status,targeting",
       limit: "100",
-    }).catch(() => ({ data: [] }));
+    });
     return res.data;
   }
 
@@ -128,12 +130,12 @@ export class MetaGraphClient {
   async fetchAds(adSetId: string): Promise<Array<{
     id: string;
     name: string;
-    status: string;
+    status?: string;
   }>> {
-    const res = await this.fetchApi<{ data: Array<any> }>(`/${adSetId}/ads`, {
+    const res = await this.fetchApi<{ data: Array<{ id: string; name: string; status?: string }> }>(`/${adSetId}/ads`, {
       fields: "id,name,status",
       limit: "100",
-    }).catch(() => ({ data: [] }));
+    });
     return res.data;
   }
 
@@ -141,14 +143,33 @@ export class MetaGraphClient {
   async fetchLeadForms(pageId: string): Promise<Array<{
     id: string;
     name: string;
-    status: string;
+    status?: string;
     locale?: string;
   }>> {
-    const res = await this.fetchApi<{ data: Array<any> }>(`/${pageId}/leadgen_forms`, {
+    const res = await this.fetchApi<{ data: Array<{ id: string; name: string; status?: string; locale?: string }> }>(`/${pageId}/leadgen_forms`, {
       fields: "id,name,status,locale",
       limit: "100",
-    }).catch(() => ({ data: [] }));
+    });
     return res.data;
+  }
+
+  /** Uses one tenant-owned ad account, never a global account listing. */
+  async fetchPixels(adAccountId: string): Promise<Array<{ id: string; name: string }>> {
+    const formattedAccountId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+    const res = await this.fetchApi<{ data: Array<{ id: string; name?: string }> }>(`/${formattedAccountId}/adspixels`, {
+      fields: "id,name",
+      limit: "100",
+    });
+    return res.data.map((pixel) => ({ id: pixel.id, name: pixel.name || `Pixel ${pixel.id}` }));
+  }
+
+  /** Reads datasets only below the business confirmed for this tenant connection. */
+  async fetchDatasets(businessId: string): Promise<Array<{ id: string; name: string }>> {
+    const res = await this.fetchApi<{ data: Array<{ id: string; name?: string }> }>(`/${businessId}/datasets`, {
+      fields: "id,name",
+      limit: "100",
+    });
+    return res.data.map((dataset) => ({ id: dataset.id, name: dataset.name || `Dataset ${dataset.id}` }));
   }
 
   /** Busca detalhes de um lead gerado via Lead Ads */

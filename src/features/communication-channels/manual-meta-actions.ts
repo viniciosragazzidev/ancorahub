@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -362,5 +363,67 @@ export async function updateMetaLeadAdSourceDistributionAction(input: {
 
   revalidatePath("/integrations/meta");
   revalidatePath("/leads/distribuicao");
+  return { success: true };
+}
+
+const metaAssetIdSchema = z.string().trim().regex(/^(?:act_)?\d{5,40}$/, "Identificador Meta inválido.");
+const operationalAssetsSchema = z.object({
+  sourceId: z.string().uuid().nullable(),
+  adAccountId: metaAssetIdSchema.optional().nullable(),
+  pixelId: metaAssetIdSchema.optional().nullable(),
+  datasetId: metaAssetIdSchema.optional().nullable(),
+});
+
+/**
+ * Saves the tenant's chosen operational assets. The browser may only choose an
+ * already-ingested asset belonging to this tenant; it cannot make the shared
+ * platform credential enumerate Meta assets.
+ */
+export async function updateMetaOperationalAssetsAction(input: unknown) {
+  const context = await requireLeadAdsAccess();
+  const parsed = operationalAssetsSchema.parse(input);
+  const db = getDatabase();
+
+  const [source, adAccount, pixel, dataset] = await Promise.all([
+    parsed.sourceId
+      ? db.select({ id: schema.metaLeadAdSources.id, pageId: schema.metaLeadAdSources.pageId }).from(schema.metaLeadAdSources)
+        .where(and(eq(schema.metaLeadAdSources.id, parsed.sourceId), eq(schema.metaLeadAdSources.tenantId, context.tenantId))).limit(1)
+      : Promise.resolve([]),
+    parsed.adAccountId
+      ? db.select({ id: schema.metaAdAccounts.adAccountId }).from(schema.metaAdAccounts)
+        .where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.adAccountId, parsed.adAccountId))).limit(1)
+      : Promise.resolve([]),
+    parsed.pixelId
+      ? db.select({ id: schema.metaPixels.pixelId }).from(schema.metaPixels)
+        .where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.pixelId, parsed.pixelId))).limit(1)
+      : Promise.resolve([]),
+    parsed.datasetId
+      ? db.select({ id: schema.metaDatasets.datasetId }).from(schema.metaDatasets)
+        .where(and(eq(schema.metaDatasets.tenantId, context.tenantId), eq(schema.metaDatasets.datasetId, parsed.datasetId))).limit(1)
+      : Promise.resolve([]),
+  ]);
+
+  if (parsed.sourceId && !source[0]) throw new Error("Fonte Meta não encontrada nesta empresa.");
+  if (parsed.adAccountId && !adAccount[0]) throw new Error("Conta de anúncios não encontrada nos ativos desta empresa.");
+  if (parsed.pixelId && !pixel[0]) throw new Error("Pixel não encontrado nos ativos desta empresa.");
+  if (parsed.datasetId && !dataset[0]) throw new Error("Dataset não encontrado nos ativos desta empresa.");
+
+  const now = new Date();
+  const values = {
+    facebookPageId: source[0]?.pageId ?? null,
+    adAccountId: parsed.adAccountId || null,
+    pixelId: parsed.pixelId || null,
+    datasetId: parsed.datasetId || null,
+    lastSyncedAt: now,
+    lastError: null,
+    updatedAt: now,
+  };
+  const [settings] = await db.select({ id: schema.metaIntegrationSettings.id }).from(schema.metaIntegrationSettings)
+    .where(eq(schema.metaIntegrationSettings.tenantId, context.tenantId)).limit(1);
+  if (settings) await db.update(schema.metaIntegrationSettings).set(values).where(eq(schema.metaIntegrationSettings.id, settings.id));
+  else await db.insert(schema.metaIntegrationSettings).values({ id: randomUUID(), tenantId: context.tenantId, createdBy: context.userId, createdAt: now, ...values });
+  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_operational_assets", entidadeId: settings?.id ?? context.tenantId, acao: "meta_operational_assets.updated" });
+  revalidatePath("/integrations/meta");
+  revalidatePath("/marketing/campanhas");
   return { success: true };
 }

@@ -36,7 +36,7 @@ export function CampaignsDashboardView({
       <section aria-label="Métricas de marketing" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {[
           { label: "Leads Capturados", value: totals.leads, color: "text-chart-1", bg: "bg-chart-1/10", icon: Users },
-          { label: "Conversas WhatsApp", value: totals.conversations, color: "text-emerald-500", bg: "bg-emerald-500/10", icon: Phone },
+          { label: "Leads em atendimento", value: totals.conversations, color: "text-emerald-500", bg: "bg-emerald-500/10", icon: Phone },
           { label: "Vendas Concluídas", value: totals.sales, color: "text-chart-5", bg: "bg-chart-5/10", icon: CheckCircle },
           { label: "Taxa de Conversão", value: `${totals.conversionRate}%`, color: "text-chart-2", bg: "bg-chart-2/10", icon: ChartBar },
           { label: "Receita Gerada", value: formatCurrency(totals.revenue, { maximumFractionDigits: 0 }), color: "text-primary", bg: "bg-primary/10", icon: Lightning },
@@ -87,7 +87,7 @@ export function CampaignsDashboardView({
 
                 <TableHead className="text-xs font-semibold">Status</TableHead>
                 <TableHead className="text-right text-xs font-semibold">Leads</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Conversas</TableHead>
+                <TableHead className="text-right text-xs font-semibold">Em atendimento</TableHead>
                 <TableHead className="text-right text-xs font-semibold">Vendas</TableHead>
                 <TableHead className="text-right text-xs font-semibold">Receita Vendida</TableHead>
                 <TableHead className="text-right text-xs font-semibold">Conversão %</TableHead>

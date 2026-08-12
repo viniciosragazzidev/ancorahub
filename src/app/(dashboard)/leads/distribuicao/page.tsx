@@ -1,4 +1,4 @@
-import { count, eq, and, inArray } from "drizzle-orm";
+import { count, desc, eq, and, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -17,10 +17,12 @@ import {
 } from "@/features/lead-distribution/jobs";
 import { getLeadEffectOutboxHealth } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { retryLeadEffectAction } from "@/features/lead-distribution/actions";
+import { QueueControlCenter } from "./_components/queue-control-center";
+import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 
 export const dynamic = "force-dynamic";
 
-type DistributionView = "operar" | "configurar" | "saude";
+type DistributionView = "operar" | "filas" | "historico" | "saude";
 type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
 
 const activeStatuses = [
@@ -39,7 +41,7 @@ export default async function LeadDistributionPage({
   searchParams: Promise<{ view?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  const view: DistributionView = params.view === "configurar" || params.view === "saude" ? params.view : "operar";
+  const view: DistributionView = params.view === "filas" || params.view === "historico" || params.view === "saude" ? params.view : "operar";
   const queueFilter: QueueFilter = params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
     ? params.status
     : "all";
@@ -248,6 +250,38 @@ export default async function LeadDistributionPage({
       .limit(20),
   ]);
 
+  const [queues, queueLeadCounts, recentEvents, globalPolicy, metaCampaigns, metaCampaignRoutes] = await Promise.all([
+    db.select({
+      id: schema.leadQueues.id,
+      name: schema.leadQueues.name,
+      branchId: schema.leadQueues.branchId,
+      branchName: schema.branches.name,
+      status: schema.leadQueues.status,
+      assignmentMode: schema.leadQueues.assignmentMode,
+      assignmentStrategy: schema.leadQueues.assignmentStrategy,
+      capacityEnabled: schema.leadQueues.capacityEnabled,
+      capacityPerBroker: schema.leadQueues.capacityPerBroker,
+    }).from(schema.leadQueues).innerJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds)))
+      .orderBy(schema.branches.name, schema.leadQueues.name),
+    db.select({ queueId: schema.leads.queueId, waiting: count(schema.leads.id) }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.branchId, branchIds), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"])))
+      .groupBy(schema.leads.queueId),
+    db.select({ id: schema.leadDistributionEvents.id, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt, leadName: schema.leads.nome, queueName: schema.leadQueues.name, brokerName: schema.user.name })
+      .from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id))
+      .leftJoin(schema.leadQueues, eq(schema.leadDistributionEvents.toQueueId, schema.leadQueues.id))
+      .leftJoin(schema.user, eq(schema.leadDistributionEvents.newOwnerId, schema.user.id))
+      .where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+      .orderBy(desc(schema.leadDistributionEvents.createdAt)).limit(40),
+    db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))).limit(1),
+    db.select({ campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
+      .from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(schema.metaCampaigns.name),
+    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
+      .from(schema.metaCampaignQueueRoutes).innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+      .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds))).orderBy(schema.leadQueues.name),
+  ]);
+
   const activeBrokerLeadsMap = new Map(
     activeBrokerLeads.map((entry) => [entry.brokerId, Number(entry.count)]),
   );
@@ -290,6 +324,13 @@ export default async function LeadDistributionPage({
       oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${oldest.toLocaleDateString("pt-BR")}`,
     };
   });
+  const queueWaiting = new Map(queueLeadCounts.map((item) => [item.queueId, Number(item.waiting)]));
+  const queuesForControl = queues.map((queue) => ({
+    ...queue,
+    waiting: queueWaiting.get(queue.id) ?? 0,
+    members: countsByBranch.get(queue.branchId) ?? 0,
+    activeLeads: leadsByBranch.get(queue.branchId) ?? 0,
+  }));
 
   return (
     <>
@@ -304,10 +345,13 @@ export default async function LeadDistributionPage({
           </div>
           <nav aria-label="Seções da Central de Filas" className="flex flex-wrap gap-2">
             <Button render={<Link href="/leads/distribuicao?view=operar" />} size="sm" variant={view === "operar" ? "default" : "outline"}>
-              Operar filas
+              Visão geral
             </Button>
-            <Button render={<Link href="/leads/distribuicao?view=configurar" />} size="sm" variant={view === "configurar" ? "default" : "outline"}>
-              Configurar
+            <Button render={<Link href="/leads/distribuicao?view=filas" />} size="sm" variant={view === "filas" ? "default" : "outline"}>
+              Filas e regras
+            </Button>
+            <Button render={<Link href="/leads/distribuicao?view=historico" />} size="sm" variant={view === "historico" ? "default" : "outline"}>
+              Histórico
             </Button>
             <Button render={<Link href="/leads/distribuicao?view=saude" />} size="sm" variant={view === "saude" ? "default" : "outline"}>
               Saúde da automação
@@ -372,7 +416,7 @@ export default async function LeadDistributionPage({
             </div>
           </>
         ) : null}
-        {view === "configurar" ? (
+        {view === "filas" ? (
           <>
             <Card variant="overview">
               <CardHeader>
@@ -380,6 +424,8 @@ export default async function LeadDistributionPage({
                 <CardDescription>Altere disponibilidade, capacidade e regras fora da rotina de tratamento da fila. As mudanças afetam os próximos leads recebidos.</CardDescription>
               </CardHeader>
             </Card>
+            <QueueControlCenter queues={queuesForControl} branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))} campaigns={metaCampaigns} campaignRoutes={metaCampaignRoutes} canEdit />
+            <DistributionPolicyPanel canEdit={context.role === "director"} brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))} policy={globalPolicy[0]?.policy ?? {}} />
             <DistributionPanel
               branches={enrichedBranches}
               brokers={brokers.map((broker) => ({
@@ -394,6 +440,17 @@ export default async function LeadDistributionPage({
               canManageAcceptingLeads={context.role === "director"}
             />
           </>
+        ) : null}
+        {view === "historico" ? (
+          <Card variant="overview">
+            <CardHeader>
+              <CardTitle>Histórico de decisões</CardTitle>
+              <CardDescription>Registro auditável de atribuições, redistribuições e intervenções manuais no seu escopo.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {recentEvents.length ? <div className="divide-y divide-border">{recentEvents.map((event) => <div key={event.id} className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">{event.leadName} <span className="font-normal text-muted-foreground">→</span> {event.brokerName ?? "Aguardando corretor"}</p><p className="text-xs text-muted-foreground">{event.queueName ?? "Inbox geral"} · {event.action.replaceAll("_", " ")}{event.reason ? ` · ${event.reason}` : ""}</p></div><time className="shrink-0 text-xs text-muted-foreground">{event.createdAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</time></div>)}</div> : <div className="px-5 py-12 text-center"><p className="text-sm font-medium">Ainda não há eventos neste escopo</p><p className="mt-1 text-xs text-muted-foreground">Quando a equipe rotear ou atribuir leads, a explicação aparecerá aqui.</p></div>}
+            </CardContent>
+          </Card>
         ) : null}
         {view === "saude" ? (
           <>

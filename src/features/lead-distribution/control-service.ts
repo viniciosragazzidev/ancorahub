@@ -1,0 +1,152 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
+
+import type { TenantContext } from "@/shared/auth/types";
+import { AuthorizationError } from "@/shared/auth/errors";
+import { getDatabase, schema } from "@/shared/db";
+import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type IntelligentDistributionPolicy, type RankedBroker } from "./domain";
+
+const queueInput = z.object({
+  id: z.string().uuid().optional(),
+  branchId: z.string().uuid(),
+  name: z.string().trim().min(3).max(60),
+  assignmentMode: z.enum(["automatic", "manual"]),
+  assignmentStrategy: z.enum(["round_robin", "capacity"]),
+  capacityEnabled: z.boolean(),
+  capacityPerBroker: z.number().int().min(1).max(200).nullable(),
+  status: z.enum(["active", "inactive"]),
+});
+
+const simulationInput = z.object({
+  branchId: z.string().uuid(),
+  queueId: z.string().uuid().optional(),
+  temperature: z.enum(["hot", "warm", "cold"]).default("warm"),
+  score: z.number().int().min(0).max(100).default(50),
+});
+
+const campaignQueueRouteInput = z.object({
+  campaignId: z.string().trim().min(1).max(100),
+  queueId: z.string().uuid(),
+  enabled: z.boolean().default(true),
+});
+
+function assertManager(context: TenantContext, branchId: string) {
+  if (context.role !== "director" && context.role !== "manager") throw new AuthorizationError("Sem permissão para administrar filas.");
+  if (context.role === "manager" && context.branchId !== branchId) throw new AuthorizationError("Você só pode administrar filas da sua unidade.");
+}
+
+function slugify(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 42);
+}
+
+function readPolicy(value: unknown): IntelligentDistributionPolicy {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaultIntelligentDistributionPolicy;
+  const raw = value as Partial<IntelligentDistributionPolicy>;
+  return {
+    excludedBrokerIds: Array.isArray(raw.excludedBrokerIds) ? raw.excludedBrokerIds.filter((id): id is string => typeof id === "string") : [],
+    excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
+  };
+}
+
+export async function saveDistributionQueue(context: TenantContext, rawInput: unknown) {
+  const input = queueInput.parse(rawInput);
+  assertManager(context, input.branchId);
+  const db = getDatabase();
+  const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches)
+    .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+  if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
+  const now = new Date();
+  const values = {
+    branchId: input.branchId,
+    name: input.name,
+    assignmentMode: input.assignmentMode,
+    assignmentStrategy: input.assignmentStrategy,
+    capacityEnabled: input.capacityEnabled,
+    capacityPerBroker: input.capacityEnabled ? input.capacityPerBroker : null,
+    status: input.status,
+    updatedAt: now,
+  };
+
+  if (input.id) {
+    const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.id, input.id), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1);
+    if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
+    await db.update(schema.leadQueues).set({ ...values, branchId: queue.branchId }).where(eq(schema.leadQueues.id, queue.id));
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: "queue.updated" });
+    return { id: queue.id, created: false };
+  }
+
+  const id = randomUUID();
+  const slugBase = slugify(input.name) || "fila";
+  await db.insert(schema.leadQueues).values({ id, tenantId: context.tenantId, slug: `${slugBase}-${id.slice(0, 6)}`, isDefault: false, createdAt: now, ...values });
+  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: id, acao: "queue.created" });
+  return { id, created: true };
+}
+
+export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInput: unknown) {
+  const input = campaignQueueRouteInput.parse(rawInput);
+  const db = getDatabase();
+  const [[campaign], [queue]] = await Promise.all([
+    db.select({ campaignId: schema.metaCampaigns.campaignId }).from(schema.metaCampaigns)
+      .where(and(eq(schema.metaCampaigns.tenantId, context.tenantId), eq(schema.metaCampaigns.campaignId, input.campaignId))).limit(1),
+    db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, input.queueId))).limit(1),
+  ]);
+  if (!campaign) throw new AuthorizationError("Campanha Meta não encontrada na sua empresa.");
+  if (!queue) throw new AuthorizationError("Fila não encontrada na sua empresa.");
+  assertManager(context, queue.branchId);
+  const now = new Date();
+  await db.insert(schema.metaCampaignQueueRoutes).values({
+    id: randomUUID(), tenantId: context.tenantId, campaignId: campaign.campaignId, queueId: queue.id,
+    enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
+  }).onConflictDoUpdate({
+    target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
+    set: { queueId: queue.id, enabled: input.enabled, updatedAt: now },
+  });
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
+    acao: input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
+  });
+  return { campaignId: campaign.campaignId, queueId: queue.id, enabled: input.enabled };
+}
+
+export async function simulateDistribution(context: TenantContext, rawInput: unknown) {
+  const input = simulationInput.parse(rawInput);
+  assertManager(context, input.branchId);
+  const db = getDatabase();
+  const [queue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, status: schema.leadQueues.status })
+    .from(schema.leadQueues).where(and(eq(schema.leadQueues.id, input.queueId ?? ""), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.branchId, input.branchId))).limit(1);
+  const fallbackQueue = !queue ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, status: schema.leadQueues.status })
+    .from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.branchId, input.branchId), eq(schema.leadQueues.status, "active"))).orderBy(desc(schema.leadQueues.isDefault), asc(schema.leadQueues.createdAt)).limit(1) : [];
+  const effectiveQueue = queue ?? fallbackQueue[0];
+  if (!effectiveQueue || effectiveQueue.status !== "active") return { queue: null, eligible: [], selected: null, reason: "Não existe uma fila ativa para esta unidade." };
+  const [policyRow, brokers] = await Promise.all([
+    db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id), eq(schema.leadDistributionPolicies.enabled, true))).limit(1),
+    db.select({ id: schema.user.id, name: schema.user.name, createdAt: schema.user.createdAt })
+      .from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.branchId, input.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(asc(schema.user.createdAt)),
+  ]);
+  const policy = readPolicy(policyRow[0]?.policy);
+  const ids = brokers.map((broker) => broker.id).filter((id) => !policy.excludedBrokerIds.includes(id));
+  if (!ids.length) return { queue: effectiveQueue, eligible: [], selected: null, reason: "Nenhum corretor disponível atende a política desta fila." };
+  const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
+    .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
+  const loadByBroker = new Map(loads.map((row) => [row.brokerId, Number(row.total)]));
+  const candidates: RankedBroker[] = brokers.filter((broker) => ids.includes(broker.id)).map((broker) => {
+    const activeLeads = loadByBroker.get(broker.id) ?? 0;
+    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads, capacity: effectiveQueue.capacityEnabled ? effectiveQueue.capacity : null, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: input.temperature === "hot" || input.score >= 80 ? 1 : 0, idleSince: null, rankingScore: 0 };
+    return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, policy) };
+  });
+  const decision = resolveDistributionCandidate(candidates, policy, effectiveQueue.strategy === "round_robin" ? "round_robin" : "capacity");
+  return {
+    queue: effectiveQueue,
+    eligible: decision.eligible.map((candidate) => ({ id: candidate.id, name: brokers.find((broker) => broker.id === candidate.id)?.name ?? "Corretor", activeLeads: candidate.activeLeads, capacity: candidate.capacity, score: candidate.rankingScore })),
+    selected: decision.selected ? { id: decision.selected.id, name: brokers.find((broker) => broker.id === decision.selected?.id)?.name ?? "Corretor", activeLeads: decision.selected.activeLeads, capacity: decision.selected.capacity } : null,
+    reason: decision.selected ? "A simulação usa a mesma ordenação determinística da distribuição automática. Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
+  };
+}

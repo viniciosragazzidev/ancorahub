@@ -18,6 +18,7 @@ import { resolveWebhookBranch, WebhookBranchNotFoundError } from "./resolve-webh
 export type CreateLeadFromWebhookSyncInput = {
   tenantId: string;
   branchId: string | null;
+  queueId?: string | null;
   credentialId: string;
   createdByUserId: string;
   payload: unknown;
@@ -55,9 +56,19 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   const data = parsed.data;
   if (data.website && data.website.trim().length > 0) return { success: true, leadId: "honeypot-discarded", duplicate: false };
 
-  let branchId: string;
+  let branchId: string | null = input.branchId;
+  let queueId: string | null = null;
   try {
-    const resolved = input.branchId ?? await resolveWebhookBranch(tenantId, null);
+    if (input.queueId) {
+      const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId })
+        .from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.id, input.queueId), eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.status, "active")))
+        .limit(1);
+      if (!queue) throw new WebhookBranchNotFoundError();
+      queueId = queue.id;
+      branchId = queue.branchId;
+    }
+    const resolved = branchId ?? await resolveWebhookBranch(tenantId, null);
     if (!resolved) throw new WebhookBranchNotFoundError();
     branchId = resolved;
   } catch (error) {
@@ -68,6 +79,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     }
     throw error;
   }
+
+  if (!branchId) return { success: false, code: "BRANCH_NOT_FOUND" };
 
   const payloadHash = hashNormalizedWebhookPayload(data as Record<string, unknown>);
   const prior = await resolveLeadWebhookIdempotency(credentialId, idempotencyKey, null, payloadHash);
@@ -99,13 +112,14 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     }
 
     await tx.insert(schema.leads).values({
-      id: leadId, tenantId, branchId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
+      id: leadId, tenantId, branchId, queueId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
       origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: distStatus,
       consentimentoLgpd: false, webhookCredentialId: credentialId, createdAt: now,
       ...(input.leadSource ? {
         externalId: input.leadSource.externalId,
         sourceChannel: input.leadSource.channel,
         sourceCampaign: input.leadSource.campaign ?? null,
+        metaCampaignId: input.leadSource.campaign ?? null,
         sourceAd: input.leadSource.ad ?? null,
         sourceForm: input.leadSource.form ?? null,
         sourceMetadata: input.leadSource.metadata ?? null,
@@ -118,7 +132,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: createdByUserId, entidade: "lead", entidadeId: leadId, acao: "lead.webhook.received" });
     await tx.insert(schema.leadDistributionEvents).values({
-      id: randomUUID(), tenantId, leadId, toBranchId: branchId, action: distStatus, source: "webhook", strategy: "outbox",
+      id: randomUUID(), tenantId, leadId, toBranchId: branchId, toQueueId: queueId, action: distStatus, source: "webhook", strategy: "outbox",
       reason: bypassPlantao ? "Lead direcionado diretamente para a lista geral de leads." : "Lead recebido e aguardando distribuição idempotente.", actorId: createdByUserId, createdAt: now,
     });
     await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));

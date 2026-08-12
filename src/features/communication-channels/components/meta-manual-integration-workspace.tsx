@@ -16,6 +16,7 @@ import {
   pauseManualMetaLeadAdsSourceAction,
   reactivateManualMetaLeadAdsSourceAction,
   updateMetaLeadAdSourceDistributionAction,
+  updateMetaOperationalAssetsAction,
 } from "../manual-meta-actions";
 
 type Asset = { id: string; name?: string };
@@ -27,6 +28,14 @@ type Props = {
   channel: { status: string; displayPhoneNumber: string | null; verifiedName: string | null } | null;
   branches: Array<{ id: string; name: string }>;
   leadAdSources: Array<{ id: string; pageId: string; status: string; distributionMode: string; branchId: string | null; lastWebhookAt: Date | null; lastLeadAt: Date | null; lastError: string | null }>;
+  operationalSelection: { facebookPageId: string | null; adAccountId: string | null; pixelId: string | null; datasetId: string | null; lastSyncedAt: Date | null; lastError: string | null } | null;
+  inventory: {
+    adAccounts: Array<{ id: string; name: string; status: string }>;
+    pixels: Array<{ id: string; name: string; status: string }>;
+    datasets: Array<{ id: string; name: string; status: string }>;
+    campaigns: Array<{ id: string; name: string; status: string }>;
+    forms: Array<{ id: string; name: string; status: string; pageId: string }>;
+  };
 };
 
 
@@ -110,6 +119,58 @@ function CopyValue({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2"><code className="min-w-0 flex-1 truncate text-sm">{value}</code><Button size="icon-sm" variant="ghost" type="button" aria-label={`Copiar ${label}`} onClick={() => navigator.clipboard.writeText(value).then(() => toast.success(`${label} copiado.`))}><Copy className="size-4" /></Button></div>;
 }
 
+function OperationalAssetsControl({ props }: { props: Props }) {
+  const [pending, startTransition] = useTransition();
+  const [sourceId, setSourceId] = useState(() => props.leadAdSources.find((source) => source.pageId === props.operationalSelection?.facebookPageId)?.id ?? "");
+  const [adAccountId, setAdAccountId] = useState(props.operationalSelection?.adAccountId ?? "");
+  const [pixelId, setPixelId] = useState(props.operationalSelection?.pixelId ?? "");
+  const [datasetId, setDatasetId] = useState(props.operationalSelection?.datasetId ?? "");
+  const hasInventory = props.inventory.adAccounts.length + props.inventory.pixels.length + props.inventory.datasets.length > 0;
+
+  const save = () => startTransition(async () => {
+    try {
+      await updateMetaOperationalAssetsAction({ sourceId: sourceId || null, adAccountId: adAccountId || null, pixelId: pixelId || null, datasetId: datasetId || null });
+      toast.success("Ativos operacionais atualizados. A distribuição continua centralizada nas filas.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar os ativos Meta.");
+    }
+  });
+
+  return <Card className="border-border shadow-none">
+    <CardHeader className="gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><CardTitle className="text-base">Ativos operacionais</CardTitle><CardDescription className="mt-1">Escolha quais ativos já sincronizados representam a operação desta empresa. Nenhuma escolha envia eventos para a Meta.</CardDescription></div>
+        <Badge variant="outline">Configuração local</Badge>
+      </div>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <label className="grid gap-1.5 text-sm font-medium">Fonte de Página
+          <AppSelect aria-label="Fonte de Página Meta" className="w-full" disabled={pending} onValueChange={setSourceId} options={[{ value: "", label: "Nenhuma página padrão" }, ...props.leadAdSources.filter((source) => source.status === "active").map((source) => ({ value: source.id, label: `Página ${source.pageId}` }))]} size="sm" triggerClassName="h-9 bg-background" value={sourceId} />
+        </label>
+        <label className="grid gap-1.5 text-sm font-medium">Conta de anúncios
+          <AppSelect aria-label="Conta de anúncios Meta" className="w-full" disabled={pending || !props.inventory.adAccounts.length} onValueChange={setAdAccountId} options={[{ value: "", label: props.inventory.adAccounts.length ? "Nenhuma conta padrão" : "Sincronize uma conta primeiro" }, ...props.inventory.adAccounts.map((asset) => ({ value: asset.id, label: asset.name }))]} size="sm" triggerClassName="h-9 bg-background" value={adAccountId} />
+        </label>
+        <label className="grid gap-1.5 text-sm font-medium">Pixel
+          <AppSelect aria-label="Pixel Meta" className="w-full" disabled={pending || !props.inventory.pixels.length} onValueChange={setPixelId} options={[{ value: "", label: props.inventory.pixels.length ? "Nenhum pixel padrão" : "Nenhum pixel sincronizado" }, ...props.inventory.pixels.map((asset) => ({ value: asset.id, label: asset.name }))]} size="sm" triggerClassName="h-9 bg-background" value={pixelId} />
+        </label>
+        <label className="grid gap-1.5 text-sm font-medium">Dataset
+          <AppSelect aria-label="Dataset Meta" className="w-full" disabled={pending || !props.inventory.datasets.length} onValueChange={setDatasetId} options={[{ value: "", label: props.inventory.datasets.length ? "Nenhum dataset padrão" : "Nenhum dataset sincronizado" }, ...props.inventory.datasets.map((asset) => ({ value: asset.id, label: asset.name }))]} size="sm" triggerClassName="h-9 bg-background" value={datasetId} />
+        </label>
+      </div>
+      {!hasInventory ? <p className="rounded-md border border-dashed border-border bg-muted/30 p-3 text-sm text-muted-foreground">As fontes de Página já podem receber leads. Campanhas, contas, pixels e datasets aparecerão aqui depois da sincronização da conexão Meta da empresa; o sistema não faz descoberta global de ativos.</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3"><p className="text-xs text-muted-foreground">Rotas de campanha e formulário são configuradas em Filas de distribuição; elas nunca escolhem um corretor diretamente.</p><Button size="sm" onClick={save} disabled={pending}>{pending ? "Salvando…" : "Salvar ativos"}</Button></div>
+    </CardContent>
+  </Card>;
+}
+
+function InventorySummary({ inventory }: { inventory: Props["inventory"] }) {
+  const groups = [
+    ["Campanhas", inventory.campaigns.length], ["Formulários", inventory.forms.length], ["Contas", inventory.adAccounts.length], ["Pixels", inventory.pixels.length],
+  ] as const;
+  return <Card className="border-border shadow-none"><CardHeader><CardTitle className="text-base">Inventário sincronizado</CardTitle><CardDescription>Leitura local dos ativos autorizados para esta empresa. Campanhas e formulários chegam aqui para consulta e são encaminhados para filas na Central de distribuição.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{groups.map(([label, total]) => <div className="rounded-lg border border-border bg-muted/20 p-3" key={label}><p className="text-2xl font-semibold tabular-nums">{total}</p><p className="mt-1 text-xs text-muted-foreground">{label}</p></div>)}</div><div className="grid gap-3 md:grid-cols-2"><div className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium">Campanhas disponíveis</p><Button size="sm" variant="ghost" render={<a href="/leads/distribuicao" />}>Escolher fila</Button></div><div className="mt-2 space-y-1">{inventory.campaigns.slice(0, 5).map((item) => <div className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs" key={item.id}><span className="truncate font-medium">{item.name}</span><Badge variant="outline">{item.status}</Badge></div>)}{!inventory.campaigns.length ? <p className="text-xs text-muted-foreground">Nenhuma campanha sincronizada.</p> : null}</div></div><div className="rounded-lg border border-border p-3"><p className="text-sm font-medium">Formulários de Lead Ads</p><div className="mt-2 space-y-1">{inventory.forms.slice(0, 5).map((item) => <div className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs" key={item.id}><span className="truncate font-medium">{item.name}</span><Badge variant="outline">{item.status}</Badge></div>)}{!inventory.forms.length ? <p className="text-xs text-muted-foreground">Nenhum formulário sincronizado.</p> : null}</div></div></div></CardContent></Card>;
+}
+
 function MetaLink({ href, children }: { href: string; children: ReactNode }) {
   return <a className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href={href} rel="noreferrer" target="_blank">{children}<ArrowSquareOut aria-hidden="true" className="size-3.5" /></a>;
 }
@@ -187,6 +248,7 @@ export function MetaManualIntegrationWorkspace(props: Props) {
   });
 
   return <div className="space-y-4">
+    <Card className="border-primary/20 bg-primary/5 shadow-none"><CardContent className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"><div><p className="text-sm font-semibold">Central Meta da corretora</p><p className="mt-1 text-sm text-muted-foreground">Conecte páginas, acompanhe ativos e encaminhe cada origem para a fila certa — sem ponto solto e sem expor ativos de outras empresas.</p></div><Button variant="outline" size="sm" render={<a href="/leads/distribuicao" />}>Abrir filas e regras</Button></CardContent></Card>
     <LeadAdsWizard props={props} />
     <Card className="border-border shadow-none">
         <CardHeader>
@@ -217,5 +279,7 @@ export function MetaManualIntegrationWorkspace(props: Props) {
           )) : <p className="text-sm text-muted-foreground">Nenhuma Página ativa ainda.</p>}
         </CardContent>
     </Card>
+    <OperationalAssetsControl props={props} />
+    <InventorySummary inventory={props.inventory} />
   </div>;
 }

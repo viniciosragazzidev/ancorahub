@@ -132,6 +132,28 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
           }
         }
       }
+
+      const pixels = await client.fetchPixels(account.adAccountId);
+      for (const pixel of pixels) {
+        await db.insert(schema.metaPixels).values({
+          id: randomUUID(), tenantId, pixelId: pixel.id, name: pixel.name, status: "active", createdAt: new Date(), updatedAt: new Date(),
+        }).onConflictDoUpdate({
+          target: [schema.metaPixels.tenantId, schema.metaPixels.pixelId],
+          set: { name: pixel.name, status: "active", updatedAt: new Date() },
+        });
+        totalSynced++;
+      }
+    }
+
+    const datasets = await client.fetchDatasets(connection.businessId);
+    for (const dataset of datasets) {
+      await db.insert(schema.metaDatasets).values({
+        id: randomUUID(), tenantId, datasetId: dataset.id, name: dataset.name, status: "active", createdAt: new Date(), updatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: [schema.metaDatasets.tenantId, schema.metaDatasets.datasetId],
+        set: { name: dataset.name, status: "active", updatedAt: new Date() },
+      });
+      totalSynced++;
     }
 
     // 3. Buscar formulários de Lead Ads de cada página do tenant

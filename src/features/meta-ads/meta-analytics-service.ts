@@ -77,7 +77,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     const saleStats = salesMap.get(c.campaignId) || salesMap.get(c.name) || { count: 0, revenue: 0 };
 
     const leadsCount = leadStats.total;
-    const conversationsCount = Math.round(leadsCount * 0.85); // conversas iniciadas
+    // Do not infer conversations from an arbitrary percentage. Until the
+    // communication attribution is persisted, expose the verified CRM state.
+    const conversationsCount = leadStats.active;
     const salesCount = Math.max(leadStats.converted, saleStats.count);
     const revenueTotal = saleStats.revenue;
     const conversionRate = leadsCount > 0 ? Number(((salesCount / leadsCount) * 100).toFixed(1)) : 0;

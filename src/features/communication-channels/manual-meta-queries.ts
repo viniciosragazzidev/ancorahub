@@ -32,7 +32,7 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
   const db = getDatabase();
   const leadAdsConfig = getMetaLeadAdsConfigurationState();
 
-  const [identity, leadAdsEnabled, channels, leadAdSources, branches] = await Promise.all([
+  const [identity, leadAdsEnabled, channels, leadAdSources, branches, settings, adAccounts, pixels, datasets, campaigns, forms] = await Promise.all([
     getMetaLeadAdsPlatformIdentity(),
     isMetaLeadAdsEnabled(context.tenantId),
     db
@@ -72,6 +72,18 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
       })
       .from(schema.branches)
       .where(eq(schema.branches.tenantId, context.tenantId)),
+    db.select({ facebookPageId: schema.metaIntegrationSettings.facebookPageId, adAccountId: schema.metaIntegrationSettings.adAccountId, pixelId: schema.metaIntegrationSettings.pixelId, datasetId: schema.metaIntegrationSettings.datasetId, lastSyncedAt: schema.metaIntegrationSettings.lastSyncedAt, lastError: schema.metaIntegrationSettings.lastError })
+      .from(schema.metaIntegrationSettings).where(eq(schema.metaIntegrationSettings.tenantId, context.tenantId)).limit(1),
+    db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, status: schema.metaAdAccounts.status })
+      .from(schema.metaAdAccounts).where(eq(schema.metaAdAccounts.tenantId, context.tenantId)).orderBy(desc(schema.metaAdAccounts.updatedAt)),
+    db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status })
+      .from(schema.metaPixels).where(eq(schema.metaPixels.tenantId, context.tenantId)).orderBy(desc(schema.metaPixels.updatedAt)),
+    db.select({ id: schema.metaDatasets.datasetId, name: schema.metaDatasets.name, status: schema.metaDatasets.status })
+      .from(schema.metaDatasets).where(eq(schema.metaDatasets.tenantId, context.tenantId)).orderBy(desc(schema.metaDatasets.updatedAt)),
+    db.select({ id: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
+      .from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(desc(schema.metaCampaigns.updatedAt)),
+    db.select({ id: schema.metaLeadForms.formId, name: schema.metaLeadForms.name, status: schema.metaLeadForms.status, pageId: schema.metaLeadForms.pageId })
+      .from(schema.metaLeadForms).where(eq(schema.metaLeadForms.tenantId, context.tenantId)).orderBy(desc(schema.metaLeadForms.updatedAt)),
   ]);
 
   return {
@@ -82,5 +94,7 @@ export async function getManualMetaIntegrationWorkspaceData(context: TenantConte
     channel: channels[0] ?? null,
     leadAdSources,
     branches,
+    operationalSelection: settings[0] ?? null,
+    inventory: { adAccounts, pixels, datasets, campaigns, forms },
   };
 }
