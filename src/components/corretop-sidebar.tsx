@@ -83,6 +83,7 @@ const navSections: SidebarSection[] = [
     items: [
       { label: "Inteligência do Tenant", icon: BookOpen, url: "/inteligencia", permission: "acessar_qualificacao_ia" },
       { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
+      { label: "Distribuição de Leads", icon: Redistribute, url: "/leads/distribuicao", permission: "acessar_qualificacao_ia" },
       { label: "Automações & Regras", icon: Sparkle, url: "/automacoes", permission: "acessar_configuracoes" },
     ],
   },
