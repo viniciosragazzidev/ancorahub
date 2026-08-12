@@ -1,4 +1,4 @@
-const API_BASE = "https://corretop.vercel.app";
+const API_BASE = "https://crm.ancorasaude.cloud";
 
 /**
  * Encapsula o `sendResponse` do listener. Quando o remetente encerra o canal

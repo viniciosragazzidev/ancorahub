@@ -7,9 +7,10 @@ import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/cr
 import { generateWebhookToken, resolveRequestId } from "@/features/leads/webhooks/utils/lead-webhook.utils";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
+import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
 
 import { MetaCloudApiError } from "./meta-cloud-client";
-import { getMetaLeadAdsServerConfig } from "./meta-cloud-config";
+import { getMetaLeadAdsWebhookConfig } from "./meta-cloud-config";
 import { isMetaLeadAdsTenantPilotEnabled } from "./meta-lead-ads-platform";
 
 export type MetaLeadAdsWebhookPayload = {
@@ -76,10 +77,10 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   };
 }
 
-async function fetchMetaLead(leadgenId: string): Promise<MetaLeadAdRecord> {
-  const config = getMetaLeadAdsServerConfig();
+async function fetchMetaLead(leadgenId: string, tenantAccessToken: string): Promise<MetaLeadAdRecord> {
+  const config = getMetaLeadAdsWebhookConfig();
   const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,form_id,campaign_id,campaign_name,field_data`, {
-    headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` }, cache: "no-store",
+    headers: { Accept: "application/json", Authorization: `Bearer ${tenantAccessToken}` }, cache: "no-store",
   });
   const payload = await response.json().catch(() => ({})) as MetaLeadAdRecord & { error?: { message?: string; code?: number } };
   if (!response.ok) {
@@ -173,7 +174,12 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
       if (!leadgenId) continue;
       console.log("[ingestMetaLeadAdsWebhook] Processing leadgenId", leadgenId);
       try {
-        const leadRecord = await fetchMetaLead(leadgenId);
+        const [connection] = await db.select({ accessTokenCiphertext: schema.metaConnections.accessTokenCiphertext })
+          .from(schema.metaConnections)
+          .where(and(eq(schema.metaConnections.tenantId, source.tenantId), eq(schema.metaConnections.status, "connected")))
+          .limit(1);
+        if (!connection?.accessTokenCiphertext) throw new Error("Nenhuma credencial Meta ativa foi encontrada para esta PÃ¡gina.");
+        const leadRecord = await fetchMetaLead(leadgenId, decryptMetaToken(connection.accessTokenCiphertext));
         const lead = normalizeMetaLead(leadRecord);
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
         if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");

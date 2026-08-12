@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getMetaLeadAdsServerConfig } from "@/features/communication-channels/meta-cloud-config";
+import { getMetaLeadAdsWebhookConfig } from "@/features/communication-channels/meta-cloud-config";
 import { ingestMetaLeadAdsWebhook, type MetaLeadAdsWebhookPayload, verifyMetaWebhookSignature } from "@/features/communication-channels/meta-lead-ads";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
-    const config = getMetaLeadAdsServerConfig();
+    const config = getMetaLeadAdsWebhookConfig();
     const params = new URL(request.url).searchParams;
     console.log("[Meta Lead Ads Webhook GET]", { mode: params.get("hub.mode"), verifyTokenMatch: params.get("hub.verify_token") === config.webhookVerifyToken });
     if (params.get("hub.mode") !== "subscribe" || !params.get("hub.challenge") || params.get("hub.verify_token") !== config.webhookVerifyToken) {
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const config = getMetaLeadAdsServerConfig();
+    const config = getMetaLeadAdsWebhookConfig();
     const rawBody = await request.text();
     const signature = request.headers.get("x-hub-signature-256");
     console.log("[Meta Lead Ads Webhook POST received]", { bodyLength: rawBody.length, hasSignature: Boolean(signature) });

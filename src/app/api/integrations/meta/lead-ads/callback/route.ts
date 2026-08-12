@@ -1,85 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForLongLivedToken } from "@/features/meta-ads/meta-oauth";
+
+import { completeMetaConnectionAttempt } from "@/features/meta-ads/meta-connection-attempts";
 import { MetaGraphClient } from "@/features/meta-ads/meta-graph-client";
+import { exchangeCodeForLongLivedToken } from "@/features/meta-ads/meta-oauth";
+
+function popupResponse(input: { origin: string; type: "META_MARKETING_AUTH_SUCCESS" | "META_MARKETING_AUTH_ERROR"; attemptId?: string }) {
+  const payload = JSON.stringify(input.type === "META_MARKETING_AUTH_SUCCESS"
+    ? { type: input.type, attemptId: input.attemptId }
+    : { type: input.type });
+  return new NextResponse(`<!doctype html><html><body><script>window.opener?.postMessage(${payload}, ${JSON.stringify(input.origin)});window.close();</script></body></html>`, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const code = searchParams.get("code");
-  const error = searchParams.get("error");
-  const errorReason = searchParams.get("error_reason");
-  const errorDescription = searchParams.get("error_description");
-
-  if (error || !code) {
-    const errorMsg = errorDescription || errorReason || error || "Código de autorização não recebido da Meta.";
-    return new NextResponse(
-      `<!DOCTYPE html>
-      <html>
-      <head><title>Erro na Autenticação Meta</title></head>
-      <body style="font-family: system-ui, sans-serif; display: grid; place-content: center; height: 100vh; background: #0f172a; color: #f8fafc;">
-        <div style="text-align: center; max-width: 400px; padding: 2rem; background: #1e293b; border-radius: 1rem; border: 1px solid #334155;">
-          <h2 style="color: #ef4444; margin-bottom: 0.5rem;">Falha na Conexão Meta</h2>
-          <p style="font-size: 0.875rem; color: #94a3b8;">${errorMsg}</p>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'META_AUTH_ERROR', error: '${errorMsg}' }, '*');
-              setTimeout(() => window.close(), 3000);
-            }
-          </script>
-        </div>
-      </body>
-      </html>`,
-      { headers: { "Content-Type": "text/html; charset=utf-8" } }
-    );
-  }
-
+  const code = request.nextUrl.searchParams.get("code");
+  const state = request.nextUrl.searchParams.get("state");
+  const redirectUri = process.env.META_LEAD_ADS_REDIRECT_URI?.trim() || `${request.nextUrl.origin}/api/integrations/meta/lead-ads/callback`;
+  const origin = new URL(redirectUri).origin;
+  if (!code || !state) return popupResponse({ origin, type: "META_MARKETING_AUTH_ERROR" });
   try {
-    const redirectUri = `${request.nextUrl.origin}/api/integrations/meta/lead-ads/callback`;
-    const tokenData = await exchangeCodeForLongLivedToken(code, redirectUri);
-    const client = new MetaGraphClient(tokenData.accessToken);
-    const assets = await client.discoverAssets();
-
-    return new NextResponse(
-      `<!DOCTYPE html>
-      <html>
-      <head><title>Autenticação Meta Concluída</title></head>
-      <body style="font-family: system-ui, sans-serif; display: grid; place-content: center; height: 100vh; background: #0f172a; color: #f8fafc;">
-        <div style="text-align: center; max-width: 400px; padding: 2rem; background: #1e293b; border-radius: 1rem; border: 1px solid #334155;">
-          <h2 style="color: #22c55e; margin-bottom: 0.5rem;">Meta Conectada!</h2>
-          <p style="font-size: 0.875rem; color: #94a3b8;">Importando ativos descobertos para o CorreTop...</p>
-          <script>
-            const assets = ${JSON.stringify(assets)};
-            if (window.opener) {
-              window.opener.postMessage({ type: 'META_AUTH_SUCCESS', code: '${code}', assets: assets }, '*');
-              setTimeout(() => window.close(), 1000);
-            } else {
-              window.location.href = '/integrations/meta';
-            }
-          </script>
-        </div>
-      </body>
-      </html>`,
-      { headers: { "Content-Type": "text/html; charset=utf-8" } }
-    );
-  } catch (err: any) {
-    const msg = err?.message || "Falha ao processar autorização Meta.";
-    return new NextResponse(
-      `<!DOCTYPE html>
-      <html>
-      <head><title>Erro na Autenticação Meta</title></head>
-      <body style="font-family: system-ui, sans-serif; display: grid; place-content: center; height: 100vh; background: #0f172a; color: #f8fafc;">
-        <div style="text-align: center; max-width: 400px; padding: 2rem; background: #1e293b; border-radius: 1rem; border: 1px solid #334155;">
-          <h2 style="color: #ef4444; margin-bottom: 0.5rem;">Erro de Ativos</h2>
-          <p style="font-size: 0.875rem; color: #94a3b8;">${msg}</p>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'META_AUTH_ERROR', error: '${msg}' }, '*');
-              setTimeout(() => window.close(), 3000);
-            }
-          </script>
-        </div>
-      </body>
-      </html>`,
-      { headers: { "Content-Type": "text/html; charset=utf-8" } }
-    );
+    const token = await exchangeCodeForLongLivedToken(code, redirectUri);
+    const assets = await new MetaGraphClient(token.accessToken).discoverAssets();
+    const attempt = await completeMetaConnectionAttempt({ state, accessToken: token.accessToken, assets, tokenExpiresAt: token.expiresIn ? new Date(Date.now() + token.expiresIn * 1000) : null });
+    return popupResponse({ origin, type: "META_MARKETING_AUTH_SUCCESS", attemptId: attempt.id });
+  } catch {
+    return popupResponse({ origin, type: "META_MARKETING_AUTH_ERROR" });
   }
 }

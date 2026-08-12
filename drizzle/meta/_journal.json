@@ -470,6 +470,13 @@
       "when": 1786541030471,
       "tag": "0115_meta_campaign_queue_routes",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1786550400000,
+      "tag": "0117_meta_connection_attempts",
+      "breakpoints": true
     }
   ]
 }

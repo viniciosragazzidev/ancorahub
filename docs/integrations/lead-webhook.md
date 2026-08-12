@@ -8,7 +8,7 @@ idempotência, rastreabilidade e isolamento multi-tenant.
 ## Endpoint
 
 ```
-POST https://app.corretop.com.br/api/webhooks/leads/<TENANT_ID>
+POST https://crm.ancorasaude.cloud/api/webhooks/leads/<TENANT_ID>
 ```
 
 > O `<TENANT_ID>` é o identificador único do tenant (corretora) no sistema.
@@ -261,7 +261,7 @@ Os seguintes campos **não são aceitos** no payload e causarão erro `422`:
 
 ```bash
 curl --request POST \
-  --url "https://app.corretop.com.br/api/webhooks/leads/TENANT_ID" \
+  --url "https://crm.ancorasaude.cloud/api/webhooks/leads/TENANT_ID" \
   --header "Authorization: Bearer crt_live_SEU_TOKEN" \
   --header "Content-Type: application/json" \
   --header "Idempotency-Key: meu-idempotency-key-123" \

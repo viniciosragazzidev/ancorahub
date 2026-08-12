@@ -4,6 +4,7 @@ import { ArrowSquareOut, CheckCircle, ShieldWarning } from "@/components/huge-ic
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
+import { MetaEmbeddedSignupCard } from "@/features/communication-channels/components/meta-embedded-signup-card";
 
 type Channel = {
   id: string;
@@ -64,6 +65,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
               <p><strong className="block text-foreground">Governança</strong><span className="text-muted-foreground">Templates, janela e políticas da Meta.</span></p>
             </div>
             <MetaCloudSetupCard companyAccount={official.companyAccount} configured={official.configured} enabled={official.enabled} missing={official.missing} />
+            {official.canConfigure && official.enabled && official.configured && official.appId && official.embeddedSignupConfigId ? <MetaEmbeddedSignupCard appId={official.appId} configId={official.embeddedSignupConfigId} /> : null}
           </CardContent>
         </Card>
         <Card className="border-border bg-card shadow-none">

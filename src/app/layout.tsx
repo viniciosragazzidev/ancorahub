@@ -26,7 +26,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://crm.ancorasaude.com.br"),
+  metadataBase: new URL("https://crm.ancorasaude.cloud"),
   title: {
     default: "AncoraHub — Âncora Saúde",
     template: "%s | AncoraHub",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     "Gestão de Leads",
     "Corretor de Seguros",
   ],
-  authors: [{ name: "Âncora Saúde", url: "https://crm.ancorasaude.com.br" }],
+  authors: [{ name: "Âncora Saúde", url: "https://crm.ancorasaude.cloud" }],
   creator: "Âncora Saúde",
   publisher: "Âncora Saúde",
   icons: {
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     title: "AncoraHub — Âncora Saúde",
     description:
       "Plataforma inteligente de gestão de leads, distribuição automática e qualificação por IA via WhatsApp.",
-    url: "https://crm.ancorasaude.com.br",
+    url: "https://crm.ancorasaude.cloud",
     siteName: "AncoraHub",
     images: [
       {

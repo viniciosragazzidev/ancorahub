@@ -5,9 +5,12 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { encryptMetaToken, exchangeCodeForLongLivedToken } from "./meta-oauth";
+import { decryptMetaToken } from "./meta-oauth";
+import { consumeMetaConnectionAttempt, createMetaConnectionAttempt, readVerifiedMetaConnectionAttempt } from "./meta-connection-attempts";
 import { MetaGraphClient } from "./meta-graph-client";
 import { runMetaTenantSync } from "./meta-sync-service";
+import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
+import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 import type { MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
@@ -91,27 +94,37 @@ export async function getMetaConnectionState(): Promise<{
 }
 
 /** Descobrir ativos Meta via token/código de auth */
-export async function discoverMetaAssetsFromAuthCode(code: string, redirectUri: string): Promise<MetaDiscoveredAssets> {
-  const tokenData = await exchangeCodeForLongLivedToken(code, redirectUri);
-  const client = new MetaGraphClient(tokenData.accessToken);
-  return client.discoverAssets();
+
+export async function beginMetaMarketingConnection() {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director") throw new Error("Apenas Diretores podem conectar Marketing da Meta.");
+  const attempt = await createMetaConnectionAttempt({ tenantId: context.tenantId, userId: context.userId, product: "marketing" });
+  await getDatabase().insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "meta_connection_attempt",
+    entidadeId: attempt.id,
+    acao: "meta_marketing_connection_started",
+    createdAt: new Date(),
+  });
+  return attempt;
+}
+
+export async function getMetaMarketingAttemptAssets(attemptId: string): Promise<MetaDiscoveredAssets> {
+  const context = await getRequiredTenantContext();
+  const attempt = await readVerifiedMetaConnectionAttempt({ attemptId, tenantId: context.tenantId, userId: context.userId });
+  return attempt.assetSnapshot as MetaDiscoveredAssets;
 }
 
 /** Descobrir ativos Meta fornecendo o Access Token diretamente */
-export async function discoverMetaAssetsFromToken(token: string): Promise<MetaDiscoveredAssets> {
-  const client = new MetaGraphClient(token.trim());
-  return client.discoverAssets();
-}
 
 /** Salva/Confirma a conexão Meta do tenant com os ativos selecionados */
 export async function confirmMetaConnection(payload: {
-  authCode?: string;
-  redirectUri?: string;
+  attemptId: string;
   businessId: string;
   businessName: string;
   pages: Array<{ id: string; name: string }>;
   adAccounts: Array<{ id: string; name: string; currency: string }>;
-  whatsapp?: { wabaId: string; phoneNumberId: string; displayPhoneNumber: string } | null;
 }): Promise<{ success: boolean; error?: string }> {
   const context = await getRequiredTenantContext();
   if (context.role !== "director") {
@@ -121,18 +134,23 @@ export async function confirmMetaConnection(payload: {
   const db = getDatabase();
   const now = new Date();
 
-  // Exchange auth code or generate mock long lived token
-  let token = `EAA_META_TOKEN_${randomUUID()}`;
-  let expiresAt = new Date(Date.now() + 60 * 24 * 3600 * 1000);
-
-  if (payload.authCode && payload.redirectUri) {
-    const exchanged = await exchangeCodeForLongLivedToken(payload.authCode, payload.redirectUri);
-    token = exchanged.accessToken;
-    expiresAt = new Date(Date.now() + exchanged.expiresIn * 1000);
+  const attempt = await readVerifiedMetaConnectionAttempt({ attemptId: payload.attemptId, tenantId: context.tenantId, userId: context.userId });
+  const tokenCiphertext = attempt.accessTokenCiphertext;
+  if (!tokenCiphertext) throw new Error("A autorização Meta não contém uma credencial válida.");
+  const authorizedAssets = attempt.assetSnapshot as MetaDiscoveredAssets;
+  if (authorizedAssets.business.id !== payload.businessId) throw new Error("A empresa selecionada não pertence à autorização atual da Meta.");
+  const authorizedPages = new Map(authorizedAssets.pages.map((page) => [page.id, page]));
+  const authorizedAccounts = new Map(authorizedAssets.adAccounts.map((account) => [account.id, account]));
+  if (payload.pages.some((page) => !authorizedPages.has(page.id)) || payload.adAccounts.some((account) => !authorizedAccounts.has(account.id))) {
+    throw new Error("Um ativo selecionado não pertence à autorização atual da Meta.");
   }
-
-  const tokenCiphertext = encryptMetaToken(token);
+  const expiresAt = attempt.tokenExpiresAt;
   const connectionId = randomUUID();
+  const accessToken = decryptMetaToken(tokenCiphertext);
+
+  for (const page of payload.pages) {
+    await subscribePageToLeadgen(page.id, accessToken);
+  }
 
   // 1. Inserir ou atualizar meta_connections
   const [existing] = await db
@@ -146,7 +164,7 @@ export async function confirmMetaConnection(payload: {
       .update(schema.metaConnections)
       .set({
         businessId: payload.businessId,
-        businessName: payload.businessName,
+        businessName: authorizedAssets.business.name,
         accessTokenCiphertext: tokenCiphertext,
         expiresAt,
         status: "connected",
@@ -159,7 +177,7 @@ export async function confirmMetaConnection(payload: {
       id: connectionId,
       tenantId: context.tenantId,
       businessId: payload.businessId,
-      businessName: payload.businessName,
+      businessName: authorizedAssets.business.name,
       accessTokenCiphertext: tokenCiphertext,
       expiresAt,
       status: "connected",
@@ -180,14 +198,14 @@ export async function confirmMetaConnection(payload: {
         tenantId: context.tenantId,
         connectionId: activeConnectionId,
         pageId: page.id,
-        name: page.name,
+        name: authorizedPages.get(page.id)!.name,
         status: "active",
         createdAt: now,
         updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [schema.metaPages.tenantId, schema.metaPages.pageId],
-        set: { name: page.name, updatedAt: now },
+        set: { name: authorizedPages.get(page.id)!.name, updatedAt: now },
       });
   }
 
@@ -200,46 +218,28 @@ export async function confirmMetaConnection(payload: {
         tenantId: context.tenantId,
         connectionId: activeConnectionId,
         adAccountId: adAcc.id,
-        name: adAcc.name,
-        currency: adAcc.currency || "BRL",
+        name: authorizedAccounts.get(adAcc.id)!.name,
+        currency: authorizedAccounts.get(adAcc.id)!.currency || "BRL",
         status: "active",
         createdAt: now,
         updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [schema.metaAdAccounts.tenantId, schema.metaAdAccounts.adAccountId],
-        set: { name: adAcc.name, currency: adAcc.currency || "BRL", updatedAt: now },
+        set: { name: authorizedAccounts.get(adAcc.id)!.name, currency: authorizedAccounts.get(adAcc.id)!.currency || "BRL", updatedAt: now },
       });
   }
 
-  // 4. Salvar Canal WhatsApp se fornecido
-  if (payload.whatsapp?.phoneNumberId) {
-    await db
-      .insert(schema.communicationChannels)
-      .values({
-        id: randomUUID(),
-        tenantId: context.tenantId,
-        provider: "meta_cloud",
-        status: "active",
-        businessId: payload.businessId,
-        wabaId: payload.whatsapp.wabaId,
-        phoneNumberId: payload.whatsapp.phoneNumberId,
-        displayPhoneNumber: payload.whatsapp.displayPhoneNumber,
-        accessTokenCiphertext: tokenCiphertext,
-        isDefault: true,
-        createdBy: context.userId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [schema.communicationChannels.provider, schema.communicationChannels.phoneNumberId],
-        set: {
-          status: "active",
-          accessTokenCiphertext: tokenCiphertext,
-          displayPhoneNumber: payload.whatsapp.displayPhoneNumber,
-          updatedAt: now,
-        },
-      });
+  // 4. Create the tenant-scoped Lead Ads source after the selected Page has
+  // accepted the subscription. WhatsApp stays in its own Embedded Signup flow.
+  for (const page of payload.pages) {
+    await configureMetaLeadAdsSource({
+      tenantId: context.tenantId,
+      branchId: null,
+      pageId: page.id,
+      adAccountId: null,
+      actorUserId: context.userId,
+    });
   }
 
   // 5. Registrar auditoria
@@ -254,6 +254,7 @@ export async function confirmMetaConnection(payload: {
 
   // 6. Rodar primeira sincronização
   await runMetaTenantSync(context.tenantId, "full");
+  await consumeMetaConnectionAttempt(attempt.id);
 
   revalidatePath("/settings/integracoes/meta");
   revalidatePath("/marketing/campanhas");

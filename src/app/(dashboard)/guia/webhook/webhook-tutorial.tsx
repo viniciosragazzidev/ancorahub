@@ -152,7 +152,7 @@ export function WebhookTutorial() {
             filename="index.html"
             code={`<!-- 1. Snippet de Inicialização (antes do </body>) -->
 <script>
-  window.CORRETOP_HUB_URL = "https://corretop.vercel.app/api/webhooks/leads";
+  window.CORRETOP_HUB_URL = "https://crm.ancorasaude.cloud/api/webhooks/leads";
   window.CORRETOP_HUB_TOKEN = "crt_live_SEU_TOKEN";
 </script>
 
@@ -329,7 +329,7 @@ export function WebhookTutorial() {
         <CodeBlock
           filename="terminal"
           code={`curl --request POST \\
-  --url "https://corretop.vercel.app/api/webhooks/leads" \\
+  --url "https://crm.ancorasaude.cloud/api/webhooks/leads" \\
   --header "Authorization: Bearer crt_live_SEU_TOKEN" \\
   --header "Content-Type: application/json" \\
   --header "Idempotency-Key: meu-lead-001" \\

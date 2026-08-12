@@ -1579,6 +1579,36 @@ export const metaCampaignQueueRoutes = pgTable(
   ],
 );
 
+/**
+ * One-time, server-owned authorization handoff for a Meta product. Browser
+ * values are never credentials; the callback validates the state then stores
+ * the encrypted credential and the Graph-confirmed asset snapshot here until
+ * the authenticated Director confirms the selection.
+ */
+export const metaConnectionAttempts = pgTable(
+  "meta_connection_attempts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    product: text("product").notNull(),
+    stateHash: text("state_hash").notNull(),
+    status: text("status").notNull().default("pending"),
+    accessTokenCiphertext: text("access_token_ciphertext"),
+    assetSnapshot: jsonb("asset_snapshot"),
+    tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    errorCode: text("error_code"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_connection_attempts_state_unique").on(table.stateHash),
+    index("meta_connection_attempts_tenant_status_idx").on(table.tenantId, table.product, table.status),
+  ],
+);
+
 export const metaAdSets = pgTable(
   "meta_ad_sets",
   {

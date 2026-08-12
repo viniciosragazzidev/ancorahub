@@ -36,7 +36,7 @@ export async function startWhatsAppConnection() {
       [connection] = await db.select().from(schema.whatsappConnections).where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId))).limit(1);
     }
     if (!connection?.sessionId) throw new Error("Sessão não configurada.");
-    const publicAppUrl = (process.env.OPENWA_WEBHOOK_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://corretop.vercel.app").replace(/\/$/, "");
+    const publicAppUrl = (process.env.OPENWA_WEBHOOK_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://crm.ancorasaude.cloud").replace(/\/$/, "");
     await registerOpenWaWebhook(connection.sessionId, `${publicAppUrl}/api/webhooks/openwa/${context.tenantId}`, connection.webhookSecret ?? process.env.OPENWA_WEBHOOK_SECRET ?? "").catch(() => undefined);
     const response = await fetch(`${baseUrl()}/sessions/${connection.sessionId}/start`, { method: "POST", headers: headers(), cache: "no-store" });
     if (!response.ok && response.status !== 400) throw new Error("OpenWA não conseguiu iniciar a sessão.");

@@ -116,7 +116,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
 
   const snippet = useMemo(() => {
     if (!selected) return "";
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://app.corretop.com.br";
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://crm.ancorasaude.cloud";
     const token = revealedToken ?? `${selected.tokenPrefix}⬢⬢⬢⬢⬢⬢⬢⬢`;
     return `<form data-ancora-form>
   <input type="text" name="nome" placeholder="Seu nome" required>
@@ -268,7 +268,7 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <p>Copie o snippet abaixo e cole antes do {"</body>"} da página. Substitua <code>SEU_TOKEN</code> pelo token gerado:</p>
             <pre className="rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-foreground overflow-x-auto">
 {`<script
-  src="https://app.corretop.com.br/embed/lead-form.js"
+  src="https://crm.ancorasaude.cloud/embed/lead-form.js"
   data-token="SEU_TOKEN"></script>`}
             </pre>
             <p>O script é <strong>estático e versionado</strong> — funciona em qualquer construtor (WordPress, Wix, HTML puro, React, etc.).</p>
@@ -283,7 +283,7 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <p>Para redirecionar o visitante após o envio, adicione <code>data-redirect</code> no script:</p>
             <pre className="rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-foreground overflow-x-auto">
 {`<script
-  src="https://app.corretop.com.br/embed/lead-form.js"
+  src="https://crm.ancorasaude.cloud/embed/lead-form.js"
   data-token="SEU_TOKEN"
   data-redirect="/obrigado"></script>`}
             </pre>
@@ -331,7 +331,7 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </h4>
             <pre className="rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-foreground overflow-x-auto">
 {`curl -X POST \\
-  "https://app.corretop.com.br/api/webhooks/leads/SEU_TOKEN" \\
+  "https://crm.ancorasaude.cloud/api/webhooks/leads/SEU_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"nome":"Maria","telefone":"+5521999999999"}'`}
             </pre>

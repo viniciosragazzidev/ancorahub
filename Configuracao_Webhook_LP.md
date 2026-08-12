@@ -7,7 +7,7 @@ Para receber leads gerados em seus formulários externos (WordPress, Webflow, RD
 
 ## 1. Informações de Endpoint e Autenticação
 
-*   **URL do Webhook:** `https://corretop.vercel.app/api/webhooks/leads`
+*   **URL do Webhook:** `https://crm.ancorasaude.cloud/api/webhooks/leads`
 *   **Método HTTP:** `POST`
 *   **Content-Type:** `application/json`
 
@@ -68,7 +68,7 @@ document.querySelector("#seu-formulario").addEventListener("submit", async (even
   };
 
   try {
-    const response = await fetch("https://corretop.vercel.app/api/webhooks/leads", {
+    const response = await fetch("https://crm.ancorasaude.cloud/api/webhooks/leads", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

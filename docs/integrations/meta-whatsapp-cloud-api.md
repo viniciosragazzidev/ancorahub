@@ -47,7 +47,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 No produto WhatsApp do app Meta, informe:
 
 ```text
-Callback URL: https://corretop.vercel.app/api/webhooks/meta/whatsapp
+Callback URL: https://crm.ancorasaude.cloud/api/webhooks/meta/whatsapp
 Verify Token: <o mesmo META_WHATSAPP_WEBHOOK_VERIFY_TOKEN da Vercel>
 ```
 

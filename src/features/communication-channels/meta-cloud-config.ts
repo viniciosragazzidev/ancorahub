@@ -19,10 +19,22 @@ export type MetaLeadAdsServerConfig = {
   graphVersion: string;
 };
 
+export type MetaLeadAdsWebhookConfig = Omit<MetaLeadAdsServerConfig, "accessToken">;
+
+/** App-level webhook verification has no need for a tenant data credential. */
+export function getMetaLeadAdsWebhookConfig(): MetaLeadAdsWebhookConfig {
+  const appSecret = process.env.META_LEAD_ADS_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
+  const webhookVerifyToken = process.env.META_LEAD_WEBHOOK_VERIFY_TOKEN?.trim() || process.env.META_LEAD_ADS_WEBHOOK_VERIFY_TOKEN?.trim();
+  if (!appSecret) throw new Error("Lead Ads webhook configuration is incomplete: META_LEAD_ADS_APP_SECRET.");
+  if (!webhookVerifyToken) throw new Error("Lead Ads webhook configuration is incomplete: META_LEAD_WEBHOOK_VERIFY_TOKEN.");
+  const graphVersion = process.env.META_GRAPH_API_VERSION?.trim() || "v25.0";
+  if (!graphVersionPattern.test(graphVersion)) throw new Error("META_GRAPH_API_VERSION is invalid.");
+  return { appSecret, graphVersion, webhookVerifyToken };
+}
+
 export function getMetaLeadAdsConfigurationState() {
   const missing = [
-    ...(process.env.META_LEAD_ADS_ACCESS_TOKEN?.trim() ? [] : ["META_LEAD_ADS_ACCESS_TOKEN"]),
-    ...((process.env.META_LEAD_ADS_APP_SECRET?.trim() || process.env.META_WHATSAPP_APP_SECRET?.trim()) ? [] : ["META_LEAD_ADS_APP_SECRET"]),
+    ...((process.env.META_LEAD_ADS_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim()) ? [] : ["META_LEAD_ADS_APP_SECRET"]),
     ...((process.env.META_LEAD_WEBHOOK_VERIFY_TOKEN?.trim() || process.env.META_LEAD_ADS_WEBHOOK_VERIFY_TOKEN?.trim()) ? [] : ["META_LEAD_WEBHOOK_VERIFY_TOKEN"]),
   ];
   return { configured: missing.length === 0, missing };

@@ -154,7 +154,7 @@ No submit do formulário, use JavaScript para enviar o payload:
 
 ```bash
 curl -X POST \
-  "https://app.corretop.com.br/api/webhooks/leads/SEU_TENANT_ID" \
+  "https://crm.ancorasaude.cloud/api/webhooks/leads/SEU_TENANT_ID" \
   -H "Authorization: Bearer crt_live_SEU_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: teste-001" \

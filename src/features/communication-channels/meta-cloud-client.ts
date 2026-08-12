@@ -88,8 +88,10 @@ export async function discoverMetaLeadAdsAssets(pageId: string): Promise<MetaLea
 }
 
 /** Subscribes the platform app to Lead Ads events for an already-authorized Page. */
-export async function subscribePageToLeadgen(pageId: string) {
-  const config = getMetaLeadAdsServerConfig();
+export async function subscribePageToLeadgen(pageId: string, tenantAccessToken?: string) {
+  const config = tenantAccessToken
+    ? { graphVersion: process.env.META_GRAPH_API_VERSION?.trim() || "v25.0", accessToken: tenantAccessToken }
+    : getMetaLeadAdsServerConfig();
 
   const postSubscription = async (token: string) => {
     const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}/subscribed_apps`, {
@@ -107,6 +109,13 @@ export async function subscribePageToLeadgen(pageId: string) {
   };
 
   let { response, payload } = await postSubscription(config.accessToken);
+
+  if (tenantAccessToken) {
+    if (!response.ok || !payload.success) {
+      throw new MetaCloudApiError(payload.error?.message ?? "Meta rejected the Page leadgen subscription.", response.status, payload.error?.code);
+    }
+    return payload;
+  }
 
   if (!response.ok || !payload.success) {
     const errorCode = payload.error?.code;

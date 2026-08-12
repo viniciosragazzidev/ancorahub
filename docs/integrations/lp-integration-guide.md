@@ -92,7 +92,7 @@ Isso é útil quando o construtor de LP (WordPress, Wix, etc.) usa os campos par
 
 ```html
 <script
-  src="https://app.corretop.com.br/embed/lead-form.js"
+  src="https://crm.ancorasaude.cloud/embed/lead-form.js"
   data-token="crt_live_SEU_TOKEN_AQUI"></script>
 ```
 
@@ -104,7 +104,7 @@ Se quiser redirecionar o visitante para uma página de obrigado após o envio:
 
 ```html
 <script
-  src="https://app.corretop.com.br/embed/lead-form.js"
+  src="https://crm.ancorasaude.cloud/embed/lead-form.js"
   data-token="crt_live_SEU_TOKEN_AQUI"
   data-redirect="/obrigado"></script>
 ```
@@ -156,7 +156,7 @@ Se quiser redirecionar o visitante para uma página de obrigado após o envio:
 
   <!-- CorreTop Lead Capture -->
   <script
-    src="https://app.corretop.com.br/embed/lead-form.js"
+    src="https://crm.ancorasaude.cloud/embed/lead-form.js"
     data-token="crt_live_SEU_TOKEN_AQUI"
     data-redirect="/obrigado"></script>
 </body>
@@ -180,7 +180,7 @@ Cole no final da página, antes do `</body>`:
   <button type="submit">Enviar</button>
 </form>
 
-<script src="https://app.corretop.com.br/embed/lead-form.js" data-token="crt_live_SEU_TOKEN"></script>
+<script src="https://crm.ancorasaude.cloud/embed/lead-form.js" data-token="crt_live_SEU_TOKEN"></script>
 ```
 
 ### No Elementor

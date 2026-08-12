@@ -118,7 +118,7 @@ async function resolveProviderConfigs(tenantId: string): Promise<ProviderConfig[
       apiKey: openrouterApiKey,
       models: openrouterModel === DEFAULT_OPENROUTER_MODEL ? [openrouterModel] : [openrouterModel, DEFAULT_OPENROUTER_MODEL],
       extraHeaders: {
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://corretop.com.br",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://crm.ancorasaude.cloud",
         "X-Title": "Âncora Corretora CRM AI Agent",
       },
     },

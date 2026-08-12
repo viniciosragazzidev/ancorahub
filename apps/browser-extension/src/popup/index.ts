@@ -60,7 +60,7 @@ function showDisconnected(message?: string) {
     if (!code) { status.textContent = "Informe o código gerado no CRM."; return; }
     status.textContent = "Conectando…";
     try {
-      const response = await fetch("https://corretop.vercel.app/api/extension/auth/exchange", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, deviceId: crypto.randomUUID(), extensionVersion: "0.1.2" }) });
+      const response = await fetch("https://crm.ancorasaude.cloud/api/extension/auth/exchange", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, deviceId: crypto.randomUUID(), extensionVersion: "0.1.2" }) });
       const body = await response.json();
       if (!response.ok || typeof body.token !== "string") throw new Error("INVALID_CODE");
       await chrome.storage.session.set({ token: body.token });

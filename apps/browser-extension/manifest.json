@@ -4,7 +4,7 @@
   "version": "0.1.2",
   "description": "Painel contextual do AncoraHub para o WhatsApp Web.",
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["https://web.whatsapp.com/*", "https://corretop.vercel.app/*"],
+  "host_permissions": ["https://web.whatsapp.com/*", "https://crm.ancorasaude.cloud/*"],
   "background": { "service_worker": "background-service-worker.js" },
   "action": { "default_title": "AncoraHub Assistant", "default_popup": "popup/index.html" },
   "content_scripts": [{ "matches": ["https://web.whatsapp.com/*"], "js": ["content-index.js"], "run_at": "document_idle" }],

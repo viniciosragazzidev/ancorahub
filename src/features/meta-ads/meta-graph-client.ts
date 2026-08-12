@@ -51,15 +51,6 @@ export class MetaGraphClient {
       // 4. Fetch Ad Accounts
       const adAccountsRes = await this.fetchApi<{ data: Array<{ id: string; name: string; currency: string; account_status: number }> }>("/me/adaccounts", { fields: "id,name,currency,account_status" }).catch(() => ({ data: [] }));
 
-      // 5. Fetch WhatsApp Business Accounts (WABA)
-      const wabaRes = await this.fetchApi<{ data: Array<{ id: string; name?: string; phone_numbers?: { data: Array<{ id: string; display_phone_number: string; verified_name?: string }> } }> }>(
-        `/${primaryBusiness.id}/whatsapp_business_accounts`,
-        { fields: "id,name,phone_numbers{id,display_phone_number,verified_name}" }
-      ).catch(() => ({ data: [] }));
-
-      const primaryWaba = wabaRes.data[0];
-      const primaryPhone = primaryWaba?.phone_numbers?.data[0];
-
       return {
         business: {
           id: primaryBusiness.id,
@@ -76,12 +67,7 @@ export class MetaGraphClient {
           currency: a.currency || "BRL",
           accountStatus: a.account_status || 1,
         })),
-        whatsapp: primaryWaba ? {
-          wabaId: primaryWaba.id,
-          phoneNumberId: primaryPhone?.id || null,
-          displayPhoneNumber: primaryPhone?.display_phone_number || null,
-          verifiedName: primaryPhone?.verified_name || null,
-        } : null,
+        whatsapp: null,
         pixels: [],
         datasets: [],
       };

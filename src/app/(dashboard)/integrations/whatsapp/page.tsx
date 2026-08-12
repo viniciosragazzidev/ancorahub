@@ -51,7 +51,7 @@ export default async function WhatsAppIntegrationPage() {
   return <>
     <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
     <WhatsAppPage
-      official={{ ...getMetaCloudConfigurationState({ includeEmbeddedSignup: false }), enabled: metaEnabled, canConfigure: false, branches, channels, companyAccount }}
+      official={{ ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels, companyAccount }}
       waha={(context.role === "director" || context.role === "manager") ? <WahaConnectionsCard connections={wahaConnections} enabled={wahaConnectionsEnabled} role={context.role} /> : null}
     />
   </>;
