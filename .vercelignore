@@ -9,3 +9,8 @@ temp_deskcomm_crm/
 
 # Architecture graph artifacts are regenerated locally for engineering work.
 graphify-out/
+
+# Local reference documents. They are not application assets.
+public/CRM_HOSTINGER_VPS.pdf
+public/Pix VPS Hostiger CRM - Assinatura 1 ano (minimo permitido e mais  custo e beneficio).pdf
+vps.md
