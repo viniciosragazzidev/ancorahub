@@ -6,7 +6,7 @@ vi.mock("./meta-cloud-config", () => ({
   getMetaLeadAdsServerConfig: () => ({ accessToken: "platform-token", graphVersion: "v25.0" }),
 }));
 
-import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, subscribePageToLeadgen } from "./meta-cloud-client";
+import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, resolvePageAccessToken, subscribePageToLeadgen } from "./meta-cloud-client";
 
 describe("Meta Cloud template payload", () => {
   it("sends names for the named broker invitation body variables", () => {
@@ -64,6 +64,30 @@ describe("Meta Cloud template payload", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "Permissão de Página ausente", code: 10 } }), { status: 403 })));
 
     await expect(subscribePageToLeadgen("123456789")).rejects.toThrow("Permissão de Página ausente");
+  });
+
+  it("derives a Page token from the connecting user's assets and returns only the selected Page token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [
+        { id: "other-page", access_token: "other-page-token" },
+        { id: "123456789", access_token: "selected-page-token" },
+      ],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resolvePageAccessToken("123456789", "user-token")).resolves.toBe("selected-page-token");
+    expect(fetchMock).toHaveBeenCalledWith("https://graph.facebook.com/v25.0/me/accounts?fields=id,access_token&limit=100", {
+      headers: { Accept: "application/json", Authorization: "Bearer user-token" },
+      cache: "no-store",
+    });
+  });
+
+  it("does not fall back to another Page token when the selected Page is absent", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "other-page", access_token: "other-page-token" }],
+    }), { status: 200 })));
+
+    await expect(resolvePageAccessToken("123456789", "user-token")).rejects.toThrow("não devolveu um token para a Página selecionada");
   });
 
   it("uses only the selected Page when retrying a Lead Ads subscription", async () => {

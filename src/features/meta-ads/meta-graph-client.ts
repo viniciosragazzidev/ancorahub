@@ -46,7 +46,7 @@ export class MetaGraphClient {
       const primaryBusiness = businessesRes.data[0] ?? { id: meRes.id, name: meRes.name || "Minha Empresa Meta" };
 
       // 3. Fetch Facebook Pages
-      const pagesRes = await this.fetchApi<{ data: Array<{ id: string; name: string; access_token?: string }> }>("/me/accounts", { fields: "id,name,access_token" }).catch(() => ({ data: [] }));
+      const pagesRes = await this.fetchApi<{ data: Array<{ id: string; name: string }> }>("/me/accounts", { fields: "id,name" }).catch(() => ({ data: [] }));
 
       // 4. Fetch Ad Accounts
       const adAccountsRes = await this.fetchApi<{ data: Array<{ id: string; name: string; currency: string; account_status: number }> }>("/me/adaccounts", { fields: "id,name,currency,account_status" }).catch(() => ({ data: [] }));
@@ -59,7 +59,6 @@ export class MetaGraphClient {
         pages: pagesRes.data.map((p) => ({
           id: p.id,
           name: p.name,
-          accessToken: p.access_token,
         })),
         adAccounts: adAccountsRes.data.map((a) => ({
           id: a.id,

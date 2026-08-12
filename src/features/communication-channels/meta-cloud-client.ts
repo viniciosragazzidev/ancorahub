@@ -87,10 +87,32 @@ export async function discoverMetaLeadAdsAssets(pageId: string): Promise<MetaLea
   }
 }
 
+/**
+ * Exchanges a tenant's user token for the token of one explicitly selected
+ * Page. Page credentials never cross the Server Action boundary.
+ */
+export async function resolvePageAccessToken(pageId: string, userAccessToken: string) {
+  const graphVersion = process.env.META_GRAPH_API_VERSION?.trim() || "v25.0";
+  const response = await fetch(`https://graph.facebook.com/${graphVersion}/me/accounts?fields=id,access_token&limit=100`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${userAccessToken}` },
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({})) as { data?: Array<{ id?: string; access_token?: string }> } & MetaApiErrorResponse;
+  const page = payload.data?.find((candidate) => candidate.id === pageId);
+  if (!response.ok || !page?.access_token) {
+    throw new MetaCloudApiError(
+      payload.error?.message ?? "A Meta não devolveu um token para a Página selecionada. Confirme que o usuário possui acesso à Página e reconecte.",
+      response.status,
+      payload.error?.code,
+    );
+  }
+  return page.access_token;
+}
+
 /** Subscribes the platform app to Lead Ads events for an already-authorized Page. */
-export async function subscribePageToLeadgen(pageId: string, tenantAccessToken?: string) {
-  const config = tenantAccessToken
-    ? { graphVersion: process.env.META_GRAPH_API_VERSION?.trim() || "v25.0", accessToken: tenantAccessToken }
+export async function subscribePageToLeadgen(pageId: string, pageAccessToken?: string) {
+  const config = pageAccessToken
+    ? { graphVersion: process.env.META_GRAPH_API_VERSION?.trim() || "v25.0", accessToken: pageAccessToken }
     : getMetaLeadAdsServerConfig();
 
   const postSubscription = async (token: string) => {
@@ -110,9 +132,9 @@ export async function subscribePageToLeadgen(pageId: string, tenantAccessToken?:
 
   let { response, payload } = await postSubscription(config.accessToken);
 
-  if (tenantAccessToken) {
+  if (pageAccessToken) {
     if (!response.ok || !payload.success) {
-      throw new MetaCloudApiError(payload.error?.message ?? "Meta rejected the Page leadgen subscription.", response.status, payload.error?.code);
+      throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a assinatura da Página para receber formulários.", response.status, payload.error?.code);
     }
     return payload;
   }

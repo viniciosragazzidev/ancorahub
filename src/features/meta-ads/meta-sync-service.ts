@@ -159,7 +159,8 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     // 3. Buscar formulários de Lead Ads de cada página do tenant
     const pages = await db.select().from(schema.metaPages).where(eq(schema.metaPages.tenantId, tenantId));
     for (const page of pages) {
-      const forms = await client.fetchLeadForms(page.pageId);
+      const pageToken = page.accessTokenCiphertext ? decryptMetaToken(page.accessTokenCiphertext) : rawToken;
+      const forms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);
       for (const form of forms) {
         await db
           .insert(schema.metaLeadForms)

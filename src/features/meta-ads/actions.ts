@@ -5,13 +5,13 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { decryptMetaToken } from "./meta-oauth";
+import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
 import { consumeMetaConnectionAttempt, readVerifiedMetaConnectionAttempt } from "./meta-connection-attempts";
 import { startMetaMarketingConnection } from "./meta-marketing-connection-service";
 import { MetaGraphClient } from "./meta-graph-client";
 import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
-import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
+import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 import type { MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
@@ -103,7 +103,9 @@ export async function beginMetaMarketingConnection() {
 export async function getMetaMarketingAttemptAssets(attemptId: string): Promise<MetaDiscoveredAssets> {
   const context = await getRequiredTenantContext();
   const attempt = await readVerifiedMetaConnectionAttempt({ attemptId, tenantId: context.tenantId, userId: context.userId });
-  return attempt.assetSnapshot as MetaDiscoveredAssets;
+  const assets = attempt.assetSnapshot as MetaDiscoveredAssets;
+  // The UI needs identifiers and labels only. Credentials remain server-only.
+  return { ...assets, pages: assets.pages.map(({ id, name }) => ({ id, name })) };
 }
 
 /** Descobrir ativos Meta fornecendo o Access Token diretamente */
@@ -138,8 +140,11 @@ export async function confirmMetaConnection(payload: {
   const connectionId = randomUUID();
   const accessToken = decryptMetaToken(tokenCiphertext);
 
+  const pageTokenCiphertexts = new Map<string, string>();
   for (const page of payload.pages) {
-    await subscribePageToLeadgen(page.id, accessToken);
+    const pageAccessToken = await resolvePageAccessToken(page.id, accessToken);
+    await subscribePageToLeadgen(page.id, pageAccessToken);
+    pageTokenCiphertexts.set(page.id, encryptMetaToken(pageAccessToken));
   }
 
   // 1. Inserir ou atualizar meta_connections
@@ -189,13 +194,14 @@ export async function confirmMetaConnection(payload: {
         connectionId: activeConnectionId,
         pageId: page.id,
         name: authorizedPages.get(page.id)!.name,
+        accessTokenCiphertext: pageTokenCiphertexts.get(page.id)!,
         status: "active",
         createdAt: now,
         updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [schema.metaPages.tenantId, schema.metaPages.pageId],
-        set: { name: authorizedPages.get(page.id)!.name, updatedAt: now },
+        set: { name: authorizedPages.get(page.id)!.name, accessTokenCiphertext: pageTokenCiphertexts.get(page.id)!, updatedAt: now },
       });
   }
 

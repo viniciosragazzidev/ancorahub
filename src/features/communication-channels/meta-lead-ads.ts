@@ -174,12 +174,12 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
       if (!leadgenId) continue;
       console.log("[ingestMetaLeadAdsWebhook] Processing leadgenId", leadgenId);
       try {
-        const [connection] = await db.select({ accessTokenCiphertext: schema.metaConnections.accessTokenCiphertext })
-          .from(schema.metaConnections)
-          .where(and(eq(schema.metaConnections.tenantId, source.tenantId), eq(schema.metaConnections.status, "connected")))
+        const [page] = await db.select({ accessTokenCiphertext: schema.metaPages.accessTokenCiphertext })
+          .from(schema.metaPages)
+          .where(and(eq(schema.metaPages.tenantId, source.tenantId), eq(schema.metaPages.pageId, entry.id), eq(schema.metaPages.status, "active")))
           .limit(1);
-        if (!connection?.accessTokenCiphertext) throw new Error("Nenhuma credencial Meta ativa foi encontrada para esta Página.");
-        const leadRecord = await fetchMetaLead(leadgenId, decryptMetaToken(connection.accessTokenCiphertext));
+        if (!page?.accessTokenCiphertext) throw new Error("A Página Meta não possui uma credencial ativa. Reconecte a Página para receber novos formulários.");
+        const leadRecord = await fetchMetaLead(leadgenId, decryptMetaToken(page.accessTokenCiphertext));
         const lead = normalizeMetaLead(leadRecord);
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
         if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
