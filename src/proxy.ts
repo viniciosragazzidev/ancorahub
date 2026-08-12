@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 
 import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db";
+import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
 
 const protectedPathPrefixes = ["/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos", "/clientes", "/metas", "/relatorios", "/catalogo", "/minha-fila", "/minha-meta", "/notificacoes", "/filiais", "/financeiro", "/configuracoes", "/diretor", "/gestor", "/corretor", "/super-admin", "/checklist", "/materiais-divulgacao", "/marketing"] as const;
 const publicPaths = ["/compartilhado", "/api/public", "/health"] as const;
@@ -94,6 +95,14 @@ export async function proxy(request: NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? randomUUID();
   request.headers.set("x-request-id", requestId);
   request.headers.set("x-pathname", pathname);
+
+  if (isNavigationPrefetch(request.headers)) {
+    const response = NextResponse.next({ request: { headers: request.headers } });
+    response.headers.set("x-request-id", requestId);
+    response.headers.set("x-prefetch", "bypassed-proxy-session");
+    return response;
+  }
+
   const supabaseResponse = await getSafeSupabaseResponse(request);
   const session = request.cookies.get("better-auth.session_token")
     ?? request.cookies.get("__Secure-better-auth.session_token")

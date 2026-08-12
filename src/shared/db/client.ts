@@ -8,21 +8,22 @@ type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
 let database: Database | undefined;
 
-function connectionLimit() {
+export function connectionLimit() {
   // Static generation uses several workers and must not serialize all page-data
   // queries through a single socket. Runtime serverless instances stay capped
   // at a low number to protect Supabase's project limit.
   if (process.env.NEXT_PHASE === "phase-production-build") return 3;
   const configured = Number.parseInt(process.env.DB_POOL_MAX ?? "", 10);
   if (Number.isFinite(configured) && configured >= 1 && configured <= 10) return configured;
-  // Increased from 3 to 5 to prevent pool exhaustion when pages run multiple
-  // parallel queries (e.g. /super-admin/settings with Promise.all).
-  // Supabase's 15-connection project limit is still respected.
-  return process.env.NODE_ENV === "production" ? 5 : 3;
+  // Each serverless instance can be multiplied by concurrent route renders.
+  // Keep the default to one socket in production; postgres.js queues concurrent
+  // queries inside the invocation instead of exhausting the project's shared
+  // connection limit. Operators can raise it deliberately with DB_POOL_MAX.
+  return process.env.NODE_ENV === "production" ? 1 : 3;
 }
 
 function getDatabaseUrl(): string {
-  const databaseUrl = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL;
+  const databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
     throw new Error(
       "DATABASE_URL is required for database-backed operations. Add it to .env.local or the server environment.",

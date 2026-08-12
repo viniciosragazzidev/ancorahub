@@ -88,7 +88,7 @@ function NavigationGroup({
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     isActive={isActive}
-                    render={<Link href={item.url} onClick={() => isMobile && setOpenMobile(false)} prefetch />}
+                    render={<Link href={item.url} onClick={() => isMobile && setOpenMobile(false)} prefetch={false} />}
                     tooltip={item.label}
                   >
                     <Icon weight={isActive ? "fill" : "regular"} />
@@ -134,7 +134,7 @@ export function SuperDevSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="h-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/super-dev" prefetch />}>
+            <SidebarMenuButton className="h-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/super-dev" prefetch={false} />}>
               <AncoraLogo className="h-7 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
               <img src="/icon.png" alt="Ancora" className="h-7 w-7 mx-auto hidden group-data-[collapsible=icon]:block object-contain" />
             </SidebarMenuButton>
@@ -175,7 +175,7 @@ export function SuperDevSidebar() {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href="/super-dev/settings" prefetch />}>
+                <DropdownMenuItem render={<Link href="/super-dev/settings" prefetch={false} />}>
                   <SlidersHorizontal className="size-4" />Configurações
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

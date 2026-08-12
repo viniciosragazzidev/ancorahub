@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { Globe, LinkSimple, Megaphone, Plug, WhatsappLogo } from "@/components/huge-icons";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import { Badge } from "@/components/ui/badge";
@@ -89,13 +87,13 @@ function IntegrationTile({ integration }: { integration: IntegrationCard }) {
   }
 
   return (
-    <Link
+    <a
       aria-label={`Abrir integração ${integration.name}`}
       className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       href={integration.href}
     >
       {content}
-    </Link>
+    </a>
   );
 }
 

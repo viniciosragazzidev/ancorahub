@@ -71,7 +71,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/integrations/whatsapp"}
-                render={<Link href="/super-admin/integrations/whatsapp" prefetch />}
+                render={<Link href="/super-admin/integrations/whatsapp" prefetch={false} />}
                 tooltip="WhatsApp Oficial"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -82,7 +82,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/whatsapp-review"}
-                render={<Link href="/super-admin/whatsapp-review" prefetch />}
+                render={<Link href="/super-admin/whatsapp-review" prefetch={false} />}
                 tooltip="Revisão WhatsApp Meta"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -94,7 +94,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/onboarding"}
-                render={<Link href="/super-admin/onboarding" prefetch />}
+                render={<Link href="/super-admin/onboarding" prefetch={false} />}
                 tooltip="Onboarding guiado"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -105,7 +105,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin"}
-                render={<Link href="/super-admin" prefetch />}
+                render={<Link href="/super-admin" prefetch={false} />}
                 tooltip="Visão Geral"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -116,7 +116,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/tenants" || pathname.startsWith("/super-admin/tenants/")}
-                render={<Link href="/super-admin/tenants" prefetch />}
+                render={<Link href="/super-admin/tenants" prefetch={false} />}
                 tooltip="Empresas"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -127,7 +127,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/materiais-divulgacao"}
-                render={<Link href="/super-admin/materiais-divulgacao" prefetch />}
+                render={<Link href="/super-admin/materiais-divulgacao" prefetch={false} />}
                 tooltip="Materiais de Divulgação"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -143,7 +143,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/audit"}
-                render={<Link href="/super-admin/audit" prefetch />}
+                render={<Link href="/super-admin/audit" prefetch={false} />}
                 tooltip="Logs de Auditoria"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -154,7 +154,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/sessions"}
-                render={<Link href="/super-admin/sessions" prefetch />}
+                render={<Link href="/super-admin/sessions" prefetch={false} />}
                 tooltip="Sessões Ativas"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -165,7 +165,7 @@ export function PlatformAdminSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname === "/super-admin/settings"}
-                render={<Link href="/super-admin/settings" prefetch />}
+                render={<Link href="/super-admin/settings" prefetch={false} />}
                 tooltip="Configurações"
                 className="px-3.5 py-2 text-xs font-medium"
               >
@@ -219,7 +219,7 @@ export function PlatformAdminSidebar() {
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href="/super-admin/settings" prefetch />}>
+                <DropdownMenuItem render={<Link href="/super-admin/settings" prefetch={false} />}>
                   <SlidersHorizontal className="size-4" />Parâmetros
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

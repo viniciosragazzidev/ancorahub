@@ -178,7 +178,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           .from(schema.metaConnections)
           .where(and(eq(schema.metaConnections.tenantId, source.tenantId), eq(schema.metaConnections.status, "connected")))
           .limit(1);
-        if (!connection?.accessTokenCiphertext) throw new Error("Nenhuma credencial Meta ativa foi encontrada para esta PÃ¡gina.");
+        if (!connection?.accessTokenCiphertext) throw new Error("Nenhuma credencial Meta ativa foi encontrada para esta Página.");
         const leadRecord = await fetchMetaLead(leadgenId, decryptMetaToken(connection.accessTokenCiphertext));
         const lead = normalizeMetaLead(leadRecord);
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });

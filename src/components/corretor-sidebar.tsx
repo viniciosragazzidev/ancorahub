@@ -119,7 +119,7 @@ export function CorretorSidebar() {
       <SidebarHeader className="border-b border-sidebar-border/50 p-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="h-9 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/corretor/resumo" prefetch />}>
+            <SidebarMenuButton className="h-9 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/corretor/resumo" prefetch={false} />}>
               <div className="grid size-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
                 C
               </div>
@@ -139,7 +139,7 @@ export function CorretorSidebar() {
               <SidebarMenuItem key={item.label}>
                 <SidebarMenuButton
                   isActive={isActive}
-                  render={<Link href={item.url} prefetch />}
+                  render={<Link href={item.url} prefetch={false} />}
                   tooltip={item.label}
                   className="px-3 py-2 text-xs font-medium rounded-lg transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto"
                 >
