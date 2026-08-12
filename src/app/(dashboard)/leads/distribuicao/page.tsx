@@ -41,7 +41,9 @@ export default async function LeadDistributionPage({
   searchParams: Promise<{ view?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  const view: DistributionView = params.view === "filas" || params.view === "historico" || params.view === "saude" ? params.view : "operar";
+  // The route is the administrative control center. Opening it without a
+  // query must expose the editable queue rules, not hide them behind a tab.
+  const view: DistributionView = params.view === "operar" || params.view === "historico" || params.view === "saude" ? params.view : "filas";
   const queueFilter: QueueFilter = params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
     ? params.status
     : "all";
@@ -345,10 +347,10 @@ export default async function LeadDistributionPage({
           </div>
           <nav aria-label="Seções da Central de Filas" className="flex flex-wrap gap-2">
             <Button render={<Link href="/leads/distribuicao?view=operar" />} size="sm" variant={view === "operar" ? "default" : "outline"}>
-              Visão geral
+              Operar fila
             </Button>
             <Button render={<Link href="/leads/distribuicao?view=filas" />} size="sm" variant={view === "filas" ? "default" : "outline"}>
-              Filas e regras
+              Central de filas
             </Button>
             <Button render={<Link href="/leads/distribuicao?view=historico" />} size="sm" variant={view === "historico" ? "default" : "outline"}>
               Histórico
