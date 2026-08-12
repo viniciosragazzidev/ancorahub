@@ -6,7 +6,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken } from "./meta-oauth";
-import { consumeMetaConnectionAttempt, createMetaConnectionAttempt, readVerifiedMetaConnectionAttempt } from "./meta-connection-attempts";
+import { consumeMetaConnectionAttempt, readVerifiedMetaConnectionAttempt } from "./meta-connection-attempts";
+import { startMetaMarketingConnection } from "./meta-marketing-connection-service";
 import { MetaGraphClient } from "./meta-graph-client";
 import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
@@ -96,18 +97,7 @@ export async function getMetaConnectionState(): Promise<{
 /** Descobrir ativos Meta via token/código de auth */
 
 export async function beginMetaMarketingConnection() {
-  const context = await getRequiredTenantContext();
-  if (context.role !== "director") throw new Error("Apenas Diretores podem conectar Marketing da Meta.");
-  const attempt = await createMetaConnectionAttempt({ tenantId: context.tenantId, userId: context.userId, product: "marketing" });
-  await getDatabase().insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId: context.userId,
-    entidade: "meta_connection_attempt",
-    entidadeId: attempt.id,
-    acao: "meta_marketing_connection_started",
-    createdAt: new Date(),
-  });
-  return attempt;
+  return startMetaMarketingConnection();
 }
 
 export async function getMetaMarketingAttemptAssets(attemptId: string): Promise<MetaDiscoveredAssets> {
