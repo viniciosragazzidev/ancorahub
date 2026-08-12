@@ -28,13 +28,26 @@ function downloadName(contentDisposition: string | null, fallback: string) {
   return match?.[1] ?? fallback;
 }
 
-export function ReportCenter({ reports }: { reports: readonly ReportDefinition[] }) {
+export type BranchOption = { id: string; name: string };
+
+type ReportCenterProps = {
+  reports: readonly ReportDefinition[];
+  branches?: BranchOption[];
+  userRole?: string;
+  defaultBranchId?: string;
+};
+
+export function ReportCenter({ reports, branches = [], userRole, defaultBranchId }: ReportCenterProps) {
   const [selected, setSelected] = useState<ReportDefinition | null>(null);
   const [format, setFormat] = useState<ReportFormat>("xlsx");
   const [preset, setPreset] = useState<RangePreset>("30");
   const initialRange = useMemo(() => rangeFor(30), []);
   const [start, setStart] = useState(initialRange.start);
   const [end, setEnd] = useState(initialRange.end);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(() => {
+    if (userRole === "manager" && defaultBranchId) return defaultBranchId;
+    return "all";
+  });
   const [isGenerating, setIsGenerating] = useState(false);
 
   function openReport(report: ReportDefinition) {
@@ -63,6 +76,9 @@ export function ReportCenter({ reports }: { reports: readonly ReportDefinition[]
     setIsGenerating(true);
     try {
       const query = new URLSearchParams({ start: `${start}T00:00:00.000Z`, end: `${end}T23:59:59.999Z`, format });
+      if (selectedBranchId && selectedBranchId !== "all") {
+        query.set("branchId", selectedBranchId);
+      }
       const response = await fetch(`/api/reports/${selected.id}?${query.toString()}`, { cache: "no-store" });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
@@ -132,6 +148,24 @@ export function ReportCenter({ reports }: { reports: readonly ReportDefinition[]
               <DialogDescription>{selected?.description} O arquivo contém até 10 mil linhas por vez e períodos de até 366 dias.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4" aria-busy={isGenerating}>
+              {branches.length > 0 && (userRole === "director" || userRole === "manager") && (
+                <label className="grid gap-1.5 text-sm font-medium">
+                  Unidade
+                  <select
+                    value={selectedBranchId}
+                    onChange={(event) => setSelectedBranchId(event.target.value)}
+                    disabled={isGenerating || userRole === "manager"}
+                    className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none"
+                  >
+                    {userRole === "director" && <option value="all">Todas as Unidades (Visão Global)</option>}
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="grid gap-1.5 text-sm font-medium">Período
                 <select value={preset} onChange={(event) => changePreset(event.target.value as RangePreset)} disabled={isGenerating} className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none">
                   <option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="custom">Personalizado</option>

@@ -42,6 +42,14 @@ export default async function ReportsPage({
   const supervisedBrokerIds = context.role === "supervisor"
     ? await getSupervisedBrokerIds(context.tenantId, context.userId)
     : [];
+  const tenantBranches = (context.role === "director" || context.role === "manager")
+    ? await db
+        .select({ id: schema.branches.id, name: schema.branches.name })
+        .from(schema.branches)
+        .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active")))
+        .orderBy(schema.branches.name)
+    : [];
+
   const internalDocuments = canExport
     ? await db
         .select({
@@ -342,7 +350,14 @@ export default async function ReportsPage({
 
         <ReportTrendCharts data={trendData} period={period} showRevenue={canViewFinancialReports} />
 
-        {canGenerateOperational ? <ReportCenter reports={reportRegistry} /> : null}
+        {canGenerateOperational ? (
+          <ReportCenter
+            reports={reportRegistry}
+            branches={tenantBranches}
+            userRole={context.role}
+            defaultBranchId={context.branchId ?? undefined}
+          />
+        ) : null}
 
         {/* Planilhas importadas */}
         <SpreadsheetSection />

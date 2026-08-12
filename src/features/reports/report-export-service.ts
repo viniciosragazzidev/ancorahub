@@ -17,6 +17,7 @@ const inputSchema = z.object({
   start: z.coerce.date(),
   end: z.coerce.date(),
   format: z.enum(["xlsx", "csv"]).default("xlsx"),
+  branchId: z.string().optional(),
 });
 
 export type ReportExport = { body: Uint8Array | string; contentType: string; filename: string; rows: number };
@@ -48,9 +49,10 @@ async function supervisedIds(context: TenantContext) {
   return getSupervisedBrokerIds(context.tenantId, context.userId);
 }
 
-function scopeFor(context: TenantContext, brokerIds: string[] | null) {
+function scopeFor(context: TenantContext, brokerIds: string[] | null, targetBranchId?: string) {
   if (context.role === "supervisor") return brokerIds?.length ? inArray(schema.leads.corretorId, brokerIds) : eq(schema.leads.id, "__no_supervised_leads__");
   if (context.role === "manager" && context.branchId) return eq(schema.leads.branchId, context.branchId);
+  if (context.role === "director" && targetBranchId && targetBranchId !== "all") return eq(schema.leads.branchId, targetBranchId);
   return undefined;
 }
 
@@ -62,12 +64,17 @@ export async function generateReport(context: TenantContext, reportId: string, r
   }
 
   const input = inputSchema.parse(rawInput);
+  if (context.role === "manager" && input.branchId && context.branchId && input.branchId !== context.branchId) {
+    throw new Error("Você só pode gerar relatórios da sua própria unidade.");
+  }
+  const effectiveBranchId = context.role === "director" ? input.branchId : (context.branchId ?? undefined);
+
   const days = (input.end.getTime() - input.start.getTime()) / 86_400_000;
   if (input.end < input.start || days > MAX_RANGE_DAYS) throw new Error("Escolha um período de até 366 dias.");
 
   const db = getDatabase();
   const brokerIds = await supervisedIds(context);
-  const leadScope = scopeFor(context, brokerIds);
+  const leadScope = scopeFor(context, brokerIds, effectiveBranchId);
   const baseLeadWhere = and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, input.start), lte(schema.leads.createdAt, input.end));
   let rows: Record<string, unknown>[];
 

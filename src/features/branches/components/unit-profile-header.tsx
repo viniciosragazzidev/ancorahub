@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toggleAcceptingLeadsAction, toggleAutoDistributeAction, type BranchActionState } from "@/features/branches/actions";
+import { UnitReportsExporter } from "@/features/branches/components/unit-reports-exporter";
 import type { TenantRole } from "@/shared/db/schema";
 
 type UnitProfileHeaderProps = {
@@ -94,42 +95,45 @@ export function UnitProfileHeader({
           </div>
         </div>
 
-        {(canToggleAccepting || canToggleAutoDist) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {canToggleAccepting && (
-              <form action={acceptingAction}>
-                <input type="hidden" name="branchId" value={branch.id} />
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  disabled={acceptingPending}
-                  className="gap-1.5"
-                >
-                  <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                  {branch.acceptingLeads ? "Pausar recebimento" : "Retomar recebimento"}
-                </Button>
-                <ActionFeedback state={acceptingState} />
-              </form>
-            )}
-            {canToggleAutoDist && (
-              <form action={autoDistAction}>
-                <input type="hidden" name="branchId" value={branch.id} />
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  disabled={autoDistPending}
-                  className="gap-1.5"
-                >
-                  <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                  {branch.autoDistribute ? "Desativar auto-distribuição" : "Ativar auto-distribuição"}
-                </Button>
-                <ActionFeedback state={autoDistState} />
-              </form>
-            )}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <UnitReportsExporter
+            branchId={branch.id}
+            branchName={branch.name}
+            currentRole={currentRole}
+          />
+          {canToggleAccepting && (
+            <form action={acceptingAction}>
+              <input type="hidden" name="branchId" value={branch.id} />
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={acceptingPending}
+                className="gap-1.5"
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                {branch.acceptingLeads ? "Pausar recebimento" : "Retomar recebimento"}
+              </Button>
+              <ActionFeedback state={acceptingState} />
+            </form>
+          )}
+          {canToggleAutoDist && (
+            <form action={autoDistAction}>
+              <input type="hidden" name="branchId" value={branch.id} />
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={autoDistPending}
+                className="gap-1.5"
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                {branch.autoDistribute ? "Desativar auto-distribuição" : "Ativar auto-distribuição"}
+              </Button>
+              <ActionFeedback state={autoDistState} />
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

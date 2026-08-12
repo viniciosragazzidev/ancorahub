@@ -11,7 +11,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
     const { reportId } = await params;
     const searchParams = new URL(request.url).searchParams;
     const report = await generateReport(context, reportId, {
-      start: searchParams.get("start"), end: searchParams.get("end"), format: searchParams.get("format"),
+      start: searchParams.get("start"),
+      end: searchParams.get("end"),
+      format: searchParams.get("format"),
+      branchId: searchParams.get("branchId") ?? undefined,
     });
     const body = typeof report.body === "string" ? report.body : new Uint8Array(report.body).buffer;
     return new NextResponse(body, { headers: { "Content-Type": report.contentType, "Content-Disposition": `attachment; filename="${report.filename}"`, "X-Report-Rows": String(report.rows), "Cache-Control": "no-store" } });
