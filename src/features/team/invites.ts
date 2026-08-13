@@ -24,17 +24,18 @@ export async function createTeamInvite(rawInput: unknown) {
   const [branch] = await db.select().from(schema.branches).where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"))).limit(1);
   if (!branch) throw new Error("A filial selecionada não pertence ao tenant ativo ou está inativa.");
   const [existing] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.email, input.email)).limit(1);
+  let userId: string;
   if (existing) {
-    const [activeMembership] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(eq(schema.tenantMemberships.userId, existing.id)).limit(1);
-    if (activeMembership) {
-      throw new Error("Já existe um membro ativo cadastrado com este e-mail.");
+    const [membershipInTenant] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.userId, existing.id), eq(schema.tenantMemberships.tenantId, context.tenantId))).limit(1);
+    if (membershipInTenant) {
+      throw new Error("Já existe um membro ativo cadastrado com este e-mail nesta corretora.");
     }
-    await db.delete(schema.account).where(eq(schema.account.userId, existing.id));
-    await db.delete(schema.user).where(eq(schema.user.id, existing.id));
+    userId = existing.id;
+  } else {
+    userId = randomUUID();
+    await db.insert(schema.user).values({ id: userId, name: input.name, email: input.email, emailVerified: false, active: false, status: "pending" });
   }
-  const userId = randomUUID();
   const token = randomBytes(32).toString("hex");
-  await db.insert(schema.user).values({ id: userId, name: input.name, email: input.email, emailVerified: false, active: false, status: "pending" });
   await db.insert(schema.tenantMemberships).values({ id: randomUUID(), tenantId: context.tenantId, userId, branchId: input.branchId, role: input.role, status: "active" });
   await db.insert(schema.invites).values({ id: randomUUID(), userId, tokenHash: digest(token), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), invitedBy: context.userId });
   return { token, role: input.role as CreatableTeamRole };

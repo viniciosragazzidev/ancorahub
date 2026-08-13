@@ -77,20 +77,20 @@ export async function createTeamUser(rawInput: unknown) {
     .limit(1);
 
   if (existingUser) {
-    const [activeMembership] = await db
+    const [membershipInTenant] = await db
       .select({ id: schema.tenantMemberships.id })
       .from(schema.tenantMemberships)
-      .where(eq(schema.tenantMemberships.userId, existingUser.id))
+      .where(
+        and(
+          eq(schema.tenantMemberships.userId, existingUser.id),
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+        ),
+      )
       .limit(1);
 
-    if (activeMembership) {
-      throw new Error("Já existe um membro ativo cadastrado com este e-mail.");
+    if (membershipInTenant) {
+      throw new Error("Já existe um membro da equipe cadastrado com este e-mail nesta corretora.");
     }
-
-    // Se o usuário não tem nenhuma associação ativa a nenhum tenant (foi excluído da equipe),
-    // limpamos a conta e o registro de usuário órfãos para permitir o recadastro sem erros.
-    await db.delete(schema.account).where(eq(schema.account.userId, existingUser.id));
-    await db.delete(schema.user).where(eq(schema.user.id, existingUser.id));
   }
 
   const brokerProfileId = randomUUID();

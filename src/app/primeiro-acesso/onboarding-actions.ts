@@ -60,30 +60,60 @@ export async function completeOnboardingAction(
       throw new Error("O CPF informado não coincide com o CPF cadastrado pelo gestor.");
     }
 
-    // 4. Validate email unique in user table
+    // 4. Validate email in user table
     const [existingUser] = await db
       .select({ id: schema.user.id })
       .from(schema.user)
       .where(eq(schema.user.email, invitation.email))
       .limit(1);
+
+    let userId: string;
+    let isNewUser = false;
+
     if (existingUser) {
-      throw new Error("Já existe uma conta de acesso ativa com este e-mail.");
+      const [activeMembership] = await db
+        .select({ id: schema.tenantMemberships.id })
+        .from(schema.tenantMemberships)
+        .where(
+          and(
+            eq(schema.tenantMemberships.userId, existingUser.id),
+            eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+          ),
+        )
+        .limit(1);
+      if (activeMembership) {
+        throw new Error("Já existe uma conta de acesso ativa com este e-mail.");
+      }
+      userId = existingUser.id;
+    } else {
+      userId = randomUUID();
+      isNewUser = true;
     }
 
-    const userId = randomUUID();
     const hashedPassword = await hashPassword(input.password);
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
-      // Create user
-      await tx.insert(schema.user).values({
-        id: userId,
-        name: input.name,
-        email: invitation.email,
-        emailVerified: true,
-        active: true,
-        status: "active",
-      });
+      if (isNewUser) {
+        // Create user
+        await tx.insert(schema.user).values({
+          id: userId,
+          name: input.name,
+          email: invitation.email,
+          emailVerified: true,
+          active: true,
+          status: "active",
+        });
+      } else {
+        // Update user
+        await tx.update(schema.user).set({
+          name: input.name,
+          emailVerified: true,
+          active: true,
+          status: "active",
+        }).where(eq(schema.user.id, userId));
+        await tx.delete(schema.account).where(eq(schema.account.userId, userId));
+      }
 
       // Create credential account
       await tx.insert(schema.account).values({
