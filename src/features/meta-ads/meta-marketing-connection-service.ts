@@ -9,8 +9,8 @@ import { createMetaConnectionAttempt } from "./meta-connection-attempts";
 
 export async function startMetaMarketingConnection() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") {
-    throw new Error("Apenas Diretores podem conectar Marketing da Meta.");
+  if (context.role !== "director" && context.jobTitle !== "marketing" && context.role !== "manager") {
+    throw new Error("Sem permissão para conectar Marketing da Meta.");
   }
 
   const attempt = await createMetaConnectionAttempt({

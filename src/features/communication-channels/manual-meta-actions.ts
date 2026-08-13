@@ -41,14 +41,14 @@ function sanitizeError(error: unknown) {
 
 async function requireManualMetaAccess() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") throw new Error("Somente o Diretor pode configurar a integração Meta da empresa.");
+  if (context.role !== "director" && context.jobTitle !== "marketing" && context.role !== "manager") throw new Error("Sem permissão para configurar a integração Meta da empresa.");
   if (!(await isMetaCloudWhatsAppEnabled())) throw new Error("A integração oficial da Meta está desativada pelo Super-admin.");
   return context;
 }
 
 async function requireLeadAdsAccess() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") throw new Error("Somente o Diretor pode configurar a captação por anúncios.");
+  if (context.role !== "director" && context.jobTitle !== "marketing" && context.role !== "manager") throw new Error("Sem permissão para configurar a captação por anúncios.");
   if (!(await isMetaLeadAdsEnabled(context.tenantId))) throw new Error("A captação por Lead Ads ainda não está liberada para esta empresa piloto.");
   return context;
 }

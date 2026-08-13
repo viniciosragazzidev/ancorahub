@@ -30,7 +30,7 @@ export function MetaIntegrationHub({
       </CardContent>
     </Card>
 
-    {!canConfigure ? <Card className="border-warning/30 bg-warning/5 shadow-none"><CardContent className="flex items-start gap-3 p-4"><ShieldWarning className="mt-0.5 size-5 shrink-0 text-warning" /><div><p className="font-medium">Visualização operacional</p><p className="mt-1 text-sm text-muted-foreground">Somente o Diretor pode iniciar, alterar ou desconectar a integração de Marketing Meta desta corretora.</p></div></CardContent></Card> : null}
+    {!canConfigure ? <Card className="border-warning/30 bg-warning/5 shadow-none"><CardContent className="flex items-start gap-3 p-4"><ShieldWarning className="mt-0.5 size-5 shrink-0 text-warning" /><div><p className="font-medium">Visualização operacional</p><p className="mt-1 text-sm text-muted-foreground">Somente o Diretor ou time de Marketing pode iniciar, alterar ou desconectar a integração de Marketing Meta desta corretora.</p></div></CardContent></Card> : null}
 
     <MetaIntegrationView connection={marketing.connection} assets={marketing.assets} logs={marketing.logs} canConfigure={canConfigure} />
 

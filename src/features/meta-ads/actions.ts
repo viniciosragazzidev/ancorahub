@@ -110,8 +110,8 @@ export async function confirmMetaConnection(payload: {
   adAccounts: Array<{ id: string; name: string; currency: string }>;
 }): Promise<{ success: boolean; error?: string }> {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") {
-    throw new Error("Apenas Diretores podem configurar integrações com a Meta.");
+  if (context.role !== "director" && context.jobTitle !== "marketing" && context.role !== "manager") {
+    throw new Error("Apenas Diretores ou Marketing podem configurar integrações com a Meta.");
   }
 
   const db = getDatabase();
@@ -256,8 +256,8 @@ export async function confirmMetaConnection(payload: {
 /** Desconectar integração Meta */
 export async function disconnectMetaConnection(): Promise<{ success: boolean }> {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") {
-    throw new Error("Apenas Diretores podem desconectar integrações.");
+  if (context.role !== "director" && context.jobTitle !== "marketing" && context.role !== "manager") {
+    throw new Error("Apenas Diretores ou Marketing podem desconectar integrações.");
   }
 
   const db = getDatabase();
