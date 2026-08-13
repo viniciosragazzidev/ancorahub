@@ -41,7 +41,7 @@ export default async function TeamPage() {
         userId: schema.brokerProfiles.userId,
         name: schema.brokerProfiles.professionalName,
         email: schema.brokerProfiles.invitedEmail,
-        role: sql<"broker">`'broker'`,
+        role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}, 'broker')`,
         jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, 'broker')`,
         customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`

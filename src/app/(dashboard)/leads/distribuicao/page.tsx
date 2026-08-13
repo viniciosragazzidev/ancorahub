@@ -20,6 +20,7 @@ import { getLeadEffectOutboxHealth } from "@/features/leads/webhooks/services/le
 import { retryLeadEffectAction } from "@/features/lead-distribution/actions";
 import { QueueControlCenter } from "./_components/queue-control-center";
 import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
+import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -260,8 +261,8 @@ export default async function LeadDistributionPage({
       .leftJoin(schema.user, eq(schema.leadDistributionEvents.newOwnerId, schema.user.id))
       .where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
       .orderBy(desc(schema.leadDistributionEvents.createdAt)).limit(40),
-    db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
-      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))).limit(1),
+    db.select({ queueId: schema.leadDistributionPolicies.queueId, policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))),
     db.select({ campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
       .from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(schema.metaCampaigns.name),
     db.select({ adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status })
@@ -352,12 +353,23 @@ export default async function LeadDistributionPage({
   });
 
   const queueWaiting = new Map(queueLeadCounts.map((item) => [item.queueId, Number(item.waiting)]));
-  const queuesForControl = queues.map((queue) => ({
-    ...queue,
-    waiting: queueWaiting.get(queue.id) ?? 0,
-    members: countsByBranch.get(queue.branchId) ?? 0,
-    activeLeads: leadsByBranch.get(queue.branchId) ?? 0,
-  }));
+  const queuePoliciesMap = new Map(
+    globalPolicy
+      .filter((p) => p.queueId)
+      .map((p) => [p.queueId!, readDistributionPolicy(p.policy)]),
+  );
+
+  const queuesForControl = queues.map((queue) => {
+    const queuePolicy = queuePoliciesMap.get(queue.id);
+    return {
+      ...queue,
+      allowedBranchIds: queuePolicy?.allowedBranchIds ?? [],
+      allowedBrokerIds: queuePolicy?.allowedBrokerIds ?? [],
+      waiting: queueWaiting.get(queue.id) ?? 0,
+      members: countsByBranch.get(queue.branchId) ?? 0,
+      activeLeads: leadsByBranch.get(queue.branchId) ?? 0,
+    };
+  });
 
   return (
     <>
@@ -384,6 +396,7 @@ export default async function LeadDistributionPage({
             <QueueControlCenter
               queues={queuesForControl}
               branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+              brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId ?? "", branchName: broker.branchName ?? "" }))}
               campaigns={metaCampaigns}
               ads={metaAds}
               campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
@@ -393,7 +406,7 @@ export default async function LeadDistributionPage({
             <DistributionPolicyPanel
               canEdit={context.role === "director"}
               brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
-              policy={globalPolicy[0]?.policy ?? {}}
+              policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
             />
           </TabsContent>
 

@@ -5,15 +5,29 @@ export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number;
 export type IntelligentDistributionPolicy = {
   excludedBrokerIds: string[];
   excludedBranchIds: string[];
+  allowedBrokerIds?: string[];
+  allowedBranchIds?: string[];
   ranking: { enabled: boolean; conversionWeight: number; slaWeight: number; manualPriorityWeight: number };
 };
 
 export type RankedBroker = EligibleBroker & { onDuty: boolean; conversionRate: number; slaRate: number; manualPriority: number; idleSince: Date | null; rankingScore: number };
 
 export const defaultIntelligentDistributionPolicy: IntelligentDistributionPolicy = {
-  excludedBrokerIds: [], excludedBranchIds: [],
+  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [],
   ranking: { enabled: true, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 },
 };
+
+export function readDistributionPolicy(value: unknown): IntelligentDistributionPolicy {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return defaultIntelligentDistributionPolicy;
+  const raw = value as Partial<IntelligentDistributionPolicy>;
+  return {
+    excludedBrokerIds: Array.isArray(raw.excludedBrokerIds) ? raw.excludedBrokerIds.filter((id): id is string => typeof id === "string") : [],
+    excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
+    allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
+  };
+}
 
 export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy): RankedBroker[] {
   return brokers
@@ -65,7 +79,7 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
 
 export function isDeferredDistributionReason(reason: string) {
   const normalized = reason.toLocaleLowerCase("pt-BR");
-  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacidade") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada");
+  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacity") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada");
 }
 
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {

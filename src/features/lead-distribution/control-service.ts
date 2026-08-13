@@ -12,6 +12,8 @@ import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, reso
 const queueInput = z.object({
   id: z.string().uuid().optional(),
   branchId: z.string().uuid(),
+  allowedBranchIds: z.array(z.string().uuid()).default([]),
+  allowedBrokerIds: z.array(z.string().uuid()).default([]),
   name: z.string().trim().min(3).max(60),
   assignmentMode: z.enum(["automatic", "manual"]),
   assignmentStrategy: z.enum(["round_robin", "capacity"]),
@@ -62,6 +64,8 @@ function readPolicy(value: unknown): IntelligentDistributionPolicy {
   return {
     excludedBrokerIds: Array.isArray(raw.excludedBrokerIds) ? raw.excludedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
+    allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
@@ -85,20 +89,54 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     updatedAt: now,
   };
 
-  if (input.id) {
+  let queueId = input.id;
+  let created = false;
+
+  if (queueId) {
     const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.id, input.id), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1);
+      .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1);
     if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
     await db.update(schema.leadQueues).set({ ...values, branchId: queue.branchId }).where(eq(schema.leadQueues.id, queue.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: "queue.updated" });
-    return { id: queue.id, created: false };
+  } else {
+    queueId = randomUUID();
+    created = true;
+    const slugBase = slugify(input.name) || "fila";
+    await db.insert(schema.leadQueues).values({ id: queueId, tenantId: context.tenantId, slug: `${slugBase}-${queueId.slice(0, 6)}`, isDefault: false, createdAt: now, ...values });
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queueId, acao: "queue.created" });
   }
 
-  const id = randomUUID();
-  const slugBase = slugify(input.name) || "fila";
-  await db.insert(schema.leadQueues).values({ id, tenantId: context.tenantId, slug: `${slugBase}-${id.slice(0, 6)}`, isDefault: false, createdAt: now, ...values });
-  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: id, acao: "queue.created" });
-  return { id, created: true };
+  // Update or insert queue distribution policy with allowedBranchIds & allowedBrokerIds
+  const [existingPolicy] = await db.select({ id: schema.leadDistributionPolicies.id, policy: schema.leadDistributionPolicies.policy })
+    .from(schema.leadDistributionPolicies)
+    .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, queueId)))
+    .limit(1);
+
+  const currentPolicy = readPolicy(existingPolicy?.policy);
+  const updatedPolicy: IntelligentDistributionPolicy = {
+    ...currentPolicy,
+    allowedBranchIds: input.allowedBranchIds,
+    allowedBrokerIds: input.allowedBrokerIds,
+  };
+
+  if (existingPolicy) {
+    await db.update(schema.leadDistributionPolicies)
+      .set({ policy: updatedPolicy, updatedBy: context.userId, updatedAt: now })
+      .where(eq(schema.leadDistributionPolicies.id, existingPolicy.id));
+  } else {
+    await db.insert(schema.leadDistributionPolicies).values({
+      id: randomUUID(),
+      tenantId: context.tenantId,
+      queueId,
+      enabled: true,
+      policy: updatedPolicy,
+      updatedBy: context.userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  return { id: queueId, created };
 }
 
 export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInput: unknown) {
@@ -173,15 +211,30 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     .from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.branchId, input.branchId), eq(schema.leadQueues.status, "active"))).orderBy(desc(schema.leadQueues.isDefault), asc(schema.leadQueues.createdAt)).limit(1) : [];
   const effectiveQueue = queue ?? fallbackQueue[0];
   if (!effectiveQueue || effectiveQueue.status !== "active") return { queue: null, eligible: [], selected: null, reason: "Não existe uma fila ativa para esta unidade." };
-  const [policyRow, brokers] = await Promise.all([
-    db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
-      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id), eq(schema.leadDistributionPolicies.enabled, true))).limit(1),
-    db.select({ id: schema.user.id, name: schema.user.name, createdAt: schema.user.createdAt })
-      .from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.branchId, input.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(asc(schema.user.createdAt)),
-  ]);
-  const policy = readPolicy(policyRow[0]?.policy);
-  const ids = brokers.map((broker) => broker.id).filter((id) => !policy.excludedBrokerIds.includes(id));
+
+  const [policyRow] = await db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+    .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id), eq(schema.leadDistributionPolicies.enabled, true))).limit(1);
+
+  const policy = readPolicy(policyRow?.policy);
+  const targetBranchIds = Array.from(new Set([input.branchId, ...(policy.allowedBranchIds ?? [])]));
+
+  const brokers = await db.select({ id: schema.user.id, name: schema.user.name, createdAt: schema.user.createdAt })
+    .from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      inArray(schema.tenantMemberships.branchId, targetBranchIds),
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      eq(schema.tenantMemberships.availabilityStatus, "available"),
+      eq(schema.user.active, true),
+      eq(schema.user.status, "active")
+    )).orderBy(asc(schema.user.createdAt));
+
+  const allowedBrokerSet = policy.allowedBrokerIds?.length ? new Set(policy.allowedBrokerIds) : null;
+  const ids = brokers
+    .map((broker) => broker.id)
+    .filter((id) => !policy.excludedBrokerIds.includes(id) && (!allowedBrokerSet || allowedBrokerSet.has(id)));
+
   if (!ids.length) return { queue: effectiveQueue, eligible: [], selected: null, reason: "Nenhum corretor disponível atende a política desta fila." };
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
     .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);

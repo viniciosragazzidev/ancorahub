@@ -46,7 +46,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
             <UserAvatar seed={member.email} name={member.name} size="lg" className="size-14 shrink-0 rounded-xl" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-xl font-semibold tracking-tight">{member.name}</h1><MemberStatusBadge status={member.membershipStatus === "active" ? member.userStatus : "disabled"} /></div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"><RoleBadge role={member.role} /><span>{roleName}</span><span className="text-border">•</span><span>{member.branchName ?? "Geral da empresa"}</span></div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"><RoleBadge role={member.role} jobTitle={member.jobTitle} /><span>{roleName}</span><span className="text-border">•</span><span>{member.branchName ?? "Geral da empresa"}</span></div>
               <p className="mt-2 truncate text-sm text-muted-foreground">{member.email}</p>
             </div>
           </div>

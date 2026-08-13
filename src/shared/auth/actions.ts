@@ -70,11 +70,22 @@ export async function getRoleRedirect(): Promise<string> {
   }
 
   if (jobTitle === "marketing") {
-    return "/leads";
+    return "/dashboard";
   }
 
   return ROLE_REDIRECT[role] ?? "/corretor/resumo";
 }
+
+const JOB_TITLE_LABELS: Record<string, string> = {
+  director: "Diretor",
+  manager: "Gestor",
+  supervisor: "Supervisor",
+  broker: "Corretor",
+  marketing: "Marketing",
+  finance: "Financeiro",
+  operations: "Operações",
+  support: "Suporte",
+};
 
 export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
   const session = await getAuth().api.getSession({
@@ -103,7 +114,13 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
   let role = membership?.role ?? null;
   let jobTitle: string | null = membership?.jobTitle ?? null;
   let activeRoleOverride: string | null = null;
-  let displayRoleLabel = membership?.customRoleName ?? (role ? ROLE_LABELS[role] ?? role : null);
+  let displayRoleLabel =
+    membership?.customRoleName ??
+    (jobTitle && jobTitle !== "broker" && JOB_TITLE_LABELS[jobTitle]
+      ? JOB_TITLE_LABELS[jobTitle]
+      : role
+        ? ROLE_LABELS[role] ?? role
+        : null);
 
   if (isPlatformAdmin) {
     const { getSuperAdminRoleOverride } = await import("@/features/super-admin/role-impersonation");

@@ -30,7 +30,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   if (context.jobTitle === "marketing") {
     const headersList = await headers();
     const pathname = headersList.get("x-pathname") || "";
-    const restrictedPrefixes = ["/conversas", "/tarefas", "/documentos", "/clientes", "/vendas", "/checklist", "/minha-fila", "/dashboard", "/corretor", "/metas", "/relatorios", "/noc", "/filiais", "/unidades", "/gestor", "/diretor"];
+    const restrictedPrefixes = ["/conversas", "/tarefas", "/documentos", "/clientes", "/vendas", "/checklist", "/minha-fila", "/corretor", "/metas", "/relatorios", "/noc", "/filiais", "/unidades", "/gestor", "/diretor"];
     const isRestricted = restrictedPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"));
     if (isRestricted) {
       redirect("/access-denied");

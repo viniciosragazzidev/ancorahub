@@ -216,8 +216,9 @@ export function MemberStatusBadge({ status }: { status: "active" | "pending" | "
   }
 }
 
-export function RoleBadge({ role }: { role: string }) {
-  switch (role) {
+export function RoleBadge({ role, jobTitle }: { role: string; jobTitle?: string | null }) {
+  const effectiveKey = (jobTitle && jobTitle !== "broker" ? jobTitle : role).toLowerCase();
+  switch (effectiveKey) {
     case "director":
       return (
         <Badge variant="purple" className="gap-1 px-2 py-0.5 font-medium border-purple-500/15">
@@ -231,6 +232,39 @@ export function RoleBadge({ role }: { role: string }) {
           Gestor
         </Badge>
       );
+    case "supervisor":
+      return (
+        <Badge variant="cyan" className="gap-1 px-2 py-0.5 font-medium border-cyan-500/15">
+          Supervisor
+        </Badge>
+      );
+    case "marketing":
+      return (
+        <Badge variant="pink" className="gap-1 px-2 py-0.5 font-medium border-pink-500/15">
+          Marketing
+        </Badge>
+      );
+    case "support":
+    case "suporte":
+      return (
+        <Badge variant="orange" className="gap-1 px-2 py-0.5 font-medium border-orange-500/15">
+          Suporte
+        </Badge>
+      );
+    case "finance":
+    case "financeiro":
+      return (
+        <Badge variant="success" className="gap-1 px-2 py-0.5 font-medium border-emerald-500/15">
+          Financeiro
+        </Badge>
+      );
+    case "operations":
+    case "operacoes":
+      return (
+        <Badge variant="warning" className="gap-1 px-2 py-0.5 font-medium border-amber-500/15">
+          Operações
+        </Badge>
+      );
     case "broker":
       return (
         <Badge variant="outline" className="gap-1 px-2 py-0.5 font-medium text-muted-foreground">
@@ -238,6 +272,6 @@ export function RoleBadge({ role }: { role: string }) {
         </Badge>
       );
     default:
-      return <Badge variant="outline" className="px-2 py-0.5">{role}</Badge>;
+      return <Badge variant="outline" className="px-2 py-0.5">{jobTitle || role}</Badge>;
   }
 }

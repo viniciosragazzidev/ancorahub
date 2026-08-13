@@ -200,7 +200,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
   return (
     <Sidebar variant="sidebar">
       <SidebarHeader className="space-y-3 border-b border-sidebar-border/50 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3">
-        <Link href="/dashboard" className="flex h-8 min-w-0 items-center group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center">
+        <Link href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"} className="flex h-8 min-w-0 items-center group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center">
           <AncoraLogo src={logoUrl} className="h-8 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
           <img src="/icon.png" alt="Ancora" className="hidden size-5 object-contain group-data-[collapsible=icon]:block" />
         </Link>

@@ -1,10 +1,11 @@
 import NocDashboardContent from "./_components/noc-dashboard-content";
+import MarketingDashboardContent from "./_components/marketing-dashboard-content";
 import { BrokerWorkspace } from "./_components/broker-workspace";
 import { getBrokerWorkspaceData, isBrokerWorkspaceEnabled } from "@/features/broker-workspace/queries";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
-import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardData } from "./data";
+import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardData, getMarketingDashboardData } from "./data";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,12 @@ export default async function DashboardPage({
 }) {
   const context = await getRequiredTenantContext();
   const period = parsePeriod((await searchParams).period);
+
+  if (context.jobTitle === "marketing") {
+    const data = await getMarketingDashboardData(period);
+    return <MarketingDashboardContent data={data} period={period} />;
+  }
+
   if (context.role === "director") {
     const data = await getDirectorDashboardData(period);
     return <NocDashboardContent role="director" data={data} period={period} />;

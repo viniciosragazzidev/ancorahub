@@ -151,7 +151,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     {
       accessorKey: "role",
       header: "Papel",
-      cell: ({ row }) => <RoleBadge role={row.original.role} />,
+      cell: ({ row }) => <RoleBadge role={row.original.role} jobTitle={row.original.jobTitle} />,
     },
     {
       accessorKey: "branchName",

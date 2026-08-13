@@ -198,3 +198,119 @@ export async function getDirectorDashboardData(period: PeriodValue = DEFAULT_PER
 
   return { user: user[0], tenant: tenant[0], totals: { leads: leads.length, activeLeads: active.length, converted: leads.filter((lead) => lead.status === "converted").length, branches: branches.length, members: members.length, activeBrokers: members.filter((member) => member.role === "broker" && member.status === "active").length, unworked, stalled }, funnel, trend, branches: branches.map((branch) => { const branchLeads = leads.filter((lead) => lead.branchId === branch.id); const converted = branchLeads.filter((lead) => lead.status === "converted").length; return { name: branch.name, leads: branchLeads.length, activeLeads: branchLeads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status)).length, conversion: branchLeads.length ? `${((converted / branchLeads.length) * 100).toFixed(1)}%` : "0,0%" }; }) };
 }
+
+export type MarketingDashboardData = {
+  user: { name: string; email: string };
+  tenant: { name: string };
+  totals: {
+    metaCampaigns: number;
+    activeCampaigns: number;
+    metaAds: number;
+    activeAds: number;
+    leadsTotal: number;
+    qualifiedLeads: number;
+    convertedLeads: number;
+    unroutedCampaigns: number;
+  };
+  funnel: Array<{ stage: string; volume: number }>;
+  sources: Array<{ name: string; count: number; percentage: string }>;
+  campaigns: Array<{
+    id: string;
+    campaignId: string;
+    name: string;
+    status: string;
+    queueName: string | null;
+    leadsCount: number;
+  }>;
+  trend: LeadTrend;
+};
+
+export async function getMarketingDashboardData(period: PeriodValue = DEFAULT_PERIOD): Promise<MarketingDashboardData> {
+  const context = await getRequiredTenantContext();
+  const db = getDatabase();
+
+  const [user, tenant, leads, campaigns, campaignRoutes, ads, trendRaw] = await Promise.all([
+    db.select({ name: schema.user.name, email: schema.user.email }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
+    db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
+    db.select({ id: schema.leads.id, status: schema.leads.status, origem: schema.leads.origem, metaCampaignId: schema.leads.metaCampaignId, createdAt: schema.leads.createdAt }).from(schema.leads).where(eq(schema.leads.tenantId, context.tenantId)),
+    db.select({ id: schema.metaCampaigns.id, campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)),
+    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
+      .from(schema.metaCampaignQueueRoutes)
+      .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+      .where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)),
+    db.select({ id: schema.metaAds.id, adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)),
+    db.select({
+      date: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
+      leads: sql<number>`count(*)::int`,
+      converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')::int`,
+    })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), gte(schema.leads.createdAt, periodDaysAgoSql(period))))
+      .groupBy(sql`1`)
+      .orderBy(sql`1`),
+  ]);
+
+  if (!user[0] || !tenant[0]) throw new Error("User or tenant not found");
+
+  const routeMap = new Map(campaignRoutes.map((r) => [r.campaignId, r]));
+  const leadsPerCampaignMap = new Map<string, number>();
+  const leadsPerSourceMap = new Map<string, number>();
+
+  for (const lead of leads) {
+    const src = lead.origem || "Não identificada";
+    leadsPerSourceMap.set(src, (leadsPerSourceMap.get(src) ?? 0) + 1);
+    if (lead.metaCampaignId) {
+      leadsPerCampaignMap.set(lead.metaCampaignId, (leadsPerCampaignMap.get(lead.metaCampaignId) ?? 0) + 1);
+    }
+  }
+
+  const campaignItems = campaigns.map((c) => {
+    const route = routeMap.get(c.campaignId);
+    return {
+      id: c.id,
+      campaignId: c.campaignId,
+      name: c.name,
+      status: c.status,
+      queueName: route?.enabled ? route.queueName ?? "Fila padrão" : "Sem entrada",
+      leadsCount: leadsPerCampaignMap.get(c.campaignId) ?? 0,
+    };
+  });
+
+  const unroutedCampaigns = campaigns.filter((c) => !routeMap.has(c.campaignId) || !routeMap.get(c.campaignId)?.enabled).length;
+
+  const qualifiedLeads = leads.filter((l) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted"].includes(l.status)).length;
+  const convertedLeads = leads.filter((l) => l.status === "converted").length;
+
+  const totalSourcesCount = leads.length || 1;
+  const sources = Array.from(leadsPerSourceMap.entries()).map(([name, count]) => ({
+    name,
+    count,
+    percentage: `${((count / totalSourcesCount) * 100).toFixed(1)}%`,
+  })).sort((a, b) => b.count - a.count);
+
+  const stage = (status: string) => status === "new" || status === "distributed" ? "Novo" : status === "in_contact" ? "Contato" : status === "quote_sent" ? "Cotação" : status === "negotiation" ? "Negociação" : status === "converted" ? "Conversão" : "Em análise";
+  const stageNames = ["Novo", "Contato", "Cotação", "Negociação", "Conversão"];
+  const funnel = stageNames.map((name) => ({ stage: name, volume: leads.filter((lead) => stage(lead.status) === name).length }));
+
+  const trendMap = new Map(trendRaw.map((r) => [r.date, r]));
+  const trend = fillTrendDays(period, trendMap);
+
+  return {
+    user: user[0],
+    tenant: tenant[0],
+    totals: {
+      metaCampaigns: campaigns.length,
+      activeCampaigns: campaigns.filter((c) => c.status === "ACTIVE").length,
+      metaAds: ads.length,
+      activeAds: ads.filter((a) => a.status === "ACTIVE").length,
+      leadsTotal: leads.length,
+      qualifiedLeads,
+      convertedLeads,
+      unroutedCampaigns,
+    },
+    funnel,
+    sources,
+    campaigns: campaignItems,
+    trend,
+  };
+}

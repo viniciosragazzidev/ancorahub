@@ -512,6 +512,13 @@
       "when": 1786718400000,
       "tag": "0122_meta_ad_queue_routes",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1786722000000,
+      "tag": "0123_enable_full_realtime",
+      "breakpoints": true
     }
   ]
 }
