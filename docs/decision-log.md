@@ -569,3 +569,19 @@ Somente a resposta bem-sucedida da Meta marca o canal como operacional; falhas f
 auditadas, bloqueiam envio e oferecem uma nova tentativa segura ao Diretor. Conexões
 anteriores são identificadas como não verificadas até essa confirmação, sem apagar
 histórico. O kill switch global da Cloud API continua sendo a autoridade reversível.
+
+## DEC-077 — Sinais de atualização por usuário sem replicação direta de tabelas
+
+**Estado:** Aceita
+**Data:** 2026-08-13
+
+O CRM não utilizará `postgres_changes` no navegador para dados operacionais. A sessão
+da aplicação é resolvida pelo Better Auth, portanto uma assinatura direta ao Realtime
+do Supabase não deve ser tratada como autorização de leitura de linhas do tenant.
+
+As notificações passam a publicar somente um sinal sem conteúdo pessoal em um tópico
+opaco, derivado no servidor de tenant, usuário e segredo de aplicação. Ao receber o
+sinal, o navegador consulta os detalhes pela API interna autenticada. Há reconciliação
+lenta quando a aba está visível e propagação local entre abas. A capacidade pode ser
+desativada globalmente pelo Super-admin; persistência de notificação e Web Push não
+falham se o Realtime estiver indisponível.

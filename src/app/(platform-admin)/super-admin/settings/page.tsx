@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateWorkflowAutomationSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateNotificationCapabilityAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateWorkflowAutomationSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateNotificationCapabilityAction, updateRealtimeSyncSettingsAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
@@ -29,6 +29,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_route_onboarding_enabled",
     "feature_whatsapp_meta_cloud_enabled",
     "feature_meta_lead_ads_enabled",
+    "feature_realtime_sync_enabled",
     META_LEAD_ADS_PLATFORM_SETTINGS.partnerName,
     META_LEAD_ADS_PLATFORM_SETTINGS.businessId,
     META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp,
@@ -84,6 +85,7 @@ export default async function SuperAdminSettingsPage() {
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
+  const realtimeSyncEnabled = settingMap.get("feature_realtime_sync_enabled") !== "false";
   const metaLeadAdsPartnerName = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.partnerName) ?? "Ancora Hub";
   const metaLeadAdsBusinessId = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.businessId) ?? "37173915645589885";
   const metaLeadAdsSupportWhatsApp = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp) ?? "+55 21 95930-7782";
@@ -305,6 +307,19 @@ export default async function SuperAdminSettingsPage() {
                     </div>
                   </form>
                 ))}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Sincronização em tempo real</CardTitle>
+                <CardDescription>Envia ao navegador apenas um sinal técnico de atualização; os dados continuam sendo lidos pelo CRM autenticado. Desativar preserva notificações e push, usando a reconciliação periódica.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateRealtimeSyncSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="realtimeSyncEnabled" value="true" defaultChecked={realtimeSyncEnabled} className="size-4" /><span><span className="font-medium">Sinais em tempo real habilitados</span><span className="block text-xs text-muted-foreground">Controle global, reversível e auditado.</span></span></label>
+                  <Button type="submit" variant={realtimeSyncEnabled ? "outline" : "default"}>{realtimeSyncEnabled ? "Salvar controle" : "Ativar sincronização"}</Button>
+                </form>
               </CardContent>
             </Card>
 

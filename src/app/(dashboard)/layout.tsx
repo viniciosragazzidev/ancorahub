@@ -16,6 +16,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { ContextualHelpDrawer } from "@/components/contextual-help-drawer";
 import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
+import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -46,6 +47,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     .from(schema.tenants)
     .where(eq(schema.tenants.id, context.tenantId))
     .limit(1);
+  const syncTopic = getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId });
 
   return (
     <AgentDrawerProvider>
@@ -63,7 +65,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           tenantId={context.tenantId}
           userId={context.userId}
           role={context.role}
-          branchId={context.branchId}
+          syncTopic={syncTopic}
         >
           <NotificationCountProvider userId={context.userId}>
             <FeedbackToastHandler userId={context.userId} />

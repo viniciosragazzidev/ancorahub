@@ -1,13 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, gte, isNull, or } from "drizzle-orm";
+import { and, count, eq, isNull, or } from "drizzle-orm";
 import webpush from "web-push";
 
 import { createLeadOffersForBrokers } from "@/features/lead-distribution/offers";
 import { getDatabase, schema } from "@/shared/db";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isNotificationCapabilityEnabled } from "./queries";
+import { publishRealtimeSync } from "./realtime-sync";
 import type { NotificationCapabilityId } from "./catalog";
 
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
@@ -156,12 +157,28 @@ export async function publishNotification(input: {
     createdAt: new Date(),
   }).onConflictDoNothing().returning({ id: schema.notifications.id });
   if (!inserted.length) return true;
-  await sendNotificationToUser(input.recipientUserId, {
-    title: input.pushTitle ?? input.title,
-    body: input.pushBody ?? input.message,
-    url: input.url,
-    tag: input.tag,
-  });
+
+  const notificationId = inserted[0].id;
+  const occurredAt = new Date().toISOString();
+  const [pushResult, realtimeResult] = await Promise.allSettled([
+    sendNotificationToUser(input.recipientUserId, {
+      title: input.pushTitle ?? input.title,
+      body: input.pushBody ?? input.message,
+      url: input.url,
+      tag: input.tag,
+    }),
+    publishRealtimeSync(
+      { tenantId: input.tenantId, userId: input.recipientUserId },
+      { version: 1, kind: "notification.created", notificationId, occurredAt },
+    ),
+  ]);
+
+  if (pushResult.status === "rejected") {
+    throw pushResult.reason;
+  }
+  if (realtimeResult.status === "rejected") {
+    console.warn("[notification-realtime] Signal delivery failed.");
+  }
   return true;
 }
 

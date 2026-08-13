@@ -4,13 +4,13 @@
 
 - A tabela `lead_distribution_jobs` persiste trabalhos de atribuição e impede jobs ativos duplicados por lead.
 - O executor interno trabalha em lotes, usa atualização condicional, lease recuperável, backoff e falha visível após o limite configurado.
-- A rota protegida `/api/internal/jobs/distribution` está pronta para um agendador recorrente; `CRON_SECRET` é obrigatório. Enquanto o projeto permanecer no Vercel Hobby, o deploy usa uma execução diária às 03:00 UTC (00:00 em São Paulo) como contingência operacional. Essa frequência é insuficiente para o SLA de distribuição e o upgrade para Vercel Pro ou a adoção de um agendador externo é uma pendência urgente.
+- A rota protegida `/api/internal/jobs/distribution` é executada pelo Vercel Cron a cada dois minutos; `CRON_SECRET` é obrigatório. A frequência é compatível com o ambiente Vercel pago e a fila continua preservada para nova tentativa se uma execução falhar.
 - O Super-admin pode pausar, parametrizar e executar um ciclo manual com auditoria.
 - A tela de Distribuição informa pendências, processamento e exceções reais. A migration 0059 é pré-requisito para esta telemetria.
 
 ### Pendência obrigatória de infraestrutura
 
-Quando o CorreTop migrar para **Vercel Pro** ou para qualquer ambiente com agendador recorrente compatível, substituir o cron diário por chamada autenticada para `/api/internal/jobs/distribution` a cada **2 minutos**. A variável `CRON_SECRET` deve permanecer configurada no ambiente executor e no CRM. Até a mudança, a fila continua preservada, pode ser processada manualmente pelo Super-admin e a distribuição automática deve ser considerada degradada, não contínua.
+Em qualquer mudança de ambiente, manter a chamada autenticada para `/api/internal/jobs/distribution` a cada **2 minutos** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
 
 ## Pendência urgente de infraestrutura
 

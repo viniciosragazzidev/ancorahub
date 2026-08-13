@@ -1,22 +1,26 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { publishRealtimeSync } from "@/features/notifications/realtime-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const markReadSchema = z.object({
+  notificationId: z.string().uuid(),
+});
+
 export async function POST(request: Request) {
   try {
     const context = await getRequiredTenantContext();
-    const { notificationId } = await request.json();
+    const parsed = markReadSchema.safeParse(await request.json());
+    if (!parsed.success) return NextResponse.json({ error: "notificationId is invalid" }, { status: 400 });
+    const { notificationId } = parsed.data;
 
-    if (!notificationId || typeof notificationId !== "string") {
-      return NextResponse.json({ error: "notificationId is required" }, { status: 400 });
-    }
-
-    await getDatabase()
+    const updated = await getDatabase()
       .update(schema.notifications)
       .set({ readAt: new Date() })
       .where(
@@ -26,7 +30,25 @@ export async function POST(request: Request) {
           eq(schema.notifications.recipientUserId, context.userId),
           isNull(schema.notifications.readAt),
         ),
-      );
+      )
+      .returning({ id: schema.notifications.id });
+
+    if (updated.length) {
+      try {
+        await publishRealtimeSync(
+          { tenantId: context.tenantId, userId: context.userId },
+          {
+            version: 1,
+            kind: "notification.read",
+            notificationId: updated[0].id,
+            occurredAt: new Date().toISOString(),
+          },
+        );
+      } catch {
+        // Reading the notification remains successful if the optional live
+        // signal is temporarily unavailable.
+      }
+    }
 
     revalidatePath("/notificacoes");
 

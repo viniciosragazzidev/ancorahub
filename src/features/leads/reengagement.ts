@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 
 const REENGAGEMENT_DAYS = 30;
 const NOTIFICATION_TYPE = "lead_reengagement";
@@ -63,7 +64,18 @@ export async function createLeadReengagementReminders(now = new Date()) {
       createdAt: now,
     }));
 
-  if (pending.length) await db.insert(schema.notifications).values(pending);
+  if (pending.length) {
+    const inserted = await db.insert(schema.notifications).values(pending).returning({
+      id: schema.notifications.id,
+      tenantId: schema.notifications.tenantId,
+      userId: schema.notifications.recipientUserId,
+    });
+    void publishRealtimeSyncSignals(inserted.map((notification) => ({
+      tenantId: notification.tenantId,
+      userId: notification.userId,
+      notificationId: notification.id,
+    })));
+  }
 
   return { reengagement: pending.length };
 }

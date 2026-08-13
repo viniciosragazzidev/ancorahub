@@ -5,6 +5,7 @@ import { and, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 
 export const RENEWAL_ALERT_WINDOW_DAYS = 30;
 
@@ -170,7 +171,18 @@ export async function createClientRenewalReminders(now = new Date()) {
     }
   }
 
-  if (pending.length) await db.insert(schema.notifications).values(pending);
+  if (pending.length) {
+    const inserted = await db.insert(schema.notifications).values(pending).returning({
+      id: schema.notifications.id,
+      tenantId: schema.notifications.tenantId,
+      userId: schema.notifications.recipientUserId,
+    });
+    void publishRealtimeSyncSignals(inserted.map((notification) => ({
+      tenantId: notification.tenantId,
+      userId: notification.userId,
+      notificationId: notification.id,
+    })));
+  }
 
   // ── 5. Process scheduled customerRenewalReminders (T-90, T-60, T-30, T-15) ──
   const todayStr = today.toISOString().slice(0, 10);
@@ -223,4 +235,3 @@ export async function createClientRenewalReminders(now = new Date()) {
 
   return { reminders: pending.length + dueScheduledReminders.length, clients: dueClients.length };
 }
-

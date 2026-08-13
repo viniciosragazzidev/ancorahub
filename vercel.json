@@ -2,23 +2,31 @@
   "crons": [
     {
       "path": "/api/internal/sla",
-      "schedule": "0 0 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/internal/reminders",
-      "schedule": "0 1 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/internal/jobs/distribution",
-      "schedule": "0 2 * * *"
+      "schedule": "*/2 * * * *"
     },
     {
       "path": "/api/internal/jobs/lead-effects",
-      "schedule": "0 3 * * *"
+      "schedule": "*/2 * * * *"
     },
     {
       "path": "/api/internal/jobs/whatsapp",
-      "schedule": "0 4 * * *"
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/meta-sync",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/waha-cadence",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

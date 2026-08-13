@@ -28,6 +28,7 @@ import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs"
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
+import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -715,6 +716,23 @@ export async function updateTenantCustomRolesPilotAction(tenantId: string, formD
   revalidatePath("/super-admin/settings");
   revalidatePath("/equipe/cargos");
   revalidatePath(`/super-admin/tenants/${targetTenantId}`);
+}
+
+export async function updateRealtimeSyncSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("realtimeSyncEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting(REALTIME_SYNC_FEATURE, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "notification_realtime_sync.updated",
+    targetType: "system_settings",
+    targetId: REALTIME_SYNC_FEATURE,
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
 }
 
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {

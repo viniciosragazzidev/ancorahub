@@ -8,6 +8,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { processQueuedLead } from "@/features/lead-distribution/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 
 export type FeedbackSlaResult = { checked: number; released: number; reassigned: number; notifications: number };
 
@@ -39,17 +40,28 @@ export async function runFeedbackSlaSweep(tenantId?: string): Promise<FeedbackSl
       const released = await db.transaction(async (tx) => {
         const updated = await tx.update(schema.leads).set({ corretorId: null, status: "new", distributionStatus: "queued", assignmentSource: "redistribution", assignmentStrategy: "automatic", assignedAt: null, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, distributionUpdatedAt: now })
           .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, tenant.id), eq(schema.leads.corretorId, brokerId), eq(schema.leads.status, "distributed"), isNull(schema.leads.firstContactAt))).returning({ id: schema.leads.id });
-        if (!updated.length) return false;
+        if (!updated.length) return null;
         await tx.update(schema.leadAssignmentAttempts).set({ status: "overdue", expiredAt: now, releasedAt: now, releaseReason: "feedback_timeout" }).where(and(eq(schema.leadAssignmentAttempts.leadId, lead.id), eq(schema.leadAssignmentAttempts.brokerId, brokerId), eq(schema.leadAssignmentAttempts.status, "open")));
         await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: actor.userId, tipo: "system_alert", conteudo: "Lead devolvido à fila por ausência de feedback dentro do SLA." });
         await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: actor.userId, entidade: "lead", entidadeId: lead.id, acao: "lead.feedback_timeout_redistributed" });
-        if (notificationsEnabled) await tx.insert(schema.notifications).values([
-          { id: randomUUID(), tenantId: tenant.id, recipientUserId: brokerId, leadId: lead.id, type: "lead_feedback_overdue", title: "Lead devolvido à fila", message: `O lead ${lead.nome} foi devolvido por falta de feedback dentro do SLA.`, createdAt: now },
-          { id: randomUUID(), tenantId: tenant.id, recipientUserId: actor.userId, leadId: lead.id, type: "lead_feedback_overdue", title: "Lead redistribuído", message: `O lead ${lead.nome} foi devolvido à fila por falta de feedback.`, createdAt: now },
+        const notifications = notificationsEnabled
+          ? [
+              { id: randomUUID(), tenantId: tenant.id, userId: brokerId },
+              { id: randomUUID(), tenantId: tenant.id, userId: actor.userId },
+            ]
+          : [];
+        if (notifications.length) await tx.insert(schema.notifications).values([
+          { id: notifications[0].id, tenantId: tenant.id, recipientUserId: brokerId, leadId: lead.id, type: "lead_feedback_overdue", title: "Lead devolvido à fila", message: `O lead ${lead.nome} foi devolvido por falta de feedback dentro do SLA.`, createdAt: now },
+          { id: notifications[1].id, tenantId: tenant.id, recipientUserId: actor.userId, leadId: lead.id, type: "lead_feedback_overdue", title: "Lead redistribuído", message: `O lead ${lead.nome} foi devolvido à fila por falta de feedback.`, createdAt: now },
         ]);
-        return true;
+        return notifications;
       });
       if (!released) continue;
+      void publishRealtimeSyncSignals(released.map((notification) => ({
+        tenantId: notification.tenantId,
+        userId: notification.userId,
+        notificationId: notification.id,
+      })));
       result.released += 1;
       result.notifications += 2;
       const context: TenantContext = { userId: actor.userId, tenantId: tenant.id, role: "director", jobTitle: "director", branchId: null };

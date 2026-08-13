@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { chooseAvailableBroker } from "./assignment";
 import { notifyLeadReassigned, notifyNewLead } from "@/features/notifications/send-push-helper";
+import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -146,7 +147,19 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
         }
       }
     }
-    if (pending.length) { await db.insert(schema.notifications).values(pending); notifications += pending.length; }
+    if (pending.length) {
+      const inserted = await db.insert(schema.notifications).values(pending).returning({
+        id: schema.notifications.id,
+        tenantId: schema.notifications.tenantId,
+        userId: schema.notifications.recipientUserId,
+      });
+      void publishRealtimeSyncSignals(inserted.map((notification) => ({
+        tenantId: notification.tenantId,
+        userId: notification.userId,
+        notificationId: notification.id,
+      })));
+      notifications += pending.length;
+    }
   }
   return { tenants: tenants.length, unworked, stalled, notifications };
 }

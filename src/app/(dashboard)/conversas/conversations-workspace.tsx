@@ -43,7 +43,6 @@ import {
   PaperPlaneTilt,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
-import { createClient } from "@/utils/supabase/client";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { cn } from "@/lib/utils";
 import {
@@ -126,124 +125,12 @@ export function ConversationsWorkspace({
       : initialConversations.find((item) => item.messages.length > 0)?.id ?? initialConversations[0]?.id ?? null,
   );
 
-  // ── Real-time: sync when server re-renders (e.g. after router.refresh()) ──
-  // Only add new conversations that don't exist yet, preserve real-time message state
+  // Server data becomes authoritative after the authenticated shell refreshes.
+  // Conversation content is never streamed as raw database rows to the browser.
   useEffect(() => {
-    setConversations((prev) => {
-      const existingIds = new Set(prev.map((c) => c.id));
-      const newOnes = initialConversations.filter((c) => !existingIds.has(c.id));
-      if (!newOnes.length) return prev;
-      return [...prev, ...newOnes];
-    });
+    const sync = window.setTimeout(() => setConversations(initialConversations), 0);
+    return () => window.clearTimeout(sync);
   }, [initialConversations]);
-
-  // ── Real-time: subscribe to new whatsapp_messages ──
-  useEffect(() => {
-    if (!tenantId) return;
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`conversas:messages:${tenantId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "whatsapp_messages",
-          filter: `tenant_id=eq.${tenantId}`,
-        },
-        (payload) => {
-          const msg = payload.new as {
-            id: string;
-            lead_id: string | null;
-            body: string;
-            direction: string;
-            sent_at: string;
-          } | null;
-          if (!msg?.lead_id) return;
-
-          setConversations((prev) =>
-            prev.map((conversation) => {
-              if (conversation.id !== msg.lead_id) return conversation;
-              if (conversation.messages.some((m) => m.id === msg.id)) return conversation;
-
-              const newMessage: ConversationMessage = {
-                id: msg.id,
-                leadId: msg.lead_id,
-                body: msg.body,
-                direction: msg.direction,
-                sentAt: msg.sent_at,
-              };
-
-              return {
-                ...conversation,
-                messages: [...conversation.messages, newMessage],
-                latestMessage: {
-                  body: msg.body,
-                  direction: msg.direction,
-                  sentAt: msg.sent_at,
-                },
-              };
-            }),
-          );
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [tenantId]);
-
-  // ── Real-time: subscribe to ai_conversations status changes ──
-  useEffect(() => {
-    if (!tenantId) return;
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`conversas:ai:${tenantId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "ai_conversations",
-          filter: `tenant_id=eq.${tenantId}`,
-        },
-        (payload) => {
-          const row = payload.new as {
-            id: string;
-            lead_id: string | null;
-            status: string;
-            ai_model: string | null;
-            transfer_reason: string | null;
-            qualification_summary: string | null;
-            assigned_user_id: string | null;
-          } | null;
-          if (!row?.lead_id) return;
-
-          setConversations((prev) =>
-            prev.map((conversation) => {
-              if (conversation.id !== row.lead_id) return conversation;
-              return {
-                ...conversation,
-                aiConversation: {
-                  id: row.id,
-                  status: row.status as AiConversationData["status"],
-                  aiModel: row.ai_model,
-                  transferReason: row.transfer_reason,
-                  qualificationSummary: row.qualification_summary,
-                  assignedUserId: row.assigned_user_id,
-                },
-              };
-            }),
-          );
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [tenantId]);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ViewFilter>("all");

@@ -1,26 +1,24 @@
 "use client";
 
-import { useEffect, startTransition } from "react";
+import { useCallback, useEffect, startTransition } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+
 import { Button } from "@/components/ui/button";
+import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 
 const SNOOZE_KEY = "feedback-snooze-until";
-const SNOOZE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const SNOOZE_DURATION_MS = 5 * 60 * 1000;
 
-interface NotificationPayload {
+type RecentNotification = {
   id: string;
-  recipient_user_id: string;
-  lead_id: string | null;
-  type: string;
   title: string;
   message: string;
-  read_at: string | null;
-  created_at: string;
-}
+  type: string;
+  leadId: string | null;
+};
 
-function isGloballySnoozed(): boolean {
+function isGloballySnoozed() {
   try {
     const snoozedUntil = localStorage.getItem(SNOOZE_KEY);
     return snoozedUntil !== null && Date.now() < Number(snoozedUntil);
@@ -29,124 +27,65 @@ function isGloballySnoozed(): boolean {
   }
 }
 
-function snoozeAllFeedback(): void {
+function snoozeAllFeedback() {
   try {
     localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_DURATION_MS));
   } catch {
-    // localStorage may be unavailable
+    // Browser storage may be unavailable.
   }
 }
 
 /**
- * Listens for new `lead_feedback_reminder` notifications via Supabase Realtime
- * and shows a persistent sonner toast with "Registrar agora" / "Lembrar depois" actions.
- *
- * Must be rendered inside a dashboard layout with an active user session.
+ * Renders feedback alerts only after the authenticated shell receives a
+ * minimal server signal. Notification contents never travel in Realtime.
  */
 export function FeedbackToastHandler({ userId }: { userId: string }) {
+  // The server derives the recipient from the Better Auth session; this prop
+  // documents that the handler remains scoped by the authenticated shell.
+  void userId;
   const router = useRouter();
 
+  const showFeedbackToast = useCallback((notification: RecentNotification) => {
+    if (notification.type !== "lead_feedback_reminder" || isGloballySnoozed()) return;
+    const isUrgent = notification.title.includes("urgente");
+    toast.custom((toastId) => (
+      <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-primary">Feedback pendente</p>
+            <p className="mt-0.5 text-sm font-medium text-foreground">{notification.title}</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{notification.message}</p>
+          </div>
+          <button type="button" onClick={() => toast.dismiss(toastId)} className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Fechar">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {notification.leadId ? <Button size="sm" className="flex-1 text-xs" onClick={() => { startTransition(() => router.push(`/leads/${notification.leadId}#feedback`)); toast.dismiss(toastId); }}>Registrar agora</Button> : null}
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => { snoozeAllFeedback(); toast.dismiss(toastId); }}>Lembrar depois</Button>
+        </div>
+        {isUrgent ? <p className="text-[10px] font-medium text-destructive">Limite de tentativas excedido. O gestor foi notificado.</p> : null}
+      </div>
+    ), { duration: Infinity, position: "bottom-right", style: { padding: 0, background: "transparent", boxShadow: "none", border: "none", width: "auto" } });
+  }, [router]);
+
   useEffect(() => {
-    const supabase = createClient();
-    const channelName = `feedback-toast:${userId}`;
-
-    const channel = supabase
-      .channel(channelName)
-      .on<NotificationPayload>(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `recipient_user_id=eq.${userId}`,
-        },
-        (payload) => {
-          const notif = payload.new;
-          if (!notif || notif.type !== "lead_feedback_reminder") return;
-          if (isGloballySnoozed()) return;
-
-          const isUrgent = notif.title.includes("urgente");
-          const leadId = notif.lead_id;
-
-          toast.custom(
-            (t) => (
-              <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-primary">
-                      Feedback pendente
-                    </p>
-                    <p className="mt-0.5 text-sm font-medium text-foreground">
-                      {notif.title}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      {notif.message}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => toast.dismiss(t)}
-                    className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label="Fechar"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {leadId && (
-                    <Button
-                      size="sm"
-                      className="flex-1 text-xs"
-                      onClick={() => {
-                        startTransition(() => {
-                          router.push(`/leads/${leadId}#feedback`);
-                        });
-                        toast.dismiss(t);
-                      }}
-                    >
-                      Registrar agora
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 text-xs"                      onClick={() => {
-                        snoozeAllFeedback();
-                        toast.dismiss(t);
-                      }}
-                  >
-                    Lembrar depois
-                  </Button>
-                </div>
-
-                {isUrgent && (
-                  <p className="text-[10px] font-medium text-destructive">
-                    Limite de tentativas excedido. O gestor foi notificado.
-                  </p>
-                )}
-              </div>
-            ),
-            {
-              duration: Infinity,
-              position: "bottom-right",
-              style: { padding: 0, background: "transparent", boxShadow: "none", border: "none", width: "auto" },
-            },
-          );
-        },
-      )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error("Falha ao assinar lembretes de feedback em tempo real.");
-        }
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
+    const onRealtimeSync = async (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
+      if (detail?.kind !== "notification.created") return;
+      try {
+        const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { notifications?: RecentNotification[] };
+        const notification = payload.notifications?.find((item) => item.id === detail.notificationId);
+        if (notification) showFeedbackToast(notification);
+      } catch {
+        // A later notification sync retries through the authenticated endpoint.
+      }
     };
-  }, [userId, router]);
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtimeSync);
+    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtimeSync);
+  }, [showFeedbackToast]);
 
   return null;
 }

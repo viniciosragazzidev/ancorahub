@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import {
@@ -47,8 +46,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
   const refreshPendingRef = useRef(false);
-  const shellStartedAtRef = useRef(Date.now());
-  const [isOnline, setIsOnline] = useState(true);
+  const shellStartedAtRef = useRef<number | null>(null);
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
 
@@ -93,7 +92,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
       if (!response.ok) return;
       const payload = await response.json() as { notifications?: RecentNotification[] };
-      const graceWindowStart = shellStartedAtRef.current - 30_000;
+      const graceWindowStart = (shellStartedAtRef.current ?? Date.now()) - 30_000;
 
       for (const notification of payload.notifications ?? []) {
         const createdAt = notification.createdAt ? Date.parse(notification.createdAt) : NaN;
@@ -128,6 +127,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [reconcileRecentBrokerNotifications, syncClientState]);
 
   useEffect(() => {
+    shellStartedAtRef.current = Date.now();
     const resumePendingRefresh = () => {
       if (refreshPendingRef.current) scheduleServerRefresh();
     };
@@ -146,7 +146,6 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
-    setIsOnline(navigator.onLine);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     return () => {
@@ -193,14 +192,17 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
 
   useEffect(() => {
     if (role !== "broker") return;
-    void reconcileRecentBrokerNotifications();
+    const initialReconciliation = window.setTimeout(() => void reconcileRecentBrokerNotifications(), 0);
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") void reconcileRecentBrokerNotifications();
     }, BROKER_RECONCILIATION_MS);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialReconciliation);
+      window.clearInterval(interval);
+    };
   }, [reconcileRecentBrokerNotifications, role]);
 
-  const resolveIncoming = useCallback((item: IncomingLead, _reason: "open" | "dismiss") => {
+  const resolveIncoming = useCallback((item: IncomingLead) => {
     setIncomingLeads((state) => resolveIncomingLead(state, item.notificationId));
     void fetch("/api/internal/mark-read", {
       method: "POST",

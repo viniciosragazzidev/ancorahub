@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+
+import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 
 interface NotificationCountContextValue {
   unreadCount: number;
@@ -25,9 +26,6 @@ export function NotificationCountProvider({
   userId: string;
 }) {
   const [unreadCount, setUnreadCount] = useState(0);
-  const userIdRef = useRef(userId);
-  userIdRef.current = userId;
-
   const fetchCount = useCallback(async () => {
     try {
       const res = await fetch("/api/internal/unread-count", { cache: "no-store" });
@@ -41,16 +39,16 @@ export function NotificationCountProvider({
     }
   }, []);
 
-  // Fetch initial count & set fallback polling interval
+  // The server Broadcast signal is the primary update path. The slower fallback
+  // covers a missed WebSocket frame without creating a constant request stream.
   useEffect(() => {
-    void fetchCount();
+    const initialFetch = window.setTimeout(() => void fetchCount(), 0);
 
-    // Poll every 30 seconds as fallback in case Supabase Realtime WebSocket drops
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         void fetchCount();
       }
-    }, 30_000);
+    }, 120_000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -61,57 +59,21 @@ export function NotificationCountProvider({
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      window.clearTimeout(initialFetch);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [fetchCount]);
 
-  // Subscribe to real-time changes via Supabase
   useEffect(() => {
-    const currentUserId = userIdRef.current;
-    const supabase = createClient();
-    const channelName = `notification-count:${currentUserId}`;
-
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `recipient_user_id=eq.${currentUserId}`,
-        },
-        () => {
-          setUnreadCount((prev) => prev + 1);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "notifications",
-          filter: `recipient_user_id=eq.${currentUserId}`,
-        },
-        (payload) => {
-          const oldRow = payload.old as { read_at?: string | null } | null;
-          const newRow = payload.new as { read_at?: string | null } | null;
-          if (oldRow && newRow && !oldRow.read_at && newRow.read_at) {
-            setUnreadCount((prev) => Math.max(0, prev - 1));
-          }
-        },
-      )
-      .subscribe((status, error) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.warn("Realtime WebSocket desconectado. Ativando fallback via polling.", error);
-          void fetchCount();
-        }
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
+    const onRealtimeSync = (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
+      if (detail?.kind === "notification.created" || detail?.kind === "notification.read") {
+        void fetchCount();
+      }
     };
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtimeSync);
+    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtimeSync);
   }, [fetchCount]);
 
   return (

@@ -92,6 +92,14 @@ mas novas features não devem adicionar `router.refresh()` como única estratég
 Cada migração de domínio precisa trocar a atualização manual pelo adaptador local
 first e adicionar teste de sucesso, rollback, permissão e reconexão.
 
+## Realtime sem replicar dados do tenant
+
+O Realtime do navegador deve transportar somente invalidações mínimas e sem dados
+pessoais. O servidor deriva o tópico a partir da identidade autenticada e o cliente
+reconsulta os dados por uma rota já autorizada. Assinaturas diretas a tabelas exigem
+uma sessão Supabase com RLS comprovada e não podem ser usadas como atalho para a
+sessão do CRM.
+
 ## Definition of Done
 
 - [ ] Feedback otimista aparece antes do retorno HTTP.
