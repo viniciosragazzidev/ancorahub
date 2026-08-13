@@ -91,9 +91,9 @@ const navSections: SidebarSection[] = [
   {
     label: "Gestão",
     items: [
-      { label: "Equipe da Unidade", icon: Users, url: "/equipe", permission: "convidar_corretor" },
-      { label: "Metas & Desempenho", icon: Target, url: "/metas", permission: "gerenciar_metas" },
-      { label: "Relatórios da Unidade", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
+      { label: "Equipe", icon: Users, url: "/equipe", permission: "convidar_corretor" },
+      { label: "Metas", icon: Target, url: "/metas", permission: "gerenciar_metas" },
+      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
       { label: "Financeiro & Comissões", icon: CurrencyCircleDollar, url: "/financeiro", permission: "acessar_financeiro" },
     ],
   },
@@ -112,12 +112,31 @@ const navSections: SidebarSection[] = [
     items: [
       { label: "Marketing Meta", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
       { label: "Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
-      { label: "Minha Unidade", icon: Buildings, url: "/filiais", permission: "acessar_configuracoes_unidade" },
+      { label: "Unidades", icon: Buildings, url: "/filiais", permission: "acessar_configuracoes_unidade" },
       { label: "Parâmetros", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
       { label: "Guia do Sistema", icon: BookOpen, url: "/guia", permission: "acessar_guia" },
     ],
   },
 ];
+
+function getItemLabel(item: SidebarItem, roleKey?: UserDisplayInfo["roleKey"] | null): string {
+  if (item.url === "/filiais") {
+    return roleKey === "director" ? "Unidades" : "Minha unidade";
+  }
+  if (item.url === "/equipe") {
+    return roleKey === "manager" ? "Equipe da Unidade" : "Equipe";
+  }
+  if (item.url === "/metas") {
+    return roleKey === "manager" ? "Metas da Unidade" : "Metas";
+  }
+  if (item.url === "/relatorios") {
+    return roleKey === "manager" ? "Relatórios da Unidade" : "Relatórios";
+  }
+  if (item.url === "/financeiro") {
+    return roleKey === "manager" ? "Financeiro da Unidade" : "Financeiro & Comissões";
+  }
+  return item.label;
+}
 
 const marketingHiddenPaths = [
   "/conversas",
@@ -250,8 +269,8 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     pathname === item.url ||
                     (item.url !== "/dashboard" && pathname.startsWith(item.url + "/")) ||
                     (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
+                  const displayLabel = getItemLabel(item, user?.roleKey);
                   const entranceDelay = itemEntranceDelays.get(`${section.label}:${item.label}`) ?? 0;
-
                   const itemTargetUrl = item.url === "/filiais" && user?.roleKey === "manager" && user?.branchId
                     ? `/unidades/${user.branchId}`
                     : item.url;
@@ -272,11 +291,11 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       <SidebarMenuButton
                         isActive={isActive}
                         render={<Link href={itemTargetUrl} onClick={() => isMobile && setOpenMobile(false)} />}
-                        tooltip={item.label}
+                        tooltip={displayLabel}
                         className="relative z-10 h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
                       >
                         <Icon weight={isActive ? "fill" : "regular"} className="size-4 shrink-0 text-primary" />
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{displayLabel}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
