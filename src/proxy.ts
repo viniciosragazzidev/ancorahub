@@ -7,13 +7,21 @@ import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db";
 import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
 
-const protectedPathPrefixes = ["/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos", "/clientes", "/metas", "/relatorios", "/catalogo", "/minha-fila", "/minha-meta", "/notificacoes", "/filiais", "/financeiro", "/configuracoes", "/diretor", "/gestor", "/corretor", "/super-admin", "/checklist", "/materiais-divulgacao", "/marketing"] as const;
+const protectedPathPrefixes = [
+  "/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos",
+  "/clientes", "/metas", "/relatorios", "/catalogo", "/minha-fila", "/minha-meta",
+  "/notificacoes", "/filiais", "/financeiro", "/configuracoes", "/diretor", "/gestor",
+  "/corretor", "/super-admin", "/checklist", "/materiais-divulgacao", "/marketing",
+  "/conversas", "/qualificacao", "/automacoes", "/inteligencia", "/integrations",
+  "/vendas", "/cotacao", "/empresas", "/tarefas", "/agentes-ia", "/assistente",
+  "/noc", "/guia", "/propostas", "/ferramentas-vendas"
+] as const;
 const publicPaths = ["/compartilhado", "/api/public", "/health"] as const;
 const authPaths = ["/login", "/verify", "/admin/login"] as const;
 
 type SessionLookup = { userId: string; role: string | null; onboardingStatus: string | null } | null;
 const sessionCache = new Map<string, { expiresAt: number; value: SessionLookup }>();
-const SESSION_CACHE_TTL_MS = 5_000;
+const SESSION_CACHE_TTL_MS = 60_000;
 
 async function lookupSession(token: string): Promise<SessionLookup> {
   const cached = sessionCache.get(token);
@@ -80,7 +88,7 @@ async function getSafeSupabaseResponse(request: NextRequest) {
     return await Promise.race([
       updateSession(request),
       new Promise<NextResponse>((resolve) => {
-        timer = setTimeout(() => resolve(fallback), 1_500);
+        timer = setTimeout(() => resolve(fallback), 500);
       }),
     ]);
   } catch {
