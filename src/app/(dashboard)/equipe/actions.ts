@@ -28,7 +28,7 @@ type PendingInvite = {
 
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
-const memberRole = z.enum(["manager", "supervisor", "broker"]);
+const memberRole = z.enum(["director", "manager", "supervisor", "broker"]);
 const memberJobTitle = z.enum(schema.teamJobTitleValues);
 
 const updateMemberInput = z.object({
@@ -585,7 +585,7 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
         invitation.branchId,
         invitation.brokerProfileId,
         invitation.email,
-        invitation.role as "manager" | "broker",
+        invitation.role as "director" | "manager" | "supervisor" | "broker",
         invitation.jobTitle,
       );
       // Re-enfileirar envio WhatsApp
@@ -608,7 +608,7 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
           recipientId: newInvite.id,
           destinationPhone: newInvite.phone,
           purpose: "brokerInvitation",
-          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "manager" ? "Gestor" : "Corretor"],
+          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "director" ? "Diretor" : invitation.role === "manager" ? "Gestor" : "Corretor"],
           requestedBy: context.userId,
           idempotencyKey: `team-invitation:${newInvite.id}`,
         });

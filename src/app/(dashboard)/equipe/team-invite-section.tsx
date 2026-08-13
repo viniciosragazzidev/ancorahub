@@ -12,9 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTeamUserAction, importBrokersAction } from "./actions";
 
-type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean };
+type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean; canInviteDirector?: boolean };
 
 const jobTitles = [
+  { value: "director", label: "Diretor" },
   { value: "manager", label: "Gestor" },
   { value: "broker", label: "Corretor" },
   { value: "marketing", label: "Marketing" },
@@ -23,7 +24,7 @@ const jobTitles = [
   { value: "support", label: "Suporte" },
 ] as const;
 
-export function TeamInviteSection({ branches, canInviteManager }: Props) {
+export function TeamInviteSection({ branches, canInviteManager, canInviteDirector }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [createdLink, setCreatedLink] = useState<string | null>(null);
@@ -31,7 +32,7 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
   const [whatsappStatus, setWhatsappStatus] = useState<"queued" | "not_available" | "failed" | "sent" | null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
   const [jobTitle, setJobTitle] = useState("broker");
-  const [role, setRole] = useState(canInviteManager ? "manager" : "broker");
+  const [role, setRole] = useState(canInviteDirector ? "director" : canInviteManager ? "manager" : "broker");
   const formRef = useRef<HTMLFormElement>(null);
   const csvFormRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
@@ -175,11 +176,16 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
                   <Select name="jobTitle" value={jobTitle} onValueChange={(val) => {
                     if (!val) return;
                     setJobTitle(val);
-                    if (val === "manager") setRole("manager");
-                    if (val !== "manager") setRole("broker");
+                    if (val === "director") setRole("director");
+                    else if (val === "manager") setRole("manager");
+                    else setRole("broker");
                   }} disabled={pending} labels={Object.fromEntries(jobTitles.map((t) => [t.value, t.label]))}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cargo" /></SelectTrigger>
-                    <SelectContent>{jobTitles.filter((item) => canInviteManager || item.value !== "manager").map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                      {jobTitles
+                        .filter((item) => (item.value === "director" ? canInviteDirector : canInviteManager || item.value !== "manager"))
+                        .map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </Field>
                 <Field>
@@ -187,12 +193,14 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
                   <Select name="role" value={role} onValueChange={(val) => {
                     if (!val) return;
                     setRole(val);
-                    if (val === "manager") setJobTitle("manager");
-                  }} disabled={pending || jobTitle === "broker" || jobTitle === "manager"} labels={{ manager: "Gestão da unidade", broker: "Operação individual" }}>
+                    if (val === "director") setJobTitle("director");
+                    else if (val === "manager") setJobTitle("manager");
+                  }} disabled={pending || jobTitle === "broker" || jobTitle === "manager" || jobTitle === "director"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o perfil" /></SelectTrigger>
                     <SelectContent>
-                      {canInviteManager && jobTitle !== "broker" ? <SelectItem value="manager">Gestão da unidade</SelectItem> : null}
-                      {jobTitle !== "manager" ? <SelectItem value="broker">Operação individual</SelectItem> : null}
+                      {canInviteDirector ? <SelectItem value="director">Acesso Global (Direção)</SelectItem> : null}
+                      {canInviteManager && jobTitle !== "broker" && jobTitle !== "director" ? <SelectItem value="manager">Gestão da unidade</SelectItem> : null}
+                      {jobTitle !== "manager" && jobTitle !== "director" ? <SelectItem value="broker">Operação individual</SelectItem> : null}
                     </SelectContent>
                   </Select>
                 </Field>

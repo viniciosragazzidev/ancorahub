@@ -20,7 +20,7 @@ const createUserInput = z.object({
   // accidentally send the title (e.g. "marketing") as role; normalize that
   // value server-side so only the two supported access profiles reach the
   // permission guard. A manager request still goes through requireCanCreateRole.
-  role: z.preprocess((value) => value === "manager" ? "manager" : value === "supervisor" ? "supervisor" : "broker", z.enum(["manager", "supervisor", "broker"])),
+  role: z.preprocess((value) => value === "director" ? "director" : value === "manager" ? "manager" : value === "supervisor" ? "supervisor" : "broker", z.enum(["director", "manager", "supervisor", "broker"])),
   jobTitle: z.enum(["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"]).default("broker"),
   branchId: z.string().uuid(),
 });
@@ -141,7 +141,7 @@ export async function createTeamUser(rawInput: unknown) {
     )).limit(1);
     if (channel) {
       const company = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
-      const roleLabel = input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
+      const roleLabel = input.jobTitle === "director" || input.role === "director" ? "Diretor" : input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
       const queued = await enqueueMetaTemplateMessage({
         tenantId: context.tenantId,
         recipientType: "user",

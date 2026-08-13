@@ -34,14 +34,15 @@ export default async function CreateTeamMemberPage() {
             <CardTitle>Novo Funcionário</CardTitle>
             <CardDescription>
               {context.role === "director"
-                ? "Voce pode criar Gestores e Corretores."
-                : "Voce pode criar apenas Corretores."}
+                ? "Você pode criar Diretores, Gestores e Corretores."
+                : "Você pode criar apenas Corretores."}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <TeamInviteSection
               branches={branches}
               canInviteManager={context.role === "director"}
+              canInviteDirector={context.role === "director"}
             />
           </CardContent>
         </Card>

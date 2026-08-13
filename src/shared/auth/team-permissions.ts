@@ -4,12 +4,12 @@ import { AuthorizationError } from "./errors";
 import type { TenantContext } from "./types";
 import type { TenantRole } from "@/shared/db/schema";
 
-export const creatableTeamRoles = ["manager", "supervisor", "broker"] as const;
+export const creatableTeamRoles = ["director", "manager", "supervisor", "broker"] as const;
 export type CreatableTeamRole = (typeof creatableTeamRoles)[number];
 
 export function requireCanCreateRole(context: TenantContext, targetRole: CreatableTeamRole): TenantContext {
   const allowed = context.role === "director"
-    ? targetRole === "manager" || targetRole === "supervisor" || targetRole === "broker"
+    ? targetRole === "director" || targetRole === "manager" || targetRole === "supervisor" || targetRole === "broker"
     : context.role === "manager"
       ? targetRole === "supervisor" || targetRole === "broker"
       : context.role === "supervisor" && targetRole === "broker";

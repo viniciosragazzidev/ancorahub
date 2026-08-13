@@ -158,7 +158,7 @@ export default async function TeamPage() {
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe"
-        rightSlot={<div className="flex items-center gap-2">{context.role === "director" ? <Button render={<Link href="/equipe/cargos" />} variant="outline">Cargos e permissões</Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} /></div>}
+        rightSlot={<div className="flex items-center gap-2">{context.role === "director" ? <Button render={<Link href="/equipe/cargos" />} variant="outline">Cargos e permissões</Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} /></div>}
       />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:

@@ -9,13 +9,15 @@ import { AppSelect } from "@/components/ui/select";
 export function TeamInviteForm({
   action,
   branches,
+  canInviteDirector = false,
   canInviteManager,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   branches: { id: string; name: string }[];
+  canInviteDirector?: boolean;
   canInviteManager: boolean;
 }) {
-  const [role, setRole] = useState(canInviteManager ? "manager" : "broker");
+  const [role, setRole] = useState(canInviteDirector ? "director" : canInviteManager ? "manager" : "broker");
   return (
     <form action={action} className="space-y-4">
       <div className="space-y-2">
@@ -37,7 +39,18 @@ export function TeamInviteForm({
       <input name="role" type="hidden" value={role} />
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Papel a convidar</legend>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {canInviteDirector ? (
+            <button
+              aria-pressed={role === "director"}
+              className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+              onClick={() => setRole("director")}
+              type="button"
+            >
+              <span className="block text-xs font-medium">Diretor</span>
+              <span className="text-[10px] text-muted-foreground">Acesso global.</span>
+            </button>
+          ) : null}
           {canInviteManager ? (
             <button
               aria-pressed={role === "manager"}
