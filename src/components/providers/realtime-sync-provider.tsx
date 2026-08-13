@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { createClient } from "@/utils/supabase/client";
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import {
   createIncomingLeadQueueState,
@@ -14,64 +13,52 @@ import {
   resolveIncomingLead,
   type IncomingLead,
 } from "@/components/notifications/incoming-lead-queue";
+import {
+  dispatchRealtimeSyncEvent,
+  type RealtimeSyncBrowserDetail,
+} from "@/components/providers/realtime-events";
+import { createClient } from "@/utils/supabase/client";
 
 interface RealtimeSyncProviderProps {
   children: React.ReactNode;
   tenantId: string;
   userId: string;
   role: string;
-  branchId: string | null;
+  syncTopic: string | null;
 }
 
-interface LeadRow {
-  id: string;
-  tenant_id: string;
-  branch_id: string | null;
-  corretor_id: string | null;
-  nome: string;
-  status: string;
-}
-
-interface NotificationRow {
-  id: string;
-  tenant_id: string;
-  recipient_user_id: string;
-  lead_id: string | null;
-  type: string;
-  title: string;
-  message: string;
-  created_at?: string;
-}
+type RecentNotification = {
+  id?: string;
+  title?: string;
+  message?: string;
+  type?: string;
+  readAt?: string | null;
+  createdAt?: string;
+  leadId?: string | null;
+};
 
 const LEADS_REVISION_KEY = "ancorahub:leads-revision";
 const LIVE_REFRESH_DELAY_MS = 160;
+const BROKER_RECONCILIATION_MS = 60_000;
 
-export function RealtimeSyncProvider({ children, tenantId, userId, role, branchId }: RealtimeSyncProviderProps) {
+export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const playSoundRef = useRef<((cue: any) => void) | null>(null);
-  const seenLeadIdsRef = useRef<Set<string>>(new Set());
-  const broadcastRef = useRef<BroadcastChannel | null>(null);
+  const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
   const refreshPendingRef = useRef(false);
+  const shellStartedAtRef = useRef(Date.now());
   const [isOnline, setIsOnline] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
-  const shellStartedAtRef = useRef(Date.now());
 
-  /** Se o usuário está digitando em um campo de formulário, pula o refresh */
   const isFormElementFocused = useCallback(() => {
-    const el = document.activeElement;
-    if (!el) return false;
-    const tag = el.tagName.toLowerCase();
-    return (
-      tag === "input" ||
-      tag === "textarea" ||
-      tag === "select" ||
-      (el as HTMLElement)?.isContentEditable ||
-      el.getAttribute("role") === "textbox" ||
-      el.closest('[role="dialog"]') !== null
-    );
+    const element = document.activeElement;
+    if (!element) return false;
+    const tag = element.tagName.toLowerCase();
+    return tag === "input" || tag === "textarea" || tag === "select" ||
+      (element as HTMLElement).isContentEditable || element.getAttribute("role") === "textbox" ||
+      element.closest('[role="dialog"]') !== null;
   }, []);
 
   const scheduleServerRefresh = useCallback(() => {
@@ -79,240 +66,153 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, branchI
       refreshPendingRef.current = true;
       return;
     }
-
     refreshPendingRef.current = false;
     if (refreshTimerRef.current !== null) return;
-
     refreshTimerRef.current = window.setTimeout(() => {
       refreshTimerRef.current = null;
       router.refresh();
     }, LIVE_REFRESH_DELAY_MS);
   }, [isFormElementFocused, router]);
 
-  const recordLeadRevision = useCallback((reason: string) => {
-    if (!reason.startsWith("lead.") && !reason.startsWith("notification.lead_assigned")) return;
+  const syncClientState = useCallback((detail: RealtimeSyncBrowserDetail, broadcast = true) => {
+    void queryClient.invalidateQueries({ queryKey: ["local-first", tenantId, userId] });
+    setLastSyncedAt(Date.now());
     try {
       window.sessionStorage.setItem(LEADS_REVISION_KEY, String(Date.now()));
     } catch {
-      // Storage can be unavailable in private browser contexts. The immediate
-      // route refresh remains sufficient for the currently open workspace.
+      // The immediate refresh remains sufficient when browser storage is unavailable.
     }
-  }, []);
-
-  const syncClientState = useCallback((reason: string, broadcast = true) => {
-    void queryClient.invalidateQueries({ queryKey: ["local-first", tenantId, userId] });
-    setLastSyncedAt(Date.now());
-    recordLeadRevision(reason);
+    dispatchRealtimeSyncEvent(detail);
     scheduleServerRefresh();
-    if (broadcast) broadcastRef.current?.postMessage({ type: "local-first.invalidate", reason });
-  }, [queryClient, recordLeadRevision, scheduleServerRefresh, tenantId, userId]);
+    if (broadcast) localBroadcastRef.current?.postMessage({ type: "local-first.invalidate", detail });
+  }, [queryClient, scheduleServerRefresh, tenantId, userId]);
+
+  const reconcileRecentBrokerNotifications = useCallback(async (notificationId?: string) => {
+    if (role !== "broker") return;
+    try {
+      const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json() as { notifications?: RecentNotification[] };
+      const graceWindowStart = shellStartedAtRef.current - 30_000;
+
+      for (const notification of payload.notifications ?? []) {
+        const createdAt = notification.createdAt ? Date.parse(notification.createdAt) : NaN;
+        if (!notification.id || !notification.leadId || notification.readAt || !Number.isFinite(createdAt)) continue;
+        if (notificationId ? notification.id !== notificationId : createdAt < graceWindowStart) continue;
+        if (!isAssignedLeadNotification({
+          tenant_id: tenantId,
+          recipient_user_id: userId,
+          type: notification.type,
+          lead_id: notification.leadId,
+        }, tenantId, userId)) continue;
+        const resolvedNotificationId = notification.id;
+        const resolvedLeadId = notification.leadId;
+        setIncomingLeads((state) => enqueueIncomingLead(state, {
+          notificationId: resolvedNotificationId!,
+          leadId: resolvedLeadId!,
+          title: notification.title ?? "Novo lead atribuído",
+          message: notification.message ?? "Você recebeu um novo lead para atender.",
+          createdAt: notification.createdAt ?? new Date().toISOString(),
+        }));
+      }
+    } catch {
+      // The next authenticated reconciliation retries without exposing data to Realtime.
+    }
+  }, [role, tenantId, userId]);
+
+  const handleRemoteSignal = useCallback((detail: RealtimeSyncBrowserDetail) => {
+    syncClientState(detail);
+    if (detail.kind === "notification.created") {
+      void reconcileRecentBrokerNotifications(detail.notificationId);
+    }
+  }, [reconcileRecentBrokerNotifications, syncClientState]);
 
   useEffect(() => {
     const resumePendingRefresh = () => {
       if (refreshPendingRef.current) scheduleServerRefresh();
     };
-    const handleFocusOut = () => window.setTimeout(resumePendingRefresh, 0);
-
+    const onFocusOut = () => window.setTimeout(resumePendingRefresh, 0);
     window.addEventListener("focus", resumePendingRefresh);
-    window.addEventListener("focusout", handleFocusOut);
+    window.addEventListener("focusout", onFocusOut);
     document.addEventListener("visibilitychange", resumePendingRefresh);
     return () => {
       window.removeEventListener("focus", resumePendingRefresh);
-      window.removeEventListener("focusout", handleFocusOut);
+      window.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("visibilitychange", resumePendingRefresh);
       if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
     };
   }, [scheduleServerRefresh]);
 
   useEffect(() => {
-    if (typeof BroadcastChannel === "undefined") return;
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    setIsOnline(navigator.onLine);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
     const channel = new BroadcastChannel(`ancorahub:local-first:${tenantId}:${userId}`);
-    broadcastRef.current = channel;
-    channel.onmessage = (event: MessageEvent<{ type?: string; reason?: string }>) => {
-      if (event.data?.type === "local-first.invalidate" && event.data.reason) {
-        syncClientState(event.data.reason, false);
+    localBroadcastRef.current = channel;
+    channel.onmessage = (event: MessageEvent<{ type?: string; detail?: RealtimeSyncBrowserDetail }>) => {
+      if (event.data?.type === "local-first.invalidate" && event.data.detail) {
+        syncClientState(event.data.detail, false);
       }
     };
-
     return () => {
-      if (broadcastRef.current === channel) broadcastRef.current = null;
+      if (localBroadcastRef.current === channel) localBroadcastRef.current = null;
       channel.close();
     };
   }, [syncClientState, tenantId, userId]);
 
   useEffect(() => {
-    // Only track online status change without triggering full page refresh
-    const handleOnline = () => { setIsOnline(true); };
-    const handleOffline = () => setIsOnline(false);
-    setIsOnline(navigator.onLine);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  const notifyNewLead = useCallback((lead: LeadRow) => {
-    const isAssignedToMe = lead.corretor_id === userId;
-    const isInMyBranch = lead.branch_id === branchId;
-    const isUnassigned = !lead.corretor_id;
-    const hasNoBranch = !lead.branch_id;
-    const canNotify = isAssignedToMe || isUnassigned || hasNoBranch || role === "director" || (role === "manager" && isInMyBranch);
-    if (!canNotify) return;
-    // The assignment notification is the authoritative visual for brokers.
-    // Skip this raw lead-row toast to avoid two alerts for the same lead.
-    if (role === "broker" && isAssignedToMe) return;
-    playSoundRef.current?.("success");
-    const description = isAssignedToMe
-      ? `O lead "${lead.nome}" foi distribuído para você.`
-      : isUnassigned && hasNoBranch
-        ? `"${lead.nome}" chegou sem filial e está aguardando distribuição.`
-        : isUnassigned
-          ? `"${lead.nome}" chegou na sua unidade e está aguardando distribuição.`
-          : `Novo lead "${lead.nome}" foi adicionado.`;
-    toast.success("Novo lead recebido!", {
-      description,
-      action: { label: "Abrir", onClick: () => router.push(`/leads/${lead.id}`) },
-      duration: 10_000,
-    });
-  }, [userId, branchId, role, router]);
-
-  const resolveIncoming = useCallback((item: IncomingLead, reason: "open" | "dismiss") => {
-    setIncomingLeads((state) => resolveIncomingLead(state, item.notificationId));
-    void fetch("/api/internal/mark-read", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notificationId: item.notificationId }),
-    }).catch(() => undefined);
-    void reason;
-  }, []);
-
-  useEffect(() => {
+    if (!syncTopic) return;
     const supabase = createClient();
     const channel = supabase
-      .channel(`public:tenant:${tenantId}:user:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "leads", filter: `tenant_id=eq.${tenantId}` }, (payload) => {
-        const newRow = payload.new as LeadRow | null;
-        const oldRow = payload.old as Partial<LeadRow> | null;
-        if (payload.eventType === "INSERT" && newRow) {
-          if (!seenLeadIdsRef.current.has(newRow.id)) {
-            seenLeadIdsRef.current.add(newRow.id);
-            notifyNewLead(newRow);
-          }
-          syncClientState("lead.insert");
-        }
-        if (payload.eventType === "UPDATE" && newRow && (role === "director" || (role === "manager" && (newRow.branch_id === branchId || oldRow?.branch_id === branchId)) || (role === "broker" && (newRow.corretor_id === userId || oldRow?.corretor_id === userId || newRow.branch_id === branchId || oldRow?.branch_id === branchId)))) syncClientState("lead.update");
-        if (payload.eventType === "DELETE" && oldRow && (role === "director" || (role === "manager" && oldRow.branch_id === branchId) || (role === "broker" && (oldRow.corretor_id === userId || oldRow.branch_id === branchId)))) syncClientState("lead.delete");
+      .channel(syncTopic, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "refresh" }, (payload) => {
+        const signal = payload.payload as Partial<RealtimeSyncBrowserDetail>;
+        if (!signal.notificationId || (signal.kind !== "notification.created" && signal.kind !== "notification.read")) return;
+        setIsOnline(true);
+        handleRemoteSignal({ kind: signal.kind, notificationId: signal.notificationId });
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `recipient_user_id=eq.${userId}` }, (payload) => {
-        const notification = payload.new as NotificationRow | null;
-        if (!notification || notification.tenant_id !== tenantId) return;
-        if (role === "broker" && isAssignedLeadNotification(notification, tenantId, userId)) {
-          const item: IncomingLead = {
-            notificationId: notification.id,
-            leadId: notification.lead_id,
-            title: notification.title,
-            message: notification.message,
-            createdAt: notification.created_at ?? new Date().toISOString(),
-          };
-          setIncomingLeads((state) => enqueueIncomingLead(state, item));
-          playSoundRef.current?.("success");
-          syncClientState("notification.lead_assigned");
-          return;
-        }
-        playSoundRef.current?.("success");
-        toast.success(notification.title, { description: notification.message, action: notification.lead_id ? { label: "Abrir", onClick: () => router.push(`/leads/${notification.lead_id}`) } : undefined });
-        syncClientState("notification.insert");
-      })
-      // Server components are refreshed as a fallback even when a screen has
-      // no React Query hook yet. This keeps every tenant-scoped surface live.
-      .on("postgres_changes", { event: "*", schema: "public", table: "lead_documents", filter: `tenant_id=eq.${tenantId}` }, () => syncClientState("documents"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "lead_tasks", filter: `tenant_id=eq.${tenantId}` }, () => syncClientState("tasks"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "clients", filter: `tenant_id=eq.${tenantId}` }, () => syncClientState("clients"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "sales", filter: `tenant_id=eq.${tenantId}` }, () => syncClientState("sales"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "tenant_memberships", filter: `tenant_id=eq.${tenantId}` }, () => syncClientState("team"))
-      .subscribe((status, error) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setIsOnline(false);
-          console.error("Falha ao assinar atualizações em tempo real.", error);
-        }
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setIsOnline(false);
         if (status === "SUBSCRIBED") {
           setIsOnline(true);
           setLastSyncedAt(Date.now());
         }
       });
     return () => { void supabase.removeChannel(channel); };
-  }, [tenantId, userId, role, branchId, router, notifyNewLead, syncClientState]);
+  }, [handleRemoteSignal, syncTopic]);
 
-  // Reconcile recent assignment notifications as a fallback for browsers that
-  // miss a Supabase Realtime frame while the push still arrives successfully.
   useEffect(() => {
     if (role !== "broker") return;
-    let cancelled = false;
+    void reconcileRecentBrokerNotifications();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void reconcileRecentBrokerNotifications();
+    }, BROKER_RECONCILIATION_MS);
+    return () => window.clearInterval(interval);
+  }, [reconcileRecentBrokerNotifications, role]);
 
-    const reconcile = async () => {
-      try {
-        const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
-        if (!response.ok) return;
-        const payload = await response.json() as {
-          notifications?: Array<{
-            id?: string;
-            title?: string;
-            message?: string;
-            type?: string;
-            readAt?: string | null;
-            createdAt?: string;
-            leadId?: string | null;
-          }>;
-        };
-        if (cancelled) return;
-
-        const graceWindowStart = shellStartedAtRef.current - 30_000;
-        let recoveredAssignment = false;
-        for (const notification of payload.notifications ?? []) {
-          const createdAt = notification.createdAt ? Date.parse(notification.createdAt) : NaN;
-          if (!notification.id || !notification.leadId || notification.readAt || !Number.isFinite(createdAt) || createdAt < graceWindowStart) continue;
-          if (!isAssignedLeadNotification({
-            tenant_id: tenantId,
-            recipient_user_id: userId,
-            type: notification.type,
-            lead_id: notification.leadId,
-          }, tenantId, userId)) continue;
-          setIncomingLeads((state) => enqueueIncomingLead(state, {
-            notificationId: notification.id!,
-            leadId: notification.leadId!,
-            title: notification.title ?? "Novo lead atribuído",
-            message: notification.message ?? "Você recebeu um novo lead para atender.",
-            createdAt: notification.createdAt!,
-          }));
-          recoveredAssignment = true;
-        }
-        if (recoveredAssignment) syncClientState("notification.lead_assigned.reconciled");
-      } catch {
-        // Realtime remains the primary path; polling is best-effort recovery.
-      }
-    };
-
-    void reconcile();
-    const interval = window.setInterval(() => void reconcile(), 4_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [role, syncClientState, tenantId, userId]);
+  const resolveIncoming = useCallback((item: IncomingLead, _reason: "open" | "dismiss") => {
+    setIncomingLeads((state) => resolveIncomingLead(state, item.notificationId));
+    void fetch("/api/internal/mark-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: item.notificationId }),
+    }).catch(() => undefined);
+  }, []);
 
   return (
     <>
-      {role === "broker" ? (
-        <IncomingLeadCard
-          item={incomingLeads.queue[0] ?? null}
-          queuedCount={Math.max(0, incomingLeads.queue.length - 1)}
-          onResolve={resolveIncoming}
-        />
-      ) : null}
-      {!isOnline ? <div role="status" className="fixed inset-x-0 bottom-3 z-[70] mx-auto w-fit rounded-full border border-warning/30 bg-card px-3 py-1.5 text-xs text-warning shadow-lg">Conexão perdida · as alterações serão sincronizadas assim que voltar</div> : null}
+      {role === "broker" ? <IncomingLeadCard item={incomingLeads.queue[0] ?? null} queuedCount={Math.max(0, incomingLeads.queue.length - 1)} onResolve={resolveIncoming} /> : null}
+      {!isOnline ? <div role="status" className="fixed inset-x-0 bottom-3 z-[70] mx-auto w-fit rounded-full border border-warning/30 bg-card px-3 py-1.5 text-xs text-warning shadow-lg">Conexão de atualização indisponível · os dados serão reconciliados ao retornar</div> : null}
       <div data-local-first-sync={lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined}>{children}</div>
     </>
   );

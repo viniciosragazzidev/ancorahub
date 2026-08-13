@@ -9,15 +9,15 @@ import { WorkflowAutomationStudio } from "@/features/workflow-automation/compone
 import { getWorkflowAutomations } from "@/features/workflow-automation/queries";
 
 export const metadata = {
-  title: "Automacoes - CRM Âncora Corretora",
-  description: "Gerenciamento de regras de automacao e disparos do CRM",
+  title: "Automações - CRM Âncora Corretora",
+  description: "Gerenciamento de regras de automação e disparos do CRM",
 };
 
 export default async function AutomacoesPage() {
   const context = await getRequiredTenantContext();
 
-  // Protect page: Only director can manage automations
-  if (context.role !== "director") {
+  // Protect page: Director and Manager can access automations
+  if (context.role !== "director" && context.role !== "manager") {
     redirect("/access-denied");
   }
 
@@ -30,19 +30,17 @@ export default async function AutomacoesPage() {
 
   return (
     <>
-      <DashboardHeader breadcrumb="Automação" title="Automações" />
-      <main className="h-[calc(100dvh-var(--header-height,3.5rem))] max-h-[100vh] w-full flex-1 overflow-hidden bg-background p-0">
-        <div className="h-full w-full overflow-hidden bg-card flex flex-col min-h-0">
-          <WorkflowAutomationStudio initialWorkflows={workflows} />
-          <details className="border-t border-border bg-card shrink-0">
-            <summary className="cursor-pointer px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
-              Automações anteriores e histórico de envios
-            </summary>
-            <div className="max-h-60 overflow-y-auto p-4 border-t border-border/60">
-              <AutomationsClient initialAutomations={automations} initialLogs={logs} isAdmin={true} />
-            </div>
-          </details>
-        </div>
+      <DashboardHeader
+        breadcrumb="Automações"
+        title="Estúdio de Automação & Triggers"
+      />
+      <main className="flex-1 space-y-6 p-4 lg:p-6">
+        <WorkflowAutomationStudio initialWorkflows={workflows} />
+        <AutomationsClient
+          initialAutomations={automations}
+          initialLogs={logs}
+          isAdmin={context.role === "director" || context.role === "manager"}
+        />
       </main>
     </>
   );

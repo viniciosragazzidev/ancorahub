@@ -7,7 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export default async function DirectorPerformancePage() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") redirect("/access-denied");
+  if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const enabled = await isPerformanceRankingEnabled();
   if (!enabled) return <>
     <DashboardHeader breadcrumb="Gestão comercial / Metas" title="Temporadas e ranking" />

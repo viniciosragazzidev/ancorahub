@@ -8,6 +8,9 @@ import { getDatabase, schema } from "@/shared/db";
 
 export default async function BranchesPage() {
   const context = await getRequiredTenantContext();
+  if (context.role === "manager" && context.branchId) {
+    redirect(`/unidades/${context.branchId}`);
+  }
   if (context.role !== "director") redirect("/access-denied");
 
   const db = getDatabase();

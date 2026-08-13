@@ -28,6 +28,7 @@ export type UserDisplayInfo = {
   role: string | null;
   roleKey: TenantRole | null;
   jobTitle: string | null;
+  branchId?: string | null;
   permissions?: PermissionKey[];
   redirectLogout: string;
   isPlatformAdmin?: boolean;
@@ -105,7 +106,14 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
   const isPlatformAdmin = !!dbUser?.isPlatformAdmin;
 
   const [membership] = await getDatabase()
-    .select({ tenantId: schema.tenantMemberships.tenantId, role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle, customRoleId: schema.tenantMemberships.customRoleId, customRoleName: schema.customRoles.name })
+    .select({
+      tenantId: schema.tenantMemberships.tenantId,
+      role: schema.tenantMemberships.role,
+      jobTitle: schema.tenantMemberships.jobTitle,
+      branchId: schema.tenantMemberships.branchId,
+      customRoleId: schema.tenantMemberships.customRoleId,
+      customRoleName: schema.customRoles.name,
+    })
     .from(schema.tenantMemberships)
     .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
     .where(eq(schema.tenantMemberships.userId, session.user.id))
@@ -144,6 +152,7 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
     role: displayRoleLabel,
     roleKey: role,
     jobTitle,
+    branchId: membership?.branchId ?? null,
     permissions,
     redirectLogout,
     isPlatformAdmin,

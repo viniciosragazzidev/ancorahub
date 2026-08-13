@@ -76,23 +76,25 @@ const navSections: SidebarSection[] = [
       { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
       { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
       { label: "Cotações", icon: SlidersHorizontal, url: "/cotacao", permission: "acessar_cotacoes" },
+      { label: "Tabelas de Vendas", icon: FileArrowDown, url: "/ferramentas-vendas/tabelas-personalizadas", permission: "acessar_ferramentas_vendas" },
     ],
   },
   {
-    label: "Automação",
+    label: "Automação & IA",
     items: [
       { label: "Inteligência do Tenant", icon: BookOpen, url: "/inteligencia", permission: "acessar_qualificacao_ia" },
       { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
-      { label: "Distribuição de Leads", icon: Redistribute, url: "/leads/distribuicao", permission: "acessar_qualificacao_ia" },
+      { label: "Distribuição & Plantão", icon: Redistribute, url: "/leads/distribuicao", permission: "acessar_qualificacao_ia" },
       { label: "Automações & Regras", icon: Sparkle, url: "/automacoes", permission: "acessar_configuracoes" },
     ],
   },
   {
     label: "Gestão",
     items: [
-      { label: "Equipe", icon: Users, url: "/equipe", permission: "convidar_corretor" },
-      { label: "Metas", icon: Target, url: "/metas", permission: "gerenciar_metas" },
-      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
+      { label: "Equipe da Unidade", icon: Users, url: "/equipe", permission: "convidar_corretor" },
+      { label: "Metas & Desempenho", icon: Target, url: "/metas", permission: "gerenciar_metas" },
+      { label: "Relatórios da Unidade", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
+      { label: "Financeiro & Comissões", icon: CurrencyCircleDollar, url: "/financeiro", permission: "acessar_financeiro" },
     ],
   },
   {
@@ -100,16 +102,17 @@ const navSections: SidebarSection[] = [
     items: [
       { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
       { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
-      { label: "Catálogo Global", icon: FolderSimple, url: "/catalogo", permission: "acessar_catalogo" },
+      { label: "Catálogo de Produtos", icon: FolderSimple, url: "/catalogo", permission: "acessar_catalogo" },
+      { label: "Materiais de Divulgação", icon: BookOpen, url: "/materiais-divulgacao", permission: "acessar_materiais_divulgacao" },
       { label: "NOC & Alertas", icon: Monitor, url: "/noc", permission: "ver_dashboard_equipe" },
     ],
   },
   {
     label: "Administração",
     items: [
-      { label: "Marketing", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
+      { label: "Marketing Meta", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
       { label: "Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
-      { label: "Unidades", icon: Buildings, url: "/filiais", permission: "gerenciar_filiais" },
+      { label: "Minha Unidade", icon: Buildings, url: "/filiais", permission: "acessar_configuracoes_unidade" },
       { label: "Parâmetros", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
       { label: "Guia do Sistema", icon: BookOpen, url: "/guia", permission: "acessar_guia" },
     ],
@@ -249,6 +252,10 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
                   const entranceDelay = itemEntranceDelays.get(`${section.label}:${item.label}`) ?? 0;
 
+                  const itemTargetUrl = item.url === "/filiais" && user?.roleKey === "manager" && user?.branchId
+                    ? `/unidades/${user.branchId}`
+                    : item.url;
+
                   return (
                     <SidebarMenuItem
                       key={item.label}
@@ -264,7 +271,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       )}
                       <SidebarMenuButton
                         isActive={isActive}
-                        render={<Link href={item.url} onClick={() => isMobile && setOpenMobile(false)} />}
+                        render={<Link href={itemTargetUrl} onClick={() => isMobile && setOpenMobile(false)} />}
                         tooltip={item.label}
                         className="relative z-10 h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
                       >

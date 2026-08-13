@@ -13,8 +13,8 @@ export const metadata = {
 export default async function FluxosWhatsappPage() {
   const context = await getRequiredTenantContext();
 
-  // Protect page: Only director can manage flows
-  if (context.role !== "director") {
+  // Protect page: Director and Manager can manage flows
+  if (context.role !== "director" && context.role !== "manager") {
     redirect("/access-denied");
   }
 

@@ -14,7 +14,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export default async function TenantPrivateCatalogPage() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") redirect("/access-denied");
+  if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { enabled, carriers, plans } = await getTenantPrivateCatalogData(context);
 
   return (

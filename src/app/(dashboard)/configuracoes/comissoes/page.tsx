@@ -9,7 +9,7 @@ import { PostSaleSettings } from "@/features/post-sale/components/post-sale-sett
 
 export default async function CommissionRulesPage() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director") redirect("/access-denied");
+  if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
 
   const [rules, carriers, postSaleSettings] = await Promise.all([
     getCommissionRules(),
