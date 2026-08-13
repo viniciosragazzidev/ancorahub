@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { UserPlus } from "@/components/huge-icons";
+import { UserPlus, WhatsappLogo } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [createdLink, setCreatedLink] = useState<string | null>(null);
+  const [createdName, setCreatedName] = useState<string | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState<"queued" | "not_available" | "failed" | "sent" | null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
   const [jobTitle, setJobTitle] = useState("broker");
@@ -36,11 +37,13 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
   const router = useRouter();
 
   function handleSubmit(formData: FormData) {
+    const name = String(formData.get("name") ?? "");
     startTransition(async () => {
       const result = await createTeamUserAction({ success: false }, formData);
       if (result.success) {
         toast.success("Perfil profissional criado com sucesso.");
         setWhatsappStatus(result.whatsappStatus ?? "not_available");
+        setCreatedName(name);
         const origin = typeof window !== "undefined" ? window.location.origin : "";
         if (result.token) {
           setCreatedLink(`${origin}/onboarding?token=${result.token}`);
@@ -86,22 +89,53 @@ export function TeamInviteSection({ branches, canInviteManager }: Props) {
               O perfil profissional foi criado com sucesso. Como não utilizamos senhas padrões, envie o link de ativação exclusivo abaixo para o colaborador:
             </DialogDescription>
             <div className={`rounded-lg border p-3 text-sm ${whatsappStatus === "queued" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
-              {whatsappStatus === "sent" ? "Convite enviado pelo WhatsApp corporativo." : whatsappStatus === "queued" ? "Convite enfileirado para envio pelo WhatsApp corporativo. Se o modelo da Meta não estiver disponível, uma mensagem alternativa com o link será tentada automaticamente." : whatsappStatus === "failed" ? "O convite foi criado, mas não foi possível concluir o envio pelo WhatsApp. Use o link abaixo ou tente novamente depois." : "O WhatsApp corporativo ainda não está disponível. Envie o link abaixo manualmente."}
+              {whatsappStatus === "sent" ? "Convite enviado pelo WhatsApp corporativo." : whatsappStatus === "queued" ? "Convite enfileirado para envio pelo WhatsApp corporativo." : "Envie a mensagem de convite manualmente abaixo."}
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted p-3 text-xs font-mono select-all break-all text-muted-foreground">
-              {createdLink}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Mensagem pronta para WhatsApp:</label>
+              <div className="rounded-lg border border-border bg-muted/60 p-3 text-xs whitespace-pre-wrap select-all font-sans leading-relaxed text-foreground">
+                {`Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`}
+              </div>
             </div>
-            <div className="flex gap-2 pt-2">
+
+            <div className="flex flex-col gap-2 pt-2">
               <Button
-                className="flex-1"
+                className="w-full gap-2"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(createdLink);
-                  toast.success("Link copiado para a área de transferência!");
+                  const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
+                  await navigator.clipboard.writeText(msg);
+                  toast.success("Mensagem completa de convite copiada!");
                 }}
               >
-                Copiar Link
+                <WhatsappLogo className="size-4 text-emerald-500" /> Copiar Mensagem Pronta (WhatsApp)
               </Button>
-              <Button variant="outline" onClick={handleClose}>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 text-xs"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(createdLink);
+                    toast.success("Link direto copiado!");
+                  }}
+                >
+                  Copiar Apenas Link
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  className="flex-1 gap-2 text-xs"
+                  onClick={() => {
+                    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                  }}
+                >
+                  <WhatsappLogo className="size-4" /> Abrir no WhatsApp
+                </Button>
+              </div>
+
+              <Button variant="ghost" className="mt-1" onClick={handleClose}>
                 Fechar
               </Button>
             </div>

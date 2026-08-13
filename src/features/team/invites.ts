@@ -24,7 +24,14 @@ export async function createTeamInvite(rawInput: unknown) {
   const [branch] = await db.select().from(schema.branches).where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"))).limit(1);
   if (!branch) throw new Error("A filial selecionada não pertence ao tenant ativo ou está inativa.");
   const [existing] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.email, input.email)).limit(1);
-  if (existing) throw new Error("Já existe uma identidade com este e-mail.");
+  if (existing) {
+    const [activeMembership] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(eq(schema.tenantMemberships.userId, existing.id)).limit(1);
+    if (activeMembership) {
+      throw new Error("Já existe um membro ativo cadastrado com este e-mail.");
+    }
+    await db.delete(schema.account).where(eq(schema.account.userId, existing.id));
+    await db.delete(schema.user).where(eq(schema.user.id, existing.id));
+  }
   const userId = randomUUID();
   const token = randomBytes(32).toString("hex");
   await db.insert(schema.user).values({ id: userId, name: input.name, email: input.email, emailVerified: false, active: false, status: "pending" });

@@ -451,17 +451,37 @@ export async function deleteTeamMemberAction(
         if (profile) await tx.delete(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id)));
         if (profile) await tx.delete(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, context.tenantId)));
         await tx.delete(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, member.membershipId), eq(schema.tenantMemberships.tenantId, context.tenantId)));
-        // A identidade pode ter histórico/auditoria e até pertencer a outro tenant.
-        // Removemos somente o acesso desta empresa e invalidamos as sessões ativas.
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+
+        const [otherMembership] = await tx
+          .select({ id: schema.tenantMemberships.id })
+          .from(schema.tenantMemberships)
+          .where(eq(schema.tenantMemberships.userId, member.userId))
+          .limit(1);
+
+        if (!otherMembership) {
+          await tx.delete(schema.account).where(eq(schema.account.userId, member.userId));
+          await tx.delete(schema.user).where(eq(schema.user.id, member.userId));
+        }
       });
     } else {
-      const [profile] = await db.select({ id: schema.brokerProfiles.id, branchId: schema.brokerProfiles.branchId, userId: schema.brokerProfiles.userId }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, memberId), eq(schema.brokerProfiles.tenantId, context.tenantId))).limit(1);
+      const [profile] = await db.select({ id: schema.brokerProfiles.id, branchId: schema.brokerProfiles.branchId, userId: schema.brokerProfiles.userId, invitedEmail: schema.brokerProfiles.invitedEmail }).from(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, memberId), eq(schema.brokerProfiles.tenantId, context.tenantId))).limit(1);
       if (!profile) throw new Error("Membro não encontrado.");
       requireCanManageMember(context, { role: "broker", branchId: profile.branchId, userId: profile.userId ?? profile.id });
       await db.transaction(async (tx) => {
         await tx.delete(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id)));
         await tx.delete(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, context.tenantId)));
+        if (profile.userId) {
+          const [otherMembership] = await tx
+            .select({ id: schema.tenantMemberships.id })
+            .from(schema.tenantMemberships)
+            .where(eq(schema.tenantMemberships.userId, profile.userId))
+            .limit(1);
+          if (!otherMembership) {
+            await tx.delete(schema.account).where(eq(schema.account.userId, profile.userId));
+            await tx.delete(schema.user).where(eq(schema.user.id, profile.userId));
+          }
+        }
       });
     }
 
