@@ -1,17 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useState } from "react";
 import { Trash } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { deleteLeadAction } from "../actions";
 
 export function DeleteLeadControl({ leadId, leadName }: { leadId: string; leadName: string }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(deleteLeadAction, {});
-  useEffect(() => { if (state.success) { setOpen(false); router.replace("/leads"); router.refresh(); } }, [router, state.success]);
 
   return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger render={<Button variant="outline" size="sm" className="text-destructive hover:text-destructive"><Trash className="size-4" />Excluir lead</Button>} />

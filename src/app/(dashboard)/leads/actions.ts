@@ -24,7 +24,7 @@ export async function createManualLeadAction(_previous: LeadCreateState, formDat
   redirect(`/leads/${result.leadId}`);
 }
 
-export type LeadDeleteState = { success?: true; error?: string };
+export type LeadDeleteState = { error?: string };
 
 export async function deleteLeadAction(_previous: LeadDeleteState, formData: FormData): Promise<LeadDeleteState> {
   const parsed = z.object({ leadId: z.string().uuid() }).safeParse({ leadId: formData.get("leadId") });
@@ -47,10 +47,14 @@ export async function deleteLeadAction(_previous: LeadDeleteState, formData: For
       return true;
     });
     if (!result) return { error: "Este lead já não está disponível." };
-    revalidatePath("/leads");
-    revalidatePath(`/leads/${parsed.data.leadId}`);
-    return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível excluir o lead." };
   }
+
+  revalidatePath("/leads");
+  // The active route is the lead that has just been soft-deleted. Revalidating
+  // it would render its `notFound()` boundary in the Server Action response,
+  // preventing the dialog from receiving a completed response. A Server Action
+  // redirect carries the fresh list view in that same response instead.
+  redirect("/leads");
 }
