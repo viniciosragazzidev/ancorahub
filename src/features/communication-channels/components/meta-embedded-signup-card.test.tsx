@@ -2,12 +2,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { completeMock, refreshMock } = vi.hoisted(() => ({
+const { completeMock, assignMock } = vi.hoisted(() => ({
   completeMock: vi.fn(),
-  refreshMock: vi.fn(),
+  assignMock: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
 vi.mock("../actions", () => ({ completeMetaEmbeddedSignupAction: completeMock }));
 
 import { MetaEmbeddedSignupCard } from "./meta-embedded-signup-card";
@@ -15,11 +14,16 @@ import { MetaEmbeddedSignupCard } from "./meta-embedded-signup-card";
 afterEach(() => {
   cleanup();
   completeMock.mockReset();
-  refreshMock.mockReset();
+  assignMock.mockReset();
   delete window.FB;
 });
 
 describe("MetaEmbeddedSignupCard", () => {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: { ...window.location, assign: assignMock },
+  });
+
   it("conclui o cadastro quando a Meta envia o resultado FINISH como JSON em postMessage", async () => {
     completeMock.mockResolvedValue({ success: true });
     window.FB = {
@@ -46,6 +50,6 @@ describe("MetaEmbeddedSignupCard", () => {
       phoneNumberId: "987654321098765",
     }));
     expect(await screen.findByText("Número oficial conectado e validado pela Meta.")).toBeInTheDocument();
-    expect(refreshMock).toHaveBeenCalled();
+    expect(assignMock).toHaveBeenCalledWith("/integrations/whatsapp?channel=connected");
   });
 });

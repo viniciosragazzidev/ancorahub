@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { CheckCircle, Warning } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,6 @@ function parseMetaSignupMessage(value: unknown) {
 }
 
 export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: string; configId: string; disabled?: boolean }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const finishRef = useRef<SignupResult | null>(null);
@@ -54,7 +52,7 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
     try {
       await completeMetaEmbeddedSignupAction({ code, businessId: result.businessId, wabaId: result.wabaId, phoneNumberId: result.phoneNumberId });
       setMessage("Número oficial conectado e validado pela Meta.");
-      router.refresh();
+       window.location.assign("/integrations/whatsapp?channel=connected");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível concluir a conexão. Revise a conta e tente novamente.");
     } finally {
