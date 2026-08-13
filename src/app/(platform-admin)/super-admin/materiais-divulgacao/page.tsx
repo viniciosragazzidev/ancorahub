@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listAllMaterialsGlobally } from "@/features/promotional-materials/queries-global";
+import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 
 const CATEGORY_LABELS: Record<string, string> = {
   todos: "Todos",
@@ -15,17 +16,37 @@ const CATEGORY_LABELS: Record<string, string> = {
   materiais_divulgacao: "Materiais de Divulgação",
 };
 
-export default async function SuperAdminMaterialsPage() {
-  const materials = await listAllMaterialsGlobally();
+function formatDate(val: unknown): string {
+  if (!val) return "—";
+  try {
+    const d = new Date(val as Date | string | number);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("pt-BR");
+  } catch {
+    return "—";
+  }
+}
 
-  const tenantGroups = materials.reduce(
+export default async function SuperAdminMaterialsPage() {
+  await getRequiredPlatformAdmin();
+
+  let materials: Awaited<ReturnType<typeof listAllMaterialsGlobally>> = [];
+  try {
+    materials = await listAllMaterialsGlobally();
+  } catch (err) {
+    console.error("[super-admin-materials] Erro ao buscar materiais globais:", err);
+  }
+
+  const safeMaterials = Array.isArray(materials) ? materials : [];
+
+  const tenantGroups = safeMaterials.reduce(
     (acc, m) => {
-      const key = m.tenantId ?? "unknown";
-      if (!acc[key]) acc[key] = { name: m.tenantName ?? "Desconhecido", items: [] };
+      const key = m?.tenantId ?? "unknown";
+      if (!acc[key]) acc[key] = { name: m?.tenantName ?? "Desconhecido", items: [] };
       acc[key].items.push(m);
       return acc;
     },
-    {} as Record<string, { name: string; items: typeof materials }>,
+    {} as Record<string, { name: string; items: typeof safeMaterials }>,
   );
 
   return (
@@ -44,7 +65,7 @@ export default async function SuperAdminMaterialsPage() {
           <CardHeader>
             <CardTitle>Materiais por empresa</CardTitle>
             <CardDescription>
-              {materials.length} material(is) no total em {Object.keys(tenantGroups).length} empresa(s).
+              {safeMaterials.length} material(is) no total em {Object.keys(tenantGroups).length} empresa(s).
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -59,17 +80,17 @@ export default async function SuperAdminMaterialsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {materials.map((material) => (
+                {safeMaterials.map((material) => (
                   <TableRow key={material.id}>
                     <TableCell className="pl-5 font-medium">
                       {material.tenantName ?? "—"}
                     </TableCell>
                     <TableCell className="max-w-[240px] truncate">
-                      {material.title}
+                      {material.title ?? "Sem título"}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {CATEGORY_LABELS[material.category] ?? material.category}
+                        {material.category ? (CATEGORY_LABELS[material.category] ?? material.category) : "Geral"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -78,11 +99,11 @@ export default async function SuperAdminMaterialsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="pr-5 text-right text-sm text-muted-foreground">
-                      {new Date(material.createdAt).toLocaleDateString("pt-BR")}
+                      {formatDate(material.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))}
-                {materials.length === 0 && (
+                {safeMaterials.length === 0 && (
                   <TableRow>
                     <TableCell className="p-6 text-center text-sm text-muted-foreground" colSpan={5}>
                       Nenhum material de divulgação cadastrado na plataforma.
@@ -95,7 +116,7 @@ export default async function SuperAdminMaterialsPage() {
         </Card>
 
         <p className="text-xs text-muted-foreground">
-          {materials.length} material(is) cadastrado(s) ·{" "}
+          {safeMaterials.length} material(is) cadastrado(s) ·{" "}
           {Object.keys(tenantGroups).length} empresa(s) com materiais
           <Badge className="ml-2" variant="outline">Somente leitura</Badge>
         </p>

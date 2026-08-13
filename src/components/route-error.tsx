@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils"
 
 type RouteErrorProps = {
   error: Error & { digest?: string }
-  unstable_retry: () => void
+  reset?: () => void
+  unstable_retry?: () => void
   title?: string
   description?: string
   imageSrc?: string
@@ -19,6 +20,7 @@ type RouteErrorProps = {
 
 export function RouteError({
   error,
+  reset,
   unstable_retry,
   title = "Ops! Não foi possível carregar esta área",
   description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o Dashboard.",
@@ -28,6 +30,16 @@ export function RouteError({
     // O digest permite correlacionar o erro no servidor sem expor a mensagem interna.
     if (error.digest) console.error("route_render_error", { digest: error.digest })
   }, [error])
+
+  const handleRetry = () => {
+    if (typeof reset === "function") {
+      reset();
+    } else if (typeof unstable_retry === "function") {
+      unstable_retry();
+    } else {
+      window.location.reload();
+    }
+  }
 
   return (
     <main
@@ -55,7 +67,7 @@ export function RouteError({
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <Button type="button" size="lg" onClick={unstable_retry} className="gap-2 px-6 shadow-sm hover:shadow transition-all">
+        <Button type="button" size="lg" onClick={handleRetry} className="gap-2 px-6 shadow-sm hover:shadow transition-all">
           <RotateCcw className="size-4" />
           <span>Tentar novamente</span>
         </Button>

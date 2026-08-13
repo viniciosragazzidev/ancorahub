@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { exchangeCodeForLongLivedToken, discoverAssets, completeMetaConnectionAttempt } = vi.hoisted(() => ({
+const { exchangeCodeForLongLivedToken, discoverAssets, fetchGrantedPermissions, completeMetaConnectionAttempt } = vi.hoisted(() => ({
   exchangeCodeForLongLivedToken: vi.fn(),
   discoverAssets: vi.fn(),
+  fetchGrantedPermissions: vi.fn(),
   completeMetaConnectionAttempt: vi.fn(),
 }));
 
 vi.mock("@/features/meta-ads/meta-oauth", () => ({ exchangeCodeForLongLivedToken }));
 vi.mock("@/features/meta-ads/meta-connection-attempts", () => ({ completeMetaConnectionAttempt }));
 vi.mock("@/features/meta-ads/meta-graph-client", () => ({
-  MetaGraphClient: class { discoverAssets = discoverAssets; },
+  MetaGraphClient: class {
+    discoverAssets = discoverAssets;
+    fetchGrantedPermissions = fetchGrantedPermissions;
+  },
 }));
 
 import { GET } from "./route";
@@ -24,6 +28,7 @@ describe("GET /api/integrations/meta/lead-ads/callback", () => {
     vi.clearAllMocks();
     exchangeCodeForLongLivedToken.mockResolvedValue({ accessToken: "server-only-token", expiresIn: 3600 });
     discoverAssets.mockResolvedValue({ business: { id: "business-1", name: "Corretora" }, pages: [], adAccounts: [], whatsapp: null, pixels: [], datasets: [] });
+    fetchGrantedPermissions.mockResolvedValue(["pages_show_list", "leads_retrieval"]);
     completeMetaConnectionAttempt.mockResolvedValue({ id: "attempt-1" });
   });
 

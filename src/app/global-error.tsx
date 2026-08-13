@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 
-export default function GlobalError({ error, unstable_retry }: { error: Error & { digest?: string }; unstable_retry: () => void }) {
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     if (error.digest) console.error("global_render_error", { digest: error.digest })
   }, [error])
@@ -15,7 +15,7 @@ export default function GlobalError({ error, unstable_retry }: { error: Error & 
             <h1 id="global-error-title">O sistema encontrou um problema</h1>
             <p>Tente novamente. Se o problema continuar, informe o horário e a referência exibida ao suporte.</p>
             {error.digest ? <p>Referência: {error.digest}</p> : null}
-            <button type="button" onClick={unstable_retry}>Tentar novamente</button>
+            <button type="button" onClick={() => (typeof reset === "function" ? reset() : window.location.reload())}>Tentar novamente</button>
           </section>
         </main>
       </body>
