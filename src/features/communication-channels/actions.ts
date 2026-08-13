@@ -40,14 +40,14 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
 
   const [existing] = await db.select().from(schema.communicationChannels).where(and(eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.phoneNumberId, phoneNumberId))).limit(1);
   if (existing && existing.tenantId !== context.tenantId) throw new Error("Este número oficial já está vinculado a outra corretora.");
+  const [currentDefault] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true), eq(schema.communicationChannels.status, "active"))).limit(1);
+  if (currentDefault && currentDefault.id !== existing?.id) throw new Error("Esta corretora já possui um canal oficial ativo. Desconecte-o antes de trocar o número.");
   const config = getMetaCloudServerConfig();
   const now = new Date();
   const values = { tenantId: context.tenantId, branchId: null, ownerUserId: null, provider: META_CLOUD_PROVIDER, channelType: "shared", status: "active", businessId, wabaId, phoneNumberId, displayPhoneNumber: phone.display_phone_number ?? null, verifiedName: phone.verified_name ?? null, qualityRating: phone.quality_rating ?? null, messagingLimit: phone.messaging_limit_tier ?? null, accessTokenCiphertext: encryptChannelSecret(accessToken, config.tokenEncryptionKey), tokenKeyVersion: "v1", tokenExpiresAt: token.expires_in ? new Date(now.getTime() + token.expires_in * 1000) : null, activatedAt: now, updatedAt: now };
   const channelId = existing?.id ?? randomUUID();
   if (existing) await db.update(schema.communicationChannels).set({ ...values, isDefault: true }).where(eq(schema.communicationChannels.id, existing.id));
   else {
-    const [currentDefault] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true), eq(schema.communicationChannels.status, "active"))).limit(1);
-    if (currentDefault) throw new Error("Esta corretora já possui um canal oficial ativo. Reconecte o número existente ou desative-o antes de trocar.");
     await db.insert(schema.communicationChannels).values({ id: channelId, ...values, isDefault: true, createdBy: context.userId, createdAt: now });
   }
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channelId, acao: existing ? "meta_cloud_channel_reconnected" : "meta_cloud_channel_connected" });
@@ -64,4 +64,31 @@ export async function setMetaCloudChannelStatusAction(channelId: string, active:
   await db.update(schema.communicationChannels).set({ status: active ? "active" : "inactive", updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channelId));
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: active ? "meta_cloud_channel_activated" : "meta_cloud_channel_deactivated" });
   revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
+}
+
+/** Disconnects the CRM while retaining auditable conversation history. */
+export async function disconnectMetaCloudChannelAction(channelId: string) {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director") throw new Error("Somente o Diretor pode desconectar canais oficiais.");
+  const db = getDatabase();
+  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
+    eq(schema.communicationChannels.id, channelId),
+    eq(schema.communicationChannels.tenantId, context.tenantId),
+    eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+  )).limit(1);
+  if (!channel) throw new Error("Canal oficial não encontrado.");
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx.update(schema.communicationChannels).set({
+      status: "inactive", isDefault: false, accessTokenCiphertext: null,
+      tokenKeyVersion: null, tokenExpiresAt: null, updatedAt: now,
+    }).where(eq(schema.communicationChannels.id, channel.id));
+    await tx.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "communication_channel",
+      entidadeId: channel.id, acao: "meta_cloud_channel_disconnected", createdAt: now,
+    });
+  });
+  revalidatePath("/integrations/whatsapp"); revalidatePath("/integrations/meta"); revalidatePath("/conversas");
+  return { success: true };
 }

@@ -6,7 +6,7 @@ vi.mock("./meta-cloud-config", () => ({
   getMetaLeadAdsServerConfig: () => ({ accessToken: "platform-token", graphVersion: "v25.0" }),
 }));
 
-import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, resolvePageAccessToken, subscribePageToLeadgen } from "./meta-cloud-client";
+import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
 
 describe("Meta Cloud template payload", () => {
   it("sends names for the named broker invitation body variables", () => {
@@ -64,6 +64,34 @@ describe("Meta Cloud template payload", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "Permissão de Página ausente", code: 10 } }), { status: 403 })));
 
     await expect(subscribePageToLeadgen("123456789")).rejects.toThrow("Permissão de Página ausente");
+  });
+
+  it("sends an approved service template only through the configured official number", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: "wamid.test" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendMetaCloudTemplate({
+      phoneNumberId: "phone-number-id",
+      accessToken: "channel-token",
+      to: "+55 21 99999-9999",
+      templateName: "broker_first_access",
+      languageCode: "pt_BR",
+      variables: ["Ana", "Ancora", "Gestor"],
+      variableNames: ["nome", "empresa", "cargo"],
+    })).resolves.toEqual({ messages: [{ id: "wamid.test" }] });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://graph.facebook.com/v25.0/phone-number-id/messages", expect.objectContaining({
+      method: "POST",
+      cache: "no-store",
+      headers: expect.objectContaining({ Authorization: "Bearer channel-token", "Content-Type": "application/json" }),
+    }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: "5521999999999",
+      type: "template",
+      template: { name: "broker_first_access", language: { code: "pt_BR" } },
+    });
   });
 
   it("derives a Page token from the connecting user's assets and returns only the selected Page token", async () => {

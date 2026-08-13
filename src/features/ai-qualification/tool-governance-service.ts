@@ -68,10 +68,7 @@ export const updateToolPermissionSchema = z.object({
 
 export type UpdateToolPermissionInput = z.infer<typeof updateToolPermissionSchema>;
 
-import { ensureAiTablesExist } from "@/features/ai-agent/conversation-state-machine";
-
 export async function getToolPermissions(tenantId: string) {
-  await ensureAiTablesExist();
   const db = getDatabase();
   let dbPermissions: any[] = [];
   try {

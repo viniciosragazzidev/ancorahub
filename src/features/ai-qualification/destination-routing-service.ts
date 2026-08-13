@@ -62,10 +62,7 @@ export const brokerEligibilitySchema = z.object({
 
 export type BrokerEligibilityInput = z.infer<typeof brokerEligibilitySchema>;
 
-import { ensureAiTablesExist } from "@/features/ai-agent/conversation-state-machine";
-
 export async function getDestinationRules(tenantId: string) {
-  await ensureAiTablesExist();
   const db = getDatabase();
 
   try {

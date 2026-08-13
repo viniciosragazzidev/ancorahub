@@ -15,6 +15,15 @@ export type MetaConnectionInfo = {
   whatsappConnected: boolean;
 };
 
+export type MetaConnectionAssets = {
+  pages: Array<{ id: string; name: string; status: string }>;
+  adAccounts: Array<{ id: string; name: string; currency: string; status: string }>;
+  pixels: Array<{ id: string; name: string; status: string }>;
+  datasets: Array<{ id: string; name: string; status: string }>;
+  leadFormsCount: number;
+  campaignsCount: number;
+};
+
 export type MetaDiscoveredAssets = {
   business: {
     id: string;

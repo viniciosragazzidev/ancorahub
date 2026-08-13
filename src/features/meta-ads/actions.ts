@@ -12,12 +12,12 @@ import { MetaGraphClient } from "./meta-graph-client";
 import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
 import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
-import type { MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "./types";
+import type { MetaConnectionAssets, MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
 export async function getMetaConnectionState(): Promise<{
   connection: MetaConnectionInfo | null;
-  assets: MetaDiscoveredAssets | null;
+  assets: MetaConnectionAssets | null;
   logs: MetaSyncLogItem[];
   isConfigured: boolean;
 }> {
@@ -39,28 +39,17 @@ export async function getMetaConnectionState(): Promise<{
     };
   }
 
-  const [pagesCountResult] = await db
-    .select({ count: schema.metaPages.id })
-    .from(schema.metaPages)
-    .where(eq(schema.metaPages.tenantId, context.tenantId));
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, logs] = await Promise.all([
+    db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(eq(schema.metaPages.tenantId, context.tenantId)).orderBy(schema.metaPages.name),
+    db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(eq(schema.metaAdAccounts.tenantId, context.tenantId)).orderBy(schema.metaAdAccounts.name),
+    db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(eq(schema.metaPixels.tenantId, context.tenantId)).orderBy(schema.metaPixels.name),
+    db.select({ id: schema.metaDatasets.datasetId, name: schema.metaDatasets.name, status: schema.metaDatasets.status }).from(schema.metaDatasets).where(eq(schema.metaDatasets.tenantId, context.tenantId)).orderBy(schema.metaDatasets.name),
+    db.select({ id: schema.metaLeadForms.id }).from(schema.metaLeadForms).where(eq(schema.metaLeadForms.tenantId, context.tenantId)),
+    db.select({ id: schema.metaCampaigns.id }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)),
+    db.select().from(schema.metaSyncLogs).where(eq(schema.metaSyncLogs.tenantId, context.tenantId)).orderBy(desc(schema.metaSyncLogs.startedAt)).limit(10),
+  ]);
 
-  const [adAccountsCountResult] = await db
-    .select({ count: schema.metaAdAccounts.id })
-    .from(schema.metaAdAccounts)
-    .where(eq(schema.metaAdAccounts.tenantId, context.tenantId));
-
-  const [whatsappChannel] = await db
-    .select({ id: schema.communicationChannels.id })
-    .from(schema.communicationChannels)
-    .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, "meta_cloud")))
-    .limit(1);
-
-  const logs = await db
-    .select()
-    .from(schema.metaSyncLogs)
-    .where(eq(schema.metaSyncLogs.tenantId, context.tenantId))
-    .orderBy(desc(schema.metaSyncLogs.startedAt))
-    .limit(10);
+  const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadFormsCount: leadForms.length, campaignsCount: campaigns.length };
 
   const connInfo: MetaConnectionInfo = {
     id: connection.id,
@@ -72,14 +61,14 @@ export async function getMetaConnectionState(): Promise<{
     expiresAt: connection.expiresAt,
     lastError: connection.lastError,
     lastSyncedAt: connection.lastSyncedAt,
-    pagesCount: pagesCountResult ? 1 : 0,
-    adAccountsCount: adAccountsCountResult ? 1 : 0,
-    whatsappConnected: !!whatsappChannel,
+    pagesCount: pages.length,
+    adAccountsCount: adAccounts.length,
+    whatsappConnected: false,
   };
 
   return {
     connection: connInfo,
-    assets: null,
+    assets,
     logs: logs.map((l) => ({
       id: l.id,
       syncType: l.syncType,

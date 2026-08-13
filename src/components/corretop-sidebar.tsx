@@ -171,6 +171,18 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
     }))
     .filter((section) => section.items.length > 0);
 
+  // Cascata de entrada dos itens do menu: atraso progressivo conforme o item visível.
+  const itemEntranceDelays = new Map<string, number>();
+  {
+    let index = 0;
+    for (const section of visibleSections) {
+      for (const item of section.items) {
+        itemEntranceDelays.set(`${section.label}:${item.label}`, Math.min(index * 40, 520));
+        index += 1;
+      }
+    }
+  }
+
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
     try {
@@ -232,9 +244,14 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.url || (item.url !== "/dashboard" && pathname.startsWith(item.url + "/"));
+                  const entranceDelay = itemEntranceDelays.get(`${section.label}:${item.label}`) ?? 0;
 
                   return (
-                    <SidebarMenuItem key={item.label} className="relative group-data-[collapsible=icon]:w-full">
+                    <SidebarMenuItem
+                      key={item.label}
+                      className="ct-reveal relative group-data-[collapsible=icon]:w-full"
+                      style={{ animationDelay: `${entranceDelay}ms` }}
+                    >
                       {isActive && (
                         <motion.div
                           layoutId="sidebar-active-item"

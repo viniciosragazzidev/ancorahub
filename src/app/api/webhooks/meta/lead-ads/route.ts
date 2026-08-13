@@ -29,11 +29,9 @@ export async function POST(request: Request) {
     const signature = request.headers.get("x-hub-signature-256");
     console.log("[Meta Lead Ads Webhook POST received]", { bodyLength: rawBody.length, hasSignature: Boolean(signature) });
 
-    if (config.appSecret && !verifyMetaWebhookSignature(rawBody, signature, config.appSecret)) {
-      console.warn("[Meta Lead Ads Webhook POST] Invalid signature:", { signature });
-      if (process.env.NODE_ENV === "production" && signature) {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
+    if (!verifyMetaWebhookSignature(rawBody, signature, config.appSecret)) {
+      console.warn("[Meta Lead Ads Webhook POST] Invalid signature", { hasSignature: Boolean(signature) });
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     let payload: MetaLeadAdsWebhookPayload;

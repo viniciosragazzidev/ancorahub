@@ -44,10 +44,7 @@ export const followUpRuleSchema = z.object({
 
 export type FollowUpRuleInput = z.infer<typeof followUpRuleSchema>;
 
-import { ensureAiTablesExist } from "@/features/ai-agent/conversation-state-machine";
-
 export async function getFollowUpRules(tenantId: string) {
-  await ensureAiTablesExist();
   const db = getDatabase();
 
   try {

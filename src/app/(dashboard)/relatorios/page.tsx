@@ -12,7 +12,7 @@ import {
   TrendUp,
   Users,
 } from "@/components/huge-icons";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -39,30 +39,34 @@ export default async function ReportsPage({
   const canExport = hasCapability(context.role, "exportar_relatorios", context.jobTitle);
   const canGenerateOperational = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
   const canViewFinancialReports = hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
-  const supervisedBrokerIds = context.role === "supervisor"
-    ? await getSupervisedBrokerIds(context.tenantId, context.userId)
-    : [];
-  const tenantBranches = (context.role === "director" || context.role === "manager")
-    ? await db
-        .select({ id: schema.branches.id, name: schema.branches.name })
-        .from(schema.branches)
-        .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active")))
-        .orderBy(schema.branches.name)
-    : [];
 
-  const internalDocuments = canExport
-    ? await db
-        .select({
-          id: schema.internalReportDocuments.id,
-          title: schema.internalReportDocuments.title,
-          filename: schema.internalReportDocuments.filename,
-          createdAt: schema.internalReportDocuments.createdAt,
-        })
-        .from(schema.internalReportDocuments)
-        .where(eq(schema.internalReportDocuments.tenantId, context.tenantId))
-        .orderBy(sql`${schema.internalReportDocuments.createdAt} desc`)
-        .limit(20)
-    : [];
+  // Parallelize initial scope queries
+  const [supervisedBrokerIds, tenantBranches, internalDocuments] = await Promise.all([
+    context.role === "supervisor"
+      ? getSupervisedBrokerIds(context.tenantId, context.userId)
+      : Promise.resolve([]),
+    (context.role === "director" || context.role === "manager")
+      ? db
+          .select({ id: schema.branches.id, name: schema.branches.name })
+          .from(schema.branches)
+          .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active")))
+          .orderBy(schema.branches.name)
+      : Promise.resolve([]),
+    canExport
+      ? db
+          .select({
+            id: schema.internalReportDocuments.id,
+            title: schema.internalReportDocuments.title,
+            filename: schema.internalReportDocuments.filename,
+            createdAt: schema.internalReportDocuments.createdAt,
+          })
+          .from(schema.internalReportDocuments)
+          .where(eq(schema.internalReportDocuments.tenantId, context.tenantId))
+          .orderBy(sql`${schema.internalReportDocuments.createdAt} desc`)
+          .limit(20)
+      : Promise.resolve([]),
+  ]);
+
   const leadScope =
     context.role === "broker"
       ? eq(schema.leads.corretorId, context.userId)
@@ -73,6 +77,7 @@ export default async function ReportsPage({
       : context.role === "manager" && context.branchId
         ? eq(schema.leads.branchId, context.branchId)
         : undefined;
+
   const clientScope =
     context.role === "broker"
       ? eq(schema.clients.corretorId, context.userId)
@@ -84,8 +89,17 @@ export default async function ReportsPage({
         ? eq(schema.clients.branchId, context.branchId)
         : undefined;
 
-  // Fetch aggregate stats
-  const [leadCount, clientCount, saleCount] = await Promise.all([
+  // Fetch all aggregate stats and day series in a single parallel batch
+  const [
+    leadCount,
+    clientCount,
+    saleCount,
+    periodRevenue,
+    leadsByDay,
+    clientsByDay,
+    salesByDay,
+    revenueByDay,
+  ] = await Promise.all([
     db
       .select({ count: count() })
       .from(schema.leads)
@@ -118,27 +132,23 @@ export default async function ReportsPage({
           gte(schema.sales.saleDate, reportStart),
         ),
       ),
-  ]);
-
-  // Get the period's sales revenue
-  const periodRevenue = canViewFinancialReports ? await db
-    .select({
-      total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
-    })
-    .from(schema.sales)
-    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-    .where(
-      and(
-        eq(schema.sales.tenantId, context.tenantId),
-        eq(schema.leads.tenantId, context.tenantId),
-        leadScope,
-        eq(schema.sales.status, "active"),
-        gte(schema.sales.saleDate, reportStart),
-      ),
-    ) : [{ total: "0" }];
-
-  // Daily trends (N dias) para os cards do resumo
-  const [leadsByDay, clientsByDay, salesByDay, revenueByDay] = await Promise.all([
+    canViewFinancialReports
+      ? db
+          .select({
+            total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
+          })
+          .from(schema.sales)
+          .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+          .where(
+            and(
+              eq(schema.sales.tenantId, context.tenantId),
+              eq(schema.leads.tenantId, context.tenantId),
+              leadScope,
+              eq(schema.sales.status, "active"),
+              gte(schema.sales.saleDate, reportStart),
+            ),
+          )
+      : Promise.resolve([{ total: "0" }]),
     db
       .select({
         day: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
@@ -180,23 +190,25 @@ export default async function ReportsPage({
         ),
       )
       .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`),
-    canViewFinancialReports ? db
-      .select({
-        day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`,
-        total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
-      })
-      .from(schema.sales)
-      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-      .where(
-        and(
-          eq(schema.sales.tenantId, context.tenantId),
-          eq(schema.leads.tenantId, context.tenantId),
-          leadScope,
-          eq(schema.sales.status, "active"),
-          gte(schema.sales.saleDate, reportStart),
-        ),
-      )
-      .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`) : Promise.resolve([]),
+    canViewFinancialReports
+      ? db
+          .select({
+            day: sql<string>`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`,
+            total: sql<string>`coalesce(sum(${schema.sales.saleValue}), '0')`,
+          })
+          .from(schema.sales)
+          .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+          .where(
+            and(
+              eq(schema.sales.tenantId, context.tenantId),
+              eq(schema.leads.tenantId, context.tenantId),
+              leadScope,
+              eq(schema.sales.status, "active"),
+              gte(schema.sales.saleDate, reportStart),
+            ),
+          )
+          .groupBy(sql`to_char(${schema.sales.saleDate}, 'YYYY-MM-DD')`)
+      : Promise.resolve([]),
   ]);
 
   function fillDaySeries(rows: Array<{ day: string; count?: number; total?: string }>) {
@@ -278,14 +290,6 @@ export default async function ReportsPage({
         rightSlot={<PeriodSelect value={period} />}
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        {/* Contexto de página legado, preservado para eventual restauração.
-        <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs font-medium text-primary">GESTÃO COMERCIAL</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Relatórios</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Consolide indicadores de leads, conversão, produção e desempenho da corretora em um só lugar.</p>
-          </div>
-        </section> */}
         <ViewScopeContext role={context.role} />
 
         <section aria-labelledby="reports-overview-title">

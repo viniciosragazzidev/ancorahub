@@ -9,7 +9,6 @@ import { getToolPermissions } from "@/features/ai-qualification/tool-governance-
 import { getDestinationRules, getBrokerEligibilityProfiles } from "@/features/ai-qualification/destination-routing-service";
 import { getQualificationStats } from "@/features/ai-qualification/stats-service";
 import { getQualificationAlerts } from "@/features/ai-qualification/alerts-service";
-import { ensureAiTablesExist } from "@/features/ai-agent/conversation-state-machine";
 import { QualificationHubClient } from "./_components/qualification-hub-client";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +18,6 @@ export default async function QualificacaoPage() {
   if (!hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)) {
     throw new AuthorizationError("Apenas diretores, gestores e equipe de marketing têm permissão para acessar a qualificação por IA.");
   }
-
-  await ensureAiTablesExist();
 
   const [
     settings,

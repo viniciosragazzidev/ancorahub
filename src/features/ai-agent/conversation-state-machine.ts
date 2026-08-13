@@ -93,7 +93,7 @@ async function sendAiOutbound(input: {
   return { status: "sent" as const, messageId: sent.messageId };
 }
 
-let tablesEnsured = false;
+let tablesEnsured = true;
 // Promise de lock para evitar execuções paralelas durante o build
 let ensuringPromise: Promise<void> | null = null;
 

@@ -21,67 +21,71 @@ export default async function ChecklistPage() {
       ? eq(schema.leads.branchId, context.branchId)
       : undefined;
 
-  const preConversionLeads = await db
-    .select({
-      id: schema.leads.id,
-      nome: schema.leads.nome,
-      telefone: schema.leads.telefone,
-      email: schema.leads.email,
-      status: schema.leads.status,
-      planId: schema.leads.planId,
-      corretorId: schema.leads.corretorId,
-      corretorNome: schema.user.name,
-      branchName: schema.branches.name,
-      stageEnteredAt: schema.leads.stageEnteredAt,
-    })
-    .from(schema.leads)
-    .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
-    .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
-    .where(
-      and(
-        eq(schema.leads.tenantId, context.tenantId),
-        inArray(schema.leads.status, finalStages),
-        ...(scope ? [scope] : []),
-      ),
-    )
-    .orderBy(desc(schema.leads.stageEnteredAt))
-    .limit(50);
-
-  // Converted leads in the last 30 days (post-sale)
+  // Fetch leads in parallel
   const thirtyDaysAgo = sql`now() - interval '30 days'`;
-  const convertedLeads = await db
-    .select({
-      id: schema.leads.id,
-      nome: schema.leads.nome,
-      telefone: schema.leads.telefone,
-      status: schema.leads.status,
-      corretorNome: schema.user.name,
-      branchName: schema.branches.name,
-      stageEnteredAt: schema.leads.stageEnteredAt,
-    })
-    .from(schema.leads)
-    .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
-    .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
-    .where(
-      and(
-        eq(schema.leads.tenantId, context.tenantId),
-        eq(schema.leads.status, "converted"),
-        ...(scope ? [scope] : []),
-        sql`${schema.leads.stageEnteredAt} >= ${thirtyDaysAgo}`,
-      ),
-    )
-    .orderBy(desc(schema.leads.stageEnteredAt))
-    .limit(50);
 
-  const allLeadIds = [...preConversionLeads, ...convertedLeads].map((l) => l.id);
+  const [preConversionLeads, convertedLeads] = await Promise.all([
+    db
+      .select({
+        id: schema.leads.id,
+        nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
+        email: schema.leads.email,
+        status: schema.leads.status,
+        planId: schema.leads.planId,
+        corretorId: schema.leads.corretorId,
+        corretorNome: schema.user.name,
+        branchName: schema.branches.name,
+        stageEnteredAt: schema.leads.stageEnteredAt,
+      })
+      .from(schema.leads)
+      .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+      .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          inArray(schema.leads.status, finalStages),
+          ...(scope ? [scope] : []),
+        ),
+      )
+      .orderBy(desc(schema.leads.stageEnteredAt))
+      .limit(50),
+    db
+      .select({
+        id: schema.leads.id,
+        nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
+        status: schema.leads.status,
+        corretorNome: schema.user.name,
+        branchName: schema.branches.name,
+        stageEnteredAt: schema.leads.stageEnteredAt,
+      })
+      .from(schema.leads)
+      .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+      .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.status, "converted"),
+          ...(scope ? [scope] : []),
+          sql`${schema.leads.stageEnteredAt} >= ${thirtyDaysAgo}`,
+        ),
+      )
+      .orderBy(desc(schema.leads.stageEnteredAt))
+      .limit(50),
+  ]);
 
-  if (!allLeadIds.length) {
+  const allLeadIds = [
+    ...new Set([...preConversionLeads.map((l) => l.id), ...convertedLeads.map((l) => l.id)]),
+  ];
+
+  if (allLeadIds.length === 0) {
     return (
       <>
-        <DashboardHeader breadcrumb="Operação" title="Checklist de fechamento" />
-        <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-          <section className="flex flex-col items-center gap-4 py-20 text-center">
-            <CheckCircle className="size-12 text-muted-foreground/40" />
+        <DashboardHeader breadcrumb="Operação" title="Checklist Pós-Venda & Documentos" />
+        <main className="mx-auto flex w-full max-w-[1280px] flex-col gap-6 p-4 pb-8 lg:p-6">
+          <section className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
+            <CheckCircle className="mb-3 size-12 text-emerald-500" />
             <h2 className="text-lg font-semibold">Nada pendente</h2>
             <p className="max-w-md text-sm text-muted-foreground">
               Nenhum lead em etapa de fechamento ou convertido nos últimos 30 dias no seu escopo.
@@ -92,23 +96,36 @@ export default async function ChecklistPage() {
     );
   }
 
-  // ─── Fetch validation data ───
+  // ─── Fetch validation data in parallel ───
 
-  // Documents per lead
-  const docRows = allLeadIds.length
-    ? await db
-        .select({
-          leadId: schema.leadDocuments.leadId,
-          status: schema.leadDocuments.status,
-        })
-        .from(schema.leadDocuments)
-        .where(
-          and(
-            eq(schema.leadDocuments.tenantId, context.tenantId),
-            inArray(schema.leadDocuments.leadId, allLeadIds),
-          ),
-        )
-    : [];
+  const [docRows, saleRows] = await Promise.all([
+    db
+      .select({
+        leadId: schema.leadDocuments.leadId,
+        status: schema.leadDocuments.status,
+      })
+      .from(schema.leadDocuments)
+      .where(
+        and(
+          eq(schema.leadDocuments.tenantId, context.tenantId),
+          inArray(schema.leadDocuments.leadId, allLeadIds),
+        ),
+      ),
+    db
+      .select({
+        leadId: schema.sales.leadId,
+        id: schema.sales.id,
+        commissionRuleId: schema.sales.commissionRuleId,
+      })
+      .from(schema.sales)
+      .where(
+        and(
+          eq(schema.sales.tenantId, context.tenantId),
+          inArray(schema.sales.leadId, allLeadIds),
+        ),
+      ),
+  ]);
+
   const docsByLead = new Map<string, { total: number; approved: number; pending: number; rejected: number }>();
   for (const doc of docRows) {
     const entry = docsByLead.get(doc.leadId) ?? { total: 0, approved: 0, pending: 0, rejected: 0 };
@@ -119,22 +136,6 @@ export default async function ChecklistPage() {
     docsByLead.set(doc.leadId, entry);
   }
 
-  // Sales / commission per lead
-  const saleRows = allLeadIds.length
-    ? await db
-        .select({
-          leadId: schema.sales.leadId,
-          id: schema.sales.id,
-          commissionRuleId: schema.sales.commissionRuleId,
-        })
-        .from(schema.sales)
-        .where(
-          and(
-            eq(schema.sales.tenantId, context.tenantId),
-            inArray(schema.sales.leadId, allLeadIds),
-          ),
-        )
-    : [];
   const salesByLead = new Map<string, { hasSale: boolean; hasCommission: boolean }>();
   for (const s of saleRows) {
     salesByLead.set(s.leadId, { hasSale: true, hasCommission: !!s.commissionRuleId });

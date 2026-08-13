@@ -44,6 +44,15 @@ function BreadcrumbLink({
   render,
   ...props
 }: useRender.ComponentProps<"a">) {
+  if (React.isValidElement(render)) {
+    const renderElement = render as React.ReactElement<Record<string, unknown>>;
+    return React.cloneElement(renderElement, {
+      className: cn("transition-colors hover:text-foreground", className, renderElement.props.className as string),
+      "data-slot": "breadcrumb-link",
+      ...props,
+    });
+  }
+
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(

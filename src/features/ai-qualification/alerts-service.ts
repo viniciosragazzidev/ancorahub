@@ -18,10 +18,7 @@ export type QualificationAlertRecord = {
   resolvedBy: string | null;
 };
 
-import { ensureAiTablesExist } from "@/features/ai-agent/conversation-state-machine";
-
 export async function getQualificationAlerts(tenantId: string): Promise<QualificationAlertRecord[]> {
-  await ensureAiTablesExist();
   const db = getDatabase();
 
   const now = new Date();
@@ -113,7 +110,6 @@ export async function createQualificationAlert(input: {
   message: string;
   suggestedAction?: string;
 }) {
-  await ensureAiTablesExist();
   const db = getDatabase();
   const alertId = randomUUID();
   const now = new Date();
