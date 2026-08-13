@@ -275,6 +275,19 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
   return { success: true };
 }
 
+/** Telemetria das etapas do onboarding de Marketing da Meta (funnel). */
+export async function recordMetaMarketingOnboardingStep(step: string) {
+  const context = await getRequiredTenantContext();
+  await getDatabase().insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "meta_connection_attempt",
+    entidadeId: context.tenantId,
+    acao: `meta_onboarding.${step}`,
+    createdAt: new Date(),
+  });
+}
+
 /** Disparar sincronização manual */
 export async function triggerManualMetaSync(): Promise<{ success: boolean; itemsSynced: number; error?: string }> {
   const context = await getRequiredTenantContext();

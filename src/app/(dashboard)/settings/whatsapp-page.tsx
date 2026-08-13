@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
-import { ArrowSquareOut, CheckCircle, ShieldWarning } from "@/components/huge-icons";
+import { CheckCircle, ShieldWarning } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
 import { MetaEmbeddedSignupCard } from "@/features/communication-channels/components/meta-embedded-signup-card";
+import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
 
 type Channel = {
   id: string;
@@ -69,13 +70,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
             {canConnectNumber ? <MetaEmbeddedSignupCard appId={official.appId!} configId={official.embeddedSignupConfigId!} /> : null}
           </CardContent>
         </Card>
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader><CardTitle>Como conectar o número oficial</CardTitle><CardDescription>O Diretor abre o cadastro seguro abaixo, escolhe a conta WhatsApp Business e confirma o número corporativo. Nenhum token ou ID técnico precisa ser copiado para o CRM.</CardDescription></CardHeader>
-          <CardContent className="space-y-4 text-sm leading-6 text-muted-foreground">
-            <ol className="list-decimal space-y-2 pl-5"><li>Confirme na Meta que você administra o Portfólio Empresarial, a conta WhatsApp Business e o número corporativo.</li><li>Clique em <strong>Conectar número com Facebook</strong> e conclua a seleção no ambiente seguro da Meta.</li><li>Ao voltar, o CRM valida o número e apresenta o status. Para trocar de número, desconecte o atual e conecte o novo.</li></ol>
-            <a className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href="https://business.facebook.com/wa/manage/" rel="noreferrer" target="_blank">Abrir WhatsApp Manager da Meta <ArrowSquareOut aria-hidden="true" className="size-3.5" /></a>
-          </CardContent>
-        </Card>
+        <WhatsAppTestMessageCard />
         {waha}
       </div>
 

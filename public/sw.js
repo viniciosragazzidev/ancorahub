@@ -1,8 +1,8 @@
 // ─── CorreTop PWA Service Worker ─────────────────────────────────────────────
-// Versão: 1.0.1
+// Versão: 1.0.2
 // Incremente CACHE_VERSION para forçar atualização do cache.
 
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 7;
 const STATIC_CACHE = `corretop-static-v${CACHE_VERSION}`;
 const ASSET_CACHE = `corretop-assets-v${CACHE_VERSION}`;
 
@@ -24,7 +24,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     Promise.all([
-      // Limpa caches antigos
+      // Limpa TODOS os caches antigos para forçar atualização em produção
       caches.keys().then((keys) =>
         Promise.all(
           keys
@@ -212,4 +212,3 @@ self.addEventListener("notificationclose", (event) => {
   // Log opcional para analytics
   console.log("Notificação fechada:", event.notification.tag);
 });
-

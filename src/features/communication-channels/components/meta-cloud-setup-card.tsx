@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-import { Pause, Trash, Warning } from "@/components/huge-icons";
+import { Pause, Trash } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
@@ -41,34 +42,31 @@ export function MetaCloudSetupCard({ enabled, configured, missing, companyAccoun
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [disconnectOpen, setDisconnectOpen] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const status = accountStatus(companyAccount, enabled, configured);
 
   const changeStatus = (active: boolean) => {
     if (!companyAccount) return;
-    setFeedback(null);
     startTransition(async () => {
       try {
         await setMetaCloudChannelStatusAction(companyAccount.id, active);
-        setFeedback(active ? "Número oficial reativado." : "Número oficial pausado. Nenhuma nova mensagem será processada pelo CRM.");
+        toast.success(active ? "Número oficial reativado." : "Número oficial pausado.", { description: active ? undefined : "Nenhuma nova mensagem será processada pelo CRM." });
         router.refresh();
       } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Não foi possível alterar o canal agora.");
+        toast.error(error instanceof Error ? error.message : "Não foi possível alterar o canal agora.");
       }
     });
   };
 
   const disconnect = () => {
     if (!companyAccount) return;
-    setFeedback(null);
     startTransition(async () => {
       try {
         await disconnectMetaCloudChannelAction(companyAccount.id);
         setDisconnectOpen(false);
-        setFeedback("Número desconectado do CRM. O histórico foi preservado.");
+        toast.success("Número desconectado do CRM.", { description: "O histórico foi preservado." });
         router.refresh();
       } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Não foi possível desconectar o número agora.");
+        toast.error(error instanceof Error ? error.message : "Não foi possível desconectar o número agora.");
       }
     });
   };
@@ -81,7 +79,6 @@ export function MetaCloudSetupCard({ enabled, configured, missing, companyAccoun
       {enabled && !configured ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm"><p className="font-medium">Configuração técnica indisponível</p><p className="mt-1 text-muted-foreground">O suporte precisa concluir as variáveis seguras do servidor: {missing.join(", ")}.</p></div> : null}
       {enabled && configured && !companyAccount ? <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-sm font-medium">Nenhum número oficial conectado</p><p className="mt-1 text-xs text-muted-foreground">Use o botão abaixo para escolher a conta WhatsApp Business e o número corporativo.</p></div> : null}
       {companyAccount ? <><div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-3"><Detail label="Nome verificado" value={companyAccount.verifiedName ?? "Não informado"} /><Detail label="Número oficial" value={companyAccount.displayPhoneNumber ?? "Não informado"} /><Detail label="Qualidade" value={companyAccount.qualityRating ?? "Ainda não disponível"} /><Detail label="Limite de mensagens" value={companyAccount.messagingLimit ?? "Não informado"} /><Detail label="Último webhook" value={formatDate(companyAccount.lastWebhookAt)} /><Detail label="Ativada em" value={formatDate(companyAccount.activatedAt)} />{showTechnicalDetails ? <><Detail label="Business ID" value={companyAccount.businessId ?? "—"} mono /><Detail label="WABA ID" value={companyAccount.wabaId ?? "—"} mono /><Detail label="Phone Number ID" value={companyAccount.phoneNumberId ?? "—"} mono /></> : null}</div>{canManage ? <div className="flex flex-wrap gap-2"><Button disabled={pending} onClick={() => changeStatus(companyAccount.status !== "active")} size="sm" variant="outline">{companyAccount.status === "active" ? <><Pause />Pausar</> : "Reativar"}</Button><Button disabled={pending} onClick={() => setDisconnectOpen(true)} size="sm" variant="destructive"><Trash />Desconectar número</Button></div> : null}</> : null}
-      {feedback ? <p aria-live="polite" className="flex items-start gap-2 text-sm text-muted-foreground"><Warning className="mt-0.5 size-4 shrink-0" />{feedback}</p> : null}
       <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}><DialogPopup className="sm:max-w-md"><DialogHeader><DialogTitle>Desconectar este número do CRM?</DialogTitle><DialogDescription>Novos envios e recebimentos oficiais serão interrompidos. O histórico, auditoria e campanhas permanecem preservados; você poderá reconectar depois.</DialogDescription></DialogHeader><DialogFooter><Button disabled={pending} onClick={() => setDisconnectOpen(false)} variant="outline">Cancelar</Button><Button disabled={pending} onClick={disconnect} variant="destructive">{pending ? "Desconectando…" : "Desconectar número"}</Button></DialogFooter></DialogPopup></Dialog>
     </CardContent>
   </Card>;

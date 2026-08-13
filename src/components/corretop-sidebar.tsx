@@ -200,7 +200,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
   return (
     <Sidebar variant="sidebar">
       <SidebarHeader className="space-y-3 border-b border-sidebar-border/50 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3">
-        <Link href="/dashboard" prefetch={false} className="flex h-8 min-w-0 items-center group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center">
+        <Link href="/dashboard" className="flex h-8 min-w-0 items-center group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center">
           <AncoraLogo src={logoUrl} className="h-8 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
           <img src="/icon.png" alt="Ancora" className="hidden size-5 object-contain group-data-[collapsible=icon]:block" />
         </Link>
@@ -214,7 +214,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={isPlantaoActive}
-                render={<Link href="/leads/distribuicao/plantao" onClick={() => isMobile && setOpenMobile(false)} prefetch={false} />}
+                render={<Link href="/leads/distribuicao/plantao" onClick={() => isMobile && setOpenMobile(false)} />}
                 tooltip="Plantão ao vivo"
                 className="group/plantao relative h-9 justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[11px] font-semibold uppercase text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/40 hover:bg-emerald-500/15 dark:text-emerald-400 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-emerald-500/25 group-data-[collapsible=icon]:bg-emerald-500/12 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
               >
@@ -261,7 +261,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       )}
                       <SidebarMenuButton
                         isActive={isActive}
-                        render={<Link href={item.url} onClick={() => isMobile && setOpenMobile(false)} prefetch={false} />}
+                        render={<Link href={item.url} onClick={() => isMobile && setOpenMobile(false)} />}
                         tooltip={item.label}
                         className="relative z-10 h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
                       >
@@ -319,13 +319,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 {user?.userProfileEnabled ? (
-                  <DropdownMenuItem render={<Link href="/settings?tab=conta" prefetch={false} />}>
+                  <DropdownMenuItem render={<Link href="/settings?tab=conta" />}>
                     <UserCircle className="size-4" />
                     Meu perfil
                   </DropdownMenuItem>
                 ) : null}
                 {roleKey && user?.permissions?.includes("acessar_configuracoes") ? (
-                  <DropdownMenuItem render={<Link href="/settings" prefetch={false} />}>
+                  <DropdownMenuItem render={<Link href="/settings" />}>
                     <SlidersHorizontal className="size-4" />
                     Configurações
                   </DropdownMenuItem>

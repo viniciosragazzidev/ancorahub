@@ -17,7 +17,6 @@ import {
   Send,
   ShieldCheck,
   Layers,
-  Check,
   RefreshCw,
   Activity,
   AlertTriangle,
@@ -33,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +47,6 @@ import {
   addTestNumberAction,
   removeTestNumberAction,
   resetMemoryAction,
-  sendWhatsAppTestMessageAction,
   saveFollowUpRuleAction,
   deleteFollowUpRuleAction,
   updateToolPermissionAction,
@@ -239,13 +238,6 @@ export function QualificationHubClient({
   const [brokerProfiles, setBrokerProfiles] = useState(initialBrokerProfiles);
   const [alerts, setAlerts] = useState(initialAlerts);
 
-  // WhatsApp Test Message State
-  const [testDestPhone, setTestDestPhone] = useState("");
-  const [testMsgType, setTestMsgType] = useState<"free_text" | "approved_template" | "internal_test">("free_text");
-  const [testMsgText, setTestMsgText] = useState("Teste de conexão do WhatsApp AncoraHub.");
-  const [testResult, setTestResult] = useState<any>(null);
-  const [isSendingTest, setIsSendingTest] = useState(false);
-
   const activeAlertsCount = alerts.filter((a) => a.status === "active").length;
 
   const tabs = [
@@ -317,29 +309,7 @@ export function QualificationHubClient({
     }
   };
 
-  const handleSendTestMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!testDestPhone.trim()) {
-      toast.error("Informe um número de telefone de teste.");
-      return;
-    }
-    setIsSendingTest(true);
-    try {
-      const result = await sendWhatsAppTestMessageAction({
-        destinationNumber: testDestPhone,
-        messageType: testMsgType,
-        messageText: testMsgText,
-      });
-      setTestResult(result);
-      toast.success(`Mensagem de teste aceita pela Meta (ID: ${result.messageId})`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro ao enviar mensagem de teste.");
-    } finally {
-      setIsSendingTest(false);
-    }
-  };
-
-  const handleSaveFollowUpRule = async (e: React.FormEvent) => {
+const handleSaveFollowUpRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRuleName.trim()) {
       toast.error("Informe o nome da regra de follow-up.");
@@ -734,74 +704,7 @@ export function QualificationHubClient({
               </Card>
 
               {/* TEST MESSAGE SENDER */}
-              <Card variant="subtle" className="rounded-xl border-border/80 md:col-span-2 p-5 space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Send className="size-4 text-primary" />
-                    Envio de Mensagem de Teste (Rastreável)
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Envie mensagens diretas com rastreamento de entregabilidade e custos estimados.
-                  </p>
-                </div>
-
-                <form onSubmit={handleSendTestMessage} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">Número de Destino (+55...)</Label>
-                      <Input
-                        value={testDestPhone}
-                        onChange={(e) => setTestDestPhone(e.target.value)}
-                        placeholder="+55 71 99999-9999"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold">Tipo de Mensagem</Label>
-                      <Select
-                        value={testMsgType}
-                        onValueChange={(val: any) => setTestMsgType(val)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="free_text">Texto livre (Janela de 24h)</SelectItem>
-                          <SelectItem value="approved_template">Template oficial aprovado</SelectItem>
-                          <SelectItem value="internal_test">Teste interno de diagnóstico</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold">Conteúdo da Mensagem</Label>
-                    <Textarea
-                      value={testMsgText}
-                      onChange={(e) => setTestMsgText(e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-
-                  <Button type="submit" disabled={isSendingTest} size="sm" className="gap-2">
-                    <Send className="size-3.5" />
-                    {isSendingTest ? "Enviando para Meta..." : "Enviar Teste de Conexão"}
-                  </Button>
-                </form>
-
-                {testResult && (
-                  <div className="rounded-lg border p-4 bg-muted/40 text-xs space-y-2">
-                    <div className="flex items-center gap-2 font-semibold text-emerald-600">
-                      <Check className="size-4" /> Aceito pela Meta API
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-                      <div>Message ID: <span className="font-mono text-foreground">{testResult.messageId}</span></div>
-                      <div>Status Inicial: <Badge variant="outline">{testResult.initialStatus}</Badge></div>
-                      <div>Custo Estimado: <span className="font-semibold text-foreground">R$ {testResult.estimatedCostBrl.toFixed(2)}</span></div>
-                      <div>Destino Mascarado: <span className="font-mono text-foreground">{testResult.maskedDestination}</span></div>
-                    </div>
-                  </div>
-                )}
-              </Card>
+              <WhatsAppTestMessageCard className="md:col-span-2" />
             </div>
           </div>
         )}

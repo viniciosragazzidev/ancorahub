@@ -2,16 +2,20 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refreshMock, disconnectMock } = vi.hoisted(() => ({
+const { refreshMock, disconnectMock, toastSuccessMock, toastErrorMock } = vi.hoisted(() => ({
   refreshMock: vi.fn(),
   disconnectMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastErrorMock: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
+vi.mock("sonner", () => ({ toast: { success: toastSuccessMock, error: toastErrorMock } }));
 vi.mock("../actions", () => ({
   confirmMetaConnection: vi.fn(),
   disconnectMetaConnection: disconnectMock,
   getMetaMarketingAttemptAssets: vi.fn(),
+  recordMetaMarketingOnboardingStep: vi.fn(),
   triggerManualMetaSync: vi.fn(),
 }));
 vi.mock("../meta-marketing-oauth-url", () => ({ createMetaMarketingOAuthUrl: vi.fn(() => "https://meta.example/auth") }));
@@ -46,6 +50,8 @@ afterEach(() => {
   cleanup();
   refreshMock.mockClear();
   disconnectMock.mockReset();
+  toastSuccessMock.mockClear();
+  toastErrorMock.mockClear();
 });
 
 describe("MetaIntegrationView", () => {
@@ -55,7 +61,8 @@ describe("MetaIntegrationView", () => {
     expect(screen.getByRole("button", { name: "Conectar Marketing" })).toBeInTheDocument();
     expect(screen.getByText("Conexão exclusiva de Marketing para páginas, campanhas, formulários, pixels e filas.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Conectar Marketing" }));
-    expect(screen.getByText("Você selecionará apenas os ativos que pertencem à sua corretora. O WhatsApp é conectado separadamente.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Conectar Marketing da Meta" })).toBeInTheDocument();
+    expect(screen.getByText(/O WhatsApp oficial é uma conexão separada desta autorização/)).toBeInTheDocument();
   });
 
   it("shows the connected business profile and authorized assets", () => {
@@ -84,6 +91,6 @@ describe("MetaIntegrationView", () => {
 
     await waitFor(() => expect(disconnectMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(refreshMock).toHaveBeenCalled());
-    expect(screen.getByText(/Conexão de Marketing desconectada/)).toBeInTheDocument();
+    expect(toastSuccessMock).toHaveBeenCalledWith("Conexão de Marketing desconectada.", { description: expect.any(String) });
   });
 });

@@ -1,4 +1,4 @@
-import { Globe, LinkSimple, Megaphone, Plug, WhatsappLogo } from "@/components/huge-icons";
+import { Globe, LinkSimple, Plug, WhatsappLogo } from "@/components/huge-icons";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,13 +17,6 @@ export const integrationCatalogEntries: IntegrationCard[] = [
     description: "Configure a captação de formulários Meta e acompanhe as Páginas que alimentam a operação.",
     href: "/integrations/meta",
     icon: Globe,
-    status: "available",
-  },
-  {
-    name: "Facebook Lead Ads",
-    description: "Receba formulários de anúncios diretamente na fila central da empresa.",
-    href: "/integrations/meta",
-    icon: Megaphone,
     status: "available",
   },
   {

@@ -5,6 +5,10 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
+import {
+  getWhatsAppTestFailureMessage,
+  normalizeWhatsAppDestination,
+} from "./whatsapp-diagnostic-copy";
 
 export type WhatsAppConnectionDiagnostic = {
   channelConnected: boolean;
@@ -173,12 +177,12 @@ export async function sendWhatsAppTestMessage(
   const data = sendWhatsAppTestMessageSchema.parse(input);
   const db = getDatabase();
 
-  const normalizedNumber = data.destinationNumber.replace(/\D/g, "");
-  if (normalizedNumber.length < 10) {
+  const normalizedNumber = normalizeWhatsAppDestination(data.destinationNumber);
+  if (normalizedNumber.length < 12) {
     throw new Error("Número de destino inválido. Informe o código de país e DDD (ex: 5571999999999).");
   }
 
-  const maskedDestination = maskPhoneNumber(data.destinationNumber);
+  const maskedDestination = maskPhoneNumber(normalizedNumber);
   const now = new Date();
 
   let messageId = `wamid.test_${randomUUID().slice(0, 12)}`;
@@ -223,8 +227,10 @@ export async function sendWhatsAppTestMessage(
       }
     }
   } catch (err) {
-    console.error("[whatsapp-diagnostic] Error dispatching test message:", err);
-    errorReason = err instanceof Error ? err.message : "Falha na transmissão da mensagem via provedor WhatsApp.";
+    const providerCode =
+      err && typeof err === "object" && "code" in err && typeof err.code === "number" ? err.code : undefined;
+    console.warn("[whatsapp-diagnostic] test_message.rejected", { providerCode });
+    errorReason = getWhatsAppTestFailureMessage(err);
   }
 
   // Registrar log de auditoria

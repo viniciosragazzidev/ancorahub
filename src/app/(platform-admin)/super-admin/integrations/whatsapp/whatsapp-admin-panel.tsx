@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppSelect } from "@/components/ui/select";
@@ -18,8 +20,10 @@ function formatDate(value: Date | null) {
 }
 
 export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]; connections: Connection[] }) {
+  const router = useRouter();
   const [tenantId, setTenantId] = useState(tenants[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
   const connectionByTenant = new Map(connections.map((connection) => [connection.tenantId, connection]));
   const selectedConnection = connectionByTenant.get(tenantId);
 
@@ -32,6 +36,22 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
       if (!result.success) { toast.error(result.error); return; }
       toast.success("Empresa conectada ao WhatsApp oficial", { description: result.displayPhoneNumber ?? undefined });
       window.location.reload();
+    });
+  }
+
+  function confirmDisconnect() {
+    if (!selectedConnection) return;
+    setDisconnectOpen(false);
+    startTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("channelId", selectedConnection.id);
+        await disconnectWhatsAppTenantAction(formData);
+        toast.success("Canal oficial desconectado.", { description: "O histórico foi preservado." });
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível desconectar o canal.");
+      }
     });
   }
 
@@ -66,9 +86,10 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
           <div className="space-y-1.5"><Label htmlFor="wabaId">WABA ID</Label><Input id="wabaId" inputMode="numeric" name="wabaId" placeholder="Identificador da conta WhatsApp Business" required /></div>
           <div className="space-y-1.5"><Label htmlFor="phoneNumberId">Phone Number ID</Label><Input format="none" id="phoneNumberId" inputMode="numeric" name="phoneNumberId" placeholder="Identificador do número na Meta" required /></div>
           <div className="space-y-1.5 lg:col-span-2"><Label htmlFor="accessToken">Access Token</Label><Input autoComplete="new-password" id="accessToken" name="accessToken" placeholder="Cole o token somente nesta sessão" required type="password" /><p className="text-xs text-muted-foreground">O token é usado para validar a Meta e salvo apenas cifrado. Nunca será retornado ou mostrado novamente.</p></div>
-          <div className="flex flex-wrap gap-3 lg:col-span-2"><Button disabled={isPending || !tenantId} type="submit">{isPending ? "Validando e conectando…" : "Validar e conectar empresa"}</Button>{selectedConnection ? <Button disabled={isPending} formAction={disconnectWhatsAppTenantAction} formNoValidate name="channelId" value={selectedConnection.id} type="submit" variant="outline">Desconectar canal</Button> : null}</div>
+          <div className="flex flex-wrap gap-3 lg:col-span-2"><Button disabled={isPending || !tenantId} type="submit">{isPending ? "Validando e conectando…" : "Validar e conectar empresa"}</Button>{selectedConnection ? <Button disabled={isPending} onClick={() => setDisconnectOpen(true)} type="button" variant="outline">Desconectar canal</Button> : null}</div>
         </form>
       </CardContent>
     </Card>
+    <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}><DialogPopup className="sm:max-w-md"><DialogHeader><DialogTitle>Desconectar este canal oficial?</DialogTitle><DialogDescription>O número {selectedConnection?.displayPhoneNumber ?? ""} será desativado no CRM desta empresa. O histórico é preservado e a empresa poderá conectar um novo número depois.</DialogDescription></DialogHeader><DialogFooter><Button disabled={isPending} variant="outline" onClick={() => setDisconnectOpen(false)}>Cancelar</Button><Button disabled={isPending} variant="destructive" onClick={confirmDisconnect}>{isPending ? "Desconectando…" : "Desconectar canal"}</Button></DialogFooter></DialogPopup></Dialog>
   </div>;
 }
