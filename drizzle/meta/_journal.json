@@ -484,6 +484,13 @@
       "when": 1786620600000,
       "tag": "0118_qualification_hub_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1786626000000,
+      "tag": "0119_whatsapp_cloud_registration_state",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import { processMetaOutboundBatch, enqueueMetaTextMessage } from "@/features/com
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { startQualificationConversationForLead } from "@/features/ai-agent/conversation-state-machine";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 
 const questions = [
   { key: "city", prompt: "Para começar, em qual cidade você pretende contratar o plano?" },
@@ -65,7 +66,7 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   }
   const [lead] = await db.select({ id: schema.leads.id, phone: schema.leads.telefone }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
   if (!lead?.phone) return { started: false, reason: "missing_phone" as const };
-  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, "meta_cloud_api"), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
+  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
   if (!channel) return { started: false, reason: "missing_channel" as const };
   const existing = await db.select({ id: schema.aiQualificationSessions.id, status: schema.aiQualificationSessions.status }).from(schema.aiQualificationSessions).where(and(eq(schema.aiQualificationSessions.tenantId, input.tenantId), eq(schema.aiQualificationSessions.leadId, input.leadId))).limit(1);
   if (existing[0] && !["failed", "expired", "handed_off"].includes(existing[0].status)) return { started: false, reason: "already_started" as const };
@@ -136,7 +137,7 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
 
 async function queueReply(input: { tenantId: string; leadId: string; phone: string; actorUserId: string }, sessionId: string, body: string, version: number) {
   const db = getDatabase();
-  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, "meta_cloud_api"), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
+  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
   if (!channel) return;
   await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: input.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${sessionId}:reply:${version}:${body.slice(0, 24)}` });
   await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] reply delivery deferred", error));

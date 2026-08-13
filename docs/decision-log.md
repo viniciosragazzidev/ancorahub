@@ -1,5 +1,18 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-077 — Retomada de qualificação pendente por mensagem inbound
+
+**Estado:** Aceita
+**Data:** 2026-08-13
+
+Um lead que tenha entrado antes de a IA ser ativada pode iniciar ou retomar a
+qualificação na próxima mensagem recebida no WhatsApp oficial, desde que seu
+`qualification_status` ainda seja `pending`. Conversas pausadas, assumidas por humano,
+opt-out, números internos e leads que já possuem resultado de qualificação permanecem
+protegidos e não são reiniciados. Ao concluir os campos exigidos, o motor persiste a
+qualificação, encaminha pelo mesmo resolvedor de distribuição e deixa a conversa em
+espera humana. A ativação continua dependente dos controles global e do tenant.
+
 > **DEC-058 — Intake transacional e outbox de efeitos (aceita em 2026-07-28):** o webhook confirma um lead somente após gravar, na mesma transação, a entrega idempotente, o lead, a timeline, auditoria, evento de distribuição e efeitos pendentes. Distribuição e notificações são executadas fora da requisição por outbox com lease, retry e dead-letter; falha externa não recria o lead nem apaga o trabalho. O Super-admin controla o processador e toda exceção permanece rastreável.
 >
 > **DEC-038 — Processamento resiliente da distribuição (aceita em 2026-07-20):** a distribuição automática usa fila persistente no PostgreSQL e executores idempotentes por rota interna protegida. Locks possuem lease recuperável, falhas transitórias usam backoff configurável e parâmetros iniciais conservadores (lote 25, lease 2 minutos, máximo 8 tentativas) são reversíveis e auditáveis pelo Super-admin. A regra comercial já existente de capacidade, round-robin e SLA não é alterada.
@@ -530,3 +543,29 @@ delegará elegibilidade, capacidade, SLA e escolha do corretor ao motor central 
 distribuição. A transição é reversível por capacidade global e preserva capturas e
 histórico. Eventos de conversão para a Meta ficam preparados, mas permanecem
 desabilitados até consentimento, contrato de dados e homologação explícita.
+
+## DEC-075 — Drenagem imediata e escopada do intake Meta
+
+**Estado:** Aceita
+**Data:** 2026-08-13
+
+Depois de persistir com sucesso um lead recebido por `leadgen`, o webhook da Meta
+pode executar uma drenagem curta dos efeitos e do job de distribuição daquele
+mesmo `tenant_id` e `lead_id`. O processamento nunca busca ou executa trabalho de
+outra corretora e o cron diário continua sendo a recuperação de leases, retries e
+itens que não puderam ser concluídos no request. Uma falha nessa drenagem não
+altera o aceite do webhook, não recria o lead e fica rastreável pela outbox.
+
+## DEC-076 — Ativação server-side do número após Embedded Signup
+
+**Estado:** Aceita
+**Data:** 2026-08-13
+
+A confirmação de posse do número permanece exclusivamente no cadastro hospedado
+pela Meta. Ao receber o `FINISH`, o CRM valida os IDs retornados, persiste o canal
+como pendente e conclui o registro da Cloud API no servidor com PIN de seis dígitos
+gerado aleatoriamente, cifrado em repouso e nunca retornado ao navegador ou aos logs.
+Somente a resposta bem-sucedida da Meta marca o canal como operacional; falhas ficam
+auditadas, bloqueiam envio e oferecem uma nova tentativa segura ao Diretor. Conexões
+anteriores são identificadas como não verificadas até essa confirmação, sem apagar
+histórico. O kill switch global da Cloud API continua sendo a autoridade reversível.

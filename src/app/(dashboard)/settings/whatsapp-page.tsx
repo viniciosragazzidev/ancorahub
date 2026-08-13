@@ -16,6 +16,9 @@ type Channel = {
   status: string;
   qualityRating: string | null;
   messagingLimit: string | null;
+  registrationStatus: string;
+  registrationErrorCode: string | null;
+  registeredAt: Date | null;
   businessId: string | null;
   wabaId: string | null;
   phoneNumberId: string | null;
@@ -37,7 +40,7 @@ type OfficialSetup = {
 };
 
 export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha: ReactNode }) {
-  const officialReady = official.enabled && official.configured && official.companyAccount?.status === "active";
+  const officialReady = official.enabled && official.configured && official.companyAccount?.status === "active" && official.companyAccount.registrationStatus === "registered";
   const canConnectNumber = official.canConfigure && official.enabled && official.configured && official.appId && official.embeddedSignupConfigId && official.companyAccount?.status !== "active";
   return <main className="flex min-h-full flex-col gap-6 bg-background p-4 antialiased lg:p-6">
     <header className="max-w-3xl">

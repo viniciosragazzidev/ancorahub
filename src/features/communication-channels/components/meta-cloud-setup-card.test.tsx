@@ -11,7 +11,7 @@ const { refreshMock, disconnectMock, toastSuccessMock, toastErrorMock } = vi.hoi
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccessMock, error: toastErrorMock } }));
-vi.mock("../actions", () => ({ disconnectMetaCloudChannelAction: disconnectMock, setMetaCloudChannelStatusAction: vi.fn() }));
+vi.mock("../actions", () => ({ completeMetaCloudChannelRegistrationAction: vi.fn(), disconnectMetaCloudChannelAction: disconnectMock, setMetaCloudChannelStatusAction: vi.fn() }));
 
 import { MetaCloudSetupCard } from "./meta-cloud-setup-card";
 
@@ -26,6 +26,7 @@ afterEach(() => {
 const activeChannel = {
   id: "channel-1", displayPhoneNumber: "+55 71 99999-9999", verifiedName: "Âncora Saúde", status: "active",
   qualityRating: "GREEN", messagingLimit: "1K", businessId: "business-1", wabaId: "waba-1", phoneNumberId: "phone-1",
+  registrationStatus: "registered", registrationErrorCode: null, registeredAt: new Date("2026-08-12T12:00:00Z"),
   lastWebhookAt: null, activatedAt: new Date("2026-08-12T12:00:00Z"),
 };
 
@@ -45,6 +46,14 @@ describe("MetaCloudSetupCard", () => {
 
     expect(screen.getByText("Nenhum número oficial conectado")).toBeInTheDocument();
     expect(screen.getByText("Use o botão abaixo para escolher a conta WhatsApp Business e o número corporativo.")).toBeInTheDocument();
+  });
+
+  it("offers a safe Cloud API activation retry instead of claiming a legacy number is active", () => {
+    render(<MetaCloudSetupCard enabled configured missing={[]} companyAccount={{ ...activeChannel, registrationStatus: "legacy_unverified" }} canManage />);
+
+    expect(screen.getByText("Este número ainda precisa de ativação técnica")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ativar número na Cloud API" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Pausar" })).not.toBeInTheDocument();
   });
 
   it("shows an error toast when disconnecting the official number fails", async () => {

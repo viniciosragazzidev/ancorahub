@@ -146,7 +146,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   if ("conflict" in committed) return { success: false, code: "IDEMPOTENCY_CONFLICT" };
   if (committed.duplicate) return { success: true, leadId: committed.leadId, duplicate: true };
 
-  void notifyLeadArrived(leadId, tenantId, branchId, normalizedName, `sync-intake:${leadId}`).catch((err) => console.error("[createLeadFromWebhookSync] notifyLeadArrived error:", err));
+  void notifyLeadArrived(leadId, tenantId, branchId, normalizedName, `lead-arrived:${leadId}`).catch((err) => console.error("[createLeadFromWebhookSync] notifyLeadArrived error:", err));
 
   if (qualificationEngineEnabled && !bypassPlantao) {
     const qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId }).catch(() => ({ started: false as const, reason: "failed" as const }));

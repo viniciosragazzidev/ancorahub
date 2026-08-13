@@ -1,14 +1,14 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { encryptChannelSecret } from "./secret-crypto";
-import { exchangeEmbeddedSignupCode, getMetaPhoneNumber, getMetaWaba, subscribeWabaToApp } from "./meta-cloud-client";
+import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
+import { exchangeEmbeddedSignupCode, getMetaPhoneNumber, getMetaWaba, registerMetaPhoneNumber, subscribeWabaToApp } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER, type MetaEmbeddedSignupPayload } from "./types";
@@ -18,6 +18,37 @@ const signupInput = z.object({ code: z.string().trim().min(12).max(4096), busine
 function requireSignupValue(value: string | undefined, label: string) {
   if (!value) throw new Error(`A Meta não retornou ${label}. Refaça o cadastro.`);
   return value;
+}
+
+function generateRegistrationPin() {
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+async function registerChannelPhone(input: {
+  channelId: string;
+  tenantId: string;
+  actorUserId: string;
+  phoneNumberId: string;
+  accessToken: string;
+  registrationPin: string;
+}) {
+  const db = getDatabase();
+  const now = new Date();
+  try {
+    await registerMetaPhoneNumber(input.phoneNumberId, input.accessToken, input.registrationPin);
+  } catch (error) {
+    const errorCode = error instanceof Error && "code" in error && typeof error.code === "number" ? String(error.code) : "unknown";
+    await db.transaction(async (tx) => {
+      await tx.update(schema.communicationChannels).set({ status: "pending", registrationStatus: "failed", registrationErrorCode: errorCode, updatedAt: new Date() }).where(and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId)));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "communication_channel", entidadeId: input.channelId, acao: "meta_cloud_channel_registration_failed" });
+    });
+    throw new Error("A Meta concluiu o cadastro, mas o número ainda não foi ativado para a Cloud API. Revise o número na Meta e tente conectar novamente.");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.update(schema.communicationChannels).set({ status: "active", registrationStatus: "registered", registrationErrorCode: null, registeredAt: now, activatedAt: now, updatedAt: now }).where(and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId)));
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "communication_channel", entidadeId: input.channelId, acao: "meta_cloud_channel_registered" });
+  });
 }
 
 export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSignupPayload) {
@@ -40,19 +71,53 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
 
   const [existing] = await db.select().from(schema.communicationChannels).where(and(eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.phoneNumberId, phoneNumberId))).limit(1);
   if (existing && existing.tenantId !== context.tenantId) throw new Error("Este número oficial já está vinculado a outra corretora.");
-  const [currentDefault] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true), eq(schema.communicationChannels.status, "active"))).limit(1);
+  const [currentDefault] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
   if (currentDefault && currentDefault.id !== existing?.id) throw new Error("Esta corretora já possui um canal oficial ativo. Desconecte-o antes de trocar o número.");
   const config = getMetaCloudServerConfig();
   const now = new Date();
-  const values = { tenantId: context.tenantId, branchId: null, ownerUserId: null, provider: META_CLOUD_PROVIDER, channelType: "shared", status: "active", businessId, wabaId, phoneNumberId, displayPhoneNumber: phone.display_phone_number ?? null, verifiedName: phone.verified_name ?? null, qualityRating: phone.quality_rating ?? null, messagingLimit: phone.messaging_limit_tier ?? null, accessTokenCiphertext: encryptChannelSecret(accessToken, config.tokenEncryptionKey), tokenKeyVersion: "v1", tokenExpiresAt: token.expires_in ? new Date(now.getTime() + token.expires_in * 1000) : null, activatedAt: now, updatedAt: now };
+  const registrationPin = existing?.registrationPinCiphertext
+    ? decryptChannelSecret(existing.registrationPinCiphertext, config.tokenEncryptionKey)
+    : generateRegistrationPin();
+  const values = { tenantId: context.tenantId, branchId: null, ownerUserId: null, provider: META_CLOUD_PROVIDER, channelType: "shared", status: "pending", businessId, wabaId, phoneNumberId, displayPhoneNumber: phone.display_phone_number ?? null, verifiedName: phone.verified_name ?? null, qualityRating: phone.quality_rating ?? null, messagingLimit: phone.messaging_limit_tier ?? null, registrationStatus: "registering", registrationPinCiphertext: encryptChannelSecret(registrationPin, config.tokenEncryptionKey), registrationErrorCode: null, registeredAt: null, accessTokenCiphertext: encryptChannelSecret(accessToken, config.tokenEncryptionKey), tokenKeyVersion: "v1", tokenExpiresAt: token.expires_in ? new Date(now.getTime() + token.expires_in * 1000) : null, activatedAt: null, updatedAt: now };
   const channelId = existing?.id ?? randomUUID();
   if (existing) await db.update(schema.communicationChannels).set({ ...values, isDefault: true }).where(eq(schema.communicationChannels.id, existing.id));
   else {
     await db.insert(schema.communicationChannels).values({ id: channelId, ...values, isDefault: true, createdBy: context.userId, createdAt: now });
   }
-  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channelId, acao: existing ? "meta_cloud_channel_reconnected" : "meta_cloud_channel_connected" });
+  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channelId, acao: existing ? "meta_cloud_channel_reconnected" : "meta_cloud_channel_signup_received" });
+
+  try {
+    await registerChannelPhone({ channelId, tenantId: context.tenantId, actorUserId: context.userId, phoneNumberId, accessToken, registrationPin });
+  } catch (error) {
+    revalidatePath("/integrations/whatsapp");
+    throw error;
+  }
   revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
-  return { success: true, channelId, displayPhoneNumber: phone.display_phone_number ?? null };
+  return { success: true, channelId, displayPhoneNumber: phone.display_phone_number ?? null, registrationStatus: "registered" };
+}
+
+/** Completes registration for a legacy signup without asking the user to repeat Meta's phone verification. */
+export async function completeMetaCloudChannelRegistrationAction(channelId: string) {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director") throw new Error("Somente o Diretor pode concluir a ativação do canal oficial.");
+  if (!(await isMetaCloudWhatsAppEnabled())) throw new Error("A integração oficial está desativada pelo Super-admin.");
+  const db = getDatabase();
+  const [channel] = await db.select().from(schema.communicationChannels).where(and(eq(schema.communicationChannels.id, channelId), eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), isNull(schema.communicationChannels.branchId))).limit(1);
+  if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Este canal não possui as credenciais necessárias. Reconecte-o pela Meta.");
+  const config = getMetaCloudServerConfig();
+  const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, config.tokenEncryptionKey);
+  const registrationPin = channel.registrationPinCiphertext
+    ? decryptChannelSecret(channel.registrationPinCiphertext, config.tokenEncryptionKey)
+    : generateRegistrationPin();
+  await db.update(schema.communicationChannels).set({ status: "pending", registrationStatus: "registering", registrationPinCiphertext: encryptChannelSecret(registrationPin, config.tokenEncryptionKey), registrationErrorCode: null, updatedAt: new Date() }).where(and(eq(schema.communicationChannels.id, channel.id), eq(schema.communicationChannels.tenantId, context.tenantId)));
+  try {
+    await registerChannelPhone({ channelId: channel.id, tenantId: context.tenantId, actorUserId: context.userId, phoneNumberId: channel.phoneNumberId, accessToken, registrationPin });
+  } catch (error) {
+    revalidatePath("/integrations/whatsapp");
+    throw error;
+  }
+  revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
+  return { success: true };
 }
 
 export async function setMetaCloudChannelStatusAction(channelId: string, active: boolean) {
@@ -82,7 +147,7 @@ export async function disconnectMetaCloudChannelAction(channelId: string) {
   await db.transaction(async (tx) => {
     await tx.update(schema.communicationChannels).set({
       status: "inactive", isDefault: false, accessTokenCiphertext: null,
-      tokenKeyVersion: null, tokenExpiresAt: null, updatedAt: now,
+      tokenKeyVersion: null, tokenExpiresAt: null, registrationPinCiphertext: null, updatedAt: now,
     }).where(eq(schema.communicationChannels.id, channel.id));
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "communication_channel",

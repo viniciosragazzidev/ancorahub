@@ -10,6 +10,7 @@ import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { META_CLOUD_PROVIDER } from "./types";
 import type { MetaWebhookPayload } from "./types";
+import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
 
 export async function isMetaCloudWhatsAppEnabled() {
   const [row] = await getDatabase()
@@ -30,6 +31,7 @@ export async function getPreferredMetaCloudChannel(input: { tenantId: string; br
         eq(schema.communicationChannels.tenantId, input.tenantId),
         eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
         eq(schema.communicationChannels.status, "active"),
+        eq(schema.communicationChannels.registrationStatus, "registered"),
       ),
     )
     .limit(1);
@@ -37,6 +39,9 @@ export async function getPreferredMetaCloudChannel(input: { tenantId: string; br
 }
 
 export async function sendMetaCloudChannelText(input: { channel: typeof schema.communicationChannels.$inferSelect; to: string; body: string }) {
+  if (input.channel.registrationStatus !== "registered") {
+    throw new Error("O número oficial ainda não foi ativado para a Cloud API.");
+  }
   if (!input.channel.phoneNumberId || !input.channel.accessTokenCiphertext) {
     throw new Error("Canal corporativo incompleto.");
   }
@@ -162,7 +167,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
 
         if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         const [leads, clients] = await Promise.all([
-          db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(eq(schema.leads.tenantId, channel.tenantId)),
+          db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus }).from(schema.leads).where(eq(schema.leads.tenantId, channel.tenantId)),
           db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, channel.tenantId)),
         ]);
         const matchingLeads = leads.filter((item) => samePhone(item.phone, phone));
@@ -198,7 +203,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
 
-        if (activeLeadId) {
+        if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
           try {
             const aiResult = await processInboundAiResponse({
@@ -223,6 +228,12 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
               error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
             });
           }
+        } else if (activeLeadId) {
+          console.info("[ai-wpp] inbound.ignored_non_pending_qualification", {
+            tenantId: channel.tenantId,
+            leadId: activeLeadId,
+            qualificationStatus: lead?.qualificationStatus ?? "unknown",
+          });
         }
         await setWebhookEventResult(eventId, "processed");
         processed += 1;

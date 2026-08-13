@@ -51,8 +51,8 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
     completingRef.current = true;
     try {
       await completeMetaEmbeddedSignupAction({ code, businessId: result.businessId, wabaId: result.wabaId, phoneNumberId: result.phoneNumberId });
-      setMessage("Número oficial conectado e validado pela Meta.");
-       window.location.assign("/integrations/whatsapp?channel=connected");
+      setMessage("Cadastro concluído. O CRM confirmou a ativação do número na Cloud API.");
+      window.location.assign("/integrations/whatsapp?channel=connected");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível concluir a conexão. Revise a conta e tente novamente.");
     } finally {
@@ -130,5 +130,5 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
     document.head.appendChild(script);
   };
 
-  return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Conectar número oficial</CardTitle><CardDescription>Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. Páginas e anúncios não fazem parte desta etapa.</CardDescription></CardHeader><CardContent className="space-y-3"><Button onClick={start} disabled={disabled || loading} className="w-full">{loading ? "Conectando com a Meta…" : "Conectar número com Facebook"}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("conectado") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
+  return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Conectar número oficial</CardTitle><CardDescription>Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. A confirmação do telefone acontece dentro da Meta; o CRM conclui a ativação técnica após o término.</CardDescription></CardHeader><CardContent className="space-y-3"><Button onClick={start} disabled={disabled || loading} className="w-full">{loading ? "Conectando com a Meta…" : "Conectar número com Facebook"}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("concluído") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
 }

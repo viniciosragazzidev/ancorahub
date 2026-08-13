@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateQualification,
   getNextQualificationQuestion,
+  shouldStartOrResumeAiQualification,
 } from "@/features/qualification-engine/service";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 import { resolveQualificationDestination } from "@/features/ai-qualification/destination-routing-service";
@@ -25,6 +26,19 @@ describe("Qualification Flow Unit Tests", () => {
       entryRules: { origins: [], campaigns: [], leadTypes: [], branchIds: [], tags: [] },
     },
   };
+
+  describe("re-entry after the assistant is enabled", () => {
+    it("allows an existing lead with pending qualification to start or resume through WhatsApp", () => {
+      expect(shouldStartOrResumeAiQualification("pending")).toBe(true);
+    });
+
+    it.each(["qualified", "hot", "warm", "cold", "lost", "unknown"]) (
+      "does not restart qualification once the lead is no longer pending (%s)",
+      (qualificationStatus) => {
+        expect(shouldStartOrResumeAiQualification(qualificationStatus)).toBe(false);
+      },
+    );
+  });
 
   describe("getNextQualificationQuestion", () => {
     it("returns customerName (Q1) when memory is empty", () => {

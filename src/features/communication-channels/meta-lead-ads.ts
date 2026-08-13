@@ -8,6 +8,8 @@ import { generateWebhookToken, resolveRequestId } from "@/features/leads/webhook
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
+import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
+import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 import { MetaCloudApiError } from "./meta-cloud-client";
 import { getMetaLeadAdsWebhookConfig } from "./meta-cloud-config";
@@ -77,29 +79,24 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   };
 }
 
-async function fetchMetaLead(leadgenId: string, tenantAccessToken: string): Promise<MetaLeadAdRecord> {
+export async function fetchMetaLead(leadgenId: string, tenantAccessToken: string): Promise<MetaLeadAdRecord> {
   const config = getMetaLeadAdsWebhookConfig();
   const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,form_id,campaign_id,campaign_name,field_data`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${tenantAccessToken}` }, cache: "no-store",
   });
   const payload = await response.json().catch(() => ({})) as MetaLeadAdRecord & { error?: { message?: string; code?: number } };
-  if (!response.ok) {
-    if (payload.error?.code === 100 || response.status === 400 || response.status === 404) {
-      return {
-        id: leadgenId,
-        created_time: new Date().toISOString(),
-        ad_id: "test_ad",
-        form_id: "test_form",
-        field_data: [
-          { name: "full_name", values: ["Lead de Teste Meta"] },
-          { name: "phone_number", values: ["+5511999999999"] },
-          { name: "email", values: ["teste.meta@ancorahub.com.br"] },
-        ],
-      };
-    }
-    throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a leitura do lead.", response.status, payload.error?.code);
-  }
+  if (!response.ok) throw new MetaCloudApiError(
+    "A Meta não permitiu carregar os detalhes deste lead. Ele não foi criado no CRM.",
+    response.status,
+    payload.error?.code,
+  );
   return payload;
+}
+
+/** Processes only this lead's durable work; the daily cron remains its recovery path. */
+async function processMetaLeadImmediately(input: { tenantId: string; leadId: string }) {
+  await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 3 });
+  await runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 });
 }
 
 export async function configureMetaLeadAdsSource(input: { tenantId: string; branchId: string | null; pageId: string; adAccountId: string | null; actorUserId: string }) {
@@ -198,6 +195,15 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);
         if (!result.success) throw new Error(result.code);
+        try {
+          await processMetaLeadImmediately({ tenantId: source.tenantId, leadId: result.leadId });
+        } catch (error) {
+          // The lead is durable and the outbox retries it later; do not induce a duplicate Meta delivery.
+          console.error("[meta-lead-ads] immediate processing deferred", {
+            leadId: result.leadId,
+            message: error instanceof Error ? error.message.slice(0, 160) : "unexpected_error",
+          });
+        }
         await db.update(schema.metaLeadAdSources).set({ lastLeadAt: receivedAt, lastError: null, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
         processed += 1;
       } catch (error) {

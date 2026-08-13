@@ -49,7 +49,7 @@ describe("MetaEmbeddedSignupCard", () => {
       wabaId: "123456789012345",
       phoneNumberId: "987654321098765",
     }));
-    expect(await screen.findByText("Número oficial conectado e validado pela Meta.")).toBeInTheDocument();
+    expect(await screen.findByText("Cadastro concluído. O CRM confirmou a ativação do número na Cloud API.")).toBeInTheDocument();
     expect(assignMock).toHaveBeenCalledWith("/integrations/whatsapp?channel=connected");
   });
 });

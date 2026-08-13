@@ -72,25 +72,41 @@ function errorMessage(error: unknown) {
   return (error instanceof Error ? error.message : "Falha inesperada.").replace(/[\r\n]+/g, " ").slice(0, 240);
 }
 
-async function recoverExpiredLeases(now: Date) {
+async function recoverExpiredLeases(now: Date, tenantId?: string, leadId?: string) {
   const result = await getDatabase().update(schema.leadEffectOutbox).set({
     status: "retrying", lockedAt: null, lockedBy: null, leaseExpiresAt: null, runAfter: now,
     lastErrorCode: "LEASE_EXPIRED", lastErrorMessage: "Execução recuperada após expiração do lease.", updatedAt: now,
-  }).where(and(eq(schema.leadEffectOutbox.status, "processing"), lt(schema.leadEffectOutbox.leaseExpiresAt, now))).returning({ id: schema.leadEffectOutbox.id });
+  }).where(and(
+    eq(schema.leadEffectOutbox.status, "processing"),
+    lt(schema.leadEffectOutbox.leaseExpiresAt, now),
+    tenantId ? eq(schema.leadEffectOutbox.tenantId, tenantId) : undefined,
+    leadId ? eq(schema.leadEffectOutbox.leadId, leadId) : undefined,
+  )).returning({ id: schema.leadEffectOutbox.id });
   return result.length;
 }
 
-async function claimNext(workerId: string, leaseSeconds: number) {
+async function claimNext(workerId: string, leaseSeconds: number, tenantId?: string, leadId?: string) {
   const now = new Date();
   const [candidate] = await getDatabase().select({ id: schema.leadEffectOutbox.id })
     .from(schema.leadEffectOutbox)
-    .where(and(inArray(schema.leadEffectOutbox.status, [...activeStatuses]), lte(schema.leadEffectOutbox.runAfter, now)))
+    .where(and(
+      inArray(schema.leadEffectOutbox.status, [...activeStatuses]),
+      lte(schema.leadEffectOutbox.runAfter, now),
+      tenantId ? eq(schema.leadEffectOutbox.tenantId, tenantId) : undefined,
+      leadId ? eq(schema.leadEffectOutbox.leadId, leadId) : undefined,
+    ))
     .orderBy(asc(schema.leadEffectOutbox.runAfter), asc(schema.leadEffectOutbox.createdAt)).limit(1);
   if (!candidate) return null;
   const [claimed] = await getDatabase().update(schema.leadEffectOutbox).set({
     status: "processing", attemptCount: sql`${schema.leadEffectOutbox.attemptCount} + 1`, lockedAt: now,
     lockedBy: workerId, leaseExpiresAt: new Date(now.getTime() + leaseSeconds * 1000), updatedAt: now,
-  }).where(and(eq(schema.leadEffectOutbox.id, candidate.id), inArray(schema.leadEffectOutbox.status, [...activeStatuses]), lte(schema.leadEffectOutbox.runAfter, now))).returning();
+  }).where(and(
+    eq(schema.leadEffectOutbox.id, candidate.id),
+    inArray(schema.leadEffectOutbox.status, [...activeStatuses]),
+    lte(schema.leadEffectOutbox.runAfter, now),
+    tenantId ? eq(schema.leadEffectOutbox.tenantId, tenantId) : undefined,
+    leadId ? eq(schema.leadEffectOutbox.leadId, leadId) : undefined,
+  )).returning();
   return claimed ?? null;
 }
 
@@ -114,7 +130,7 @@ async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect
     return;
   }
   if (effect.type === "NOTIFY_LEAD_ARRIVED") {
-    await notifyLeadArrived(effect.leadId, effect.tenantId, payload.branchId ?? null, payload.leadName ?? "Novo lead", `lead-arrived:${effect.id}`);
+    await notifyLeadArrived(effect.leadId, effect.tenantId, payload.branchId ?? null, payload.leadName ?? "Novo lead", `lead-arrived:${effect.leadId}`);
     return;
   }
   if (effect.type === "NOTIFY_LEAD_ASSIGNED") {
@@ -145,14 +161,14 @@ async function retryOrFail(effect: typeof schema.leadEffectOutbox.$inferSelect, 
   return exhausted;
 }
 
-export async function runLeadEffectOutboxProcessor(input: { limit?: number } = {}) {
+export async function runLeadEffectOutboxProcessor(input: { tenantId?: string; leadId?: string; limit?: number } = {}) {
   const config = await getLeadEffectOutboxConfig();
   const result = { recoveredLeases: 0, claimed: 0, completed: 0, retried: 0, failed: 0 };
   if (!config.enabled) return result;
-  result.recoveredLeases = await recoverExpiredLeases(new Date());
+  result.recoveredLeases = await recoverExpiredLeases(new Date(), input.tenantId, input.leadId);
   const workerId = `lead-effects:${randomUUID()}`;
   for (let index = 0; index < Math.min(input.limit ?? config.batchSize, config.batchSize); index += 1) {
-    const effect = await claimNext(workerId, config.leaseSeconds);
+    const effect = await claimNext(workerId, config.leaseSeconds, input.tenantId, input.leadId);
     if (!effect) break;
     result.claimed += 1;
     try {

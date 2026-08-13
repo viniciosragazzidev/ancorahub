@@ -42,6 +42,16 @@ export type QualificationQuestionDefinition = {
   errorMessage: string;
 };
 
+/**
+ * A lead that arrived while the assistant was paused must be eligible to enter
+ * the qualification when it sends a new inbound WhatsApp message after the
+ * assistant is enabled. Once a commercial qualification result exists, the
+ * conversation must not be restarted automatically.
+ */
+export function shouldStartOrResumeAiQualification(qualificationStatus: string | null | undefined) {
+  return qualificationStatus === "pending";
+}
+
 const ALL_QUESTIONS_DEFINITIONS: Record<string, QualificationQuestionDefinition> = {
   customerName: {
     id: "Q1",
@@ -271,4 +281,3 @@ export async function persistQualificationEvaluation(input: {
 
   return result;
 }
-

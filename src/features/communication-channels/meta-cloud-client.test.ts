@@ -6,9 +6,23 @@ vi.mock("./meta-cloud-config", () => ({
   getMetaLeadAdsServerConfig: () => ({ accessToken: "platform-token", graphVersion: "v25.0" }),
 }));
 
-import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
+import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, registerMetaPhoneNumber, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
 
 describe("Meta Cloud template payload", () => {
+  it("registers the selected phone server-side without exposing the two-step PIN", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(registerMetaPhoneNumber("123456789", "channel-token", "012345")).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://graph.facebook.com/v25.0/123456789/register", expect.objectContaining({
+      method: "POST",
+      cache: "no-store",
+      headers: expect.objectContaining({ Authorization: "Bearer channel-token", "Content-Type": "application/json" }),
+    }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toEqual({ messaging_product: "whatsapp", pin: "012345" });
+  });
+
   it("sends names for the named broker invitation body variables", () => {
     const payload = buildMetaCloudTemplatePayload({
       to: "+55 21 99999-9999",

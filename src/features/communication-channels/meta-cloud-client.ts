@@ -56,6 +56,15 @@ export async function subscribeWabaToApp(wabaId: string, accessToken: string) {
   return graphRequest<{ success?: boolean }>(`${encodeURIComponent(wabaId)}/subscribed_apps`, { method: "POST" }, accessToken);
 }
 
+/** Completes the backend portion of Embedded Signup; phone ownership stays in Meta's flow. */
+export async function registerMetaPhoneNumber(phoneNumberId: string, accessToken: string, pin: string) {
+  return graphRequest<{ success?: boolean }>(`${encodeURIComponent(phoneNumberId)}/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", pin }),
+  }, accessToken);
+}
+
 type MetaAsset = { id: string; name?: string };
 export type MetaLeadAdsAssets = { pages: MetaAsset[]; adAccounts: MetaAsset[]; pixels: MetaAsset[]; datasets: MetaAsset[] };
 

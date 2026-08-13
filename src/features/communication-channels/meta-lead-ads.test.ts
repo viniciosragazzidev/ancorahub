@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("./meta-cloud-config", () => ({
+  getMetaLeadAdsWebhookConfig: () => ({ graphVersion: "v25.0" }),
+}));
 
-import { normalizeMetaLead, verifyMetaWebhookSignature } from "./meta-lead-ads";
+import { fetchMetaLead, normalizeMetaLead, verifyMetaWebhookSignature } from "./meta-lead-ads";
 
 describe("Meta Lead Ads normalization", () => {
   it("maps Meta standard fields without retaining unrelated form answers", () => {
@@ -36,5 +39,16 @@ describe("Meta Lead Ads normalization", () => {
     const signature = `sha256=${createHmac("sha256", "secret").update(body).digest("hex")}`;
     expect(verifyMetaWebhookSignature(body, signature, "secret")).toBe(true);
     expect(verifyMetaWebhookSignature(body, "sha256=00", "secret")).toBe(false);
+  });
+
+  it("never creates a synthetic lead when Meta rejects the lead lookup", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 100, message: "Unknown object" } }), { status: 404 })));
+
+    await expect(fetchMetaLead("leadgen_missing", "tenant-page-token")).rejects.toMatchObject({
+      name: "Error",
+      status: 404,
+      code: 100,
+      message: "A Meta não permitiu carregar os detalhes deste lead. Ele não foi criado no CRM.",
+    });
   });
 });

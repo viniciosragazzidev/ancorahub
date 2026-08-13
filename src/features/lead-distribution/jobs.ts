@@ -75,7 +75,7 @@ export async function enqueueLeadDistributionJob(input: { tenantId: string; lead
   }).onConflictDoNothing();
 }
 
-async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: string) {
+async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: string, leadId?: string) {
   const db = getDatabase();
   const queuedLeads = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId })
     .from(schema.leads)
@@ -83,6 +83,7 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
       eq(schema.leads.distributionStatus, "queued"),
       isNull(schema.leads.corretorId),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
+      leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
     .orderBy(asc(schema.leads.distributionUpdatedAt), asc(schema.leads.createdAt))
     .limit(config.batchSize);
@@ -112,7 +113,7 @@ function sanitizeError(error: unknown) {
   return message.replace(/[\r\n]+/g, " ").slice(0, 240);
 }
 
-async function recoverExpiredJobLeases(now: Date) {
+async function recoverExpiredJobLeases(now: Date, tenantId?: string, leadId?: string) {
   const result = await getDatabase().update(schema.leadDistributionJobs).set({
     status: "retrying",
     lockedAt: null,
@@ -122,11 +123,16 @@ async function recoverExpiredJobLeases(now: Date) {
     lastErrorCode: "LEASE_EXPIRED",
     lastErrorMessage: "A execução anterior excedeu o lease e foi recuperada.",
     updatedAt: now,
-  }).where(and(eq(schema.leadDistributionJobs.status, "processing"), lt(schema.leadDistributionJobs.leaseExpiresAt, now))).returning({ id: schema.leadDistributionJobs.id });
+  }).where(and(
+    eq(schema.leadDistributionJobs.status, "processing"),
+    lt(schema.leadDistributionJobs.leaseExpiresAt, now),
+    tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
+    leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
+  )).returning({ id: schema.leadDistributionJobs.id });
   return result.length;
 }
 
-async function recoverStuckLeadAssignments(now: Date, config: DistributionJobConfig, tenantId?: string) {
+async function recoverStuckLeadAssignments(now: Date, config: DistributionJobConfig, tenantId?: string, leadId?: string) {
   const cutoff = new Date(now.getTime() - config.recoveryMinutes * 60_000);
   const db = getDatabase();
   const stuck = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId })
@@ -136,6 +142,7 @@ async function recoverStuckLeadAssignments(now: Date, config: DistributionJobCon
       isNull(schema.leads.corretorId),
       lte(schema.leads.distributionUpdatedAt, cutoff),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
+      leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
     .limit(config.batchSize);
 
@@ -156,7 +163,7 @@ async function recoverStuckLeadAssignments(now: Date, config: DistributionJobCon
   return stuck.length;
 }
 
-async function claimNextJob(workerId: string, config: DistributionJobConfig, tenantId?: string) {
+async function claimNextJob(workerId: string, config: DistributionJobConfig, tenantId?: string, leadId?: string) {
   const now = new Date();
   const [candidate] = await getDatabase().select({ id: schema.leadDistributionJobs.id })
     .from(schema.leadDistributionJobs)
@@ -165,6 +172,7 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
       inArray(schema.leadDistributionJobs.status, [...ACTIVE_JOB_STATUSES]),
       lte(schema.leadDistributionJobs.runAfter, now),
       tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
+      leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
     ))
     .orderBy(asc(schema.leadDistributionJobs.runAfter), asc(schema.leadDistributionJobs.createdAt))
     .limit(1);
@@ -181,6 +189,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
     eq(schema.leadDistributionJobs.id, candidate.id),
     inArray(schema.leadDistributionJobs.status, [...ACTIVE_JOB_STATUSES]),
     lte(schema.leadDistributionJobs.runAfter, now),
+    tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
+    leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
   )).returning();
   return claimed ?? null;
 }
@@ -208,20 +218,20 @@ async function deferOrFailJob(job: typeof schema.leadDistributionJobs.$inferSele
   return exhausted;
 }
 
-export async function runLeadDistributionProcessor(input: { tenantId?: string; limit?: number } = {}): Promise<DistributionJobRunResult> {
+export async function runLeadDistributionProcessor(input: { tenantId?: string; leadId?: string; limit?: number } = {}): Promise<DistributionJobRunResult> {
   const config = await getDistributionJobConfig();
   const result: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
   if (!config.enabled) return result;
 
   const effectiveConfig = { ...config, batchSize: Math.min(input.limit ?? config.batchSize, config.batchSize) };
   const now = new Date();
-  result.recoveredLeases = await recoverExpiredJobLeases(now);
-  result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId);
-  result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId);
+  result.recoveredLeases = await recoverExpiredJobLeases(now, input.tenantId, input.leadId);
+  result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId);
+  result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId);
   const workerId = `distribution:${randomUUID()}`;
 
   for (let index = 0; index < effectiveConfig.batchSize; index += 1) {
-    const job = await claimNextJob(workerId, effectiveConfig, input.tenantId);
+    const job = await claimNextJob(workerId, effectiveConfig, input.tenantId, input.leadId);
     if (!job) break;
     result.claimed += 1;
     const context = await getAutomationContext(job.tenantId);

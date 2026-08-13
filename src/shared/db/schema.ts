@@ -1401,6 +1401,11 @@ export const communicationChannels = pgTable(
     verifiedName: text("verified_name"),
     qualityRating: text("quality_rating"),
     messagingLimit: text("messaging_limit"),
+    /** Provider-confirmed lifecycle; `status` remains the tenant pause control. */
+    registrationStatus: text("registration_status").notNull().default("pending"),
+    registrationPinCiphertext: text("registration_pin_ciphertext"),
+    registrationErrorCode: text("registration_error_code"),
+    registeredAt: timestamp("registered_at", { withTimezone: true }),
     accessTokenCiphertext: text("access_token_ciphertext"),
     tokenKeyVersion: text("token_key_version"),
     tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),

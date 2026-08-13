@@ -569,7 +569,7 @@ export async function processInboundAiResponse({
   // 6. Extrair campos estruturados da mensagem e atualizar memória
   const updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
   const memoryContext = buildMemoryContext(updatedMemory);
-  const qualification = evaluateQualification(updatedMemory, behavior.policy);
+  let qualification = evaluateQualification(updatedMemory, behavior.policy);
 
   // 6b. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
@@ -648,22 +648,7 @@ export async function processInboundAiResponse({
     tenantName: tenantInfo?.name,
   });
 
-  // Once the six core fields are present, qualification is complete. The
-  // handoff is deterministic so an incorrect model question cannot reopen the
-  // questionnaire after the e-mail was received.
-  if (qualification.missingFields.length === 0) {
-    const handoffMessage = tenantConfig.handoffMessage
-      || "Obrigado! Já tenho os dados necessários. Vou encaminhar seu atendimento para um corretor da equipe agora.";
-    aiResult.content = handoffMessage;
-    aiResult.shouldTransferToHuman = true;
-    aiResult.transferReason = "Qualificação concluída";
-    if (aiResult.structured) {
-      aiResult.structured.message = handoffMessage;
-      aiResult.structured.shouldTransfer = true;
-      aiResult.structured.questionAsked = null;
-    }
-  }
-  const qualificationStatus = qualification.state === "QUALIFIED" ? qualification.qualificationStatus : undefined;
+  let qualificationStatus = qualification.state === "QUALIFIED" ? qualification.qualificationStatus : undefined;
 
   console.info("[ai-wpp] ai.completed", {
     tenantId,
@@ -894,6 +879,23 @@ export async function processInboundAiResponse({
     }
   }
 
+  // The model can extract a field from the same message it responds to. Re-evaluate
+  // after those structured updates so the final answer is not an extra question and
+  // the lead is handed off in this same turn.
+  qualification = evaluateQualification(updatedMemory, behavior.policy);
+  qualificationStatus = qualification.state === "QUALIFIED" ? qualification.qualificationStatus : undefined;
+
+  if (qualification.missingFields.length === 0) {
+    aiResult.content = tenantConfig.handoffMessage || "Obrigado pelas informações. Vou encaminhar seu atendimento para um corretor da equipe agora.";
+    aiResult.shouldTransferToHuman = true;
+    aiResult.transferReason = "Qualification completed";
+
+    if (aiResult.structured) {
+      aiResult.structured.shouldTransfer = true;
+      aiResult.structured.questionAsked = null;
+    }
+  }
+
   // Persist the question in the same turn so a short next reply such as "3" can be interpreted safely.
   updatedMemory.lastQuestionAsked = aiResult.content;
 
@@ -960,7 +962,11 @@ export async function processInboundAiResponse({
             eq(schema.leads.tenantId, tenantId),
           )
         );
-      console.info("[ai-agent] Lead information updated in database from memory:", { leadId, leadUpdates });
+      console.info("[ai-agent] lead.updated_from_qualification", {
+        tenantId,
+        leadId,
+        fields: Object.keys(leadUpdates),
+      });
     }
   } catch (leadUpdateErr) {
     console.error("[ai-agent] Failed to update lead details from memory in database:", leadUpdateErr);
