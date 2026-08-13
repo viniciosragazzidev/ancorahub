@@ -8,11 +8,10 @@ import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
 import { consumeMetaConnectionAttempt, readVerifiedMetaConnectionAttempt } from "./meta-connection-attempts";
 import { startMetaMarketingConnection } from "./meta-marketing-connection-service";
-import { MetaGraphClient } from "./meta-graph-client";
 import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
 import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
-import type { MetaConnectionAssets, MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem } from "./types";
+import type { MetaConnectionAssets, MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem, MetaSyncWarning } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
 export async function getMetaConnectionState(): Promise<{
@@ -40,25 +39,37 @@ export async function getMetaConnectionState(): Promise<{
     };
   }
 
-  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, ads, logs] = await Promise.all([
-    db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(eq(schema.metaPages.tenantId, context.tenantId)).orderBy(schema.metaPages.name),
-    db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(eq(schema.metaAdAccounts.tenantId, context.tenantId)).orderBy(schema.metaAdAccounts.name),
-    db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(eq(schema.metaPixels.tenantId, context.tenantId)).orderBy(schema.metaPixels.name),
-    db.select({ id: schema.metaDatasets.datasetId, name: schema.metaDatasets.name, status: schema.metaDatasets.status }).from(schema.metaDatasets).where(eq(schema.metaDatasets.tenantId, context.tenantId)).orderBy(schema.metaDatasets.name),
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs] = await Promise.all([
+    db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))).orderBy(schema.metaPages.name),
+    db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.status, "active"))).orderBy(schema.metaAdAccounts.name),
+    db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.status, "active"))).orderBy(schema.metaPixels.name),
+    db.select({ id: schema.metaDatasets.datasetId, name: schema.metaDatasets.name, status: schema.metaDatasets.status }).from(schema.metaDatasets).where(and(eq(schema.metaDatasets.tenantId, context.tenantId), eq(schema.metaDatasets.status, "active"))).orderBy(schema.metaDatasets.name),
     db.select({ id: schema.metaLeadForms.formId, name: schema.metaLeadForms.name, status: schema.metaLeadForms.status, pageId: schema.metaLeadForms.pageId }).from(schema.metaLeadForms).where(eq(schema.metaLeadForms.tenantId, context.tenantId)).orderBy(schema.metaLeadForms.name),
     db.select({ id: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status, adAccountId: schema.metaCampaigns.adAccountId }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(schema.metaCampaigns.name),
+    db.select({ id: schema.metaAdSets.adSetId, campaignId: schema.metaAdSets.campaignId }).from(schema.metaAdSets).where(eq(schema.metaAdSets.tenantId, context.tenantId)),
     db.select({ id: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status, adSetId: schema.metaAds.adSetId }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
     db.select().from(schema.metaSyncLogs).where(eq(schema.metaSyncLogs.tenantId, context.tenantId)).orderBy(desc(schema.metaSyncLogs.startedAt)).limit(10),
   ]);
 
-  const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadForms, campaigns, ads };
+  const activeAccountIds = new Set(adAccounts.map((account) => account.id));
+  const activePageIds = new Set(pages.map((page) => page.id));
+  const activeCampaigns = campaigns.filter((campaign) => activeAccountIds.has(campaign.adAccountId));
+  const activeCampaignIds = new Set(activeCampaigns.map((campaign) => campaign.id));
+  const activeAdSetIds = new Set(adSets.filter((adSet) => activeCampaignIds.has(adSet.campaignId)).map((adSet) => adSet.id));
+  const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadForms: leadForms.filter((form) => activePageIds.has(form.pageId)), campaigns: activeCampaigns, ads: ads.filter((ad) => activeAdSetIds.has(ad.adSetId)) };
 
+  const connectionStatus: MetaConnectionInfo["status"] = connection.status === "connected"
+    || connection.status === "disconnected"
+    || connection.status === "expired"
+    || connection.status === "error"
+    ? connection.status
+    : "error";
   const connInfo: MetaConnectionInfo = {
     id: connection.id,
     tenantId: connection.tenantId,
     businessId: connection.businessId,
     businessName: connection.businessName,
-    status: connection.status as any,
+    status: connectionStatus,
     permissions: (connection.permissions as string[]) || [],
     expiresAt: connection.expiresAt,
     lastError: connection.lastError,
@@ -157,6 +168,7 @@ export async function confirmMetaConnection(payload: {
         accessTokenCiphertext: tokenCiphertext,
         expiresAt,
         status: "connected",
+        permissions: authorizedAssets.permissions ?? [],
         lastError: null,
         updatedAt: now,
       })
@@ -170,6 +182,7 @@ export async function confirmMetaConnection(payload: {
       accessTokenCiphertext: tokenCiphertext,
       expiresAt,
       status: "connected",
+      permissions: authorizedAssets.permissions ?? [],
       createdBy: context.userId,
       createdAt: now,
       updatedAt: now,
@@ -177,6 +190,25 @@ export async function confirmMetaConnection(payload: {
   }
 
   const activeConnectionId = existing?.id || connectionId;
+
+  // A new authorization may expose assets unrelated to the brokerage. Only the
+  // explicit selections in this confirmation stay active for this connection.
+  // This also removes leftovers from an earlier, broader OAuth confirmation.
+  await db.update(schema.metaPages)
+    .set({ status: "inactive", updatedAt: now })
+    .where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.connectionId, activeConnectionId), eq(schema.metaPages.status, "active")));
+  await db.update(schema.metaAdAccounts)
+    .set({ status: "inactive", updatedAt: now })
+    .where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.connectionId, activeConnectionId), eq(schema.metaAdAccounts.status, "active")));
+  // Pixels and datasets are cache-only mirrors. Marking the previous snapshot
+  // inactive prevents old, unselected assets from remaining selectable after a
+  // Director narrows the connection. Leads and routing history are untouched.
+  await db.update(schema.metaPixels)
+    .set({ status: "inactive", updatedAt: now })
+    .where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.status, "active")));
+  await db.update(schema.metaDatasets)
+    .set({ status: "inactive", updatedAt: now })
+    .where(and(eq(schema.metaDatasets.tenantId, context.tenantId), eq(schema.metaDatasets.status, "active")));
 
   // 2. Salvar Páginas
   for (const page of payload.pages) {
@@ -198,6 +230,15 @@ export async function confirmMetaConnection(payload: {
         set: { name: authorizedPages.get(page.id)!.name, accessTokenCiphertext: pageTokenCiphertexts.get(page.id)!, status: "active", updatedAt: now },
       });
   }
+
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "meta_connection",
+    entidadeId: activeConnectionId,
+    acao: "meta_connection_assets_explicitly_scoped",
+    createdAt: now,
+  });
 
   // 3. Salvar Contas de Anúncios
   for (const adAcc of payload.adAccounts) {
@@ -321,7 +362,7 @@ export async function recordMetaMarketingOnboardingStep(step: string) {
 }
 
 /** Disparar sincronização manual */
-export async function triggerManualMetaSync(): Promise<{ success: boolean; itemsSynced: number; error?: string }> {
+export async function triggerManualMetaSync(): Promise<{ success: boolean; itemsSynced: number; error?: string; warnings?: MetaSyncWarning[] }> {
   const context = await getRequiredTenantContext();
   const res = await runMetaTenantSync(context.tenantId, "full");
   revalidatePath("/integrations/meta");

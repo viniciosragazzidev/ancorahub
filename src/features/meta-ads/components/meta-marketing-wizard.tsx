@@ -47,6 +47,8 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
   const [authState, setAuthState] = useState<AuthState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [assets, setAssets] = useState<MetaDiscoveredAssets | null>(null);
+  const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
+  const [selectedAdAccountIds, setSelectedAdAccountIds] = useState<string[]>([]);
   const [waitingIndex, setWaitingIndex] = useState(0);
   const [connectingIndex, setConnectingIndex] = useState(0);
   const popupRef = useRef<Window | null>(null);
@@ -68,6 +70,10 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
         void getMetaMarketingAttemptAssets(event.data.attemptId)
           .then((result) => {
             setAssets(result);
+            // OAuth discovery can return every asset visible to an administrator.
+            // Selection starts empty so a Director deliberately opts in each asset.
+            setSelectedPageIds([]);
+            setSelectedAdAccountIds([]);
             setAuthState("idle");
             setStep("review");
             trackOnboardingStep("oauth_success");
@@ -159,8 +165,8 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
         attemptId: attemptIdRef.current,
         businessId: assets.business.id,
         businessName: assets.business.name,
-        pages: assets.pages.map(({ id, name }) => ({ id, name })),
-        adAccounts: assets.adAccounts.map(({ id, name, currency }) => ({ id, name, currency })),
+        pages: assets.pages.filter((page) => selectedPageIds.includes(page.id)).map(({ id, name }) => ({ id, name })),
+        adAccounts: assets.adAccounts.filter((account) => selectedAdAccountIds.includes(account.id)).map(({ id, name, currency }) => ({ id, name, currency })),
       });
       setStep("done");
       trackOnboardingStep("complete");
@@ -219,8 +225,10 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
     </div> : null}
 
     {step === "review" && assets ? <div className="py-2">
-      <DialogDescription>Confirme os ativos da corretora. Esta etapa grava a conexão e ativa a sincronização; o WhatsApp possui um conector independente.</DialogDescription>
-      <MetaAssetsReview assets={assets} error={error} />
+      <DialogDescription>Escolha apenas os ativos desta corretora. Nenhum item é conectado automaticamente; esta etapa grava a seleção e ativa a sincronização. O WhatsApp possui um conector independente.</DialogDescription>
+      <MetaAssetsReview assets={{ ...assets, pages: assets.pages.filter((page) => selectedPageIds.includes(page.id)), adAccounts: assets.adAccounts.filter((account) => selectedAdAccountIds.includes(account.id)) }} error={error} />
+      <AssetSelector title="Páginas para captar Lead Ads" description="Somente as páginas marcadas serão assinadas pelo CRM." items={assets.pages} selectedIds={selectedPageIds} onChange={setSelectedPageIds} />
+      <AssetSelector title="Contas de anúncios para sincronizar" description="Somente as contas marcadas terão campanhas, anúncios e pixels sincronizados." items={assets.adAccounts} selectedIds={selectedAdAccountIds} onChange={setSelectedAdAccountIds} />
     </div> : null}
 
     {step === "connecting" ? <div className="space-y-4 py-6">
@@ -262,7 +270,7 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
 
       {step === "review" ? <>
         <Button variant="outline" onClick={() => go("authorize")}><ArrowLeft className="size-4" />Voltar</Button>
-        <Button onClick={() => void confirm()}><CheckCircle className="size-4" />Confirmar e conectar</Button>
+        <Button disabled={!selectedPageIds.length && !selectedAdAccountIds.length} onClick={() => void confirm()}><CheckCircle className="size-4" />Confirmar e conectar</Button>
       </> : null}
 
       {step === "done" ? <>
@@ -279,6 +287,17 @@ function IntroCard({ icon, title, copy }: { icon: ReactNode; title: string; copy
 
 function PermissionRow({ icon, label, copy }: { icon: ReactNode; label: string; copy: string }) {
   return <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/20 p-3 text-sm">{icon}<div><p className="font-medium">{label}</p><p className="text-xs text-muted-foreground">{copy}</p></div></div>;
+}
+
+function AssetSelector({ title, description, items, selectedIds, onChange }: {
+  title: string;
+  description: string;
+  items: Array<{ id: string; name: string }>;
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const toggle = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter((selectedId) => selectedId !== id) : [...selectedIds, id]);
+  return <section className="mt-3 rounded-lg border border-border p-3"><p className="text-sm font-medium">{title}</p><p className="mt-1 text-xs text-muted-foreground">{description}</p>{items.length ? <div className="mt-3 divide-y divide-border rounded-md border border-border">{items.map((asset) => <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40" key={asset.id}><input aria-label={asset.name} checked={selectedIds.includes(asset.id)} className="size-4 accent-primary" onChange={() => toggle(asset.id)} type="checkbox" /><span className="min-w-0 flex-1 truncate">{asset.name}</span><span className="font-mono text-xs text-muted-foreground">{asset.id}</span></label>)}</div> : <p className="mt-3 text-sm text-muted-foreground">A Meta não retornou nenhum ativo desse tipo para esta autorização.</p>}</section>;
 }
 
 function NextStep({ href, label, hint }: { href: string; label: string; hint: string }) {

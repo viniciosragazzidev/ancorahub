@@ -21,6 +21,26 @@ export function MetaIntegrationView({ connection, assets, logs, canConfigure = t
   const [disconnecting, startDisconnecting] = useTransition();
   const router = useRouter();
   const connected = connection?.status === "connected";
+  const permissionWarning = getPermissionWarning(connection?.lastError);
+
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      const result = await triggerManualMetaSync();
+      if (!result.success) {
+        toast.error(result.error ?? "A sincronização não foi concluída.");
+        return;
+      }
+      if (result.warnings?.length) {
+        toast.warning("Sincronização parcial da Meta.", { description: result.warnings[0]?.message });
+      } else {
+        toast.success("Ativos sincronizados.");
+      }
+      router.refresh();
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleDisconnect = () => {
     startDisconnecting(async () => {
@@ -36,7 +56,22 @@ export function MetaIntegrationView({ connection, assets, logs, canConfigure = t
   };
 
   return <div className="space-y-6">
-    <Card className="border-border bg-card shadow-none"><CardHeader className="flex flex-row items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><Globe className="size-5 text-primary" />Meta Ads e Lead Ads</CardTitle><CardDescription>Conexão exclusiva de Marketing para páginas, campanhas, formulários, pixels e filas.</CardDescription></div><Badge variant={connected ? "success" : "outline"}>{connected ? "Conectada" : "Não conectada"}</Badge></CardHeader><CardContent className="flex flex-wrap gap-2">{connected ? <><Button variant="outline" disabled={syncing || !canConfigure} onClick={async () => { setSyncing(true); try { const result = await triggerManualMetaSync(); if (!result.success) toast.error(result.error ?? "A sincronização não foi concluída."); else { toast.success("Ativos sincronizados."); router.refresh(); } } finally { setSyncing(false); } }}><ArrowsClockwise className="size-4" />{syncing ? "Sincronizando…" : "Sincronizar"}</Button><Button variant="destructive" disabled={!canConfigure || disconnecting} onClick={() => setDisconnectOpen(true)}><Power className="size-4" />Desconectar</Button></> : <Button disabled={!canConfigure} onClick={() => setWizardOpen(true)}><Lightning className="size-4" />Conectar Marketing</Button>}</CardContent></Card>
+    <Card className="border-border bg-card shadow-none">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div><CardTitle className="flex items-center gap-2"><Globe className="size-5 text-primary" />Meta Ads e Lead Ads</CardTitle><CardDescription>Conexão exclusiva de Marketing para páginas, campanhas, formulários, pixels e filas.</CardDescription></div>
+        <Badge variant={connected ? "success" : "outline"}>{connected ? "Conectada" : "Não conectada"}</Badge>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {connected ? <>
+            <Button variant="outline" disabled={syncing || !canConfigure} onClick={() => void sync()}><ArrowsClockwise className="size-4" />{syncing ? "Sincronizando…" : "Sincronizar"}</Button>
+            <Button variant="outline" disabled={!canConfigure} onClick={() => setWizardOpen(true)}><Lightning className="size-4" />{permissionWarning ? "Reconectar permissões" : "Revisar ativos"}</Button>
+            <Button variant="destructive" disabled={!canConfigure || disconnecting} onClick={() => setDisconnectOpen(true)}><Power className="size-4" />Desconectar</Button>
+          </> : <Button disabled={!canConfigure} onClick={() => setWizardOpen(true)}><Lightning className="size-4" />Conectar Marketing</Button>}
+        </div>
+        {permissionWarning ? <div role="alert" className="rounded-lg border border-warning/35 bg-warning/10 p-3 text-sm"><p className="font-medium text-foreground">Permissão de anúncios necessária</p><p className="mt-1 text-muted-foreground">{permissionWarning}</p><p className="mt-2 text-xs text-muted-foreground">A reconexão abre o consentimento da Meta novamente. Nenhum histórico ou fila do CRM será apagado.</p></div> : null}
+      </CardContent>
+    </Card>
 
     {connected && assets ? <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Perfil e ativos conectados</CardTitle><CardDescription>Veja apenas os ativos autorizados para esta corretora. Em Distribuição de Leads você escolhe quais campanhas entram no CRM e a fila de cada uma.</CardDescription></CardHeader><CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs text-muted-foreground">Portfólio empresarial</p><p className="mt-1 truncate text-sm font-semibold">{connection.businessName ?? "Nome não informado"}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{connection.businessId}</p></div><MetricCard label="Páginas autorizadas" value={assets.pages.length} /><MetricCard label="Campanhas sincronizadas" value={assets.campaigns.length} /><MetricCard label="Anúncios sincronizados" value={assets.ads.length} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Páginas conectadas" empty="Nenhuma página selecionada." items={assets.pages.map((asset) => ({ ...asset, detail: asset.id }))} /><AssetList title="Contas de anúncios" empty="Nenhuma conta de anúncios selecionada." items={assets.adAccounts.map((asset) => ({ ...asset, detail: `${asset.id} · ${asset.currency}` }))} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Pixels" empty="Nenhum pixel sincronizado ainda." items={assets.pixels.map((asset) => ({ ...asset, detail: asset.id }))} /><AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Formulários de Lead Ads" empty="Nenhum formulário sincronizado ainda." items={assets.leadForms.map((asset) => ({ ...asset, detail: `Página ${asset.pageId}` }))} /><AssetList title="Campanhas" empty="Nenhuma campanha sincronizada ainda." items={assets.campaigns.map((asset) => ({ ...asset, detail: asset.adAccountId }))} /></div><AssetList title="Anúncios" empty="Nenhum anúncio sincronizado ainda." items={assets.ads.map((asset) => ({ ...asset, detail: `Conjunto ${asset.adSetId}` }))} /></CardContent></Card> : null}
 
@@ -44,6 +79,16 @@ export function MetaIntegrationView({ connection, assets, logs, canConfigure = t
     {wizardOpen ? <MetaMarketingWizard onClose={() => setWizardOpen(false)} /> : null}
     <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}><DialogPopup className="sm:max-w-md"><DialogHeader><DialogTitle>Desconectar Marketing da Meta?</DialogTitle><DialogDescription>As páginas, campanhas, formulários, pixels e filas deixam de sincronizar. A captura é interrompida, a Página fica disponível para uma conexão futura e o histórico já capturado é preservado.</DialogDescription></DialogHeader><DialogFooter><Button disabled={disconnecting} variant="outline" onClick={() => setDisconnectOpen(false)}>Cancelar</Button><Button disabled={disconnecting} onClick={handleDisconnect} variant="destructive">{disconnecting ? "Desconectando…" : "Desconectar"}</Button></DialogFooter></DialogPopup></Dialog>
   </div>;
+}
+
+function getPermissionWarning(lastError: string | null | undefined) {
+  if (!lastError) return null;
+  try {
+    const parsed = JSON.parse(lastError) as { warnings?: Array<{ code?: string; message?: string }> };
+    return parsed.warnings?.find((warning) => warning.code === "missing_ads_read")?.message ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function AssetList({ title, empty, items }: { title: string; empty: string; items: Array<{ id: string; name: string; status: string; detail: string }> }) {

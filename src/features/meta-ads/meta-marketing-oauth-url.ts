@@ -11,6 +11,10 @@ export function createMetaMarketingOAuthUrl(input: {
     redirect_uri: input.redirectUri,
     state: input.state,
     response_type: "code",
+    // Existing tokens do not receive new scopes retroactively. This asks Meta to
+    // show any missing consent again without requesting campaign write access.
+    auth_type: "rerequest",
+    return_scopes: "true",
     scope: "pages_show_list,pages_read_engagement,pages_manage_metadata,leads_retrieval,ads_read",
   }).toString();
 

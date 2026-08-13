@@ -55,6 +55,15 @@ export type MetaDiscoveredAssets = {
     id: string;
     name: string;
   }>;
+  /** Granted OAuth scopes, checked server-side and never exposed with credentials. */
+  permissions?: string[];
+};
+
+export type MetaSyncWarningCode = "missing_ads_read" | "asset_access_limited";
+
+export type MetaSyncWarning = {
+  code: MetaSyncWarningCode;
+  message: string;
 };
 
 export type MetaCampaignItem = {

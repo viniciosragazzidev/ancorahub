@@ -13,5 +13,8 @@ describe("Meta Marketing OAuth URL", () => {
     expect(typeof oauthUrl).toBe("string");
     expect(oauthUrl).toContain("https://www.facebook.com/v25.0/dialog/oauth?");
     expect(new URL(oauthUrl).searchParams.get("state")).toBe("opaque-browser-state");
+    expect(new URL(oauthUrl).searchParams.get("scope")?.split(",")).toContain("ads_read");
+    expect(new URL(oauthUrl).searchParams.get("auth_type")).toBe("rerequest");
+    expect(new URL(oauthUrl).searchParams.get("return_scopes")).toBe("true");
   });
 });

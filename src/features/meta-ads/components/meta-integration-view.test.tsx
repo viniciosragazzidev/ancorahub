@@ -2,21 +2,23 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refreshMock, disconnectMock, toastSuccessMock, toastErrorMock } = vi.hoisted(() => ({
+const { refreshMock, disconnectMock, syncMock, toastSuccessMock, toastWarningMock, toastErrorMock } = vi.hoisted(() => ({
   refreshMock: vi.fn(),
   disconnectMock: vi.fn(),
+  syncMock: vi.fn(),
   toastSuccessMock: vi.fn(),
+  toastWarningMock: vi.fn(),
   toastErrorMock: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
-vi.mock("sonner", () => ({ toast: { success: toastSuccessMock, error: toastErrorMock } }));
+vi.mock("sonner", () => ({ toast: { success: toastSuccessMock, warning: toastWarningMock, error: toastErrorMock } }));
 vi.mock("../actions", () => ({
   confirmMetaConnection: vi.fn(),
   disconnectMetaConnection: disconnectMock,
   getMetaMarketingAttemptAssets: vi.fn(),
   recordMetaMarketingOnboardingStep: vi.fn(),
-  triggerManualMetaSync: vi.fn(),
+  triggerManualMetaSync: syncMock,
 }));
 vi.mock("../meta-marketing-oauth-url", () => ({ createMetaMarketingOAuthUrl: vi.fn(() => "https://meta.example/auth") }));
 
@@ -39,7 +41,7 @@ const connectedAssets = {
 };
 
 afterEach(() => {
-  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); toastSuccessMock.mockClear(); toastErrorMock.mockClear();
+  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); syncMock.mockReset(); toastSuccessMock.mockClear(); toastWarningMock.mockClear(); toastErrorMock.mockClear();
 });
 
 describe("MetaIntegrationView", () => {
@@ -74,5 +76,19 @@ describe("MetaIntegrationView", () => {
     await waitFor(() => expect(disconnectMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(refreshMock).toHaveBeenCalled());
     expect(toastSuccessMock).toHaveBeenCalledWith("Conexão de Marketing desconectada.", { description: expect.any(String) });
+  });
+
+  it("explains the missing ad-account permission and offers a safe reconnection", () => {
+    render(<MetaIntegrationView canConfigure connection={{ ...connectedConnection, lastError: JSON.stringify({ warnings: [{ code: "missing_ads_read", message: "Grant ads_read." }] }) }} assets={connectedAssets} logs={[]} />);
+    expect(screen.getByText("Permissão de anúncios necessária")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reconectar permissões" })).toBeInTheDocument();
+  });
+
+  it("reports a partial sync without hiding the assets already synchronized", async () => {
+    syncMock.mockResolvedValue({ success: true, itemsSynced: 2, warnings: [{ code: "missing_ads_read", message: "Grant ads_read." }] });
+    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar" }));
+    await waitFor(() => expect(toastWarningMock).toHaveBeenCalledWith("Sincronização parcial da Meta.", { description: "Grant ads_read." }));
+    expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 });

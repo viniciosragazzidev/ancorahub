@@ -5,6 +5,28 @@ import type { MetaDiscoveredAssets } from "./types";
 const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION?.trim() || "v25.0";
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
+export class MetaGraphApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: number,
+  ) {
+    super(message);
+    this.name = "MetaGraphApiError";
+  }
+}
+
+/** The permission error returned by Marketing API when a selected ad account was not granted to this token. */
+export function isMetaAdsReadPermissionError(error: unknown) {
+  return error instanceof MetaGraphApiError
+    && error.code === 200
+    && /ads_(?:read|management)/i.test(error.message);
+}
+
+export function isMetaPermissionError(error: unknown) {
+  return error instanceof MetaGraphApiError && [10, 100, 190, 200].includes(error.code ?? 0);
+}
+
 export class MetaGraphClient {
   private accessToken: string;
 
@@ -29,13 +51,29 @@ export class MetaGraphClient {
     if (!res.ok) {
       const errorPayload = await res.json().catch(() => ({}));
       const message = errorPayload?.error?.message || `Meta Graph API HTTP ${res.status}`;
-      throw new Error(message);
+      throw new MetaGraphApiError(message, res.status, errorPayload?.error?.code);
     }
 
     return res.json() as Promise<T>;
   }
 
-  /** Descobre ativos vinculados ao token recebido via Embedded Signup v4 */
+  /**
+   * Reads the scopes actually granted to this user token. The token itself is
+   * never returned or written to logs. This is the authority for deciding
+   * whether Marketing assets can be synchronized.
+   */
+  async fetchGrantedPermissions(): Promise<string[]> {
+    const response = await this.fetchApi<{ data: Array<{ permission?: string; status?: string }> }>("/me/permissions");
+    return response.data
+      .filter((entry) => entry.status === "granted" && typeof entry.permission === "string")
+      .map((entry) => entry.permission!);
+  }
+
+  /**
+   * Provides candidates from the current OAuth grant for an explicit Director
+   * review. Nothing in this list is persisted or synchronized until it is
+   * selected in the wizard and revalidated in confirmMetaConnection.
+   */
   async discoverAssets(): Promise<MetaDiscoveredAssets> {
     try {
       // 1. Obter info do usuário / me e businesses
@@ -70,7 +108,8 @@ export class MetaGraphClient {
         pixels: [],
         datasets: [],
       };
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error("Token inválido ou sem permissões suficientes.");
       console.error("[MetaGraphClient] Error discovering assets:", err);
       throw new Error(`Falha ao consultar ativos na Graph API da Meta: ${err?.message || "Token inválido ou sem permissões suficentes."}`);
     }

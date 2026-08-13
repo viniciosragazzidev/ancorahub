@@ -33,7 +33,14 @@ export async function GET(request: NextRequest) {
   try {
     const token = await exchangeCodeForLongLivedToken(code, redirectUri);
     stage = "asset_discovery_failed";
-    const assets = await new MetaGraphClient(token.accessToken).discoverAssets();
+    const client = new MetaGraphClient(token.accessToken);
+    const [assets, permissions] = await Promise.all([
+      client.discoverAssets(),
+      // A valid OAuth grant must not fail solely because Meta temporarily
+      // refuses permission introspection. Sync performs the same check later.
+      client.fetchGrantedPermissions().catch(() => []),
+    ]);
+    assets.permissions = permissions;
     stage = "authorization_persist_failed";
     const attempt = await completeMetaConnectionAttempt({ state, accessToken: token.accessToken, assets, tokenExpiresAt: token.expiresIn ? new Date(Date.now() + token.expiresIn * 1000) : null });
     console.info("[meta-marketing-oauth-callback] authorization_verified", { attemptId: attempt.id });
