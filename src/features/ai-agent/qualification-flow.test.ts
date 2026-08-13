@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateQualification,
   getNextQualificationQuestion,
+  resolveDeterministicQualificationTurn,
   shouldStartOrResumeAiQualification,
 } from "@/features/qualification-engine/service";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
@@ -144,6 +145,43 @@ describe("Qualification Flow Unit Tests", () => {
       const next = getNextQualificationQuestion(updatedMemory, policy);
       expect(next?.key).toBe("numberOfLives");
       expect(next?.id).toBe("Q3");
+    });
+  });
+
+  describe("deterministic WhatsApp progression", () => {
+    it("never repeats lives and hands off exactly after the email in the reported family-plan flow", () => {
+      let memory: ConversationMemory = {
+        ...createEmptyMemory(),
+        customerName: { value: "Cliente de teste", confidence: 1 },
+        customerFirstName: { value: "Cliente", confidence: 1 },
+        collectedFields: ["customerName"],
+        lastQuestionAsked: "Você busca um plano individual/familiar ou para empresa (PJ)?",
+      };
+
+      memory = extractFieldsFromMessage("Familiar", memory, "m1");
+      let turn = resolveDeterministicQualificationTurn({ memory, policy, handoffMessage: "Vou transferir você para um corretor agora." });
+      expect(turn.kind).toBe("collecting");
+      expect(turn.nextQuestion?.key).toBe("numberOfLives");
+
+      memory = extractFieldsFromMessage("3", { ...memory, lastQuestionAsked: turn.reply }, "m2");
+      turn = resolveDeterministicQualificationTurn({ memory, policy, handoffMessage: "Vou transferir você para um corretor agora." });
+      expect(turn.nextQuestion?.key).toBe("age");
+
+      memory = extractFieldsFromMessage("17,44,43", { ...memory, lastQuestionAsked: turn.reply }, "m3");
+      turn = resolveDeterministicQualificationTurn({ memory, policy, handoffMessage: "Vou transferir você para um corretor agora." });
+      expect(turn.nextQuestion?.key).toBe("city");
+
+      memory = extractFieldsFromMessage("Rio de Janeiro, centro", { ...memory, lastQuestionAsked: turn.reply }, "m4");
+      turn = resolveDeterministicQualificationTurn({ memory, policy, handoffMessage: "Vou transferir você para um corretor agora." });
+      expect(turn.nextQuestion?.key).toBe("email");
+
+      memory = extractFieldsFromMessage("cliente.teste@example.com", { ...memory, lastQuestionAsked: turn.reply }, "m5");
+      turn = resolveDeterministicQualificationTurn({ memory, policy, handoffMessage: "Vou transferir você para um corretor agora." });
+
+      expect(turn.kind).toBe("handoff");
+      expect(turn.evaluation.state).toBe("QUALIFIED");
+      expect(turn.reply).toBe("Vou transferir você para um corretor agora.");
+      expect(turn.nextQuestion).toBeNull();
     });
   });
 

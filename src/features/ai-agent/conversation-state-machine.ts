@@ -20,7 +20,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
-import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion } from "@/features/qualification-engine/service";
+import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
@@ -346,6 +346,154 @@ export async function transitionConversationState({
     );
 }
 
+async function persistLeadFieldsFromQualification(input: {
+  tenantId: string;
+  leadId: string;
+  memory: ConversationMemory;
+  qualificationStatus?: "pending" | "qualified" | "hot" | "warm" | "cold";
+}) {
+  const db = getDatabase();
+  const leadUpdates: Partial<typeof schema.leads.$inferInsert> = {};
+  const rawName = input.memory.customerName?.value?.trim();
+  if (rawName && !/^lead whatsapp/i.test(rawName)) leadUpdates.nome = rawName;
+  const rawEmail = input.memory.email?.value?.trim().toLowerCase();
+  if (rawEmail && rawEmail.includes("@")) leadUpdates.email = rawEmail;
+  if (input.memory.planType?.value === "empresarial") leadUpdates.tipo = "PJ";
+  if (["individual", "familiar"].includes(input.memory.planType?.value ?? "")) leadUpdates.tipo = "PF";
+  if (input.qualificationStatus) leadUpdates.qualificationStatus = input.qualificationStatus;
+  if (!Object.keys(leadUpdates).length) return;
+
+  await db.update(schema.leads).set({ ...leadUpdates, updatedAt: new Date() })
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+}
+
+async function completeDeterministicQualificationTurn(input: {
+  tenantId: string;
+  leadId: string;
+  phone: string;
+  conversationId: string;
+  communicationChannelId?: string | null;
+  transport: AiTransport;
+  openWaSessionId?: string | null;
+  wahaRunId?: string | null;
+  sourceIdentifier?: string | null;
+  memory: ConversationMemory;
+  policy: Parameters<typeof persistQualificationEvaluation>[0]["policy"];
+  turn: DeterministicQualificationTurn;
+}) {
+  const db = getDatabase();
+  const now = new Date();
+  const isHandoff = input.turn.kind === "handoff";
+  const memory = {
+    ...input.memory,
+    lastQuestionAsked: isHandoff ? undefined : input.turn.reply,
+    updatedAt: now.toISOString(),
+  };
+
+  await db.update(schema.aiConversations).set({
+    memory: memory as unknown as Record<string, unknown>,
+    lastProcessedMessageId: input.sourceIdentifier ?? null,
+    lastActivityAt: now,
+    updatedAt: now,
+  }).where(and(eq(schema.aiConversations.id, input.conversationId), eq(schema.aiConversations.tenantId, input.tenantId)));
+
+  const persistedQualification = await persistQualificationEvaluation({
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    conversationId: input.conversationId,
+    actorUserId: null,
+    policy: input.policy,
+    memory,
+  });
+  await persistLeadFieldsFromQualification({
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    memory,
+    qualificationStatus: persistedQualification.qualificationStatus,
+  });
+
+  let distribution: Awaited<ReturnType<typeof import("@/features/lead-distribution/service").distributeQualifiedLead>> | null = null;
+  if (isHandoff) {
+    const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+    distribution = await distributeQualifiedLead({ tenantId: input.tenantId, leadId: input.leadId, actorUserId: null });
+    await transitionConversationState({
+      tenantId: input.tenantId,
+      conversationId: input.conversationId,
+      newStatus: "WAITING_HUMAN",
+      reason: "Qualificação concluída; atendimento encaminhado para a fila comercial.",
+    });
+    const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
+    await executeDeterministicClosing(input.tenantId, input.conversationId, input.leadId, memory.customerName?.value);
+  } else {
+    await transitionConversationState({ tenantId: input.tenantId, conversationId: input.conversationId, newStatus: "WAITING_CUSTOMER" });
+  }
+
+  const messageId = `ai_msg_qualification_${crypto.randomUUID()}`;
+  await db.insert(schema.whatsappMessages).values({
+    id: messageId,
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    communicationChannelId: input.communicationChannelId ?? null,
+    conversationId: input.conversationId,
+    senderRole: "assistant",
+    provider: input.transport,
+    phone: input.phone,
+    direction: "outbound",
+    body: input.turn.reply,
+    sentAt: now,
+  });
+
+  let deliveryStatus = "failed";
+  try {
+    const sent = await sendAiOutbound({
+      tenantId: input.tenantId,
+      phone: input.phone,
+      body: input.turn.reply,
+      transport: input.transport,
+      openWaSessionId: input.openWaSessionId,
+      wahaRunId: input.wahaRunId,
+    });
+    if (sent.status === "sent") {
+      deliveryStatus = "sent";
+      await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
+        .where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+    }
+  } catch (error) {
+    await db.update(schema.whatsappMessages).set({ providerStatus: "failed" })
+      .where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+    console.error("[qualification] deterministic_outbound_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+  }
+
+  await db.insert(schema.aiAttendanceLogs).values({
+    id: `log_qualification_${crypto.randomUUID()}`,
+    tenantId: input.tenantId,
+    conversationId: input.conversationId,
+    leadId: input.leadId,
+    provider: "deterministic_qualification",
+    modelUsed: "qualification_rules_v1",
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    estimatedCost: "0",
+    latencyMs: 0,
+    status: deliveryStatus === "sent" ? "success" : "delivery_failed",
+    sourceMessageId: input.sourceIdentifier ?? null,
+  }).catch((error) => console.warn("[qualification] attendance_log_failed", { conversationId: input.conversationId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" }));
+
+  console.info("[qualification] deterministic_turn_completed", {
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    conversationId: input.conversationId,
+    state: persistedQualification.state,
+    classification: persistedQualification.classification,
+    mode: input.turn.kind,
+    deliveryStatus,
+    distribution: distribution?.distributed ? "assigned" : distribution?.assignedResult?.status ?? distribution?.reason ?? null,
+  });
+
+  return { status: isHandoff ? "transferred_to_human" : "replied", deliveryStatus, reply: input.turn.reply };
+}
+
 export async function processInboundAiResponse({
   tenantId,
   leadId,
@@ -450,6 +598,11 @@ export async function processInboundAiResponse({
   }
 
   // 4. Optimistic lock — claim this conversation using lockVersion
+  if (conversation.status === "WAITING_HUMAN") {
+    console.info("[ai-wpp] inbound_ignored_waiting_human", { tenantId, leadId, conversationId: conversation.id });
+    return { status: "ignored_waiting_human" };
+  }
+
   const [claimed] = await db
     .update(schema.aiConversations)
     .set({
@@ -618,7 +771,29 @@ export async function processInboundAiResponse({
     return { status: "ignored_ai_disabled" };
   }
 
+  const deterministicTurn = resolveDeterministicQualificationTurn({
+    memory: updatedMemory,
+    policy: behavior.policy,
+    handoffMessage: tenantConfig.handoffMessage,
+  });
+  return completeDeterministicQualificationTurn({
+    tenantId,
+    leadId,
+    phone,
+    conversationId: conversation.id,
+    communicationChannelId,
+    transport,
+    openWaSessionId,
+    wahaRunId,
+    sourceIdentifier,
+    memory: updatedMemory,
+    policy: behavior.policy,
+    turn: deterministicTurn,
+  });
+
   // 7. Detectar idioma da mensagem do usuário
+  /* Legacy LLM path retained for a future non-qualification assistant mode.
+   * Qualification returns above, before this path can select another field.
   const detectedLanguage = detectLanguage(userMessageBody);
 
   // 7b. tenantConfig já carregado no step 6b
@@ -1048,4 +1223,5 @@ export async function processInboundAiResponse({
   });
 
   return { status: "replied", deliveryStatus, reply: aiResult.content };
+  */
 }

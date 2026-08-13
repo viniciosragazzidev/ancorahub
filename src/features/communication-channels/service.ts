@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
@@ -167,7 +167,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
 
         if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         const [leads, clients] = await Promise.all([
-          db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus }).from(schema.leads).where(eq(schema.leads.tenantId, channel.tenantId)),
+          db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus }).from(schema.leads).where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt))),
           db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, channel.tenantId)),
         ]);
         const matchingLeads = leads.filter((item) => samePhone(item.phone, phone));

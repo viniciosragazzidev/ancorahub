@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { StartServiceButton } from "./start-service-button";
 import { SupervisionPanel } from "./supervision-panel";
+import { DeleteLeadControl } from "./delete-lead-control";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -104,6 +105,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     .where(and(
       eq(schema.leads.id, id),
       eq(schema.leads.tenantId, context.tenantId),
+      isNull(schema.leads.deletedAt),
       scopeFilter,
     ))
     .limit(1);
@@ -193,6 +195,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
               {/* Quick Header Actions */}
               <div id="lead-actions" className="flex flex-wrap items-center gap-2 sm:justify-end">
+                {context.role === "director" ? <DeleteLeadControl leadId={lead.id} leadName={lead.nome} /> : null}
                 {context.role === "broker" && context.userId === lead.corretorId && lead.status === "distributed" && (
                   <StartServiceButton leadId={lead.id} />
                 )}

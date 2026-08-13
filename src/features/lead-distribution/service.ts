@@ -384,6 +384,21 @@ export async function distributeQualifiedLead(input: {
     : await routeLeadToBranch(distributionContext, input.leadId, targetBranchId, `Qualification completed (${classification.toUpperCase()})`);
   if (routedQualifiedLead.status !== "routed") return { distributed: false, destination, reason: `routing_${routedQualifiedLead.status}` };
   const routedAssignment = await processQueuedLead(distributionContext, input.leadId);
+  if (routedAssignment.status === "queued") {
+    // A qualified lead is never discarded because the roster is empty. Keep
+    // its qualification and queue position until a broker becomes eligible.
+    await db.update(schema.leads).set({
+      corretorId: null,
+      distributionStatus: "queued",
+      distributionUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+    console.info("[distribute-qualified] queued_waiting_for_broker", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      reason: routedAssignment.reason,
+    });
+  }
   return {
     distributed: routedAssignment.status === "assigned",
     brokerId: routedAssignment.status === "assigned" ? routedAssignment.brokerId : null,

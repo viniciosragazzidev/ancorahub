@@ -43,6 +43,18 @@ export type QualificationQuestionDefinition = {
 };
 
 /**
+ * Defines the operational reply for a qualification turn without delegating
+ * field ordering or completion to the language model. This prevents inferred
+ * values and repeated questions from keeping a qualified lead in limbo.
+ */
+export type DeterministicQualificationTurn = {
+  kind: "collecting" | "handoff";
+  reply: string;
+  evaluation: QualificationEvaluation;
+  nextQuestion: QualificationQuestionDefinition | null;
+};
+
+/**
  * A lead that arrived while the assistant was paused must be eligible to enter
  * the qualification when it sends a new inbound WhatsApp message after the
  * assistant is enabled. Once a commercial qualification result exists, the
@@ -143,6 +155,35 @@ export function getNextQualificationQuestion(
     }
   }
   return null;
+}
+
+export function resolveDeterministicQualificationTurn(input: {
+  memory: ConversationMemory;
+  policy: AgentBehaviorPolicy;
+  handoffMessage?: string | null;
+}): DeterministicQualificationTurn {
+  const evaluation = evaluateQualification(input.memory, input.policy);
+  const nextQuestion = getNextQualificationQuestion(input.memory, input.policy);
+
+  if (!nextQuestion) {
+    return {
+      kind: "handoff",
+      reply: input.handoffMessage?.trim() || "Obrigado pelas informações. Vou encaminhar seu atendimento para um corretor da equipe agora.",
+      evaluation,
+      nextQuestion: null,
+    };
+  }
+
+  const firstName = input.memory.customerFirstName?.value
+    ?? input.memory.customerName?.value.split(/\s+/)[0];
+  const greeting = firstName ? `Perfeito, ${firstName}. ` : "";
+
+  return {
+    kind: "collecting",
+    reply: `${greeting}${nextQuestion.text}`,
+    evaluation,
+    nextQuestion,
+  };
 }
 
 export function leadMatchesQualificationEntryRules(lead: LeadEligibilityInput, policy: AgentBehaviorPolicy) {

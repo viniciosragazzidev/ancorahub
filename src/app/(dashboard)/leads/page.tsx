@@ -157,6 +157,7 @@ export default async function LeadsPage({
 
   const where = and(
     eq(schema.leads.tenantId, context.tenantId),
+    isNull(schema.leads.deletedAt),
     gte(schema.leads.createdAt, periodStart(period)),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
