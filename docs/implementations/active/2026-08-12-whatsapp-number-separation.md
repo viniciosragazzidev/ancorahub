@@ -54,3 +54,5 @@ histórico não é apagado.
 - O lint global continua bloqueado exclusivamente por arquivos externos já
   existentes fora deste escopo; type-check, segurança e build não apontaram
   falhas da entrega.
+- O retorno do Embedded Signup v4 aceita o evento seguro `WA_EMBEDDED_SIGNUP` tanto como objeto quanto como JSON serializado, formato usado pelo pop-up hospedado da Meta. O fluxo encerra o estado de carregamento ao concluir, cancelar, falhar ou exceder 90 segundos e evita dupla conclusão quando código e dados chegam em eventos distintos.
+- A configuração pública de produção usa o `config_id` v4 `2285077245657163`, exclusivo do canal WhatsApp e sem relação com os ativos de Marketing Meta.
