@@ -63,7 +63,7 @@ const jobTitleLabel: Record<string, string> = {
   support: "Suporte",
 };
 
-const jobTitles = ["manager", "broker", "marketing", "finance", "operations", "support"] as const;
+const jobTitles = ["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"] as const;
 
 function EditMemberDialog({
   member,
@@ -86,15 +86,9 @@ function EditMemberDialog({
     currentRole === "manager" && currentBranchId
       ? branches.filter((branch) => branch.id === currentBranchId)
       : branches;
-  const roleOptions =
-    currentRole === "director"
-      ? (["manager", "broker"] as const)
-      : (["broker"] as const);
 
   const [jobTitle, setJobTitle] = useState<string>(member.jobTitle);
-  const [role, setRole] = useState<string>(
-    currentRole === "director" && member.role === "manager" ? "manager" : "broker"
-  );
+  const [role, setRole] = useState<string>(member.role);
   const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || member.customRoleScope === "branch";
 
   useEffect(() => {
@@ -111,9 +105,9 @@ function EditMemberDialog({
     if (!open) {
       formRef.current?.reset();
       setJobTitle(member.jobTitle);
-      setRole(currentRole === "director" && member.role === "manager" ? "manager" : "broker");
+      setRole(member.role);
     }
-  }, [open, member.jobTitle, member.role, currentRole]);
+  }, [open, member.jobTitle, member.role]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,11 +144,17 @@ function EditMemberDialog({
             <Select value={jobTitle} onValueChange={(val) => {
               if (!val) return;
               setJobTitle(val);
-              if (val === "manager") setRole("manager");
-              if (val === "broker") setRole("broker");
+              if (val === "director") setRole("director");
+              else if (val === "manager") setRole("manager");
+              else if (val === "supervisor") setRole("supervisor");
+              else if (val === "broker") setRole("broker");
             }} disabled={pending} name="jobTitle">
               <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cargo">{(value: string | null) => jobTitleLabel[value ?? ""] ?? "Selecione o cargo"}</SelectValue></SelectTrigger>
-              <SelectContent>{jobTitles.filter((r) => currentRole === "director" || r !== "manager").map((r) => <SelectItem key={r} value={r}>{jobTitleLabel[r]}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {jobTitles
+                  .filter((r) => currentRole === "director" || (r !== "manager" && r !== "director"))
+                  .map((r) => <SelectItem key={r} value={r}>{jobTitleLabel[r]}</SelectItem>)}
+              </SelectContent>
             </Select>
           </Field>
           <Field>
@@ -164,21 +164,26 @@ function EditMemberDialog({
               onValueChange={(val) => {
                 if (!val) return;
                 setRole(val);
-                if (val === "manager") setJobTitle("manager");
+                if (val === "director") setJobTitle("director");
+                else if (val === "manager") setJobTitle("manager");
               }}
-              disabled={pending || roleOptions.length === 1 || jobTitle === "broker" || jobTitle === "manager"}
+              disabled={pending || currentRole !== "director"}
               name="role"
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o papel">{(value: string | null) => roleLabel[value as TeamMember["role"]] ?? "Selecione o papel"}</SelectValue>
+                <SelectValue placeholder="Selecione o papel">{(value: string | null) => roleLabel[value as TeamMember["role"]] ?? value ?? "Selecione o papel"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {currentRole === "director" && jobTitle !== "broker" ? (
-                  <SelectItem value="manager">{roleLabel["manager"]}</SelectItem>
-                ) : null}
-                {jobTitle !== "manager" ? (
-                  <SelectItem value="broker">{roleLabel["broker"]}</SelectItem>
-                ) : null}
+                {currentRole === "director" ? (
+                  <>
+                    <SelectItem value="director">Diretor (Acesso Global)</SelectItem>
+                    <SelectItem value="manager">Gestor (Gestão da Unidade)</SelectItem>
+                    <SelectItem value="supervisor">Supervisor (Operação da Unidade)</SelectItem>
+                    <SelectItem value="broker">Corretor (Operação Individual)</SelectItem>
+                  </>
+                ) : (
+                  <SelectItem value="broker">Corretor (Operação Individual)</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </Field>
