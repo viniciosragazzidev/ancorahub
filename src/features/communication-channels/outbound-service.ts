@@ -11,6 +11,7 @@ import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, type MetaWhatsAppTemplatePurpose } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
+import { WhatsAppTemplateResolver } from "./template-sync-service";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -43,7 +44,8 @@ export async function enqueueMetaTemplateMessage(input: {
 }) {
   const destinationPhone = phoneSchema.parse(input.destinationPhone);
   const variables = variablesSchema.parse(input.variables ?? []);
-  const template = getMetaWhatsAppTemplate(input.purpose);
+  const resolvedTemplate = await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
+  const template = resolvedTemplate ?? getMetaWhatsAppTemplate(input.purpose);
   if (!template) throw new Error("Modelo de WhatsApp não permitido para esta operação.");
   const db = getDatabase();
   const channelQuery = input.channelId
@@ -130,53 +132,49 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
       } else if (row.purpose === "leadAssignmentConfirmed") {
         const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
         if (variables[4]) {
-          urlButtonParameter = variables[4]; // lead ID/token for dynamic CTA button
+          urlButtonParameter = variables[4];
         }
       }
-      const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-      const templateVariables = row.purpose === "leadAssignmentConfirmed" ? variables.slice(0, 4) : row.purpose === "newLeadAssignment" ? variables.slice(0, 5) : variables;
-      const variableNames = getMetaWhatsAppTemplateVariableNames(row.purpose);
-      const response = row.messageType === "text"
-        ? await sendMetaCloudText({ phoneNumberId, accessToken, to: row.destinationPhone, body: variables[0] ?? "" })
-        : await sendMetaCloudTemplate({ phoneNumberId, accessToken, to: row.destinationPhone, templateName: row.templateName, languageCode: row.templateLanguage, variables: templateVariables, variableNames, urlButtonParameter });
-      const providerMessageId = response.messages?.[0]?.id;
-      if (!providerMessageId) throw new Error("A Meta não retornou o identificador da mensagem.");
-      await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, sentAt: new Date(), updatedAt: new Date(), providerErrorCode: null, providerErrorMessage: null }).where(eq(schema.whatsappOutboundMessages.id, row.id));
 
-      if (row.purpose === "brokerInvitation" && row.recipientId) {
-        await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryMessageId: providerMessageId, deliveredAt: new Date(), deliveryAttempts: row.attempts + 1, deliveryError: null }).where(and(eq(schema.brokerInvitations.id, row.recipientId), eq(schema.brokerInvitations.tenantId, row.tenantId)));
-      } else if (row.purpose === "newLeadAssignment") {
-        // Link providerMessageId to lead_offers table if matching
-        await db.update(schema.leadOffers).set({ whatsappMessageId: providerMessageId, status: "SENT", updatedAt: new Date() }).where(and(eq(schema.leadOffers.outboundMessageId, row.id), eq(schema.leadOffers.tenantId, row.tenantId)));
+      let metaResponse: { messages?: Array<{ id: string }> };
+      if (row.messageType === "text") {
+        const bodyText = Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "";
+        metaResponse = await sendMetaCloudText({ phoneNumberId, accessToken, to: row.destinationPhone, body: bodyText });
+      } else {
+        const variableNames = getMetaWhatsAppTemplateVariableNames(row.purpose);
+        const rawVariables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
+        metaResponse = await sendMetaCloudTemplate({
+          phoneNumberId,
+          accessToken,
+          to: row.destinationPhone,
+          templateName: row.templateName,
+          languageCode: row.templateLanguage,
+          variables: rawVariables,
+          variableNames,
+          urlButtonParameter,
+        });
+      }
+
+      const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
+      await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      if (invitation && row.recipientId) {
+        await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts + 1, deliveryError: null }).where(eq(schema.brokerInvitations.id, row.recipientId));
       }
       sent += 1;
     } catch (error) {
-      const transient = error instanceof MetaCloudApiError && (error.status === 408 || error.status === 409 || error.status === 429 || error.status >= 500);
-      const shouldRetry = transient && row.attempts + 1 < 5;
-      const safeCode = error instanceof MetaCloudApiError && error.code ? String(error.code) : "outbound_delivery_failed";
-      console.error("[whatsapp/outbound] delivery failed", {
-        messageId: row.id,
-        tenantId: row.tenantId,
-        purpose: row.purpose,
-        messageType: row.messageType,
-        status: error instanceof MetaCloudApiError ? error.status : undefined,
-        code: safeCode,
-        attempt: row.attempts + 1,
-        retrying: shouldRetry,
-      });
-      const nextAttemptAt = shouldRetry ? new Date(Date.now() + Math.min(3_600_000, 30_000 * 2 ** row.attempts)) : null;
-      await db.update(schema.whatsappOutboundMessages).set({ status: shouldRetry ? "queued" : "failed", nextAttemptAt, failedAt: shouldRetry ? null : new Date(), providerErrorCode: safeCode, providerErrorMessage: "Falha de entrega; consulte o histórico operacional.", updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      const message = error instanceof Error ? error.message : "Falha no envio via Meta Cloud API.";
+      const code = error instanceof MetaCloudApiError ? String(error.code ?? error.status) : "META_OUTBOUND_FAILED";
+      const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
+      const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
+      await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
       if (row.purpose === "brokerInvitation" && row.recipientId) {
-        await db.update(schema.brokerInvitations)
-          .set(getInvitationDeliveryFailureUpdate({ shouldRetry, attempts: row.attempts + 1 }))
-          .where(and(
-            eq(schema.brokerInvitations.id, row.recipientId),
-            eq(schema.brokerInvitations.tenantId, row.tenantId),
-          ));
+        const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
+        await db.update(schema.brokerInvitations).set(failureUpdate).where(eq(schema.brokerInvitations.id, row.recipientId));
       }
-      if (shouldRetry) retried += 1; else failed += 1;
+      if (nextAttemptAt) retried += 1; else failed += 1;
     }
   };
-  await runWithConcurrency(rows, 5, processRow);
+
+  await runWithConcurrency(rows, 3, processRow);
   return { processed: rows.length, sent, failed, retried };
 }

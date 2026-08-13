@@ -107,7 +107,7 @@ const navSections: SidebarSection[] = [
   {
     label: "Administração",
     items: [
-      { label: "Marketing", icon: Megaphone, url: "/marketing", permission: "acessar_campanhas_meta" },
+      { label: "Marketing", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
       { label: "Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
       { label: "Unidades", icon: Buildings, url: "/filiais", permission: "gerenciar_filiais" },
       { label: "Parâmetros", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
@@ -243,7 +243,10 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
               <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
                 {section.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.url || (item.url !== "/dashboard" && pathname.startsWith(item.url + "/"));
+                  const isActive =
+                    pathname === item.url ||
+                    (item.url !== "/dashboard" && pathname.startsWith(item.url + "/")) ||
+                    (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
                   const entranceDelay = itemEntranceDelays.get(`${section.label}:${item.label}`) ?? 0;
 
                   return (

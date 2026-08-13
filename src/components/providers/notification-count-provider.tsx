@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 interface NotificationCountContextValue {
@@ -28,45 +28,43 @@ export function NotificationCountProvider({
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
 
-  // Fetch initial count on mount
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
+  const fetchCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/unread-count", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (typeof data.count === "number") {
+        setUnreadCount(data.count);
+      }
+    } catch {
+      // Silently ignore network failures
+    }
+  }, []);
 
-    const fetchInitial = async () => {
-      try {
-        const res = await fetch("/api/internal/unread-count", {
-          signal: controller.signal,
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && typeof data.count === "number") {
-          setUnreadCount(data.count);
-        }
-      } catch (err: unknown) {
-        if (
-          (err instanceof Error && err.name === "AbortError") ||
-          (err instanceof DOMException && err.name === "AbortError")
-        ) {
-          return;
-        }
-        // Silently fail — subscription will catch updates
+  // Fetch initial count & set fallback polling interval
+  useEffect(() => {
+    void fetchCount();
+
+    // Poll every 30 seconds as fallback in case Supabase Realtime WebSocket drops
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void fetchCount();
+      }
+    }, 30_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchCount();
       }
     };
 
-    void fetchInitial();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      cancelled = true;
-      if (!controller.signal.aborted) {
-        try {
-          controller.abort("component_unmounted");
-        } catch {
-          // ignore
-        }
-      }
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [fetchCount]);
 
   // Subscribe to real-time changes via Supabase
   useEffect(() => {
@@ -99,28 +97,22 @@ export function NotificationCountProvider({
         (payload) => {
           const oldRow = payload.old as { read_at?: string | null } | null;
           const newRow = payload.new as { read_at?: string | null } | null;
-          // Decrement only when readAt transitions from null → value
           if (oldRow && newRow && !oldRow.read_at && newRow.read_at) {
             setUnreadCount((prev) => Math.max(0, prev - 1));
           }
         },
       )
       .subscribe((status, error) => {
-        if (
-          status === "CHANNEL_ERROR" ||
-          status === "TIMED_OUT"
-        ) {
-          console.error(
-            "Falha ao assinar contagem de notificações.",
-            error,
-          );
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("Realtime WebSocket desconectado. Ativando fallback via polling.", error);
+          void fetchCount();
         }
       });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchCount]);
 
   return (
     <NotificationCountContext.Provider value={{ unreadCount, userId }}>

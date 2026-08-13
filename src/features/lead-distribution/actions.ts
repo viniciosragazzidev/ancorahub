@@ -14,7 +14,7 @@ import { enqueueLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { saveDistributionQueue, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -137,6 +137,17 @@ export async function saveMetaCampaignQueueRouteAction(input: unknown) {
     return { success: true, route, message: "Campanha Meta vinculada Ã  fila." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra da campanha." };
+  }
+}
+
+export async function saveMetaAdQueueRouteAction(input: unknown) {
+  try {
+    const route = await saveMetaAdQueueRoute(await getRequiredTenantContext(), input);
+    refreshDistribution();
+    revalidatePath("/integrations/meta");
+    return { success: true, route, message: "Regra de anúncio atualizada." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra do anúncio." };
   }
 }
 

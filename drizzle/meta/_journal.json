@@ -498,6 +498,20 @@
       "when": 1786632000000,
       "tag": "0120_director_lead_soft_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1786714800000,
+      "tag": "0121_meta_lead_ads_source_release",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1786718400000,
+      "tag": "0122_meta_ad_queue_routes",
+      "breakpoints": true
     }
   ]
 }

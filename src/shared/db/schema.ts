@@ -1501,6 +1501,61 @@ export const metaConnections = pgTable(
   ],
 );
 
+/**
+ * Espelho local sincronizado dos templates oficiais de mensagem da WABA (Meta).
+ */
+export const metaWhatsAppTemplates = pgTable(
+  "meta_whatsapp_templates",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    wabaId: text("waba_id").notNull(),
+    metaTemplateId: text("meta_template_id"),
+    name: text("name").notNull(),
+    language: text("language").notNull().default("pt_BR"),
+    category: text("category").notNull().default("UTILITY"),
+    status: text("status").notNull().default("PENDING"),
+    qualityRating: text("quality_rating"),
+    componentsJson: jsonb("components_json").notNull().default([]),
+    headerType: text("header_type").notNull().default("NONE"),
+    bodyText: text("body_text"),
+    footerText: text("footer_text"),
+    variablesJson: jsonb("variables_json").notNull().default([]),
+    buttonsJson: jsonb("buttons_json").notNull().default([]),
+    origin: text("origin").notNull().default("CRM"),
+    rejectedReason: text("rejected_reason"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("meta_whatsapp_templates_tenant_waba_idx").on(table.tenantId, table.wabaId, table.status),
+    uniqueIndex("meta_whatsapp_templates_tenant_name_lang_unique").on(table.tenantId, table.wabaId, table.name, table.language),
+  ],
+);
+
+/**
+ * Mapeamento dinâmico de utilidade comercial do CRM para templates Meta aprovados.
+ */
+export const metaWhatsAppTemplateUsages = pgTable(
+  "meta_whatsapp_template_usages",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    eventKey: text("event_key").notNull(),
+    templateId: text("template_id").notNull().references(() => metaWhatsAppTemplates.id, { onDelete: "cascade" }),
+    variableMappingsJson: jsonb("variable_mappings_json").notNull().default({}),
+    active: boolean("active").notNull().default(true),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_whatsapp_template_usages_tenant_event_unique").on(table.tenantId, table.eventKey),
+    index("meta_whatsapp_template_usages_tenant_active_idx").on(table.tenantId, table.active),
+  ],
+);
+
 /** Páginas do Facebook vinculadas ao tenant/conexão Meta */
 export const metaPages = pgTable(
   "meta_pages",
@@ -1575,7 +1630,7 @@ export const metaCampaignQueueRoutes = pgTable(
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     campaignId: text("campaign_id").notNull(),
-    queueId: text("queue_id").notNull().references(() => leadQueues.id, { onDelete: "cascade" }),
+    queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
     enabled: boolean("enabled").notNull().default(true),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
@@ -1584,6 +1639,25 @@ export const metaCampaignQueueRoutes = pgTable(
   (table) => [
     uniqueIndex("meta_campaign_queue_routes_tenant_campaign_unique").on(table.tenantId, table.campaignId),
     index("meta_campaign_queue_routes_queue_idx").on(table.tenantId, table.queueId),
+  ],
+);
+
+/** Regra de entrada mais específica para um anúncio Meta. */
+export const metaAdQueueRoutes = pgTable(
+  "meta_ad_queue_routes",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    adId: text("ad_id").notNull(),
+    queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_ad_queue_routes_tenant_ad_unique").on(table.tenantId, table.adId),
+    index("meta_ad_queue_routes_queue_idx").on(table.tenantId, table.queueId),
   ],
 );
 
@@ -2926,7 +3000,7 @@ export const metaLeadAdSources = pgTable(
     updatedAt,
   },
   (table) => [
-    uniqueIndex("meta_lead_ad_sources_page_unique").on(table.pageId),
+    uniqueIndex("meta_lead_ad_sources_active_page_unique").on(table.pageId).where(sql`${table.status} = 'active'`),
     uniqueIndex("meta_lead_ad_sources_credential_unique").on(table.leadWebhookCredentialId),
     index("meta_lead_ad_sources_tenant_status_idx").on(table.tenantId, table.status),
     index("meta_lead_ad_sources_branch_idx").on(table.branchId),

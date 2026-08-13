@@ -28,6 +28,7 @@ export async function getMetaConnectionState(): Promise<{
     .select()
     .from(schema.metaConnections)
     .where(eq(schema.metaConnections.tenantId, context.tenantId))
+    .orderBy(desc(schema.metaConnections.updatedAt))
     .limit(1);
 
   if (!connection) {
@@ -39,17 +40,18 @@ export async function getMetaConnectionState(): Promise<{
     };
   }
 
-  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, logs] = await Promise.all([
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, ads, logs] = await Promise.all([
     db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(eq(schema.metaPages.tenantId, context.tenantId)).orderBy(schema.metaPages.name),
     db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(eq(schema.metaAdAccounts.tenantId, context.tenantId)).orderBy(schema.metaAdAccounts.name),
     db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(eq(schema.metaPixels.tenantId, context.tenantId)).orderBy(schema.metaPixels.name),
     db.select({ id: schema.metaDatasets.datasetId, name: schema.metaDatasets.name, status: schema.metaDatasets.status }).from(schema.metaDatasets).where(eq(schema.metaDatasets.tenantId, context.tenantId)).orderBy(schema.metaDatasets.name),
-    db.select({ id: schema.metaLeadForms.id }).from(schema.metaLeadForms).where(eq(schema.metaLeadForms.tenantId, context.tenantId)),
-    db.select({ id: schema.metaCampaigns.id }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)),
+    db.select({ id: schema.metaLeadForms.formId, name: schema.metaLeadForms.name, status: schema.metaLeadForms.status, pageId: schema.metaLeadForms.pageId }).from(schema.metaLeadForms).where(eq(schema.metaLeadForms.tenantId, context.tenantId)).orderBy(schema.metaLeadForms.name),
+    db.select({ id: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status, adAccountId: schema.metaCampaigns.adAccountId }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(schema.metaCampaigns.name),
+    db.select({ id: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status, adSetId: schema.metaAds.adSetId }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
     db.select().from(schema.metaSyncLogs).where(eq(schema.metaSyncLogs.tenantId, context.tenantId)).orderBy(desc(schema.metaSyncLogs.startedAt)).limit(10),
   ]);
 
-  const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadFormsCount: leadForms.length, campaignsCount: campaigns.length };
+  const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadForms, campaigns, ads };
 
   const connInfo: MetaConnectionInfo = {
     id: connection.id,
@@ -140,7 +142,10 @@ export async function confirmMetaConnection(payload: {
   const [existing] = await db
     .select({ id: schema.metaConnections.id })
     .from(schema.metaConnections)
-    .where(eq(schema.metaConnections.tenantId, context.tenantId))
+    .where(and(
+      eq(schema.metaConnections.tenantId, context.tenantId),
+      eq(schema.metaConnections.businessId, payload.businessId),
+    ))
     .limit(1);
 
   if (existing) {
@@ -190,7 +195,7 @@ export async function confirmMetaConnection(payload: {
       })
       .onConflictDoUpdate({
         target: [schema.metaPages.tenantId, schema.metaPages.pageId],
-        set: { name: authorizedPages.get(page.id)!.name, accessTokenCiphertext: pageTokenCiphertexts.get(page.id)!, updatedAt: now },
+        set: { name: authorizedPages.get(page.id)!.name, accessTokenCiphertext: pageTokenCiphertexts.get(page.id)!, status: "active", updatedAt: now },
       });
   }
 
@@ -211,7 +216,7 @@ export async function confirmMetaConnection(payload: {
       })
       .onConflictDoUpdate({
         target: [schema.metaAdAccounts.tenantId, schema.metaAdAccounts.adAccountId],
-        set: { name: authorizedAccounts.get(adAcc.id)!.name, currency: authorizedAccounts.get(adAcc.id)!.currency || "BRL", updatedAt: now },
+        set: { name: authorizedAccounts.get(adAcc.id)!.name, currency: authorizedAccounts.get(adAcc.id)!.currency || "BRL", status: "active", updatedAt: now },
       });
   }
 
@@ -256,18 +261,45 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
   }
 
   const db = getDatabase();
-  await db
-    .update(schema.metaConnections)
-    .set({ status: "disconnected", updatedAt: new Date() })
-    .where(eq(schema.metaConnections.tenantId, context.tenantId));
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    const sources = await tx
+      .select({ id: schema.metaLeadAdSources.id, leadWebhookCredentialId: schema.metaLeadAdSources.leadWebhookCredentialId })
+      .from(schema.metaLeadAdSources)
+      .where(and(eq(schema.metaLeadAdSources.tenantId, context.tenantId), eq(schema.metaLeadAdSources.status, "active")));
 
-  await db.insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId: context.userId,
-    entidade: "meta_connection",
-    entidadeId: context.tenantId,
-    acao: "meta_connection_disconnected",
-    createdAt: new Date(),
+    await tx
+      .update(schema.metaConnections)
+      .set({ status: "disconnected", updatedAt: now })
+      .where(eq(schema.metaConnections.tenantId, context.tenantId));
+    await tx
+      .update(schema.metaPages)
+      .set({ status: "inactive", updatedAt: now })
+      .where(eq(schema.metaPages.tenantId, context.tenantId));
+    await tx
+      .update(schema.metaAdAccounts)
+      .set({ status: "inactive", updatedAt: now })
+      .where(eq(schema.metaAdAccounts.tenantId, context.tenantId));
+
+    for (const source of sources) {
+      await tx.update(schema.metaLeadAdSources).set({ status: "inactive", updatedAt: now })
+        .where(and(eq(schema.metaLeadAdSources.id, source.id), eq(schema.metaLeadAdSources.tenantId, context.tenantId)));
+      await tx.update(schema.leadWebhookCredentials).set({ status: "revoked", revokedAt: now, updatedAt: now })
+        .where(and(eq(schema.leadWebhookCredentials.id, source.leadWebhookCredentialId), eq(schema.leadWebhookCredentials.tenantId, context.tenantId)));
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(), userId: context.userId, entidade: "meta_lead_ads_source", entidadeId: source.id,
+        acao: "meta_lead_ads.source_released_on_marketing_disconnect", createdAt: now,
+      });
+    }
+
+    await tx.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "meta_connection",
+      entidadeId: context.tenantId,
+      acao: "meta_connection_disconnected",
+      createdAt: now,
+    });
   });
 
   revalidatePath("/integrations/meta");

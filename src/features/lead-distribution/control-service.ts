@@ -29,8 +29,22 @@ const simulationInput = z.object({
 
 const campaignQueueRouteInput = z.object({
   campaignId: z.string().trim().min(1).max(100),
-  queueId: z.string().uuid(),
+  queueId: z.string().uuid().nullable(),
   enabled: z.boolean().default(true),
+}).superRefine((input, context) => {
+  if (input.enabled && !input.queueId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["queueId"], message: "Selecione a fila que receberá os leads desta campanha." });
+  }
+});
+
+const adQueueRouteInput = z.object({
+  adId: z.string().trim().min(1).max(100),
+  queueId: z.string().uuid().nullable(),
+  enabled: z.boolean().default(true),
+}).superRefine((input, context) => {
+  if (input.enabled && !input.queueId) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["queueId"], message: "Selecione a fila que receberá os leads deste anúncio." });
+  }
 });
 
 function assertManager(context: TenantContext, branchId: string) {
@@ -90,28 +104,63 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
 export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInput: unknown) {
   const input = campaignQueueRouteInput.parse(rawInput);
   const db = getDatabase();
-  const [[campaign], [queue]] = await Promise.all([
+  const [[campaign], queueResult] = await Promise.all([
     db.select({ campaignId: schema.metaCampaigns.campaignId }).from(schema.metaCampaigns)
       .where(and(eq(schema.metaCampaigns.tenantId, context.tenantId), eq(schema.metaCampaigns.campaignId, input.campaignId))).limit(1),
-    db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, input.queueId))).limit(1),
+    input.queueId
+      ? db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, status: schema.leadQueues.status }).from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, input.queueId))).limit(1)
+      : Promise.resolve([]),
   ]);
+  const queue = queueResult[0];
   if (!campaign) throw new AuthorizationError("Campanha Meta não encontrada na sua empresa.");
-  if (!queue) throw new AuthorizationError("Fila não encontrada na sua empresa.");
-  assertManager(context, queue.branchId);
+  if (input.enabled && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
+  if (input.enabled && queue) assertManager(context, queue.branchId);
+  if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de uma campanha no CRM.");
   const now = new Date();
   await db.insert(schema.metaCampaignQueueRoutes).values({
-    id: randomUUID(), tenantId: context.tenantId, campaignId: campaign.campaignId, queueId: queue.id,
+    id: randomUUID(), tenantId: context.tenantId, campaignId: campaign.campaignId, queueId: queue?.id ?? null,
     enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
   }).onConflictDoUpdate({
     target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
-    set: { queueId: queue.id, enabled: input.enabled, updatedAt: now },
+    set: { queueId: queue?.id ?? null, enabled: input.enabled, updatedAt: now },
   });
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
     acao: input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
   });
-  return { campaignId: campaign.campaignId, queueId: queue.id, enabled: input.enabled };
+  return { campaignId: campaign.campaignId, queueId: queue?.id ?? null, enabled: input.enabled };
+}
+
+export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unknown) {
+  const input = adQueueRouteInput.parse(rawInput);
+  const db = getDatabase();
+  const [[ad], queueResult] = await Promise.all([
+    db.select({ adId: schema.metaAds.adId }).from(schema.metaAds)
+      .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAds.adId, input.adId))).limit(1),
+    input.queueId
+      ? db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, status: schema.leadQueues.status }).from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, input.queueId))).limit(1)
+      : Promise.resolve([]),
+  ]);
+  const queue = queueResult[0];
+  if (!ad) throw new AuthorizationError("Anúncio Meta não encontrado na sua empresa.");
+  if (input.enabled && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
+  if (input.enabled && queue) assertManager(context, queue.branchId);
+  if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de um anúncio no CRM.");
+  const now = new Date();
+  await db.insert(schema.metaAdQueueRoutes).values({
+    id: randomUUID(), tenantId: context.tenantId, adId: ad.adId, queueId: queue?.id ?? null,
+    enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
+  }).onConflictDoUpdate({
+    target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
+    set: { queueId: queue?.id ?? null, enabled: input.enabled, updatedAt: now },
+  });
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: context.userId, entidade: "meta_ad_queue_route", entidadeId: ad.adId,
+    acao: input.enabled ? "meta_ad_queue_route.saved" : "meta_ad_queue_route.paused",
+  });
+  return { adId: ad.adId, queueId: queue?.id ?? null, enabled: input.enabled };
 }
 
 export async function simulateDistribution(context: TenantContext, rawInput: unknown) {

@@ -20,8 +20,9 @@ export type MetaConnectionAssets = {
   adAccounts: Array<{ id: string; name: string; currency: string; status: string }>;
   pixels: Array<{ id: string; name: string; status: string }>;
   datasets: Array<{ id: string; name: string; status: string }>;
-  leadFormsCount: number;
-  campaignsCount: number;
+  leadForms: Array<{ id: string; name: string; status: string; pageId: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; adAccountId: string }>;
+  ads: Array<{ id: string; name: string; status: string; adSetId: string }>;
 };
 
 export type MetaDiscoveredAssets = {

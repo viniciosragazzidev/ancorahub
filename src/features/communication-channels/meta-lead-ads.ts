@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { generateWebhookToken, resolveRequestId } from "@/features/leads/webhooks/utils/lead-webhook.utils";
@@ -27,6 +27,36 @@ type MetaLeadField = { name?: string; values?: string[] };
 type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; form_id?: string; campaign_id?: string; campaign_name?: string; field_data?: MetaLeadField[] };
 
 export const META_LEAD_ADS_SOURCE = "meta_lead_ads";
+
+type ExistingMetaLeadAdsSource = {
+  id: string;
+  tenantId: string;
+  leadWebhookCredentialId: string;
+  status: string;
+};
+
+type MetaLeadAdsSourceClaim = "create" | "reuse" | "release_and_create";
+
+/**
+ * A Page may have historical inactive mappings, but only one active mapping.
+ * This keeps the webhook tenant-safe while allowing a director to release a
+ * disconnected Page and connect it to the correct brokerage later.
+ */
+export function resolveMetaLeadAdsSourceClaim(
+  existing: ExistingMetaLeadAdsSource | undefined,
+  tenantId: string,
+  canReleaseDisconnectedOwner = false,
+): MetaLeadAdsSourceClaim {
+  if (!existing) return "create" as const;
+  if (existing.tenantId === tenantId) return "reuse" as const;
+  if (existing.status === "active" && canReleaseDisconnectedOwner) {
+    return "release_and_create";
+  }
+  if (existing.status === "active") {
+    throw new Error("Esta Página Meta já está conectada a outra empresa.");
+  }
+  return "create" as const;
+}
 
 export async function isMetaLeadAdsEnabled(tenantId?: string) {
   const setting = await getSystemSetting("feature_meta_lead_ads_enabled").catch(() => null);
@@ -102,11 +132,59 @@ async function processMetaLeadImmediately(input: { tenantId: string; leadId: str
 export async function configureMetaLeadAdsSource(input: { tenantId: string; branchId: string | null; pageId: string; adAccountId: string | null; actorUserId: string }) {
   const db = getDatabase();
   const now = new Date();
-  const [existing] = await db.select().from(schema.metaLeadAdSources).where(eq(schema.metaLeadAdSources.pageId, input.pageId)).limit(1);
-  if (existing && existing.tenantId !== input.tenantId) throw new Error("Esta Página Meta já está conectada a outra empresa.");
+  const [activeSource] = await db.select().from(schema.metaLeadAdSources)
+    .where(and(eq(schema.metaLeadAdSources.pageId, input.pageId), eq(schema.metaLeadAdSources.status, "active")))
+    .limit(1);
+  const [tenantSource] = activeSource?.tenantId === input.tenantId
+    ? [activeSource]
+    : await db.select().from(schema.metaLeadAdSources)
+      .where(and(eq(schema.metaLeadAdSources.pageId, input.pageId), eq(schema.metaLeadAdSources.tenantId, input.tenantId)))
+      .orderBy(desc(schema.metaLeadAdSources.updatedAt))
+      .limit(1);
+
+  // Versions released before the canonical Marketing disconnect could leave an
+  // active source behind. It is safe to release only when the source's owner
+  // has an explicit disconnected connection for the same Page; manual sources
+  // without that evidence remain protected from cross-tenant takeover.
+  const [ownerConnection] = activeSource && activeSource.tenantId !== input.tenantId
+    ? await db.select({ status: schema.metaConnections.status })
+      .from(schema.metaPages)
+      .innerJoin(schema.metaConnections, eq(schema.metaPages.connectionId, schema.metaConnections.id))
+      .where(and(
+        eq(schema.metaPages.tenantId, activeSource.tenantId),
+        eq(schema.metaPages.pageId, input.pageId),
+      ))
+      .orderBy(desc(schema.metaConnections.updatedAt))
+      .limit(1)
+    : [];
+  const claim = resolveMetaLeadAdsSourceClaim(
+    activeSource,
+    input.tenantId,
+    ownerConnection?.status === "disconnected",
+  );
+  const existing = tenantSource;
   const sourceId = existing?.id ?? randomUUID();
   const credentialId = existing?.leadWebhookCredentialId ?? randomUUID();
   await db.transaction(async (tx) => {
+    if (claim === "release_and_create" && activeSource) {
+      await tx.update(schema.metaLeadAdSources)
+        .set({ status: "inactive", updatedAt: now })
+        .where(and(
+          eq(schema.metaLeadAdSources.id, activeSource.id),
+          eq(schema.metaLeadAdSources.tenantId, activeSource.tenantId),
+          eq(schema.metaLeadAdSources.status, "active"),
+        ));
+      await tx.update(schema.leadWebhookCredentials)
+        .set({ status: "revoked", revokedAt: now, updatedAt: now })
+        .where(and(
+          eq(schema.leadWebhookCredentials.id, activeSource.leadWebhookCredentialId),
+          eq(schema.leadWebhookCredentials.tenantId, activeSource.tenantId),
+        ));
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(), userId: input.actorUserId, entidade: "meta_lead_ads_source", entidadeId: activeSource.id,
+        acao: "meta_lead_ads.source_released_after_owner_disconnect", createdAt: now,
+      });
+    }
     if (!existing) {
       const internalToken = generateWebhookToken();
       await tx.insert(schema.leadWebhookCredentials).values({ id: credentialId, tenantId: input.tenantId, branchId: input.branchId, name: `Meta Lead Ads • ${input.pageId}`, source: META_LEAD_ADS_SOURCE, tokenPrefix: internalToken.tokenPrefix, tokenHash: internalToken.tokenHash, status: "active", createdBy: input.actorUserId, createdAt: now, updatedAt: now });
@@ -118,6 +196,21 @@ export async function configureMetaLeadAdsSource(input: { tenantId: string; bran
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "meta_lead_ads_source", entidadeId: sourceId, acao: existing ? "meta_lead_ads.source_updated" : "meta_lead_ads.source_created" });
   });
   return { sourceId };
+}
+
+export function resolveMetaCampaignIntake(input: {
+  adRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
+  campaignRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
+}) {
+  const route = input.adRoute ?? input.campaignRoute;
+  if (!route) return { action: "capture" as const, queueId: null };
+  if (!route.enabled) return { action: "ignore" as const, queueId: null };
+  if (route.queueId && route.queueStatus === "active") {
+    return { action: "capture" as const, queueId: route.queueId };
+  }
+  // A paused or removed queue must never discard a lead silently. Fall back to
+  // the Page/default route until a Director or Manager corrects the rule.
+  return { action: "capture" as const, queueId: null };
 }
 
 export async function pauseMetaLeadAdsSource(input: { tenantId: string; sourceId: string; actorUserId: string }) {
@@ -180,14 +273,36 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         const lead = normalizeMetaLead(leadRecord);
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
         if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
-        const [campaignRoute] = lead.campaignId ? await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId })
+        const [campaignRoute] = lead.campaignId ? await db.select({
+          queueId: schema.metaCampaignQueueRoutes.queueId,
+          enabled: schema.metaCampaignQueueRoutes.enabled,
+          queueStatus: schema.leadQueues.status,
+        })
           .from(schema.metaCampaignQueueRoutes)
-          .innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
-          .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, lead.campaignId), eq(schema.metaCampaignQueueRoutes.enabled, true), eq(schema.leadQueues.status, "active")))
+          .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+          .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, lead.campaignId)))
           .limit(1) : [];
-        const bypassPlantao = source.distributionMode === "direct_leads" && !campaignRoute;
+        const [adRoute] = lead.adId ? await db.select({
+          queueId: schema.metaAdQueueRoutes.queueId,
+          enabled: schema.metaAdQueueRoutes.enabled,
+          queueStatus: schema.leadQueues.status,
+        })
+          .from(schema.metaAdQueueRoutes)
+          .leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
+          .where(and(eq(schema.metaAdQueueRoutes.tenantId, source.tenantId), eq(schema.metaAdQueueRoutes.adId, lead.adId)))
+          .limit(1) : [];
+        const campaignIntake = resolveMetaCampaignIntake({ adRoute, campaignRoute });
+        if (campaignIntake.action === "ignore") {
+          await db.insert(schema.auditLogs).values({
+            id: randomUUID(), userId: credential.createdBy, entidade: adRoute ? "meta_ad_queue_route" : "meta_campaign_queue_route", entidadeId: lead.adId ?? lead.campaignId ?? lead.externalId,
+            acao: adRoute ? "meta_lead_ads.ad_ignored" : "meta_lead_ads.campaign_ignored", createdAt: receivedAt,
+          });
+          ignored += 1;
+          continue;
+        }
+        const bypassPlantao = source.distributionMode === "direct_leads" && !campaignIntake.queueId;
         const result = await createLeadFromWebhookSync({
-          tenantId: source.tenantId, branchId: source.branchId ?? null, queueId: campaignRoute?.queueId ?? null, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
+          tenantId: source.tenantId, branchId: source.branchId ?? null, queueId: campaignIntake.queueId, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
           bypassPlantao,

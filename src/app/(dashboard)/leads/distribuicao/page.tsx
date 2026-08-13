@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   getDistributionJobConfig,
@@ -22,7 +23,7 @@ import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/
 
 export const dynamic = "force-dynamic";
 
-type DistributionView = "operar" | "filas" | "historico" | "saude";
+type DistributionView = "operar" | "filas" | "plantao" | "saude_historico";
 type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
 
 const activeStatuses = [
@@ -41,16 +42,19 @@ export default async function LeadDistributionPage({
   searchParams: Promise<{ view?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  // The route is the administrative control center. Opening it without a
-  // query must expose the editable queue rules, not hide them behind a tab.
-  const view: DistributionView = params.view === "operar" || params.view === "historico" || params.view === "saude" ? params.view : "filas";
-  const queueFilter: QueueFilter = params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
-    ? params.status
-    : "all";
+  const view: DistributionView =
+    params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
+      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view as DistributionView))
+      : "filas";
+
+  const queueFilter: QueueFilter =
+    params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
+      ? params.status
+      : "all";
+
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
 
-  // Managers must have a branch assigned to access distribution
   if (context.role === "manager" && !context.branchId) {
     return (
       <>
@@ -58,8 +62,7 @@ export default async function LeadDistributionPage({
         <main className="flex min-h-full flex-col items-center justify-center gap-4 bg-background p-12 text-center">
           <p className="text-sm font-semibold text-foreground">Unidade não definida</p>
           <p className="text-xs text-muted-foreground">
-            Seu acesso como gestor não está vinculado a nenhuma unidade. Fale com o diretor para
-            ajustar seu cadastro.
+            Seu acesso como gestor não está vinculado a nenhuma unidade. Fale com o diretor para ajustar seu cadastro.
           </p>
         </main>
       </>
@@ -68,7 +71,6 @@ export default async function LeadDistributionPage({
 
   const db = getDatabase();
 
-  // Fetch branches with their distribution flags
   const branchScope =
     context.role === "manager" && context.branchId
       ? and(
@@ -76,6 +78,7 @@ export default async function LeadDistributionPage({
           eq(schema.branches.id, context.branchId),
         )
       : eq(schema.branches.tenantId, context.tenantId);
+
   const branches = await db
     .select({
       id: schema.branches.id,
@@ -105,18 +108,25 @@ export default async function LeadDistributionPage({
     );
   }
 
+  // Single consolidated Promise.all for fast TTFB
   const [
     brokers,
     unassignedLeads,
     activeBrokerLeads,
-    memberCounts,
-    availableCounts,
-    leadCounts,
-    newLeadCounts,
+    brokerStatsByBranch,
+    leadStatsByBranch,
     jobHealth,
     jobConfig,
     effectHealth,
     failedEffects,
+    queues,
+    queueLeadCounts,
+    recentEvents,
+    globalPolicy,
+    metaCampaigns,
+    metaAds,
+    metaCampaignRoutes,
+    metaAdRoutes,
   ] = await Promise.all([
     db
       .select({
@@ -174,6 +184,7 @@ export default async function LeadDistributionPage({
     db
       .select({
         branchId: schema.tenantMemberships.branchId,
+        availabilityStatus: schema.tenantMemberships.availabilityStatus,
         count: count(schema.tenantMemberships.id),
       })
       .from(schema.tenantMemberships)
@@ -181,48 +192,25 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.tenantMemberships.tenantId, context.tenantId),
           eq(schema.tenantMemberships.role, "broker"),
-          inArray(schema.tenantMemberships.branchId, branchIds),
-        ),
-      )
-      .groupBy(schema.tenantMemberships.branchId),
-    db
-      .select({
-        branchId: schema.tenantMemberships.branchId,
-        count: count(schema.tenantMemberships.id),
-      })
-      .from(schema.tenantMemberships)
-      .where(
-        and(
-          eq(schema.tenantMemberships.tenantId, context.tenantId),
-          eq(schema.tenantMemberships.role, "broker"),
-          eq(schema.tenantMemberships.availabilityStatus, "available"),
           eq(schema.tenantMemberships.status, "active"),
           inArray(schema.tenantMemberships.branchId, branchIds),
         ),
       )
-      .groupBy(schema.tenantMemberships.branchId),
+      .groupBy(schema.tenantMemberships.branchId, schema.tenantMemberships.availabilityStatus),
     db
-      .select({ branchId: schema.leads.branchId, count: count(schema.leads.id) })
+      .select({
+        branchId: schema.leads.branchId,
+        status: schema.leads.status,
+        count: count(schema.leads.id),
+      })
       .from(schema.leads)
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
           inArray(schema.leads.branchId, branchIds),
-          inArray(schema.leads.status, activeStatuses),
         ),
       )
-      .groupBy(schema.leads.branchId),
-    db
-      .select({ branchId: schema.leads.branchId, count: count(schema.leads.id) })
-      .from(schema.leads)
-      .where(
-        and(
-          eq(schema.leads.tenantId, context.tenantId),
-          inArray(schema.leads.branchId, branchIds),
-          eq(schema.leads.status, "new"),
-        ),
-      )
-      .groupBy(schema.leads.branchId),
+      .groupBy(schema.leads.branchId, schema.leads.status),
     getLeadDistributionJobHealth(context.tenantId),
     getDistributionJobConfig(),
     getLeadEffectOutboxHealth(context.tenantId),
@@ -250,9 +238,6 @@ export default async function LeadDistributionPage({
       )
       .orderBy(schema.leadEffectOutbox.updatedAt)
       .limit(20),
-  ]);
-
-  const [queues, queueLeadCounts, recentEvents, globalPolicy, metaCampaigns, metaCampaignRoutes] = await Promise.all([
     db.select({
       id: schema.leadQueues.id,
       name: schema.leadQueues.name,
@@ -279,18 +264,57 @@ export default async function LeadDistributionPage({
       .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))).limit(1),
     db.select({ campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
       .from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(schema.metaCampaigns.name),
+    db.select({ adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status })
+      .from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
-      .from(schema.metaCampaignQueueRoutes).innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
-      .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds))).orderBy(schema.leadQueues.name),
+      .from(schema.metaCampaignQueueRoutes).leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+      .where(and(
+        eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
+        context.role === "manager" && context.branchId
+          ? eq(schema.leadQueues.branchId, context.branchId)
+          : undefined,
+      )).orderBy(schema.leadQueues.name),
+    db.select({ adId: schema.metaAdQueueRoutes.adId, queueId: schema.metaAdQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaAdQueueRoutes.enabled })
+      .from(schema.metaAdQueueRoutes).leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
+      .where(and(
+        eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
+        context.role === "manager" && context.branchId
+          ? eq(schema.leadQueues.branchId, context.branchId)
+          : undefined,
+      )).orderBy(schema.leadQueues.name),
   ]);
 
   const activeBrokerLeadsMap = new Map(
     activeBrokerLeads.map((entry) => [entry.brokerId, Number(entry.count)]),
   );
-  const countsByBranch = new Map(memberCounts.map((e) => [e.branchId, Number(e.count)]));
-  const availableByBranch = new Map(availableCounts.map((e) => [e.branchId, Number(e.count)]));
-  const leadsByBranch = new Map(leadCounts.map((e) => [e.branchId, Number(e.count)]));
-  const newByBranch = new Map(newLeadCounts.map((e) => [e.branchId, Number(e.count)]));
+
+  // Process aggregated broker stats
+  const countsByBranch = new Map<string, number>();
+  const availableByBranch = new Map<string, number>();
+  brokerStatsByBranch.forEach((row) => {
+    if (!row.branchId) return;
+    const currentTotal = countsByBranch.get(row.branchId) ?? 0;
+    countsByBranch.set(row.branchId, currentTotal + Number(row.count));
+    if (row.availabilityStatus === "available") {
+      const currentAvail = availableByBranch.get(row.branchId) ?? 0;
+      availableByBranch.set(row.branchId, currentAvail + Number(row.count));
+    }
+  });
+
+  // Process aggregated lead stats
+  const leadsByBranch = new Map<string, number>();
+  const newByBranch = new Map<string, number>();
+  leadStatsByBranch.forEach((row) => {
+    if (!row.branchId) return;
+    if (activeStatuses.includes(row.status as any)) {
+      const currentActive = leadsByBranch.get(row.branchId) ?? 0;
+      leadsByBranch.set(row.branchId, currentActive + Number(row.count));
+    }
+    if (row.status === "new") {
+      const currentNew = newByBranch.get(row.branchId) ?? 0;
+      newByBranch.set(row.branchId, currentNew + Number(row.count));
+    }
+  });
 
   const enrichedBranches = branches.map((branch) => ({
     id: branch.id,
@@ -304,13 +328,13 @@ export default async function LeadDistributionPage({
     newLeads: newByBranch.get(branch.id) ?? 0,
   }));
 
-  // Overall metrics
   const totalBranches = branches.length;
   const acceptingBranches = branches.filter((b) => b.acceptingLeads).length;
   const autoDistributeBranches = branches.filter((b) => b.autoDistribute).length;
   const totalBrokers = [...countsByBranch.values()].reduce((a, b) => a + b, 0);
   const totalAvailable = [...availableByBranch.values()].reduce((a, b) => a + b, 0);
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
+
   const queueCards = ([
     ...(context.role === "director"
       ? [{ status: "unassigned" as const, title: "Sem unidade", description: "Aguardando encaminhamento do Diretor." }]
@@ -326,6 +350,7 @@ export default async function LeadDistributionPage({
       oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${oldest.toLocaleDateString("pt-BR")}`,
     };
   });
+
   const queueWaiting = new Map(queueLeadCounts.map((item) => [item.queueId, Number(item.waiting)]));
   const queuesForControl = queues.map((queue) => ({
     ...queue,
@@ -336,32 +361,44 @@ export default async function LeadDistributionPage({
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Central de Filas" />
+      <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        <section className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 shadow-xs sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold">Filas com responsabilidade clara</p>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Opere pendências, ajuste regras ou acompanhe a automação sem misturar decisões de momentos diferentes.
-            </p>
-          </div>
-          <nav aria-label="Seções da Central de Filas" className="flex flex-wrap gap-2">
-            <Button render={<Link href="/leads/distribuicao?view=operar" />} size="sm" variant={view === "operar" ? "default" : "outline"}>
-              Operar fila
-            </Button>
-            <Button render={<Link href="/leads/distribuicao?view=filas" />} size="sm" variant={view === "filas" ? "default" : "outline"}>
-              Central de filas
-            </Button>
-            <Button render={<Link href="/leads/distribuicao?view=historico" />} size="sm" variant={view === "historico" ? "default" : "outline"}>
-              Histórico
-            </Button>
-            <Button render={<Link href="/leads/distribuicao?view=saude" />} size="sm" variant={view === "saude" ? "default" : "outline"}>
-              Saúde da automação
-            </Button>
-          </nav>
-        </section>
-        {view === "operar" ? (
-          <>
+        <Tabs defaultValue={view} className="w-full space-y-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 max-w-2xl">
+            <TabsTrigger value="filas">
+              <Link href="/leads/distribuicao?view=filas" className="w-full">Central de Filas</Link>
+            </TabsTrigger>
+            <TabsTrigger value="operar">
+              <Link href="/leads/distribuicao?view=operar" className="w-full">Operar Fila</Link>
+            </TabsTrigger>
+            <TabsTrigger value="plantao">
+              <Link href="/leads/distribuicao?view=plantao" className="w-full">Plantão & Equipe</Link>
+            </TabsTrigger>
+            <TabsTrigger value="saude_historico">
+              <Link href="/leads/distribuicao?view=saude_historico" className="w-full">Saúde & Histórico</Link>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ABA 1: CENTRAL DE FILAS */}
+          <TabsContent value="filas" className="space-y-6">
+            <QueueControlCenter
+              queues={queuesForControl}
+              branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+              campaigns={metaCampaigns}
+              ads={metaAds}
+              campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
+              adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
+              canEdit
+            />
+            <DistributionPolicyPanel
+              canEdit={context.role === "director"}
+              brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+              policy={globalPolicy[0]?.policy ?? {}}
+            />
+          </TabsContent>
+
+          {/* ABA 2: OPERAR FILA */}
+          <TabsContent value="operar" className="space-y-6">
             <DistributionMetrics
               metrics={{
                 totalBranches,
@@ -374,7 +411,7 @@ export default async function LeadDistributionPage({
             />
             <section aria-labelledby="filas-de-acao" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <div className="md:col-span-2 xl:col-span-3">
-                <h2 id="filas-de-acao" className="text-base font-semibold">Filas de ação</h2>
+                <h2 id="filas-de-acao" className="text-base font-semibold">Filas de ação rápida</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Comece pela fila mais antiga que está sob sua responsabilidade.</p>
               </div>
               {queueCards.map((queue) => (
@@ -416,18 +453,10 @@ export default async function LeadDistributionPage({
                 }))}
               />
             </div>
-          </>
-        ) : null}
-        {view === "filas" ? (
-          <>
-            <Card variant="overview">
-              <CardHeader>
-                <CardTitle>Configuração da distribuição</CardTitle>
-                <CardDescription>Altere disponibilidade, capacidade e regras fora da rotina de tratamento da fila. As mudanças afetam os próximos leads recebidos.</CardDescription>
-              </CardHeader>
-            </Card>
-            <QueueControlCenter queues={queuesForControl} branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))} campaigns={metaCampaigns} campaignRoutes={metaCampaignRoutes} canEdit />
-            <DistributionPolicyPanel canEdit={context.role === "director"} brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))} policy={globalPolicy[0]?.policy ?? {}} />
+          </TabsContent>
+
+          {/* ABA 3: PLANTÃO & EQUIPE */}
+          <TabsContent value="plantao" className="space-y-6">
             <DistributionPanel
               branches={enrichedBranches}
               brokers={brokers.map((broker) => ({
@@ -441,126 +470,149 @@ export default async function LeadDistributionPage({
               }))}
               canManageAcceptingLeads={context.role === "director"}
             />
-          </>
-        ) : null}
-        {view === "historico" ? (
-          <Card variant="overview">
-            <CardHeader>
-              <CardTitle>Histórico de decisões</CardTitle>
-              <CardDescription>Registro auditável de atribuições, redistribuições e intervenções manuais no seu escopo.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {recentEvents.length ? <div className="divide-y divide-border">{recentEvents.map((event) => <div key={event.id} className="flex flex-col gap-1 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">{event.leadName} <span className="font-normal text-muted-foreground">→</span> {event.brokerName ?? "Aguardando corretor"}</p><p className="text-xs text-muted-foreground">{event.queueName ?? "Inbox geral"} · {event.action.replaceAll("_", " ")}{event.reason ? ` · ${event.reason}` : ""}</p></div><time className="shrink-0 text-xs text-muted-foreground">{event.createdAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</time></div>)}</div> : <div className="px-5 py-12 text-center"><p className="text-sm font-medium">Ainda não há eventos neste escopo</p><p className="mt-1 text-xs text-muted-foreground">Quando a equipe rotear ou atribuir leads, a explicação aparecerá aqui.</p></div>}
-            </CardContent>
-          </Card>
-        ) : null}
-        {view === "saude" ? (
-          <>
-            <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle>Automação da fila</CardTitle>
-              <CardDescription>
-                Estado real do processamento assíncrono desta corretora.
-              </CardDescription>
-            </div>
-            <Badge
-              variant={
-                !jobHealth.available
-                  ? "outline"
-                  : !jobConfig.enabled
-                    ? "outline"
-                    : jobHealth.failed > 0
-                      ? "warning"
-                      : "success"
-              }
-            >
-              {!jobHealth.available
-                ? "Aguardando migration"
-                : !jobConfig.enabled
-                  ? "Pausada globalmente"
-                  : jobHealth.failed > 0
-                    ? "Requer atenção"
-                    : "Ativa"}
-            </Badge>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label="Aguardando" value={jobHealth.pending + jobHealth.retrying} />
-            <Stat label="Em processamento" value={jobHealth.processing} />
-            <Stat
-              label="Exceções"
-              value={jobHealth.failed}
-              tone={jobHealth.failed > 0 ? "warning" : undefined}
-            />
-            <Stat
-              label="Próximo passo"
-              hint={
-                jobHealth.failed > 0
-                  ? "Revisar exceções com o Diretor"
-                  : jobHealth.pending + jobHealth.retrying > 0
-                    ? "O motor tentará distribuir"
-                    : "Nenhuma pendência automática"
-              }
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-            <div>
-              <CardTitle>Efeitos pendentes do intake</CardTitle>
-              <CardDescription>
-                Distribuição e notificações confirmadas após o recebimento do lead.
-              </CardDescription>
-            </div>
-            <Badge variant={effectHealth.failed > 0 ? "warning" : "success"}>
-              {effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}
-            </Badge>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat label="Aguardando" value={effectHealth.pending + effectHealth.retrying} />
-              <Stat label="Processando" value={effectHealth.processing} />
-              <Stat
-                label="Exceções"
-                value={effectHealth.failed}
-                tone={effectHealth.failed > 0 ? "warning" : undefined}
-              />
-              <Stat label="Concluídos" value={effectHealth.completed} />
-            </div>
-            {failedEffects.length > 0 ? (
-              <div className="space-y-2 border-t border-border pt-4">
-                {failedEffects.map((effect) => (
-                  <div
-                    key={effect.id}
-                    className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium">
-                        {effect.leadName} · {effect.type}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {effect.lastErrorCode ?? "Falha de processamento"} · tentativa{" "}
-                        {effect.attemptCount} · {effect.lastErrorMessage ?? "Sem detalhe adicional"}
-                      </p>
+          </TabsContent>
+
+          {/* ABA 4: SAÚDE & HISTÓRICO */}
+          <TabsContent value="saude_historico" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card variant="overview">
+                <CardHeader>
+                  <CardTitle>Histórico auditável de decisões</CardTitle>
+                  <CardDescription>Registro de atribuições, redistribuições e intervenções manuais.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0 max-h-[500px] overflow-y-auto">
+                  {recentEvents.length ? (
+                    <div className="divide-y divide-border">
+                      {recentEvents.map((event) => (
+                        <div key={event.id} className="flex flex-col gap-1 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {event.leadName} <span className="font-normal text-muted-foreground">→</span> {event.brokerName ?? "Aguardando corretor"}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {event.queueName ?? "Inbox geral"} · {event.action.replaceAll("_", " ")}{event.reason ? ` · ${event.reason}` : ""}
+                            </p>
+                          </div>
+                          <time className="shrink-0 text-[10px] text-muted-foreground">
+                            {event.createdAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                          </time>
+                        </div>
+                      ))}
                     </div>
-                    <form action={retryLeadEffectAction}>
-                      <input type="hidden" name="effectId" value={effect.id} />
-                      <Button type="submit" size="sm" variant="outline">
-                        Reprocessar
-                      </Button>
-                    </form>
-                  </div>
-                ))}
+                  ) : (
+                    <div className="px-5 py-12 text-center">
+                      <p className="text-sm font-medium">Ainda não há eventos neste escopo</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Quando a equipe rotear ou atribuir leads, a explicação aparecerá aqui.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                    <div>
+                      <CardTitle>Automação da fila</CardTitle>
+                      <CardDescription>Estado real do processamento assíncrono desta corretora.</CardDescription>
+                    </div>
+                    <Badge
+                      variant={
+                        !jobHealth.available
+                          ? "outline"
+                          : !jobConfig.enabled
+                            ? "outline"
+                            : jobHealth.failed > 0
+                              ? "warning"
+                              : "success"
+                      }
+                    >
+                      {!jobHealth.available
+                        ? "Aguardando migration"
+                        : !jobConfig.enabled
+                          ? "Pausada globalmente"
+                          : jobHealth.failed > 0
+                            ? "Requer atenção"
+                            : "Ativa"}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2">
+                    <Stat label="Aguardando" value={jobHealth.pending + jobHealth.retrying} />
+                    <Stat label="Em processamento" value={jobHealth.processing} />
+                    <Stat
+                      label="Exceções"
+                      value={jobHealth.failed}
+                      tone={jobHealth.failed > 0 ? "warning" : undefined}
+                    />
+                    <Stat
+                      label="Próximo passo"
+                      hint={
+                        jobHealth.failed > 0
+                          ? "Revisar exceções com o Diretor"
+                          : jobHealth.pending + jobHealth.retrying > 0
+                            ? "O motor tentará distribuir"
+                            : "Nenhuma pendência automática"
+                      }
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+                    <div>
+                      <CardTitle>Efeitos pendentes do intake</CardTitle>
+                      <CardDescription>Distribuição e notificações confirmadas após o recebimento do lead.</CardDescription>
+                    </div>
+                    <Badge variant={effectHealth.failed > 0 ? "warning" : "success"}>
+                      {effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Stat label="Aguardando" value={effectHealth.pending + effectHealth.retrying} />
+                      <Stat label="Processando" value={effectHealth.processing} />
+                      <Stat
+                        label="Exceções"
+                        value={effectHealth.failed}
+                        tone={effectHealth.failed > 0 ? "warning" : undefined}
+                      />
+                      <Stat label="Concluídos" value={effectHealth.completed} />
+                    </div>
+                    {failedEffects.length > 0 ? (
+                      <div className="space-y-2 border-t border-border pt-4">
+                        {failedEffects.map((effect) => (
+                          <div
+                            key={effect.id}
+                            className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between text-xs"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium">
+                                {effect.leadName} · {effect.type}
+                              </p>
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                {effect.lastErrorCode ?? "Falha de processamento"} · tentativa{" "}
+                                {effect.attemptCount} · {effect.lastErrorMessage ?? "Sem detalhe adicional"}
+                              </p>
+                            </div>
+                            <form action={retryLeadEffectAction}>
+                              <input type="hidden" name="effectId" value={effect.id} />
+                              <Button type="submit" size="xs" variant="outline">
+                                Reprocessar
+                              </Button>
+                            </form>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+                        Nenhuma exceção pendente.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-                Nenhuma exceção pendente.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-          </>
-        ) : null}
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </>
   );

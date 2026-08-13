@@ -50,7 +50,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     const adAccounts = await db
       .select()
       .from(schema.metaAdAccounts)
-      .where(eq(schema.metaAdAccounts.tenantId, tenantId));
+      .where(and(eq(schema.metaAdAccounts.tenantId, tenantId), eq(schema.metaAdAccounts.status, "active")));
 
     for (const account of adAccounts) {
       const remoteCampaigns = await client.fetchCampaigns(account.adAccountId);
@@ -157,7 +157,8 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     }
 
     // 3. Buscar formulários de Lead Ads de cada página do tenant
-    const pages = await db.select().from(schema.metaPages).where(eq(schema.metaPages.tenantId, tenantId));
+    const pages = await db.select().from(schema.metaPages)
+      .where(and(eq(schema.metaPages.tenantId, tenantId), eq(schema.metaPages.status, "active")));
     for (const page of pages) {
       const pageToken = page.accessTokenCiphertext ? decryptMetaToken(page.accessTokenCiphertext) : rawToken;
       const forms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);

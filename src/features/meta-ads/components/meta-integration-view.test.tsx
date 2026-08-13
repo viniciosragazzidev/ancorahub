@@ -23,18 +23,9 @@ vi.mock("../meta-marketing-oauth-url", () => ({ createMetaMarketingOAuthUrl: vi.
 import { MetaIntegrationView } from "./meta-integration-view";
 
 const connectedConnection = {
-  id: "connection-1",
-  tenantId: "tenant-1",
-  businessId: "business-1",
-  businessName: "Âncora Hub",
-  status: "connected" as const,
-  permissions: [] as string[],
-  expiresAt: null,
-  lastError: null,
-  lastSyncedAt: null,
-  pagesCount: 1,
-  adAccountsCount: 1,
-  whatsappConnected: false,
+  id: "connection-1", tenantId: "tenant-1", businessId: "business-1", businessName: "Âncora Hub",
+  status: "connected" as const, permissions: [] as string[], expiresAt: null, lastError: null, lastSyncedAt: null,
+  pagesCount: 1, adAccountsCount: 1, whatsappConnected: false,
 };
 
 const connectedAssets = {
@@ -42,53 +33,44 @@ const connectedAssets = {
   adAccounts: [{ id: "act_1", name: "Conta principal", currency: "BRL", status: "active" }],
   pixels: [{ id: "pixel-1", name: "Pixel principal", status: "active" }],
   datasets: [],
-  leadFormsCount: 2,
-  campaignsCount: 3,
+  leadForms: [{ id: "form-1", name: "Formulário principal", status: "ACTIVE", pageId: "page-1" }],
+  campaigns: [{ id: "campaign-1", name: "Campanha de saúde", status: "ACTIVE", adAccountId: "act_1" }],
+  ads: [{ id: "ad-1", name: "Anúncio principal", status: "ACTIVE", adSetId: "adset-1" }],
 };
 
 afterEach(() => {
-  cleanup();
-  refreshMock.mockClear();
-  disconnectMock.mockReset();
-  toastSuccessMock.mockClear();
-  toastErrorMock.mockClear();
+  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); toastSuccessMock.mockClear(); toastErrorMock.mockClear();
 });
 
 describe("MetaIntegrationView", () => {
   it("keeps WhatsApp outside the Marketing authorization flow", () => {
     render(<MetaIntegrationView connection={null} assets={null} logs={[]} />);
-
     expect(screen.getByRole("button", { name: "Conectar Marketing" })).toBeInTheDocument();
-    expect(screen.getByText("Conexão exclusiva de Marketing para páginas, campanhas, formulários, pixels e filas.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Conectar Marketing" }));
     expect(screen.getByRole("heading", { name: "Conectar Marketing da Meta" })).toBeInTheDocument();
     expect(screen.getByText(/O WhatsApp oficial é uma conexão separada desta autorização/)).toBeInTheDocument();
   });
 
-  it("shows the connected business profile and authorized assets", () => {
+  it("shows the tenant-owned business profile, pixels, forms, campaigns and ads", () => {
     render(<MetaIntegrationView canConfigure={false} connection={connectedConnection} assets={connectedAssets} logs={[]} />);
-
     expect(screen.getByText("Perfil e ativos conectados")).toBeInTheDocument();
     expect(screen.getByText("Âncora Hub")).toBeInTheDocument();
     expect(screen.getByText("Âncora Saúde")).toBeInTheDocument();
     expect(screen.getByText("Pixel principal")).toBeInTheDocument();
-    expect(screen.getByText("2 formulários de Lead Ads")).toBeInTheDocument();
+    expect(screen.getByText("Formulário principal")).toBeInTheDocument();
+    expect(screen.getByText("Campanha de saúde")).toBeInTheDocument();
+    expect(screen.getByText("Anúncio principal")).toBeInTheDocument();
   });
 
   it("asks for confirmation before disconnecting and refreshes the page state", async () => {
     disconnectMock.mockResolvedValue({ success: true });
-    render(<MetaIntegrationView canConfigure={true} connection={connectedConnection} assets={connectedAssets} logs={[]} />);
-
+    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
     fireEvent.click(screen.getByRole("button", { name: "Desconectar" }));
     expect(screen.getByText("Desconectar Marketing da Meta?")).toBeInTheDocument();
-
-    // A confirmação exige a ação explícita no dialog; cancelar não desconecta.
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancelar" }));
     expect(disconnectMock).not.toHaveBeenCalled();
-
     fireEvent.click(screen.getByRole("button", { name: "Desconectar" }));
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Desconectar" }));
-
     await waitFor(() => expect(disconnectMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(refreshMock).toHaveBeenCalled());
     expect(toastSuccessMock).toHaveBeenCalledWith("Conexão de Marketing desconectada.", { description: expect.any(String) });
