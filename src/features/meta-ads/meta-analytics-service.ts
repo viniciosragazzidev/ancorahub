@@ -16,11 +16,58 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
 }> {
   const db = getDatabase();
 
-  // 1. Buscar campanhas do tenant
+  // 1. Verificar se existe uma conexão Meta ativa
+  const activeConnection = await db
+    .select({ id: schema.metaConnections.id })
+    .from(schema.metaConnections)
+    .where(and(eq(schema.metaConnections.tenantId, tenantId), eq(schema.metaConnections.status, "connected")))
+    .limit(1);
+
+  if (activeConnection.length === 0) {
+    return {
+      campaigns: [],
+      totals: {
+        leads: 0,
+        conversations: 0,
+        sales: 0,
+        revenue: 0,
+        conversionRate: 0,
+      },
+    };
+  }
+
+  // 2. Buscar campanhas do tenant vinculadas a contas de anúncios ativas
   const campaignsList = await db
-    .select()
+    .select({
+      id: schema.metaCampaigns.id,
+      tenantId: schema.metaCampaigns.tenantId,
+      adAccountId: schema.metaCampaigns.adAccountId,
+      campaignId: schema.metaCampaigns.campaignId,
+      name: schema.metaCampaigns.name,
+      objective: schema.metaCampaigns.objective,
+      status: schema.metaCampaigns.status,
+      dailyBudget: schema.metaCampaigns.dailyBudget,
+      lifetimeBudget: schema.metaCampaigns.lifetimeBudget,
+      startTime: schema.metaCampaigns.startTime,
+      stopTime: schema.metaCampaigns.stopTime,
+      createdAt: schema.metaCampaigns.createdAt,
+      updatedAt: schema.metaCampaigns.updatedAt,
+    })
     .from(schema.metaCampaigns)
-    .where(eq(schema.metaCampaigns.tenantId, tenantId));
+    .innerJoin(
+      schema.metaAdAccounts,
+      and(
+        eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId),
+        eq(schema.metaCampaigns.tenantId, schema.metaAdAccounts.tenantId)
+      )
+    )
+    .where(
+      and(
+        eq(schema.metaCampaigns.tenantId, tenantId),
+        eq(schema.metaAdAccounts.status, "active"),
+        sql`${schema.metaCampaigns.status} != 'ARCHIVED'`
+      )
+    );
 
   // 2. Buscar estatísticas agregadas por campanha via relacionamentos do lead
   const leadsPerCampaign = await db

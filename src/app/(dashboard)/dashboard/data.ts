@@ -233,16 +233,44 @@ export async function getMarketingDashboardData(period: PeriodValue = DEFAULT_PE
   const context = await getRequiredTenantContext();
   const db = getDatabase();
 
-  const [user, tenant, leads, campaigns, campaignRoutes, ads, trendRaw] = await Promise.all([
+  const activeConn = await db
+    .select({ id: schema.metaConnections.id })
+    .from(schema.metaConnections)
+    .where(and(eq(schema.metaConnections.tenantId, context.tenantId), eq(schema.metaConnections.status, "connected")))
+    .limit(1);
+
+  const isMetaConnected = activeConn.length > 0;
+
+  const [user, tenant, leads, rawCampaigns, campaignRoutes, rawAds, trendRaw] = await Promise.all([
     db.select({ name: schema.user.name, email: schema.user.email }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
     db.select({ id: schema.leads.id, status: schema.leads.status, origem: schema.leads.origem, metaCampaignId: schema.leads.metaCampaignId, createdAt: schema.leads.createdAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))),
-    db.select({ id: schema.metaCampaigns.id, campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)),
+    isMetaConnected
+      ? db
+          .select({ id: schema.metaCampaigns.id, campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
+          .from(schema.metaCampaigns)
+          .innerJoin(
+            schema.metaAdAccounts,
+            and(
+              eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId),
+              eq(schema.metaCampaigns.tenantId, schema.metaAdAccounts.tenantId)
+            )
+          )
+          .where(
+            and(
+              eq(schema.metaCampaigns.tenantId, context.tenantId),
+              eq(schema.metaAdAccounts.status, "active"),
+              sql`${schema.metaCampaigns.status} != 'ARCHIVED'`
+            )
+          )
+      : Promise.resolve([]),
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
       .from(schema.metaCampaignQueueRoutes)
       .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
       .where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)),
-    db.select({ id: schema.metaAds.id, adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)),
+    isMetaConnected
+      ? db.select({ id: schema.metaAds.id, adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status }).from(schema.metaAds).where(and(eq(schema.metaAds.tenantId, context.tenantId), sql`${schema.metaAds.status} != 'inactive'`))
+      : Promise.resolve([]),
     db.select({
       date: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
       leads: sql<number>`count(*)::int`,
@@ -253,6 +281,9 @@ export async function getMarketingDashboardData(period: PeriodValue = DEFAULT_PE
       .groupBy(sql`1`)
       .orderBy(sql`1`),
   ]);
+
+  const campaigns = rawCampaigns;
+  const ads = rawAds;
 
   if (!user[0] || !tenant[0]) throw new Error("User or tenant not found");
 

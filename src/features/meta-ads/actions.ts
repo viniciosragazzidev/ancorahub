@@ -321,6 +321,18 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
       .update(schema.metaAdAccounts)
       .set({ status: "inactive", updatedAt: now })
       .where(eq(schema.metaAdAccounts.tenantId, context.tenantId));
+    await tx
+      .update(schema.metaCampaigns)
+      .set({ status: "ARCHIVED", updatedAt: now })
+      .where(eq(schema.metaCampaigns.tenantId, context.tenantId));
+    await tx
+      .update(schema.metaPixels)
+      .set({ status: "inactive", updatedAt: now })
+      .where(eq(schema.metaPixels.tenantId, context.tenantId));
+    await tx
+      .update(schema.metaDatasets)
+      .set({ status: "inactive", updatedAt: now })
+      .where(eq(schema.metaDatasets.tenantId, context.tenantId));
 
     for (const source of sources) {
       await tx.update(schema.metaLeadAdSources).set({ status: "inactive", updatedAt: now })
@@ -345,6 +357,9 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
 
   revalidatePath("/integrations/meta");
   revalidatePath("/settings/integracoes/meta");
+  revalidatePath("/marketing/campanhas");
+  revalidatePath("/marketing/importacoes");
+  revalidatePath("/settings");
   return { success: true };
 }
 
