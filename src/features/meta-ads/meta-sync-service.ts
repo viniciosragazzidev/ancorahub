@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 
 import { isMetaAdsReadPermissionError, isMetaPermissionError, MetaGraphClient } from "./meta-graph-client";
 import { decryptMetaToken } from "./meta-oauth";
@@ -242,6 +243,12 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     for (const page of validPages) {
       try {
         const pageToken = page.accessTokenCiphertext ? decryptMetaToken(page.accessTokenCiphertext) : rawToken;
+        const pageLeadgenClient = new MetaGraphClient(pageToken);
+        const leadgenSubscribed = await pageLeadgenClient.fetchLeadgenSubscription(page.pageId);
+        if (!leadgenSubscribed) {
+          await subscribePageToLeadgen(page.pageId, pageToken);
+          console.log("[meta-sync] Repaired missing leadgen subscription", { tenantId, pageId: page.pageId });
+        }
         let forms: Array<{ id: string; name: string; status?: string; locale?: string }> = [];
 
         // Try with Page Token first, fallback to User Token
@@ -267,6 +274,17 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
         }
       } catch (error) {
         console.error(`[meta-sync] Error fetching lead forms for page ${page.pageId}:`, error);
+        if (error instanceof Error && error.message.includes("leadgen")) {
+          const message = "The Page leadgen subscription is not confirmed. The source remains active, but new leads may wait for Meta delivery to be repaired.";
+          warnings.push({ code: "leadgen_subscription_missing", message });
+          await db.update(schema.metaLeadAdSources)
+            .set({ lastError: message, updatedAt: now })
+            .where(and(
+              eq(schema.metaLeadAdSources.tenantId, tenantId),
+              eq(schema.metaLeadAdSources.pageId, page.pageId),
+              eq(schema.metaLeadAdSources.status, "active"),
+            ));
+        }
         if (isMetaPermissionError(error)) {
           warnings.push({
             code: "asset_access_limited",

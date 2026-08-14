@@ -59,7 +59,7 @@ export type MetaDiscoveredAssets = {
   permissions?: string[];
 };
 
-export type MetaSyncWarningCode = "missing_ads_read" | "asset_access_limited" | "invalid_asset";
+export type MetaSyncWarningCode = "missing_ads_read" | "asset_access_limited" | "invalid_asset" | "leadgen_subscription_missing";
 
 export type MetaSyncWarning = {
   code: MetaSyncWarningCode;

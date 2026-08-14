@@ -255,7 +255,8 @@ export async function configureManualMetaLeadAdsSourceAction(formData: FormData)
       .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
     if (!branch) throw new Error("Selecione uma unidade ativa da sua empresa.");
   }
-  await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: input.branchId, pageId: input.pageId, adAccountId: input.adAccountId || null, actorUserId: context.userId });
+  await subscribePageToLeadgen(input.pageId);
+  await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: input.branchId, pageId: input.pageId, adAccountId: input.adAccountId || null, actorUserId: context.userId, leadgenSubscriptionVerified: true });
   revalidatePath("/integrations/meta");
 }
 
@@ -290,7 +291,7 @@ export async function confirmManualMetaLeadAdsAssetsAction(input: unknown) {
   }
   const db = getDatabase();
   await subscribePageToLeadgen(selected.pageId);
-  await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId: selected.pageId, adAccountId: null, actorUserId: context.userId });
+  await configureMetaLeadAdsSource({ tenantId: context.tenantId, branchId: null, pageId: selected.pageId, adAccountId: null, actorUserId: context.userId, leadgenSubscriptionVerified: true });
   const now = new Date();
   const [settings] = await db.select({ id: schema.metaIntegrationSettings.id }).from(schema.metaIntegrationSettings).where(eq(schema.metaIntegrationSettings.tenantId, context.tenantId)).limit(1);
   const values = { adAccountId: null, pixelId: null, datasetId: null, lastSyncedAt: now, lastError: null, updatedAt: now };
@@ -313,17 +314,14 @@ export async function reactivateManualMetaLeadAdsSourceAction(formData: FormData
   const context = await requireLeadAdsAccess();
   const pageId = String(formData.get("pageId") ?? "").trim();
   if (!pageId) throw new Error("Página inválida.");
-  try {
-    await subscribePageToLeadgen(pageId);
-  } catch (err) {
-    console.warn(`[reactivateManualMetaLeadAdsSourceAction] Warning subscribing page ${pageId}:`, err);
-  }
+  await subscribePageToLeadgen(pageId);
   await configureMetaLeadAdsSource({
     tenantId: context.tenantId,
     branchId: null,
     pageId,
     adAccountId: null,
     actorUserId: context.userId,
+    leadgenSubscriptionVerified: true,
   });
   revalidatePath("/integrations/meta");
 }

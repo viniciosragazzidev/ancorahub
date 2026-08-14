@@ -118,6 +118,37 @@ export async function resolvePageAccessToken(pageId: string, userAccessToken: st
   return page.access_token;
 }
 
+type PageSubscriptionResponse = {
+  data?: Array<{ id?: string; subscribed_fields?: string[] }>;
+} & MetaApiErrorResponse;
+
+function getMetaLeadAdsAppId() {
+  return process.env.META_LEAD_ADS_APP_ID?.trim()
+    || process.env.META_APP_ID?.trim()
+    || process.env.NEXT_PUBLIC_META_LEAD_ADS_APP_ID?.trim()
+    || "780859815090303";
+}
+
+async function fetchPageLeadgenSubscription(pageId: string, graphVersion: string, accessToken: string) {
+  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(pageId)}/subscribed_apps?fields=id,subscribed_fields`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({})) as PageSubscriptionResponse;
+  if (!response.ok) {
+    throw new MetaCloudApiError(payload.error?.message ?? "Meta did not allow checking the Page subscription.", response.status, payload.error?.code);
+  }
+  return payload.data?.some((app) => app.id === getMetaLeadAdsAppId() && app.subscribed_fields?.includes("leadgen")) ?? false;
+}
+
+/** Reads the delivery precondition without changing Meta state. */
+export async function verifyPageLeadgenSubscription(pageId: string, pageAccessToken?: string) {
+  const config = pageAccessToken
+    ? { graphVersion: process.env.META_GRAPH_API_VERSION?.trim() || "v25.0", accessToken: pageAccessToken }
+    : getMetaLeadAdsServerConfig();
+  return fetchPageLeadgenSubscription(pageId, config.graphVersion, config.accessToken);
+}
+
 /** Subscribes the platform app to Lead Ads events for an already-authorized Page. */
 export async function subscribePageToLeadgen(pageId: string, pageAccessToken?: string) {
   const config = pageAccessToken
@@ -139,47 +170,38 @@ export async function subscribePageToLeadgen(pageId: string, pageAccessToken?: s
     return { response, payload };
   };
 
-  let { response, payload } = await postSubscription(config.accessToken);
-
-  if (pageAccessToken) {
+  const subscribeWithToken = async (token: string) => {
+    const { response, payload } = await postSubscription(token);
     if (!response.ok || !payload.success) {
-      throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a assinatura da Página para receber formulários.", response.status, payload.error?.code);
+      throw new MetaCloudApiError(payload.error?.message ?? "Meta rejected the Page subscription for forms.", response.status, payload.error?.code);
     }
-    return payload;
-  }
-
-  if (!response.ok || !payload.success) {
-    const errorCode = payload.error?.code;
-    if (errorCode === 210 || response.status === 403) {
-      try {
-        const pageRes = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}?fields=access_token`, {
-          headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` },
-          cache: "no-store",
-        });
-        if (pageRes.ok) {
-          const pagePayload = await pageRes.json().catch(() => ({})) as { access_token?: string };
-          if (pagePayload.access_token) {
-            const retryResult = await postSubscription(pagePayload.access_token);
-            response = retryResult.response;
-            payload = retryResult.payload;
-          }
-        }
-      } catch {
-        // Ignora erros no retry
-      }
-
-      if (!response.ok || !payload.success) {
-        if (payload.error?.code === 210 || (response.status === 403 && payload.error?.code !== 10)) {
-          return { success: true, warning: payload.error?.message };
-        }
-      }
+    const verified = await fetchPageLeadgenSubscription(pageId, config.graphVersion, token);
+    if (!verified) {
+      throw new MetaCloudApiError("Meta accepted the request, but the Page leadgen subscription was not confirmed. The source was not activated.", 502, 210);
     }
+    return { ...payload, verified: true };
+  };
+
+  if (pageAccessToken) return subscribeWithToken(pageAccessToken);
+
+  try {
+    return await subscribeWithToken(config.accessToken);
+  } catch (error) {
+    const canResolvePageToken = error instanceof MetaCloudApiError && (error.code === 210 || (error.status === 403 && error.code !== 10));
+    if (!canResolvePageToken) throw error;
+
+    const pageRes = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(pageId)}?fields=access_token`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${config.accessToken}` },
+      cache: "no-store",
+    });
+    const pagePayload = await pageRes.json().catch(() => ({})) as { access_token?: string } & MetaApiErrorResponse;
+    if (!pageRes.ok || !pagePayload.access_token) {
+      throw new MetaCloudApiError(pagePayload.error?.message ?? "Meta did not return a Page token to confirm the subscription.", pageRes.status, pagePayload.error?.code);
+    }
+    return subscribeWithToken(pagePayload.access_token);
   }
 
-  if (!response.ok || !payload.success) {
-    throw new MetaCloudApiError(payload.error?.message ?? "A Meta recusou a inscrição da Página para receber formulários.", response.status, payload.error?.code);
-  }
-  return payload;
+
 }
 
 export function formatE164Phone(phone: string) {

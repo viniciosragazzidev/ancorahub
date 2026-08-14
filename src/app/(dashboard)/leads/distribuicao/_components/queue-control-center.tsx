@@ -87,6 +87,26 @@ export function QueueControlCenter({
   const [savingCampaignRoute, setSavingCampaignRoute] = useState(false);
   const [savingAdRoute, setSavingAdRoute] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showOnlyActiveCampaigns, setShowOnlyActiveCampaigns] = useState(true);
+  const [showOnlyActiveAds, setShowOnlyActiveAds] = useState(true);
+
+  const activeCampaigns = useMemo(
+    () => campaigns.filter((c) => (c.status ?? "").toUpperCase() === "ACTIVE"),
+    [campaigns],
+  );
+  const displayedCampaigns = useMemo(
+    () => (showOnlyActiveCampaigns && activeCampaigns.length > 0 ? activeCampaigns : campaigns),
+    [showOnlyActiveCampaigns, activeCampaigns, campaigns],
+  );
+
+  const activeAds = useMemo(
+    () => ads.filter((a) => (a.status ?? "").toUpperCase() === "ACTIVE"),
+    [ads],
+  );
+  const displayedAds = useMemo(
+    () => (showOnlyActiveAds && activeAds.length > 0 ? activeAds : ads),
+    [showOnlyActiveAds, activeAds, ads],
+  );
 
   async function handleDeleteQueue(queue: Queue) {
     if (!confirm(`Tem certeza que deseja excluir a fila "${queue.name}"?`)) return;
@@ -314,76 +334,227 @@ export function QueueControlCenter({
       </section>
 
       {/* Meta Campaign Route Card */}
-      <Card variant="compact" className="border-primary/15 bg-primary/[0.025]">
-        <CardHeader>
-          <CardTitle className="text-base">
-            Entrada por campanha Meta <InfoTooltip title="Regra de entrada" description="Uma campanha pode entrar na fila escolhida ou ser ignorada pelo CRM. Depois da entrada, a fila decide capacidade, escala e corretor." />
-          </CardTitle>
-          <CardDescription>Escolha somente as campanhas que devem gerar lead e a fila ativa de cada uma. Campanhas sem regra usam a Fila Geral.</CardDescription>
+      <Card variant="compact" className="border-primary/20 bg-card shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <span>Entrada por campanha Meta</span>
+                <InfoTooltip title="Regra de entrada por campanha" description="Define para qual fila cada campanha envia os leads (Fila Geral, Unidade ou Corretor específico). Opcionalmente é possível ignorar uma campanha." />
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs font-normal">
+                  {activeCampaigns.length} ativa(s)
+                </Badge>
+              </CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                Escolha a campanha e selecione a fila de destino desejada. Campanhas sem regra explicita usam a Fila Geral.
+              </CardDescription>
+            </div>
+            {campaigns.length > activeCampaigns.length && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setShowOnlyActiveCampaigns((prev) => !prev)}
+                className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+              >
+                {showOnlyActiveCampaigns ? `Mostrar todas (${campaigns.length})` : `Filtrar ativas (${activeCampaigns.length})`}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {campaigns.length && queues.length ? (
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-              <AppSelect aria-label="Campanha Meta" value={campaignRoute.campaignId} onValueChange={(campaignId) => setCampaignRoute({ ...campaignRoute, campaignId })} options={campaigns.map((campaign) => ({ value: campaign.campaignId, label: `${campaign.name} · ${campaign.status}` }))} />
-              <AppSelect aria-label="Fila de destino da campanha" value={campaignRoute.queueId} onValueChange={(queueId) => setCampaignRoute({ ...campaignRoute, queueId })} options={queues.filter((queue) => queue.status === "active").map((queue) => ({ value: queue.id, label: `${queue.name}${queue.branchName ? ` · ${queue.branchName}` : " (Geral)"}` }))} />
-              <Button size="sm" onClick={() => void saveCampaignRoute(true)} disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId || !campaignRoute.queueId}>
+          {displayedCampaigns.length && queues.length ? (
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
+              <AppSelect
+                aria-label="Campanha Meta"
+                value={campaignRoute.campaignId}
+                onValueChange={(campaignId) => setCampaignRoute({ ...campaignRoute, campaignId })}
+                options={displayedCampaigns.map((campaign) => {
+                  const isActive = (campaign.status ?? "").toUpperCase() === "ACTIVE";
+                  return {
+                    value: campaign.campaignId,
+                    label: `${isActive ? "🟢" : "⚪"} ${campaign.name} ${isActive ? "" : "· PAUSED"}`,
+                  };
+                })}
+              />
+              <AppSelect
+                aria-label="Fila de destino da campanha"
+                value={campaignRoute.queueId}
+                onValueChange={(queueId) => setCampaignRoute({ ...campaignRoute, queueId })}
+                options={queues
+                  .filter((queue) => queue.status === "active")
+                  .map((queue) => ({
+                    value: queue.id,
+                    label: queue.branchName
+                      ? `🏢 ${queue.name} · ${queue.branchName}`
+                      : `🌐 ${queue.name} (Fila geral)`,
+                  }))}
+              />
+              <Button
+                size="sm"
+                onClick={() => void saveCampaignRoute(true)}
+                disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId || !campaignRoute.queueId}
+                className="gap-1"
+              >
                 {savingCampaignRoute ? "Salvando…" : "Receber na fila"}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => void saveCampaignRoute(false)} disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void saveCampaignRoute(false)}
+                disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId}
+                className="text-destructive hover:bg-destructive/10"
+              >
                 {savingCampaignRoute ? "Salvando…" : "Não registrar"}
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Sincronize ao menos uma campanha Meta e crie uma fila ativa para configurar essa regra.</p>
+            <p className="text-sm text-muted-foreground">
+              {campaigns.length === 0
+                ? "Sincronize ao menos uma campanha Meta para configurar essa regra."
+                : "Nenhuma campanha ativa encontrada. Alterne para 'Mostrar todas' para ver campanhas pausadas."}
+            </p>
           )}
+
           {campaignRoutes.length ? (
             <div className="space-y-2 border-t border-border/60 pt-3">
-              {campaignRoutes.map((route) => (
-                <div key={route.campaignId} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="font-medium">{campaigns.find((campaign) => campaign.campaignId === route.campaignId)?.name ?? route.campaignId}</span>
-                  <Badge variant={route.enabled ? "success" : "outline"}>
-                    {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "Não registrar no CRM"}
-                  </Badge>
-                </div>
-              ))}
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Regras de Campanhas Configuradas ({campaignRoutes.length})
+              </div>
+              <div className="divide-y divide-border/40 rounded-lg border border-border/60 bg-muted/20">
+                {campaignRoutes.map((route) => {
+                  const matched = campaigns.find((c) => c.campaignId === route.campaignId);
+                  const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
+                  return (
+                    <div key={route.campaignId} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                        <span className="font-medium truncate">{matched?.name ?? route.campaignId}</span>
+                        {matched?.status && (
+                          <Badge variant="outline" className="text-[10px] font-normal uppercase">
+                            {matched.status}
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
+                        {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
       {/* Meta Ad Route Card */}
-      <Card variant="compact">
-        <CardHeader>
-          <CardTitle className="text-base">
-            Exceção por anúncio <InfoTooltip title="Prioridade da regra" description="Se um anúncio tiver regra própria, ela prevalece sobre a regra da campanha. Use quando anúncios da mesma campanha precisam de filas diferentes." />
-          </CardTitle>
-          <CardDescription>Configure o nível mais específico quando precisar separar anúncios dentro da mesma campanha.</CardDescription>
+      <Card variant="compact" className="border-border/60">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <span>Exceção por anúncio</span>
+                <InfoTooltip title="Prioridade da regra" description="Se um anúncio tiver regra própria, ela prevalece sobre a regra da campanha. Use quando anúncios da mesma campanha precisam de filas diferentes." />
+                <Badge variant="outline" className="text-xs font-normal">
+                  {activeAds.length} ativo(s)
+                </Badge>
+              </CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                Configure o nível mais específico quando precisar separar anúncios dentro da mesma campanha.
+              </CardDescription>
+            </div>
+            {ads.length > activeAds.length && (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setShowOnlyActiveAds((prev) => !prev)}
+                className="text-xs text-muted-foreground hover:text-foreground shrink-0"
+              >
+                {showOnlyActiveAds ? `Mostrar todos (${ads.length})` : `Filtrar ativos (${activeAds.length})`}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {ads.length && queues.length ? (
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-              <AppSelect aria-label="Anúncio Meta" value={adRoute.adId} onValueChange={(adId) => setAdRoute({ ...adRoute, adId })} options={ads.map((ad) => ({ value: ad.adId, label: `${ad.name} · ${ad.status}` }))} />
-              <AppSelect aria-label="Fila de destino do anúncio" value={adRoute.queueId} onValueChange={(queueId) => setAdRoute({ ...adRoute, queueId })} options={queues.filter((queue) => queue.status === "active").map((queue) => ({ value: queue.id, label: `${queue.name}${queue.branchName ? ` · ${queue.branchName}` : " (Geral)"}` }))} />
-              <Button size="sm" onClick={() => void saveAdRoute(true)} disabled={!canEdit || savingAdRoute || !adRoute.adId || !adRoute.queueId}>
+          {displayedAds.length && queues.length ? (
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
+              <AppSelect
+                aria-label="Anúncio Meta"
+                value={adRoute.adId}
+                onValueChange={(adId) => setAdRoute({ ...adRoute, adId })}
+                options={displayedAds.map((ad) => {
+                  const isActive = (ad.status ?? "").toUpperCase() === "ACTIVE";
+                  return {
+                    value: ad.adId,
+                    label: `${isActive ? "🟢" : "⚪"} ${ad.name} ${isActive ? "" : "· PAUSED"}`,
+                  };
+                })}
+              />
+              <AppSelect
+                aria-label="Fila de destino do anúncio"
+                value={adRoute.queueId}
+                onValueChange={(queueId) => setAdRoute({ ...adRoute, queueId })}
+                options={queues
+                  .filter((queue) => queue.status === "active")
+                  .map((queue) => ({
+                    value: queue.id,
+                    label: queue.branchName
+                      ? `🏢 ${queue.name} · ${queue.branchName}`
+                      : `🌐 ${queue.name} (Fila geral)`,
+                  }))}
+              />
+              <Button
+                size="sm"
+                onClick={() => void saveAdRoute(true)}
+                disabled={!canEdit || savingAdRoute || !adRoute.adId || !adRoute.queueId}
+              >
                 {savingAdRoute ? "Salvando…" : "Receber na fila"}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => void saveAdRoute(false)} disabled={!canEdit || savingAdRoute || !adRoute.adId}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void saveAdRoute(false)}
+                disabled={!canEdit || savingAdRoute || !adRoute.adId}
+                className="text-destructive hover:bg-destructive/10"
+              >
                 {savingAdRoute ? "Salvando…" : "Não registrar"}
               </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Os anúncios aparecem depois da sincronização completa da conta de anúncios.</p>
+            <p className="text-sm text-muted-foreground">
+              {ads.length === 0
+                ? "Os anúncios aparecem depois da sincronização completa da conta de anúncios."
+                : "Nenhum anúncio ativo encontrado. Alterne para 'Mostrar todos' para ver anúncios pausados."}
+            </p>
           )}
+
           {adRoutes.length ? (
             <div className="space-y-2 border-t border-border/60 pt-3">
-              {adRoutes.map((route) => (
-                <div key={route.adId} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="font-medium">{ads.find((ad) => ad.adId === route.adId)?.name ?? route.adId}</span>
-                  <Badge variant={route.enabled ? "success" : "outline"}>
-                    {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "Não registrar no CRM"}
-                  </Badge>
-                </div>
-              ))}
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Exceções de Anúncios Configuradas ({adRoutes.length})
+              </div>
+              <div className="divide-y divide-border/40 rounded-lg border border-border/60 bg-muted/20">
+                {adRoutes.map((route) => {
+                  const matched = ads.find((a) => a.adId === route.adId);
+                  const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
+                  return (
+                    <div key={route.adId} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                        <span className="font-medium truncate">{matched?.name ?? route.adId}</span>
+                        {matched?.status && (
+                          <Badge variant="outline" className="text-[10px] font-normal uppercase">
+                            {matched.status}
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
+                        {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </CardContent>

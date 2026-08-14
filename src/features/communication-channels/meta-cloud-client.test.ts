@@ -57,7 +57,9 @@ describe("Meta Cloud template payload", () => {
   });
 
   it("subscribes an authorized Page to the leadgen event with the platform credential", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "780859815090303", subscribed_fields: ["leadgen"] }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await subscribePageToLeadgen("123456789");
@@ -78,6 +80,15 @@ describe("Meta Cloud template payload", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: "Permissão de Página ausente", code: 10 } }), { status: 403 })));
 
     await expect(subscribePageToLeadgen("123456789")).rejects.toThrow("Permissão de Página ausente");
+  });
+
+  it("does not claim success when Meta accepts the request but omits leadgen from the verified subscription", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "another-app", subscribed_fields: ["leadgen"] }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(subscribePageToLeadgen("123456789", "page-token")).rejects.toThrow("leadgen subscription");
   });
 
   it("sends an approved service template only through the configured official number", async () => {
@@ -136,15 +147,17 @@ describe("Meta Cloud template payload", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: "Token da Página necessário", code: 210 } }), { status: 403 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "page-token" }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "780859815090303", subscribed_fields: ["leadgen"] }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(subscribePageToLeadgen("123456789")).resolves.toEqual({ success: true });
+    await expect(subscribePageToLeadgen("123456789")).resolves.toEqual({ success: true, verified: true });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       "https://graph.facebook.com/v25.0/123456789/subscribed_apps",
       "https://graph.facebook.com/v25.0/123456789?fields=access_token",
       "https://graph.facebook.com/v25.0/123456789/subscribed_apps",
+      "https://graph.facebook.com/v25.0/123456789/subscribed_apps?fields=id,subscribed_fields",
     ]);
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("me/accounts"))).toBe(false);
   });

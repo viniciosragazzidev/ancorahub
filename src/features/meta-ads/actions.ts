@@ -270,6 +270,7 @@ export async function confirmMetaConnection(payload: {
       pageId: page.id,
       adAccountId: null,
       actorUserId: context.userId,
+      leadgenSubscriptionVerified: true,
     });
   }
 

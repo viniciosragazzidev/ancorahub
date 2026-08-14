@@ -129,7 +129,10 @@ async function processMetaLeadImmediately(input: { tenantId: string; leadId: str
   await runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 });
 }
 
-export async function configureMetaLeadAdsSource(input: { tenantId: string; branchId: string | null; pageId: string; adAccountId: string | null; actorUserId: string }) {
+export async function configureMetaLeadAdsSource(input: { tenantId: string; branchId: string | null; pageId: string; adAccountId: string | null; actorUserId: string; leadgenSubscriptionVerified: true }) {
+  if (input.leadgenSubscriptionVerified !== true) {
+    throw new Error("Meta source cannot be activated without a confirmed leadgen subscription.");
+  }
   const db = getDatabase();
   const now = new Date();
   const [activeSource] = await db.select().from(schema.metaLeadAdSources)

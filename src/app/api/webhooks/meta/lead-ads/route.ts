@@ -7,6 +7,26 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+function summarizeWebhookPayload(payload: MetaLeadAdsWebhookPayload) {
+  const entries = Array.isArray(payload.entry) ? payload.entry : [];
+  const pageIds = entries
+    .map((entry) => typeof entry?.id === "string" ? entry.id : "")
+    .filter((id, index, values) => /^\d{6,30}$/.test(id) && values.indexOf(id) === index)
+    .slice(0, 20);
+  const fields = entries
+    .flatMap((entry) => Array.isArray(entry?.changes) ? entry.changes : [])
+    .map((change) => typeof change?.field === "string" ? change.field : "")
+    .filter((field, index, values) => field && values.indexOf(field) === index)
+    .slice(0, 20);
+  return {
+    object: typeof payload.object === "string" ? payload.object : null,
+    entriesCount: entries.length,
+    pageIds,
+    fields,
+    leadgenEvents: fields.filter((field) => field === "leadgen").length,
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const config = getMetaLeadAdsWebhookConfig();
@@ -42,7 +62,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ accepted: true, ignored: "invalid_json" });
     }
 
-    console.log("[Meta Lead Ads Webhook POST payload]", { object: payload.object, entriesCount: payload.entry?.length ?? 0 });
+    console.log("[META_WEBHOOK_HTTP_RECEIVED]", summarizeWebhookPayload(payload));
     const result = await ingestMetaLeadAdsWebhook(payload, rawBody, request);
     console.log("[Meta Lead Ads Webhook POST ingest result]", result);
     return NextResponse.json({ accepted: true, ...result });
