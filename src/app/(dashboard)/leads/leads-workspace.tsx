@@ -440,7 +440,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 1: QUALIFICAÇÕES ─── */}
         <TabsContent value="qualificacoes" className="mt-4">
-          <Card variant="subtle" className="rounded-2xl border-border/50 bg-card/80 dark:border-border/70 dark:bg-card/95">
+          <Card variant="subtle" className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
             <CardContent className="p-0">
               {qualifyingLeads.length === 0 ? (
                 <EmptyState
@@ -574,7 +574,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
         <TabsContent value="list" className="mt-4">
-          <Card variant="subtle" className="rounded-2xl border-border/50 bg-card/80 dark:border-border/70 dark:bg-card/95">
+          <Card variant="subtle" className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
             <CardContent className="p-0">
               <div className="hidden divide-y divide-border max-[559px]:block">
                 {leads.map((lead) => (

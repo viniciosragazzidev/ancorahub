@@ -111,7 +111,7 @@ export default async function LeadsPage({
           isNull(schema.leads.assignedAt),
           gte(
             schema.leads.assignedAt,
-            sql`now() - (${schema.tenants.slaFirstContactMinutes}::integer * interval '1 minute')`
+            sql`now() - (COALESCE(NULLIF(${schema.tenants.slaFirstContactMinutes}, ''), '15')::integer * interval '1 minute')`
           )
         )
       : null;
@@ -154,16 +154,17 @@ export default async function LeadsPage({
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
+  const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
 
   const where = and(
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt),
-    gte(schema.leads.createdAt, periodStart(period)),
     or(
       isNotNull(schema.leads.corretorId),
       ne(schema.leads.qualificationStatus, "pending"),
       isNull(schema.leads.qualificationStatus)
     ),
+    ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
     ...(branchFilter ? [branchFilter] : []),
