@@ -604,10 +604,9 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
         const [company] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
         const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
           eq(schema.communicationChannels.tenantId, context.tenantId),
-          eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+          inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
           eq(schema.communicationChannels.status, "active"),
-          eq(schema.communicationChannels.isDefault, true),
-        )).limit(1);
+        )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
         const queued = await enqueueMetaTemplateMessage({
           tenantId: context.tenantId,
           channelId: channel?.id,

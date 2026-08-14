@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -135,10 +135,9 @@ export async function createTeamUser(rawInput: unknown) {
   try {
     const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
       eq(schema.communicationChannels.tenantId, context.tenantId),
-      eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+      inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
       eq(schema.communicationChannels.status, "active"),
-      eq(schema.communicationChannels.isDefault, true),
-    )).limit(1);
+    )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
     if (channel) {
       const company = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
       const roleLabel = input.jobTitle === "director" || input.role === "director" ? "Diretor" : input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
