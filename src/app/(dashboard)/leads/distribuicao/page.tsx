@@ -279,7 +279,8 @@ export default async function LeadDistributionPage({
       .orderBy(schema.metaCampaigns.name),
     db.select({ adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status })
       .from(schema.metaAds)
-      .innerJoin(schema.metaCampaigns, eq(schema.metaAds.campaignId, schema.metaCampaigns.campaignId))
+      .innerJoin(schema.metaAdSets, eq(schema.metaAds.adSetId, schema.metaAdSets.adSetId))
+      .innerJoin(schema.metaCampaigns, eq(schema.metaAdSets.campaignId, schema.metaCampaigns.campaignId))
       .innerJoin(schema.metaAdAccounts, eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId))
       .innerJoin(schema.metaConnections, eq(schema.metaAdAccounts.connectionId, schema.metaConnections.id))
       .where(and(

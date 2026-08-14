@@ -82,6 +82,7 @@ const labels: Record<PermissionKey, [string, string, string]> = {
 
   // Configurações & Pessoal
   acessar_configuracoes: ["Acessar configurações da empresa", "Visualizar as abas de parametrização.", "Configurações & Pessoal"],
+  acessar_configuracoes_unidade: ["Acessar configurações da unidade", "Visualizar configurações da sua unidade de atuação.", "Configurações & Pessoal"],
   acessar_configuracoes_pessoais: ["Configurações pessoais", "Ajustar preferências de perfil e senha.", "Configurações & Pessoal"],
   configurar_whatsapp_proprio: ["Conectar WhatsApp pessoal", "Conectar número de atendimento individual via WAHA.", "Configurações & Pessoal"],
   acessar_guia: ["Acessar guia de uso", "Acessar materiais de ajuda e onboarding.", "Configurações & Pessoal"],

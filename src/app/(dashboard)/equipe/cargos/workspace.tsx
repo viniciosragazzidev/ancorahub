@@ -424,7 +424,7 @@ function RoleEditorDialog({
               <TabsTrigger value="permissoes">
                 Permissões
                 {selected.length > 0 && (
-                  <Badge variant="primary" className="ml-1.5 px-1.5 py-0 h-4 min-w-4 text-[10px] flex items-center justify-center font-bold">
+                  <Badge variant="indigo" className="ml-1.5 px-1.5 py-0 h-4 min-w-4 text-[10px] flex items-center justify-center font-bold">
                     {selected.length}
                   </Badge>
                 )}
