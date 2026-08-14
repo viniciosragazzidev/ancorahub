@@ -54,17 +54,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       updatedAt: schema.metaCampaigns.updatedAt,
     })
     .from(schema.metaCampaigns)
-    .innerJoin(
-      schema.metaAdAccounts,
-      and(
-        eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId),
-        eq(schema.metaCampaigns.tenantId, schema.metaAdAccounts.tenantId)
-      )
-    )
     .where(
       and(
         eq(schema.metaCampaigns.tenantId, tenantId),
-        eq(schema.metaAdAccounts.status, "active"),
         sql`${schema.metaCampaigns.status} != 'ARCHIVED'`
       )
     );

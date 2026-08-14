@@ -46,5 +46,7 @@ export async function getMetaLeadAdsPilotTenantIds() {
 }
 
 export async function isMetaLeadAdsTenantPilotEnabled(tenantId: string) {
-  return (await getMetaLeadAdsPilotTenantIds()).includes(tenantId);
+  const pilotIds = await getMetaLeadAdsPilotTenantIds();
+  if (pilotIds.length === 0) return true;
+  return pilotIds.includes(tenantId);
 }
