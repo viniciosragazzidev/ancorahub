@@ -602,8 +602,15 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
     if (newInvite.phone) {
       try {
         const [company] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+        const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
+          eq(schema.communicationChannels.tenantId, context.tenantId),
+          eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+          eq(schema.communicationChannels.status, "active"),
+          eq(schema.communicationChannels.isDefault, true),
+        )).limit(1);
         const queued = await enqueueMetaTemplateMessage({
           tenantId: context.tenantId,
+          channelId: channel?.id,
           recipientType: "user",
           recipientId: newInvite.id,
           destinationPhone: newInvite.phone,

@@ -144,6 +144,7 @@ export async function createTeamUser(rawInput: unknown) {
       const roleLabel = input.jobTitle === "director" || input.role === "director" ? "Diretor" : input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
       const queued = await enqueueMetaTemplateMessage({
         tenantId: context.tenantId,
+        channelId: channel.id,
         recipientType: "user",
         recipientId: invitationId,
         destinationPhone: input.phone,
