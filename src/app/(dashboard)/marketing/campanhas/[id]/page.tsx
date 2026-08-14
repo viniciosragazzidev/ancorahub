@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CampaignDetailView } from "@/features/meta-ads/components/campaign-detail-view";
 import { getTenantMetaCampaignsPerformance } from "@/features/meta-ads/meta-analytics-service";
@@ -23,8 +23,8 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
     notFound();
   }
 
-  // Fetch active distribution queues and existing route for this campaign
-  const [queues, currentRoutes] = await Promise.all([
+  // Fetch active distribution queues, campaign route, and ad sets/ads for this campaign
+  const [queues, currentRoutes, adSets, adLeadCounts] = await Promise.all([
     db
       .select({
         id: schema.leadQueues.id,
@@ -47,7 +47,48 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
         ),
       )
       .limit(1),
+    db
+      .select({ adSetId: schema.metaAdSets.adSetId })
+      .from(schema.metaAdSets)
+      .where(and(eq(schema.metaAdSets.tenantId, context.tenantId), eq(schema.metaAdSets.campaignId, campaign.campaignId))),
+    db
+      .select({
+        metaAdId: schema.leads.metaAdId,
+        total: count(schema.leads.id),
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.metaCampaignId, campaign.campaignId),
+          isNull(schema.leads.deletedAt),
+          isNotNull(schema.leads.metaAdId),
+        ),
+      )
+      .groupBy(schema.leads.metaAdId),
   ]);
+
+  const adSetIds = adSets.map((s) => s.adSetId);
+
+  const rawAds = adSetIds.length
+    ? await db
+        .select({
+          id: schema.metaAds.id,
+          adId: schema.metaAds.adId,
+          name: schema.metaAds.name,
+          status: schema.metaAds.status,
+          adSetId: schema.metaAds.adSetId,
+        })
+        .from(schema.metaAds)
+        .where(and(eq(schema.metaAds.tenantId, context.tenantId), inArray(schema.metaAds.adSetId, adSetIds)))
+    : [];
+
+  const leadCountMap = new Map(adLeadCounts.map((r) => [r.metaAdId!, Number(r.total)]));
+
+  const campaignAds = rawAds.map((ad) => ({
+    ...ad,
+    leadsCount: leadCountMap.get(ad.adId) ?? 0,
+  }));
 
   const currentRoute = currentRoutes[0];
 
@@ -57,6 +98,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6 max-w-7xl mx-auto w-full">
         <CampaignDetailView
           campaign={campaign}
+          ads={campaignAds}
           queues={queues}
           initialQueueId={currentRoute?.queueId ?? null}
         />

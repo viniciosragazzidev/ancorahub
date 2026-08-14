@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, Clock, Lightning, MagicWand, Phone, Target, UserList, Users } from "@/components/huge-icons";
@@ -8,16 +8,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppSelect } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/features/quotes/utils";
 import { saveMetaCampaignQueueRouteAction } from "@/features/lead-distribution/actions";
 import type { MetaCampaignItem } from "../types";
 
+export type CampaignAdItem = {
+  id: string;
+  adId: string;
+  name: string;
+  status: string;
+  adSetId: string;
+  leadsCount: number;
+};
+
 export function CampaignDetailView({
   campaign,
+  ads = [],
   queues = [],
   initialQueueId = null,
 }: {
   campaign: MetaCampaignItem;
+  ads?: CampaignAdItem[];
   queues?: Array<{ id: string; name: string; branchName?: string | null }>;
   initialQueueId?: string | null;
 }) {
@@ -29,6 +41,16 @@ export function CampaignDetailView({
   const salesCount = campaign.salesCount || 0;
   const revenueTotal = campaign.revenueTotal || 0;
   const conversionRate = campaign.conversionRate || 0;
+
+  const sortedAds = useMemo(() => {
+    return [...ads].sort((a, b) => {
+      const aActive = a.status === "ACTIVE" || a.status === "active";
+      const bActive = b.status === "ACTIVE" || b.status === "active";
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+      return b.leadsCount - a.leadsCount;
+    });
+  }, [ads]);
 
   async function handleSaveQueue() {
     setIsSaving(true);
@@ -168,6 +190,63 @@ export function CampaignDetailView({
           <p className="text-[11px] text-muted-foreground mt-1">Taxa de conversão: {conversionRate}%</p>
         </div>
       </div>
+
+      {/* ─── TABELA DE ANÚNCIOS DA CAMPANHA ─── */}
+      <Card className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
+          <div>
+            <CardTitle className="text-base font-bold">Anúncios da Campanha Meta Ads ({ads.length})</CardTitle>
+            <CardDescription className="text-xs">
+              Lista de anúncios ativos e pausados vinculados a esta campanha com volume de leads gerados.
+            </CardDescription>
+          </div>
+          <Badge variant="outline" className="text-[10px]">
+            {ads.filter((a) => a.status === "ACTIVE" || a.status === "active").length} Ativos
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead className="pl-4 text-xs font-semibold">Nome do Anúncio</TableHead>
+                <TableHead className="text-xs font-semibold">ID do Anúncio</TableHead>
+                <TableHead className="text-xs font-semibold">Status</TableHead>
+                <TableHead className="text-right pr-4 text-xs font-semibold">Leads Capturados</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedAds.map((ad) => (
+                <TableRow key={ad.id} className="hover:bg-muted/40 transition-colors">
+                  <TableCell className="pl-4 py-2.5 font-semibold text-xs text-foreground">
+                    {ad.name}
+                  </TableCell>
+                  <TableCell className="py-2.5 font-mono text-[11px] text-muted-foreground">
+                    {ad.adId}
+                  </TableCell>
+                  <TableCell className="py-2.5">
+                    <Badge
+                      variant={ad.status === "ACTIVE" || ad.status === "active" ? "success" : "outline"}
+                      className="text-[10px]"
+                    >
+                      {ad.status === "ACTIVE" || ad.status === "active" ? "🟢 Ativo" : "⚪ Pausado"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="pr-4 text-right font-mono text-xs font-bold text-foreground tabular-nums py-2.5">
+                    {ad.leadsCount}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {sortedAds.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="p-8 text-center text-xs text-muted-foreground">
+                    Nenhum anúncio individual sincronizado para esta campanha até o momento.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Detalhes & Configuração */}
       <div className="grid gap-6 md:grid-cols-2">

@@ -92,7 +92,39 @@ function getPermissionWarning(lastError: string | null | undefined) {
 }
 
 function AssetList({ title, empty, items }: { title: string; empty: string; items: Array<{ id: string; name: string; status: string; detail: string }> }) {
-  return <div className="rounded-lg border border-border"><div className="border-b border-border px-4 py-3"><p className="text-sm font-semibold">{title}</p></div><div className="divide-y divide-border">{items.length ? items.map((item) => <div className="flex items-center justify-between gap-3 px-4 py-3" key={item.id}><div className="min-w-0"><p className="truncate text-sm font-medium">{item.name}</p><p className="truncate font-mono text-xs text-muted-foreground">{item.detail}</p></div><Badge variant={item.status === "active" || item.status === "ACTIVE" ? "success" : "outline"}>{item.status}</Badge></div>) : <p className="px-4 py-3 text-sm text-muted-foreground">{empty}</p>}</div></div>;
+  const sortedItems = [...items].sort((a, b) => {
+    const aActive = a.status === "active" || a.status === "ACTIVE";
+    const bActive = b.status === "active" || b.status === "ACTIVE";
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="rounded-lg border border-border">
+      <div className="border-b border-border px-4 py-3 flex items-center justify-between">
+        <p className="text-sm font-semibold">{title}</p>
+        <span className="text-xs text-muted-foreground font-mono">{items.length} item{items.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="divide-y divide-border">
+        {sortedItems.length ? (
+          sortedItems.map((item) => (
+            <div className="flex items-center justify-between gap-3 px-4 py-3" key={item.id}>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{item.name}</p>
+                <p className="truncate font-mono text-xs text-muted-foreground">{item.detail}</p>
+              </div>
+              <Badge variant={item.status === "active" || item.status === "ACTIVE" ? "success" : "outline"}>
+                {item.status === "active" || item.status === "ACTIVE" ? "Ativo" : item.status}
+              </Badge>
+            </div>
+          ))
+        ) : (
+          <p className="px-4 py-3 text-sm text-muted-foreground">{empty}</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function MetricCard({ label, value }: { label: string; value: number }) {
