@@ -172,16 +172,16 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const officialBrokerMessagesEnabled = officialBrokerTab ? await isMetaCloudWhatsAppEnabled() : false;
   if (officialBrokerTab && officialBrokerMessagesEnabled) {
     const [brokers, invitations, outboundMessages, inboundMessages] = await Promise.all([
-      db.select({ id: schema.brokerProfiles.id, name: schema.brokerProfiles.professionalName, phone: schema.brokerProfiles.phone, branchName: schema.branches.name })
+      db.select({ id: schema.brokerProfiles.id, userId: schema.brokerProfiles.userId, name: schema.brokerProfiles.professionalName, phone: schema.brokerProfiles.phone, branchName: schema.branches.name })
         .from(schema.brokerProfiles)
         .leftJoin(schema.branches, and(eq(schema.brokerProfiles.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
         .where(eq(schema.brokerProfiles.tenantId, context.tenantId))
         .orderBy(asc(schema.brokerProfiles.professionalName)),
-      db.select({ brokerProfileId: schema.brokerInvitations.brokerProfileId, status: schema.brokerInvitations.status, deliveryStatus: schema.brokerInvitations.deliveryStatus, createdAt: schema.brokerInvitations.createdAt })
+      db.select({ id: schema.brokerInvitations.id, brokerProfileId: schema.brokerInvitations.brokerProfileId, status: schema.brokerInvitations.status, deliveryStatus: schema.brokerInvitations.deliveryStatus, createdAt: schema.brokerInvitations.createdAt })
         .from(schema.brokerInvitations)
         .where(eq(schema.brokerInvitations.tenantId, context.tenantId))
         .orderBy(desc(schema.brokerInvitations.createdAt)),
-      db.select({ id: schema.whatsappOutboundMessages.id, destinationPhone: schema.whatsappOutboundMessages.destinationPhone, purpose: schema.whatsappOutboundMessages.purpose, messageType: schema.whatsappOutboundMessages.messageType, templateName: schema.whatsappOutboundMessages.templateName, status: schema.whatsappOutboundMessages.status, createdAt: schema.whatsappOutboundMessages.createdAt, sentAt: schema.whatsappOutboundMessages.sentAt, deliveredAt: schema.whatsappOutboundMessages.deliveredAt, readAt: schema.whatsappOutboundMessages.readAt, attempts: schema.whatsappOutboundMessages.attempts, providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage })
+      db.select({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, destinationPhone: schema.whatsappOutboundMessages.destinationPhone, purpose: schema.whatsappOutboundMessages.purpose, messageType: schema.whatsappOutboundMessages.messageType, templateName: schema.whatsappOutboundMessages.templateName, status: schema.whatsappOutboundMessages.status, createdAt: schema.whatsappOutboundMessages.createdAt, sentAt: schema.whatsappOutboundMessages.sentAt, deliveredAt: schema.whatsappOutboundMessages.deliveredAt, readAt: schema.whatsappOutboundMessages.readAt, attempts: schema.whatsappOutboundMessages.attempts, providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage })
         .from(schema.whatsappOutboundMessages)
         .innerJoin(schema.communicationChannels, and(eq(schema.whatsappOutboundMessages.channelId, schema.communicationChannels.id), eq(schema.communicationChannels.tenantId, context.tenantId)))
         .where(and(eq(schema.whatsappOutboundMessages.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.whatsappOutboundMessages.recipientType, "user")))
@@ -194,14 +194,41 @@ export default async function ConversationsPage({ searchParams }: { searchParams
         .limit(500),
     ]);
 
-    const brokerByPhone = new Map(brokers.map((broker) => [normalizePhone(broker.phone), broker]));
+    const brokerByProfileId = new Map(brokers.map((b) => [b.id, b]));
+    const brokerByUserId = new Map(brokers.filter((b) => b.userId).map((b) => [b.userId!, b]));
+    const invitationToBrokerId = new Map(invitations.map((inv) => [inv.id, inv.brokerProfileId]));
+
+    const brokerByPhone = new Map<string, (typeof brokers)[number]>();
+    for (const broker of brokers) {
+      const digits = normalizePhone(broker.phone);
+      if (digits) {
+        brokerByPhone.set(digits, broker);
+        if (digits.length >= 11) brokerByPhone.set(digits.slice(-11), broker);
+        if (digits.length >= 10) brokerByPhone.set(digits.slice(-10), broker);
+      }
+    }
+
+    const findBroker = (recipientId: string | null, phone: string) => {
+      if (recipientId) {
+        if (brokerByProfileId.has(recipientId)) return brokerByProfileId.get(recipientId);
+        if (brokerByUserId.has(recipientId)) return brokerByUserId.get(recipientId);
+        const fromInv = invitationToBrokerId.get(recipientId);
+        if (fromInv && brokerByProfileId.has(fromInv)) return brokerByProfileId.get(fromInv);
+      }
+      const digits = normalizePhone(phone);
+      if (!digits) return undefined;
+      return brokerByPhone.get(digits)
+        || (digits.length >= 11 ? brokerByPhone.get(digits.slice(-11)) : undefined)
+        || (digits.length >= 10 ? brokerByPhone.get(digits.slice(-10)) : undefined);
+    };
+
     const invitationByBroker = new Map<string, (typeof invitations)[number]>();
     for (const invitation of invitations) if (!invitationByBroker.has(invitation.brokerProfileId)) invitationByBroker.set(invitation.brokerProfileId, invitation);
     const messagesByBroker = new Map<string, OfficialBrokerMessage[]>();
     const addMessage = (brokerId: string, message: OfficialBrokerMessage) => messagesByBroker.set(brokerId, [...(messagesByBroker.get(brokerId) ?? []), message]);
 
     for (const message of outboundMessages) {
-      const broker = brokerByPhone.get(normalizePhone(message.destinationPhone));
+      const broker = findBroker(message.recipientId, message.destinationPhone);
       if (!broker) continue;
       addMessage(broker.id, {
         id: `out:${message.id}`,
@@ -216,7 +243,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
       });
     }
     for (const message of inboundMessages) {
-      const broker = brokerByPhone.get(normalizePhone(message.phone));
+      const broker = findBroker(null, message.phone);
       if (!broker) continue;
       addMessage(broker.id, { id: `in:${message.id}`, direction: "incoming", body: message.body || "[Mensagem sem texto]", sentAt: message.sentAt.toISOString(), status: "received" });
     }
