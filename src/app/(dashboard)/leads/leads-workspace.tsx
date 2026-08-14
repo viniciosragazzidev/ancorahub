@@ -213,7 +213,7 @@ export function LeadsWorkspace({
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
-  queues?: Array<{ id: string; name: string; branchId: string }>;
+  queues?: Array<{ id: string; name: string; branchId: string | null }>;
   contextRole: string;
   contextJobTitle?: string | null;
   contextBranchId?: string | null;

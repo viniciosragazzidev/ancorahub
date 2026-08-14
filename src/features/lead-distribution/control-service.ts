@@ -50,9 +50,9 @@ const adQueueRouteInput = z.object({
   }
 });
 
-function assertManager(context: TenantContext, branchId: string) {
+function assertManager(context: TenantContext, branchId?: string | null) {
   if (context.role !== "director" && context.role !== "manager") throw new AuthorizationError("Sem permissão para administrar filas.");
-  if (context.role === "manager" && context.branchId !== branchId) throw new AuthorizationError("Você só pode administrar filas da sua unidade.");
+  if (context.role === "manager" && branchId && context.branchId !== branchId) throw new AuthorizationError("Você só pode administrar filas da sua unidade.");
 }
 
 function slugify(text: string): string {

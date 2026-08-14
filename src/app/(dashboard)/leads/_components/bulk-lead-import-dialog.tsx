@@ -13,7 +13,7 @@ import { importLeadsFromCsvAction } from "@/features/leads/bulk-import";
 import type { TenantRole } from "@/shared/db/schema";
 
 type Branch = { id: string; name: string };
-type LeadQueue = { id: string; name: string; branchId: string };
+type LeadQueue = { id: string; name: string; branchId: string | null };
 
 export function BulkLeadImportDialog({
   branches,

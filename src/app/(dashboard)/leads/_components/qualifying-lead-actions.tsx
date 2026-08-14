@@ -24,7 +24,7 @@ import {
   updateLeadTargetQueueAction,
 } from "@/features/leads/qualification-tab-actions";
 
-type LeadQueue = { id: string; name: string; branchId: string };
+type LeadQueue = { id: string; name: string; branchId: string | null };
 
 type QualifyingLeadActionsProps = {
   leadId: string;
