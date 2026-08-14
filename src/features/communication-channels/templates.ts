@@ -23,6 +23,6 @@ export function getMetaWhatsAppTemplate(purpose: string) {
  * broker invitation template is configured with {{nome}}, {{empresa}} and
  * {{cargo}}, rather than positional {{1}}, {{2}} and {{3}} placeholders.
  */
-export function getMetaWhatsAppTemplateVariableNames(_purpose: string) {
-  return undefined;
+export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
+  return purpose === "brokerInvitation" ? ["nome", "empresa", "cargo"] : undefined;
 }

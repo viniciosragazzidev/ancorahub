@@ -93,7 +93,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
         ));
       warnings.push({
         code: "invalid_asset",
-        message: "Uma conta de anÃºncios invÃ¡lida foi desativada localmente. Reconecte ou selecione novamente uma conta real da Meta.",
+        message: "Uma conta de anuncios invalida foi desativada localmente. Reconecte ou selecione novamente uma conta real da Meta.",
       });
     }
 
@@ -235,7 +235,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
         ));
       warnings.push({
         code: "invalid_asset",
-        message: "Uma pÃ¡gina Meta invÃ¡lida foi desativada localmente. Reconecte ou selecione novamente uma pÃ¡gina real da Meta.",
+        message: "Uma pagina Meta invalida foi desativada localmente. Reconecte ou selecione novamente uma pagina real da Meta.",
       });
     }
 
