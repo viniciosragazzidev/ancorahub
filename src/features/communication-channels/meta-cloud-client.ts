@@ -212,9 +212,10 @@ export function buildMetaCloudTemplatePayload(input: MetaCloudTemplateInput) {
   if (input.variableNames && input.variableNames.length !== input.variables.length) {
     throw new Error("A quantidade de variáveis nomeadas não corresponde ao template Meta.");
   }
-  const parameters = input.variables.map((text) => ({
+  const parameters = input.variables.map((text, index) => ({
     type: "text" as const,
     text,
+    ...(input.variableNames ? { parameter_name: input.variableNames[index] } : {}),
   }));
   return {
     messaging_product: "whatsapp",
