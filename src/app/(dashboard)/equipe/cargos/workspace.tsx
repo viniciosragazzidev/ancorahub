@@ -208,11 +208,21 @@ function PermissionsTab({
 // ── Identidade tab ────────────────────────────────────────────────────────────
 
 function IdentidadeTab({
-  editing,
+  name,
+  setName,
+  description,
+  setDescription,
+  status,
+  setStatus,
   scope,
   onScopeChange,
 }: {
-  editing: Role | null;
+  name: string;
+  setName: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  status: "draft" | "active";
+  setStatus: (v: "draft" | "active") => void;
   scope: Role["scope"];
   onScopeChange: (scope: Role["scope"]) => void;
 }) {
@@ -225,13 +235,14 @@ function IdentidadeTab({
             id="role-name"
             name="name"
             required
-            defaultValue={editing?.name ?? ""}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             placeholder="Ex.: Operador de Suporte, Gerente…"
           />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="role-status">Estado</Label>
-          <Select name="status" defaultValue={editing?.status === "active" ? "active" : "draft"}>
+          <Select value={status} onValueChange={(v) => { if (v) setStatus(v as "draft" | "active"); }}>
             <SelectTrigger id="role-status">
               <SelectValue />
             </SelectTrigger>
@@ -246,7 +257,8 @@ function IdentidadeTab({
           <Input
             id="role-description"
             name="description"
-            defaultValue={editing?.description ?? ""}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             placeholder="Explique resumidamente a atribuição desse cargo."
           />
         </div>
@@ -332,6 +344,9 @@ function RoleEditorDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const [name, setName] = useState(editing?.name ?? "");
+  const [description, setDescription] = useState(editing?.description ?? "");
+  const [status, setStatus] = useState<"draft" | "active">(editing?.status === "active" ? "active" : "draft");
   const [scope, setScope] = useState<Role["scope"]>(editing?.scope ?? "tenant");
   const [selected, setSelected] = useState<string[]>(editing?.permissions ?? []);
   const [pending, startTransition] = useTransition();
@@ -339,6 +354,9 @@ function RoleEditorDialog({
 
   useEffect(() => {
     if (open) {
+      setName(editing?.name ?? "");
+      setDescription(editing?.description ?? "");
+      setStatus(editing?.status === "active" ? "active" : "draft");
       setScope(editing?.scope ?? "tenant");
       setSelected(editing?.permissions ?? []);
     }
@@ -377,16 +395,17 @@ function RoleEditorDialog({
     });
   }
 
-  function submit(formData: FormData) {
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
     const payload = {
       id: editing?.id,
-      name: formData.get("name"),
-      description: formData.get("description"),
+      name,
+      description,
       color: "primary",
       icon: "shield",
       scope,
       permissions: selected,
-      status: formData.get("status"),
+      status,
     };
     startTransition(async () => {
       try {
@@ -417,7 +436,7 @@ function RoleEditorDialog({
           <DialogClose render={<button aria-label="Fechar" className="rounded-md p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><X className="size-4" /></button>} />
         </div>
 
-        <form action={submit} className="flex flex-1 flex-col overflow-hidden min-h-0">
+        <form onSubmit={submit} className="flex flex-1 flex-col overflow-hidden min-h-0">
           <Tabs defaultValue="identidade" className="flex flex-1 flex-col overflow-hidden min-h-0">
             <TabsList className="shrink-0 px-5 pt-2 border-b border-border/50">
               <TabsTrigger value="identidade">Identidade</TabsTrigger>
@@ -444,7 +463,12 @@ function RoleEditorDialog({
             <div className="flex-1 overflow-y-auto py-3">
               <TabsContent value="identidade">
                 <IdentidadeTab
-                  editing={editing}
+                  name={name}
+                  setName={setName}
+                  description={description}
+                  setDescription={setDescription}
+                  status={status}
+                  setStatus={setStatus}
                   scope={scope}
                   onScopeChange={handleScopeChange}
                 />
