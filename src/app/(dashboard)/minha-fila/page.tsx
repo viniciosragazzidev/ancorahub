@@ -60,11 +60,12 @@ export default async function MinhaFilaPage() {
       and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.corretorId, context.userId),
+        isNull(schema.leads.deletedAt),
         or(
           ne(schema.leads.status, "distributed"),
           isNotNull(schema.leads.firstContactAt),
           isNull(schema.leads.assignedAt),
-          gte(schema.leads.assignedAt, sql`now() - (${schema.tenants.slaFirstContactMinutes}::integer * interval '1 minute')`),
+          gte(schema.leads.assignedAt, sql`now() - (COALESCE(NULLIF(${schema.tenants.slaFirstContactMinutes}, ''), '15')::integer * interval '1 minute')`),
         ),
       ),
     )

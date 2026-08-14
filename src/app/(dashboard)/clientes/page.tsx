@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, sql, countDistinct } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
+import { BranchSelect } from "@/components/branch-select";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
@@ -11,23 +12,39 @@ export const dynamic = "force-dynamic";
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; branch?: string }>;
 }) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const period = parsePeriod((await searchParams).period);
+  const resolvedSearchParams = await searchParams;
+  const period = parsePeriod(resolvedSearchParams.period);
+  const branchParam = resolvedSearchParams.branch;
 
-  // Scope filter based on role
+  const canFilterBranch = context.role === "director" || context.role === "manager";
+
+  const branches = canFilterBranch
+    ? await db
+        .select({ id: schema.branches.id, name: schema.branches.name })
+        .from(schema.branches)
+        .where(eq(schema.branches.tenantId, context.tenantId))
+    : [];
+
+  // Scope filter based on role & branch selection
   const clientScope = context.role === "broker"
     ? eq(schema.clients.corretorId, context.userId)
-    : context.role === "manager" && context.branchId
-      ? eq(schema.clients.branchId, context.branchId)
-      : undefined;
+    : branchParam
+      ? eq(schema.clients.branchId, branchParam)
+      : context.role === "manager" && context.branchId
+        ? eq(schema.clients.branchId, context.branchId)
+        : undefined;
+
   const leadScope = context.role === "broker"
     ? eq(schema.leads.corretorId, context.userId)
-    : context.role === "manager" && context.branchId
-      ? eq(schema.leads.branchId, context.branchId)
-      : undefined;
+    : branchParam
+      ? eq(schema.leads.branchId, branchParam)
+      : context.role === "manager" && context.branchId
+        ? eq(schema.leads.branchId, context.branchId)
+        : undefined;
 
   const periodStartDate = periodStart(period);
 
@@ -86,7 +103,7 @@ export default async function CustomersPage({
           eq(schema.activeCustomers.tenantId, context.tenantId),
           eq(schema.activeCustomers.status, "active"),
           gte(schema.activeCustomers.contractAnniversary, new Date().toISOString().slice(0, 10)),
-          clientScope ? eq(schema.clients.corretorId, context.userId) : undefined,
+          clientScope,
         ),
       ),
 
@@ -122,17 +139,17 @@ export default async function CustomersPage({
 
   return (
     <>
-      <DashboardHeader breadcrumb="Pós-venda" title="Clientes" rightSlot={<PeriodSelect value={period} />} />
+      <DashboardHeader
+        breadcrumb="Pós-venda"
+        title="Clientes"
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <BranchSelect branches={branches} value={branchParam} />
+            <PeriodSelect value={period} />
+          </div>
+        }
+      />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-        {/* Contexto de página legado, preservado para eventual restauração:
-        <section>
-          <p className="text-xs font-medium text-primary uppercase tracking-wider font-mono">PÓS-VENDA & CARTEIRA</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Carteira de Clientes</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Acompanhe clientes convertidos, informações de contato, corretores responsáveis e datas de renovação de contrato.
-          </p>
-        </section>
-        */}
         <ClientesList clients={clients} metrics={metrics} period={period} />
       </main>
     </>

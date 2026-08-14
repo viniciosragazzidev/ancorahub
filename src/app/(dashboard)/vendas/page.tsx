@@ -2,6 +2,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
+import { BranchSelect } from "@/components/branch-select";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
@@ -11,11 +12,22 @@ import { RelatedActions } from "@/components/related-actions";
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; branch?: string }>;
 }) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const period = parsePeriod((await searchParams).period);
+  const resolvedSearchParams = await searchParams;
+  const period = parsePeriod(resolvedSearchParams.period);
+  const branchParam = resolvedSearchParams.branch;
+
+  const canFilterBranch = context.role === "director" || context.role === "manager";
+
+  const branches = canFilterBranch
+    ? await db
+        .select({ id: schema.branches.id, name: schema.branches.name })
+        .from(schema.branches)
+        .where(eq(schema.branches.tenantId, context.tenantId))
+    : [];
 
   // Build conditions with scope filtering
   const conditions = [
@@ -25,6 +37,8 @@ export default async function SalesPage({
 
   if (context.role === "broker") {
     conditions.push(eq(schema.sales.brokerId, context.userId));
+  } else if (branchParam) {
+    conditions.push(eq(schema.leads.branchId, branchParam));
   } else if (context.role === "manager" && context.branchId) {
     conditions.push(eq(schema.leads.branchId, context.branchId));
   }
@@ -59,6 +73,7 @@ export default async function SalesPage({
   const allValues = await db
     .select({ totalValue: schema.sales.saleValue })
     .from(schema.sales)
+    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
     .where(and(...conditions));
 
   const totalRevenue = allValues.reduce((sum, row) => sum + Number(row.totalValue), 0);
@@ -68,7 +83,12 @@ export default async function SalesPage({
       <DashboardHeader
         breadcrumb="Operação comercial"
         title="Vendas & Fechamentos"
-        rightSlot={<PeriodSelect value={period} />}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            <BranchSelect branches={branches} value={branchParam} />
+            <PeriodSelect value={period} />
+          </div>
+        }
       />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <SalesWorkspace

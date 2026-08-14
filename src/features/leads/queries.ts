@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { assertTenantAccess } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -61,6 +61,7 @@ export async function getUrgentLeadForUser() {
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, context.userId),
           eq(schema.leads.status, "distributed"),
+          isNull(schema.leads.deletedAt),
         ),
       )
       .orderBy(schema.leads.assignedAt)
@@ -82,10 +83,7 @@ export async function getUrgentLeadForUser() {
         and(
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, context.userId),
-          and(
-            eq(schema.leads.tenantId, context.tenantId),
-            eq(schema.leads.corretorId, context.userId),
-          ),
+          isNull(schema.leads.deletedAt),
         ),
       )
       .orderBy(schema.leads.updatedAt)
@@ -109,6 +107,7 @@ export async function getUrgentLeadForUser() {
     .where(
       and(
         eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.deletedAt),
         ...(context.role === "manager" && context.branchId ? [eq(schema.leads.branchId, context.branchId)] : []),
       ),
     )

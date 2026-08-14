@@ -32,6 +32,7 @@ import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
 import { QualifyingLeadActions } from "./_components/qualifying-lead-actions";
+import { LeadsPagination } from "./_components/leads-pagination";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
@@ -208,6 +209,7 @@ export function LeadsWorkspace({
   brokers = [],
   branches = [],
   pageSize = 20,
+  pagination,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -220,9 +222,16 @@ export function LeadsWorkspace({
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
   branches?: Array<{ id: string; name: string }>;
   pageSize?: number;
+  pagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const [qualifyingPage, setQualifyingPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 

@@ -388,7 +388,7 @@ export default async function LeadsPage({
 
         {/* Filters */}
         <LeadsFilters
-          branches={isDirector || context.role === "manager" ? branches : []}
+          branches={branches}
           brokers={brokers}
           initialBranch={filters.branch}
           initialCorretor={filters.corretor}
@@ -422,12 +422,12 @@ export default async function LeadsPage({
               brokers={brokers}
               branches={branches}
               pageSize={pageSize}
-            />
-            <LeadsPagination
-              currentPage={page}
-              pageSize={pageSize}
-              totalItems={totalItems}
-              totalPages={totalPages}
+              pagination={{
+                currentPage: page,
+                pageSize,
+                totalItems,
+                totalPages,
+              }}
             />
           </div>
         ) : (

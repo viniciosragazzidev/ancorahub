@@ -1,4 +1,4 @@
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -10,11 +10,12 @@ import type { TenantRole } from "@/shared/db/schema";
 import { FEATURE_SEARCH_INDEX } from "@/shared/feature-search-index";
 
 function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string) {
-  if (role === "director") return eq(schema.leads.tenantId, tenantId);
+  const base = and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
+  if (role === "director") return base;
   if ((role === "manager" || role === "supervisor") && branchId) {
-    return and(eq(schema.leads.tenantId, tenantId), eq(schema.leads.branchId, branchId));
+    return and(base, eq(schema.leads.branchId, branchId));
   }
-  return and(eq(schema.leads.tenantId, tenantId), eq(schema.leads.corretorId, userId));
+  return and(base, eq(schema.leads.corretorId, userId));
 }
 
 export async function GET(request: NextRequest) {
