@@ -173,7 +173,18 @@ export default async function LeadsPage({
 
   const offset = (page - 1) * pageSize;
 
-  const [totalCountResult, availablePlans, leads, legacyPlans, branches, pausedBranchCount, slaSettings, brokers] = await Promise.all([
+  const [
+    totalCountResult,
+    availablePlans,
+    leads,
+    legacyPlans,
+    branches,
+    pausedBranchCount,
+    slaSettings,
+    brokers,
+    rawQualifyingLeads,
+    activeQueues,
+  ] = await Promise.all([
     db.select({ total: count() }).from(schema.leads).innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id)).where(where),
     listAvailableCatalogPlans(context),
     db
@@ -245,6 +256,47 @@ export default async function LeadsPage({
             )
           )
       : Promise.resolve([]),
+    db
+      .select({
+        id: schema.leads.id,
+        nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
+        email: schema.leads.email,
+        status: schema.leads.status,
+        qualificationStatus: schema.leads.qualificationStatus,
+        qualificationState: schema.leads.qualificationState,
+        qualificationScore: schema.leads.qualificationScore,
+        qualificationDetails: schema.leads.qualificationDetails,
+        origem: schema.leads.origem,
+        sourceChannel: schema.leads.sourceChannel,
+        sourceCampaign: schema.leads.sourceCampaign,
+        tipo: schema.leads.tipo,
+        queueId: schema.leads.queueId,
+        queueName: schema.leadQueues.name,
+        branchId: schema.leads.branchId,
+        branchName: schema.branches.name,
+        createdAt: schema.leads.createdAt,
+      })
+      .from(schema.leads)
+      .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
+      .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          eq(schema.leads.qualificationStatus, "pending"),
+          context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
+        )
+      )
+      .orderBy(desc(schema.leads.createdAt)),
+    db
+      .select({
+        id: schema.leadQueues.id,
+        name: schema.leadQueues.name,
+        branchId: schema.leadQueues.branchId,
+      })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))),
   ]);
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
@@ -265,6 +317,13 @@ export default async function LeadsPage({
       plans.push({ id: p.planId, name: p.planName, carrierName: p.carrierName });
     }
   }
+
+  const qualifyingLeads = rawQualifyingLeads.map((item) => ({
+    ...item,
+    qualificationScore: item.qualificationScore ?? 0,
+    qualificationDetails: (item.qualificationDetails as Record<string, unknown>) ?? {},
+    createdAt: item.createdAt.toISOString(),
+  }));
 
   const slaFirstContactMinutes = Number(slaSettings.slaFirstContactMinutes);
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);
@@ -290,7 +349,7 @@ export default async function LeadsPage({
           <div className="flex items-center gap-2">
             <PeriodSelect value={period} />
             <NextUrgentLeadButton />
-            <BulkLeadImportDialog branches={branches} role={context.role} jobTitle={context.jobTitle} branchId={context.branchId} />
+            <BulkLeadImportDialog branches={branches} queues={activeQueues} role={context.role} jobTitle={context.jobTitle} branchId={context.branchId} />
             <ManualLeadSheet initiallyOpen={filters.new === "1"} plans={plans} />
           </div>
         }
@@ -335,7 +394,7 @@ export default async function LeadsPage({
         />
 
         {/* Workspace or RCD Directional Empty State */}
-        {leads.length ? (
+        {leads.length || qualifyingLeads.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
               leads={leads.map((lead) => ({
@@ -346,6 +405,8 @@ export default async function LeadsPage({
                 serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
               }))}
+              qualifyingLeads={qualifyingLeads}
+              queues={activeQueues}
               contextRole={leadManagementActionsEnabled ? context.role : "broker"}
               contextJobTitle={context.jobTitle}
               contextBranchId={context.branchId}
@@ -392,6 +453,7 @@ export default async function LeadsPage({
               />
               <BulkLeadImportDialog
                 branches={branches}
+                queues={activeQueues}
                 role={context.role}
                 jobTitle={context.jobTitle}
                 branchId={context.branchId}

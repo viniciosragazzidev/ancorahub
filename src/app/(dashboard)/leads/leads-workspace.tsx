@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, SquaresFour, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, SquaresFour, Target, UserList, WhatsappLogo, X } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
@@ -31,6 +31,8 @@ import { BulkReassignDialog } from "@/components/ui/bulk-reassign-dialog";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
+import { QualifyingLeadActions } from "./_components/qualifying-lead-actions";
+import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,6 +75,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
+
+export type QualifyingLeadItem = {
+  id: string;
+  nome: string;
+  telefone: string;
+  email: string | null;
+  status: string;
+  qualificationStatus: string;
+  qualificationState: string;
+  qualificationScore: number;
+  qualificationDetails?: Record<string, unknown> | null;
+  origem: string;
+  sourceChannel?: string | null;
+  sourceCampaign?: string | null;
+  tipo: string;
+  queueId?: string | null;
+  queueName?: string | null;
+  branchId?: string | null;
+  branchName?: string | null;
+  createdAt: string;
+};
 
 export type LeadWorkspaceItem = {
   id: string;
@@ -175,6 +198,8 @@ const kanbanTone: Record<string, { dot: string; column: string; count: string }>
 
 export function LeadsWorkspace({
   leads,
+  qualifyingLeads = [],
+  queues = [],
   contextRole,
   contextJobTitle,
   contextBranchId,
@@ -184,6 +209,8 @@ export function LeadsWorkspace({
   branches = [],
 }: {
   leads: LeadWorkspaceItem[];
+  qualifyingLeads?: QualifyingLeadItem[];
+  queues?: Array<{ id: string; name: string; branchId: string }>;
   contextRole: string;
   contextJobTitle?: string | null;
   contextBranchId?: string | null;
@@ -359,12 +386,21 @@ export function LeadsWorkspace({
       </div>
 
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
-      <Tabs defaultValue="list" className="flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue={qualifyingLeads.length > 0 ? "qualificacoes" : "list"} className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <TabsList aria-label="Visualização de leads">
+            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
+              <Target className="size-4 text-primary" />
+              Qualificações
+              {qualifyingLeads.length > 0 ? (
+                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {qualifyingLeads.length}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
             <TabsTrigger value="list" className="text-xs gap-1.5">
               <UserList className="size-4" />
-              Lista de Atendimento
+              Leads Qualificados & Distribuídos
             </TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs gap-1.5">
               <SquaresFour className="size-4" />
@@ -393,6 +429,114 @@ export function LeadsWorkspace({
           </DropdownMenu>
         </div>
 
+        {/* ─── TAB 1: QUALIFICAÇÕES ─── */}
+        <TabsContent value="qualificacoes" className="mt-4">
+          <Card variant="subtle" className="rounded-2xl border-border/50 bg-card/80 dark:border-border/70 dark:bg-card/95">
+            <CardContent className="p-0">
+              {qualifyingLeads.length === 0 ? (
+                <EmptyState
+                  variant="ghost"
+                  icon={Target}
+                  title="Nenhum lead em qualificação no momento"
+                  description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
+                />
+              ) : (
+                <>
+                  <div className="hidden divide-y divide-border max-[559px]:block">
+                    {qualifyingLeads.map((lead) => (
+                      <div key={lead.id} className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">{lead.nome}</span>
+                          <Badge variant="outline" className="text-[10px]">{lead.queueName ?? "Geral"}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{lead.telefone}</p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <LeadQualificationBadge status={lead.qualificationStatus} />
+                          <span className="text-xs font-semibold">{lead.qualificationScore} pts</span>
+                        </div>
+                        <div className="pt-2 flex justify-end">
+                          <QualifyingLeadActions
+                            leadId={lead.id}
+                            leadName={lead.nome}
+                            currentQueueId={lead.queueId ?? null}
+                            currentQueueName={lead.queueName ?? null}
+                            queues={queues}
+                            onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Table className="max-[559px]:hidden">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-4">Lead</TableHead>
+                        <TableHead>Origem / Canal</TableHead>
+                        <TableHead>Fila de Destino</TableHead>
+                        <TableHead>Qualificação IA</TableHead>
+                        <TableHead className="hidden lg:table-cell">Entrada</TableHead>
+                        <TableHead className="pr-5 text-right">Ações de Controle</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {qualifyingLeads.map((lead) => (
+                        <TableRow key={lead.id} className="group/row">
+                          <TableCell className="pl-4 font-medium">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{lead.nome}</p>
+                              <p className="text-xs text-muted-foreground">{lead.telefone}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <Badge variant="secondary" className="text-[10px]">
+                                {lead.sourceChannel === "bulk_import" ? "Importação CSV" : lead.origem}
+                              </Badge>
+                              {lead.sourceCampaign ? (
+                                <p className="text-[11px] text-muted-foreground truncate max-w-36 mt-0.5">
+                                  {lead.sourceCampaign}
+                                </p>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {lead.queueName ?? "Geral da unidade"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <LeadQualificationBadge status={lead.qualificationStatus} />
+                              <span className="text-xs font-semibold text-foreground">
+                                {lead.qualificationScore} pts
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                            {formatDate(lead.createdAt, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                          </TableCell>
+                          <TableCell className="pr-5 text-right">
+                            <QualifyingLeadActions
+                              leadId={lead.id}
+                              leadName={lead.nome}
+                              currentQueueId={lead.queueId ?? null}
+                              currentQueueName={lead.queueName ?? null}
+                              queues={queues}
+                              onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
         <TabsContent value="list" className="mt-4">
           <Card variant="subtle" className="rounded-2xl border-border/50 bg-card/80 dark:border-border/70 dark:bg-card/95">
             <CardContent className="p-0">
