@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
-import { ArrowRight, ChartBar, CheckCircle, Lightning, MagnifyingGlass, Phone, Users } from "@/components/huge-icons";
+import { ArrowRight, ChevronDownIcon, ChevronRightIcon, ChartBar, CheckCircle, Lightning, MagnifyingGlass, Phone, Users, Megaphone, Buildings } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,16 @@ export function CampaignsDashboardView({
   };
 }) {
   const [search, setSearch] = useState("");
+  const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (campaignId: string) => {
+    setExpandedCampaignIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(campaignId)) next.delete(campaignId);
+      else next.add(campaignId);
+      return next;
+    });
+  };
 
   const filteredCampaigns = useMemo(() => {
     return campaigns
@@ -37,6 +47,19 @@ export function CampaignsDashboardView({
         return (b.leadsCount || 0) - (a.leadsCount || 0);
       });
   }, [campaigns, search]);
+
+  // Agrupamento de campanhas por Conta de Anúncios
+  const groupedByAdAccount = useMemo(() => {
+    const groups = new Map<string, { accountId: string; accountName: string; campaigns: MetaCampaignItem[] }>();
+    for (const camp of filteredCampaigns) {
+      const accKey = camp.adAccountId || "default";
+      const accName = camp.adAccountName || `Conta de Anúncios ${accKey}`;
+      const group = groups.get(accKey) || { accountId: accKey, accountName: accName, campaigns: [] };
+      group.campaigns.push(camp);
+      groups.set(accKey, group);
+    }
+    return Array.from(groups.values());
+  }, [filteredCampaigns]);
 
   return (
     <div className="space-y-6">
@@ -68,13 +91,15 @@ export function CampaignsDashboardView({
         })}
       </section>
 
-      {/* ─── TABELA DE CAMPANHAS ─── */}
+      {/* ─── TABELA DE CAMPANHAS AGRUPADA POR CONTA DE ANÚNCIOS ─── */}
       <Card className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
           <div>
-            <CardTitle className="text-base font-bold">Desempenho Comercial por Campanha</CardTitle>
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Megaphone className="size-5 text-primary" /> Desempenho por Conta de Anúncios, Campanha & Anúncio
+            </CardTitle>
             <CardDescription className="text-xs">
-              Relação direta do investimento de marketing com leads, conversas, propostas e receita vendida.
+              Visão hierárquica agrupada com tags de identificação de Contas, Campanhas e Anúncios Meta.
             </CardDescription>
           </div>
           <div className="relative w-64">
@@ -88,57 +113,148 @@ export function CampaignsDashboardView({
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="pl-4 text-xs font-semibold">Campanha</TableHead>
-                <TableHead className="text-xs font-semibold">Status</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Leads</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Em atendimento</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Vendas</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Receita Vendida</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Conversão %</TableHead>
-                <TableHead className="pr-4 text-right text-xs font-semibold">Ação</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCampaigns.map((camp) => (
-                <TableRow key={camp.id} className="hover:bg-muted/40 transition-colors">
-                  <TableCell className="pl-4 py-2.5">
-                    <p className="font-semibold text-xs text-foreground">{camp.name}</p>
-                    <p className="text-[11px] font-mono text-muted-foreground">{camp.objective || "LEAD_GENERATION"}</p>
-                  </TableCell>
+          {groupedByAdAccount.map((group) => (
+            <div key={group.accountName} className="border-b border-border/40 last:border-b-0">
+              {/* Header da Conta de Anúncios com Tags de Identificação */}
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 px-4 py-2.5 border-b border-border/30">
+                <div className="flex items-center gap-2">
+                  <Buildings className="size-4 text-primary" />
+                  <span className="text-xs font-bold text-foreground tracking-wide">{group.accountName}</span>
+                  <Badge variant="outline" className="text-[10px] font-mono bg-background/50">
+                    ID Conta: {group.accountId}
+                  </Badge>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {group.campaigns.length} {group.campaigns.length === 1 ? "campanha" : "campanhas"}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
+                  <span>Leads: <strong className="text-foreground">{group.campaigns.reduce((sum, c) => sum + (c.leadsCount || 0), 0)}</strong></span>
+                  <span>Vendas: <strong className="text-emerald-600 dark:text-emerald-400">{group.campaigns.reduce((sum, c) => sum + (c.salesCount || 0), 0)}</strong></span>
+                </div>
+              </div>
 
-                  <TableCell className="py-2.5">
-                    <Badge variant={camp.status === "ACTIVE" || camp.status === "active" ? "success" : "outline"} className="text-[10px]">
-                      {camp.status === "ACTIVE" || camp.status === "active" ? "Ativa" : "Pausada"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.leadsCount || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.conversationsCount || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums py-2.5">{camp.salesCount || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-foreground tabular-nums py-2.5">
-                    {formatCurrency(camp.revenueTotal || 0, { maximumFractionDigits: 0 })}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums py-2.5">{camp.conversionRate || 0}%</TableCell>
-                  <TableCell className="pr-4 text-right py-2.5">
-                    <Button render={<Link href={`/marketing/campanhas/${camp.id}`} />} size="sm" variant="ghost" className="h-8 text-xs gap-1">
-                      Detalhes <ArrowRight className="size-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {filteredCampaigns.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="p-8 text-center text-xs text-muted-foreground">
-                    Nenhuma campanha encontrada. Conecte sua conta Meta ou ajuste o filtro.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/10 border-b border-border/30">
+                    <TableHead className="w-10 pl-4"></TableHead>
+                    <TableHead className="text-xs font-semibold">Campanha Meta & Tags de Identificação</TableHead>
+                    <TableHead className="text-xs font-semibold">Status</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Leads</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Em atendimento</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Vendas</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Receita Vendida</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Conversão %</TableHead>
+                    <TableHead className="pr-4 text-right text-xs font-semibold">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {group.campaigns.map((camp) => {
+                    const isExpanded = expandedCampaignIds.has(camp.id);
+                    const hasAds = (camp.ads?.length ?? 0) > 0;
+                    return (
+                      <Fragment key={camp.id}>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="pl-4 py-2.5">
+                            {hasAds && (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(camp.id)}
+                                className="grid size-6 place-items-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                title={isExpanded ? "Ocultar anúncios" : "Ver anúncios"}
+                              >
+                                {isExpanded ? <ChevronDownIcon className="size-4 text-primary" /> : <ChevronRightIcon className="size-4" />}
+                              </button>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2.5">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-semibold text-xs text-foreground">{camp.name}</span>
+                                {hasAds && (
+                                  <Badge variant="secondary" className="text-[9px] h-4 px-1.5 font-normal">
+                                    {camp.ads!.length} {camp.ads!.length === 1 ? "anúncio" : "anúncios"}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground bg-muted/20">
+                                  ID Campanha: {camp.campaignId}
+                                </Badge>
+                                <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground bg-muted/20">
+                                  Objetivo: {camp.objective || "LEAD_GENERATION"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="py-2.5">
+                            <Badge variant={camp.status === "ACTIVE" || camp.status === "active" ? "success" : "outline"} className="text-[10px]">
+                              {camp.status === "ACTIVE" || camp.status === "active" ? "Ativa" : "Pausada"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.leadsCount || 0}</TableCell>
+                          <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.conversationsCount || 0}</TableCell>
+                          <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums py-2.5">{camp.salesCount || 0}</TableCell>
+                          <TableCell className="text-right font-mono text-xs font-bold text-foreground tabular-nums py-2.5">
+                            {formatCurrency(camp.revenueTotal || 0, { maximumFractionDigits: 0 })}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums py-2.5">{camp.conversionRate || 0}%</TableCell>
+                          <TableCell className="pr-4 text-right py-2.5">
+                            <Button render={<Link href={`/marketing/campanhas/${camp.id}`} />} size="sm" variant="ghost" className="h-8 text-xs gap-1">
+                              Detalhes <ArrowRight className="size-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Sub-tabela expansível de Anúncios da Campanha com Tags de Identificação */}
+                        {isExpanded && hasAds && (
+                          <TableRow className="bg-muted/15 hover:bg-muted/20">
+                            <TableCell colSpan={9} className="p-0 pl-12 pr-4 py-3">
+                              <div className="rounded-lg border border-border/50 bg-background/80 p-3 space-y-2">
+                                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                                  <Megaphone className="size-3.5 text-primary" /> Anúncios vinculados com tags de identificação:
+                                </p>
+                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                  {camp.ads!.map((ad) => (
+                                    <div key={ad.id} className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-card p-2.5 text-xs">
+                                      <div className="min-w-0 space-y-1">
+                                        <p className="font-medium truncate text-foreground text-xs">{ad.name}</p>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <Badge variant={ad.status === "ACTIVE" || ad.status === "active" ? "success" : "outline"} className="text-[9px] px-1 py-0 h-4">
+                                            {ad.status === "ACTIVE" || ad.status === "active" ? "Ativo" : "Pausado"}
+                                          </Badge>
+                                          <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground px-1 py-0 h-4">
+                                            ID Anúncio: {ad.adId}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <span className="text-[10px] font-mono text-muted-foreground block">Leads</span>
+                                        <span className="font-mono font-bold text-xs text-primary">{ad.leadsCount || 0}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          ))}
+
+          {filteredCampaigns.length === 0 && (
+            <div className="p-8 text-center text-xs text-muted-foreground">
+              Nenhuma campanha encontrada. Conecte sua conta Meta ou ajuste o filtro.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+

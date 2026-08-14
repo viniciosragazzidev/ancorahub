@@ -66,9 +66,19 @@ export type MetaSyncWarning = {
   message: string;
 };
 
+export type MetaAdSummaryItem = {
+  id: string;
+  adId: string;
+  name: string;
+  status: string;
+  leadsCount?: number;
+};
+
 export type MetaCampaignItem = {
   id: string;
   campaignId: string;
+  adAccountId: string;
+  adAccountName?: string | null;
   name: string;
   objective: string | null;
   status: string;
@@ -81,6 +91,7 @@ export type MetaCampaignItem = {
   salesCount?: number;
   revenueTotal?: number;
   conversionRate?: number;
+  ads?: MetaAdSummaryItem[];
 };
 
 export type MetaAdSetItem = {

@@ -86,6 +86,58 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     .where(and(eq(schema.quotes.tenantId, tenantId), eq(schema.quotes.status, "accepted")))
     .groupBy(schema.leads.metaCampaignId, schema.leads.sourceCampaign);
 
+  // 4. Buscar contas de anúncios para mapeamento de nomes
+  const adAccountsList = await db
+    .select({
+      adAccountId: schema.metaAdAccounts.adAccountId,
+      name: schema.metaAdAccounts.name,
+    })
+    .from(schema.metaAdAccounts)
+    .where(eq(schema.metaAdAccounts.tenantId, tenantId));
+  const adAccountNameMap = new Map(adAccountsList.map((a) => [a.adAccountId, a.name]));
+
+  // 5. Buscar anúncios vinculados às campanhas do tenant
+  const adsWithCampaign = await db
+    .select({
+      id: schema.metaAds.id,
+      adId: schema.metaAds.adId,
+      name: schema.metaAds.name,
+      status: schema.metaAds.status,
+      campaignId: schema.metaAdSets.campaignId,
+    })
+    .from(schema.metaAds)
+    .innerJoin(
+      schema.metaAdSets,
+      and(
+        eq(schema.metaAds.adSetId, schema.metaAdSets.adSetId),
+        eq(schema.metaAds.tenantId, schema.metaAdSets.tenantId)
+      )
+    )
+    .where(eq(schema.metaAds.tenantId, tenantId));
+
+  const leadsPerAd = await db
+    .select({
+      adId: schema.leads.metaAdId,
+      totalCount: count(),
+    })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.tenantId, tenantId), sql`${schema.leads.metaAdId} IS NOT NULL`))
+    .groupBy(schema.leads.metaAdId);
+  const leadsByAdMap = new Map(leadsPerAd.map((item) => [item.adId!, Number(item.totalCount)]));
+
+  const adsByCampaignMap = new Map<string, Array<{ id: string; adId: string; name: string; status: string; leadsCount: number }>>();
+  for (const ad of adsWithCampaign) {
+    const list = adsByCampaignMap.get(ad.campaignId) || [];
+    list.push({
+      id: ad.id,
+      adId: ad.adId,
+      name: ad.name,
+      status: ad.status,
+      leadsCount: leadsByAdMap.get(ad.adId) || 0,
+    });
+    adsByCampaignMap.set(ad.campaignId, list);
+  }
+
   // Mapear agregações
   const leadsMap = new Map<string, { total: number; active: number; converted: number }>();
   for (const item of leadsPerCampaign) {
@@ -116,8 +168,6 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     const saleStats = salesMap.get(c.campaignId) || salesMap.get(c.name) || { count: 0, revenue: 0 };
 
     const leadsCount = leadStats.total;
-    // Do not infer conversations from an arbitrary percentage. Until the
-    // communication attribution is persisted, expose the verified CRM state.
     const conversationsCount = leadStats.active;
     const salesCount = Math.max(leadStats.converted, saleStats.count);
     const revenueTotal = saleStats.revenue;
@@ -131,6 +181,8 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     return {
       id: c.id,
       campaignId: c.campaignId,
+      adAccountId: c.adAccountId,
+      adAccountName: adAccountNameMap.get(c.adAccountId) || `Conta de Anúncios ${c.adAccountId}`,
       name: c.name,
       objective: c.objective,
       status: c.status,
@@ -143,6 +195,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       salesCount,
       revenueTotal,
       conversionRate,
+      ads: adsByCampaignMap.get(c.campaignId) || [],
     };
   });
 
