@@ -425,52 +425,60 @@ export class WhatsAppTemplateResolver {
     else if (purpose === "taskReminder") eventKey = "TASK_REMINDER";
     else if (purpose === "clientNotice") eventKey = "CLIENT_NOTICE";
 
-    if (eventKey) {
-      const [usage] = await db
-        .select({
-          templateName: schema.metaWhatsAppTemplates.name,
-          language: schema.metaWhatsAppTemplates.language,
-          status: schema.metaWhatsAppTemplates.status,
-        })
-        .from(schema.metaWhatsAppTemplateUsages)
-        .innerJoin(
-          schema.metaWhatsAppTemplates,
-          eq(schema.metaWhatsAppTemplateUsages.templateId, schema.metaWhatsAppTemplates.id),
-        )
-        .where(
-          and(
-            eq(schema.metaWhatsAppTemplateUsages.tenantId, tenantId),
-            eq(schema.metaWhatsAppTemplateUsages.eventKey, eventKey),
-            eq(schema.metaWhatsAppTemplateUsages.active, true),
-            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-            isNull(schema.metaWhatsAppTemplates.deletedAt),
-          ),
-        )
-        .limit(1);
+    try {
+      if (eventKey) {
+        const [usage] = await db
+          .select({
+            templateName: schema.metaWhatsAppTemplates.name,
+            language: schema.metaWhatsAppTemplates.language,
+            status: schema.metaWhatsAppTemplates.status,
+          })
+          .from(schema.metaWhatsAppTemplateUsages)
+          .innerJoin(
+            schema.metaWhatsAppTemplates,
+            eq(schema.metaWhatsAppTemplateUsages.templateId, schema.metaWhatsAppTemplates.id),
+          )
+          .where(
+            and(
+              eq(schema.metaWhatsAppTemplateUsages.tenantId, tenantId),
+              eq(schema.metaWhatsAppTemplateUsages.eventKey, eventKey),
+              eq(schema.metaWhatsAppTemplateUsages.active, true),
+              eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+              isNull(schema.metaWhatsAppTemplates.deletedAt),
+            ),
+          )
+          .limit(1);
 
-      if (usage) {
-        return { name: usage.templateName, language: usage.language, isCustom: true };
+        if (usage) {
+          return { name: usage.templateName, language: usage.language, isCustom: true };
+        }
       }
+
+      const fallback = META_WHATSAPP_TEMPLATE_PURPOSES[purpose as MetaWhatsAppTemplatePurpose];
+      if (fallback) {
+        const [synced] = await db
+          .select({ name: schema.metaWhatsAppTemplates.name, language: schema.metaWhatsAppTemplates.language })
+          .from(schema.metaWhatsAppTemplates)
+          .where(
+            and(
+              eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+              eq(schema.metaWhatsAppTemplates.name, fallback.name),
+              isNull(schema.metaWhatsAppTemplates.deletedAt),
+            ),
+          )
+          .limit(1);
+
+        if (synced) {
+          return { name: synced.name, language: synced.language, isCustom: false };
+        }
+      }
+    } catch {
+      // Ignora erro se tabelas meta_whatsapp_templates ou meta_whatsapp_template_usages nao existirem no DB
     }
 
     // Built-in legacy fallback guarantee with dynamic language detection from synced WABA templates
     const fallback = META_WHATSAPP_TEMPLATE_PURPOSES[purpose as MetaWhatsAppTemplatePurpose];
     if (fallback) {
-      const [synced] = await db
-        .select({ name: schema.metaWhatsAppTemplates.name, language: schema.metaWhatsAppTemplates.language })
-        .from(schema.metaWhatsAppTemplates)
-        .where(
-          and(
-            eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
-            eq(schema.metaWhatsAppTemplates.name, fallback.name),
-            isNull(schema.metaWhatsAppTemplates.deletedAt),
-          ),
-        )
-        .limit(1);
-
-      if (synced) {
-        return { name: synced.name, language: synced.language, isCustom: false };
-      }
       return { name: fallback.name, language: fallback.language, isCustom: false };
     }
 

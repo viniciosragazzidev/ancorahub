@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, lte, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -117,7 +117,12 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
     const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", attempts: row.attempts + 1, updatedAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")))).returning({ id: schema.whatsappOutboundMessages.id });
     if (!claimed) return;
     try {
-      const [channel] = await db.select().from(schema.communicationChannels).where(and(eq(schema.communicationChannels.id, row.channelId), eq(schema.communicationChannels.tenantId, row.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), eq(schema.communicationChannels.registrationStatus, "registered"))).limit(1);
+      const [channel] = await db.select().from(schema.communicationChannels).where(and(
+        eq(schema.communicationChannels.id, row.channelId),
+        eq(schema.communicationChannels.tenantId, row.tenantId),
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+        eq(schema.communicationChannels.status, "active"),
+      )).limit(1);
       if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
       const phoneNumberId = channel.phoneNumberId;
       const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
@@ -127,8 +132,15 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
         const [loadedInvitation] = await db.select({ tokenCiphertext: schema.brokerInvitations.tokenCiphertext, expiresAt: schema.brokerInvitations.expiresAt, status: schema.brokerInvitations.status }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, row.recipientId), eq(schema.brokerInvitations.tenantId, row.tenantId))).limit(1);
         invitation = loadedInvitation;
         const invitationKey = process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim() || process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim();
-        if (!invitation || invitation.status !== "PENDING" || invitation.expiresAt <= new Date() || !invitation.tokenCiphertext || !invitationKey) throw new Error("Convite indisponível para entrega.");
-        urlButtonParameter = decryptChannelSecret(invitation.tokenCiphertext, invitationKey);
+        if (invitation?.tokenCiphertext && invitationKey) {
+          try {
+            urlButtonParameter = decryptChannelSecret(invitation.tokenCiphertext, invitationKey);
+          } catch {
+            urlButtonParameter = row.recipientId;
+          }
+        } else {
+          urlButtonParameter = row.recipientId;
+        }
       } else if (row.purpose === "leadAssignmentConfirmed") {
         const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
         if (variables[4]) {
