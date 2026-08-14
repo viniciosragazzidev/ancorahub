@@ -14,7 +14,7 @@ import { enqueueLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { deleteDistributionQueue, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -118,6 +118,16 @@ export async function saveDistributionQueueAction(input: unknown) {
     return { success: true, id: result.id, message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
+  }
+}
+
+export async function deleteDistributionQueueAction(queueId: string) {
+  try {
+    await deleteDistributionQueue(await getRequiredTenantContext(), queueId);
+    refreshDistribution();
+    return { success: true, message: "Fila removida com sucesso." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível excluir a fila." };
   }
 }
 

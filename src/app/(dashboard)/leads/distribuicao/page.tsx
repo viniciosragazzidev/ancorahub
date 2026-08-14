@@ -1,4 +1,4 @@
-import { count, desc, eq, and, inArray } from "drizzle-orm";
+import { count, desc, eq, and, inArray, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -163,6 +163,7 @@ export default async function LeadDistributionPage({
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
           inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
@@ -177,6 +178,7 @@ export default async function LeadDistributionPage({
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
           inArray(schema.leads.branchId, branchIds),
           inArray(schema.leads.status, activeStatuses),
         ),
@@ -208,6 +210,7 @@ export default async function LeadDistributionPage({
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
           inArray(schema.leads.branchId, branchIds),
         ),
       )
@@ -232,6 +235,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leadEffectOutbox.tenantId, context.tenantId),
           eq(schema.leadEffectOutbox.status, "failed"),
+          isNull(schema.leads.deletedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
@@ -250,23 +254,40 @@ export default async function LeadDistributionPage({
       capacityEnabled: schema.leadQueues.capacityEnabled,
       capacityPerBroker: schema.leadQueues.capacityPerBroker,
     }).from(schema.leadQueues).innerJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds)))
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds), isNull(schema.leadQueues.deletedAt)))
       .orderBy(schema.branches.name, schema.leadQueues.name),
     db.select({ queueId: schema.leads.queueId, waiting: count(schema.leads.id) }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.branchId, branchIds), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"])))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), inArray(schema.leads.branchId, branchIds), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"])))
       .groupBy(schema.leads.queueId),
     db.select({ id: schema.leadDistributionEvents.id, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt, leadName: schema.leads.nome, queueName: schema.leadQueues.name, brokerName: schema.user.name })
       .from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id))
       .leftJoin(schema.leadQueues, eq(schema.leadDistributionEvents.toQueueId, schema.leadQueues.id))
       .leftJoin(schema.user, eq(schema.leadDistributionEvents.newOwnerId, schema.user.id))
-      .where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+      .where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), isNull(schema.leads.deletedAt), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
       .orderBy(desc(schema.leadDistributionEvents.createdAt)).limit(40),
     db.select({ queueId: schema.leadDistributionPolicies.queueId, policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
       .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))),
     db.select({ campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
-      .from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)).orderBy(schema.metaCampaigns.name),
+      .from(schema.metaCampaigns)
+      .innerJoin(schema.metaAdAccounts, eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId))
+      .innerJoin(schema.metaConnections, eq(schema.metaAdAccounts.connectionId, schema.metaConnections.id))
+      .where(and(
+        eq(schema.metaCampaigns.tenantId, context.tenantId),
+        eq(schema.metaConnections.status, "connected"),
+        eq(schema.metaAdAccounts.status, "active"),
+      ))
+      .orderBy(schema.metaCampaigns.name),
     db.select({ adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status })
-      .from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
+      .from(schema.metaAds)
+      .innerJoin(schema.metaCampaigns, eq(schema.metaAds.campaignId, schema.metaCampaigns.campaignId))
+      .innerJoin(schema.metaAdAccounts, eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId))
+      .innerJoin(schema.metaConnections, eq(schema.metaAdAccounts.connectionId, schema.metaConnections.id))
+      .where(and(
+        eq(schema.metaAds.tenantId, context.tenantId),
+        eq(schema.metaConnections.status, "connected"),
+        eq(schema.metaAdAccounts.status, "active"),
+      ))
+      .orderBy(schema.metaAds.name),
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
       .from(schema.metaCampaignQueueRoutes).leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
       .where(and(
@@ -429,7 +450,7 @@ export default async function LeadDistributionPage({
               </div>
               {queueCards.map((queue) => (
                 <Card key={queue.status} variant="overview" className="gap-0">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="p-4 pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <CardTitle className="text-base">{queue.title}</CardTitle>
@@ -438,7 +459,7 @@ export default async function LeadDistributionPage({
                       <Badge variant={queue.count > 0 ? "warning" : "success"}>{queue.count}</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                  <CardContent className="flex items-center justify-between gap-3 border-t border-border/60 p-4 pt-3">
                     <span className="text-xs text-muted-foreground">{queue.oldestLabel}</span>
                     <Button render={<Link href={`/leads/distribuicao?view=operar&status=${queue.status}#inbox-distribuicao`} />} size="xs" variant="outline">
                       Abrir fila

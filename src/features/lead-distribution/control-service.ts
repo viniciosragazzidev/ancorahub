@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { TenantContext } from "@/shared/auth/types";
@@ -252,3 +252,43 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     reason: decision.selected ? "A simulação usa a mesma ordenação determinística da distribuição automática. Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
   };
 }
+
+export async function deleteDistributionQueue(context: TenantContext, queueId: string) {
+  const db = getDatabase();
+  const [queue] = await db
+    .select({
+      id: schema.leadQueues.id,
+      branchId: schema.leadQueues.branchId,
+      isDefault: schema.leadQueues.isDefault,
+    })
+    .from(schema.leadQueues)
+    .where(
+      and(
+        eq(schema.leadQueues.id, queueId),
+        eq(schema.leadQueues.tenantId, context.tenantId),
+        isNull(schema.leadQueues.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (!queue) throw new AuthorizationError("Fila não encontrada ou já removida.");
+  if (queue.isDefault) throw new Error("A fila padrão da unidade não pode ser excluída.");
+  assertManager(context, queue.branchId);
+
+  const now = new Date();
+  await db
+    .update(schema.leadQueues)
+    .set({ status: "inactive", deletedAt: now, updatedAt: now })
+    .where(eq(schema.leadQueues.id, queue.id));
+
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "lead_queue",
+    entidadeId: queue.id,
+    acao: "queue.deleted",
+  });
+
+  return { success: true };
+}
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
-import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, UserList, Buildings } from "@/components/huge-icons";
+import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
-import { saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction } from "@/features/lead-distribution/actions";
+import { deleteDistributionQueueAction, saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction } from "@/features/lead-distribution/actions";
 import { toast } from "sonner";
 
 type Queue = {
@@ -81,6 +81,16 @@ export function QueueControlCenter({
   const [adRoute, setAdRoute] = useState({ adId: ads[0]?.adId ?? "", queueId: queues[0]?.id ?? "" });
   const [savingCampaignRoute, setSavingCampaignRoute] = useState(false);
   const [savingAdRoute, setSavingAdRoute] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDeleteQueue(queue: Queue) {
+    if (!confirm(`Tem certeza que deseja excluir a fila "${queue.name}"?`)) return;
+    setDeletingId(queue.id);
+    const result = await deleteDistributionQueueAction(queue.id);
+    setDeletingId(null);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.");
+    toast.success(result.message);
+  }
 
   const branchQueues = useMemo(
     () => queues.filter((queue) => queue.branchId === simulationForm.branchId && queue.status === "active"),
@@ -265,7 +275,17 @@ export function QueueControlCenter({
                     </div>
 
                     {canEdit ? (
-                      <div className="flex justify-end border-t border-border/60 pt-3">
+                      <div className="flex justify-end gap-2 border-t border-border/60 pt-3">
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => handleDeleteQueue(queue)}
+                          disabled={deletingId === queue.id}
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-1"
+                        >
+                          <Trash className="size-3.5" />
+                          {deletingId === queue.id ? "Excluindo…" : "Excluir"}
+                        </Button>
                         <Button size="xs" variant="outline" onClick={() => openEdit(queue)}>
                           <SlidersHorizontal />Editar
                         </Button>

@@ -41,14 +41,14 @@ export default async function TeamPage() {
         userId: schema.brokerProfiles.userId,
         name: schema.brokerProfiles.professionalName,
         email: schema.brokerProfiles.invitedEmail,
-        role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}, 'broker')`,
-        jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, 'broker')`,
+        role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}::text, ${schema.brokerInvitations.role}::text, 'broker')::tenant_role`,
+        jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, ${schema.brokerInvitations.jobTitle}, 'broker')`,
         customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
-            when ${schema.user.status} = 'pending' or ${schema.brokerProfiles.lifecycleStatus} = 'INVITED' then 'pending'::user_status
-            when ${schema.user.status} = 'disabled' or ${schema.tenantMemberships.status} = 'inactive' then 'disabled'::user_status
-            else 'active'::user_status
+            when ${schema.user.status}::text = 'pending' or ${schema.brokerProfiles.lifecycleStatus}::text = 'INVITED' then 'pending'
+            when ${schema.user.status}::text = 'disabled' or ${schema.tenantMemberships.status}::text = 'inactive' then 'disabled'
+            else 'active'
           end
         `,
         branchId: sql<string | null>`case when ${schema.tenantMemberships.id} is null then ${schema.brokerProfiles.branchId} else ${schema.tenantMemberships.branchId} end`,
@@ -60,6 +60,10 @@ export default async function TeamPage() {
       .leftJoin(schema.tenantMemberships, and(
         eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
         eq(schema.tenantMemberships.tenantId, context.tenantId),
+      ))
+      .leftJoin(schema.brokerInvitations, and(
+        eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId),
+        eq(schema.brokerInvitations.status, "PENDING")
       ))
       .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
@@ -74,7 +78,7 @@ export default async function TeamPage() {
         email: schema.user.email,
         role: schema.tenantMemberships.role,
         jobTitle: sql<string>`case
-          when ${schema.tenantMemberships.role} in ('director', 'manager', 'supervisor')
+          when ${schema.tenantMemberships.role}::text in ('director', 'manager', 'supervisor')
             and ${schema.tenantMemberships.jobTitle} = 'broker'
           then ${schema.tenantMemberships.role}::text
           else ${schema.tenantMemberships.jobTitle}
@@ -82,9 +86,9 @@ export default async function TeamPage() {
         customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
-            when ${schema.user.status} = 'pending' then 'pending'::user_status
-            when ${schema.user.status} = 'disabled' or ${schema.tenantMemberships.status} = 'inactive' then 'disabled'::user_status
-            else 'active'::user_status
+            when ${schema.user.status}::text = 'pending' then 'pending'
+            when ${schema.user.status}::text = 'disabled' or ${schema.tenantMemberships.status}::text = 'inactive' then 'disabled'
+            else 'active'
           end
         `,
         branchId: schema.tenantMemberships.branchId,
@@ -98,7 +102,7 @@ export default async function TeamPage() {
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         branchScope,
-        sql`(${schema.tenantMemberships.role} <> 'broker' or ${schema.brokerProfiles.id} is null)`
+        sql`(${schema.tenantMemberships.role}::text <> 'broker' or ${schema.brokerProfiles.id} is null)`
       )),
     getDatabase()
       .select({ count: sql<number>`count(*)::int` })

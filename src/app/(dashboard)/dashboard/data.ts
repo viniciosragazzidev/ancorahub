@@ -32,6 +32,7 @@ export async function getBrokerDashboardData(period: PeriodValue = DEFAULT_PERIO
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.corretorId, context.userId),
+        isNull(schema.leads.deletedAt),
         or(
           ne(schema.leads.status, "distributed"),
           isNotNull(schema.leads.firstContactAt),
@@ -52,6 +53,7 @@ export async function getBrokerDashboardData(period: PeriodValue = DEFAULT_PERIO
         and(
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, context.userId),
+          isNull(schema.leads.deletedAt),
           gte(schema.leads.createdAt, periodDaysAgoSql(period)),
         ),
       )
@@ -118,7 +120,7 @@ export async function getManagerDashboardData(period: PeriodValue = DEFAULT_PERI
   const [branch, members, leads, trendRaw] = await Promise.all([
     db.select({ autoDistribute: schema.branches.autoDistribute, branchName: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.id, context.branchId!), eq(schema.branches.tenantId, context.tenantId))).limit(1),
     db.select({ userId: schema.tenantMemberships.userId, status: schema.tenantMemberships.status }).from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.branchId, context.branchId!), eq(schema.tenantMemberships.role, "broker"))),
-    db.select({ status: schema.leads.status, corretorId: schema.leads.corretorId, assignedAt: schema.leads.assignedAt, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.branchId, context.branchId!))),
+    db.select({ status: schema.leads.status, corretorId: schema.leads.corretorId, assignedAt: schema.leads.assignedAt, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.branchId, context.branchId!), isNull(schema.leads.deletedAt))),
     db
       .select({
         date: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
@@ -130,6 +132,7 @@ export async function getManagerDashboardData(period: PeriodValue = DEFAULT_PERI
         and(
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.branchId, context.branchId!),
+          isNull(schema.leads.deletedAt),
           gte(schema.leads.createdAt, periodDaysAgoSql(period)),
         ),
       )
@@ -163,7 +166,7 @@ export async function getDirectorDashboardData(period: PeriodValue = DEFAULT_PER
   const [user, tenant, leads, branches, members, trendRaw] = await Promise.all([
     db.select({ name: schema.user.name, email: schema.user.email, image: schema.user.image }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db.select({ name: schema.tenants.name, slug: schema.tenants.slug, legalName: schema.tenants.legalName, cnpj: schema.tenants.cnpj, subscriptionPlan: schema.tenants.subscriptionPlan }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
-    db.select({ status: schema.leads.status, branchId: schema.leads.branchId, assignedAt: schema.leads.assignedAt, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads).where(eq(schema.leads.tenantId, context.tenantId)),
+    db.select({ status: schema.leads.status, branchId: schema.leads.branchId, assignedAt: schema.leads.assignedAt, stageEnteredAt: schema.leads.stageEnteredAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))),
     db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId)),
     db.select({ role: schema.tenantMemberships.role, status: schema.tenantMemberships.status }).from(schema.tenantMemberships).where(eq(schema.tenantMemberships.tenantId, context.tenantId)),
     // Lead trend: last 30 days grouped by date
@@ -177,6 +180,7 @@ export async function getDirectorDashboardData(period: PeriodValue = DEFAULT_PER
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
           gte(schema.leads.createdAt, periodDaysAgoSql(period)),
         ),
       )
@@ -232,7 +236,7 @@ export async function getMarketingDashboardData(period: PeriodValue = DEFAULT_PE
   const [user, tenant, leads, campaigns, campaignRoutes, ads, trendRaw] = await Promise.all([
     db.select({ name: schema.user.name, email: schema.user.email }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
-    db.select({ id: schema.leads.id, status: schema.leads.status, origem: schema.leads.origem, metaCampaignId: schema.leads.metaCampaignId, createdAt: schema.leads.createdAt }).from(schema.leads).where(eq(schema.leads.tenantId, context.tenantId)),
+    db.select({ id: schema.leads.id, status: schema.leads.status, origem: schema.leads.origem, metaCampaignId: schema.leads.metaCampaignId, createdAt: schema.leads.createdAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))),
     db.select({ id: schema.metaCampaigns.id, campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status }).from(schema.metaCampaigns).where(eq(schema.metaCampaigns.tenantId, context.tenantId)),
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
       .from(schema.metaCampaignQueueRoutes)
@@ -245,7 +249,7 @@ export async function getMarketingDashboardData(period: PeriodValue = DEFAULT_PE
       converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')::int`,
     })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), gte(schema.leads.createdAt, periodDaysAgoSql(period))))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, periodDaysAgoSql(period))))
       .groupBy(sql`1`)
       .orderBy(sql`1`),
   ]);

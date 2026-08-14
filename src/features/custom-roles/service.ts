@@ -17,7 +17,7 @@ const roleInput = z.object({
   color: z.enum(["primary", "emerald", "blue", "amber", "rose"]),
   icon: z.enum(["shield", "chart", "megaphone", "wallet", "headphones"]),
   scope: z.enum(["none", "own", "branch", "tenant"]),
-  permissions: z.array(z.string()).max(40),
+  permissions: z.array(z.string()).max(60),
   status: z.enum(["draft", "active"]),
 });
 
