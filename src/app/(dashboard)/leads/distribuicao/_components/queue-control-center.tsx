@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
-import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Zap } from "@/components/huge-icons";
+import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Lightning } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -421,7 +421,7 @@ export function QueueControlCenter({
               {/* Exclusividade de Plantão */}
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <Zap className="size-4 text-emerald-500" /> Exclusividade de Plantão Agendado ou Ativo
+                  <Lightning className="size-4 text-emerald-500" /> Exclusividade de Plantão Agendado ou Ativo
                 </p>
                 <p className="text-[11px] text-muted-foreground">
                   Se selecinoado, os leads direcionados a esta fila serão entregues exclusivamente aos corretores em escala ou ativos neste plantão.

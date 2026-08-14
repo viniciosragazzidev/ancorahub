@@ -162,7 +162,7 @@ function CoverageAlerts({ schedules, assignments, onOpen }: { schedules: Schedul
 function DutyFormSheet({ open, onOpenChange, schedule, snapshot }: { open: boolean; onOpenChange: (open: boolean) => void; schedule: Schedule | null; snapshot: Snapshot }) {
   const [pending, startTransition] = useTransition();
   const [branchIds, setBranchIds] = useState<string[]>(schedule ? [schedule.branchId] : [snapshot.branches[0]?.id ?? ""].filter(Boolean));
-  const [queueIdsByBranch, setQueueIdsByBranch] = useState<Record<string, string>>(() => Object.fromEntries((schedule ? [schedule.branchId] : [snapshot.branches[0]?.id ?? ""].filter(Boolean)).map((branchId) => [branchId, schedule?.branchId === branchId ? schedule.queueId : snapshot.queues.find((queue) => queue.branchId === branchId)?.id ?? ""])));
+  const [queueIdsByBranch, setQueueIdsByBranch] = useState<Record<string, string>>(() => Object.fromEntries((schedule ? [schedule.branchId] : [snapshot.branches[0]?.id ?? ""].filter(Boolean)).map((branchId) => [branchId, schedule && schedule.branchId === branchId ? schedule.queueId : snapshot.queues.find((queue) => queue.branchId === branchId)?.id ?? ""])));
   const selectedBranches = snapshot.branches.filter((branch) => branchIds.includes(branch.id));
   const queueForBranch = (branchId: string) => queueIdsByBranch[branchId] ?? snapshot.queues.find((queue) => queue.branchId === branchId)?.id ?? "";
   const canSubmit = selectedBranches.length > 0 && selectedBranches.every((branch) => Boolean(queueForBranch(branch.id)));

@@ -214,12 +214,15 @@ export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unk
 
 export async function simulateDistribution(context: TenantContext, rawInput: unknown) {
   const input = simulationInput.parse(rawInput);
-  assertManager(context, input.branchId);
+  if (input.branchId) {
+    assertManager(context, input.branchId);
+  }
   const db = getDatabase();
+  const branchCond = input.branchId ? eq(schema.leadQueues.branchId, input.branchId) : undefined;
   const [queue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, status: schema.leadQueues.status })
-    .from(schema.leadQueues).where(and(eq(schema.leadQueues.id, input.queueId ?? ""), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.branchId, input.branchId))).limit(1);
+    .from(schema.leadQueues).where(and(eq(schema.leadQueues.id, input.queueId ?? ""), eq(schema.leadQueues.tenantId, context.tenantId), branchCond)).limit(1);
   const fallbackQueue = !queue ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, status: schema.leadQueues.status })
-    .from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.branchId, input.branchId), eq(schema.leadQueues.status, "active"))).orderBy(desc(schema.leadQueues.isDefault), asc(schema.leadQueues.createdAt)).limit(1) : [];
+    .from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), branchCond, eq(schema.leadQueues.status, "active"))).orderBy(desc(schema.leadQueues.isDefault), asc(schema.leadQueues.createdAt)).limit(1) : [];
   const effectiveQueue = queue ?? fallbackQueue[0];
   if (!effectiveQueue || effectiveQueue.status !== "active") return { queue: null, eligible: [], selected: null, reason: "Não existe uma fila ativa para esta unidade." };
 
@@ -227,13 +230,13 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id), eq(schema.leadDistributionPolicies.enabled, true))).limit(1);
 
   const policy = readPolicy(policyRow?.policy);
-  const targetBranchIds = Array.from(new Set([input.branchId, ...(policy.allowedBranchIds ?? [])]));
+  const targetBranchIds = Array.from(new Set([input.branchId, ...(policy.allowedBranchIds ?? [])].filter((id): id is string => typeof id === "string" && id.length > 0)));
 
   const brokers = await db.select({ id: schema.user.id, name: schema.user.name, createdAt: schema.user.createdAt })
     .from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
     .where(and(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
-      inArray(schema.tenantMemberships.branchId, targetBranchIds),
+      targetBranchIds.length ? inArray(schema.tenantMemberships.branchId, targetBranchIds) : undefined,
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
       eq(schema.tenantMemberships.availabilityStatus, "available"),

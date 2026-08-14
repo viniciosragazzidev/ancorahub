@@ -585,7 +585,7 @@ export const leadQueues = pgTable(
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     branchId: text("branch_id").references(() => branches.id, { onDelete: "cascade" }),
-    exclusiveDutyScheduleId: text("exclusive_duty_schedule_id").references(() => unitDutySchedules.id, { onDelete: "set null" }),
+    exclusiveDutyScheduleId: text("exclusive_duty_schedule_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: text("status").notNull().default("active"),
