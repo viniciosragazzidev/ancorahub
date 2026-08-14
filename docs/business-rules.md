@@ -51,6 +51,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-029F | Remover plantão significa arquivar, nunca apagar o histórico. | Arquivamento → regra e atribuições ativas saem da operação; restauração reativa somente a regra e mantém auditoria. | DEC-061 |
 | BR-029G | Criar plantão para várias unidades gera regras independentes por unidade e fila. | Diretor seleciona unidades e filas ativas → regras, auditorias e coberturas locais são criadas atomicamente; Gestor só pode criar para a própria unidade. | DEC-062 |
 | BR-029H | Empresa PJ pertence ao tenant e pode ser compartilhada apenas dentro do escopo permitido. | Cadastro de lead PJ com CNPJ válido → reutiliza ou cria empresa no tenant; corretor enxerga somente empresas com oportunidade própria. | DEC-071 |
+| BR-029I | Novos leads em triagem (qualificação pendente) pertencem exclusivamente à aba Qualificações e não aparecem no Kanban ou lista de atendimento até a conclusão da qualificação; leads já atribuídos ou qualificados não aparecem na aba de qualificações. | Lead criado com IA ativa → entra em qualificação pendente e sem corretor → isolado na aba Qualificações; qualificação concluída ou aprovação manual → passa a qualificado e é distribuído para a lista e o Kanban. | DEC-078 |
 
 ## Cotação, documentos e venda
 

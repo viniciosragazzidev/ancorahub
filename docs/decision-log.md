@@ -13,6 +13,16 @@ protegidos e não são reiniciados. Ao concluir os campos exigidos, o motor pers
 qualificação, encaminha pelo mesmo resolvedor de distribuição e deixa a conversa em
 espera humana. A ativação continua dependente dos controles global e do tenant.
 
+## DEC-078 — Segregação de fases entre Qualificação IA e Distribuição Operacional
+
+**Estado:** Aceita
+**Data:** 2026-08-14
+
+A esteira de atendimento impõe a segregação estrita entre leads em qualificação por IA e leads prontos para atendimento humano:
+- **Aba Qualificações**: Exibe exclusivamente novos leads não atribuídos (`corretorId` nulo) e pendentes (`qualification_status: "pending"`). Leads já distribuídos jamais aparecem nesta aba.
+- **Aba Leads Qualificados & Distribuídos e Kanban**: Exibe exclusivamente leads que já concluíram a qualificação (`qualification_status` igual a `"qualified"`, `"disqualified"` ou desativado). Leads em qualificação pendente são filtrados na consulta do banco e excluídos desta visualização.
+- Ao concluir a qualificação (por IA ou por intervenção manual do gestor/diretor via "Aprovar & Distribuir"), o lead é atribuído, seu estado é atualizado e ele transita atomicamente para a aba de atendimento e o Kanban.
+
 > **DEC-058 — Intake transacional e outbox de efeitos (aceita em 2026-07-28):** o webhook confirma um lead somente após gravar, na mesma transação, a entrega idempotente, o lead, a timeline, auditoria, evento de distribuição e efeitos pendentes. Distribuição e notificações são executadas fora da requisição por outbox com lease, retry e dead-letter; falha externa não recria o lead nem apaga o trabalho. O Super-admin controla o processador e toda exceção permanece rastreável.
 >
 > **DEC-038 — Processamento resiliente da distribuição (aceita em 2026-07-20):** a distribuição automática usa fila persistente no PostgreSQL e executores idempotentes por rota interna protegida. Locks possuem lease recuperável, falhas transitórias usam backoff configurável e parâmetros iniciais conservadores (lote 25, lease 2 minutos, máximo 8 tentativas) são reversíveis e auditáveis pelo Super-admin. A regra comercial já existente de capacidade, round-robin e SLA não é alterada.
