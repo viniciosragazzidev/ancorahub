@@ -31,8 +31,8 @@ describe("MetaGraphClient permissions", () => {
       ],
     }), { status: 200 }));
 
-    await expect(new MetaGraphClient("secret-token").fetchLeadgenSubscription("page_123")).resolves.toBe(true);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/page_123/subscribed_apps");
+    await expect(new MetaGraphClient("secret-token").fetchLeadgenSubscription("1262967620230301")).resolves.toBe(true);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/1262967620230301/subscribed_apps");
     fetchMock.mockRestore();
   });
 
@@ -41,7 +41,16 @@ describe("MetaGraphClient permissions", () => {
       data: [{ id: "another-app", subscribed_fields: ["leadgen"] }],
     }), { status: 200 }));
 
-    await expect(new MetaGraphClient("secret-token").fetchLeadgenSubscription("page_123")).resolves.toBe(false);
+    await expect(new MetaGraphClient("secret-token").fetchLeadgenSubscription("1262967620230301")).resolves.toBe(false);
+    fetchMock.mockRestore();
+  });
+
+  it("does not call Graph API for malformed persisted asset identifiers", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(new MetaGraphClient("secret-token").fetchCampaigns("act_mock_789")).rejects.toMatchObject({ code: 100 });
+    await expect(new MetaGraphClient("secret-token").fetchLeadForms("page_mock_456")).rejects.toMatchObject({ code: 100 });
+    expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockRestore();
   });
 });

@@ -7,6 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 import { isMetaAdsReadPermissionError, isMetaPermissionError, MetaGraphClient } from "./meta-graph-client";
 import { decryptMetaToken } from "./meta-oauth";
+import { isMetaAdAccountId, isMetaPageId } from "./meta-id-validation";
 import type { MetaSyncWarning } from "./types";
 
 const MISSING_ADS_READ_MESSAGE = "A conexão Meta atual não recebeu leitura da conta de anúncios. Reconecte Marketing com um administrador da conta e conceda ads_read para sincronizar campanhas, anúncios e pixels.";
@@ -71,11 +72,36 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     const adAccounts = await db.select().from(schema.metaAdAccounts)
       .where(and(eq(schema.metaAdAccounts.tenantId, tenantId), eq(schema.metaAdAccounts.status, "active")));
 
+    const validAdAccounts = [] as typeof adAccounts;
+    for (const account of adAccounts) {
+      if (isMetaAdAccountId(account.adAccountId)) {
+        validAdAccounts.push(account);
+        continue;
+      }
+
+      console.warn("[meta-sync] Ignoring invalid persisted ad-account identifier", {
+        tenantId,
+        adAccountId: account.adAccountId,
+      });
+      await db.update(schema.metaAdAccounts)
+        .set({ status: "inactive", updatedAt: now })
+        .where(and(
+          eq(schema.metaAdAccounts.tenantId, tenantId),
+          eq(schema.metaAdAccounts.connectionId, connection.id),
+          eq(schema.metaAdAccounts.adAccountId, account.adAccountId),
+          eq(schema.metaAdAccounts.status, "active"),
+        ));
+      warnings.push({
+        code: "invalid_asset",
+        message: "Uma conta de anÃºncios invÃ¡lida foi desativada localmente. Reconecte ou selecione novamente uma conta real da Meta.",
+      });
+    }
+
     if (!canReadAds && adAccounts.length) {
       warnings.push({ code: "missing_ads_read", message: MISSING_ADS_READ_MESSAGE });
     }
 
-    for (const account of canReadAds ? adAccounts : []) {
+    for (const account of canReadAds ? validAdAccounts : []) {
       try {
         const remoteCampaigns = await client.fetchCampaigns(account.adAccountId);
         for (const campaign of remoteCampaigns) {
@@ -188,7 +214,32 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
 
     const pages = await db.select().from(schema.metaPages)
       .where(and(eq(schema.metaPages.tenantId, tenantId), eq(schema.metaPages.status, "active")));
+    const validPages = [] as typeof pages;
     for (const page of pages) {
+      if (isMetaPageId(page.pageId)) {
+        validPages.push(page);
+        continue;
+      }
+
+      console.warn("[meta-sync] Ignoring invalid persisted page identifier", {
+        tenantId,
+        pageId: page.pageId,
+      });
+      await db.update(schema.metaPages)
+        .set({ status: "inactive", updatedAt: now })
+        .where(and(
+          eq(schema.metaPages.tenantId, tenantId),
+          eq(schema.metaPages.connectionId, connection.id),
+          eq(schema.metaPages.pageId, page.pageId),
+          eq(schema.metaPages.status, "active"),
+        ));
+      warnings.push({
+        code: "invalid_asset",
+        message: "Uma pÃ¡gina Meta invÃ¡lida foi desativada localmente. Reconecte ou selecione novamente uma pÃ¡gina real da Meta.",
+      });
+    }
+
+    for (const page of validPages) {
       try {
         const pageToken = page.accessTokenCiphertext ? decryptMetaToken(page.accessTokenCiphertext) : rawToken;
         let forms: Array<{ id: string; name: string; status?: string; locale?: string }> = [];

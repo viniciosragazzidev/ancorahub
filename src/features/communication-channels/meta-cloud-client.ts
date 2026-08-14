@@ -182,11 +182,20 @@ export async function subscribePageToLeadgen(pageId: string, pageAccessToken?: s
   return payload;
 }
 
+export function formatE164Phone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    return `55${digits}`;
+  }
+  return digits;
+}
+
 export async function sendMetaCloudText(input: { phoneNumberId: string; accessToken: string; to: string; body: string }) {
   return graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: input.to.replace(/\D/g, ""), type: "text", text: { preview_url: false, body: input.body } }),
+    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: formatE164Phone(input.to), type: "text", text: { preview_url: false, body: input.body } }),
   }, input.accessToken);
 }
 
@@ -211,7 +220,7 @@ export function buildMetaCloudTemplatePayload(input: MetaCloudTemplateInput) {
   return {
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: input.to.replace(/\D/g, ""),
+    to: formatE164Phone(input.to),
     type: "template",
     template: {
       name: input.templateName,
