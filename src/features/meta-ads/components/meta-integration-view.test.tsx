@@ -45,6 +45,21 @@ afterEach(() => {
 });
 
 describe("MetaIntegrationView", () => {
+  it("paginates asset lists with up to 15 items per page", () => {
+    const manyPages = Array.from({ length: 17 }, (_, index) => ({ id: `page-${index + 1}`, name: `Página ${String(index + 1).padStart(2, "0")}`, status: "active" }));
+    render(<MetaIntegrationView canConfigure={false} connection={connectedConnection} assets={{ ...connectedAssets, pages: manyPages }} logs={[]} />);
+    expect(screen.getByText("Página 01")).toBeInTheDocument();
+    expect(screen.getByText("Página 15")).toBeInTheDocument();
+    expect(screen.queryByText("Página 16")).not.toBeInTheDocument();
+    expect(screen.getByText("1–15 de 17")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
+    expect(screen.getByText("Página 16")).toBeInTheDocument();
+    expect(screen.queryByText("Página 01")).not.toBeInTheDocument();
+    expect(screen.getByText("16–17 de 17")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
+    expect(screen.getByText("Página 01")).toBeInTheDocument();
+  });
+
   it("keeps WhatsApp outside the Marketing authorization flow", () => {
     render(<MetaIntegrationView connection={null} assets={null} logs={[]} />);
     expect(screen.getByRole("button", { name: "Conectar Marketing" })).toBeInTheDocument();
