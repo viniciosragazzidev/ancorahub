@@ -129,3 +129,51 @@ export type MetaSyncLogItem = {
   startedAt: Date;
   completedAt: Date | null;
 };
+
+export type MetaSyncAuditDiagnostic = {
+  connection: {
+    status: string;
+    businessId: string | null;
+    businessName: string | null;
+    lastSyncedAt: Date | null;
+    permissions: string[];
+    grantedScopesCheck: {
+      adsRead: boolean;
+      leadsRetrieval: boolean;
+      pagesShowList: boolean;
+      pagesManageMetadata: boolean;
+    };
+  } | null;
+  adAccounts: Array<{
+    adAccountId: string;
+    name: string;
+    status: string;
+    metaCampaignsCount: number;
+    crmCampaignsCount: number;
+    metaAdsCount: number;
+    crmAdsCount: number;
+    syncStatus: "MATCH" | "TRUNCATED" | "NOT_SYNCED" | "ERROR";
+    errorMessage?: string;
+  }>;
+  pages: Array<{
+    pageId: string;
+    name: string;
+    status: string;
+    hasPageToken: boolean;
+    leadgenSubscribed: boolean;
+    metaLeadFormsCount: number;
+    crmLeadFormsCount: number;
+    syncStatus: "MATCH" | "EMPTY" | "ERROR";
+    errorMessage?: string;
+  }>;
+  totals: {
+    metaCampaignsTotal: number;
+    crmCampaignsTotal: number;
+    metaAdsTotal: number;
+    crmAdsTotal: number;
+    metaFormsTotal: number;
+    crmFormsTotal: number;
+    crmPixelsTotal: number;
+    crmDatasetsTotal: number;
+  };
+};

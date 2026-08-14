@@ -96,6 +96,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
           }).onConflictDoUpdate({
             target: [schema.metaCampaigns.tenantId, schema.metaCampaigns.campaignId],
             set: {
+              adAccountId: account.adAccountId,
               name: campaign.name,
               objective: campaign.objective || null,
               status: campaign.status || "PAUSED",
@@ -106,46 +107,63 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
           });
           totalSynced++;
 
-          const adSets = await client.fetchAdSets(campaign.id);
-          for (const adSet of adSets) {
-            await db.insert(schema.metaAdSets).values({
-              id: randomUUID(), tenantId, campaignId: campaign.id, adSetId: adSet.id,
-              name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null,
-              createdAt: now, updatedAt: now,
-            }).onConflictDoUpdate({
-              target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
-              set: { name: adSet.name, status: adSet.status || "PAUSED", updatedAt: now },
-            });
-
-            const ads = await client.fetchAds(adSet.id);
-            for (const ad of ads) {
-              await db.insert(schema.metaAds).values({
-                id: randomUUID(), tenantId, adSetId: adSet.id, adId: ad.id,
-                name: ad.name, status: ad.status || "PAUSED", createdAt: now, updatedAt: now,
+          try {
+            const adSets = await client.fetchAdSets(campaign.id);
+            for (const adSet of adSets) {
+              await db.insert(schema.metaAdSets).values({
+                id: randomUUID(), tenantId, campaignId: campaign.id, adSetId: adSet.id,
+                name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null,
+                createdAt: now, updatedAt: now,
               }).onConflictDoUpdate({
-                target: [schema.metaAds.tenantId, schema.metaAds.adId],
-                set: { name: ad.name, status: ad.status || "PAUSED", updatedAt: now },
+                target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
+                set: { name: adSet.name, status: adSet.status || "PAUSED", updatedAt: now },
               });
+
+              try {
+                const ads = await client.fetchAds(adSet.id);
+                for (const ad of ads) {
+                  await db.insert(schema.metaAds).values({
+                    id: randomUUID(), tenantId, adSetId: adSet.id, adId: ad.id,
+                    name: ad.name, status: ad.status || "PAUSED", createdAt: now, updatedAt: now,
+                  }).onConflictDoUpdate({
+                    target: [schema.metaAds.tenantId, schema.metaAds.adId],
+                    set: { name: ad.name, status: ad.status || "PAUSED", updatedAt: now },
+                  });
+                }
+              } catch (adError) {
+                console.error(`[meta-sync] Warning fetching ads for adSet ${adSet.id}:`, adError);
+              }
             }
+          } catch (adSetError) {
+            console.error(`[meta-sync] Warning fetching adSets for campaign ${campaign.id}:`, adSetError);
           }
         }
 
-        const pixels = await client.fetchPixels(account.adAccountId);
-        for (const pixel of pixels) {
-          await db.insert(schema.metaPixels).values({
-            id: randomUUID(), tenantId, pixelId: pixel.id, name: pixel.name, status: "active", createdAt: now, updatedAt: now,
-          }).onConflictDoUpdate({
-            target: [schema.metaPixels.tenantId, schema.metaPixels.pixelId],
-            set: { name: pixel.name, status: "active", updatedAt: now },
-          });
-          totalSynced++;
+        try {
+          const pixels = await client.fetchPixels(account.adAccountId);
+          for (const pixel of pixels) {
+            await db.insert(schema.metaPixels).values({
+              id: randomUUID(), tenantId, pixelId: pixel.id, name: pixel.name, status: "active", createdAt: now, updatedAt: now,
+            }).onConflictDoUpdate({
+              target: [schema.metaPixels.tenantId, schema.metaPixels.pixelId],
+              set: { name: pixel.name, status: "active", updatedAt: now },
+            });
+            totalSynced++;
+          }
+        } catch (pixelError) {
+          console.error(`[meta-sync] Warning fetching pixels for account ${account.adAccountId}:`, pixelError);
         }
       } catch (error) {
+        console.error(`[meta-sync] Error syncing ad account ${account.adAccountId}:`, error);
         if (isMetaAdsReadPermissionError(error)) {
           warnings.push({ code: "missing_ads_read", message: MISSING_ADS_READ_MESSAGE });
-          continue;
+        } else {
+          warnings.push({
+            code: "asset_access_limited",
+            message: `Erro ao sincronizar a conta de anúncios ${account.name || account.adAccountId}: ${error instanceof Error ? error.message : "Erro na API da Meta."}`,
+          });
         }
-        throw error;
+        continue;
       }
     }
 
@@ -164,7 +182,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
       if (isMetaPermissionError(error)) {
         warnings.push({ code: "asset_access_limited", message: "A Meta não liberou fontes de dados para esta conexão. O administrador precisa conceder acesso a esse ativo no Business Manager." });
       } else {
-        throw error;
+        console.error("[meta-sync] Warning fetching datasets:", error);
       }
     }
 
@@ -173,7 +191,19 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     for (const page of pages) {
       try {
         const pageToken = page.accessTokenCiphertext ? decryptMetaToken(page.accessTokenCiphertext) : rawToken;
-        const forms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);
+        let forms: Array<{ id: string; name: string; status?: string; locale?: string }> = [];
+
+        // Try with Page Token first, fallback to User Token
+        try {
+          forms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);
+        } catch (pageTokenError) {
+          if (pageToken !== rawToken) {
+            forms = await client.fetchLeadForms(page.pageId).catch(() => []);
+          } else {
+            throw pageTokenError;
+          }
+        }
+
         for (const form of forms) {
           await db.insert(schema.metaLeadForms).values({
             id: randomUUID(), tenantId, pageId: page.pageId, formId: form.id, name: form.name,
@@ -185,14 +215,14 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
           totalSynced++;
         }
       } catch (error) {
+        console.error(`[meta-sync] Error fetching lead forms for page ${page.pageId}:`, error);
         if (isMetaPermissionError(error)) {
           warnings.push({
             code: "asset_access_limited",
             message: `A Meta não liberou os formulários da página ${page.name}. Confirme acesso à página e a permissão leads_retrieval.`,
           });
-          continue;
         }
-        throw error;
+        continue;
       }
     }
 

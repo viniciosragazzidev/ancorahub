@@ -385,3 +385,10 @@ export async function triggerManualMetaSync(): Promise<{ success: boolean; items
   revalidatePath("/marketing/campanhas");
   return res;
 }
+
+/** Obter relatório de auditoria de sincronização Meta */
+export async function getMetaSyncDiagnosticAction() {
+  const { getMetaSyncAuditDiagnostic } = await import("./meta-diagnostic-service");
+  const context = await getRequiredTenantContext();
+  return getMetaSyncAuditDiagnostic(context.tenantId);
+}

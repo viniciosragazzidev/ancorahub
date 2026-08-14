@@ -58,6 +58,49 @@ export class MetaGraphClient {
   }
 
   /**
+   * Helper to fetch all paginated pages from Meta Graph API using paging.next.
+   * Guarantees that accounts with hundreds of campaigns or forms are not truncated.
+   */
+  private async fetchAllPages<T>(endpoint: string, params: Record<string, string> = {}, maxItems = 3000): Promise<T[]> {
+    let allData: T[] = [];
+    let nextUrl: string | null = null;
+    let pageCount = 0;
+
+    const initialUrl = new URL(`${GRAPH_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`);
+    initialUrl.searchParams.append("access_token", this.accessToken);
+    if (!params.limit) {
+      params.limit = "100";
+    }
+    for (const [key, value] of Object.entries(params)) {
+      initialUrl.searchParams.append(key, value);
+    }
+    nextUrl = initialUrl.toString();
+
+    while (nextUrl && allData.length < maxItems && pageCount < 40) {
+      pageCount++;
+      const res = await fetch(nextUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errorPayload = await res.json().catch(() => ({}));
+        const message = errorPayload?.error?.message || `Meta Graph API HTTP ${res.status}`;
+        throw new MetaGraphApiError(message, res.status, errorPayload?.error?.code);
+      }
+
+      const payload = (await res.json()) as { data?: T[]; paging?: { next?: string } };
+      if (Array.isArray(payload.data)) {
+        allData = allData.concat(payload.data);
+      }
+      nextUrl = payload.paging?.next || null;
+    }
+
+    return allData;
+  }
+
+  /**
    * Reads the scopes actually granted to this user token. The token itself is
    * never returned or written to logs. This is the authority for deciding
    * whether Marketing assets can be synchronized.
@@ -79,26 +122,26 @@ export class MetaGraphClient {
       // 1. Obter info do usuário / me e businesses
       const meRes = await this.fetchApi<{ id: string; name?: string }>("/me", { fields: "id,name" });
 
-      // 2. Fetch businesses
-      const businessesRes = await this.fetchApi<{ data: Array<{ id: string; name: string }> }>("/me/businesses", { fields: "id,name" }).catch(() => ({ data: [] }));
-      const primaryBusiness = businessesRes.data[0] ?? { id: meRes.id, name: meRes.name || "Minha Empresa Meta" };
+      // 2. Fetch businesses (paginado)
+      const businessesData = await this.fetchAllPages<{ id: string; name: string }>("/me/businesses", { fields: "id,name" }).catch(() => []);
+      const primaryBusiness = businessesData[0] ?? { id: meRes.id, name: meRes.name || "Minha Empresa Meta" };
 
-      // 3. Fetch Facebook Pages
-      const pagesRes = await this.fetchApi<{ data: Array<{ id: string; name: string }> }>("/me/accounts", { fields: "id,name" }).catch(() => ({ data: [] }));
+      // 3. Fetch Facebook Pages (paginado)
+      const pagesData = await this.fetchAllPages<{ id: string; name: string }>("/me/accounts", { fields: "id,name" }).catch(() => []);
 
-      // 4. Fetch Ad Accounts
-      const adAccountsRes = await this.fetchApi<{ data: Array<{ id: string; name: string; currency: string; account_status: number }> }>("/me/adaccounts", { fields: "id,name,currency,account_status" }).catch(() => ({ data: [] }));
+      // 4. Fetch Ad Accounts (paginado)
+      const adAccountsData = await this.fetchAllPages<{ id: string; name: string; currency: string; account_status: number }>("/me/adaccounts", { fields: "id,name,currency,account_status" }).catch(() => []);
 
       return {
         business: {
           id: primaryBusiness.id,
           name: primaryBusiness.name,
         },
-        pages: pagesRes.data.map((p) => ({
+        pages: pagesData.map((p) => ({
           id: p.id,
           name: p.name,
         })),
-        adAccounts: adAccountsRes.data.map((a) => ({
+        adAccounts: adAccountsData.map((a) => ({
           id: a.id,
           name: a.name || `Conta ${a.id}`,
           currency: a.currency || "BRL",
@@ -111,11 +154,11 @@ export class MetaGraphClient {
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error("Token inválido ou sem permissões suficientes.");
       console.error("[MetaGraphClient] Error discovering assets:", err);
-      throw new Error(`Falha ao consultar ativos na Graph API da Meta: ${err?.message || "Token inválido ou sem permissões suficentes."}`);
+      throw new Error(`Falha ao consultar ativos na Graph API da Meta: ${err?.message || "Token inválido ou sem permissões suficientes."}`);
     }
   }
 
-  /** Busca campanhas de uma conta de anúncios */
+  /** Busca todas as campanhas paginadas de uma conta de anúncios */
   async fetchCampaigns(adAccountId: string): Promise<Array<{
     id: string;
     name: string;
@@ -127,73 +170,63 @@ export class MetaGraphClient {
     stop_time?: string;
   }>> {
     const formattedAccountId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
-    const res = await this.fetchApi<{ data: Array<{
+    return this.fetchAllPages<{
       id: string; name: string; objective?: string; status?: string; daily_budget?: string; lifetime_budget?: string; start_time?: string; stop_time?: string;
-    }> }>(`/${formattedAccountId}/campaigns`, {
+    }>(`/${formattedAccountId}/campaigns`, {
       fields: "id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time",
-      limit: "100",
     });
-    return res.data;
   }
 
-  /** Busca conjuntos de anúncios (AdSets) de uma campanha */
+  /** Busca conjuntos de anúncios (AdSets) paginados de uma campanha */
   async fetchAdSets(campaignId: string): Promise<Array<{
     id: string;
     name: string;
     status?: string;
     targeting?: Record<string, unknown>;
   }>> {
-    const res = await this.fetchApi<{ data: Array<{ id: string; name: string; status?: string; targeting?: Record<string, unknown> }> }>(`/${campaignId}/adsets`, {
+    return this.fetchAllPages<{ id: string; name: string; status?: string; targeting?: Record<string, unknown> }>(`/${campaignId}/adsets`, {
       fields: "id,name,status,targeting",
-      limit: "100",
     });
-    return res.data;
   }
 
-  /** Busca anúncios de um conjunto */
+  /** Busca todos os anúncios paginados de um conjunto */
   async fetchAds(adSetId: string): Promise<Array<{
     id: string;
     name: string;
     status?: string;
   }>> {
-    const res = await this.fetchApi<{ data: Array<{ id: string; name: string; status?: string }> }>(`/${adSetId}/ads`, {
+    return this.fetchAllPages<{ id: string; name: string; status?: string }>(`/${adSetId}/ads`, {
       fields: "id,name,status",
-      limit: "100",
     });
-    return res.data;
   }
 
-  /** Busca formulários de Lead Ads de uma página */
+  /** Busca todos os formulários de Lead Ads paginados de uma página */
   async fetchLeadForms(pageId: string): Promise<Array<{
     id: string;
     name: string;
     status?: string;
     locale?: string;
   }>> {
-    const res = await this.fetchApi<{ data: Array<{ id: string; name: string; status?: string; locale?: string }> }>(`/${pageId}/leadgen_forms`, {
+    return this.fetchAllPages<{ id: string; name: string; status?: string; locale?: string }>(`/${pageId}/leadgen_forms`, {
       fields: "id,name,status,locale",
-      limit: "100",
     });
-    return res.data;
   }
 
-  /** Uses one tenant-owned ad account, never a global account listing. */
+  /** Busca todos os pixels paginados de uma conta de anúncios */
   async fetchPixels(adAccountId: string): Promise<Array<{ id: string; name: string }>> {
     const formattedAccountId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
-    const res = await this.fetchApi<{ data: Array<{ id: string; name?: string }> }>(`/${formattedAccountId}/adspixels`, {
+    const rawPixels = await this.fetchAllPages<{ id: string; name?: string }>(`/${formattedAccountId}/adspixels`, {
       fields: "id,name",
-      limit: "100",
     });
-    return res.data.map((pixel) => ({ id: pixel.id, name: pixel.name || `Pixel ${pixel.id}` }));
+    return rawPixels.map((pixel) => ({ id: pixel.id, name: pixel.name || `Pixel ${pixel.id}` }));
   }
 
-  /** Reads datasets only below the business confirmed for this tenant connection. */
+  /** Busca todos os datasets paginados da empresa */
   async fetchDatasets(businessId: string): Promise<Array<{ id: string; name: string }>> {
-    const res = await this.fetchApi<{ data: Array<{ id: string; name?: string }> }>(`/${businessId}/datasets`, {
+    const rawDatasets = await this.fetchAllPages<{ id: string; name?: string }>(`/${businessId}/datasets`, {
       fields: "id,name",
-      limit: "100",
     });
-    return res.data.map((dataset) => ({ id: dataset.id, name: dataset.name || `Dataset ${dataset.id}` }));
+    return rawDatasets.map((dataset) => ({ id: dataset.id, name: dataset.name || `Dataset ${dataset.id}` }));
   }
 
   /** Busca detalhes de um lead gerado via Lead Ads */
