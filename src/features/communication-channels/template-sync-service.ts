@@ -453,9 +453,24 @@ export class WhatsAppTemplateResolver {
       }
     }
 
-    // Built-in legacy fallback guarantee
+    // Built-in legacy fallback guarantee with dynamic language detection from synced WABA templates
     const fallback = META_WHATSAPP_TEMPLATE_PURPOSES[purpose as MetaWhatsAppTemplatePurpose];
     if (fallback) {
+      const [synced] = await db
+        .select({ name: schema.metaWhatsAppTemplates.name, language: schema.metaWhatsAppTemplates.language })
+        .from(schema.metaWhatsAppTemplates)
+        .where(
+          and(
+            eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+            eq(schema.metaWhatsAppTemplates.name, fallback.name),
+            isNull(schema.metaWhatsAppTemplates.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (synced) {
+        return { name: synced.name, language: synced.language, isCustom: false };
+      }
       return { name: fallback.name, language: fallback.language, isCustom: false };
     }
 

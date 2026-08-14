@@ -136,23 +136,52 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
         }
       }
 
-      let metaResponse: { messages?: Array<{ id: string }> };
+      let metaResponse: { messages?: Array<{ id: string }> } = {};
       if (row.messageType === "text") {
         const bodyText = Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "";
         metaResponse = await sendMetaCloudText({ phoneNumberId, accessToken, to: row.destinationPhone, body: bodyText });
       } else {
         const variableNames = getMetaWhatsAppTemplateVariableNames(row.purpose);
         const rawVariables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-        metaResponse = await sendMetaCloudTemplate({
-          phoneNumberId,
-          accessToken,
-          to: row.destinationPhone,
-          templateName: row.templateName,
-          languageCode: row.templateLanguage,
-          variables: rawVariables,
-          variableNames,
-          urlButtonParameter,
-        });
+        try {
+          metaResponse = await sendMetaCloudTemplate({
+            phoneNumberId,
+            accessToken,
+            to: row.destinationPhone,
+            templateName: row.templateName,
+            languageCode: row.templateLanguage,
+            variables: rawVariables,
+            variableNames,
+            urlButtonParameter,
+          });
+        } catch (templateError) {
+          const isLanguageError = templateError instanceof MetaCloudApiError && (templateError.code === 100 || templateError.message.toLowerCase().includes("language") || templateError.message.toLowerCase().includes("does not exist"));
+          if (isLanguageError) {
+            const fallbackLangs = row.templateLanguage.startsWith("pt") ? ["en", "en_US"] : ["pt_BR"];
+            let sentWithFallback = false;
+            for (const lang of fallbackLangs) {
+              try {
+                metaResponse = await sendMetaCloudTemplate({
+                  phoneNumberId,
+                  accessToken,
+                  to: row.destinationPhone,
+                  templateName: row.templateName,
+                  languageCode: lang,
+                  variables: rawVariables,
+                  variableNames,
+                  urlButtonParameter,
+                });
+                sentWithFallback = true;
+                break;
+              } catch {
+                // Tenta próximo idioma de fallback
+              }
+            }
+            if (!sentWithFallback) throw templateError;
+          } else {
+            throw templateError;
+          }
+        }
       }
 
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
