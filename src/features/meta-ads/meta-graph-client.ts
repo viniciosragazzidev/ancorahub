@@ -38,7 +38,7 @@ export class MetaGraphClient {
 
   private assertMetaObjectId(value: string, label: string, validator: (candidate: string) => boolean = isMetaObjectId) {
     if (!validator(value)) {
-      throw new MetaGraphApiError(`Identificador Meta invÃ¡lido para ${label}.`, 400, 100);
+      throw new MetaGraphApiError(`Identificador Meta invalido para ${label}.`, 400, 100);
     }
   }
 
@@ -126,7 +126,7 @@ export class MetaGraphClient {
    * a Page-level Lead Ads source.
    */
   async fetchLeadgenSubscription(pageId: string): Promise<boolean> {
-    this.assertMetaObjectId(pageId, "pÃ¡gina", isMetaPageId);
+    this.assertMetaObjectId(pageId, "pagina", isMetaPageId);
     const response = await this.fetchApi<{
       data?: Array<{ id?: string; subscribed_fields?: string[] }>;
     }>(`/${pageId}/subscribed_apps`, { fields: "id,subscribed_fields" });
@@ -191,7 +191,7 @@ export class MetaGraphClient {
     start_time?: string;
     stop_time?: string;
   }>> {
-    this.assertMetaObjectId(adAccountId, "conta de anÃºncios", isMetaAdAccountId);
+    this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
     const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
     return this.fetchAllPages<{
       id: string; name: string; objective?: string; status?: string; daily_budget?: string; lifetime_budget?: string; start_time?: string; stop_time?: string;
@@ -230,7 +230,7 @@ export class MetaGraphClient {
     status?: string;
     locale?: string;
   }>> {
-    this.assertMetaObjectId(pageId, "pÃ¡gina", isMetaPageId);
+    this.assertMetaObjectId(pageId, "pagina", isMetaPageId);
     return this.fetchAllPages<{ id: string; name: string; status?: string; locale?: string }>(`/${pageId}/leadgen_forms`, {
       fields: "id,name,status,locale",
     });
@@ -238,7 +238,7 @@ export class MetaGraphClient {
 
   /** Busca todos os pixels paginados de uma conta de anúncios */
   async fetchPixels(adAccountId: string): Promise<Array<{ id: string; name: string }>> {
-    this.assertMetaObjectId(adAccountId, "conta de anÃºncios", isMetaAdAccountId);
+    this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
     const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
     const rawPixels = await this.fetchAllPages<{ id: string; name?: string }>(`/${formattedAccountId}/adspixels`, {
       fields: "id,name",

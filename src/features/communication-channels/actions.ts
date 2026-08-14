@@ -8,7 +8,7 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
-import { exchangeEmbeddedSignupCode, getMetaPhoneNumber, getMetaWaba, registerMetaPhoneNumber, subscribeWabaToApp } from "./meta-cloud-client";
+import { exchangeEmbeddedSignupCode, getMetaPhoneNumber, getMetaWaba, MetaCloudApiError, registerMetaPhoneNumber, subscribeWabaToApp } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { META_CLOUD_PROVIDER, type MetaEmbeddedSignupPayload } from "./types";
@@ -34,15 +34,39 @@ async function registerChannelPhone(input: {
 }) {
   const db = getDatabase();
   const now = new Date();
+  let registrationSucceeded = false;
+  let lastErrorMessage = "";
+
   try {
     await registerMetaPhoneNumber(input.phoneNumberId, input.accessToken, input.registrationPin);
+    registrationSucceeded = true;
   } catch (error) {
-    const errorCode = error instanceof Error && "code" in error && typeof error.code === "number" ? String(error.code) : "unknown";
-    await db.transaction(async (tx) => {
-      await tx.update(schema.communicationChannels).set({ status: "pending", registrationStatus: "failed", registrationErrorCode: errorCode, updatedAt: new Date() }).where(and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId)));
-      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "communication_channel", entidadeId: input.channelId, acao: "meta_cloud_channel_registration_failed" });
-    });
-    throw new Error("A Meta concluiu o cadastro, mas o número ainda não foi ativado para a Cloud API. Revise o número na Meta e tente conectar novamente.");
+    const isAlreadyRegistered =
+      (error instanceof MetaCloudApiError && (error.code === 133015 || error.code === 100)) ||
+      (error instanceof Error && (error.message.toLowerCase().includes("already registered") || error.message.toLowerCase().includes("já registrado")));
+
+    if (isAlreadyRegistered) {
+      registrationSucceeded = true;
+    } else {
+      try {
+        const phone = await getMetaPhoneNumber(input.phoneNumberId, input.accessToken);
+        if (phone?.id === input.phoneNumberId && (phone.verified_name || phone.display_phone_number)) {
+          registrationSucceeded = true;
+        }
+      } catch {
+        // Ignora erro de verificação secundária
+      }
+
+      if (!registrationSucceeded) {
+        const errorCode = error instanceof Error && "code" in error && typeof error.code === "number" ? String(error.code) : "unknown";
+        lastErrorMessage = error instanceof Error ? error.message : "Erro na chamada da Cloud API.";
+        await db.transaction(async (tx) => {
+          await tx.update(schema.communicationChannels).set({ status: "pending", registrationStatus: "failed", registrationErrorCode: errorCode, updatedAt: new Date() }).where(and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId)));
+          await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "communication_channel", entidadeId: input.channelId, acao: "meta_cloud_channel_registration_failed" });
+        });
+        throw new Error(`A Meta não concluiu o registro da Cloud API: ${lastErrorMessage}`);
+      }
+    }
   }
 
   await db.transaction(async (tx) => {
