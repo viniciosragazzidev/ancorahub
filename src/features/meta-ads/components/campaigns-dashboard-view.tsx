@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, ChartBar, CheckCircle, Lightning, MagnifyingGlass, Phone, Users } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +26,17 @@ export function CampaignsDashboardView({
 }) {
   const [search, setSearch] = useState("");
 
-  const filteredCampaigns = campaigns.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase().trim())
-  );
+  const filteredCampaigns = useMemo(() => {
+    return campaigns
+      .filter((c) => c.name.toLowerCase().includes(search.toLowerCase().trim()))
+      .sort((a, b) => {
+        const aActive = a.status === "ACTIVE" || a.status === "active";
+        const bActive = b.status === "ACTIVE" || b.status === "active";
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        return (b.leadsCount || 0) - (a.leadsCount || 0);
+      });
+  }, [campaigns, search]);
 
   return (
     <div className="space-y-6">
@@ -40,7 +48,7 @@ export function CampaignsDashboardView({
           { label: "Vendas Concluídas", value: totals.sales, color: "text-chart-5", bg: "bg-chart-5/10", icon: CheckCircle },
           { label: "Taxa de Conversão", value: `${totals.conversionRate}%`, color: "text-chart-2", bg: "bg-chart-2/10", icon: ChartBar },
           { label: "Receita Gerada", value: formatCurrency(totals.revenue, { maximumFractionDigits: 0 }), color: "text-primary", bg: "bg-primary/10", icon: Lightning },
-          { label: "Campanhas Ativas", value: campaigns.filter((c) => c.status === "ACTIVE").length, color: "text-chart-3", bg: "bg-chart-3/10", icon: Lightning },
+          { label: "Campanhas Ativas", value: campaigns.filter((c) => c.status === "ACTIVE" || c.status === "active").length, color: "text-chart-3", bg: "bg-chart-3/10", icon: Lightning },
         ].map((item) => {
           const Icon = item.icon;
           return (
@@ -61,8 +69,8 @@ export function CampaignsDashboardView({
       </section>
 
       {/* ─── TABELA DE CAMPANHAS ─── */}
-      <Card className="border-transparent bg-transparent shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-4">
+      <Card className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
           <div>
             <CardTitle className="text-base font-bold">Desempenho Comercial por Campanha</CardTitle>
             <CardDescription className="text-xs">
@@ -84,7 +92,6 @@ export function CampaignsDashboardView({
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <TableHead className="pl-4 text-xs font-semibold">Campanha</TableHead>
-
                 <TableHead className="text-xs font-semibold">Status</TableHead>
                 <TableHead className="text-right text-xs font-semibold">Leads</TableHead>
                 <TableHead className="text-right text-xs font-semibold">Em atendimento</TableHead>
@@ -97,24 +104,24 @@ export function CampaignsDashboardView({
             <TableBody>
               {filteredCampaigns.map((camp) => (
                 <TableRow key={camp.id} className="hover:bg-muted/40 transition-colors">
-                  <TableCell className="pl-4">
+                  <TableCell className="pl-4 py-2.5">
                     <p className="font-semibold text-xs text-foreground">{camp.name}</p>
                     <p className="text-[11px] font-mono text-muted-foreground">{camp.objective || "LEAD_GENERATION"}</p>
                   </TableCell>
 
-                  <TableCell>
-                    <Badge variant={camp.status === "ACTIVE" ? "success" : "outline"} className="text-[10px]">
-                      {camp.status === "ACTIVE" ? "Ativa" : "Pausada"}
+                  <TableCell className="py-2.5">
+                    <Badge variant={camp.status === "ACTIVE" || camp.status === "active" ? "success" : "outline"} className="text-[10px]">
+                      {camp.status === "ACTIVE" || camp.status === "active" ? "Ativa" : "Pausada"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-medium tabular-nums">{camp.leadsCount || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-xs font-medium tabular-nums">{camp.conversationsCount || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{camp.salesCount || 0}</TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-foreground tabular-nums">
+                  <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.leadsCount || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.conversationsCount || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums py-2.5">{camp.salesCount || 0}</TableCell>
+                  <TableCell className="text-right font-mono text-xs font-bold text-foreground tabular-nums py-2.5">
                     {formatCurrency(camp.revenueTotal || 0, { maximumFractionDigits: 0 })}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums">{camp.conversionRate || 0}%</TableCell>
-                  <TableCell className="pr-4 text-right">
+                  <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums py-2.5">{camp.conversionRate || 0}%</TableCell>
+                  <TableCell className="pr-4 text-right py-2.5">
                     <Button render={<Link href={`/marketing/campanhas/${camp.id}`} />} size="sm" variant="ghost" className="h-8 text-xs gap-1">
                       Detalhes <ArrowRight className="size-3.5" />
                     </Button>

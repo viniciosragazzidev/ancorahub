@@ -144,7 +144,8 @@ export async function saveMetaCampaignQueueRouteAction(input: unknown) {
     const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), input);
     refreshDistribution();
     revalidatePath("/integrations/meta");
-    return { success: true, route, message: "Campanha Meta vinculada Ã  fila." };
+    revalidatePath("/marketing/campanhas");
+    return { success: true, route, message: "Fila de distribuição da campanha atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra da campanha." };
   }

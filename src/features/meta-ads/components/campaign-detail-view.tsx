@@ -1,23 +1,54 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle, Clock, Lightning, MagicWand, Phone, UserList, Users } from "@/components/huge-icons";
+import { toast } from "sonner";
+import { ArrowRight, CheckCircle, Clock, Lightning, MagicWand, Phone, Target, UserList, Users } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppSelect } from "@/components/ui/select";
 import { formatCurrency } from "@/features/quotes/utils";
+import { saveMetaCampaignQueueRouteAction } from "@/features/lead-distribution/actions";
 import type { MetaCampaignItem } from "../types";
 
 export function CampaignDetailView({
   campaign,
+  queues = [],
+  initialQueueId = null,
 }: {
   campaign: MetaCampaignItem;
+  queues?: Array<{ id: string; name: string; branchName?: string | null }>;
+  initialQueueId?: string | null;
 }) {
+  const [selectedQueueId, setSelectedQueueId] = useState<string>(initialQueueId ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+
   const leadsCount = campaign.leadsCount || 0;
   const conversationsCount = campaign.conversationsCount || 0;
   const salesCount = campaign.salesCount || 0;
   const revenueTotal = campaign.revenueTotal || 0;
   const conversionRate = campaign.conversionRate || 0;
+
+  async function handleSaveQueue() {
+    setIsSaving(true);
+    try {
+      const res = await saveMetaCampaignQueueRouteAction({
+        campaignId: campaign.campaignId,
+        queueId: selectedQueueId || null,
+        enabled: true,
+      });
+      if (res.success) {
+        toast.success(res.message || "Fila de distribuição salva com sucesso!");
+      } else {
+        toast.error(res.error || "Erro ao salvar fila.");
+      }
+    } catch {
+      toast.error("Ocorreu um erro ao salvar a fila da campanha.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   // AI Generated performance summary
   const aiSummaryText =
@@ -33,8 +64,8 @@ export function CampaignDetailView({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <Badge variant={campaign.status === "ACTIVE" ? "success" : "outline"} className="text-[10px]">
-              {campaign.status === "ACTIVE" ? "🟢 Ativa" : "⚪ Pausada"}
+            <Badge variant={campaign.status === "ACTIVE" || campaign.status === "active" ? "success" : "outline"} className="text-[10px]">
+              {campaign.status === "ACTIVE" || campaign.status === "active" ? "🟢 Ativa" : "⚪ Pausada"}
             </Badge>
             <span className="font-mono text-xs text-muted-foreground">ID: {campaign.campaignId}</span>
           </div>
@@ -49,6 +80,57 @@ export function CampaignDetailView({
           </Button>
         </div>
       </div>
+
+      {/* Configuração de Fila de Envio / Distribuição */}
+      <Card className="border-border/70 bg-card shadow-none rounded-xl">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Target className="size-4" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-bold">Fila de Distribuição dos Leads</CardTitle>
+              <CardDescription className="text-xs">
+                Defina para qual fila os novos leads gerados por esta campanha serão direcionados automaticamente.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1 space-y-1">
+              <label className="text-xs font-semibold text-foreground">Fila Alvo para Envios de Leads</label>
+              <p className="text-[11px] text-muted-foreground">
+                Como padrão, selecionada a Fila Geral (todas as unidades e corretores elegíveis).
+              </p>
+            </div>
+            <div className="flex items-center gap-2 sm:w-[420px]">
+              <AppSelect
+                aria-label="Selecionar Fila"
+                className="h-9 w-full"
+                triggerClassName="h-9 w-full rounded-lg border-border/60 bg-card px-3 text-xs font-medium shadow-xs"
+                onValueChange={(val) => setSelectedQueueId(val)}
+                options={[
+                  { value: "", label: "Fila Geral (Todas as Unidades e Corretores)" },
+                  ...queues.map((q) => ({
+                    value: q.id,
+                    label: `${q.name}${q.branchName ? ` (${q.branchName})` : ""}`,
+                  })),
+                ]}
+                value={selectedQueueId}
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveQueue}
+                disabled={isSaving}
+                className="h-9 px-4 text-xs font-semibold shrink-0"
+              >
+                {isSaving ? "Salvando..." : "Salvar Fila"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* AI Performance Summary Card */}
       <Card className="border-primary/20 bg-primary/5 shadow-none rounded-xl">

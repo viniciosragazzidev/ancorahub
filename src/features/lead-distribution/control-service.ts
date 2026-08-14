@@ -152,7 +152,7 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   ]);
   const queue = queueResult[0];
   if (!campaign) throw new AuthorizationError("Campanha Meta não encontrada na sua empresa.");
-  if (input.enabled && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
+  if (input.enabled && input.queueId && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de uma campanha no CRM.");
   const now = new Date();
