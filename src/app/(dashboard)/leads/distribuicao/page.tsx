@@ -128,6 +128,7 @@ export default async function LeadDistributionPage({
     metaAds,
     metaCampaignRoutes,
     metaAdRoutes,
+    dutySchedules,
   ] = await Promise.all([
     db
       .select({
@@ -247,15 +248,16 @@ export default async function LeadDistributionPage({
       id: schema.leadQueues.id,
       name: schema.leadQueues.name,
       branchId: schema.leadQueues.branchId,
+      exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
       branchName: schema.branches.name,
       status: schema.leadQueues.status,
       assignmentMode: schema.leadQueues.assignmentMode,
       assignmentStrategy: schema.leadQueues.assignmentStrategy,
       capacityEnabled: schema.leadQueues.capacityEnabled,
       capacityPerBroker: schema.leadQueues.capacityPerBroker,
-    }).from(schema.leadQueues).innerJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds), isNull(schema.leadQueues.deletedAt)))
-      .orderBy(schema.branches.name, schema.leadQueues.name),
+    }).from(schema.leadQueues).leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)))
+      .orderBy(schema.leadQueues.name),
     db.select({ queueId: schema.leads.queueId, waiting: count(schema.leads.id) }).from(schema.leads)
       .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), inArray(schema.leads.branchId, branchIds), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"])))
       .groupBy(schema.leads.queueId),
@@ -269,25 +271,11 @@ export default async function LeadDistributionPage({
       .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))),
     db.select({ campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
       .from(schema.metaCampaigns)
-      .innerJoin(schema.metaAdAccounts, eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId))
-      .innerJoin(schema.metaConnections, eq(schema.metaAdAccounts.connectionId, schema.metaConnections.id))
-      .where(and(
-        eq(schema.metaCampaigns.tenantId, context.tenantId),
-        eq(schema.metaConnections.status, "connected"),
-        eq(schema.metaAdAccounts.status, "active"),
-      ))
+      .where(eq(schema.metaCampaigns.tenantId, context.tenantId))
       .orderBy(schema.metaCampaigns.name),
     db.select({ adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status })
       .from(schema.metaAds)
-      .innerJoin(schema.metaAdSets, eq(schema.metaAds.adSetId, schema.metaAdSets.adSetId))
-      .innerJoin(schema.metaCampaigns, eq(schema.metaAdSets.campaignId, schema.metaCampaigns.campaignId))
-      .innerJoin(schema.metaAdAccounts, eq(schema.metaCampaigns.adAccountId, schema.metaAdAccounts.adAccountId))
-      .innerJoin(schema.metaConnections, eq(schema.metaAdAccounts.connectionId, schema.metaConnections.id))
-      .where(and(
-        eq(schema.metaAds.tenantId, context.tenantId),
-        eq(schema.metaConnections.status, "connected"),
-        eq(schema.metaAdAccounts.status, "active"),
-      ))
+      .where(eq(schema.metaAds.tenantId, context.tenantId))
       .orderBy(schema.metaAds.name),
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
       .from(schema.metaCampaignQueueRoutes).leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
@@ -305,6 +293,19 @@ export default async function LeadDistributionPage({
           ? eq(schema.leadQueues.branchId, context.branchId)
           : undefined,
       )).orderBy(schema.leadQueues.name),
+    db.select({
+      id: schema.unitDutySchedules.id,
+      name: schema.unitDutySchedules.name,
+      startsAt: schema.unitDutySchedules.startsAt,
+      endsAt: schema.unitDutySchedules.endsAt,
+      dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+      status: schema.unitDutySchedules.status,
+      branchName: schema.branches.name,
+    })
+      .from(schema.unitDutySchedules)
+      .leftJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
+      .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), eq(schema.unitDutySchedules.status, "active")))
+      .orderBy(schema.unitDutySchedules.name),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -388,8 +389,8 @@ export default async function LeadDistributionPage({
       allowedBranchIds: queuePolicy?.allowedBranchIds ?? [],
       allowedBrokerIds: queuePolicy?.allowedBrokerIds ?? [],
       waiting: queueWaiting.get(queue.id) ?? 0,
-      members: countsByBranch.get(queue.branchId) ?? 0,
-      activeLeads: leadsByBranch.get(queue.branchId) ?? 0,
+      members: queue.branchId ? (countsByBranch.get(queue.branchId) ?? 0) : totalBrokers,
+      activeLeads: queue.branchId ? (leadsByBranch.get(queue.branchId) ?? 0) : totalNewLeads,
     };
   });
 
@@ -419,6 +420,7 @@ export default async function LeadDistributionPage({
               queues={queuesForControl}
               branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
               brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId ?? "", branchName: broker.branchName ?? "" }))}
+              dutySchedules={dutySchedules}
               campaigns={metaCampaigns}
               ads={metaAds}
               campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}

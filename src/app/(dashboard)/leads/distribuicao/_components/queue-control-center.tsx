@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
-import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings } from "@/components/huge-icons";
+import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Zap } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +15,9 @@ import { toast } from "sonner";
 type Queue = {
   id: string;
   name: string;
-  branchId: string;
-  branchName: string;
+  branchId: string | null;
+  exclusiveDutyScheduleId?: string | null;
+  branchName?: string | null;
   status: string;
   assignmentMode: string;
   assignmentStrategy: string;
@@ -31,6 +32,7 @@ type Queue = {
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string; branchId?: string | null; branchName?: string | null };
+type DutySchedule = { id: string; name: string; startsAt: string; endsAt: string; dayOfWeek?: number; branchName?: string | null };
 type Campaign = { campaignId: string; name: string; status: string };
 type CampaignRoute = { campaignId: string; queueId: string | null; queueName: string | null; enabled: boolean };
 type Ad = { adId: string; name: string; status: string };
@@ -39,6 +41,7 @@ type Simulation = { success: boolean; error?: string; queue?: { id: string; name
 
 const emptyQueue = {
   branchId: "",
+  exclusiveDutyScheduleId: "",
   allowedBranchIds: [] as string[],
   brokerScopeMode: "all" as "all" | "selected",
   allowedBrokerIds: [] as string[],
@@ -54,6 +57,7 @@ export function QueueControlCenter({
   queues,
   branches,
   brokers = [],
+  dutySchedules = [],
   campaigns,
   ads,
   campaignRoutes,
@@ -63,6 +67,7 @@ export function QueueControlCenter({
   queues: Queue[];
   branches: Branch[];
   brokers?: Broker[];
+  dutySchedules?: DutySchedule[];
   campaigns: Campaign[];
   ads: Ad[];
   campaignRoutes: CampaignRoute[];
@@ -93,7 +98,7 @@ export function QueueControlCenter({
   }
 
   const branchQueues = useMemo(
-    () => queues.filter((queue) => queue.branchId === simulationForm.branchId && queue.status === "active"),
+    () => queues.filter((queue) => (queue.branchId === simulationForm.branchId || !queue.branchId) && queue.status === "active"),
     [queues, simulationForm.branchId],
   );
 
@@ -112,7 +117,8 @@ export function QueueControlCenter({
     setEditingId(null);
     setForm({
       ...emptyQueue,
-      branchId: branches[0]?.id ?? "",
+      branchId: "",
+      exclusiveDutyScheduleId: "",
       allowedBranchIds: [],
       brokerScopeMode: "all",
       allowedBrokerIds: [],
@@ -124,7 +130,8 @@ export function QueueControlCenter({
     setEditingId(queue.id);
     const hasSpecificBrokers = (queue.allowedBrokerIds?.length ?? 0) > 0;
     setForm({
-      branchId: queue.branchId,
+      branchId: queue.branchId ?? "",
+      exclusiveDutyScheduleId: queue.exclusiveDutyScheduleId ?? "",
       allowedBranchIds: queue.allowedBranchIds ?? [],
       brokerScopeMode: hasSpecificBrokers ? "selected" : "all",
       allowedBrokerIds: queue.allowedBrokerIds ?? [],
@@ -163,7 +170,8 @@ export function QueueControlCenter({
     const finalAllowedBrokerIds = form.brokerScopeMode === "selected" ? form.allowedBrokerIds : [];
     const result = await saveDistributionQueueAction({
       id: editingId ?? undefined,
-      branchId: form.branchId,
+      branchId: form.branchId || null,
+      exclusiveDutyScheduleId: form.exclusiveDutyScheduleId || null,
       allowedBranchIds: form.allowedBranchIds,
       allowedBrokerIds: finalAllowedBrokerIds,
       name: form.name,
@@ -181,7 +189,7 @@ export function QueueControlCenter({
 
   async function runSimulation() {
     setSimulating(true);
-    const result = await simulateDistributionAction({ branchId: simulationForm.branchId, queueId: simulationForm.queueId || undefined, temperature: simulationForm.temperature, score: Number(simulationForm.score) });
+    const result = await simulateDistributionAction({ branchId: simulationForm.branchId || undefined, queueId: simulationForm.queueId || undefined, temperature: simulationForm.temperature, score: Number(simulationForm.score) });
     setSimulating(false);
     setSimulation(result);
     if (!result.success) toast.error(result.error ?? "Não foi possível simular.");
@@ -209,7 +217,7 @@ export function QueueControlCenter({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 id="queues-title" className="text-base font-semibold">Filas de distribuição</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Cada fila decide como a unidade recebe, prioriza e distribui novos leads.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Cada fila decide como a corretora ou unidade recebe, prioriza e distribui novos leads.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => { setSimulation(null); setSimulatorOpen(true); }}>
@@ -226,15 +234,16 @@ export function QueueControlCenter({
                 <UserList className="size-5" />
               </span>
               <p className="text-sm font-medium">Nenhuma fila configurada</p>
-              <p className="max-w-sm text-xs text-muted-foreground">Crie a primeira fila para tornar a distribuição previsível nesta unidade.</p>
+              <p className="max-w-sm text-xs text-muted-foreground">Crie a primeira fila para tornar a distribuição previsível na operação.</p>
               {canEdit ? <Button size="sm" onClick={openCreate}><Plus />Criar fila</Button> : null}
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {queues.map((queue) => {
-              const multiBranchCount = (queue.allowedBranchIds?.length ?? 0) + 1;
+              const multiBranchCount = (queue.allowedBranchIds?.length ?? 0) + (queue.branchId ? 1 : 0);
               const hasSpecificBrokers = (queue.allowedBrokerIds?.length ?? 0) > 0;
+              const dutyScheduleName = dutySchedules.find((ds) => ds.id === queue.exclusiveDutyScheduleId)?.name;
 
               return (
                 <Card key={queue.id} variant="compact" className="group transition-[border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-primary/30 motion-reduce:transition-none">
@@ -243,10 +252,15 @@ export function QueueControlCenter({
                       <div className="min-w-0">
                         <CardTitle className="truncate">{queue.name}</CardTitle>
                         <CardDescription className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <span>{queue.branchName}</span>
+                          <span>{queue.branchName || "Todas as Unidades (Geral)"}</span>
                           {multiBranchCount > 1 && (
                             <Badge variant="outline" className="text-[10px] font-normal">
                               +{multiBranchCount - 1} unidade(s)
+                            </Badge>
+                          )}
+                          {queue.exclusiveDutyScheduleId && (
+                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]">
+                              ⚡ Plantão: {dutyScheduleName || "Exclusivo"}
                             </Badge>
                           )}
                         </CardDescription>
@@ -305,13 +319,13 @@ export function QueueControlCenter({
           <CardTitle className="text-base">
             Entrada por campanha Meta <InfoTooltip title="Regra de entrada" description="Uma campanha pode entrar na fila escolhida ou ser ignorada pelo CRM. Depois da entrada, a fila decide capacidade, escala e corretor." />
           </CardTitle>
-          <CardDescription>Escolha somente as campanhas que devem gerar lead e a fila ativa de cada uma. Campanhas sem regra usam o fluxo geral da Página.</CardDescription>
+          <CardDescription>Escolha somente as campanhas que devem gerar lead e a fila ativa de cada uma. Campanhas sem regra usam a Fila Geral.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {campaigns.length && queues.length ? (
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
               <AppSelect aria-label="Campanha Meta" value={campaignRoute.campaignId} onValueChange={(campaignId) => setCampaignRoute({ ...campaignRoute, campaignId })} options={campaigns.map((campaign) => ({ value: campaign.campaignId, label: `${campaign.name} · ${campaign.status}` }))} />
-              <AppSelect aria-label="Fila de destino da campanha" value={campaignRoute.queueId} onValueChange={(queueId) => setCampaignRoute({ ...campaignRoute, queueId })} options={queues.filter((queue) => queue.status === "active").map((queue) => ({ value: queue.id, label: `${queue.name} · ${queue.branchName}` }))} />
+              <AppSelect aria-label="Fila de destino da campanha" value={campaignRoute.queueId} onValueChange={(queueId) => setCampaignRoute({ ...campaignRoute, queueId })} options={queues.filter((queue) => queue.status === "active").map((queue) => ({ value: queue.id, label: `${queue.name}${queue.branchName ? ` · ${queue.branchName}` : " (Geral)"}` }))} />
               <Button size="sm" onClick={() => void saveCampaignRoute(true)} disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId || !campaignRoute.queueId}>
                 {savingCampaignRoute ? "Salvando…" : "Receber na fila"}
               </Button>
@@ -349,7 +363,7 @@ export function QueueControlCenter({
           {ads.length && queues.length ? (
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
               <AppSelect aria-label="Anúncio Meta" value={adRoute.adId} onValueChange={(adId) => setAdRoute({ ...adRoute, adId })} options={ads.map((ad) => ({ value: ad.adId, label: `${ad.name} · ${ad.status}` }))} />
-              <AppSelect aria-label="Fila de destino do anúncio" value={adRoute.queueId} onValueChange={(queueId) => setAdRoute({ ...adRoute, queueId })} options={queues.filter((queue) => queue.status === "active").map((queue) => ({ value: queue.id, label: `${queue.name} · ${queue.branchName}` }))} />
+              <AppSelect aria-label="Fila de destino do anúncio" value={adRoute.queueId} onValueChange={(queueId) => setAdRoute({ ...adRoute, queueId })} options={queues.filter((queue) => queue.status === "active").map((queue) => ({ value: queue.id, label: `${queue.name}${queue.branchName ? ` · ${queue.branchName}` : " (Geral)"}` }))} />
               <Button size="sm" onClick={() => void saveAdRoute(true)} disabled={!canEdit || savingAdRoute || !adRoute.adId || !adRoute.queueId}>
                 {savingAdRoute ? "Salvando…" : "Receber na fila"}
               </Button>
@@ -392,14 +406,39 @@ export function QueueControlCenter({
 
               {/* Unidade Principal */}
               <label className="grid gap-1.5 text-sm font-medium">
-                Unidade principal (Proprietária)
+                Unidade principal (opcional)
                 <AppSelect
                   aria-label="Unidade principal da fila"
                   value={form.branchId}
                   onValueChange={(branchId) => setForm({ ...form, branchId })}
-                  options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+                  options={[
+                    { value: "", label: "Todas as Unidades (Geral / Sem Unidade Específica)" },
+                    ...branches.map((branch) => ({ value: branch.id, label: branch.name })),
+                  ]}
                 />
               </label>
+
+              {/* Exclusividade de Plantão */}
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <Zap className="size-4 text-emerald-500" /> Exclusividade de Plantão Agendado ou Ativo
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Se selecinoado, os leads direcionados a esta fila serão entregues exclusivamente aos corretores em escala ou ativos neste plantão.
+                </p>
+                <AppSelect
+                  aria-label="Exclusividade de Plantão"
+                  value={form.exclusiveDutyScheduleId}
+                  onValueChange={(exclusiveDutyScheduleId) => setForm({ ...form, exclusiveDutyScheduleId })}
+                  options={[
+                    { value: "", label: "Nenhum (Fila convencional / Atendimento padrão)" },
+                    ...dutySchedules.map((ds) => ({
+                      value: ds.id,
+                      label: `Plantão: ${ds.name} (${ds.startsAt} às ${ds.endsAt}${ds.branchName ? ` · ${ds.branchName}` : ""})`,
+                    })),
+                  ]}
+                />
+              </div>
 
               {/* Multi-Unidades Adicionais */}
               {branches.length > 1 && (
@@ -532,7 +571,7 @@ export function QueueControlCenter({
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditorOpen(false)} disabled={saving}>Cancelar</Button>
-              <Button onClick={saveQueue} disabled={saving || !form.name.trim() || !form.branchId}>
+              <Button onClick={saveQueue} disabled={saving || !form.name.trim()}>
                 {saving ? "Salvando…" : "Salvar fila"}
               </Button>
             </DialogFooter>

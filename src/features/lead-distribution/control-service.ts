@@ -11,7 +11,8 @@ import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, reso
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
-  branchId: z.string().uuid(),
+  branchId: z.string().uuid().nullable().optional(),
+  exclusiveDutyScheduleId: z.string().uuid().nullable().optional(),
   allowedBranchIds: z.array(z.string().uuid()).default([]),
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
   name: z.string().trim().min(3).max(60),
@@ -23,7 +24,7 @@ const queueInput = z.object({
 });
 
 const simulationInput = z.object({
-  branchId: z.string().uuid(),
+  branchId: z.string().uuid().nullable().optional(),
   queueId: z.string().uuid().optional(),
   temperature: z.enum(["hot", "warm", "cold"]).default("warm"),
   score: z.number().int().min(0).max(100).default(50),
@@ -54,8 +55,13 @@ function assertManager(context: TenantContext, branchId: string) {
   if (context.role === "manager" && context.branchId !== branchId) throw new AuthorizationError("Você só pode administrar filas da sua unidade.");
 }
 
-function slugify(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 42);
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
 }
 
 function readPolicy(value: unknown): IntelligentDistributionPolicy {
@@ -72,14 +78,19 @@ function readPolicy(value: unknown): IntelligentDistributionPolicy {
 
 export async function saveDistributionQueue(context: TenantContext, rawInput: unknown) {
   const input = queueInput.parse(rawInput);
-  assertManager(context, input.branchId);
+  if (input.branchId) {
+    assertManager(context, input.branchId);
+  }
   const db = getDatabase();
-  const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches)
-    .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
-  if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
+  if (input.branchId) {
+    const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches)
+      .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+    if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
+  }
   const now = new Date();
   const values = {
-    branchId: input.branchId,
+    branchId: input.branchId ?? null,
+    exclusiveDutyScheduleId: input.exclusiveDutyScheduleId ?? null,
     name: input.name,
     assignmentMode: input.assignmentMode,
     assignmentStrategy: input.assignmentStrategy,
@@ -96,7 +107,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1);
     if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
-    await db.update(schema.leadQueues).set({ ...values, branchId: queue.branchId }).where(eq(schema.leadQueues.id, queue.id));
+    await db.update(schema.leadQueues).set(values).where(eq(schema.leadQueues.id, queue.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: "queue.updated" });
   } else {
     queueId = randomUUID();
