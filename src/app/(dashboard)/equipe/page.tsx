@@ -73,7 +73,12 @@ export default async function TeamPage() {
         name: schema.user.name,
         email: schema.user.email,
         role: schema.tenantMemberships.role,
-        jobTitle: schema.tenantMemberships.jobTitle,
+        jobTitle: sql<string>`case
+          when ${schema.tenantMemberships.role} in ('director', 'manager', 'supervisor')
+            and ${schema.tenantMemberships.jobTitle} = 'broker'
+          then ${schema.tenantMemberships.role}::text
+          else ${schema.tenantMemberships.jobTitle}
+        end`,
         customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
