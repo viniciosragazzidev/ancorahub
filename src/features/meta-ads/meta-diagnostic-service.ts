@@ -157,7 +157,7 @@ export async function getMetaSyncAuditDiagnostic(tenantId: string): Promise<Meta
     let metaForms: Array<{ id: string; name: string }> = [];
     let errorMessage: string | undefined;
     let syncStatus: MetaSyncAuditDiagnostic["pages"][number]["syncStatus"] = "MATCH";
-    const leadgenSubscribed = true;
+    let leadgenSubscribed = false;
 
     const pageToken = page.accessTokenCiphertext ? decryptMetaToken(page.accessTokenCiphertext) : rawToken;
     const hasPageToken = Boolean(page.accessTokenCiphertext);
@@ -170,18 +170,38 @@ export async function getMetaSyncAuditDiagnostic(tenantId: string): Promise<Meta
     const crmCount = crmFormsForPage?.total ?? 0;
 
     try {
-      metaForms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);
+      const pageClient = new MetaGraphClient(pageToken);
+      [metaForms, leadgenSubscribed] = await Promise.all([
+        pageClient.fetchLeadForms(page.pageId),
+        pageClient.fetchLeadgenSubscription(page.pageId),
+      ]);
       metaFormsTotal += metaForms.length;
 
-      if (metaForms.length === 0) {
+      if (!leadgenSubscribed) {
+        syncStatus = "NOT_SUBSCRIBED";
+        errorMessage = "O app Corretop API Oficial não está inscrito em leadgen nesta Página.";
+      } else if (metaForms.length === 0) {
         syncStatus = "EMPTY";
       } else if (metaForms.length !== crmCount) {
-        syncStatus = "MATCH";
+        syncStatus = "ERROR";
+        errorMessage = "A quantidade de formulários na Meta diverge do espelho local. Execute uma nova sincronização.";
       }
-    } catch (err) {
+    } catch {
       try {
-        metaForms = await client.fetchLeadForms(page.pageId);
+        [metaForms, leadgenSubscribed] = await Promise.all([
+          client.fetchLeadForms(page.pageId),
+          client.fetchLeadgenSubscription(page.pageId),
+        ]);
         metaFormsTotal += metaForms.length;
+        if (!leadgenSubscribed) {
+          syncStatus = "NOT_SUBSCRIBED";
+          errorMessage = "O app Corretop API Oficial não está inscrito em leadgen nesta Página.";
+        } else if (metaForms.length === 0) {
+          syncStatus = "EMPTY";
+        } else if (metaForms.length !== crmCount) {
+          syncStatus = "ERROR";
+          errorMessage = "A quantidade de formulários na Meta diverge do espelho local. Execute uma nova sincronização.";
+        }
       } catch (fallbackErr) {
         syncStatus = "ERROR";
         errorMessage = fallbackErr instanceof Error ? fallbackErr.message : "Erro na Graph API ao consultar formulários da página.";

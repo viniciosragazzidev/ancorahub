@@ -4,6 +4,7 @@ import type { MetaDiscoveredAssets } from "./types";
 
 const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION?.trim() || "v25.0";
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+const META_PLATFORM_APP_ID = process.env.META_LEAD_ADS_APP_ID || process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_LEAD_ADS_APP_ID || "780859815090303";
 
 export class MetaGraphApiError extends Error {
   constructor(
@@ -110,6 +111,19 @@ export class MetaGraphClient {
     return response.data
       .filter((entry) => entry.status === "granted" && typeof entry.permission === "string")
       .map((entry) => entry.permission!);
+  }
+
+  /**
+   * Confirms that this platform app, not merely another app on the Page, is
+   * subscribed to the Lead Ads event. This is the delivery precondition for
+   * a Page-level Lead Ads source.
+   */
+  async fetchLeadgenSubscription(pageId: string): Promise<boolean> {
+    const response = await this.fetchApi<{
+      data?: Array<{ id?: string; subscribed_fields?: string[] }>;
+    }>(`/${pageId}/subscribed_apps`, { fields: "id,subscribed_fields" });
+
+    return response.data?.some((app) => app.id === META_PLATFORM_APP_ID && app.subscribed_fields?.includes("leadgen")) ?? false;
   }
 
   /**

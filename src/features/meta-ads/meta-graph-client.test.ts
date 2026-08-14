@@ -22,4 +22,26 @@ describe("MetaGraphClient permissions", () => {
     expect(isMetaAdsReadPermissionError(new MetaGraphApiError("Ad account owner has NOT grant ads_read permission", 403, 200))).toBe(true);
     expect(isMetaAdsReadPermissionError(new MetaGraphApiError("Invalid OAuth access token", 400, 190))).toBe(false);
   });
+
+  it("confirms leadgen only when the Corretop app is subscribed on the Page", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [
+        { id: "another-app", subscribed_fields: ["leadgen"] },
+        { id: "780859815090303", subscribed_fields: ["leadgen"] },
+      ],
+    }), { status: 200 }));
+
+    await expect(new MetaGraphClient("secret-token").fetchLeadgenSubscription("page_123")).resolves.toBe(true);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/page_123/subscribed_apps");
+    fetchMock.mockRestore();
+  });
+
+  it("does not treat another app's leadgen subscription as this platform's subscription", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "another-app", subscribed_fields: ["leadgen"] }],
+    }), { status: 200 }));
+
+    await expect(new MetaGraphClient("secret-token").fetchLeadgenSubscription("page_123")).resolves.toBe(false);
+    fetchMock.mockRestore();
+  });
 });

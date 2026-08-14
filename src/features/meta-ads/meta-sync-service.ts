@@ -198,7 +198,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
           forms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);
         } catch (pageTokenError) {
           if (pageToken !== rawToken) {
-            forms = await client.fetchLeadForms(page.pageId).catch(() => []);
+            forms = await client.fetchLeadForms(page.pageId);
           } else {
             throw pageTokenError;
           }

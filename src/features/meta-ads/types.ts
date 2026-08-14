@@ -163,7 +163,7 @@ export type MetaSyncAuditDiagnostic = {
     leadgenSubscribed: boolean;
     metaLeadFormsCount: number;
     crmLeadFormsCount: number;
-    syncStatus: "MATCH" | "EMPTY" | "ERROR";
+    syncStatus: "MATCH" | "EMPTY" | "NOT_SUBSCRIBED" | "ERROR";
     errorMessage?: string;
   }>;
   totals: {

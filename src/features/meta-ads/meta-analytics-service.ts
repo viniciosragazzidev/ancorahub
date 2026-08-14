@@ -57,7 +57,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     .where(
       and(
         eq(schema.metaCampaigns.tenantId, tenantId),
-        sql`${schema.metaCampaigns.status} != 'ARCHIVED'`
+        eq(schema.metaCampaigns.status, "ACTIVE"),
       )
     );
 

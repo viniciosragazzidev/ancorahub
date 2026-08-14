@@ -87,6 +87,25 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
       .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
     if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
   }
+  if (input.exclusiveDutyScheduleId) {
+    const [schedule] = await db
+      .select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId })
+      .from(schema.unitDutySchedules)
+      .where(
+        and(
+          eq(schema.unitDutySchedules.id, input.exclusiveDutyScheduleId),
+          eq(schema.unitDutySchedules.tenantId, context.tenantId),
+        ),
+      )
+      .limit(1);
+
+    if (!schedule) throw new AuthorizationError("Plantão não encontrado no escopo desta corretora.");
+    if (input.branchId && schedule.branchId !== input.branchId) {
+      throw new AuthorizationError("O plantão selecionado precisa pertencer à mesma unidade da fila.");
+    }
+    assertManager(context, schedule.branchId);
+  }
+
   const now = new Date();
   const values = {
     branchId: input.branchId ?? null,
@@ -305,4 +324,3 @@ export async function deleteDistributionQueue(context: TenantContext, queueId: s
 
   return { success: true };
 }
-

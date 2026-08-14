@@ -38,14 +38,9 @@ export function CampaignsDashboardView({
 
   const filteredCampaigns = useMemo(() => {
     return campaigns
+      .filter((campaign) => campaign.status.trim().toUpperCase() === "ACTIVE")
       .filter((c) => c.name.toLowerCase().includes(search.toLowerCase().trim()))
-      .sort((a, b) => {
-        const aActive = a.status === "ACTIVE" || a.status === "active";
-        const bActive = b.status === "ACTIVE" || b.status === "active";
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
-        return (b.leadsCount || 0) - (a.leadsCount || 0);
-      });
+      .sort((a, b) => (b.leadsCount || 0) - (a.leadsCount || 0));
   }, [campaigns, search]);
 
   // Agrupamento de campanhas por Conta de Anúncios
@@ -99,7 +94,7 @@ export function CampaignsDashboardView({
               <Megaphone className="size-5 text-primary" /> Desempenho por Conta de Anúncios, Campanha & Anúncio
             </CardTitle>
             <CardDescription className="text-xs">
-              Visão hierárquica agrupada com tags de identificação de Contas, Campanhas e Anúncios Meta.
+              Apenas campanhas ativas, agrupadas por conta de anúncios. Pausadas e arquivadas permanecem fora desta lista operacional.
             </CardDescription>
           </div>
           <div className="relative w-64">
@@ -249,7 +244,7 @@ export function CampaignsDashboardView({
 
           {filteredCampaigns.length === 0 && (
             <div className="p-8 text-center text-xs text-muted-foreground">
-              Nenhuma campanha encontrada. Conecte sua conta Meta ou ajuste o filtro.
+              Nenhuma campanha ativa encontrada para esta busca. Sincronize a Meta ou ajuste o termo pesquisado.
             </div>
           )}
         </CardContent>
@@ -257,4 +252,3 @@ export function CampaignsDashboardView({
     </div>
   );
 }
-
