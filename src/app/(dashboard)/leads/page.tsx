@@ -416,6 +416,7 @@ export default async function LeadsPage({
               slaStagnantDays={slaStagnantDays}
               brokers={brokers}
               branches={branches}
+              pageSize={pageSize}
             />
             <LeadsPagination
               currentPage={page}

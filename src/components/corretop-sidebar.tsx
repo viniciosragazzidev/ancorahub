@@ -22,6 +22,7 @@ import {
   Note,
   Plug,
   Redistribute,
+  ShieldCheck,
   SignOut,
   SlidersHorizontal,
   Target,
@@ -49,6 +50,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
@@ -327,21 +330,26 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <SidebarMenuItem className="group-data-[collapsible=icon]:w-full">
             <DropdownMenu>
               <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0!" />}>
-                <UserAvatar seed={userName} name={userName} size="sm" className="size-7 shrink-0" />
+                <UserAvatar seed={userName} name={userName} size="sm" className="size-8 shrink-0 rounded-lg ring-1 ring-border/80" />
                 <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-medium">{userName}</span>
-                  <span className="truncate text-xs text-sidebar-foreground/55">{userRole}</span>
+                  <span className="truncate font-semibold tracking-tight text-foreground">{userName}</span>
+                  <span className="truncate text-[11px] font-medium text-muted-foreground">{userRole}</span>
                 </span>
                 <SignOut className="ml-auto size-4 shrink-0 text-sidebar-foreground/55 group-data-[collapsible=icon]:hidden" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-[var(--sidebar-width)]">
+              <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-64 p-2.5 rounded-2xl border border-border/80 bg-card/95 backdrop-blur-md shadow-xl">
                 <DropdownMenuGroup>
-                  <DropdownMenuLabel>
-                    <div className="flex items-center gap-2">
-                      <UserAvatar seed={userName} name={userName} size="sm" className="size-8" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium leading-none">{userName}</span>
-                        <span className="text-xs text-muted-foreground">{userRole}</span>
+                  <DropdownMenuLabel className="p-2">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar seed={userName} name={userName} size="sm" className="size-10 shrink-0 rounded-xl ring-2 ring-primary/20 shadow-xs" />
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span className="truncate text-sm font-semibold tracking-tight text-foreground">{userName}</span>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="secondary" className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            <ShieldCheck className="size-3 text-primary" />
+                            {userRole}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   </DropdownMenuLabel>

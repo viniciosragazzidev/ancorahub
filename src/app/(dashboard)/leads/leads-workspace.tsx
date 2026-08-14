@@ -207,6 +207,7 @@ export function LeadsWorkspace({
   slaStagnantDays = 3,
   brokers = [],
   branches = [],
+  pageSize = 20,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -218,10 +219,18 @@ export function LeadsWorkspace({
   slaStagnantDays?: number;
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
   branches?: Array<{ id: string; name: string }>;
+  pageSize?: number;
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const [qualifyingPage, setQualifyingPage] = useState(1);
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+
+  const totalQualifyingPages = Math.max(1, Math.ceil(qualifyingLeads.length / pageSize));
+  const visibleQualifyingLeads = useMemo(
+    () => qualifyingLeads.slice((qualifyingPage - 1) * pageSize, qualifyingPage * pageSize),
+    [qualifyingLeads, qualifyingPage, pageSize]
+  );
   const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
     const saved = loadKanbanConfig();
     return saved?.ordered ?? kanbanStatuses;
@@ -443,7 +452,7 @@ export function LeadsWorkspace({
               ) : (
                 <>
                   <div className="hidden divide-y divide-border max-[559px]:block">
-                    {qualifyingLeads.map((lead) => (
+                    {visibleQualifyingLeads.map((lead) => (
                       <div key={lead.id} className="p-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{lead.nome}</span>
@@ -480,7 +489,7 @@ export function LeadsWorkspace({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {qualifyingLeads.map((lead) => (
+                      {visibleQualifyingLeads.map((lead) => (
                         <TableRow key={lead.id} className="group/row">
                           <TableCell className="pl-4 font-medium">
                             <div>
@@ -530,6 +539,33 @@ export function LeadsWorkspace({
                       ))}
                     </TableBody>
                   </Table>
+
+                  {qualifyingLeads.length > pageSize ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground bg-muted/20 rounded-b-2xl">
+                      <span>
+                        Mostrando {(qualifyingPage - 1) * pageSize + 1} a {Math.min(qualifyingPage * pageSize, qualifyingLeads.length)} de {qualifyingLeads.length} leads em qualificação ({pageSize} por página)
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={qualifyingPage <= 1}
+                          onClick={() => setQualifyingPage((p) => Math.max(1, p - 1))}
+                        >
+                          Anterior
+                        </Button>
+                        <span className="font-medium text-foreground">Página {qualifyingPage} de {totalQualifyingPages}</span>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          disabled={qualifyingPage >= totalQualifyingPages}
+                          onClick={() => setQualifyingPage((p) => Math.min(totalQualifyingPages, p + 1))}
+                        >
+                          Próxima
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </>
               )}
             </CardContent>
