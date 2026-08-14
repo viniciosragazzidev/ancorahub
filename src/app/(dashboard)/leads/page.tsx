@@ -159,7 +159,11 @@ export default async function LeadsPage({
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt),
     gte(schema.leads.createdAt, periodStart(period)),
-    or(ne(schema.leads.qualificationStatus, "pending"), isNull(schema.leads.qualificationStatus)),
+    or(
+      isNotNull(schema.leads.corretorId),
+      ne(schema.leads.qualificationStatus, "pending"),
+      isNull(schema.leads.qualificationStatus)
+    ),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
     ...(branchFilter ? [branchFilter] : []),

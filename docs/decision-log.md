@@ -20,7 +20,7 @@ espera humana. A ativação continua dependente dos controles global e do tenant
 
 A esteira de atendimento impõe a segregação estrita entre leads em qualificação por IA e leads prontos para atendimento humano:
 - **Aba Qualificações**: Exibe exclusivamente novos leads não atribuídos (`corretorId` nulo) e pendentes (`qualification_status: "pending"`). Leads já distribuídos jamais aparecem nesta aba.
-- **Aba Leads Qualificados & Distribuídos e Kanban**: Exibe exclusivamente leads que já concluíram a qualificação (`qualification_status` igual a `"qualified"`, `"disqualified"` ou desativado). Leads em qualificação pendente são filtrados na consulta do banco e excluídos desta visualização.
+- **Aba Leads Qualificados & Distribuídos e Kanban**: Exibe qualquer lead que já tenha sido distribuído a um corretor (`corretorId` preenchido, mesmo que não tenha qualificação concluída), além dos leads cuja qualificação já foi concluída ou dispensada.
 - Ao concluir a qualificação (por IA ou por intervenção manual do gestor/diretor via "Aprovar & Distribuir"), o lead é atribuído, seu estado é atualizado e ele transita atomicamente para a aba de atendimento e o Kanban.
 
 > **DEC-058 — Intake transacional e outbox de efeitos (aceita em 2026-07-28):** o webhook confirma um lead somente após gravar, na mesma transação, a entrega idempotente, o lead, a timeline, auditoria, evento de distribuição e efeitos pendentes. Distribuição e notificações são executadas fora da requisição por outbox com lease, retry e dead-letter; falha externa não recria o lead nem apaga o trabalho. O Super-admin controla o processador e toda exceção permanece rastreável.
