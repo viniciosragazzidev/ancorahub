@@ -4,6 +4,14 @@ import { and, count, eq, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import type { MetaCampaignItem } from "./types";
 
+/**
+ * Paused campaigns remain visible when they have historical lead attribution.
+ * This preserves marketing attribution without showing inactive empty campaigns.
+ */
+export function shouldDisplayCampaign(status: string | null | undefined, leadsCount: number): boolean {
+  return status?.toUpperCase() === "ACTIVE" || leadsCount > 0;
+}
+
 export async function getTenantMetaCampaignsPerformance(tenantId: string): Promise<{
   campaigns: MetaCampaignItem[];
   totals: {
@@ -36,7 +44,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     };
   }
 
-  // 2. Buscar campanhas do tenant vinculadas a contas de anúncios ativas
+  // 2. Buscar campanhas do tenant. The final visibility rule is applied only
+  // after lead attribution is known, so a paused campaign with results remains
+  // available for historical performance analysis.
   const campaignsList = await db
     .select({
       id: schema.metaCampaigns.id,
@@ -54,12 +64,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       updatedAt: schema.metaCampaigns.updatedAt,
     })
     .from(schema.metaCampaigns)
-    .where(
-      and(
-        eq(schema.metaCampaigns.tenantId, tenantId),
-        eq(schema.metaCampaigns.status, "ACTIVE"),
-      )
-    );
+    .where(eq(schema.metaCampaigns.tenantId, tenantId));
 
   // 2. Buscar estatísticas agregadas por campanha via relacionamentos do lead
   const leadsPerCampaign = await db
@@ -163,8 +168,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
   let totalSalesOverall = 0;
   let totalRevenueOverall = 0;
 
-  const resultCampaigns: MetaCampaignItem[] = campaignsList.map((c) => {
+  const resultCampaigns: MetaCampaignItem[] = campaignsList.flatMap((c) => {
     const leadStats = leadsMap.get(c.campaignId) || leadsMap.get(c.name) || { total: 0, active: 0, converted: 0 };
+    if (!shouldDisplayCampaign(c.status, leadStats.total)) return [];
     const saleStats = salesMap.get(c.campaignId) || salesMap.get(c.name) || { count: 0, revenue: 0 };
 
     const leadsCount = leadStats.total;
@@ -178,7 +184,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     totalSalesOverall += salesCount;
     totalRevenueOverall += revenueTotal;
 
-    return {
+    return [{
       id: c.id,
       campaignId: c.campaignId,
       adAccountId: c.adAccountId,
@@ -196,7 +202,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       revenueTotal,
       conversionRate,
       ads: adsByCampaignMap.get(c.campaignId) || [],
-    };
+    }];
   });
 
   const overallConversionRate = totalLeadsOverall > 0 ? Number(((totalSalesOverall / totalLeadsOverall) * 100).toFixed(1)) : 0;
