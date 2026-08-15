@@ -53,10 +53,10 @@ async function getOrCreateConfig(tenantId: string) {
   return created ?? (await db.select().from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, tenantId)).limit(1))[0] ?? null;
 }
 
-export async function startAiQualificationForLead(input: { tenantId: string; leadId: string; actorUserId: string }) {
+export async function startAiQualificationForLead(input: { tenantId: string; leadId: string; actorUserId: string; force?: boolean }) {
   if ((await getSystemSetting("feature_qualification_engine_enabled")) === "true") {
-    const engineResult = await startQualificationConversationForLead(input).catch(() => ({ started: false as const, reason: "failed" as const }));
-    if (engineResult.started) return engineResult;
+    const engineResult = await startQualificationConversationForLead(input, input.force).catch(() => ({ started: false as const, reason: "failed" as const }));
+    if (engineResult.started || engineResult.reason === "missing_channel") return engineResult;
   }
   const db = getDatabase();
   const config = await getOrCreateConfig(input.tenantId);
@@ -73,13 +73,26 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   }
   if (!channel) return { started: false, reason: "missing_channel" as const };
   const existing = await db.select({ id: schema.aiQualificationSessions.id, status: schema.aiQualificationSessions.status }).from(schema.aiQualificationSessions).where(and(eq(schema.aiQualificationSessions.tenantId, input.tenantId), eq(schema.aiQualificationSessions.leadId, input.leadId))).limit(1);
-  if (existing[0] && !["failed", "expired", "handed_off"].includes(existing[0].status)) return { started: false, reason: "already_started" as const };
+  if (!input.force && existing[0] && !["failed", "expired", "handed_off"].includes(existing[0].status)) return { started: false, reason: "already_started" as const };
   const now = new Date();
   const sessionId = existing[0]?.id ?? randomUUID();
   const expiresAt = new Date(now.getTime() + config.timeoutMinutes * 60_000);
   await db.insert(schema.aiQualificationSessions).values({ id: sessionId, tenantId: input.tenantId, leadId: input.leadId, status: "waiting_customer", currentQuestionKey: questions[0].key, collectedData: {}, missingFields: questions.map((question) => question.key), expiresAt, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: [schema.aiQualificationSessions.tenantId, schema.aiQualificationSessions.leadId], set: { status: "waiting_customer", currentQuestionKey: questions[0].key, collectedData: {}, missingFields: questions.map((question) => question.key), expiresAt, failureReason: null, retryCount: 0, updatedAt: now } });
   const body = `${config.initialMessage}\n\n${questions[0].prompt}`;
-  const queued = await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: lead.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${input.leadId}:start` });
+  const queued = await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: lead.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${input.leadId}:start:${Date.now()}` });
+  await db.insert(schema.whatsappMessages).values({
+    id: `ai_msg_start_${randomUUID()}`,
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    communicationChannelId: channel.id,
+    senderRole: "assistant",
+    provider: META_CLOUD_PROVIDER,
+    phone: lead.phone,
+    direction: "outbound",
+    body,
+    providerStatus: "sent",
+    sentAt: now,
+  }).onConflictDoNothing();
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "ai_qualification_session", entidadeId: sessionId, acao: "ai_qualification.started" });
   await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] initial delivery deferred", error));
   return { started: true, sessionId, queuedId: queued.id };
@@ -144,6 +157,19 @@ async function queueReply(input: { tenantId: string; leadId: string; phone: stri
   const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
   if (!channel) return;
   await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: input.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${sessionId}:reply:${version}:${body.slice(0, 24)}` });
+  await db.insert(schema.whatsappMessages).values({
+    id: `ai_msg_reply_${randomUUID()}`,
+    tenantId: input.tenantId,
+    leadId: input.leadId,
+    communicationChannelId: channel.id,
+    senderRole: "assistant",
+    provider: META_CLOUD_PROVIDER,
+    phone: input.phone,
+    direction: "outbound",
+    body,
+    providerStatus: "sent",
+    sentAt: new Date(),
+  }).onConflictDoNothing();
   await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] reply delivery deferred", error));
 }
 

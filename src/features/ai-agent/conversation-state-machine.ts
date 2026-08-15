@@ -306,7 +306,10 @@ export async function getOrCreateAiConversation({
   return created;
 }
 
-export async function startQualificationConversationForLead(input: { tenantId: string; leadId: string; actorUserId: string }) {
+export async function startQualificationConversationForLead(
+  input: { tenantId: string; leadId: string; actorUserId: string },
+  force: boolean = false
+) {
   if ((await getSystemSetting("feature_qualification_engine_enabled")) !== "true") return { started: false as const, reason: "disabled" as const };
   const db = getDatabase();
   const [lead] = await db.select({ id: schema.leads.id, telefone: schema.leads.telefone, origem: schema.leads.origem, sourceCampaign: schema.leads.sourceCampaign, tipo: schema.leads.tipo, branchId: schema.leads.branchId, nome: schema.leads.nome })
@@ -316,16 +319,29 @@ export async function startQualificationConversationForLead(input: { tenantId: s
   const { leadMatchesQualificationEntryRules } = await import("@/features/qualification-engine/service");
   if (!leadMatchesQualificationEntryRules({ origem: lead.origem, sourceCampaign: lead.sourceCampaign, tipo: lead.tipo, branchId: lead.branchId }, behavior.policy)) return { started: false as const, reason: "not_eligible" as const };
   const conversation = await getOrCreateAiConversation({ tenantId: input.tenantId, leadId: input.leadId });
-  if (!["NEW", "AI_ACTIVE"].includes(conversation.status)) return { started: false as const, reason: "already_started" as const };
+  if (!force && !["NEW", "AI_ACTIVE"].includes(conversation.status)) return { started: false as const, reason: "already_started" as const };
+
+  const memory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
+  const { resolveDeterministicQualificationTurn } = await import("@/features/qualification-engine/service");
+  const turn = resolveDeterministicQualificationTurn({ memory, policy: behavior.policy });
+
   const firstField = behavior.policy.requiredFields[0];
   const firstQuestion = COLLECTIBLE_FIELDS.find((field) => field.key === firstField)?.promptLabel ?? "nome";
-  const body = `Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento. Para começar, qual é o seu ${firstQuestion}?`;
+  const defaultGreeting = `Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento. Para começar, qual é o seu ${firstQuestion}?`;
+  const body = turn.kind === "collecting" ? turn.reply : defaultGreeting;
+
   const messageId = `ai_msg_start_${crypto.randomUUID()}`;
   await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, senderRole: "assistant", provider: "meta", phone: lead.telefone, direction: "outbound", body, sentAt: new Date() });
   const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body, transport: "meta" }).catch(() => ({ status: "failed" as const, messageId: null }));
+
+  if (sent.status === "skipped_no_channel") {
+    await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+    return { started: false as const, reason: "missing_channel" as const, error: "Nenhum canal do WhatsApp está ativo." };
+  }
+
   await db.update(schema.whatsappMessages).set({ providerStatus: sent.status === "sent" ? "sent" : "failed", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
-  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", behaviorVersionId: behavior.versionId, memory: { ...createEmptyMemory(), lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
-  await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, actorUserId: input.actorUserId, policy: behavior.policy, memory: createEmptyMemory() });
+  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...memory, lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+  await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, actorUserId: input.actorUserId, policy: behavior.policy, memory });
   return { started: true as const, conversationId: conversation.id };
 }
 

@@ -104,6 +104,7 @@ export async function triggerBulkQualificationAction(input: BulkQualificationFil
           tenantId: context.tenantId,
           leadId,
           actorUserId: context.userId,
+          force: true,
         });
         if (res.started) successCount++;
         else failedCount++;

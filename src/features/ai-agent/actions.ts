@@ -148,9 +148,17 @@ export async function resumeAiQualificationAction(leadId: string): Promise<Conve
     if (!lead) return { success: false, error: "Lead não encontrado." };
 
     const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
-    const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId });
-    
-    // Also reset conversation status to WAITING_CUSTOMER if an aiConversation row exists
+    const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId, force: true });
+
+    if (!started.started) {
+      if (started.reason === "missing_channel") {
+        return { success: false, error: "Não há nenhum canal do WhatsApp ativo (Meta Cloud, OpenWA ou WAHA) configurado para enviar mensagens." };
+      }
+      if (started.reason === "missing_phone") {
+        return { success: false, error: "Este lead não possui um número de telefone cadastrado." };
+      }
+    }
+
     const [conv] = await db.select({ id: schema.aiConversations.id }).from(schema.aiConversations).where(and(eq(schema.aiConversations.leadId, lead.id), eq(schema.aiConversations.tenantId, context.tenantId))).limit(1);
     if (conv) {
       await transitionConversationState({
@@ -207,7 +215,7 @@ export async function syncSingleLeadConversationAction(leadId: string): Promise<
 
     if (messages.length === 0) {
       const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
-      await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId }).catch(() => undefined);
+      await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId, force: true }).catch(() => undefined);
     }
 
     await db.insert(schema.auditLogs).values({
