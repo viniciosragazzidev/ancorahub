@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { transitionConversationState } from "./conversation-state-machine";
@@ -49,6 +49,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
         qualificationStatus: schema.leads.qualificationStatus,
         qualificationState: schema.leads.qualificationState,
         updatedAt: schema.leads.updatedAt,
@@ -83,8 +84,11 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         .where(
           and(
             eq(schema.whatsappMessages.tenantId, tenant.id),
-            eq(schema.whatsappMessages.leadId, lead.id),
-            eq(schema.whatsappMessages.direction, "incoming")
+            or(
+              eq(schema.whatsappMessages.leadId, lead.id),
+              and(isNotNull(schema.whatsappMessages.phone), eq(schema.whatsappMessages.phone, lead.telefone ?? ""))
+            ),
+            notInArray(schema.whatsappMessages.direction, ["outbound", "outgoing"])
           )
         )
         .limit(1);
