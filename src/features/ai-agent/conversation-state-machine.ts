@@ -121,7 +121,7 @@ export async function handleInitialMessageFailure({
       .set({
         status: "distributed",
         distributionStatus: "queued",
-        qualificationStatus: "cold",
+        qualificationStatus: "disqualified",
         qualificationState: "COMPLETED",
         updatedAt: now,
       })
@@ -134,7 +134,7 @@ export async function handleInitialMessageFailure({
         leadId,
         userId: "system",
         tipo: "note",
-        conteudo: "⚠️ Falha no envio da mensagem inicial via WhatsApp. O atendimento da IA foi encerrado automaticamente, o lead foi qualificado como Frio e transferido para a fila de distribuição geral.",
+        conteudo: "⚠️ Falha no envio da mensagem via WhatsApp pelo bot virtual. O atendimento da IA foi encerrado automaticamente, o lead foi desqualificado e transferido para a fila de distribuição geral.",
         createdAt: now,
       })
       .onConflictDoNothing();

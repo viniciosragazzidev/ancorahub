@@ -171,7 +171,7 @@ export function ConversationsWorkspace({
             conversation.aiConversation?.status === "CLOSED" ||
             ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
           : filter === "ai_active"
-            ? conversation.aiConversation?.status === "AI_ACTIVE" || conversation.aiConversation?.status === "WAITING_CUSTOMER"
+            ? (conversation.aiConversation?.status === "AI_ACTIVE" || conversation.aiConversation?.status === "WAITING_CUSTOMER") && conversation.messages.some((m) => m.direction === "incoming")
             : filter === "human_active"
               ? conversation.aiConversation?.status === "HUMAN_ACTIVE" || conversation.aiConversation?.status === "WAITING_HUMAN"
               : filter === "with_messages"
@@ -255,7 +255,7 @@ export function ConversationsWorkspace({
           <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
             <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
             <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
-            <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => c.aiConversation?.status === "AI_ACTIVE" || c.aiConversation?.status === "WAITING_CUSTOMER").length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
+            <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => (c.aiConversation?.status === "AI_ACTIVE" || c.aiConversation?.status === "WAITING_CUSTOMER") && c.messages.some((m) => m.direction === "incoming")).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
             <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
           </div>
 

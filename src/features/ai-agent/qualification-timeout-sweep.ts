@@ -76,12 +76,28 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       timedOutLeadsCount += 1;
       const updateTime = new Date();
 
+      // Check if lead replied at least once to the virtual agent / CRM
+      const [incomingMessage] = await db
+        .select({ id: schema.whatsappMessages.id })
+        .from(schema.whatsappMessages)
+        .where(
+          and(
+            eq(schema.whatsappMessages.tenantId, tenant.id),
+            eq(schema.whatsappMessages.leadId, lead.id),
+            eq(schema.whatsappMessages.direction, "incoming")
+          )
+        )
+        .limit(1);
+
+      const hasInteracted = Boolean(incomingMessage);
+      const targetQualificationStatus = hasInteracted ? "warm" : "cold";
+
       await db.transaction(async (tx) => {
-        // 1. Atualizar Lead: Status Cold + Finalizar Qualificação + Mover p/ Fila de Distribuição
+        // 1. Atualizar Lead: Status Morno/Frio conforme interação + Finalizar Qualificação + Mover p/ Fila de Distribuição
         await tx
           .update(schema.leads)
           .set({
-            qualificationStatus: "cold",
+            qualificationStatus: targetQualificationStatus,
             qualificationState: "QUALIFIED",
             qualificationCompletedAt: updateTime,
             status: "distributed",
@@ -96,7 +112,9 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           leadId: lead.id,
           userId: systemUserId,
           tipo: "system_alert",
-          conteudo: `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead marcado como Cold e transferido automaticamente para a Fila de Distribuição.`,
+          conteudo: hasInteracted
+            ? `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead interagiu com o atendimento e foi qualificado como Morno (Warm), sendo transferido para a Fila de Distribuição.`
+            : `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead não respondeu a nenhuma mensagem e foi qualificado como Frio (Cold), sendo transferido para a Fila de Distribuição.`,
         });
 
         // 3. Registrar Log de Auditoria
