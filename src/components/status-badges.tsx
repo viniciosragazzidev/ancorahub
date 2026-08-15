@@ -18,8 +18,17 @@ import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/featu
 
 export function LeadQualificationBadge({ status }: { status: string }) {
   const value = (status in LEAD_QUALIFICATION_LABELS ? status : "pending") as LeadQualificationStatus;
-  const variant = value === "hot" ? "destructive" : value === "warm" ? "warning" : value === "qualified" ? "success" : "outline";
-  return <Badge variant={variant} className="px-2 py-0.5">{LEAD_QUALIFICATION_LABELS[value]}</Badge>;
+  const variant =
+    value === "hot"
+      ? "destructive"
+      : value === "warm"
+      ? "warning"
+      : value === "qualified"
+      ? "success"
+      : value === "ia_disabled"
+      ? "secondary"
+      : "outline";
+  return <Badge variant={variant} className="px-2 py-0.5">{LEAD_QUALIFICATION_LABELS[value] ?? status}</Badge>;
 }
 
 export function LeadStatusBadge({ status }: { status: string }) {

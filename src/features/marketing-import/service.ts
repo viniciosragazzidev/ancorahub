@@ -368,6 +368,13 @@ export async function importMetaLeads(
             conteudo: `Lead importado do Meta Ads (${type === "pf" ? "PF" : "PME"}). Campanha: ${item.normalized.campanha || "N/A"}`,
             metadata: sourceMetadata,
           });
+
+          const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
+          void startAiQualificationForLead({
+            tenantId: context.tenantId,
+            leadId: item.leadId,
+            actorUserId: context.userId,
+          }).catch((err) => console.error("[marketing-import] qualification autostart error:", err));
         }
       });
     }

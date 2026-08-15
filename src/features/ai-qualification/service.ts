@@ -119,8 +119,16 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
   let value = input.text.trim();
   let message: string | null = null;
   try {
+    const config = await getOrCreateConfig(input.tenantId);
+    let systemPromptOverride = "Você é o qualificador da Âncora Corretora. Não solicite documentos, senhas, CPF ou dados de saúde. Retorne somente JSON válido no formato {value:string|null,valid:boolean,message:string|null}. Valide a resposta para a pergunta indicada e escreva uma orientação curta em português se precisar repetir.";
+    if (config?.businessContext?.trim()) {
+      systemPromptOverride += `\n\nCONTEXTO E BASE DE CONHECIMENTO DA EMPRESA:\n${config.businessContext.trim()}`;
+    }
+    if (config?.customInstructions?.trim()) {
+      systemPromptOverride += `\n\nDIRETRIZES DE ATUAÇÃO E TOM DE VOZ:\n${config.customInstructions.trim()}`;
+    }
     const result = await aiComplete({
-      systemPromptOverride: "Você é o qualificador da Âncora Corretora. Não solicite documentos, senhas, CPF ou dados de saúde. Retorne somente JSON válido no formato {value:string|null,valid:boolean,message:string|null}. Valide a resposta para a pergunta indicada e escreva uma orientação curta em português se precisar repetir.",
+      systemPromptOverride,
       maxTokensOverride: 220,
       temperatureOverride: 0.2,
       userMessage: JSON.stringify({ question: current.prompt, answer: input.text }),

@@ -21,6 +21,8 @@ export const updateTenantSettingsSchema = z.object({
   tone: z.string().trim().default("friendly"),
   useEmojis: z.boolean().default(false),
   timeoutMinutes: z.number().int().min(5).max(1440).default(30),
+  businessContext: z.string().trim().max(4000).optional().default(""),
+  customInstructions: z.string().trim().max(4000).optional().default(""),
 });
 
 export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;
@@ -105,7 +107,9 @@ export async function updateQualificationTenantSettings(
       tone: data.tone,
       useEmojis: data.useEmojis,
       timeoutMinutes: data.timeoutMinutes,
-      version: (current?.version ?? 1) + 1,
+      businessContext: data.businessContext ?? "",
+      customInstructions: data.customInstructions ?? "",
+      version: (current?.version ?? 0) + 1,
       updatedBy: actorUserId,
       updatedAt: now,
     })

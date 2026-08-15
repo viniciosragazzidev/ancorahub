@@ -2,20 +2,24 @@ import type { ConversationMemory } from "@/features/ai-agent/memory";
 
 export const LEAD_QUALIFICATION_STATUSES = [
   "pending",
+  "qualifying",
   "qualified",
   "hot",
   "warm",
   "cold",
+  "ia_disabled",
 ] as const;
 
 export type LeadQualificationStatus = (typeof LEAD_QUALIFICATION_STATUSES)[number];
 
 export const LEAD_QUALIFICATION_LABELS: Record<LeadQualificationStatus, string> = {
   pending: "Pendente",
+  qualifying: "Qualificando",
   qualified: "Qualificado",
   hot: "Quente",
   warm: "Morno",
   cold: "Frio",
+  ia_disabled: "IA Desativada",
 };
 
 /** Classifies only from explicit conversation signals; absence of a signal stays qualified. */

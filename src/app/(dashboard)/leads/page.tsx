@@ -55,6 +55,12 @@ export default async function LeadsPage({
 
   const filters = await searchParams;
   const db = getDatabase();
+
+  const { enforceLeadQualificationRules } = await import("@/features/leads/qualification-guard");
+  await enforceLeadQualificationRules(context.tenantId).catch((err) =>
+    console.error("[leads-page] Error enforcing qualification rules:", err)
+  );
+
   const period = parsePeriod(filters.period);
 
   // Pagination parameters

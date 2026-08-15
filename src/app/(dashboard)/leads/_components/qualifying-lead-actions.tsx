@@ -30,18 +30,36 @@ type LeadQueue = { id: string; name: string; branchId: string | null };
 export function StartQualificationButton({
   leadId,
   leadName,
+  qualificationStatus,
+  alreadyStarted,
   variant = "outline",
   size = "xs",
   className = "",
 }: {
   leadId: string;
   leadName?: string;
+  qualificationStatus?: string | null;
+  alreadyStarted?: boolean;
   variant?: "default" | "outline" | "ghost" | "secondary";
   size?: "default" | "sm" | "xs" | "icon";
   className?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+
+  const isStarted = Boolean(alreadyStarted || (qualificationStatus && qualificationStatus !== "pending"));
+
+  if (isStarted) {
+    return (
+      <span
+        title="A qualificação por IA deste lead já foi iniciada"
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 ${className}`}
+      >
+        <Sparkle className="size-3.5 text-emerald-500" />
+        Qualificação Iniciada
+      </span>
+    );
+  }
 
   async function handleStart() {
     setBusy(true);

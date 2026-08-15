@@ -109,6 +109,7 @@ export async function changeLeadStatus(
       corretorId: schema.leads.corretorId,
       branchId: schema.leads.branchId,
       status: schema.leads.status,
+      qualificationStatus: schema.leads.qualificationStatus,
       version: schema.leads.version,
       nome: schema.leads.nome,
     })
@@ -143,7 +144,16 @@ export async function changeLeadStatus(
     );
   }
 
-  // 3. perdido: exige motivo
+  // 3. Validação de obrigatoriedade de qualificação
+  const { validateLeadStatusChangeQualification } = await import("./qualification-guard");
+  const qualificationValidation = await validateLeadStatusChangeQualification({
+    tenantId: context.tenantId,
+    leadId: lead.id,
+    newStatus,
+    currentQualificationStatus: lead.qualificationStatus,
+  });
+
+  // 4. perdido: exige motivo
   if (newStatus === "lost") {
     if (!input.motivoPerda || !(MOTIVOS_PERDA as readonly string[]).includes(input.motivoPerda)) {
       throw new Error(
@@ -153,7 +163,7 @@ export async function changeLeadStatus(
     await assertCanChangeStatus(context, lead);
   }
 
-  // 3. Reabertura (saindo de lost)
+  // 5. Reabertura (saindo de lost)
   const isReopening = previousStatus === "lost" && newStatus !== "lost";
 
   if (isReopening) {
@@ -174,6 +184,9 @@ export async function changeLeadStatus(
         status: newStatus as LeadStatus,
         stageEnteredAt: now,
         motivoPerda,
+        ...(qualificationValidation.newQualificationStatus
+          ? { qualificationStatus: qualificationValidation.newQualificationStatus }
+          : {}),
         version: lead.version + 1,
       })
       .where(and(eq(schema.leads.id, lead.id), ...(input.expectedVersion === undefined ? [] : [eq(schema.leads.version, input.expectedVersion)])))

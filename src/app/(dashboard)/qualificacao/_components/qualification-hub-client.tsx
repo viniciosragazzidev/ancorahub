@@ -74,6 +74,8 @@ type QualificationHubProps = {
     tone: string;
     useEmojis: boolean;
     timeoutMinutes: number;
+    businessContext?: string | null;
+    customInstructions?: string | null;
     version: number;
     updatedAt: string | Date | null;
   } | null;
@@ -237,6 +239,8 @@ export function QualificationHubClient({
   const [handoffMessage, setHandoffMessage] = useState(
     settings?.handoffMessage ?? "Vou encaminhar você para um corretor da equipe agora."
   );
+  const [businessContext, setBusinessContext] = useState(settings?.businessContext ?? "");
+  const [customInstructions, setCustomInstructions] = useState(settings?.customInstructions ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   // States
@@ -312,8 +316,10 @@ export function QualificationHubClient({
         tone: settings?.tone ?? "friendly",
         useEmojis: settings?.useEmojis ?? false,
         timeoutMinutes: settings?.timeoutMinutes ?? 30,
+        businessContext,
+        customInstructions,
       });
-      toast.success("Configurações da qualificação salvas com sucesso!");
+      toast.success("Configurações e Prompt de Conhecimento salvos com sucesso!");
     } catch (err) {
       toast.error("Erro ao salvar configurações da qualificação.");
     } finally {
@@ -656,6 +662,57 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                       onChange={(e) => setInitialMessage(e.target.value)}
                       rows={3}
                     />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card variant="subtle" className="rounded-xl border-border/80 md:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <div>
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Bot className="size-4 text-primary" />
+                      Conhecimento & Diretrizes da Empresa (Prompt de Contexto)
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Instrua o robô com a base de conhecimento institucional, planos comercializados e diretrizes comportamentais.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                    className="gap-1.5 font-semibold"
+                  >
+                    <Sparkles className="size-3.5" />
+                    {isSaving ? "Salvando…" : "Salvar Alterações"}
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Base de Conhecimento da Empresa (Informações & Produtos)</Label>
+                    <Textarea
+                      value={businessContext}
+                      onChange={(e) => setBusinessContext(e.target.value)}
+                      rows={4}
+                      placeholder="Ex: Somos uma corretora especialista em planos de saúde individuais, familiares e PME em São Paulo e região. Trabalhamos com Amil, Bradesco Saúde, SulAmérica, NotreDame Intermédica e Unimed..."
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Estas informações serão fornecidas à IA para fundamentar o atendimento e esclarecer dúvidas do cliente.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Diretrizes de Atuação & Tom de Voz (Instruções Personalizadas)</Label>
+                    <Textarea
+                      value={customInstructions}
+                      onChange={(e) => setCustomInstructions(e.target.value)}
+                      rows={4}
+                      placeholder="Ex: Seja cordial, empático e objetivo. Mantenha tom profissional. NUNCA solicite documentos sensíveis como CPF ou fotos no chat..."
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Regras de conduta, tom de voz e limitações que a IA deve respeitar rigorosamente.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

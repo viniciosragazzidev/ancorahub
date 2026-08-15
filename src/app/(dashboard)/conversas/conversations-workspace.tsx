@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bubble, BubbleContent, BubbleGroup } from "@/components/ui/bubble";
@@ -381,30 +382,55 @@ function ConversationHeader({
     if (!client.aiConversation?.id) return;
     if (!confirm("Tem certeza que deseja resetar a qualificação da inteligência artificial e limpar a memória deste lead? O robô de IA iniciará a conversa do zero.")) return;
     setIsPending(true);
-    await resetAiConversationAction(client.aiConversation.id);
-    setIsPending(false);
-    router.refresh();
+    const toastId = toast.loading("Resetando qualificação da IA...");
+    try {
+      const res = await resetAiConversationAction(client.aiConversation.id);
+      if (res.success) {
+        toast.success("Conversa e memória da IA resetadas com sucesso!", { id: toastId });
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Erro ao resetar conversa.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro inesperado ao resetar conversa.", { id: toastId });
+    } finally {
+      setIsPending(false);
+    }
   }
 
   async function handleResumeAi() {
     setIsPending(true);
-    const result = await resumeAiQualificationAction(client.id);
-    setIsPending(false);
-    if (!result.success) {
-      alert(result.error);
-    } else {
-      router.refresh();
+    const toastId = toast.loading("Iniciando/retomando qualificação por IA...");
+    try {
+      const result = await resumeAiQualificationAction(client.id);
+      if (!result.success) {
+        toast.error(result.error ?? "Erro ao iniciar qualificação da IA.", { id: toastId });
+      } else {
+        toast.success("Qualificação por IA iniciada! Primeira mensagem enviada.", { id: toastId });
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erro inesperado ao iniciar atendimento da IA.", { id: toastId });
+    } finally {
+      setIsPending(false);
     }
   }
 
   async function handleSyncChat() {
     setIsPending(true);
-    const result = await syncSingleLeadConversationAction(client.id);
-    setIsPending(false);
-    if (!result.success) {
-      alert(result.error ?? "Erro ao sincronizar histórico.");
-    } else {
-      router.refresh();
+    const toastId = toast.loading("Sincronizando histórico do chat...");
+    try {
+      const result = await syncSingleLeadConversationAction(client.id);
+      if (!result.success) {
+        toast.error(result.error ?? "Erro ao sincronizar histórico.", { id: toastId });
+      } else {
+        toast.success(`Chat sincronizado com sucesso! (${result.messagesCount ?? 0} mensagens)`, { id: toastId });
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erro inesperado ao sincronizar chat.", { id: toastId });
+    } finally {
+      setIsPending(false);
     }
   }
 
@@ -733,18 +759,38 @@ function HistoryEmptyState({ client }: { client: ConversationItem }) {
 
   async function handleStartAi() {
     setIsPending(true);
-    const result = await resumeAiQualificationAction(client.id);
-    setIsPending(false);
-    if (!result.success) alert(result.error);
-    else router.refresh();
+    const toastId = toast.loading("Iniciando qualificação por IA...");
+    try {
+      const result = await resumeAiQualificationAction(client.id);
+      if (!result.success) {
+        toast.error(result.error ?? "Erro ao iniciar qualificação.", { id: toastId });
+      } else {
+        toast.success("Qualificação por IA iniciada! Primeira mensagem enviada.", { id: toastId });
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erro inesperado ao iniciar qualificação.", { id: toastId });
+    } finally {
+      setIsPending(false);
+    }
   }
 
   async function handleSync() {
     setIsPending(true);
-    const result = await syncSingleLeadConversationAction(client.id);
-    setIsPending(false);
-    if (!result.success) alert(result.error ?? "Erro ao sincronizar.");
-    else router.refresh();
+    const toastId = toast.loading("Sincronizando histórico do chat...");
+    try {
+      const result = await syncSingleLeadConversationAction(client.id);
+      if (!result.success) {
+        toast.error(result.error ?? "Erro ao sincronizar.", { id: toastId });
+      } else {
+        toast.success(`Chat sincronizado! (${result.messagesCount ?? 0} mensagens)`, { id: toastId });
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erro inesperado ao sincronizar chat.", { id: toastId });
+    } finally {
+      setIsPending(false);
+    }
   }
 
   return (
