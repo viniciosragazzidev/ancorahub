@@ -26,6 +26,8 @@ export function LeadDrawerManagementActions({
   leadBranchId,
   contextRole,
   currentStatus,
+  qualificationStatus,
+  qualificationState,
   currentOwner,
   onSuccess,
 }: {
@@ -36,6 +38,8 @@ export function LeadDrawerManagementActions({
   leadBranchId?: string | null;
   contextRole?: string;
   currentStatus: string;
+  qualificationStatus?: string | null;
+  qualificationState?: string | null;
   currentOwner: string | null;
   onSuccess?: () => void;
 }) {
@@ -48,6 +52,13 @@ export function LeadDrawerManagementActions({
 
   const [openQualifyDialog, setOpenQualifyDialog] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
+
+  const isQualifiedOrDistributed =
+    currentStatus === "distributed" ||
+    ["in_contact", "quote_sent", "negotiation", "converted", "lost"].includes(currentStatus) ||
+    qualificationState === "QUALIFIED" ||
+    qualificationState === "COMPLETED" ||
+    (Boolean(qualificationStatus) && ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified"].includes(qualificationStatus!));
 
   async function handleRevertToQualifying() {
     setIsReverting(true);
@@ -182,36 +193,38 @@ export function LeadDrawerManagementActions({
       )}
 
       {/* Seção de Controle de Estágio e Qualificação */}
-      <div className="rounded-lg border border-border/70 bg-card p-3 space-y-2">
-        <p className="text-xs font-semibold text-foreground">Estágio & Qualificação do Lead</p>
-        <p className="text-xs text-muted-foreground">
-          Altere manualmente a etapa deste lead entre a fila de qualificação IA e o status de lead qualificado.
-        </p>
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1"
-            disabled={isReverting}
-            onClick={handleRevertToQualifying}
-          >
-            <RotateCcw className="size-3.5 text-amber-500" />
-            {isReverting ? "Movendo..." : "Mover p/ Qualificação"}
-          </Button>
+      {!isQualifiedOrDistributed && (
+        <div className="rounded-lg border border-border/70 bg-card p-3 space-y-2">
+          <p className="text-xs font-semibold text-foreground">Estágio & Qualificação do Lead</p>
+          <p className="text-xs text-muted-foreground">
+            Altere manualmente a etapa deste lead entre a fila de qualificação IA e o status de lead qualificado.
+          </p>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1"
+              disabled={isReverting}
+              onClick={handleRevertToQualifying}
+            >
+              <RotateCcw className="size-3.5 text-amber-500" />
+              {isReverting ? "Movendo..." : "Mover p/ Qualificação"}
+            </Button>
 
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="h-8 text-xs gap-1 font-medium"
-            onClick={() => setOpenQualifyDialog(true)}
-          >
-            <Sparkle className="size-3.5" />
-            Qualificar Lead
-          </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="h-8 text-xs gap-1 font-medium"
+              onClick={() => setOpenQualifyDialog(true)}
+            >
+              <Sparkle className="size-3.5" />
+              Qualificar Lead
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <ManualQualificationDialog
         open={openQualifyDialog}

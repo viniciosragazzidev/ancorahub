@@ -210,6 +210,7 @@ export default async function LeadsPage({
         telefone: schema.leads.telefone,
         status: schema.leads.status,
         qualificationStatus: schema.leads.qualificationStatus,
+        qualificationState: schema.leads.qualificationState,
         distributionStatus: schema.leads.distributionStatus,
         origem: schema.leads.origem,
         sourceCampaign: schema.leads.sourceCampaign,

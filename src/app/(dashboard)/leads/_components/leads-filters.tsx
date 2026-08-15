@@ -65,7 +65,8 @@ export function LeadsFilters({
   const hasAnyFilter = Boolean(search || activeCount > 0);
 
   function applyFilters() {
-    const params = new URLSearchParams(searchParams.toString());
+    const currentSearch = typeof window !== "undefined" ? window.location.search : searchParams.toString();
+    const params = new URLSearchParams(currentSearch);
     params.delete("page");
 
     if (search) params.set("search", search); else params.delete("search");
@@ -77,7 +78,12 @@ export function LeadsFilters({
     if (corretor) params.set("corretor", corretor); else params.delete("corretor");
     if (pageSize && pageSize !== "20") params.set("pageSize", pageSize); else params.delete("pageSize");
 
-    router.push(`/leads${params.toString() ? `?${params.toString()}` : ""}`);
+    const newUrl = `/leads${params.toString() ? `?${params.toString()}` : ""}`;
+    if (typeof window !== "undefined") {
+      window.location.href = newUrl;
+    } else {
+      router.push(newUrl);
+    }
     setOpen(false);
   }
 
@@ -91,18 +97,11 @@ export function LeadsFilters({
     setCorretor("");
     setPageSize("20");
 
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("search");
-    params.delete("status");
-    params.delete("branch");
-    params.delete("tipo");
-    params.delete("origem");
-    params.delete("qualification");
-    params.delete("corretor");
-    params.delete("pageSize");
-    params.delete("page");
-
-    router.push(`/leads${params.toString() ? `?${params.toString()}` : ""}`);
+    if (typeof window !== "undefined") {
+      window.location.href = "/leads";
+    } else {
+      router.push("/leads");
+    }
     setOpen(false);
   }
 

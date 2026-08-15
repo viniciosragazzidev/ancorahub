@@ -104,6 +104,7 @@ export type LeadWorkspaceItem = {
   telefone: string;
   status: string;
   qualificationStatus: string;
+  qualificationState?: string | null;
   distributionStatus?: string;
   origem: string;
   sourceCampaign: string | null;
@@ -867,10 +868,18 @@ export function LeadsWorkspace({
                     </Button>
                   </TabsContent>
                   <TabsContent value="actions" className="mt-4 space-y-3">
-                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                      <p className="text-xs font-semibold text-foreground mb-1.5">Qualificação Manual por IA</p>
-                      <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
-                    </div>
+                    {!(
+                      selectedLead.status === "distributed" ||
+                      ["in_contact", "quote_sent", "negotiation", "converted", "lost"].includes(selectedLead.status) ||
+                      selectedLead.qualificationState === "QUALIFIED" ||
+                      selectedLead.qualificationState === "COMPLETED" ||
+                      (Boolean(selectedLead.qualificationStatus) && ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified"].includes(selectedLead.qualificationStatus))
+                    ) && (
+                      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                        <p className="text-xs font-semibold text-foreground mb-1.5">Qualificação Manual por IA</p>
+                        <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
+                      </div>
+                    )}
                     {contextRole === "manager" || contextRole === "director" ? (
                       <LeadDrawerManagementActions
                         leadId={selectedLead.id}
@@ -880,6 +889,8 @@ export function LeadsWorkspace({
                         leadBranchId={selectedLead.branchId}
                         contextRole={contextRole}
                         currentStatus={selectedLead.status}
+                        qualificationStatus={selectedLead.qualificationStatus}
+                        qualificationState={selectedLead.qualificationState}
                         currentOwner={selectedLead.corretorNome}
                         onSuccess={() => setSelectedLead(null)}
                       />
