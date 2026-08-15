@@ -233,3 +233,118 @@ export async function startManualQualificationAction(input: { leadId: string }) 
     };
   }
 }
+
+export async function manuallyChangeQualificationStageAction(input: {
+  leadId: string;
+  targetStage: "qualificacoes" | "qualificado" | "humano";
+  brokerId?: string | null;
+}) {
+  try {
+    const context = await getRequiredTenantContext();
+    if (
+      !hasCapability(context.role, "acessar_leads", context.jobTitle) &&
+      !hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)
+    ) {
+      throw new AuthorizationError("Seu perfil não pode alterar o estágio de qualificação.");
+    }
+
+    const db = getDatabase();
+    const [lead] = await db
+      .select({
+        id: schema.leads.id,
+        nome: schema.leads.nome,
+        branchId: schema.leads.branchId,
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .limit(1);
+
+    if (!lead) {
+      return { success: false, error: "Lead não encontrado." };
+    }
+
+    const now = new Date();
+
+    if (input.targetStage === "qualificacoes") {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.leads)
+          .set({
+            qualificationStatus: "qualifying",
+            qualificationState: "IN_PROGRESS",
+            corretorId: null,
+            status: "new",
+            distributionStatus: "unassigned",
+            assignedAt: null,
+            updatedAt: now,
+          })
+          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+
+        await tx.insert(schema.leadInteractions).values({
+          id: randomUUID(),
+          leadId: lead.id,
+          userId: context.userId,
+          tipo: "system_alert",
+          conteudo: "Lead movido manualmente de volta para a fila de qualificação.",
+        });
+
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "lead",
+          entidadeId: lead.id,
+          acao: "qualification.manually_reverted_to_qualifying",
+        });
+      });
+    } else if (input.targetStage === "qualificado" || input.targetStage === "humano") {
+      const brokerToAssign = input.brokerId || (input.targetStage === "humano" ? await chooseAvailableBroker(context.tenantId, lead.branchId || context.branchId || "") : null);
+      const isAssigned = Boolean(brokerToAssign);
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.leads)
+          .set({
+            qualificationStatus: "qualified",
+            qualificationState: "QUALIFIED",
+            qualificationCompletedAt: now,
+            status: isAssigned ? "distributed" : "new",
+            distributionStatus: isAssigned ? "assigned" : "queued",
+            corretorId: brokerToAssign,
+            assignmentSource: isAssigned ? "manual_override" : null,
+            distributionUpdatedAt: now,
+            assignedAt: isAssigned ? now : null,
+            updatedAt: now,
+          })
+          .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+
+        await tx.insert(schema.leadInteractions).values({
+          id: randomUUID(),
+          leadId: lead.id,
+          userId: context.userId,
+          tipo: "system_alert",
+          conteudo: input.targetStage === "humano"
+            ? "Lead transferido manualmente para atendimento humano."
+            : "Lead marcado manualmente como qualificado.",
+        });
+
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "lead",
+          entidadeId: lead.id,
+          acao: `qualification.manually_moved_to_${input.targetStage}`,
+        });
+      });
+    }
+
+    revalidatePath("/leads");
+    revalidatePath(`/leads/${lead.id}`);
+    revalidatePath("/conversas");
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao alterar estágio do lead.",
+    };
+  }
+}

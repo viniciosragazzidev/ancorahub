@@ -165,11 +165,7 @@ export default async function LeadsPage({
   const where = and(
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt),
-    or(
-      isNotNull(schema.leads.corretorId),
-      ne(schema.leads.qualificationStatus, "pending"),
-      isNull(schema.leads.qualificationStatus)
-    ),
+    isNotNull(schema.leads.corretorId),
     ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
@@ -296,8 +292,13 @@ export default async function LeadsPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
-          eq(schema.leads.qualificationStatus, "pending"),
-          isNull(schema.leads.corretorId),
+          or(
+            isNull(schema.leads.corretorId),
+            eq(schema.leads.qualificationStatus, "pending"),
+            eq(schema.leads.qualificationStatus, "qualifying"),
+            eq(schema.leads.qualificationState, "IN_PROGRESS"),
+            isNull(schema.leads.qualificationStatus)
+          ),
           context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
         )
       )

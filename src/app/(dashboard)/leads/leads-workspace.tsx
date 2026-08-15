@@ -449,270 +449,272 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 1: QUALIFICAÇÕES ─── */}
         <TabsContent value="qualificacoes" className="mt-4">
-          <Card className="rounded-2xl border-0 shadow-none bg-transparent p-0 overflow-hidden">
-            <CardContent className="p-0">
-              {qualifyingLeads.length === 0 ? (
-                <EmptyState
-                  variant="ghost"
-                  icon={Target}
-                  title="Nenhum lead em qualificação no momento"
-                  description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
-                />
-              ) : (
-                <>
-                  <div className="hidden divide-y divide-border max-[559px]:block">
-                    {visibleQualifyingLeads.map((lead) => (
-                      <div key={lead.id} className="p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">{lead.nome}</span>
-                          <Badge variant="outline" className="text-[10px]">{lead.queueName ?? "Geral"}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{lead.telefone}</p>
-                        <div className="flex items-center gap-2 pt-1">
-                          <LeadQualificationBadge status={lead.qualificationStatus} />
-                          <span className="text-xs font-semibold">{lead.qualificationScore} pts</span>
-                        </div>
-                        <div className="pt-2 flex justify-end">
-                          <QualifyingLeadActions
-                            leadId={lead.id}
-                            leadName={lead.nome}
-                            currentQueueId={lead.queueId ?? null}
-                            currentQueueName={lead.queueName ?? null}
-                            queues={queues}
-                            onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Table className="max-[559px]:hidden">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="pl-4">Lead</TableHead>
-                        <TableHead>Origem / Canal</TableHead>
-                        <TableHead>Fila de Destino</TableHead>
-                        <TableHead>Qualificação IA</TableHead>
-                        <TableHead className="hidden lg:table-cell">Entrada</TableHead>
-                        <TableHead className="pr-5 text-right">Ações de Controle</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visibleQualifyingLeads.map((lead) => (
-                        <TableRow key={lead.id} className="group/row">
-                          <TableCell className="pl-4 font-medium">
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">{lead.nome}</p>
-                              <p className="text-xs text-muted-foreground">{lead.telefone}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <Badge variant="secondary" className="text-[10px]">
-                                {lead.sourceChannel === "bulk_import" ? "Importação CSV" : lead.origem}
-                              </Badge>
-                              {lead.sourceCampaign ? (
-                                <p className="text-[11px] text-muted-foreground truncate max-w-36 mt-0.5">
-                                  {lead.sourceCampaign}
-                                </p>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {lead.queueName ?? "Geral da unidade"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <LeadQualificationBadge status={lead.qualificationStatus} />
-                              <span className="text-xs font-semibold text-foreground">
-                                {lead.qualificationScore} pts
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                            {formatDate(lead.createdAt, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                          </TableCell>
-                          <TableCell className="pr-5 text-right">
-                            <QualifyingLeadActions
-                              leadId={lead.id}
-                              leadName={lead.nome}
-                              currentQueueId={lead.queueId ?? null}
-                              currentQueueName={lead.queueName ?? null}
-                              queues={queues}
-                              onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-
-                  {qualifyingLeads.length > pageSize ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground bg-muted/20 rounded-b-2xl">
-                      <span>
-                        Mostrando {(qualifyingPage - 1) * pageSize + 1} a {Math.min(qualifyingPage * pageSize, qualifyingLeads.length)} de {qualifyingLeads.length} leads em qualificação ({pageSize} por página)
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          disabled={qualifyingPage <= 1}
-                          onClick={() => setQualifyingPage((p) => Math.max(1, p - 1))}
-                        >
-                          Anterior
-                        </Button>
-                        <span className="font-medium text-foreground">Página {qualifyingPage} de {totalQualifyingPages}</span>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          disabled={qualifyingPage >= totalQualifyingPages}
-                          onClick={() => setQualifyingPage((p) => Math.min(totalQualifyingPages, p + 1))}
-                        >
-                          Próxima
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
-        <TabsContent value="list" className="mt-4">
-          <Card className="rounded-2xl border-0 shadow-none bg-transparent p-0 overflow-hidden">
-            <CardContent className="p-0">
+          {qualifyingLeads.length === 0 ? (
+            <EmptyState
+              variant="ghost"
+              icon={Target}
+              title="Nenhum lead em qualificação no momento"
+              description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
+            />
+          ) : (
+            <div className="space-y-4">
               <div className="hidden divide-y divide-border max-[559px]:block">
-                {leads.map((lead) => (
-                  <button
-                    key={lead.id}
-                    type="button"
-                    onClick={() => setSelectedLead(lead)}
-                    className="flex min-h-20 w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-[var(--duration-quick)] ease-out active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className={`block truncate font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                        {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
-                      </span>
-                      <span className={`mt-1 block truncate text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                        {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
-                      </span>
-                        <span className="mt-2 flex items-center gap-2">
-                          <LeadStatusBadge status={lead.status} />
-                          <LeadQualificationBadge status={lead.qualificationStatus} />
-                          <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
-                      </span>
-                      <span className="mt-1 flex items-center gap-2">
-                        <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="truncate text-xs" />
-                      </span>
-                    </span>
-                    <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                  </button>
+                {visibleQualifyingLeads.map((lead) => (
+                  <div key={lead.id} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">{lead.nome}</span>
+                      <Badge variant="outline" className="text-[10px]">{lead.queueName ?? "Geral"}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{lead.telefone}</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <LeadQualificationBadge status={lead.qualificationStatus} />
+                      <span className="text-xs font-semibold">{lead.qualificationScore} pts</span>
+                    </div>
+                    <div className="pt-2 flex justify-end">
+                      <QualifyingLeadActions
+                        leadId={lead.id}
+                        leadName={lead.nome}
+                        currentQueueId={lead.queueId ?? null}
+                        currentQueueName={lead.queueName ?? null}
+                        queues={queues}
+                        onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
-              <SelectionToolbar
-                selectedCount={multiSelect.count}
-                totalCount={leads.length}
-                onClear={multiSelect.clear}
-              >
-                {selectionActions}
-              </SelectionToolbar>
+
               <Table className="max-[559px]:hidden">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10 pl-4">
-                      <Checkbox
-                        aria-label="Selecionar todos"
-                        checked={multiSelect.isAllSelected}
-                        onCheckedChange={multiSelect.selectAll}
-                      />
-                    </TableHead>
-                    <TableHead className="pl-0">Lead</TableHead>
-                    <TableHead className={contextRole === "broker" ? "hidden" : ""}>Tipo</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Qualificação</TableHead>
-                    <TableHead className="hidden md:table-cell">Saúde</TableHead>
-                    <TableHead className="hidden md:table-cell">Responsável</TableHead>
+                    <TableHead className="pl-4">Lead</TableHead>
+                    <TableHead>Origem / Canal</TableHead>
+                    <TableHead>Fila de Destino</TableHead>
+                    <TableHead>Qualificação IA</TableHead>
                     <TableHead className="hidden lg:table-cell">Entrada</TableHead>
-                    <TableHead className="pr-5 text-right">Ações</TableHead>
+                    <TableHead className="pr-5 text-right">Ações de Controle</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leads.map((lead) => (
-                    <TableRow
-                      key={lead.id}
-                      className="cursor-pointer group/row data-[selected]:bg-muted/40 data-[active]:bg-muted/15"
-                      data-selected={multiSelect.isSelected(lead.id) || undefined}
-                      data-active={lead.status !== "converted" && lead.status !== "lost" || undefined}
-                      onClick={() => setSelectedLead(lead)}
-                    >
-                      <TableCell className="w-10 pl-4">
-                        <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                          <Checkbox
-                            aria-label={`Selecionar ${lead.nome}`}
-                            checked={multiSelect.isSelected(lead.id)}
-                            onCheckedChange={() => {
-                              multiSelect.toggle(lead.id);
-                            }}
-                          />
+                  {visibleQualifyingLeads.map((lead) => (
+                    <TableRow key={lead.id} className="group/row">
+                      <TableCell className="pl-4 font-medium">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{lead.nome}</p>
+                          <p className="text-xs text-muted-foreground">{lead.telefone}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="pl-0">
-                        <p className={`font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
-                        </p>
-                        <p className={`text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
-                        </p>
-                        {lead.sourceCampaign ? (
-                          <Badge variant="secondary" className="mt-1 text-[10px] bg-primary/10 text-primary border-primary/20 max-w-[200px] truncate">
-                            🎯 {lead.sourceCampaign}
+                      <TableCell>
+                        <div>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {lead.sourceChannel === "bulk_import" ? "Importação CSV" : lead.origem}
                           </Badge>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className={contextRole === "broker" ? "hidden" : ""}>
-                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
-                          {lead.tipo}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <LeadStatusBadge status={lead.status} />
+                          {lead.sourceCampaign ? (
+                            <p className="text-[11px] text-muted-foreground truncate max-w-36 mt-0.5">
+                              {lead.sourceCampaign}
+                            </p>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <LeadQualificationBadge status={lead.qualificationStatus} />
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {lead.queueName ?? "Geral da unidade"}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <LeadHealthBadge
-                          health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)}
-                        />
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <LeadQualificationBadge status={lead.qualificationStatus} />
+                          <span className="text-xs font-semibold text-foreground">
+                            {lead.qualificationScore} pts
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-sm" />
-                      </TableCell>
-                      <TableCell className="hidden text-muted-foreground lg:table-cell">
-                        {formatDate(lead.createdAt, { day: "2-digit", month: "short" })}
+                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                        {formatDate(lead.createdAt, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
                       </TableCell>
                       <TableCell className="pr-5 text-right">
-                        <Button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedLead(lead);
-                          }}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Detalhes <ArrowUpRight />
-                        </Button>
+                        <QualifyingLeadActions
+                          leadId={lead.id}
+                          leadName={lead.nome}
+                          currentQueueId={lead.queueId ?? null}
+                          currentQueueName={lead.queueName ?? null}
+                          queues={queues}
+                          onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+
+              {qualifyingLeads.length > pageSize ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs text-muted-foreground">
+                  <span>
+                    Mostrando {(qualifyingPage - 1) * pageSize + 1} a {Math.min(qualifyingPage * pageSize, qualifyingLeads.length)} de {qualifyingLeads.length} leads em qualificação ({pageSize} por página)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={qualifyingPage <= 1}
+                      onClick={() => setQualifyingPage((p) => Math.max(1, p - 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <span className="font-medium text-foreground">Página {qualifyingPage} de {totalQualifyingPages}</span>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={qualifyingPage >= totalQualifyingPages}
+                      onClick={() => setQualifyingPage((p) => Math.min(totalQualifyingPages, p + 1))}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
+        <TabsContent value="list" className="mt-4">
+          <div className="space-y-4">
+            <div className="hidden divide-y divide-border max-[559px]:block">
+              {leads.map((lead) => (
+                <button
+                  key={lead.id}
+                  type="button"
+                  onClick={() => setSelectedLead(lead)}
+                  className="flex min-h-20 w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-[var(--duration-quick)] ease-out active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
+                      {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
+                    </span>
+                    <span className={`mt-1 block truncate text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
+                      {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
+                    </span>
+                      <span className="mt-2 flex items-center gap-2">
+                        <LeadStatusBadge status={lead.status} />
+                        <LeadQualificationBadge status={lead.qualificationStatus} />
+                        <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
+                    </span>
+                    <span className="mt-1 flex items-center gap-2">
+                      <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="truncate text-xs" />
+                    </span>
+                  </span>
+                  <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+            <SelectionToolbar
+              selectedCount={multiSelect.count}
+              totalCount={leads.length}
+              onClear={multiSelect.clear}
+            >
+              {selectionActions}
+            </SelectionToolbar>
+            <Table className="max-[559px]:hidden">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10 pl-4">
+                    <Checkbox
+                      aria-label="Selecionar todos"
+                      checked={multiSelect.isAllSelected}
+                      onCheckedChange={multiSelect.selectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="pl-0">Lead</TableHead>
+                  <TableHead className={contextRole === "broker" ? "hidden" : ""}>Tipo</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Qualificação</TableHead>
+                  <TableHead className="hidden md:table-cell">Saúde</TableHead>
+                  <TableHead className="hidden md:table-cell">Responsável</TableHead>
+                  <TableHead className="hidden lg:table-cell">Entrada</TableHead>
+                  <TableHead className="pr-5 text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((lead) => (
+                  <TableRow
+                    key={lead.id}
+                    className="cursor-pointer group/row data-[selected]:bg-muted/40 data-[active]:bg-muted/15"
+                    data-selected={multiSelect.isSelected(lead.id) || undefined}
+                    data-active={lead.status !== "converted" && lead.status !== "lost" || undefined}
+                    onClick={() => setSelectedLead(lead)}
+                  >
+                    <TableCell className="w-10 pl-4">
+                      <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                        <Checkbox
+                          aria-label={`Selecionar ${lead.nome}`}
+                          checked={multiSelect.isSelected(lead.id)}
+                          onCheckedChange={() => {
+                            multiSelect.toggle(lead.id);
+                          }}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="pl-0">
+                      <p className={`font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
+                        {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
+                      </p>
+                      <p className={`text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
+                        {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
+                      </p>
+                      {lead.sourceCampaign ? (
+                        <Badge variant="secondary" className="mt-1 text-[10px] bg-primary/10 text-primary border-primary/20 max-w-[200px] truncate">
+                          🎯 {lead.sourceCampaign}
+                        </Badge>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className={contextRole === "broker" ? "hidden" : ""}>
+                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+                        {lead.tipo}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <LeadStatusBadge status={lead.status} />
+                    </TableCell>
+                    <TableCell>
+                      <LeadQualificationBadge status={lead.qualificationStatus} />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <LeadHealthBadge
+                        health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)}
+                      />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-sm" />
+                    </TableCell>
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
+                      {formatDate(lead.createdAt, { day: "2-digit", month: "short" })}
+                    </TableCell>
+                    <TableCell className="pr-5 text-right">
+                      <Button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedLead(lead);
+                        }}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Detalhes <ArrowUpRight />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {pagination ? (
+              <LeadsPagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                pageSize={pagination.pageSize}
+              />
+            ) : null}
+          </div>
         </TabsContent>
 
         <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
