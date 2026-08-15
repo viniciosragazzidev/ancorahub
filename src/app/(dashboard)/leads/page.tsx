@@ -18,6 +18,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
@@ -41,6 +42,7 @@ export default async function LeadsPage({
     period?: string;
   }>;
 }) {
+  await connection();
   const context = await getRequiredTenantContext();
   if (
     !(await hasEffectiveCapability({

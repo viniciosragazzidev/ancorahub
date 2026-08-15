@@ -65,8 +65,7 @@ export function LeadsFilters({
   const hasAnyFilter = Boolean(search || activeCount > 0);
 
   function applyFilters() {
-    const currentSearch = typeof window !== "undefined" ? window.location.search : searchParams.toString();
-    const params = new URLSearchParams(currentSearch);
+    const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
 
     if (search) params.set("search", search); else params.delete("search");
@@ -78,12 +77,10 @@ export function LeadsFilters({
     if (corretor) params.set("corretor", corretor); else params.delete("corretor");
     if (pageSize && pageSize !== "20") params.set("pageSize", pageSize); else params.delete("pageSize");
 
-    const newUrl = `/leads${params.toString() ? `?${params.toString()}` : ""}`;
-    if (typeof window !== "undefined") {
-      window.location.href = newUrl;
-    } else {
-      router.push(newUrl);
-    }
+    const queryStr = params.toString();
+    const newUrl = `/leads${queryStr ? `?${queryStr}` : ""}`;
+    router.push(newUrl);
+    router.refresh();
     setOpen(false);
   }
 
@@ -97,11 +94,8 @@ export function LeadsFilters({
     setCorretor("");
     setPageSize("20");
 
-    if (typeof window !== "undefined") {
-      window.location.href = "/leads";
-    } else {
-      router.push("/leads");
-    }
+    router.push("/leads");
+    router.refresh();
     setOpen(false);
   }
 

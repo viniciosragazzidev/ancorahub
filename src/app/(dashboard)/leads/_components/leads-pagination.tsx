@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from "@/components/huge-icons";
 
@@ -16,6 +16,7 @@ export function LeadsPagination({
   pageSize: number;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   if (totalPages <= 1 && totalItems <= pageSize) {
@@ -31,15 +32,11 @@ export function LeadsPagination({
 
   function goToPage(page: number) {
     if (page < 1 || page > totalPages || page === currentPage) return;
-    const currentSearch = typeof window !== "undefined" ? window.location.search : searchParams.toString();
-    const params = new URLSearchParams(currentSearch);
+    const params = new URLSearchParams(searchParams.toString());
     params.set("page", page.toString());
-    const newUrl = `/leads?${params.toString()}`;
-    if (typeof window !== "undefined") {
-      window.location.href = newUrl;
-    } else {
-      router.push(newUrl);
-    }
+    const newUrl = `${pathname}?${params.toString()}`;
+    router.push(newUrl);
+    router.refresh();
   }
 
   // Generate page numbers array (up to 5 pages shown)
