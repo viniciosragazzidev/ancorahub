@@ -232,6 +232,7 @@ export function LeadsWorkspace({
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const [qualifyingPage, setQualifyingPage] = useState(1);
+  const [listPage, setListPage] = useState(1);
   const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -240,6 +241,13 @@ export function LeadsWorkspace({
   const visibleQualifyingLeads = useMemo(
     () => qualifyingLeads.slice((qualifyingPage - 1) * pageSize, qualifyingPage * pageSize),
     [qualifyingLeads, qualifyingPage, pageSize]
+  );
+
+  const totalListPages = Math.max(1, Math.ceil(leads.length / pageSize));
+  const safeListPage = Math.min(Math.max(1, listPage), totalListPages);
+  const visibleLeads = useMemo(
+    () => leads.slice((safeListPage - 1) * pageSize, safeListPage * pageSize),
+    [leads, safeListPage, pageSize]
   );
   const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
     const saved = loadKanbanConfig();
@@ -582,7 +590,7 @@ export function LeadsWorkspace({
         <TabsContent value="list" className="mt-4">
           <div className="space-y-4">
             <div className="hidden divide-y divide-border max-[559px]:block">
-              {leads.map((lead) => (
+              {visibleLeads.map((lead) => (
                 <button
                   key={lead.id}
                   type="button"
@@ -637,7 +645,7 @@ export function LeadsWorkspace({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.map((lead) => (
+                {visibleLeads.map((lead) => (
                   <TableRow
                     key={lead.id}
                     className="cursor-pointer group/row data-[selected]:bg-muted/40 data-[active]:bg-muted/15"
@@ -707,14 +715,13 @@ export function LeadsWorkspace({
                 ))}
               </TableBody>
             </Table>
-            {pagination ? (
-              <LeadsPagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                totalItems={pagination.totalItems}
-                pageSize={pagination.pageSize}
-              />
-            ) : null}
+            <LeadsPagination
+              currentPage={safeListPage}
+              totalPages={totalListPages}
+              totalItems={leads.length}
+              pageSize={pageSize}
+              onPageChange={setListPage}
+            />
           </div>
         </TabsContent>
 

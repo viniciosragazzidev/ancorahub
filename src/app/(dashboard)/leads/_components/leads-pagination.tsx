@@ -9,11 +9,13 @@ export function LeadsPagination({
   totalPages,
   totalItems,
   pageSize,
+  onPageChange,
 }: {
   currentPage: number;
   totalPages: number;
   totalItems: number;
   pageSize: number;
+  onPageChange?: (page: number) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -32,11 +34,15 @@ export function LeadsPagination({
 
   function goToPage(page: number) {
     if (page < 1 || page > totalPages || page === currentPage) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", page.toString());
-    const newUrl = `${pathname}?${params.toString()}`;
-    router.push(newUrl);
-    router.refresh();
+    if (onPageChange) {
+      onPageChange(page);
+    } else {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("page", page.toString());
+      const newUrl = `${pathname}?${params.toString()}`;
+      router.push(newUrl);
+      router.refresh();
+    }
   }
 
   // Generate page numbers array (up to 5 pages shown)

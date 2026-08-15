@@ -233,8 +233,7 @@ export default async function LeadsPage({
       .innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id))
       .where(where)
       .orderBy(desc(schema.leads.createdAt))
-      .limit(pageSize)
-      .offset(offset),
+      .limit(1000),
     db
       .select({ id: schema.carrierPlans.id, name: schema.carrierPlans.name, carrierName: schema.carriers.name })
       .from(schema.carrierPlans)
