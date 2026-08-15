@@ -206,7 +206,45 @@ export default async function ConversationsPage({ searchParams }: { searchParams
     };
   });
 
-  conversations.sort((a, b) => {
+  // Deduplicate conversations by phone number so duplicate DB lead records render as 1 contact
+  const uniqueConversationsByPhone = new Map<string, ConversationItem>();
+
+  for (const conv of conversations) {
+    const rawPhone = conv.telefone ? conv.telefone.replace(/\D/g, "") : "";
+    const phoneKey = rawPhone.length >= 8 ? rawPhone.slice(-11) : conv.id;
+
+    const existing = uniqueConversationsByPhone.get(phoneKey);
+    if (!existing) {
+      uniqueConversationsByPhone.set(phoneKey, conv);
+    } else {
+      const allMsgs = [...existing.messages, ...conv.messages].sort(
+        (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
+      );
+      const seenMsgIds = new Set<string>();
+      const dedupedMsgs = allMsgs.filter((m) => {
+        if (seenMsgIds.has(m.id)) return false;
+        seenMsgIds.add(m.id);
+        return true;
+      });
+
+      const isConvDistributed = conv.status === "distributed" || (conv.qualificationStatus && conv.qualificationStatus !== "pending");
+      const primary = isConvDistributed ? conv : existing;
+      const secondary = primary === conv ? existing : conv;
+      const latest = dedupedMsgs.at(-1) ?? null;
+
+      uniqueConversationsByPhone.set(phoneKey, {
+        ...primary,
+        qualificationStatus: primary.qualificationStatus || secondary.qualificationStatus,
+        messages: dedupedMsgs,
+        latestMessage: latest ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt } : primary.latestMessage,
+        documents: [...primary.documents, ...secondary.documents],
+        aiConversation: primary.aiConversation || secondary.aiConversation,
+      });
+    }
+  }
+
+  const finalConversations = Array.from(uniqueConversationsByPhone.values());
+  finalConversations.sort((a, b) => {
     const timeA = a.latestMessage ? new Date(a.latestMessage.sentAt).getTime() : new Date(a.stageEnteredAt).getTime();
     const timeB = b.latestMessage ? new Date(b.latestMessage.sentAt).getTime() : new Date(b.stageEnteredAt).getTime();
     return timeB - timeA;
@@ -317,7 +355,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
           <nav aria-label="Tipo de conversa" className="flex items-center gap-2">
             <BulkQualificationDialog />
             <Button render={<Link href="/conversas" />} size="sm" variant={officialBrokerTab ? "ghost" : "secondary"}>
-              Leads <Badge variant="outline">{conversations.length}</Badge>
+              Leads <Badge variant="outline">{finalConversations.length}</Badge>
             </Button>
             <Button render={<Link href="/conversas?tab=corretores" />} size="sm" variant={officialBrokerTab ? "secondary" : "ghost"}>
               Número oficial <span className="hidden lg:inline">· corretores</span>
@@ -330,7 +368,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
         {officialBrokerTab ? <OfficialBrokerConversations enabled={officialBrokerMessagesEnabled} conversations={officialBrokerConversations} /> : <ConversationsWorkspace
           role={context.role}
           branches={branches}
-          conversations={conversations}
+          conversations={finalConversations}
           initialLeadId={leadId}
           userId={context.userId}
           tenantId={context.tenantId}

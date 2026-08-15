@@ -1,12 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
+import { samePhone } from "@/features/communication-channels/service";
 import { lpFormPayloadSchema } from "../schemas/lp-form-payload.schema";
 import type { ReceiveLeadWebhookResult } from "../types/lead-webhook.types";
 import { hashNormalizedWebhookPayload, normalizeLeadEmail, normalizeLeadName, normalizeLeadPhone } from "../utils/lead-webhook.utils";
@@ -109,6 +110,34 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         .limit(1);
       if (existing?.payloadHash === payloadHash && existing.leadId) return { duplicate: true as const, leadId: existing.leadId };
       return { conflict: true as const };
+    }
+    const existingLeads = await tx
+      .select({ id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt)));
+
+    const existingLead = existingLeads.find((l) => l.telefone && samePhone(l.telefone, normalizedPhone));
+
+    if (existingLead) {
+      await tx
+        .update(schema.leads)
+        .set({
+          nome: normalizedName || undefined,
+          email: normalizedEmail || undefined,
+          ...(input.leadSource ? {
+            sourceChannel: input.leadSource.channel,
+            sourceCampaign: input.leadSource.campaign ?? null,
+            metaCampaignId: input.leadSource.campaign ?? null,
+            sourceAd: input.leadSource.ad ?? null,
+            sourceForm: input.leadSource.form ?? null,
+            capturedAt: input.leadSource.capturedAt ?? receivedAt,
+          } : {}),
+          updatedAt: now,
+        })
+        .where(eq(schema.leads.id, existingLead.id));
+
+      await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId: existingLead.id, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));
+      return { duplicate: true as const, leadId: existingLead.id };
     }
 
     await tx.insert(schema.leads).values({

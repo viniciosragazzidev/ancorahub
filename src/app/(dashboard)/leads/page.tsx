@@ -341,12 +341,25 @@ export default async function LeadsPage({
     }
   }
 
-  const qualifyingLeads = rawQualifyingLeads.map((item) => ({
-    ...item,
-    qualificationScore: item.qualificationScore ?? 0,
-    qualificationDetails: (item.qualificationDetails as Record<string, unknown>) ?? {},
-    createdAt: item.createdAt.toISOString(),
-  }));
+  const distributedPhones = new Set(
+    leads
+      .map((l) => (l.telefone ? l.telefone.replace(/\D/g, "") : ""))
+      .filter(Boolean)
+  );
+
+  const qualifyingLeads = rawQualifyingLeads
+    .filter((item) => {
+      if (item.status === "distributed") return false;
+      const p = item.telefone ? item.telefone.replace(/\D/g, "") : "";
+      if (!p) return true;
+      return !distributedPhones.has(p) && (p.length < 11 || !distributedPhones.has(p.slice(-11)));
+    })
+    .map((item) => ({
+      ...item,
+      qualificationScore: item.qualificationScore ?? 0,
+      qualificationDetails: (item.qualificationDetails as Record<string, unknown>) ?? {},
+      createdAt: item.createdAt.toISOString(),
+    }));
 
   const slaFirstContactMinutes = Number(slaSettings.slaFirstContactMinutes);
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);

@@ -31,9 +31,15 @@ export function LeadsPagination({
 
   function goToPage(page: number) {
     if (page < 1 || page > totalPages || page === currentPage) return;
-    const params = new URLSearchParams(searchParams.toString());
+    const currentSearch = typeof window !== "undefined" ? window.location.search : searchParams.toString();
+    const params = new URLSearchParams(currentSearch);
     params.set("page", page.toString());
-    router.push(`/leads?${params.toString()}`);
+    const newUrl = `/leads?${params.toString()}`;
+    if (typeof window !== "undefined") {
+      window.location.href = newUrl;
+    } else {
+      router.push(newUrl);
+    }
   }
 
   // Generate page numbers array (up to 5 pages shown)
