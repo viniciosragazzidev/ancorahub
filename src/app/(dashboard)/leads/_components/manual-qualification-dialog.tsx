@@ -88,15 +88,15 @@ export function ManualQualificationDialog({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setRating("qualified")}
+                onClick={() => setRating("hot")}
                 className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-xs font-medium transition-colors ${
-                  rating === "qualified" || rating === "hot"
-                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold"
+                  rating === "hot" || rating === "qualified"
+                    ? "border-rose-500/50 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-semibold"
                     : "border-border/70 hover:bg-muted/40"
                 }`}
               >
-                <Flame className="size-4 text-emerald-500" />
-                <span>Qualificado (Quente)</span>
+                <Flame className="size-4 text-rose-500" />
+                <span>Quente (Urgente 🔥)</span>
               </button>
 
               <button

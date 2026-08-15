@@ -301,7 +301,7 @@ export async function manuallyChangeQualificationStageAction(input: {
       const brokerToAssign = input.brokerId || (input.targetStage === "humano" ? await chooseAvailableBroker(context.tenantId, lead.branchId || context.branchId || "") : null);
       const isAssigned = Boolean(brokerToAssign);
       const chosenRating = input.rating ?? "qualified";
-      const finalQualStatus = chosenRating === "not_qualified" ? "cold" : chosenRating;
+      const finalQualStatus = chosenRating === "not_qualified" ? "disqualified" : chosenRating;
 
       await db.transaction(async (tx) => {
         await tx

@@ -86,6 +86,7 @@ export type ConversationItem = {
   telefone: string;
   email: string | null;
   status: string;
+  qualificationStatus?: string | null;
   origem: string;
   branchId: string | null;
   corretorId: string | null;
@@ -106,7 +107,6 @@ export type ConversationItem = {
     requirementName: string | null;
     createdAt: string;
   }[];
-  qualificationStatus?: string | null;
   aiConversation?: AiConversationData | null;
 };
 
@@ -1053,31 +1053,40 @@ function EmptyConversation() {
 }
 
 function renderRowQualificationBadge(conversation: ConversationItem) {
+  const qualStatus = (conversation.qualificationStatus || "").toLowerCase();
+  const leadStatus = (conversation.status || "").toLowerCase();
   const isDistributedOrQualified =
-    conversation.status === "distributed" ||
+    leadStatus === "distributed" ||
     conversation.aiConversation?.status === "CLOSED" ||
-    ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status);
+    Boolean(qualStatus && qualStatus !== "pending" && qualStatus !== "qualifying");
 
   if (isDistributedOrQualified) {
-    const norm = (conversation.status || "").toLowerCase();
-    if (norm === "hot" || norm.includes("quente")) {
+    const targetStatus = qualStatus || leadStatus;
+    if (targetStatus.includes("hot") || targetStatus.includes("quente")) {
       return (
         <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
           Quente 🔥
         </Badge>
       );
     }
-    if (norm === "warm" || norm.includes("morno")) {
+    if (targetStatus.includes("warm") || targetStatus.includes("morno")) {
       return (
         <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
           Morno ☀️
         </Badge>
       );
     }
-    if (norm === "cold" || norm.includes("frio")) {
+    if (targetStatus.includes("cold") || targetStatus.includes("frio")) {
       return (
         <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
           Frio ❄️
+        </Badge>
+      );
+    }
+    if (targetStatus.includes("disqualified") || targetStatus.includes("desqualificado") || targetStatus.includes("wrong") || targetStatus.includes("opt")) {
+      return (
+        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-gray-500/30 bg-gray-500/10 text-muted-foreground font-medium">
+          Desqualificado
         </Badge>
       );
     }

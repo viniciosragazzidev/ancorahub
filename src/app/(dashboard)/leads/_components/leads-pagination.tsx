@@ -30,9 +30,24 @@ export function LeadsPagination({
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
   function goToPage(page: number) {
+    if (page < 1 || page > totalPages || page === currentPage) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", page.toString());
-    router.push(`/leads${params.toString() ? `?${params.toString()}` : ""}`);
+    router.push(`/leads?${params.toString()}`);
+  }
+
+  // Generate page numbers array (up to 5 pages shown)
+  const pages: (number | string)[] = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (currentPage > 3) pages.push("...");
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push("...");
+    pages.push(totalPages);
   }
 
   return (
@@ -43,7 +58,7 @@ export function LeadsPagination({
         <strong className="font-semibold text-foreground">{totalItems}</strong> leads
       </p>
 
-      <div className="flex items-center gap-1.5 self-end sm:self-auto">
+      <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
         <Button
           size="sm"
           variant="outline"
@@ -55,9 +70,23 @@ export function LeadsPagination({
           Anterior
         </Button>
 
-        <span className="px-2 text-xs font-medium text-foreground">
-          Página {currentPage} de {totalPages}
-        </span>
+        {pages.map((p, idx) =>
+          typeof p === "number" ? (
+            <Button
+              key={`page-${p}`}
+              size="sm"
+              variant={p === currentPage ? "default" : "outline"}
+              className="h-8 w-8 p-0 text-xs font-semibold"
+              onClick={() => goToPage(p)}
+            >
+              {p}
+            </Button>
+          ) : (
+            <span key={`dots-${idx}`} className="px-1 text-xs text-muted-foreground">
+              {p}
+            </span>
+          )
+        )}
 
         <Button
           size="sm"
