@@ -232,6 +232,7 @@ export function QualificationHubClient({
   const [enabled, setEnabled] = useState(settings?.enabled ?? false);
   const [pauseMode, setPauseMode] = useState(settings?.pauseMode ?? "handoff_active");
   const [assistantName, setAssistantName] = useState(settings?.assistantName ?? "Assistente AncoraHub");
+  const [timeoutMinutes, setTimeoutMinutes] = useState(settings?.timeoutMinutes ?? 20);
   const [initialMessage, setInitialMessage] = useState(
     settings?.initialMessage ??
       "Olá! Sou o assistente virtual do AncoraHub. Vou fazer algumas perguntas rápidas para preparar seu atendimento."
@@ -315,7 +316,7 @@ export function QualificationHubClient({
         absenceMessage: settings?.absenceMessage ?? "Sem corretores",
         tone: settings?.tone ?? "friendly",
         useEmojis: settings?.useEmojis ?? false,
-        timeoutMinutes: settings?.timeoutMinutes ?? 30,
+        timeoutMinutes: Number(timeoutMinutes) || 20,
         businessContext,
         customInstructions,
       });
@@ -636,6 +637,26 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                         <SelectItem value="pause_immediately">Pausar imediatamente todas as conversas</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Tempo Limite de Qualificação (Sem Resposta)</Label>
+                      <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 dark:text-amber-400 font-mono">
+                        {timeoutMinutes} min
+                      </Badge>
+                    </div>
+                    <Input
+                      type="number"
+                      min={5}
+                      max={120}
+                      value={timeoutMinutes}
+                      onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
+                      placeholder="20"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Se o lead ficar mais de <strong>{timeoutMinutes} minutos sem responder</strong>, a qualificação por IA é encerrada, o lead é etiquetado como <strong>Cold</strong> e enviado direto para a <strong>Fila de Distribuição de Corretores</strong>.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
