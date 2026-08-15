@@ -255,7 +255,7 @@ export function ConversationsWorkspace({
           aria-label="Lista de atendimentos"
           className={cn("flex min-h-0 flex-col border-r border-border bg-card", selected && "max-lg:hidden")}
         >
-          <div className="space-y-3 border-b border-border px-3 py-3">
+          <div className="border-b border-border px-3 py-2.5">
             <div className="relative">
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -265,11 +265,6 @@ export function ConversationsWorkspace({
                 placeholder="Buscar por nome, telefone ou e-mail"
                 value={query}
               />
-            </div>
-            <div className="flex items-center gap-1 overflow-x-auto pb-0.5" role="group" aria-label="Filtrar atendimentos">
-              <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
-              <FilterChip active={filter === "with_messages"} count={messagesWithHistory} label="Com histórico" onClick={() => setFilter("with_messages")} />
-              <FilterChip active={filter === "without_messages"} count={conversations.length - messagesWithHistory} label="Sem histórico" onClick={() => setFilter("without_messages")} />
             </div>
           </div>
 
@@ -1122,28 +1117,28 @@ function ClientProfile({ client }: { client: ConversationItem }) {
               <p className="text-xs text-muted-foreground">
                 Altere manualmente a etapa de qualificação do lead.
               </p>
-              <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="flex flex-col gap-2 pt-1">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1 justify-center"
+                  className="w-full h-8 text-xs gap-1.5 justify-center"
                   disabled={isReverting}
                   onClick={handleRevertToQualifying}
                 >
-                  <RotateCcw className="size-3.5 text-amber-500" />
-                  {isReverting ? "Movendo..." : "Mover p/ Qualificação"}
+                  <RotateCcw className="size-3.5 text-amber-500 shrink-0" />
+                  <span>{isReverting ? "Movendo..." : "Mover p/ Qualificação"}</span>
                 </Button>
 
                 <Button
                   type="button"
                   variant="default"
                   size="sm"
-                  className="h-8 text-xs gap-1.5 justify-center font-medium"
+                  className="w-full h-8 text-xs gap-1.5 justify-center font-medium"
                   onClick={() => setOpenQualifyDialog(true)}
                 >
-                  <Sparkle className="size-3.5" />
-                  Qualificar Lead
+                  <Sparkle className="size-3.5 shrink-0" />
+                  <span>Qualificar Lead</span>
                 </Button>
               </div>
             </div>
@@ -1183,39 +1178,44 @@ function ClientProfile({ client }: { client: ConversationItem }) {
             </ProfileSection>
           ) : null}
 
-          <ProfileSection title="Próximas ações">
-            <div className="flex flex-col gap-2">
-              <Button className="w-full justify-start gap-2" render={<Link href={`/leads/${client.id}`} />} size="sm" variant="outline">
-                <FileText className="size-4 shrink-0" />
-                <span className="truncate">Ver tarefas e documentos</span>
-              </Button>
-              <Button className="w-full justify-start gap-2" render={<Link href={`/leads/${client.id}#documentos`} />} size="sm" variant="outline">
-                <FileText className="size-4 shrink-0" />
-                <span className="truncate">Adicionar documento</span>
-              </Button>
-            </div>
-          </ProfileSection>
+          {/* Exibe tarefas e documentos apenas para leads em fases comerciais avançadas */}
+          {["documentation_pending", "under_analysis", "converted", "negotiation"].includes(client.status) ? (
+            <>
+              <ProfileSection title="Próximas ações">
+                <div className="flex flex-col gap-2">
+                  <Button className="w-full justify-start gap-2" render={<Link href={`/leads/${client.id}`} />} size="sm" variant="outline">
+                    <FileText className="size-4 shrink-0" />
+                    <span className="truncate">Ver tarefas e documentos</span>
+                  </Button>
+                  <Button className="w-full justify-start gap-2" render={<Link href={`/leads/${client.id}#documentos`} />} size="sm" variant="outline">
+                    <FileText className="size-4 shrink-0" />
+                    <span className="truncate">Adicionar documento</span>
+                  </Button>
+                </div>
+              </ProfileSection>
 
-          <ProfileSection action={<Link className="text-xs font-medium text-primary hover:underline" href={`/leads/${client.id}`}>Ver todos</Link>} title="Documentos">
-            <div className="grid grid-cols-2 gap-2">
-              <ProfileMetric label="Aprovados" value={approvedDocuments} />
-              <ProfileMetric label="Em análise" tone="warning" value={pendingDocuments} />
-            </div>
-            {client.documents.length ? (
-              <div className="mt-3 space-y-1.5">
-                {client.documents.slice(0, 3).map((document) => (
-                  <a className="flex items-center gap-2 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={document.fileUrl} key={document.id} rel="noreferrer" target="_blank">
-                    <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/[0.08] text-primary"><FileText className="size-3.5" /></span>
-                    <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{document.requirementName ?? document.filename}</span><span className="block truncate text-[11px] text-muted-foreground">{document.requirementName ? document.filename : documentStatusLabel(document.status)}</span></span>
-                    <ArrowSquareOut className="size-3.5 shrink-0 text-muted-foreground" />
-                  </a>
-                ))}
-              </div>
-            ) : <EmptyState variant="inline" icon={FileText} title="Nenhum documento importado." />}
-          </ProfileSection>
+              <ProfileSection action={<Link className="text-xs font-medium text-primary hover:underline" href={`/leads/${client.id}`}>Ver todos</Link>} title="Documentos">
+                <div className="grid grid-cols-2 gap-2">
+                  <ProfileMetric label="Aprovados" value={approvedDocuments} />
+                  <ProfileMetric label="Em análise" tone="warning" value={pendingDocuments} />
+                </div>
+                {client.documents.length ? (
+                  <div className="mt-3 space-y-1.5">
+                    {client.documents.slice(0, 3).map((document) => (
+                      <a className="flex items-center gap-2 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={document.fileUrl} key={document.id} rel="noreferrer" target="_blank">
+                        <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/[0.08] text-primary"><FileText className="size-3.5" /></span>
+                        <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{document.requirementName ?? document.filename}</span><span className="block truncate text-[11px] text-muted-foreground">{document.requirementName ? document.filename : documentStatusLabel(document.status)}</span></span>
+                        <ArrowSquareOut className="size-3.5 shrink-0 text-muted-foreground" />
+                      </a>
+                    ))}
+                  </div>
+                ) : <EmptyState variant="inline" icon={FileText} title="Nenhum documento importado." />}
+              </ProfileSection>
+            </>
+          ) : null}
 
-          <ProfileSection action={<span className="text-xs tabular-nums text-muted-foreground">{sharedMedia.length}</span>} title="Links compartilhados">
-            {sharedMedia.length ? (
+          {sharedMedia.length ? (
+            <ProfileSection action={<span className="text-xs tabular-nums text-muted-foreground">{sharedMedia.length}</span>} title="Links compartilhados">
               <div className="space-y-1.5">
                 {sharedMedia.slice(0, 3).map((media) => (
                   <a className="flex items-center gap-2 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={media.url} key={media.url} rel="noreferrer" target="_blank">
@@ -1225,8 +1225,8 @@ function ClientProfile({ client }: { client: ConversationItem }) {
                   </a>
                 ))}
               </div>
-            ) : <EmptyState variant="inline" icon={LinkSimple} title="Nenhum link identificado." />}
-          </ProfileSection>
+            </ProfileSection>
+          ) : null}
 
           <ProfileSection title="Resumo do atendimento">
             <dl className="grid grid-cols-2 gap-2">
