@@ -43,7 +43,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
-import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 
 import {
   updateQualificationSettingsAction,
@@ -256,16 +255,15 @@ export function QualificationHubClient({
   const activeAlertsCount = alerts.filter((a) => a.status === "active").length;
 
   const tabs = [
-    { id: "overview", label: "Visão Geral", icon: SlidersHorizontal },
-    { id: "training", label: "Treinamento e versões", icon: Layers },
-    { id: "whatsapp_diag", label: "WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
-    { id: "followup_rules", label: "Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "mcp_governance", label: "Ferramentas & MCP", icon: ShieldAlert, color: "text-amber-500" },
-    { id: "destinations", label: "Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
-    { id: "brokers", label: "Elegibilidade Corretores", icon: UserCheck },
-    { id: "system_messages", label: "Mensagens do Sistema", icon: FileText },
-    { id: "alerts", label: `Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
-    { id: "simulator", label: "Simulador Web", icon: MessageSquare },
+    { id: "overview", label: "1. Contexto & Prompt do Agente", icon: MessageSquare, color: "text-primary" },
+    { id: "training", label: "2. Treinamento e Versões", icon: Layers },
+    { id: "whatsapp_diag", label: "3. WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
+    { id: "followup_rules", label: "4. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
+    { id: "mcp_governance", label: "5. Ferramentas & Governança MCP", icon: ShieldAlert, color: "text-amber-500" },
+    { id: "destinations", label: "6. Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
+    { id: "brokers", label: "7. Elegibilidade Corretores", icon: UserCheck },
+    { id: "alerts", label: `8. Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "simulator", label: "9. Simulador Web", icon: SlidersHorizontal },
   ];
 
   const requestedTab = searchParams.get("tab");
@@ -914,7 +912,6 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         {activeTab === "training" && (
           <div className="grid gap-6">
             <AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} />
-            <DistributionPolicyPanel brokers={agentTraining.brokers} canEdit={agentTraining.canEdit} policy={agentTraining.distributionPolicy} />
           </div>
         )}
 

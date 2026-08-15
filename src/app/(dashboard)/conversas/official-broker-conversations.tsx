@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
+import { Message, MessageAvatar, MessageContent, MessageFooter, MessageHeader } from "@/components/ui/message";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatCircleText, Clock, MagnifyingGlass, PaperPlaneTilt, WhatsappLogo } from "@/components/huge-icons";
 import { cn } from "@/lib/utils";
@@ -100,7 +102,7 @@ export function OfficialBrokerConversations({ enabled, conversations }: { enable
           {selected ? <>
             <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3"><Button aria-label="Voltar para a lista" className="lg:hidden" onClick={() => setSelectedId(null)} size="icon-sm" variant="ghost">←</Button><span className="flex size-9 items-center justify-center rounded-full bg-success/10 text-sm font-semibold text-success">{initials(selected.name)}</span><div className="min-w-0"><h3 className="truncate text-sm font-semibold">{selected.name}</h3><p className="text-xs text-muted-foreground">{selected.phoneMasked} · {selected.branchName ?? "Sem unidade"}</p></div>{selected.invitationStatus ? <Badge className="ml-auto" variant={selected.invitationStatus === "ACCEPTED" ? "success" : "secondary"}>{invitationLabels[selected.invitationStatus] ?? selected.invitationStatus}</Badge> : null}</header>
             <ScrollArea className="min-h-0 flex-1"><div className="mx-auto flex w-full max-w-3xl flex-col gap-3 p-4 lg:p-5">
-              {selected.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+              {selected.messages.map((message) => <MessageBubble brokerName={selected.name} key={message.id} message={message} />)}
               {!selected.messages.length ? <EmptyState icon={ChatCircleText} title="Nenhuma mensagem registrada" description="Quando o número oficial enviar ou receber uma mensagem deste corretor, ela aparecerá aqui." /> : null}
             </div></ScrollArea>
           </> : <div className="flex h-full items-center justify-center"><EmptyState icon={ChatCircleText} title="Selecione um corretor" description="Escolha um item da lista para consultar o histórico oficial." /></div>}
@@ -110,10 +112,54 @@ export function OfficialBrokerConversations({ enabled, conversations }: { enable
   );
 }
 
-function MessageBubble({ message }: { message: OfficialBrokerMessage }) {
+function MessageBubble({ message, brokerName }: { message: OfficialBrokerMessage; brokerName: string }) {
   const outgoing = message.direction === "outgoing";
   const statusVariant = message.status === "failed" ? "destructive" : message.status === "delivered" || message.status === "read" || message.status === "received" ? "success" : "secondary";
-  return <div className={cn("flex", outgoing ? "justify-end" : "justify-start")}><article className={cn("max-w-[88%] rounded-xl border px-3 py-2.5 text-sm shadow-sm", outgoing ? "border-success/20 bg-success/5" : "border-border bg-card")}><div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">{outgoing ? <PaperPlaneTilt className="size-3" aria-hidden="true" /> : <ChatCircleText className="size-3" aria-hidden="true" />}<span>{outgoing ? "Número oficial" : "Corretor"}</span><span>·</span><time dateTime={message.sentAt}>{formatDate(message.sentAt)}</time></div><p className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-5">{message.body}</p><div className="mt-2 flex flex-wrap items-center gap-1.5"><Badge variant={statusVariant}>{deliveryLabels[message.status]}</Badge>{message.templateName ? <Badge variant="outline">{message.templateName}</Badge> : null}{message.attempts && message.attempts > 1 ? <span className="text-[11px] text-muted-foreground">{message.attempts} tentativas</span> : null}</div>{message.status === "failed" && message.error ? <p className="mt-2 text-xs text-destructive">{message.error}</p> : null}</article></div>;
+
+  return (
+    <Message align={outgoing ? "end" : "start"} className="ct-reveal-fast">
+      {outgoing ? null : (
+        <MessageAvatar>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-[11px] font-semibold text-success">{initials(brokerName)}</span>
+        </MessageAvatar>
+      )}
+
+      <MessageContent>
+        <MessageHeader>
+          <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-tight", outgoing ? "text-success" : "text-muted-foreground")}>
+            {outgoing ? <PaperPlaneTilt className="size-3" aria-hidden="true" /> : <ChatCircleText className="size-3" aria-hidden="true" />}
+            {outgoing ? "Número oficial" : "Corretor"}
+          </span>
+        </MessageHeader>
+
+        <Bubble align={outgoing ? "end" : "start"} variant="outline">
+          <BubbleContent
+            className={cn(
+              "max-w-lg text-xs leading-relaxed",
+              outgoing ? "border-success/20 bg-success/5" : "bg-card",
+            )}
+          >
+            <p className="whitespace-pre-wrap break-words leading-5">{message.body}</p>
+            {message.status === "failed" && message.error ? (
+              <p className="mt-2 text-[11px] font-medium text-destructive">{message.error}</p>
+            ) : null}
+          </BubbleContent>
+        </Bubble>
+
+        <MessageFooter>
+          <time dateTime={message.sentAt} className="tabular-nums">
+            {formatDate(message.sentAt)}
+          </time>
+          <span aria-hidden="true" className="opacity-60">•</span>
+          <Badge variant={statusVariant}>{deliveryLabels[message.status]}</Badge>
+          {message.templateName ? <Badge variant="outline">{message.templateName}</Badge> : null}
+          {message.attempts && message.attempts > 1 ? (
+            <span className="text-[11px] text-muted-foreground">{message.attempts} tentativas</span>
+          ) : null}
+        </MessageFooter>
+      </MessageContent>
+    </Message>
+  );
 }
 
 function initials(name: string) { return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }

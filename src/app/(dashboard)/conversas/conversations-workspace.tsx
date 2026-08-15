@@ -5,8 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bubble, BubbleContent, BubbleGroup } from "@/components/ui/bubble";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "@/components/ui/message";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -437,34 +438,36 @@ function ConversationHeader({
   }
 
   return (
-    <header className="flex min-h-16 flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
-      <Button aria-label="Voltar para atendimentos" className="lg:hidden" onClick={onBack} size="icon-sm" type="button" variant="ghost">
-        <ArrowLeft className="size-3.5" />
-      </Button>
-      <ContactAvatar name={client.nome} />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2 flex-wrap">
-          <h2 className="truncate text-sm font-semibold tracking-tight">{client.nome}</h2>
-          <Badge className="hidden shrink-0 sm:inline-flex" variant="outline">
-            {LEAD_STATUS_LABELS[client.status] ?? client.status}
-          </Badge>
-          {isAiActive ? (
-            <Badge className="bg-primary/10 text-primary border-primary/25" variant="outline">
-              Atendente Virtual
+    <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-3 flex-1 min-w-[200px]">
+        <Button aria-label="Voltar para atendimentos" className="lg:hidden shrink-0" onClick={onBack} size="icon-sm" type="button" variant="ghost">
+          <ArrowLeft className="size-3.5" />
+        </Button>
+        <ContactAvatar name={client.nome} className="shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-sm font-semibold tracking-tight text-foreground truncate max-w-[220px] sm:max-w-xs">{client.nome}</h2>
+            <Badge className="hidden shrink-0 sm:inline-flex" variant="outline">
+              {LEAD_STATUS_LABELS[client.status] ?? client.status}
             </Badge>
-          ) : isWaitingHuman ? (
-            <Badge className="bg-warning/15 text-warning border-warning/30 font-semibold" variant="outline">
-              Aguardando Humano
-            </Badge>
-          ) : isHumanActive ? (
-            <Badge className="bg-success/15 text-success border-success/30 font-semibold" variant="outline">
-              Atendimento Humano
-            </Badge>
-          ) : null}
+            {isAiActive ? (
+              <Badge className="bg-primary/10 text-primary border-primary/25 shrink-0" variant="outline">
+                Atendente Virtual
+              </Badge>
+            ) : isWaitingHuman ? (
+              <Badge className="bg-warning/15 text-warning border-warning/30 font-semibold shrink-0" variant="outline">
+                Aguardando Humano
+              </Badge>
+            ) : isHumanActive ? (
+              <Badge className="bg-success/15 text-success border-success/30 font-semibold shrink-0" variant="outline">
+                Atendimento Humano
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
         </div>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
         <Button
           className="h-8 text-xs font-semibold gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
           disabled={isPending}
@@ -636,18 +639,6 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
     );
   }, [client.messages]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [sortedMessages.length, client.id]);
-
-  if (!sortedMessages.length) {
-    return <HistoryEmptyState client={client} />;
-  }
-
-  const getGroupKey = (dir: string) => {
-    return dir === "outgoing" || dir === "outbound" ? "system" : "client";
-  };
-
   // Group messages by Date ("Hoje", "Ontem", "15 de Agosto de 2026")
   const messagesByDate = useMemo(() => {
     const map = new Map<string, ConversationMessage[]>();
@@ -659,6 +650,18 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
     }
     return Array.from(map.entries());
   }, [sortedMessages]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [sortedMessages.length, client.id]);
+
+  if (!sortedMessages.length) {
+    return <HistoryEmptyState client={client} />;
+  }
+
+  const getGroupKey = (dir: string) => {
+    return dir === "outgoing" || dir === "outbound" ? "system" : "client";
+  };
 
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -690,11 +693,17 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
               </div>
 
               {grouped.map((group, gi) => (
-                <BubbleGroup key={gi}>
-                  {group.messages.map((message) => (
-                    <MessageBubble key={message.id} message={message} />
+                <MessageGroup key={gi}>
+                  {group.messages.map((message, mi) => (
+                    <MessageRow
+                      clientName={client.nome}
+                      key={message.id}
+                      message={message}
+                      showAvatar={mi === group.messages.length - 1}
+                      showHeader={mi === 0}
+                    />
                   ))}
-                </BubbleGroup>
+                </MessageGroup>
               ))}
             </div>
           );
@@ -786,21 +795,22 @@ function MessageSenderBadge({
   if (isOutbound) {
     if (senderRole === "assistant" || direction === "outbound") {
       return (
-        <span className="inline-flex items-center gap-1 rounded-xs bg-white/20 dark:bg-black/20 px-1.5 py-0.5 text-[10px] font-bold tracking-tight text-white dark:text-primary-foreground">
+        <span className="inline-flex items-center gap-1 rounded-md bg-primary/[0.08] px-1.5 py-0.5 text-[10px] font-semibold tracking-tight text-primary">
           <Sparkles className="size-2.5" />
           IA Assistente
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 rounded-xs bg-white/20 dark:bg-black/20 px-1.5 py-0.5 text-[10px] font-bold tracking-tight text-white dark:text-primary-foreground">
+      <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-tight text-foreground">
         Atendente Humano
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+      <span aria-hidden="true" className="size-1 rounded-full bg-muted-foreground/40" />
       Cliente
     </span>
   );
@@ -819,67 +829,98 @@ function MessageStatusIndicator({
   switch (status) {
     case "read":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-300 dark:text-sky-400" title="Mensagem Lida pelo Cliente (WhatsApp)">
-          <span className="text-[12px] font-extrabold leading-none">✓✓</span>
-          <span>Lida</span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success" title="Mensagem lida pelo cliente (WhatsApp)">
+          <span aria-hidden="true" className="text-xs font-extrabold leading-none">✓✓</span>
+          Lida
         </span>
       );
     case "delivered":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-white/90 dark:text-primary-foreground/80" title="Entregue no WhatsApp do Cliente">
-          <span className="text-[12px] font-bold leading-none">✓✓</span>
-          <span>Entregue</span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Entregue no WhatsApp do cliente">
+          <span aria-hidden="true" className="text-xs font-bold leading-none">✓✓</span>
+          Entregue
         </span>
       );
     case "failed":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-200" title="Falha ao entregar mensagem">
-          <span className="size-3 rounded-full bg-red-500/40 text-white text-[9px] font-bold flex items-center justify-center">!</span>
-          <span>Falha</span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive" title="Falha ao entregar mensagem">
+          <span aria-hidden="true" className="grid size-3 shrink-0 place-items-center rounded-full bg-destructive/15 text-destructive text-[9px] font-bold">!</span>
+          Falha
         </span>
       );
     case "queued":
     case "sending":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-white/80 dark:text-primary-foreground/70" title="Enviando para o WhatsApp">
-          <Clock className="size-2.5 animate-spin" />
-          <span>Enviando...</span>
-        </span>
+        <Marker className="min-h-0 w-auto gap-1.5 text-[10px] font-medium text-muted-foreground" role="status">
+          <MarkerIcon>
+            <Clock className="size-2.5 animate-spin" />
+          </MarkerIcon>
+          <MarkerContent>Enviando...</MarkerContent>
+        </Marker>
       );
     case "sent":
     default:
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] text-white/90 dark:text-primary-foreground/80" title="Enviada ao Servidor Meta">
-          <span className="text-[12px] font-bold leading-none">✓</span>
-          <span>Enviada</span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Enviada ao servidor Meta">
+          <span aria-hidden="true" className="text-xs font-bold leading-none">✓</span>
+          Enviada
         </span>
       );
   }
 }
 
-function MessageBubble({ message }: { message: ConversationMessage }) {
+function MessageRow({
+  message,
+  clientName,
+  showAvatar,
+  showHeader,
+}: {
+  message: ConversationMessage;
+  clientName: string;
+  showAvatar: boolean;
+  showHeader: boolean;
+}) {
   const isOutbound = message.direction === "outgoing" || message.direction === "outbound";
 
   return (
-    <Bubble variant={isOutbound ? "default" : "secondary"} align={isOutbound ? "end" : "start"} className="group relative">
-      <BubbleContent className={cn("text-xs leading-relaxed transition-all shadow-2xs max-w-lg", isOutbound ? "bg-primary text-primary-foreground" : "bg-card border border-border text-foreground")}>
-        <div className="mb-1.5 flex items-center justify-between gap-3 border-b border-white/15 pb-1 dark:border-black/15">
-          <MessageSenderBadge direction={message.direction} senderRole={message.senderRole} />
-        </div>
-        <p className="whitespace-pre-wrap font-normal leading-5">{message.body}</p>
-        <div className={cn("mt-2 flex items-center gap-1.5 text-[10px]", isOutbound ? "justify-end text-white/90 dark:text-primary-foreground/80" : "text-muted-foreground")}>
+    <Message align={isOutbound ? "end" : "start"} className="ct-reveal-fast">
+      {isOutbound ? null : (
+        <MessageAvatar aria-hidden={!showAvatar} className={cn(!showAvatar && "invisible")}>
+          {showAvatar ? <ContactAvatar className="size-8" name={clientName} /> : null}
+        </MessageAvatar>
+      )}
+
+      <MessageContent>
+        {showHeader ? (
+          <MessageHeader>
+            <MessageSenderBadge direction={message.direction} senderRole={message.senderRole} />
+          </MessageHeader>
+        ) : null}
+
+        <Bubble align={isOutbound ? "end" : "start"} variant={isOutbound ? "default" : "outline"}>
+          <BubbleContent
+            className={cn(
+              "max-w-lg text-xs leading-relaxed",
+              isOutbound ? "bg-primary text-primary-foreground" : "bg-card",
+            )}
+          >
+            <p className="whitespace-pre-wrap leading-5">{message.body}</p>
+          </BubbleContent>
+        </Bubble>
+
+        <MessageFooter>
           <time dateTime={message.sentAt} className="tabular-nums">
             {formatTime(message.sentAt)}
           </time>
-          {isOutbound && (
+          {isOutbound ? (
             <>
               <span aria-hidden="true" className="opacity-60">•</span>
               <MessageStatusIndicator status={message.providerStatus} direction={message.direction} />
             </>
-          )}
-        </div>
-      </BubbleContent>
-    </Bubble>
+          ) : null}
+        </MessageFooter>
+      </MessageContent>
+    </Message>
   );
 }
 

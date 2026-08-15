@@ -4,13 +4,15 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { ArrowRight, Buildings, ChatCircleText } from "@/components/huge-icons";
+import { ArrowRight, Buildings, ChatCircleText, RotateCcw, Sparkle } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
 import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
+import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
+import { ManualQualificationDialog } from "./manual-qualification-dialog";
 
 type Broker = { id: string; name: string; branchId: string | null };
 type Branch = { id: string; name: string };
@@ -18,6 +20,7 @@ type ManagementMode = "reassign" | "investigate";
 
 export function LeadDrawerManagementActions({
   leadId,
+  leadName,
   brokers,
   branches,
   leadBranchId,
@@ -27,6 +30,7 @@ export function LeadDrawerManagementActions({
   onSuccess,
 }: {
   leadId: string;
+  leadName?: string;
   brokers: Broker[];
   branches?: Branch[];
   leadBranchId?: string | null;
@@ -41,6 +45,25 @@ export function LeadDrawerManagementActions({
   const [reason, setReason] = useState("");
   const [isAssuming, setIsAssuming] = useState(false);
   const [assignBranchId, setAssignBranchId] = useState("");
+
+  const [openQualifyDialog, setOpenQualifyDialog] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+
+  async function handleRevertToQualifying() {
+    setIsReverting(true);
+    const res = await manuallyChangeQualificationStageAction({
+      leadId,
+      targetStage: "qualificacoes",
+    });
+    setIsReverting(false);
+    if (res.success) {
+      toast.success("Lead movido de volta para a fila de qualificação!");
+      router.refresh();
+      if (onSuccess) onSuccess();
+    } else {
+      toast.error(res.error ?? "Erro ao mover lead para qualificação.");
+    }
+  }
 
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
@@ -157,6 +180,46 @@ export function LeadDrawerManagementActions({
           </Button>
         </div>
       )}
+
+      {/* Seção de Controle de Estágio e Qualificação */}
+      <div className="rounded-lg border border-border/70 bg-card p-3 space-y-2">
+        <p className="text-xs font-semibold text-foreground">Estágio & Qualificação do Lead</p>
+        <p className="text-xs text-muted-foreground">
+          Altere manualmente a etapa deste lead entre a fila de qualificação IA e o status de lead qualificado.
+        </p>
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1"
+            disabled={isReverting}
+            onClick={handleRevertToQualifying}
+          >
+            <RotateCcw className="size-3.5 text-amber-500" />
+            {isReverting ? "Movendo..." : "Mover p/ Qualificação"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className="h-8 text-xs gap-1 font-medium"
+            onClick={() => setOpenQualifyDialog(true)}
+          >
+            <Sparkle className="size-3.5" />
+            Qualificar Lead
+          </Button>
+        </div>
+      </div>
+
+      <ManualQualificationDialog
+        open={openQualifyDialog}
+        onOpenChange={setOpenQualifyDialog}
+        leadId={leadId}
+        leadName={leadName || "Lead"}
+        brokers={brokers}
+      />
 
       {/* Seletor de modo */}
       <div className="inline-flex w-full rounded-lg border border-border/80 bg-muted/50 p-1" role="group" aria-label="Tipo de intervenção">

@@ -874,6 +874,7 @@ export function LeadsWorkspace({
                     {contextRole === "manager" || contextRole === "director" ? (
                       <LeadDrawerManagementActions
                         leadId={selectedLead.id}
+                        leadName={selectedLead.nome}
                         brokers={filteredBrokers}
                         branches={branches}
                         leadBranchId={selectedLead.branchId}
