@@ -85,6 +85,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       metaCampaignId: schema.leads.metaCampaignId,
       tipo: schema.leads.tipo,
       status: schema.leads.status,
+      qualificationStatus: schema.leads.qualificationStatus,
+      qualificationState: schema.leads.qualificationState,
       formData: schema.leads.formData,
       qualificationDetails: schema.leads.qualificationDetails,
       corretorId: schema.leads.corretorId,
@@ -202,7 +204,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   <ChatCircleText className="size-3.5 text-primary" />
                   Conversas
                 </Button>
-                <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
+                {lead.status !== "distributed" && lead.qualificationState !== "QUALIFIED" && (!lead.qualificationStatus || ["pending", "qualifying"].includes(lead.qualificationStatus)) ? (
+                  <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
+                ) : null}
                 {context.role === "director" ? <DeleteLeadControl leadId={lead.id} leadName={lead.nome} /> : null}
                 {context.role === "broker" && context.userId === lead.corretorId && lead.status === "distributed" && (
                   <StartServiceButton leadId={lead.id} />
