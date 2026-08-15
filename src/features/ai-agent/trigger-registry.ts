@@ -1,9 +1,11 @@
-import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
-import { getDatabase, schema } from "@/shared/db";
-import { transitionConversationState } from "./conversation-state-machine";
+export type AgentTriggerCategory = "intake" | "action";
 
 export type AgentTriggerActionType =
+  | "COLLECT_NAME"
+  | "COLLECT_DEPENDENTS"
+  | "COLLECT_CITY"
+  | "COLLECT_PLAN_TYPE"
+  | "COLLECT_URGENCY"
   | "TRANSFER_HUMAN"
   | "TAG_HOT"
   | "TAG_WARM"
@@ -17,7 +19,7 @@ export interface AgentTriggerItem {
   key: string;
   name: string;
   description: string;
-  category: "transfer" | "qualification" | "opt_out" | "question" | "automation";
+  category: AgentTriggerCategory;
   actionType: AgentTriggerActionType;
   enabled: boolean;
   keywords: string[];
@@ -26,67 +28,125 @@ export interface AgentTriggerItem {
 }
 
 export const INITIAL_AGENT_TRIGGERS: AgentTriggerItem[] = [
+  // --- TRIGGERS DE ATENDIMENTO (INTAKE DE DADOS) ---
   {
-    id: "trg_transfer_human",
+    id: "trg_intake_name",
+    key: "COLLECT_NAME",
+    name: "Perguntar / Coletar Nome do Lead",
+    description: "Triggers de atendimento: Coleta e valida o nome completo ou preferido do lead.",
+    category: "intake",
+    actionType: "COLLECT_NAME",
+    enabled: true,
+    keywords: ["qual seu nome", "meu nome e", "me chamo"],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "trg_intake_dependents",
+    key: "COLLECT_DEPENDENTS",
+    name: "Coletar Vidas & Dependentes",
+    description: "Triggers de atendimento: Pergunta o número de pessoas ou dependentes para o plano de saúde.",
+    category: "intake",
+    actionType: "COLLECT_DEPENDENTS",
+    enabled: true,
+    keywords: ["quantas vidas", "dependentes", "quantas pessoas", "familia"],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "trg_intake_city",
+    key: "COLLECT_CITY",
+    name: "Coletar Cidade / Região",
+    description: "Triggers de atendimento: Identifica a cidade e estado para verificar rede credenciada.",
+    category: "intake",
+    actionType: "COLLECT_CITY",
+    enabled: true,
+    keywords: ["qual cidade", "moro em", "regiao", "sao paulo", "rio de janeiro"],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "trg_intake_plan",
+    key: "COLLECT_PLAN_TYPE",
+    name: "Coletar Tipo de Plano",
+    description: "Triggers de atendimento: Pergunta se o plano é Individual, Familiar, PME ou Empresarial (CNPJ).",
+    category: "intake",
+    actionType: "COLLECT_PLAN_TYPE",
+    enabled: true,
+    keywords: ["tipo de plano", "cnpj", "individual", "familiar", "pme"],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "trg_intake_urgency",
+    key: "COLLECT_URGENCY",
+    name: "Coletar Urgência da Contratação",
+    description: "Triggers de atendimento: Identifica o prazo de contratação (Hoje, 30 dias ou Apenas pesquisando).",
+    category: "intake",
+    actionType: "COLLECT_URGENCY",
+    enabled: true,
+    keywords: ["urgencia", "prazo", "contratar hoje", "pesquisando"],
+    updatedAt: new Date().toISOString(),
+  },
+
+  // --- TRIGGERS DE AÇÃO (TRANSFERIR, ETIQUETAR, RECUSAR, AUTOMAÇÃO) ---
+  {
+    id: "trg_action_transfer_human",
     key: "TRANSFER_TO_HUMAN",
-    name: "Transferir para Atendente Humano",
-    description: "Acionado quando o lead solicita falar com corretor ou atendente humano.",
-    category: "transfer",
+    name: "Ação: Transferir para Atendente Humano",
+    description: "Triggers de ação: Interrompe a IA e transfere o atendimento para a equipe humana.",
+    category: "action",
     actionType: "TRANSFER_HUMAN",
     enabled: true,
     keywords: ["falar com atendente", "corretor", "humano", "falar com pessoa", "urgente", "especialista"],
     updatedAt: new Date().toISOString(),
   },
   {
-    id: "trg_qualify_hot",
+    id: "trg_action_tag_hot",
     key: "QUALIFY_HOT",
-    name: "Qualificação Quente (Hot Lead)",
-    description: "Acionado quando o lead possui perfil PJ/PME ou urgência imediata de contratação.",
-    category: "qualification",
+    name: "Ação: Qualificar e Etiquetar Quente (Hot)",
+    description: "Triggers de ação: Marca como Quente e envia para distribuição com prioridade.",
+    category: "action",
     actionType: "TAG_HOT",
     enabled: true,
     keywords: ["cnpj", "pme", "plano empresarial", "urgencia maxima", "contratar hoje"],
     updatedAt: new Date().toISOString(),
   },
   {
-    id: "trg_qualify_warm",
+    id: "trg_action_tag_warm",
     key: "QUALIFY_WARM",
-    name: "Qualificação Morna (Warm Lead)",
-    description: "Acionado quando o lead demonstra interesse padrão e responde as perguntas básicas.",
-    category: "qualification",
+    name: "Ação: Qualificar e Etiquetar Morno (Warm)",
+    description: "Triggers de ação: Marca como Morno e disponibiliza na fila de distribuição.",
+    category: "action",
     actionType: "TAG_WARM",
     enabled: true,
     keywords: ["gostaria de cotacao", "valores", "qual o preco", "me mande proposta"],
     updatedAt: new Date().toISOString(),
   },
   {
-    id: "trg_opt_out",
+    id: "trg_action_opt_out",
     key: "MARK_OPT_OUT",
-    name: "Recusa / Sem Interesse (Opt-Out)",
-    description: "Acionado quando o lead declara não ter interesse ou pede para cancelar mensagens.",
-    category: "opt_out",
+    name: "Ação: Registrar Recusa / Sem Interesse",
+    description: "Triggers de ação: Marca como Frio, interrompe a IA e transfere para a lista de leads.",
+    category: "action",
     actionType: "TAG_COLD",
     enabled: true,
     keywords: ["nao tenho interesse", "nao quero", "sem interesse", "cancelar", "ja tenho plano"],
     updatedAt: new Date().toISOString(),
   },
   {
-    id: "trg_wrong_number",
+    id: "trg_action_wrong_number",
     key: "MARK_WRONG_NUMBER",
-    name: "Número Errado / Engano",
-    description: "Acionado quando o número pertence a outra pessoa ou o nome não confere.",
-    category: "opt_out",
+    name: "Ação: Registrar Número Errado",
+    description: "Triggers de ação: Marca como Número Errado e transfere para a lista de leads.",
+    category: "action",
     actionType: "TAG_DISQUALIFIED",
     enabled: true,
     keywords: ["nao sou", "numero errado", "engano", "pessoa errada", "nao conheco"],
     updatedAt: new Date().toISOString(),
   },
   {
-    id: "trg_future_webhook",
+    id: "trg_action_automation",
     key: "WEBHOOK_AUTOMATION_TEMPLATE",
-    name: "Gatilho de Automação Externa (Webhook / CRM)",
-    description: "Modelo de gatilho reutilizável para disparar webhooks e automações externas no futuro.",
-    category: "automation",
+    name: "Ação: Disparar Automação Externa (Webhook)",
+    description: "Triggers de ação: Dispara webhook e automações personalizadas de terceiros.",
+    category: "action",
     actionType: "WEBHOOK_AUTOMATION",
     enabled: false,
     keywords: ["integracao externa", "gatilho personalizado"],
@@ -94,72 +154,3 @@ export const INITIAL_AGENT_TRIGGERS: AgentTriggerItem[] = [
     updatedAt: new Date().toISOString(),
   },
 ];
-
-export async function executeAgentTrigger(params: {
-  triggerKey: string;
-  tenantId: string;
-  leadId: string;
-  conversationId?: string | null;
-  reason?: string;
-  actorUserId?: string | null;
-}) {
-  const db = getDatabase();
-  const now = new Date();
-
-  const triggerDef = INITIAL_AGENT_TRIGGERS.find((t) => t.key === params.triggerKey || t.id === params.triggerKey);
-  if (!triggerDef || !triggerDef.enabled) {
-    return { success: false, error: "Gatilho desativado ou não encontrado." };
-  }
-
-  let newQualStatus: "waiting_human" | "hot" | "warm" | "cold" | "qualifying" = "warm";
-  let isPendingBot = false;
-
-  switch (triggerDef.actionType) {
-    case "TRANSFER_HUMAN":
-      newQualStatus = "waiting_human";
-      break;
-    case "TAG_HOT":
-      newQualStatus = "hot";
-      break;
-    case "TAG_WARM":
-      newQualStatus = "warm";
-      break;
-    case "TAG_COLD":
-      newQualStatus = "cold";
-      break;
-    case "TAG_DISQUALIFIED":
-      newQualStatus = "cold";
-      break;
-    default:
-      newQualStatus = "warm";
-  }
-
-  await db.update(schema.leads).set({
-    qualificationStatus: newQualStatus,
-    qualificationState: isPendingBot ? "IN_PROGRESS" : "QUALIFIED",
-    status: isPendingBot ? "new" : "distributed",
-    distributionStatus: isPendingBot ? "unassigned" : "queued",
-    qualificationCompletedAt: isPendingBot ? null : now,
-    updatedAt: now,
-  }).where(and(eq(schema.leads.id, params.leadId), eq(schema.leads.tenantId, params.tenantId)));
-
-  if (params.conversationId) {
-    const convStatus = triggerDef.actionType === "TRANSFER_HUMAN" ? "WAITING_HUMAN" : "CLOSED";
-    await transitionConversationState({
-      tenantId: params.tenantId,
-      conversationId: params.conversationId,
-      newStatus: convStatus,
-      reason: params.reason || `Gatilho ${triggerDef.name} acionado`,
-    });
-  }
-
-  await db.insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId: params.actorUserId || "system",
-    entidade: "lead",
-    entidadeId: params.leadId,
-    acao: `agent_trigger.${triggerDef.key.toLowerCase()}`,
-  }).catch(() => undefined);
-
-  return { success: true, trigger: triggerDef };
-}
