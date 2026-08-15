@@ -9,6 +9,7 @@ import { getToolPermissions } from "@/features/ai-qualification/tool-governance-
 import { getDestinationRules, getBrokerEligibilityProfiles } from "@/features/ai-qualification/destination-routing-service";
 import { getQualificationStats } from "@/features/ai-qualification/stats-service";
 import { getQualificationAlerts } from "@/features/ai-qualification/alerts-service";
+import { getAgentTrainingCenter } from "@/features/agent-training/actions";
 import { QualificationHubClient } from "./_components/qualification-hub-client";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function QualificacaoPage() {
     brokerProfiles,
     stats,
     alerts,
+    agentTraining,
   ] = await Promise.all([
     getQualificationTenantSettings(context.tenantId),
     getTenantTestNumbers(context.tenantId),
@@ -39,6 +41,7 @@ export default async function QualificacaoPage() {
     getBrokerEligibilityProfiles(context.tenantId),
     getQualificationStats(context.tenantId),
     getQualificationAlerts(context.tenantId),
+    getAgentTrainingCenter(),
   ]);
 
   return (
@@ -52,6 +55,7 @@ export default async function QualificacaoPage() {
       brokerProfiles={brokerProfiles}
       stats={stats}
       alerts={alerts}
+      agentTraining={agentTraining}
     />
   );
 }

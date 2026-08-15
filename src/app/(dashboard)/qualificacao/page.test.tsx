@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getBrokerEligibilityProfiles: vi.fn(),
   getQualificationStats: vi.fn(),
   getQualificationAlerts: vi.fn(),
+  getAgentTrainingCenter: vi.fn(),
 }));
 
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: mocks.getRequiredTenantContext }));
@@ -26,6 +27,7 @@ vi.mock("@/features/ai-qualification/destination-routing-service", () => ({
 }));
 vi.mock("@/features/ai-qualification/stats-service", () => ({ getQualificationStats: mocks.getQualificationStats }));
 vi.mock("@/features/ai-qualification/alerts-service", () => ({ getQualificationAlerts: mocks.getQualificationAlerts }));
+vi.mock("@/features/agent-training/actions", () => ({ getAgentTrainingCenter: mocks.getAgentTrainingCenter }));
 vi.mock("./_components/qualification-hub-client", () => ({ QualificationHubClient: () => null }));
 
 import QualificacaoPage from "./page";
@@ -43,6 +45,7 @@ describe("/qualificacao", () => {
       mocks.getBrokerEligibilityProfiles,
       mocks.getQualificationStats,
       mocks.getQualificationAlerts,
+      mocks.getAgentTrainingCenter,
     ]) loader.mockResolvedValue([]);
 
     await expect(QualificacaoPage()).resolves.toBeDefined();
@@ -50,5 +53,6 @@ describe("/qualificacao", () => {
     expect(mocks.getToolPermissions).toHaveBeenCalledWith("tenant-test");
     expect(mocks.getQualificationStats).toHaveBeenCalledWith("tenant-test");
     expect(mocks.getQualificationAlerts).toHaveBeenCalledWith("tenant-test");
+    expect(mocks.getAgentTrainingCenter).toHaveBeenCalledOnce();
   });
 });

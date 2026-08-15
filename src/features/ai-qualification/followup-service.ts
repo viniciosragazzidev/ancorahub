@@ -20,7 +20,7 @@ export const followUpTriggerValues = [
 export const followUpRuleSchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(3).max(100),
-  enabled: z.boolean().default(true),
+  enabled: z.boolean().default(false),
   trigger: z.enum(followUpTriggerValues),
   delayMinutes: z.number().int().min(5).max(10080).default(120),
   maxAttempts: z.number().int().min(1).max(10).default(3),
@@ -44,6 +44,15 @@ export const followUpRuleSchema = z.object({
 
 export type FollowUpRuleInput = z.infer<typeof followUpRuleSchema>;
 
+/**
+ * Follow-up messages are deliberately in preparation-only mode. A future
+ * execution worker must replace this policy only after the LGPD, Meta template
+ * and 24-hour-window decision is approved and implemented.
+ */
+export function isFollowUpExecutionAllowed(): false {
+  return false;
+}
+
 export async function getFollowUpRules(tenantId: string) {
   const db = getDatabase();
 
@@ -57,7 +66,7 @@ export async function getFollowUpRules(tenantId: string) {
       return rules;
     }
 
-    // Seed default follow-up rule if none exists
+    // Seed a configurable draft, never an active outbound automation.
     const now = new Date();
     const defaultRuleId = randomUUID();
     await db
@@ -66,7 +75,7 @@ export async function getFollowUpRules(tenantId: string) {
         id: defaultRuleId,
         tenantId,
         name: "Lead abandonou a qualificação",
-        enabled: true,
+        enabled: false,
         trigger: "qualification_abandoned",
         delayMinutes: 120,
         maxAttempts: 3,
@@ -94,7 +103,7 @@ export async function getFollowUpRules(tenantId: string) {
         id: "default-rule-1",
         tenantId,
         name: "Lead abandonou a qualificação",
-        enabled: true,
+        enabled: false,
         trigger: "qualification_abandoned",
         delayMinutes: 120,
         maxAttempts: 3,
@@ -124,6 +133,9 @@ export async function saveFollowUpRule(
   const db = getDatabase();
   const now = new Date();
   const ruleId = data.id ?? randomUUID();
+  // This release does not authorize outbound reengagement. Keep the rule as a
+  // draft even if an older client submits enabled: true.
+  const enabled = isFollowUpExecutionAllowed() && data.enabled;
 
   await db
     .insert(schema.aiQualificationFollowUpRules)
@@ -131,7 +143,7 @@ export async function saveFollowUpRule(
       id: ruleId,
       tenantId,
       name: data.name,
-      enabled: data.enabled,
+      enabled,
       trigger: data.trigger,
       delayMinutes: data.delayMinutes,
       maxAttempts: data.maxAttempts,
@@ -152,7 +164,7 @@ export async function saveFollowUpRule(
       target: [schema.aiQualificationFollowUpRules.id],
       set: {
         name: data.name,
-        enabled: data.enabled,
+        enabled,
         trigger: data.trigger,
         delayMinutes: data.delayMinutes,
         maxAttempts: data.maxAttempts,
@@ -175,7 +187,7 @@ export async function saveFollowUpRule(
     userId: actorUserId,
     entidade: "ai_qualification_followup_rule",
     entidadeId: ruleId,
-    acao: data.id ? "followup_rule.updated" : "followup_rule.created",
+    acao: data.id ? "followup_rule.updated_prepared" : "followup_rule.created_prepared",
   });
 
   return getFollowUpRules(tenantId);

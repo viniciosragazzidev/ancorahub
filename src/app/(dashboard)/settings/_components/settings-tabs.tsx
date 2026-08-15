@@ -6,10 +6,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Building06Icon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export type TabId = "conta" | "empresa" | "unidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "ia" | "passkey" | "extensao";
+export type TabId = "conta" | "empresa" | "unidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
 type Tab = { id: TabId; label: string; icon: typeof UserIcon };
 
-export function SettingsTabs({ account, company, unit, whatsapp, integrations, security, atendimento, ai, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; ai?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
+export function SettingsTabs({ account, company, unit, whatsapp, integrations, security, atendimento, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -18,7 +18,6 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
     { id: "empresa", label: "Empresa", icon: Building06Icon },
     { id: "unidade", label: "Unidade", icon: Store01Icon },
     { id: "atendimento", label: "Atendimento", icon: Message01Icon },
-    { id: "ia", label: "Treinamento do agente", icon: Message01Icon },
     { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
     { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
     { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },
@@ -84,7 +83,6 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
         {active === "whatsapp" ? whatsapp : null}
         {active === "integracoes" ? integrations : null}
         {active === "atendimento" ? atendimento : null}
-        {active === "ia" ? ai : null}
         {active === "seguranca" ? security : null}
         {active === "extensao" ? extension : null}
       </div>

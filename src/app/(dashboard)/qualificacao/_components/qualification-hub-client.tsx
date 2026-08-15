@@ -42,6 +42,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
+import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 
 import {
   updateQualificationSettingsAction,
@@ -137,6 +139,13 @@ type QualificationHubProps = {
   }>;
   stats: QualificationStatsSummary;
   alerts: QualificationAlertRecord[];
+  agentTraining: {
+    enabled: boolean;
+    canEdit: boolean;
+    versions: Array<{ id: string; versionNumber: number; status: string; summary: string | null; validation: unknown; publishedAt: Date | null }>;
+    brokers: Array<{ id: string; name: string }>;
+    distributionPolicy: unknown;
+  };
 };
 
 type SimMemory = {
@@ -212,6 +221,7 @@ export function QualificationHubClient({
   brokerProfiles: initialBrokerProfiles,
   stats: initialStats,
   alerts: initialAlerts,
+  agentTraining,
 }: QualificationHubProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -243,6 +253,7 @@ export function QualificationHubClient({
 
   const tabs = [
     { id: "overview", label: "Visão Geral", icon: SlidersHorizontal },
+    { id: "training", label: "Treinamento e versões", icon: Layers },
     { id: "whatsapp_diag", label: "WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
     { id: "followup_rules", label: "Regras de Follow-up", icon: Clock, color: "text-purple-500" },
     { id: "mcp_governance", label: "Ferramentas & MCP", icon: ShieldAlert, color: "text-amber-500" },
@@ -319,7 +330,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
     try {
       const updated = await saveFollowUpRuleAction({
         name: newRuleName,
-        enabled: true,
+        enabled: false,
         trigger: newRuleTrigger as any,
         delayMinutes: Number(newRuleDelay),
         maxAttempts: 3,
@@ -334,7 +345,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
       });
       setFollowUpRules(updated);
       setNewRuleName("");
-      toast.success("Regra de follow-up cadastrada com sucesso!");
+      toast.success("Regra preparada. O envio automático permanece desativado.");
     } catch (err) {
       toast.error("Erro ao salvar regra de follow-up.");
     }
@@ -840,6 +851,13 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                 ))}
               </div>
             </Card>
+          </div>
+        )}
+
+        {activeTab === "training" && (
+          <div className="grid gap-6">
+            <AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} />
+            <DistributionPolicyPanel brokers={agentTraining.brokers} canEdit={agentTraining.canEdit} policy={agentTraining.distributionPolicy} />
           </div>
         )}
 

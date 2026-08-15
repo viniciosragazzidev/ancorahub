@@ -24,6 +24,7 @@ import { evaluateQualification, persistQualificationEvaluation, getNextQualifica
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
+import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 
 
 export type ConversationStatus =
@@ -489,18 +490,7 @@ async function completeDeterministicQualificationTurn(input: {
   });
 
   let distribution: Awaited<ReturnType<typeof import("@/features/lead-distribution/service").distributeQualifiedLead>> | null = null;
-  if (isHandoff) {
-    const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
-    distribution = await distributeQualifiedLead({ tenantId: input.tenantId, leadId: input.leadId, actorUserId: null });
-    await transitionConversationState({
-      tenantId: input.tenantId,
-      conversationId: input.conversationId,
-      newStatus: "WAITING_HUMAN",
-      reason: "Qualificação concluída; atendimento encaminhado para a fila comercial.",
-    });
-    const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
-    await executeDeterministicClosing(input.tenantId, input.conversationId, input.leadId, memory.customerName?.value);
-  } else {
+  if (!isHandoff) {
     await transitionConversationState({ tenantId: input.tenantId, conversationId: input.conversationId, newStatus: "WAITING_CUSTOMER" });
   }
 
@@ -520,6 +510,7 @@ async function completeDeterministicQualificationTurn(input: {
   });
 
   let deliveryStatus = "failed";
+  let providerMessageId: string | null = null;
   try {
     const sent = await sendAiOutbound({
       tenantId: input.tenantId,
@@ -531,6 +522,7 @@ async function completeDeterministicQualificationTurn(input: {
     });
     if (sent.status === "sent") {
       deliveryStatus = "sent";
+      providerMessageId = sent.messageId ?? null;
       await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
         .where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
     }
@@ -538,6 +530,27 @@ async function completeDeterministicQualificationTurn(input: {
     await db.update(schema.whatsappMessages).set({ providerStatus: "failed" })
       .where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
     console.error("[qualification] deterministic_outbound_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+  }
+
+  // The final message is a delivery contract: only a provider-confirmed send
+  // may close automation and put the conversation in the human queue.
+  if (isHandoff && isConfirmedClosingDelivery(deliveryStatus, providerMessageId)) {
+    const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+    distribution = await distributeQualifiedLead({ tenantId: input.tenantId, leadId: input.leadId, actorUserId: null });
+    const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
+    await executeDeterministicClosing(
+      input.tenantId,
+      input.conversationId,
+      input.leadId,
+      memory.customerName?.value,
+      providerMessageId,
+    );
+    await transitionConversationState({
+      tenantId: input.tenantId,
+      conversationId: input.conversationId,
+      newStatus: "WAITING_HUMAN",
+      reason: "Mensagem final entregue; qualificação concluída e atendimento encaminhado.",
+    });
   }
 
   await db.insert(schema.aiAttendanceLogs).values({
@@ -567,7 +580,11 @@ async function completeDeterministicQualificationTurn(input: {
     distribution: distribution?.distributed ? "assigned" : distribution?.assignedResult?.status ?? distribution?.reason ?? null,
   });
 
-  return { status: isHandoff ? "transferred_to_human" : "replied", deliveryStatus, reply: input.turn.reply };
+  return {
+    status: isHandoff && !isConfirmedClosingDelivery(deliveryStatus, providerMessageId) ? "handoff_delivery_failed" : isHandoff ? "transferred_to_human" : "replied",
+    deliveryStatus,
+    reply: input.turn.reply,
+  };
 }
 
 export async function processInboundAiResponse({
@@ -1233,27 +1250,7 @@ export async function processInboundAiResponse({
   }
 
   const persistedQualification = await persistQualificationEvaluation({ tenantId, leadId, conversationId: conversation.id, actorUserId: null, policy: behavior.policy, memory: updatedMemory });
-  if (persistedQualification.state === "QUALIFIED") {
-    try {
-      const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
-      const distResult = await distributeQualifiedLead({ tenantId, leadId, actorUserId: null });
-
-      const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
-      await executeDeterministicClosing(tenantId, conversation.id, leadId, updatedMemory.customerName?.value);
-
-      console.info("[qualification] completed_and_routed", {
-        tenantId,
-        leadId,
-        conversationId: conversation.id,
-        classification: persistedQualification.classification,
-        score: persistedQualification.score,
-        distributed: distResult.distributed,
-        brokerId: distResult.brokerId ?? null,
-      });
-    } catch (distErr) {
-      console.error("[qualification] error_during_distribution_or_closing", distErr);
-    }
-  }
+  const qualificationCompleted = persistedQualification.state === "QUALIFIED";
 
 
   // 7. Salvar mensagem da IA no banco
@@ -1274,11 +1271,13 @@ export async function processInboundAiResponse({
 
   // 8. Tentar enviar mensagem de saída pelo provedor da Meta se canal ativo
   let deliveryStatus = "failed";
+  let providerMessageId: string | null = null;
   try {
     const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId });
     if (sent.status === "sent") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       deliveryStatus = "sent";
+      providerMessageId = sent.messageId ?? null;
       console.info("[ai-wpp] outbound.sent", { tenantId, leadId, conversationId: conversation.id, messageId: sent.messageId });
     } else {
       console.warn("[ai-wpp] outbound.skipped", { tenantId, leadId, reason: "no_active_channel", transport });
@@ -1291,7 +1290,22 @@ export async function processInboundAiResponse({
 
   // 9. Atualizar estado final da conversa
 
-  if (aiResult.shouldTransferToHuman) {
+  if (qualificationCompleted && isConfirmedClosingDelivery(deliveryStatus, providerMessageId)) {
+    const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+    const distResult = await distributeQualifiedLead({ tenantId, leadId, actorUserId: null });
+    const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
+    await executeDeterministicClosing(tenantId, conversation.id, leadId, updatedMemory.customerName?.value, providerMessageId);
+    await transitionConversationState({
+      tenantId,
+      conversationId: conversation.id,
+      newStatus: "WAITING_HUMAN",
+      reason: "Mensagem final entregue; qualificação concluída e atendimento encaminhado.",
+    });
+    console.info("[qualification] completed_and_routed", { tenantId, leadId, conversationId: conversation.id, distributed: distResult.distributed });
+    return { status: "transferred_to_human", deliveryStatus, reply: aiResult.content };
+  }
+
+  if (aiResult.shouldTransferToHuman && !qualificationCompleted) {
     await transitionConversationState({
       tenantId,
       conversationId: conversation.id,

@@ -61,8 +61,12 @@ export async function executeDeterministicClosing(
   tenantId: string,
   sessionId: string,
   leadId?: string,
-  leadName?: string
+  leadName?: string,
+  providerMessageId?: string | null,
 ): Promise<{ closingMessage: string; messageId: string; alreadyExecuted: boolean }> {
+  if (!providerMessageId?.trim()) {
+    throw new Error("A mensagem final precisa de confirmação do provedor antes do encerramento.");
+  }
   const db = getDatabase();
   const existing = await getQualificationClosingState(tenantId, sessionId);
 
@@ -81,7 +85,7 @@ export async function executeDeterministicClosing(
     .replace("{{firstName}}", firstName);
 
   const now = new Date();
-  const messageId = `wamid.close_${randomUUID().slice(0, 12)}`;
+  const messageId = providerMessageId;
 
   await db
     .insert(schema.aiQualificationClosingStates)

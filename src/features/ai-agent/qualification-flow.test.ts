@@ -7,6 +7,7 @@ import {
 } from "@/features/qualification-engine/service";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 import { resolveQualificationDestination } from "@/features/ai-qualification/destination-routing-service";
+import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 
 describe("Qualification Flow Unit Tests", () => {
@@ -145,6 +146,42 @@ describe("Qualification Flow Unit Tests", () => {
       const next = getNextQualificationQuestion(updatedMemory, policy);
       expect(next?.key).toBe("numberOfLives");
       expect(next?.id).toBe("Q3");
+    });
+  });
+
+  describe("name entity guard", () => {
+    it("does not save a city as the customer name while collecting city", () => {
+      const memory = extractFieldsFromMessage("Petrópolis", {
+        ...createEmptyMemory(),
+        lastQuestionAsked: "Em qual cidade você pretende utilizar o plano de saúde?",
+      });
+
+      expect(memory.customerName).toBeUndefined();
+      expect(memory.customerFirstName).toBeUndefined();
+      expect(memory.city?.value).toBe("Petrópolis");
+    });
+
+    it("does not accept a number or e-mail as the customer name", () => {
+      const numeric = extractFieldsFromMessage("42", {
+        ...createEmptyMemory(),
+        lastQuestionAsked: "Qual é o seu nome completo?",
+      });
+      const email = extractFieldsFromMessage("camila@example.com", {
+        ...createEmptyMemory(),
+        lastQuestionAsked: "Qual é o seu nome completo?",
+      });
+
+      expect(numeric.customerName).toBeUndefined();
+      expect(email.customerName).toBeUndefined();
+      expect(email.email?.value).toBe("camila@example.com");
+    });
+  });
+
+  describe("closing delivery contract", () => {
+    it("allows WAITING_HUMAN only after the provider confirms the final message", () => {
+      expect(isConfirmedClosingDelivery("sent", "wamid.123")).toBe(true);
+      expect(isConfirmedClosingDelivery("sent", null)).toBe(false);
+      expect(isConfirmedClosingDelivery("failed", "wamid.123")).toBe(false);
     });
   });
 

@@ -156,14 +156,17 @@ export function extractFieldsFromMessage(
   };
 
   const trimmed = message.trim();
+  const isNameQuestion = /\bnome\b|como voce se chama|quem e voce/.test(
+    normalizeForMatching(memory.lastQuestionAsked ?? ""),
+  );
 
   // Name extraction
   if (!memory.customerName) {
-    for (const pattern of NAME_PATTERNS) {
+    for (const [index, pattern] of NAME_PATTERNS.entries()) {
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const name = match[1].trim();
-        if (name.length >= 5 && name.includes(" ")) {
+        if ((index < 2 || isNameQuestion) && name.length >= 5 && name.includes(" ")) {
           memory.customerName = { value: name, confidence: 1, sourceMessageId };
           memory.customerFirstName = {
             value: name.split(" ")[0],
@@ -180,7 +183,7 @@ export function extractFieldsFromMessage(
   // If no full name, check if message is just "first name" (single word + context)
   if (!memory.customerName && trimmed.length > 0) {
     const isJustName = /^[A-ZÀ-Ú][a-zà-ú]+$/.test(trimmed) && trimmed.length >= 2 && !commonWords.has(trimmed.toLowerCase());
-    if (isJustName) {
+    if (isJustName && /\s/.test(trimmed)) {
       // Only treat as name if message is short (likely first interaction)
       memory.customerFirstName = {
         value: trimmed,

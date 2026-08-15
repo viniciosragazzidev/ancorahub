@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   date,
   foreignKey,
   index,
@@ -14,6 +15,26 @@ import {
   uniqueIndex,
   jsonb,
 } from "drizzle-orm/pg-core";
+
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return "vector";
+  },
+  toDriver(value) {
+    if (!value.every(Number.isFinite)) {
+      throw new Error("Vector embeddings must contain only finite numbers.");
+    }
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value) {
+    return value
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .filter(Boolean)
+      .map(Number);
+  },
+});
 
 export const tenantStatusValues = ["active", "inactive", "delinquent"] as const;
 export const branchStatusValues = ["active", "inactive"] as const;
@@ -1234,7 +1255,7 @@ export const routeOnboardingProgress = pgTable(
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     routeKey: text("route_key").notNull(),
-    enabled: boolean("enabled").notNull().default(true),
+    enabled: boolean("enabled").notNull().default(false),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     resetAt: timestamp("reset_at", { withTimezone: true }),
@@ -3934,6 +3955,7 @@ export const knowledgeChunks = pgTable(
     documentId: text("document_id").notNull().references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
     chunkIndex: integer("chunk_index").notNull(),
     text: text("text").notNull(),
+    embedding: vector("embedding"),
     tokenCount: integer("token_count").notNull().default(0),
     authorityLevel: integer("authority_level").notNull().default(3),
     metadata: jsonb("metadata").notNull().default({}),

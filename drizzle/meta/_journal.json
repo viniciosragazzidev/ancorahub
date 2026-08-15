@@ -540,6 +540,20 @@
       "when": 1786730000000,
       "tag": "0126_meta_whatsapp_templates_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1786820400000,
+      "tag": "0127_ai_qualification_followup_prepared_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1786824000000,
+      "tag": "0128_supabase_vector_knowledge_chunks",
+      "breakpoints": true
     }
   ]
 }

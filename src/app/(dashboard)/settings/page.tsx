@@ -15,12 +15,7 @@ import { SettingsTabs, type TabId } from "./_components/settings-tabs";
 import { UnitTab } from "./_components/unit-tab";
 import { FeedbackTab } from "./_components/feedback-tab";
 import { getIntegrationsData } from "./integrations-actions";
-import { AgentTrainingTab } from "./_components/agent-training-tab";
-import { DistributionPolicyPanel } from "./_components/distribution-policy-panel";
-import { getAgentTrainingCenter } from "@/features/agent-training/actions";
 import { ExtensionTab } from "./extension/extension-tab";
-import { FollowUpRulesPanel } from "@/features/ai-qualification/components/followup-rules-panel";
-import { getFollowUpRules } from "@/features/ai-qualification/followup-service";
 
 import { RelatedActions } from "@/components/related-actions";
 
@@ -45,12 +40,9 @@ export default async function SettingsPage() {
   }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
   const integrations = canViewIntegrations ? await getIntegrationsData() : null;
-  const agentTraining = context.role === "director" ? await getAgentTrainingCenter() : null;
-  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "seguranca"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
+  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "seguranca"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
-  const followUpRules = canEditFeedback ? await getFollowUpRules(context.tenantId) : [];
-
   const atendimento = canEditFeedback ? (
     <div className="space-y-6">
       <FeedbackTab
@@ -62,7 +54,6 @@ export default async function SettingsPage() {
         maxActiveLeadsLimit={tenantData?.maxActiveLeadsLimit ?? 10}
         canEdit={context.role === "director"}
       />
-      <FollowUpRulesPanel rules={followUpRules as any} canEdit={context.role === "director"} />
     </div>
   ) : undefined;
 
@@ -80,7 +71,6 @@ export default async function SettingsPage() {
           company={context.role === "director" ? company : undefined}
           unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />}
           atendimento={atendimento}
-          ai={agentTraining ? <div className="grid gap-6"><AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} /><DistributionPolicyPanel brokers={agentTraining.brokers} canEdit={agentTraining.canEdit} policy={agentTraining.distributionPolicy} /></div> : undefined}
           whatsapp={whatsapp}
           integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined}
           security={<SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} />}

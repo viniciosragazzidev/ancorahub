@@ -41,7 +41,7 @@ export async function createAgentBehaviorDraftAction(policyValue: unknown) {
     await tx.insert(schema.agentBehaviorVersions).values({ id, tenantId: context.tenantId, versionNumber: (latest?.versionNumber ?? 0) + 1, status: "DRAFT", policy: validation.policy, validation: { errors: validation.errors, simulations: [] }, summary: "Rascunho criado no Centro de Treinamento", createdBy: context.userId });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "agent_behavior_version", entidadeId: id, acao: "agent_training.draft_created" });
   });
-  revalidatePath("/settings");
+  revalidatePath("/qualificacao");
   return { success: true, id };
 }
 
@@ -60,7 +60,7 @@ export async function validateAgentBehaviorVersionAction(versionId: string) {
     await tx.insert(schema.agentTrainingSimulations).values(simulations.map((item) => ({ id: randomUUID(), tenantId: context.tenantId, behaviorVersionId: version.id, scenarioKey: item.key, status: item.passed ? "passed" : "failed", result: item, createdBy: context.userId })));
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "agent_behavior_version", entidadeId: version.id, acao: passed ? "agent_training.validation_passed" : "agent_training.validation_failed" });
   });
-  revalidatePath("/settings");
+  revalidatePath("/qualificacao");
   return { success: passed, error: passed ? undefined : "Existem cenários críticos pendentes." };
 }
 
@@ -77,7 +77,7 @@ export async function publishAgentBehaviorVersionAction(versionId: string) {
     await tx.update(schema.agentBehaviorVersions).set({ status: "PUBLISHED", publishedAt: now, publishedBy: context.userId, updatedAt: now }).where(and(eq(schema.agentBehaviorVersions.id, version.id), eq(schema.agentBehaviorVersions.tenantId, context.tenantId)));
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "agent_behavior_version", entidadeId: version.id, acao: "agent_training.published" });
   });
-  revalidatePath("/settings");
+  revalidatePath("/qualificacao");
   return { success: true };
 }
 
@@ -94,7 +94,7 @@ export async function rollbackAgentBehaviorVersionAction(versionId: string) {
     await tx.update(schema.agentBehaviorVersions).set({ status: "PUBLISHED", publishedAt: now, publishedBy: context.userId, updatedAt: now }).where(and(eq(schema.agentBehaviorVersions.id, target.id), eq(schema.agentBehaviorVersions.tenantId, context.tenantId)));
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "agent_behavior_version", entidadeId: target.id, acao: "agent_training.rolled_back" });
   });
-  revalidatePath("/settings");
+  revalidatePath("/qualificacao");
   return { success: true };
 }
 

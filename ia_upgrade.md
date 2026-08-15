@@ -38,6 +38,8 @@
 | D5 | Handoff não possui contrato único completo. | Corretor perde contexto e não há explicação uniforme. | Payload versionado com resumo, score, motivos, campos, destino e versão de perfil. |
 | D6 | Follow-up pode parecer operacional antes de haver autorização. | Risco de LGPD e Meta. | Regras persistem apenas como rascunho; executor fica bloqueado. |
 | D7 | A camada de conhecimento já possui documentos e chunks, mas o schema do aplicativo ainda não declara embedding vetorial nem busca semântica. | RAG incompleto ou inseguro. | Busca vetorial server-side, escopada e rastreável, em onda independente. |
+| D8 | Extração permissiva pode interpretar uma cidade, número ou e-mail como `customerName`. | Lead recebe nome corrompido e a IA trata o cliente pelo local informado. | Guardrail determinístico de entidade e validação contextual pelo campo atualmente perguntado. |
+| D9 | O fechamento pode marcar a conversa como humana antes da confirmação de envio da mensagem final. | Cliente fica sem confirmação e o atendimento aparenta estar transferido. | Contrato de fechamento: registrar mensagem, confirmar o provider e só então mudar para `WAITING_HUMAN`. |
 
 ## 3. Arquitetura-alvo
 
@@ -129,8 +131,9 @@ O Supabase vetorial será usado como **recuperação de conhecimento**, não com
 2. `getNextQuestion` usa exclusivamente perfil + memória validada. A IA recebe a pergunta selecionada, nunca uma instrução aberta para decidir a próxima.
 3. Validar resposta, registrar tentativa e persistir dados em transação; após limite, transferir ao humano com motivo seguro.
 4. Criar chaves idempotentes por pergunta, conclusão, rota, handoff e mensagem final. Lock otimista evita efeitos duplicados em mensagens concorrentes.
+5. Aplicar Name Entity Guard: `customerName` exige nome completo explícito ou resposta compatível com a pergunta de nome; cidade/estado, número isolado e e-mail nunca preenchem esse campo. Uma resposta ao campo `city` não pode atualizar `customerName`.
 
-**Aceite:** fluxo familiar completo, resposta com múltiplos campos, correção de campo, retry esgotado, opt-out, pedido de humano, mídia e mensagem duplicada são determinísticos e não duplicam outbox.
+**Aceite:** fluxo familiar completo, resposta com múltiplos campos, correção de campo, retry esgotado, opt-out, pedido de humano, mídia e mensagem duplicada são determinísticos e não duplicam outbox. O caso `Petrópolis` quando a pergunta atual é cidade persiste somente cidade; `42` ou e-mail não viram nome.
 
 ### Onda 3 — Resultado, destino, distribuição e handoff
 
@@ -139,8 +142,9 @@ O Supabase vetorial será usado como **recuperação de conhecimento**, não com
 3. Resolver devolve decisão explicável: destino, candidatos, exclusões, fallback, SLA e versão da regra.
 4. Persistir handoff imutável com campos autorizados, score, razões, resumo determinístico, destino e referências de auditoria.
 5. Ao assumir no atendimento, a IA é pausada; retomar depende de papel autorizado, condição válida e auditoria.
+6. Fechar em duas etapas idempotentes: criar `whatsappMessages` pendente, obter confirmação do provider e registrar o `messageId` real; só então persistir fechamento enviado e transitar para `WAITING_HUMAN`. Falha de envio preserva estado recuperável e gera alerta, sem simular transferência.
 
-**Aceite:** HOT/WARM/COLD/não qualificado usam destinos distintos; sem corretor mantém fila recuperável; corretor da carteira vê resumo, mas não dados fora do escopo.
+**Aceite:** HOT/WARM/COLD/não qualificado usam destinos distintos; sem corretor mantém fila recuperável; corretor da carteira vê resumo, mas não dados fora do escopo. O último e-mail pendente sempre gera uma mensagem final confirmada antes da transferência humana.
 
 ### Onda 4 — Central `/qualificacao`
 
@@ -180,8 +184,8 @@ O Supabase vetorial será usado como **recuperação de conhecimento**, não com
 
 | Camada | Casos mínimos |
 |---|---|
-| Unitário | Perfil e versão; validadores; transições válidas/inválidas; próxima pergunta; retries; score 49/50/79/80; classificação; destino; handoff; filtros de RAG. |
-| Integração | Webhook assinado -> deduplicação -> conversa -> qualificação -> rota -> distribuição -> handoff; falha de outbox; lock concorrente; opt-out; mídia; pedido de humano; canal pausado. |
+| Unitário | Perfil e versão; validadores; Name Entity Guard (cidade, estado, número e e-mail); transições válidas/inválidas; próxima pergunta; retries; score 49/50/79/80; classificação; destino; handoff; filtros de RAG. |
+| Integração | Webhook assinado -> deduplicação -> conversa -> qualificação -> rota -> distribuição -> handoff; mensagem final confirmada antes de `WAITING_HUMAN`; falha de outbox; lock concorrente; opt-out; mídia; pedido de humano; canal pausado. |
 | Segurança | Tenant cruzado, unidade cruzada, carteira cruzada, papel inadequado, ID enviado pelo cliente e acesso direto a RPC vetorial. Todos devem falhar sem revelar existência do recurso. |
 | RAG | Isolamento de tenant, status/vigência, coleção permitida, recuperação vazia, indisponibilidade do vetor, fonte correta e ausência de PII na telemetria. |
 | Interface | Permissões, URL de abas, estados vazio/carregando/erro/indisponível, confirmação/rollback, teclado, foco, contraste, viewport estreito e movimento reduzido. |

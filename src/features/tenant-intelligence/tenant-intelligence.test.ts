@@ -142,6 +142,14 @@ describe("Tenant Intelligence Layer Unit Tests", () => {
     expect(results[0].authorityLevel).toBe(4);
   });
 
+  it("rejects an invalid vector before it can reach the database", async () => {
+    await expect(executeHybridKnowledgeSearch({
+      tenantId: "tenant-test",
+      query: "Amil Salvador",
+      queryEmbedding: [0.2, Number.NaN],
+    })).rejects.toThrow("Invalid knowledge-search embedding");
+  });
+
   it("builds unified agent context with AgentContextBuilder", async () => {
     const payload = await buildAgentContext({
       tenantContext: {
