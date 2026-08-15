@@ -43,6 +43,8 @@ import {
   UserList,
   WhatsappLogo,
   PaperPlaneTilt,
+  RotateCcw,
+  Sparkle,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -56,6 +58,8 @@ import {
   syncSingleLeadConversationAction,
 } from "@/features/ai-agent/actions";
 import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-message";
+import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
+import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
 
 export type ConversationMessage = {
   id: string;
@@ -1065,6 +1069,25 @@ function ClientProfile({ client }: { client: ConversationItem }) {
   const pendingDocuments = client.documents.filter((document) => document.status === "pending").length;
   const sharedMedia = getSharedMedia(client.messages);
 
+  const [openQualifyDialog, setOpenQualifyDialog] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+  const router = useRouter();
+
+  async function handleRevertToQualifying() {
+    setIsReverting(true);
+    const res = await manuallyChangeQualificationStageAction({
+      leadId: client.id,
+      targetStage: "qualificacoes",
+    });
+    setIsReverting(false);
+    if (res.success) {
+      toast.success("Lead movido de volta para a fila de qualificação!");
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Erro ao mover lead para qualificação.");
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-b border-border px-5 py-5">
@@ -1094,6 +1117,45 @@ function ClientProfile({ client }: { client: ConversationItem }) {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-5 p-4">
+          <ProfileSection title="Estágio & Qualificação">
+            <div className="rounded-lg border border-border/80 bg-card p-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Altere manualmente a etapa de qualificação do lead.
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1 justify-center"
+                  disabled={isReverting}
+                  onClick={handleRevertToQualifying}
+                >
+                  <RotateCcw className="size-3.5 text-amber-500" />
+                  {isReverting ? "Movendo..." : "Mover p/ Qualificação"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5 justify-center font-medium"
+                  onClick={() => setOpenQualifyDialog(true)}
+                >
+                  <Sparkle className="size-3.5" />
+                  Qualificar Lead
+                </Button>
+              </div>
+            </div>
+          </ProfileSection>
+
+          <ManualQualificationDialog
+            open={openQualifyDialog}
+            onOpenChange={setOpenQualifyDialog}
+            leadId={client.id}
+            leadName={client.nome}
+          />
+
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">
               <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-2">

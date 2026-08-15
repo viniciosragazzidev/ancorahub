@@ -56,6 +56,7 @@ export function ManualQualificationDialog({
       leadId,
       targetStage: isQualified ? "qualificado" : "humano",
       brokerId: targetBrokerId || null,
+      rating,
     });
 
     setBusy(false);

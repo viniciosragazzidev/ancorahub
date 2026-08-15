@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -162,10 +162,18 @@ export default async function LeadsPage({
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
 
+  const qualifiedOrDistributedFilter = or(
+    isNotNull(schema.leads.corretorId),
+    ne(schema.leads.qualificationState, "IN_PROGRESS"),
+    eq(schema.leads.qualificationStatus, "waiting_human"),
+    inArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "manual_transfer", "disqualified"]),
+    inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "converted", "lost"])
+  );
+
   const where = and(
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt),
-    isNotNull(schema.leads.corretorId),
+    qualifiedOrDistributedFilter,
     ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
@@ -292,13 +300,14 @@ export default async function LeadsPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.corretorId),
           or(
-            isNull(schema.leads.corretorId),
+            eq(schema.leads.qualificationState, "IN_PROGRESS"),
             eq(schema.leads.qualificationStatus, "pending"),
             eq(schema.leads.qualificationStatus, "qualifying"),
-            eq(schema.leads.qualificationState, "IN_PROGRESS"),
             isNull(schema.leads.qualificationStatus)
           ),
+          notInArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified", "waiting_human"]),
           context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
         )
       )

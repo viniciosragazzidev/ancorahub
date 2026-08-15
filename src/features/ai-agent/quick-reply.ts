@@ -110,7 +110,7 @@ export function parseHumanRequest(value: string | null | undefined) {
 
 export function parseOptOut(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
-  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text);
+  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text) || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi)/.test(text);
 }
 
 export function parseStartQualification(value: string | null | undefined) {

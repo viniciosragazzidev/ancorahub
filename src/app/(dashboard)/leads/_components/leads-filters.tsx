@@ -138,7 +138,7 @@ export function LeadsFilters({
         >
           <Input
             aria-label="Buscar leads"
-            className="h-9 w-full bg-card px-3 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:ring-1"
+            className="h-9 w-full bg-background px-3 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:ring-1"
             name="search"
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Buscar por nome ou telefone..."

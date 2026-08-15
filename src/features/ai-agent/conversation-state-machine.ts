@@ -578,15 +578,18 @@ export async function transitionConversationState({
   if (convLead?.leadId) {
     if (newStatus === "WAITING_HUMAN" || newStatus === "HUMAN_ACTIVE") {
       await db.update(schema.leads).set({
-        qualificationStatus: sql`CASE WHEN ${schema.leads.qualificationStatus} IN ('qualifying', 'pending') THEN 'qualified' ELSE ${schema.leads.qualificationStatus} END`,
+        qualificationStatus: sql`CASE WHEN ${schema.leads.qualificationStatus} IN ('qualifying', 'pending') THEN 'waiting_human' ELSE ${schema.leads.qualificationStatus} END`,
+        status: "distributed",
         qualificationState: sql`CASE WHEN ${schema.leads.qualificationState} IN ('IN_PROGRESS', 'PENDING') THEN 'QUALIFIED' ELSE ${schema.leads.qualificationState} END`,
         qualificationCompletedAt: sql`COALESCE(${schema.leads.qualificationCompletedAt}, ${now})`,
         updatedAt: now,
       }).where(and(eq(schema.leads.id, convLead.leadId), eq(schema.leads.tenantId, tenantId)));
-    } else if (newStatus === "CLOSED") {
+    } else if (newStatus === "CLOSED" || newStatus === "PAUSED") {
       await db.update(schema.leads).set({
         qualificationStatus: sql`CASE WHEN ${schema.leads.qualificationStatus} IN ('qualifying', 'pending') THEN 'cold' ELSE ${schema.leads.qualificationStatus} END`,
-        qualificationState: sql`CASE WHEN ${schema.leads.qualificationState} IN ('IN_PROGRESS', 'PENDING') THEN 'NOT_INTERESTED' ELSE ${schema.leads.qualificationState} END`,
+        status: "distributed",
+        distributionStatus: "unassigned",
+        qualificationState: sql`CASE WHEN ${schema.leads.qualificationState} IN ('IN_PROGRESS', 'PENDING') THEN 'COLD' ELSE ${schema.leads.qualificationState} END`,
         qualificationCompletedAt: sql`COALESCE(${schema.leads.qualificationCompletedAt}, ${now})`,
         updatedAt: now,
       }).where(and(eq(schema.leads.id, convLead.leadId), eq(schema.leads.tenantId, tenantId)));
@@ -971,7 +974,20 @@ export async function processInboundAiResponse({
         newStatus: "WAITING_HUMAN",
         reason: "Solicitação explícita de atendimento humano",
       });
+      await db.update(schema.leads).set({
+        qualificationStatus: "waiting_human",
+        status: "distributed",
+        updatedAt: now,
+      }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
       await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
+    } else if (quickReply.intent === "OPT_OUT" || quickReply.intent === "NO_LONGER_INTERESTED" || quickReply.intent === "WRONG_NUMBER") {
+      await db.update(schema.leads).set({
+        qualificationStatus: "cold",
+        qualificationState: "QUALIFIED",
+        status: "distributed",
+        distributionStatus: "unassigned",
+        updatedAt: now,
+      }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
     }
     const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < 30 * 60 * 1000;
     const isWaitRule = quickReply.ruleKey === "waiting_human" || quickReply.ruleKey === "waiting_response";

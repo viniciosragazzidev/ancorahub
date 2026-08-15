@@ -238,6 +238,7 @@ export async function manuallyChangeQualificationStageAction(input: {
   leadId: string;
   targetStage: "qualificacoes" | "qualificado" | "humano";
   brokerId?: string | null;
+  rating?: "qualified" | "hot" | "warm" | "cold" | "not_qualified";
 }) {
   try {
     const context = await getRequiredTenantContext();
@@ -299,15 +300,17 @@ export async function manuallyChangeQualificationStageAction(input: {
     } else if (input.targetStage === "qualificado" || input.targetStage === "humano") {
       const brokerToAssign = input.brokerId || (input.targetStage === "humano" ? await chooseAvailableBroker(context.tenantId, lead.branchId || context.branchId || "") : null);
       const isAssigned = Boolean(brokerToAssign);
+      const chosenRating = input.rating ?? "qualified";
+      const finalQualStatus = chosenRating === "not_qualified" ? "cold" : chosenRating;
 
       await db.transaction(async (tx) => {
         await tx
           .update(schema.leads)
           .set({
-            qualificationStatus: "qualified",
+            qualificationStatus: finalQualStatus,
             qualificationState: "QUALIFIED",
             qualificationCompletedAt: now,
-            status: isAssigned ? "distributed" : "new",
+            status: "distributed",
             distributionStatus: isAssigned ? "assigned" : "queued",
             corretorId: brokerToAssign,
             assignmentSource: isAssigned ? "manual_override" : null,

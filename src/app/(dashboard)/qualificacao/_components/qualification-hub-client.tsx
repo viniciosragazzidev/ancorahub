@@ -43,6 +43,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
+import { AgentTriggersPanel } from "./agent-triggers-panel";
 
 import {
   updateQualificationSettingsAction,
@@ -256,14 +257,15 @@ export function QualificationHubClient({
 
   const tabs = [
     { id: "overview", label: "1. Contexto & Prompt do Agente", icon: MessageSquare, color: "text-primary" },
-    { id: "training", label: "2. Treinamento e Versões", icon: Layers },
-    { id: "whatsapp_diag", label: "3. WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
-    { id: "followup_rules", label: "4. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "mcp_governance", label: "5. Ferramentas & Governança MCP", icon: ShieldAlert, color: "text-amber-500" },
-    { id: "destinations", label: "6. Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
-    { id: "brokers", label: "7. Elegibilidade Corretores", icon: UserCheck },
-    { id: "alerts", label: `8. Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
-    { id: "simulator", label: "9. Simulador Web", icon: SlidersHorizontal },
+    { id: "agent_triggers", label: "2. Loja de Triggers do Agente", icon: Zap, color: "text-amber-500" },
+    { id: "training", label: "3. Treinamento e Versões", icon: Layers },
+    { id: "whatsapp_diag", label: "4. WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
+    { id: "followup_rules", label: "5. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
+    { id: "mcp_governance", label: "6. Ferramentas & Governança MCP", icon: ShieldAlert, color: "text-amber-500" },
+    { id: "destinations", label: "7. Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
+    { id: "brokers", label: "8. Elegibilidade Corretores", icon: UserCheck },
+    { id: "alerts", label: `9. Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "simulator", label: "10. Simulador Web", icon: SlidersHorizontal },
   ];
 
   const requestedTab = searchParams.get("tab");
@@ -776,6 +778,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
             </div>
           </div>
         )}
+
+        {/* TAB 2: LOJA DE TRIGGERS DO AGENTE */}
+        {activeTab === "agent_triggers" && <AgentTriggersPanel />}
 
         {/* TAB 3: REGRAS DE FOLLOW-UP */}
         {activeTab === "followup_rules" && (
