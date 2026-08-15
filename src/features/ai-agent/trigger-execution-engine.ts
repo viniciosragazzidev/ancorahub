@@ -95,7 +95,7 @@ export async function executeAgentTrigger(params: {
   await db.insert(schema.leadInteractions).values({
     id: randomUUID(),
     leadId: params.leadId,
-    userId: params.actorUserId || null,
+    userId: params.actorUserId || "system",
     tipo: "system_alert",
     conteudo: `Gatilho [${triggerDef.key}] executado com sucesso: ${triggerDef.name}.`,
   });

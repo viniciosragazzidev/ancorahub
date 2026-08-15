@@ -14,12 +14,11 @@ import {
   CheckCircle,
   Globe,
   Users,
-  MapPin,
   FileText,
   Clock,
   ShieldCheck,
 } from "@/components/huge-icons";
-import { Pencil, Trash2, Zap, User } from "lucide-react";
+import { Pencil, Trash2, Zap, User, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
