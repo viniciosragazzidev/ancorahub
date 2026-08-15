@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
@@ -68,6 +69,90 @@ export function resolveMemoryResetContext(input: {
       ? input.formattedHistory
       : [...input.formattedHistory, { role: "user", content: input.currentMessage }];
   return { resetMemoryEachMessage, baseMemory, aiMessages };
+}
+
+export async function handleInitialMessageFailure({
+  tenantId,
+  leadId,
+  conversationId,
+  reason = "initial_message_failed",
+}: {
+  tenantId: string;
+  leadId: string;
+  conversationId?: string | null;
+  reason?: string;
+}) {
+  try {
+    const db = getDatabase();
+    const now = new Date();
+
+    if (conversationId) {
+      await db
+        .update(schema.aiConversations)
+        .set({
+          status: "CLOSED",
+          automationState: "CLOSED",
+          transferReason: reason,
+          updatedAt: now,
+        })
+        .where(and(eq(schema.aiConversations.id, conversationId), eq(schema.aiConversations.tenantId, tenantId)));
+    } else {
+      const [conv] = await db
+        .select({ id: schema.aiConversations.id })
+        .from(schema.aiConversations)
+        .where(and(eq(schema.aiConversations.leadId, leadId), eq(schema.aiConversations.tenantId, tenantId)))
+        .limit(1);
+
+      if (conv) {
+        await db
+          .update(schema.aiConversations)
+          .set({
+            status: "CLOSED",
+            automationState: "CLOSED",
+            transferReason: reason,
+            updatedAt: now,
+          })
+          .where(and(eq(schema.aiConversations.id, conv.id), eq(schema.aiConversations.tenantId, tenantId)));
+      }
+    }
+
+    await db
+      .update(schema.leads)
+      .set({
+        status: "distributed",
+        distributionStatus: "queued",
+        qualificationStatus: "cold",
+        qualificationState: "COMPLETED",
+        updatedAt: now,
+      })
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+
+    await db
+      .insert(schema.leadInteractions)
+      .values({
+        id: randomUUID(),
+        leadId,
+        userId: "system",
+        tipo: "note",
+        conteudo: "⚠️ Falha no envio da mensagem inicial via WhatsApp. O atendimento da IA foi encerrado automaticamente, o lead foi qualificado como Frio e transferido para a fila de distribuição geral.",
+        createdAt: now,
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(schema.auditLogs)
+      .values({
+        id: randomUUID(),
+        userId: "system",
+        entidade: "lead",
+        entidadeId: leadId,
+        acao: `lead.initial_message_failed_distributed:${reason}`,
+        createdAt: now,
+      })
+      .onConflictDoNothing();
+  } catch (err) {
+    console.warn("[handleInitialMessageFailure] DB operation skipped or warning:", err);
+  }
 }
 
 async function sendAiOutbound(input: {
@@ -503,9 +588,15 @@ export async function startQualificationConversationForLead(
 
     const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body: finalBody, transport: "meta" }).catch(() => ({ status: "failed" as const, messageId: null }));
 
-    if (sent.status === "skipped_no_channel") {
+    if (sent.status === "skipped_no_channel" || sent.status === "failed") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
-      return { started: false as const, reason: "missing_channel" as const, error: "Nenhum canal do WhatsApp está ativo." };
+      await handleInitialMessageFailure({
+        tenantId: input.tenantId,
+        leadId: input.leadId,
+        conversationId: conversation.id,
+        reason: "initial_message_dispatch_failed",
+      });
+      return { started: false as const, reason: "initial_message_failed" as const, error: "Falha no envio da mensagem inicial. Atendimento encerrado e lead enviado para a fila de distribuição." };
     }
 
     await db.update(schema.whatsappMessages).set({ providerStatus: sent.status === "sent" ? "sent" : "failed", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));

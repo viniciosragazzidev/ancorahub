@@ -260,7 +260,32 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         if (status.status === "sent") outboundUpdate.sentAt = new Date();
         if (status.status === "delivered") outboundUpdate.deliveredAt = new Date();
         if (status.status === "read") outboundUpdate.readAt = new Date();
-        if (status.status === "failed" || status.status === "deleted") outboundUpdate.failedAt = new Date();
+        if (status.status === "failed" || status.status === "deleted") {
+          outboundUpdate.failedAt = new Date();
+          const [msg] = await db
+            .select({ leadId: schema.whatsappMessages.leadId, conversationId: schema.whatsappMessages.conversationId })
+            .from(schema.whatsappMessages)
+            .where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id)))
+            .limit(1);
+
+          if (msg?.leadId) {
+            const [targetLead] = await db
+              .select({ qualificationState: schema.leads.qualificationState, status: schema.leads.status })
+              .from(schema.leads)
+              .where(and(eq(schema.leads.id, msg.leadId), eq(schema.leads.tenantId, channel.tenantId)))
+              .limit(1);
+
+            if (targetLead && (targetLead.qualificationState === "IN_PROGRESS" || targetLead.status === "new")) {
+              const { handleInitialMessageFailure } = await import("@/features/ai-agent/conversation-state-machine");
+              await handleInitialMessageFailure({
+                tenantId: channel.tenantId,
+                leadId: msg.leadId,
+                conversationId: msg.conversationId,
+                reason: "webhook_delivery_failed",
+              });
+            }
+          }
+        }
         const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose });
 
         if (outbound?.purpose === "brokerInvitation" && outbound.recipientId && ["delivered", "read"].includes(status.status)) {

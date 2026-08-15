@@ -17,18 +17,60 @@ import { normalizeTeamMemberStatus, teamMemberStatusLabels } from "@/features/te
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
 export function LeadQualificationBadge({ status }: { status: string }) {
+  const norm = (status || "").trim().toLowerCase();
+
+  if (norm === "hot" || norm.includes("quente")) {
+    return (
+      <Badge variant="destructive" className="gap-1 px-2 py-0.5 font-bold">
+        🔥 Quente
+      </Badge>
+    );
+  }
+  if (norm === "warm" || norm.includes("morno")) {
+    return (
+      <Badge variant="warning" className="gap-1 px-2 py-0.5 font-bold">
+        ☀️ Morno
+      </Badge>
+    );
+  }
+  if (norm === "cold" || norm.includes("frio")) {
+    return (
+      <Badge variant="info" className="gap-1 px-2 py-0.5 font-medium">
+        ❄️ Frio
+      </Badge>
+    );
+  }
+  if (norm === "disqualified" || norm.includes("desqualificado")) {
+    return (
+      <Badge variant="outline" className="gap-1 px-2 py-0.5 text-muted-foreground font-medium">
+        Desqualificado
+      </Badge>
+    );
+  }
+  if (norm === "qualified") {
+    return (
+      <Badge variant="success" className="gap-1 px-2 py-0.5 font-semibold">
+        ✓ Qualificado
+      </Badge>
+    );
+  }
+  if (norm === "qualifying") {
+    return (
+      <Badge variant="secondary" className="gap-1 px-2 py-0.5">
+        Em Qualificação
+      </Badge>
+    );
+  }
+  if (norm === "ia_disabled") {
+    return (
+      <Badge variant="outline" className="gap-1 px-2 py-0.5">
+        IA Desativada
+      </Badge>
+    );
+  }
+
   const value = (status in LEAD_QUALIFICATION_LABELS ? status : "pending") as LeadQualificationStatus;
-  const variant =
-    value === "hot"
-      ? "destructive"
-      : value === "warm"
-      ? "warning"
-      : value === "qualified"
-      ? "success"
-      : value === "ia_disabled"
-      ? "secondary"
-      : "outline";
-  return <Badge variant={variant} className="px-2 py-0.5">{LEAD_QUALIFICATION_LABELS[value] ?? status}</Badge>;
+  return <Badge variant="outline" className="px-2 py-0.5">{LEAD_QUALIFICATION_LABELS[value] ?? status}</Badge>;
 }
 
 export function LeadStatusBadge({ status }: { status: string }) {

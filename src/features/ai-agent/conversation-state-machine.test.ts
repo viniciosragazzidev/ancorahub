@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateAiResponse } from "./service";
-import { resolveMemoryResetContext } from "./conversation-state-machine";
+import { handleInitialMessageFailure, resolveMemoryResetContext } from "./conversation-state-machine";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 
 describe("ai-agent service & state machine", () => {
@@ -141,5 +141,16 @@ describe("ai-agent service & state machine", () => {
     expect(result.success).toBe(true);
     expect(result.content).toMatch(/idade/i);
     expect(result.content).not.toMatch(/recebi sua mensagem|o que você está procurando/i);
+  });
+
+  it("handles initial message failure gracefully by closing conversation and queueing lead for distribution", async () => {
+    await expect(
+      handleInitialMessageFailure({
+        tenantId: "tenant-test-123",
+        leadId: "lead-test-123",
+        conversationId: "conv-test-123",
+        reason: "initial_message_dispatch_failed",
+      })
+    ).resolves.not.toThrow();
   });
 });

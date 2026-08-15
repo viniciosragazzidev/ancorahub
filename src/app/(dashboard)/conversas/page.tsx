@@ -38,6 +38,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
         telefone: schema.leads.telefone,
         email: schema.leads.email,
         status: schema.leads.status,
+        qualificationStatus: schema.leads.qualificationStatus,
         origem: schema.leads.origem,
         branchId: schema.leads.branchId,
         corretorId: schema.leads.corretorId,
