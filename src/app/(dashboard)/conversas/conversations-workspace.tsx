@@ -611,13 +611,15 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
 }
 
 function ConversationHistory({ client }: { client: ConversationItem }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [client.messages.length]);
+  const sortedMessages = useMemo(() => {
+    return [...client.messages].sort(
+      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+    );
+  }, [client.messages]);
 
-  if (!client.messages.length) {
+  if (!sortedMessages.length) {
     return <HistoryEmptyState client={client} />;
   }
 
@@ -626,7 +628,7 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
   };
 
   // Group consecutive messages by sender type for BubbleGroup
-  const grouped = client.messages.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
+  const grouped = sortedMessages.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
     (acc, msg) => {
       const type = getGroupKey(msg.direction);
       const last = acc[acc.length - 1];
@@ -644,8 +646,9 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-5 sm:px-6">
         <p className="mb-1 self-center rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-          Histórico sincronizado
+          Histórico de Mensagens (Mais Recentes no Topo)
         </p>
+        <div ref={topRef} />
         {grouped.map((group, gi) => (
           <BubbleGroup key={gi}>
             {group.messages.map((message) => (
@@ -653,7 +656,6 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
             ))}
           </BubbleGroup>
         ))}
-        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   );

@@ -65,7 +65,7 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   if (config && !config.enabled) {
     await db.update(schema.aiQualificationConfigs).set({ enabled: true, updatedAt: new Date() }).where(and(eq(schema.aiQualificationConfigs.id, config.id), eq(schema.aiQualificationConfigs.tenantId, input.tenantId)));
   }
-  const [lead] = await db.select({ id: schema.leads.id, phone: schema.leads.telefone }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, phone: schema.leads.telefone, nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
   if (!lead?.phone) return { started: false, reason: "missing_phone" as const };
   let [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
   if (!channel) {
@@ -78,24 +78,117 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   const sessionId = existing[0]?.id ?? randomUUID();
   const expiresAt = new Date(now.getTime() + config.timeoutMinutes * 60_000);
   await db.insert(schema.aiQualificationSessions).values({ id: sessionId, tenantId: input.tenantId, leadId: input.leadId, status: "waiting_customer", currentQuestionKey: questions[0].key, collectedData: {}, missingFields: questions.map((question) => question.key), expiresAt, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: [schema.aiQualificationSessions.tenantId, schema.aiQualificationSessions.leadId], set: { status: "waiting_customer", currentQuestionKey: questions[0].key, collectedData: {}, missingFields: questions.map((question) => question.key), expiresAt, failureReason: null, retryCount: 0, updatedAt: now } });
-  const body = `${config.initialMessage}\n\n${questions[0].prompt}`;
-  const queued = await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: lead.phone, body, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${input.leadId}:start:${Date.now()}` });
-  await db.insert(schema.whatsappMessages).values({
-    id: `ai_msg_start_${randomUUID()}`,
-    tenantId: input.tenantId,
-    leadId: input.leadId,
-    communicationChannelId: channel.id,
-    senderRole: "assistant",
-    provider: META_CLOUD_PROVIDER,
-    phone: lead.phone,
-    direction: "outbound",
-    body,
-    providerStatus: "sent",
-    sentAt: now,
-  }).onConflictDoNothing();
+  
+  let dispatchedViaTemplate = false;
+  let finalBody = `${config.initialMessage}\n\n${questions[0].prompt}`;
+  let queuedId: string | undefined = undefined;
+
+  try {
+    const { resolveMetaChannelCredentials } = await import("@/features/communication-channels/template-sync-service");
+    const { sendMetaCloudTemplateTest } = await import("@/features/communication-channels/meta-graph-templates-client");
+    const credentials = await resolveMetaChannelCredentials(input.tenantId);
+
+    if (credentials.phoneNumberId && credentials.accessToken) {
+      const [template] = await db
+        .select()
+        .from(schema.metaWhatsAppTemplates)
+        .where(
+          and(
+            eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
+            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+            isNull(schema.metaWhatsAppTemplates.deletedAt)
+          )
+        )
+        .limit(1);
+
+      if (template) {
+        const leadName = lead.nome || "Cliente";
+        const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
+        const namedParams = bodyComp?.example?.body_text_named_params;
+        const components = [
+          {
+            type: "body",
+            parameters:
+              namedParams && namedParams.length > 0
+                ? [
+                    { type: "text", parameter_name: "nome", text: leadName },
+                    { type: "text", parameter_name: "empresa", text: "Âncora Saúde" },
+                  ]
+                : [
+                    { type: "text", text: leadName },
+                    { type: "text", text: "Âncora Saúde" },
+                  ],
+          },
+        ];
+
+        const res = await sendMetaCloudTemplateTest(
+          credentials.phoneNumberId,
+          credentials.accessToken,
+          lead.phone,
+          template.name,
+          template.language,
+          components
+        );
+
+        dispatchedViaTemplate = true;
+        const wamid = res.messages?.[0]?.id ?? null;
+        if (wamid) queuedId = wamid;
+
+        let rendered = template.bodyText || "";
+        if (rendered) {
+          rendered = rendered
+            .replace(/\{\{1\}\}/g, leadName)
+            .replace(/\{\{2\}\}/g, "Âncora Saúde")
+            .replace(/\{\{nome\}\}/g, leadName)
+            .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
+        } else {
+          rendered = finalBody;
+        }
+        finalBody = rendered;
+
+        await db.insert(schema.whatsappMessages).values({
+          id: wamid || `tpl_start_${randomUUID()}`,
+          tenantId: input.tenantId,
+          leadId: input.leadId,
+          communicationChannelId: channel.id,
+          senderRole: "assistant",
+          provider: META_CLOUD_PROVIDER,
+          phone: lead.phone,
+          direction: "outbound",
+          body: finalBody,
+          providerStatus: "sent",
+          messageId: wamid ?? undefined,
+          sentAt: now,
+        }).onConflictDoNothing();
+      }
+    }
+  } catch (templateError) {
+    console.warn("[startAiQualificationForLead] Meta template dispatch skipped/failed:", templateError);
+  }
+
+  if (!dispatchedViaTemplate) {
+    const queued = await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: lead.phone, body: finalBody, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${input.leadId}:start:${Date.now()}` });
+    queuedId = queued.id;
+    await db.insert(schema.whatsappMessages).values({
+      id: `ai_msg_start_${randomUUID()}`,
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      communicationChannelId: channel.id,
+      senderRole: "assistant",
+      provider: META_CLOUD_PROVIDER,
+      phone: lead.phone,
+      direction: "outbound",
+      body: finalBody,
+      providerStatus: "sent",
+      sentAt: now,
+    }).onConflictDoNothing();
+    await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] initial delivery deferred", error));
+  }
+
+  await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: now }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "ai_qualification_session", entidadeId: sessionId, acao: "ai_qualification.started" });
-  await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] initial delivery deferred", error));
-  return { started: true, sessionId, queuedId: queued.id };
+  return { started: true, sessionId, queuedId };
 }
 
 export async function processAiQualificationMessage(input: { tenantId: string; leadId: string; phone: string; text: string; actorUserId: string }) {

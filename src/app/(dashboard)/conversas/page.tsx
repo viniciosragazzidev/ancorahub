@@ -185,6 +185,12 @@ export default async function ConversationsPage({ searchParams }: { searchParams
     };
   });
 
+  conversations.sort((a, b) => {
+    const timeA = a.latestMessage ? new Date(a.latestMessage.sentAt).getTime() : new Date(a.stageEnteredAt).getTime();
+    const timeB = b.latestMessage ? new Date(b.latestMessage.sentAt).getTime() : new Date(b.stageEnteredAt).getTime();
+    return timeB - timeA;
+  });
+
   let officialBrokerConversations: OfficialBrokerConversation[] = [];
   const officialBrokerMessagesEnabled = officialBrokerTab ? await isMetaCloudWhatsAppEnabled() : false;
   if (officialBrokerTab && officialBrokerMessagesEnabled) {
