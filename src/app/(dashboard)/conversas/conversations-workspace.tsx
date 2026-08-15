@@ -49,7 +49,7 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { cn } from "@/lib/utils";
-import { Sparkles, RefreshCw } from "lucide-react";
+import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen } from "lucide-react";
 import {
   takeoverConversationAction,
   closeConversationAction,
@@ -106,10 +106,11 @@ export type ConversationItem = {
     requirementName: string | null;
     createdAt: string;
   }[];
+  qualificationStatus?: string | null;
   aiConversation?: AiConversationData | null;
 };
 
-type ViewFilter = "all" | "ai_active" | "waiting_human" | "human_active" | "with_messages" | "without_messages";
+type ViewFilter = "all" | "qualified" | "ai_active" | "human_active" | "with_messages" | "without_messages";
 
 export function ConversationsWorkspace({
   role,
@@ -165,12 +166,14 @@ export function ConversationsWorkspace({
         );
       const matchesFilter =
         filter === "all" ||
-        (filter === "ai_active"
-          ? conversation.aiConversation?.status === "AI_ACTIVE" || conversation.aiConversation?.status === "WAITING_CUSTOMER"
-          : filter === "waiting_human"
-            ? conversation.aiConversation?.status === "WAITING_HUMAN"
+        (filter === "qualified"
+          ? conversation.status === "distributed" ||
+            conversation.aiConversation?.status === "CLOSED" ||
+            ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status)
+          : filter === "ai_active"
+            ? conversation.aiConversation?.status === "AI_ACTIVE" || conversation.aiConversation?.status === "WAITING_CUSTOMER"
             : filter === "human_active"
-              ? conversation.aiConversation?.status === "HUMAN_ACTIVE"
+              ? conversation.aiConversation?.status === "HUMAN_ACTIVE" || conversation.aiConversation?.status === "WAITING_HUMAN"
               : filter === "with_messages"
                 ? conversation.messages.length > 0
                 : conversation.messages.length === 0);
@@ -196,6 +199,20 @@ export function ConversationsWorkspace({
   function returnToList() {
     setSelectedId(null);
     updateSelectedLeadInUrl(null);
+  }
+
+  function handleUpdateConversation(leadId: string, updates: Partial<ConversationItem>) {
+    setConversations((prev) =>
+      prev.map((item) => {
+        if (item.id === leadId) {
+          const nextAi = updates.aiConversation
+            ? { ...item.aiConversation, ...updates.aiConversation }
+            : item.aiConversation;
+          return { ...item, ...updates, aiConversation: nextAi as any };
+        }
+        return item;
+      })
+    );
   }
 
   return (
@@ -237,9 +254,9 @@ export function ConversationsWorkspace({
 
           <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
             <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
+            <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
             <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => c.aiConversation?.status === "AI_ACTIVE" || c.aiConversation?.status === "WAITING_CUSTOMER").length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
-            <FilterChip active={filter === "waiting_human"} count={conversations.filter((c) => c.aiConversation?.status === "WAITING_HUMAN").length} label="Aguardando Humano" onClick={() => setFilter("waiting_human")} />
-            <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
+            <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
           </div>
 
         </div>
@@ -248,7 +265,7 @@ export function ConversationsWorkspace({
       <div
           className={cn(
             "grid min-h-0 flex-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
-            profileOpen && "2xl:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
+            profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
           )}
       >
         <section
@@ -291,6 +308,7 @@ export function ConversationsWorkspace({
                 onBack={returnToList}
                 onOpenProfile={() => setProfileSheetOpen(true)}
                 onToggleProfile={() => setProfileOpen((open) => !open)}
+                onUpdateConversation={handleUpdateConversation}
                 profileOpen={profileOpen}
                 userId={userId}
                 tenantId={tenantId}
@@ -321,21 +339,21 @@ export function ConversationsWorkspace({
 
         <aside
           aria-label="Perfil do cliente"
-          className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card 2xl:flex 2xl:flex-col", !profileOpen && "2xl:hidden")}
+          className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card lg:flex lg:flex-col", !profileOpen && "lg:hidden")}
         >
-          {selected ? <ClientProfile client={selected} /> : null}
+          {selected ? <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} /> : null}
         </aside>
       </div>
 
       <Sheet onOpenChange={setProfileSheetOpen} open={profileSheetOpen}>
-        <SheetContent className="gap-0 p-0 2xl:hidden" side="right">
+        <SheetContent className="gap-0 p-0 lg:hidden" side="right">
           {selected ? (
             <>
               <SheetHeader>
                 <SheetTitle>Perfil do atendimento</SheetTitle>
                 <SheetDescription>Contexto e ações disponíveis para {selected.nome}.</SheetDescription>
               </SheetHeader>
-              <ClientProfile client={selected} />
+              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} />
             </>
           ) : null}
         </SheetContent>
@@ -349,6 +367,7 @@ function ConversationHeader({
   onBack,
   onOpenProfile,
   onToggleProfile,
+  onUpdateConversation,
   profileOpen,
   userId,
   tenantId,
@@ -358,6 +377,7 @@ function ConversationHeader({
   onBack: () => void;
   onOpenProfile: () => void;
   onToggleProfile: () => void;
+  onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
   profileOpen: boolean;
   userId?: string;
   tenantId?: string;
@@ -374,6 +394,9 @@ function ConversationHeader({
 
   async function handleTakeover() {
     if (!client.aiConversation?.id) return;
+    onUpdateConversation?.(client.id, {
+      aiConversation: { ...client.aiConversation, status: "HUMAN_ACTIVE" },
+    });
     setIsPending(true);
     await takeoverConversationAction(client.aiConversation.id);
     setIsPending(false);
@@ -383,6 +406,10 @@ function ConversationHeader({
   async function handleResetChat() {
     if (!client.aiConversation?.id) return;
     if (!confirm("Tem certeza que deseja resetar a qualificação da inteligência artificial e limpar a memória deste lead? O robô de IA iniciará a conversa do zero.")) return;
+    onUpdateConversation?.(client.id, {
+      messages: [],
+      aiConversation: { ...client.aiConversation, status: "AI_ACTIVE" },
+    });
     setIsPending(true);
     const toastId = toast.loading("Resetando qualificação da IA...");
     try {
@@ -401,6 +428,11 @@ function ConversationHeader({
   }
 
   async function handleResumeAi() {
+    if (client.aiConversation) {
+      onUpdateConversation?.(client.id, {
+        aiConversation: { ...client.aiConversation, status: "AI_ACTIVE" },
+      });
+    }
     setIsPending(true);
     const toastId = toast.loading("Iniciando/retomando qualificação por IA...");
     try {
@@ -539,17 +571,33 @@ function ConversationHeader({
           <TooltipContent>Abrir WhatsApp</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir perfil do atendimento" className="2xl:hidden" onClick={onOpenProfile} size="icon-sm" type="button" variant="ghost"><UserList className="size-3.5" /></Button>} />
+          <TooltipTrigger render={<Button aria-label="Abrir perfil do atendimento" className="lg:hidden" onClick={onOpenProfile} size="icon-sm" type="button" variant="ghost"><UserList className="size-3.5" /></Button>} />
           <TooltipContent>Ver perfil</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger render={<Button aria-label="Abrir lead completo" render={<Link href={`/leads/${client.id}`} />} size="icon-sm" variant="ghost"><ArrowSquareOut className="size-3.5" /></Button>} />
           <TooltipContent>Abrir lead</TooltipContent>
         </Tooltip>
-        <div className="ml-1 hidden border-l border-border pl-2 2xl:block">
+        <div className="ml-1 hidden border-l border-border pl-2 lg:block">
           <Tooltip>
-            <TooltipTrigger render={<Button aria-label={profileOpen ? "Recolher perfil do cliente" : "Mostrar perfil do cliente"} onClick={onToggleProfile} size="icon-sm" type="button" variant="ghost"><PanelLeftIcon className={cn("size-3.5", profileOpen && "rotate-180")} /></Button>} />
-            <TooltipContent>{profileOpen ? "Recolher perfil" : "Mostrar perfil"}</TooltipContent>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={profileOpen ? "Recolher painel lateral" : "Expandir painel lateral"}
+                  onClick={onToggleProfile}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  {profileOpen ? (
+                    <PanelRightClose className="size-4 text-muted-foreground hover:text-foreground" />
+                  ) : (
+                    <PanelRightOpen className="size-4 text-muted-foreground hover:text-foreground" />
+                  )}
+                </Button>
+              }
+            />
+            <TooltipContent>{profileOpen ? "Recolher painel" : "Expandir painel"}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -569,63 +617,8 @@ function FilterChip({ active, count, label, onClick }: { active: boolean; count:
       type="button"
     >
       <span>{label}</span>
-      <span className="tabular-nums text-[11px] opacity-75">{count}</span>
     </button>
   );
-}
-
-function ConversationRow({ active, conversation, onClick }: { active: boolean; conversation: ConversationItem; onClick: () => void }) {
-  const hasHistory = conversation.messages.length > 0;
-  const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
-
-  return (
-    <button
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "group flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        active ? "bg-muted/80" : "hover:bg-muted/65",
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} />
-      <span className="grid min-w-0 flex-1 gap-1">
-        <span className="flex min-w-0 items-center justify-between gap-3">
-          <span className="truncate text-sm font-medium">{conversation.nome}</span>
-          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-            {formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}
-          </span>
-        </span>
-        <span className="truncate text-xs leading-5 text-muted-foreground">
-          {conversation.latestMessage?.direction === "outgoing" || conversation.latestMessage?.direction === "outbound" ? "Você: " : ""}
-          {preview}
-        </span>
-        <span className="flex items-center gap-2 pt-0.5">
-          <Badge className="max-w-32 truncate px-1.5 text-[10px]" variant="outline">
-            {LEAD_STATUS_LABELS[conversation.status] ?? conversation.status}
-          </Badge>
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-            <Clock aria-hidden="true" className="size-3" />
-            {hasHistory ? `${conversation.messages.length} mensagens` : "Aguardando histórico"}
-          </span>
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function formatDateDivider(value: string) {
-  const date = new Date(value);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) return "Hoje";
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = date.toDateString() === yesterday.toDateString();
-  if (isYesterday) return "Ontem";
-
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
 }
 
 function ConversationHistory({ client }: { client: ConversationItem }) {
@@ -1059,7 +1052,145 @@ function EmptyConversation() {
   );
 }
 
-function ClientProfile({ client }: { client: ConversationItem }) {
+function renderRowQualificationBadge(conversation: ConversationItem) {
+  const isDistributedOrQualified =
+    conversation.status === "distributed" ||
+    conversation.aiConversation?.status === "CLOSED" ||
+    ["hot", "warm", "cold", "qualified", "disqualified"].includes(conversation.status);
+
+  if (isDistributedOrQualified) {
+    const norm = (conversation.status || "").toLowerCase();
+    if (norm === "hot" || norm.includes("quente")) {
+      return (
+        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
+          Quente 🔥
+        </Badge>
+      );
+    }
+    if (norm === "warm" || norm.includes("morno")) {
+      return (
+        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+          Morno ☀️
+        </Badge>
+      );
+    }
+    if (norm === "cold" || norm.includes("frio")) {
+      return (
+        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
+          Frio ❄️
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
+        Qualificado ✓
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="max-w-32 truncate px-1.5 text-[10px]" variant="outline">
+      {LEAD_STATUS_LABELS[conversation.status] ?? conversation.status}
+    </Badge>
+  );
+}
+
+function ConversationRow({ active, conversation, onClick }: { active: boolean; conversation: ConversationItem; onClick: () => void }) {
+  const hasHistory = conversation.messages.length > 0;
+  const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
+
+  return (
+    <button
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "group flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        active ? "bg-muted/80" : "hover:bg-muted/65",
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      <ContactAvatar className="mt-0.5 shrink-0" name={conversation.nome} />
+      <span className="grid min-w-0 flex-1 gap-1">
+        <span className="flex min-w-0 items-center justify-between gap-3">
+          <span className="truncate text-sm font-medium">{conversation.nome}</span>
+          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+            {formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}
+          </span>
+        </span>
+        <span className="truncate text-xs leading-5 text-muted-foreground">
+          {conversation.latestMessage?.direction === "outgoing" || conversation.latestMessage?.direction === "outbound" ? "Você: " : ""}
+          {preview}
+        </span>
+        <span className="flex items-center gap-2 pt-0.5">
+          {renderRowQualificationBadge(conversation)}
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+            <Clock aria-hidden="true" className="size-3" />
+            {hasHistory ? `${conversation.messages.length} mensagens` : "Aguardando histórico"}
+          </span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function formatDateDivider(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) return "Hoje";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+  if (isYesterday) return "Ontem";
+
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
+}
+
+function renderQualificationRatingBadge(status: string, qualStatus?: string | null) {
+  const norm = (qualStatus || status || "").toLowerCase();
+  if (norm.includes("hot") || norm.includes("quente")) {
+    return (
+      <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-xs gap-1">
+        🔥 Quente (Alta Prioridade)
+      </Badge>
+    );
+  }
+  if (norm.includes("warm") || norm.includes("morno")) {
+    return (
+      <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs gap-1">
+        ☀️ Morno (Interessado)
+      </Badge>
+    );
+  }
+  if (norm.includes("cold") || norm.includes("frio")) {
+    return (
+      <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium text-xs gap-1">
+        ❄️ Frio / Sem Resposta
+      </Badge>
+    );
+  }
+  if (norm.includes("disqualified") || norm.includes("wrong") || norm.includes("opt")) {
+    return (
+      <Badge variant="outline" className="border-gray-500/30 bg-gray-500/10 text-muted-foreground font-medium text-xs gap-1">
+        Desqualificado
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs gap-1">
+      ✓ Lead Qualificado
+    </Badge>
+  );
+}
+
+function ClientProfile({
+  client,
+  onUpdateConversation,
+}: {
+  client: ConversationItem;
+  onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
+}) {
   const approvedDocuments = client.documents.filter((document) => document.status === "approved").length;
   const pendingDocuments = client.documents.filter((document) => document.status === "pending").length;
   const sharedMedia = getSharedMedia(client.messages);
@@ -1068,7 +1199,17 @@ function ClientProfile({ client }: { client: ConversationItem }) {
   const [isReverting, setIsReverting] = useState(false);
   const router = useRouter();
 
+  const isQualified =
+    client.status === "distributed" ||
+    client.aiConversation?.status === "CLOSED" ||
+    ["hot", "warm", "cold", "qualified", "disqualified"].includes(client.status);
+
   async function handleRevertToQualifying() {
+    onUpdateConversation?.(client.id, {
+      status: "new",
+      qualificationStatus: "pending",
+      aiConversation: client.aiConversation ? { ...client.aiConversation, status: "AI_ACTIVE" } : null,
+    });
     setIsReverting(true);
     const res = await manuallyChangeQualificationStageAction({
       leadId: client.id,
@@ -1112,37 +1253,63 @@ function ClientProfile({ client }: { client: ConversationItem }) {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-5 p-4">
-          <ProfileSection title="Estágio & Qualificação">
-            <div className="rounded-lg border border-border/80 bg-card p-3 space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Altere manualmente a etapa de qualificação do lead.
-              </p>
-              <div className="flex flex-col gap-2 pt-1">
+          {isQualified ? (
+            <ProfileSection title="Status de Qualificação">
+              <div className="rounded-lg border border-border/80 bg-card p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-medium">Classificação</span>
+                  {renderQualificationRatingBadge(client.status, client.qualificationStatus)}
+                </div>
+                <div className="pt-2 flex items-center justify-between border-t border-border/40">
+                  <span className="text-[11px] text-muted-foreground">Fila de Atendimento</span>
+                  <span className="text-xs font-semibold text-foreground">Distribuição Geral</span>
+                </div>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="w-full h-8 text-xs gap-1.5 justify-center"
+                  className="w-full h-7 text-[11px] text-muted-foreground hover:text-foreground gap-1 justify-center mt-1"
                   disabled={isReverting}
                   onClick={handleRevertToQualifying}
                 >
-                  <RotateCcw className="size-3.5 text-amber-500 shrink-0" />
-                  <span>{isReverting ? "Movendo..." : "Mover p/ Qualificação"}</span>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  className="w-full h-8 text-xs gap-1.5 justify-center font-medium"
-                  onClick={() => setOpenQualifyDialog(true)}
-                >
-                  <Sparkle className="size-3.5 shrink-0" />
-                  <span>Qualificar Lead</span>
+                  <RotateCcw className="size-3 text-amber-500 shrink-0" />
+                  <span>{isReverting ? "Revertendo..." : "Reabrir Qualificação por IA"}</span>
                 </Button>
               </div>
-            </div>
-          </ProfileSection>
+            </ProfileSection>
+          ) : (
+            <ProfileSection title="Estágio & Qualificação">
+              <div className="rounded-lg border border-border/80 bg-card p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Altere manualmente a etapa de qualificação do lead.
+                </p>
+                <div className="flex flex-col gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-8 text-xs gap-1.5 justify-center"
+                    disabled={isReverting}
+                    onClick={handleRevertToQualifying}
+                  >
+                    <RotateCcw className="size-3.5 text-amber-500 shrink-0" />
+                    <span>{isReverting ? "Movendo..." : "Mover p/ Qualificação"}</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="w-full h-8 text-xs gap-1.5 justify-center font-medium"
+                    onClick={() => setOpenQualifyDialog(true)}
+                  >
+                    <Sparkle className="size-3.5 shrink-0" />
+                    <span>Qualificar Lead</span>
+                  </Button>
+                </div>
+              </div>
+            </ProfileSection>
+          )}
 
           <ManualQualificationDialog
             open={openQualifyDialog}
