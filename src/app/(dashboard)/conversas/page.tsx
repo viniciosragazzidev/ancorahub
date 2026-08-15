@@ -77,6 +77,8 @@ export default async function ConversationsPage({ searchParams }: { searchParams
           phone: schema.whatsappMessages.phone,
           body: schema.whatsappMessages.body,
           direction: schema.whatsappMessages.direction,
+          senderRole: schema.whatsappMessages.senderRole,
+          providerStatus: schema.whatsappMessages.providerStatus,
           sentAt: schema.whatsappMessages.sentAt,
         })
         .from(schema.whatsappMessages)
@@ -107,19 +109,37 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
   const messagesByLead = new Map<string, ConversationMessage[]>();
   for (const lead of leads) {
-    const matched = messageRows
+    const rawMatched = messageRows
       .filter((msg) => msg.leadId === lead.id || (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone, lead.telefone)))
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
-      .slice(-200)
-      .map((msg) => ({
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
+
+    const seenIds = new Set<string>();
+    const seenContentKeys = new Set<string>();
+    const matched: ConversationMessage[] = [];
+
+    for (const msg of rawMatched) {
+      if (seenIds.has(msg.id)) continue;
+      seenIds.add(msg.id);
+
+      // Deduplicate identical content sent within 5 seconds of each other
+      const window5s = Math.floor(msg.sentAt.getTime() / 5000);
+      const contentKey = `${msg.direction}:${msg.body.trim()}:${window5s}`;
+      if (seenContentKeys.has(contentKey)) continue;
+      seenContentKeys.add(contentKey);
+
+      matched.push({
         id: msg.id,
         leadId: lead.id,
         body: msg.body,
         direction: msg.direction,
+        senderRole: msg.senderRole,
+        providerStatus: msg.providerStatus,
         sentAt: msg.sentAt.toISOString(),
-      }));
+      });
+    }
+
     if (matched.length > 0) {
-      messagesByLead.set(lead.id, matched);
+      messagesByLead.set(lead.id, matched.slice(-200));
     }
   }
 

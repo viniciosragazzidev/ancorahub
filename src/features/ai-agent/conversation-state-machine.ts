@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -78,6 +78,28 @@ async function sendAiOutbound(input: {
   openWaSessionId?: string | null;
   wahaRunId?: string | null;
 }) {
+  const db = getDatabase();
+  const [lastOutbound] = await db
+    .select({ sentAt: schema.whatsappMessages.sentAt })
+    .from(schema.whatsappMessages)
+    .where(
+      and(
+        eq(schema.whatsappMessages.tenantId, input.tenantId),
+        eq(schema.whatsappMessages.phone, input.phone),
+        eq(schema.whatsappMessages.direction, "outbound")
+      )
+    )
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(1);
+
+  if (lastOutbound?.sentAt) {
+    const elapsedMs = Date.now() - new Date(lastOutbound.sentAt).getTime();
+    if (elapsedMs < 15_000) {
+      console.info(`[anti-spam-15s] Outbound message to ${input.phone} throttled (${Math.ceil((15000 - elapsedMs) / 1000)}s remaining).`);
+      return { status: "throttled" as const, messageId: null };
+    }
+  }
+
   if (input.transport === "openwa" && input.openWaSessionId) {
     try {
       const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
@@ -107,7 +129,6 @@ async function sendAiOutbound(input: {
   }
 
   // Fallback para sessão conectada no OpenWA legado se houver
-  const db = getDatabase();
   const [openWaConn] = await db
     .select({ sessionId: schema.whatsappConnections.sessionId })
     .from(schema.whatsappConnections)
@@ -323,6 +344,35 @@ export async function startQualificationConversationForLead(
   if (!force && !["NEW", "AI_ACTIVE"].includes(conversation.status)) return { started: false as const, reason: "already_started" as const };
 
   const memory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
+
+  // CHECK IF THE LEAD ALREADY HAS ASSISTANT MESSAGES IN WHATSAPP MESSAGES HISTORY
+  const [existingAssistantMsg] = await db
+    .select({ id: schema.whatsappMessages.id })
+    .from(schema.whatsappMessages)
+    .where(
+      and(
+        eq(schema.whatsappMessages.tenantId, input.tenantId),
+        eq(schema.whatsappMessages.leadId, input.leadId),
+        or(
+          eq(schema.whatsappMessages.senderRole, "assistant"),
+          eq(schema.whatsappMessages.direction, "outbound")
+        )
+      )
+    )
+    .limit(1);
+
+  if (existingAssistantMsg) {
+    // Lead already has conversation history - reactivate AI state without sending duplicate greeting template!
+    await db.update(schema.aiConversations).set({
+      status: "WAITING_CUSTOMER",
+      automationState: "AI_ACTIVE",
+      behaviorVersionId: behavior.versionId,
+      updatedAt: new Date(),
+    }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+    await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: new Date() }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+    return { started: true as const, conversationId: conversation.id, resumed: true };
+  }
+
   const { resolveDeterministicQualificationTurn } = await import("@/features/qualification-engine/service");
   const turn = resolveDeterministicQualificationTurn({ memory, policy: behavior.policy });
 
@@ -331,17 +381,138 @@ export async function startQualificationConversationForLead(
   const defaultGreeting = `Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento. Para começar, qual é o seu ${firstQuestion}?`;
   const body = turn.kind === "collecting" ? turn.reply : defaultGreeting;
 
-  const messageId = `ai_msg_start_${crypto.randomUUID()}`;
-  await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, senderRole: "assistant", provider: "meta", phone: lead.telefone, direction: "outbound", body, sentAt: new Date() });
-  const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body, transport: "meta" }).catch(() => ({ status: "failed" as const, messageId: null }));
+  // DEDUPLICATION: Check if identical message body was created in last 60s
+  const [recentDup] = await db
+    .select({ id: schema.whatsappMessages.id })
+    .from(schema.whatsappMessages)
+    .where(
+      and(
+        eq(schema.whatsappMessages.tenantId, input.tenantId),
+        eq(schema.whatsappMessages.leadId, input.leadId),
+        eq(schema.whatsappMessages.body, body),
+        gt(schema.whatsappMessages.sentAt, new Date(Date.now() - 60_000))
+      )
+    )
+    .limit(1);
 
-  if (sent.status === "skipped_no_channel") {
-    await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
-    return { started: false as const, reason: "missing_channel" as const, error: "Nenhum canal do WhatsApp está ativo." };
+  if (recentDup) {
+    await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...memory, lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+    return { started: true as const, conversationId: conversation.id, deduped: true };
   }
 
-  await db.update(schema.whatsappMessages).set({ providerStatus: sent.status === "sent" ? "sent" : "failed", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
-  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...memory, lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+  // Attempt sending Meta Approved Template first for outbound 24h window
+  let dispatchedViaTemplate = false;
+  let finalBody = body;
+  let finalMessageId = `ai_msg_start_${crypto.randomUUID()}`;
+
+  try {
+    const { resolveMetaChannelCredentials } = await import("@/features/communication-channels/template-sync-service");
+    const { sendMetaCloudTemplateTest } = await import("@/features/communication-channels/meta-graph-templates-client");
+    const credentials = await resolveMetaChannelCredentials(input.tenantId);
+
+    if (credentials.phoneNumberId && credentials.accessToken) {
+      const [template] = await db
+        .select()
+        .from(schema.metaWhatsAppTemplates)
+        .where(
+          and(
+            eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
+            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+            isNull(schema.metaWhatsAppTemplates.deletedAt)
+          )
+        )
+        .limit(1);
+
+      if (template) {
+        const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
+        const namedParams = bodyComp?.example?.body_text_named_params;
+        const components = [
+          {
+            type: "body",
+            parameters:
+              namedParams && namedParams.length > 0
+                ? [
+                    { type: "text", parameter_name: "nome", text: lead.nome || "Cliente" },
+                    { type: "text", parameter_name: "empresa", text: "Âncora Saúde" },
+                  ]
+                : [
+                    { type: "text", text: lead.nome || "Cliente" },
+                    { type: "text", text: "Âncora Saúde" },
+                  ],
+          },
+        ];
+
+        const response = await sendMetaCloudTemplateTest(
+          credentials.phoneNumberId,
+          credentials.accessToken,
+          lead.telefone,
+          template.name,
+          template.language,
+          components
+        );
+
+        dispatchedViaTemplate = true;
+        const wamid = response.messages?.[0]?.id ?? null;
+        if (wamid) finalMessageId = wamid;
+
+        let rendered = template.bodyText || "";
+        if (rendered) {
+          rendered = rendered
+            .replace(/\{\{1\}\}/g, lead.nome || "Cliente")
+            .replace(/\{\{2\}\}/g, "Âncora Saúde")
+            .replace(/\{\{nome\}\}/g, lead.nome || "Cliente")
+            .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
+        } else {
+          rendered = body;
+        }
+        finalBody = rendered;
+
+        await db.insert(schema.whatsappMessages).values({
+          id: finalMessageId,
+          tenantId: input.tenantId,
+          leadId: input.leadId,
+          conversationId: conversation.id,
+          senderRole: "assistant",
+          provider: "meta",
+          phone: lead.telefone,
+          direction: "outbound",
+          body: finalBody,
+          providerStatus: "sent",
+          messageId: wamid ?? undefined,
+          sentAt: new Date(),
+        }).onConflictDoNothing();
+      }
+    }
+  } catch (templateError) {
+    console.warn("[startQualificationConversationForLead] Meta template dispatch skipped/failed:", templateError);
+  }
+
+  if (!dispatchedViaTemplate) {
+    await db.insert(schema.whatsappMessages).values({
+      id: finalMessageId,
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      conversationId: conversation.id,
+      senderRole: "assistant",
+      provider: "meta",
+      phone: lead.telefone,
+      direction: "outbound",
+      body: finalBody,
+      sentAt: new Date(),
+    }).onConflictDoNothing();
+
+    const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body: finalBody, transport: "meta" }).catch(() => ({ status: "failed" as const, messageId: null }));
+
+    if (sent.status === "skipped_no_channel") {
+      await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+      return { started: false as const, reason: "missing_channel" as const, error: "Nenhum canal do WhatsApp está ativo." };
+    }
+
+    await db.update(schema.whatsappMessages).set({ providerStatus: sent.status === "sent" ? "sent" : "failed", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+  }
+
+  await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: new Date() }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...memory, lastQuestionAsked: finalBody }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
   await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, actorUserId: input.actorUserId, policy: behavior.policy, memory });
   return { started: true as const, conversationId: conversation.id };
 }
@@ -822,11 +993,54 @@ export async function processInboundAiResponse({
     .limit(1);
 
   // 6. Extrair campos estruturados da mensagem e atualizar memória
-  const updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
+  let updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
+
+  // 6a. Analisar nome do cadastro do lead se for um nome valido
+  if (lead?.nome && !lead.nome.startsWith("Lead WhatsApp") && !lead.nome.toLowerCase().includes("cliente") && !updatedMemory.customerName?.value) {
+    updatedMemory = {
+      ...updatedMemory,
+      customerName: { value: lead.nome, confidence: 1 },
+      customerFirstName: { value: lead.nome.split(/\s+/)[0], confidence: 1 },
+      collectedFields: Array.from(new Set([...updatedMemory.collectedFields, "customerName"])),
+    };
+  }
+
+  // 6b. Analisar historico de mensagens recebidas para acumular informacoes ja fornecidas
+  const allIncomingMsgs = await db
+    .select({ body: schema.whatsappMessages.body })
+    .from(schema.whatsappMessages)
+    .where(
+      and(
+        eq(schema.whatsappMessages.tenantId, tenantId),
+        eq(schema.whatsappMessages.leadId, leadId),
+        eq(schema.whatsappMessages.direction, "incoming")
+      )
+    );
+
+  for (const inc of allIncomingMsgs) {
+    if (inc.body) {
+      updatedMemory = extractFieldsFromMessage(inc.body, updatedMemory);
+    }
+  }
+
+  // 6c. Buscar textos de mensagens enviadas para evitar repeticao de perguntas
+  const allOutboundMsgs = await db
+    .select({ body: schema.whatsappMessages.body })
+    .from(schema.whatsappMessages)
+    .where(
+      and(
+        eq(schema.whatsappMessages.tenantId, tenantId),
+        eq(schema.whatsappMessages.leadId, leadId),
+        eq(schema.whatsappMessages.direction, "outbound")
+      )
+    );
+
+  const pastOutboundTexts = new Set(allOutboundMsgs.map((m) => m.body.trim().toLowerCase()));
+
   const memoryContext = buildMemoryContext(updatedMemory);
   let qualification = evaluateQualification(updatedMemory, behavior.policy);
 
-  // 6b. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
+  // 6d. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
 
   if (detectHumanTransferRequest(userMessageBody)) {
@@ -866,7 +1080,7 @@ export async function processInboundAiResponse({
     return { status: "transferred_to_human", deliveryStatus, reply: handoffMessage };
   }
 
-  // 6c. IA desativada para o tenant: silêncio. Pedidos explícitos de humano
+  // 6e. IA desativada para o tenant: silêncio. Pedidos explícitos de humano
   // (bloco acima) são sempre honrados, mesmo com a IA desligada.
   if (!tenantConfig.enabled) {
     console.info("[ai-wpp] ai_disabled_by_tenant", { tenantId, leadId });
@@ -877,6 +1091,7 @@ export async function processInboundAiResponse({
     memory: updatedMemory,
     policy: behavior.policy,
     handoffMessage: tenantConfig.handoffMessage,
+    pastOutboundTexts,
   });
   return completeDeterministicQualificationTurn({
     tenantId,

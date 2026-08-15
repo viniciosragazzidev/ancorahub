@@ -138,32 +138,48 @@ const memoryFieldByPolicyField: Record<string, keyof ConversationMemory> = {
 
 export function getNextQualificationQuestion(
   memory: ConversationMemory,
-  policy?: AgentBehaviorPolicy
+  policy?: AgentBehaviorPolicy,
+  pastOutboundTexts?: Set<string>
 ): QualificationQuestionDefinition | null {
   const required = policy?.requiredFields ?? ["customerName", "planType", "numberOfLives", "age", "city", "email"];
+  let fallbackQuestion: QualificationQuestionDefinition | null = null;
+
   for (const field of required) {
     if (field === "age" && memory.planType?.value === "empresarial") {
       if (!memory.averageAge?.value) {
-        return ALL_QUESTIONS_DEFINITIONS[field] ?? null;
+        const qDef = ALL_QUESTIONS_DEFINITIONS[field] ?? null;
+        if (qDef) {
+          if (!pastOutboundTexts || !pastOutboundTexts.has(qDef.text.trim().toLowerCase())) {
+            return qDef;
+          }
+          if (!fallbackQuestion) fallbackQuestion = qDef;
+        }
       }
     } else {
       const memKey = memoryFieldByPolicyField[field];
       const val = memKey ? (memory[memKey] as { value?: string } | undefined)?.value : undefined;
       if (!val || !val.trim()) {
-        return ALL_QUESTIONS_DEFINITIONS[field] ?? null;
+        const qDef = ALL_QUESTIONS_DEFINITIONS[field] ?? null;
+        if (qDef) {
+          if (!pastOutboundTexts || !pastOutboundTexts.has(qDef.text.trim().toLowerCase())) {
+            return qDef;
+          }
+          if (!fallbackQuestion) fallbackQuestion = qDef;
+        }
       }
     }
   }
-  return null;
+  return fallbackQuestion;
 }
 
 export function resolveDeterministicQualificationTurn(input: {
   memory: ConversationMemory;
   policy: AgentBehaviorPolicy;
   handoffMessage?: string | null;
+  pastOutboundTexts?: Set<string>;
 }): DeterministicQualificationTurn {
   const evaluation = evaluateQualification(input.memory, input.policy);
-  const nextQuestion = getNextQualificationQuestion(input.memory, input.policy);
+  const nextQuestion = getNextQualificationQuestion(input.memory, input.policy, input.pastOutboundTexts);
 
   if (!nextQuestion) {
     return {
@@ -175,7 +191,7 @@ export function resolveDeterministicQualificationTurn(input: {
   }
 
   const firstName = input.memory.customerFirstName?.value
-    ?? input.memory.customerName?.value.split(/\s+/)[0];
+    ?? input.memory.customerName?.value?.split(/\s+/)[0];
   const greeting = firstName ? `Perfeito, ${firstName}. ` : "";
 
   return {

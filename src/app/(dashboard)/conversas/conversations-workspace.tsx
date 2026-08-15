@@ -62,6 +62,8 @@ export type ConversationMessage = {
   body: string;
   direction: string;
   sentAt: string;
+  senderRole?: string | null;
+  providerStatus?: string | null;
 };
 
 export type AiConversationData = {
@@ -610,14 +612,33 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
   );
 }
 
-function ConversationHistory({ client }: { client: ConversationItem }) {
-  const topRef = useRef<HTMLDivElement>(null);
+function formatDateDivider(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) return "Hoje";
 
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+  if (isYesterday) return "Ontem";
+
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
+}
+
+function ConversationHistory({ client }: { client: ConversationItem }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Chronological order: oldest first, newest at bottom ("o mais recente no fim")
   const sortedMessages = useMemo(() => {
     return [...client.messages].sort(
-      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+      (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
     );
   }, [client.messages]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [sortedMessages.length, client.id]);
 
   if (!sortedMessages.length) {
     return <HistoryEmptyState client={client} />;
@@ -627,35 +648,58 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
     return dir === "outgoing" || dir === "outbound" ? "system" : "client";
   };
 
-  // Group consecutive messages by sender type for BubbleGroup
-  const grouped = sortedMessages.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
-    (acc, msg) => {
-      const type = getGroupKey(msg.direction);
-      const last = acc[acc.length - 1];
-      if (last && last.type === type) {
-        last.messages.push(msg);
-      } else {
-        acc.push({ type, messages: [msg] });
-      }
-      return acc;
-    },
-    [],
-  );
+  // Group messages by Date ("Hoje", "Ontem", "15 de Agosto de 2026")
+  const messagesByDate = useMemo(() => {
+    const map = new Map<string, ConversationMessage[]>();
+    for (const msg of sortedMessages) {
+      const dateKey = formatDateDivider(msg.sentAt);
+      const list = map.get(dateKey) ?? [];
+      list.push(msg);
+      map.set(dateKey, list);
+    }
+    return Array.from(map.entries());
+  }, [sortedMessages]);
 
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-5 sm:px-6">
-        <p className="mb-1 self-center rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-          Histórico de Mensagens (Mais Recentes no Topo)
-        </p>
-        <div ref={topRef} />
-        {grouped.map((group, gi) => (
-          <BubbleGroup key={gi}>
-            {group.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
-          </BubbleGroup>
-        ))}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
+        {messagesByDate.map(([dateLabel, msgs], dateIdx) => {
+          const grouped = msgs.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
+            (acc, msg) => {
+              const type = getGroupKey(msg.direction);
+              const last = acc[acc.length - 1];
+              if (last && last.type === type) {
+                last.messages.push(msg);
+              } else {
+                acc.push({ type, messages: [msg] });
+              }
+              return acc;
+            },
+            [],
+          );
+
+          return (
+            <div key={dateLabel || dateIdx} className="flex flex-col gap-3">
+              {/* Date Separator Pill */}
+              <div className="my-2 flex items-center justify-center gap-3">
+                <div className="h-[1px] flex-1 bg-border/50" />
+                <span className="rounded-full bg-muted/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-2xs border border-border/60">
+                  {dateLabel}
+                </span>
+                <div className="h-[1px] flex-1 bg-border/50" />
+              </div>
+
+              {grouped.map((group, gi) => (
+                <BubbleGroup key={gi}>
+                  {group.messages.map((message) => (
+                    <MessageBubble key={message.id} message={message} />
+                  ))}
+                </BubbleGroup>
+              ))}
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   );
@@ -730,23 +774,109 @@ function ChatInput({
   );
 }
 
-function MessageBubble({ message }: { message: ConversationMessage }) {
-  const isSystem = message.direction === "outgoing" || message.direction === "outbound";
+function MessageSenderBadge({
+  direction,
+  senderRole,
+}: {
+  direction: string;
+  senderRole?: string | null;
+}) {
+  const isOutbound = direction === "outgoing" || direction === "outbound";
+
+  if (isOutbound) {
+    if (senderRole === "assistant" || direction === "outbound") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-xs bg-white/20 dark:bg-black/20 px-1.5 py-0.5 text-[10px] font-bold tracking-tight text-white dark:text-primary-foreground">
+          <Sparkles className="size-2.5" />
+          IA Assistente
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 rounded-xs bg-white/20 dark:bg-black/20 px-1.5 py-0.5 text-[10px] font-bold tracking-tight text-white dark:text-primary-foreground">
+        Atendente Humano
+      </span>
+    );
+  }
 
   return (
-    <Bubble variant={isSystem ? "default" : "secondary"} align={isSystem ? "end" : "start"}>
-      <BubbleContent className="[&>p]:whitespace-pre-wrap text-xs">
-        <p className="leading-5">{message.body}</p>
-        <div className={cn("mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground", isSystem && "justify-end")}>
-          <span>
-            {message.direction === "outbound"
-              ? "Enviada (IA)"
-              : message.direction === "outgoing"
-                ? "Enviada"
-                : "Recebida"}
-          </span>
-          <span aria-hidden="true">•</span>
-          <time dateTime={message.sentAt}>{formatMessageDateTime(message.sentAt)}</time>
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+      Cliente
+    </span>
+  );
+}
+
+function MessageStatusIndicator({
+  status,
+  direction,
+}: {
+  status?: string | null;
+  direction: string;
+}) {
+  const isOutbound = direction === "outgoing" || direction === "outbound";
+  if (!isOutbound) return null;
+
+  switch (status) {
+    case "read":
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-300 dark:text-sky-400" title="Mensagem Lida pelo Cliente (WhatsApp)">
+          <span className="text-[12px] font-extrabold leading-none">✓✓</span>
+          <span>Lida</span>
+        </span>
+      );
+    case "delivered":
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] text-white/90 dark:text-primary-foreground/80" title="Entregue no WhatsApp do Cliente">
+          <span className="text-[12px] font-bold leading-none">✓✓</span>
+          <span>Entregue</span>
+        </span>
+      );
+    case "failed":
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-200" title="Falha ao entregar mensagem">
+          <span className="size-3 rounded-full bg-red-500/40 text-white text-[9px] font-bold flex items-center justify-center">!</span>
+          <span>Falha</span>
+        </span>
+      );
+    case "queued":
+    case "sending":
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] text-white/80 dark:text-primary-foreground/70" title="Enviando para o WhatsApp">
+          <Clock className="size-2.5 animate-spin" />
+          <span>Enviando...</span>
+        </span>
+      );
+    case "sent":
+    default:
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] text-white/90 dark:text-primary-foreground/80" title="Enviada ao Servidor Meta">
+          <span className="text-[12px] font-bold leading-none">✓</span>
+          <span>Enviada</span>
+        </span>
+      );
+  }
+}
+
+function MessageBubble({ message }: { message: ConversationMessage }) {
+  const isOutbound = message.direction === "outgoing" || message.direction === "outbound";
+
+  return (
+    <Bubble variant={isOutbound ? "default" : "secondary"} align={isOutbound ? "end" : "start"} className="group relative">
+      <BubbleContent className={cn("text-xs leading-relaxed transition-all shadow-2xs max-w-lg", isOutbound ? "bg-primary text-primary-foreground" : "bg-card border border-border text-foreground")}>
+        <div className="mb-1.5 flex items-center justify-between gap-3 border-b border-white/15 pb-1 dark:border-black/15">
+          <MessageSenderBadge direction={message.direction} senderRole={message.senderRole} />
+        </div>
+        <p className="whitespace-pre-wrap font-normal leading-5">{message.body}</p>
+        <div className={cn("mt-2 flex items-center gap-1.5 text-[10px]", isOutbound ? "justify-end text-white/90 dark:text-primary-foreground/80" : "text-muted-foreground")}>
+          <time dateTime={message.sentAt} className="tabular-nums">
+            {formatTime(message.sentAt)}
+          </time>
+          {isOutbound && (
+            <>
+              <span aria-hidden="true" className="opacity-60">•</span>
+              <MessageStatusIndicator status={message.providerStatus} direction={message.direction} />
+            </>
+          )}
         </div>
       </BubbleContent>
     </Bubble>
