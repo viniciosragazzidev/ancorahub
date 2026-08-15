@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -431,6 +432,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         title="Qualificação IA"
         rightSlot={
           <div className="flex items-center gap-2">
+            <BulkQualificationDialog />
             <Badge variant={enabled ? "success" : "secondary"} className="gap-1 px-2 py-1 text-xs">
               <span className={`size-2 rounded-full ${enabled ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
               {enabled ? "IA Operando" : "IA Pausada"}

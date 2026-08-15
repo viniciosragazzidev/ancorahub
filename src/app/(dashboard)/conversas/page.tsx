@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConversationsWorkspace, type ConversationItem, type ConversationMessage } from "./conversations-workspace";
 import { OfficialBrokerConversations, type OfficialBrokerConversation, type OfficialBrokerMessage } from "./official-broker-conversations";
-import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
+import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
 export const dynamic = "force-dynamic";
@@ -53,9 +54,9 @@ export default async function ConversationsPage({ searchParams }: { searchParams
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
       .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
       .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
-      .where(and(eq(schema.leads.tenantId, context.tenantId), isNotNull(schema.leads.serviceStartedAt), ...(scope ? [scope] : [])))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), ...(scope ? [scope] : [])))
       .orderBy(desc(schema.leads.stageEnteredAt))
-      .limit(100),
+      .limit(isDirector ? 500 : 150),
     isDirector
       ? db
           .select({ id: schema.branches.id, name: schema.branches.name })
@@ -67,39 +68,21 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
   const leadIds = leads.map((lead) => lead.id);
 
-  const messagesSubquery = leadIds.length
-    ? db
-        .select({
-          id: schema.whatsappMessages.id,
-          leadId: schema.whatsappMessages.leadId,
-          body: schema.whatsappMessages.body,
-          direction: schema.whatsappMessages.direction,
-          sentAt: schema.whatsappMessages.sentAt,
-          rn: sql<number>`row_number() over (partition by ${schema.whatsappMessages.leadId} order by ${schema.whatsappMessages.sentAt} desc)`.as("rn")
-        })
-        .from(schema.whatsappMessages)
-        .where(
-          and(
-            eq(schema.whatsappMessages.tenantId, context.tenantId),
-            inArray(schema.whatsappMessages.leadId, leadIds)
-          )
-        )
-        .as("msg_sq")
-    : null;
-
-  const [messageRows, documentRows, aiConversationRows] = leadIds.length && messagesSubquery
+  const [messageRows, documentRows, aiConversationRows] = leadIds.length
     ? await Promise.all([
       db
         .select({
-          id: messagesSubquery.id,
-          leadId: messagesSubquery.leadId,
-          body: messagesSubquery.body,
-          direction: messagesSubquery.direction,
-          sentAt: messagesSubquery.sentAt
+          id: schema.whatsappMessages.id,
+          leadId: schema.whatsappMessages.leadId,
+          phone: schema.whatsappMessages.phone,
+          body: schema.whatsappMessages.body,
+          direction: schema.whatsappMessages.direction,
+          sentAt: schema.whatsappMessages.sentAt,
         })
-        .from(messagesSubquery)
-        .where(lt(messagesSubquery.rn, 21))
-        .orderBy(messagesSubquery.sentAt),
+        .from(schema.whatsappMessages)
+        .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
+        .orderBy(desc(schema.whatsappMessages.sentAt))
+        .limit(2000),
       db
         .select({ id: schema.leadDocuments.id, leadId: schema.leadDocuments.leadId, filename: schema.leadDocuments.filename, fileUrl: schema.leadDocuments.fileUrl, status: schema.leadDocuments.status, requirementName: schema.documentRequirements.name, createdAt: schema.leadDocuments.createdAt })
         .from(schema.leadDocuments)
@@ -123,11 +106,21 @@ export default async function ConversationsPage({ searchParams }: { searchParams
     : [[], [], []] as const;
 
   const messagesByLead = new Map<string, ConversationMessage[]>();
-  for (const message of messageRows) {
-    if (!message.leadId) continue;
-    const items = messagesByLead.get(message.leadId) ?? [];
-    items.push({ ...message, sentAt: message.sentAt.toISOString() });
-    messagesByLead.set(message.leadId, items);
+  for (const lead of leads) {
+    const matched = messageRows
+      .filter((msg) => msg.leadId === lead.id || (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone, lead.telefone)))
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+      .slice(-200)
+      .map((msg) => ({
+        id: msg.id,
+        leadId: lead.id,
+        body: msg.body,
+        direction: msg.direction,
+        sentAt: msg.sentAt.toISOString(),
+      }));
+    if (matched.length > 0) {
+      messagesByLead.set(lead.id, matched);
+    }
   }
 
   const documentsByLead = new Map<string, { id: string; filename: string; fileUrl: string; status: string; requirementName: string | null; createdAt: string }[]>();
@@ -145,9 +138,33 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   }
 
   const conversations: ConversationItem[] = leads.map((lead) => {
-    const messages = messagesByLead.get(lead.id) ?? [];
-    const latest = messages.at(-1) ?? null;
+    let messages = messagesByLead.get(lead.id) ?? [];
     const aiConv = aiConversationsByLead.get(lead.id) ?? null;
+
+    if (messages.length === 0 && aiConv) {
+      const syntheticTime = lead.stageEnteredAt || lead.createdAt;
+      const initialGreeting = "Olá! Sou o atendente virtual da Âncora Saúde. Vou fazer algumas perguntas rápidas para preparar seu atendimento.";
+      messages = [
+        {
+          id: `synth_ai_start_${lead.id}`,
+          leadId: lead.id,
+          body: initialGreeting,
+          direction: "outbound",
+          sentAt: syntheticTime.toISOString(),
+        },
+      ];
+      if (aiConv.qualificationSummary) {
+        messages.push({
+          id: `synth_ai_summary_${lead.id}`,
+          leadId: lead.id,
+          body: `Resumo da Qualificação por IA: ${aiConv.qualificationSummary}`,
+          direction: "outbound",
+          sentAt: new Date(syntheticTime.getTime() + 1000).toISOString(),
+        });
+      }
+    }
+
+    const latest = messages.at(-1) ?? null;
     return {
       ...lead,
       createdAt: lead.createdAt.toISOString(),
@@ -270,7 +287,8 @@ export default async function ConversationsPage({ searchParams }: { searchParams
         breadcrumb="Atendimento"
         title="Conversas"
         rightSlot={isDirector ? (
-          <nav aria-label="Tipo de conversa" className="flex items-center gap-1">
+          <nav aria-label="Tipo de conversa" className="flex items-center gap-2">
+            <BulkQualificationDialog />
             <Button render={<Link href="/conversas" />} size="sm" variant={officialBrokerTab ? "ghost" : "secondary"}>
               Leads <Badge variant="outline">{conversations.length}</Badge>
             </Button>

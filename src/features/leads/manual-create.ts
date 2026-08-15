@@ -9,7 +9,8 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
-import { chooseAvailableBroker } from "./assignment";
+import { startAiQualificationForLead } from "@/features/ai-qualification/service";
+import { chooseAvailableBroker } from "@/features/leads/assignment";
 
 const formDataSchema = z.object({
   dependentes: z.string().optional().nullable(),
@@ -143,6 +144,11 @@ export async function createManualLead(rawInput: unknown) {
   if (!assigned) {
     void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId }).catch(console.error);
   }
+
+  // Auto-initiate AI qualification if active
+  void startAiQualificationForLead({ tenantId: context.tenantId, leadId, actorUserId: context.userId }).catch((err) => {
+    console.error("[createManualLead] AI qualification start failed:", err);
+  });
 
   return { leadId };
 }

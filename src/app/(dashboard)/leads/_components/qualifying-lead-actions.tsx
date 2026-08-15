@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Lightning, ArrowsDownUp, Eye } from "@/components/huge-icons";
+import { Lightning, ArrowsDownUp, Eye, Sparkle } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,10 +21,56 @@ import {
 } from "@/components/ui/select";
 import {
   forceCompleteQualificationAction,
+  startManualQualificationAction,
   updateLeadTargetQueueAction,
 } from "@/features/leads/qualification-tab-actions";
 
 type LeadQueue = { id: string; name: string; branchId: string | null };
+
+export function StartQualificationButton({
+  leadId,
+  leadName,
+  variant = "outline",
+  size = "xs",
+  className = "",
+}: {
+  leadId: string;
+  leadName?: string;
+  variant?: "default" | "outline" | "ghost" | "secondary";
+  size?: "default" | "sm" | "xs" | "icon";
+  className?: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function handleStart() {
+    setBusy(true);
+    const res = await startManualQualificationAction({ leadId });
+    setBusy(false);
+
+    if (res.success) {
+      toast.success(`Qualificação por IA iniciada para "${leadName || "o lead"}"! Primeira mensagem enviada.`);
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Erro ao iniciar qualificação por IA.");
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      size={size}
+      variant={variant}
+      onClick={handleStart}
+      disabled={busy}
+      title="Disparar primeira mensagem do robô de qualificação IA"
+      className={`gap-1 font-medium ${className}`}
+    >
+      <Sparkle className="size-3.5 text-amber-500" />
+      {busy ? "Iniciando…" : "Iniciar Qualificação IA"}
+    </Button>
+  );
+}
 
 type QualifyingLeadActionsProps = {
   leadId: string;
@@ -86,6 +132,8 @@ export function QualifyingLeadActions({
 
   return (
     <div className="flex items-center justify-end gap-1.5">
+      <StartQualificationButton leadId={leadId} leadName={leadName} />
+
       <Button
         type="button"
         size="xs"

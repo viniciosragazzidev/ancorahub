@@ -159,6 +159,10 @@ export default async function LeadDistributionPage({
         branchId: schema.leads.branchId,
         distributionStatus: schema.leads.distributionStatus,
         createdAt: schema.leads.createdAt,
+        sourceCampaign: schema.leads.sourceCampaign,
+        sourceAd: schema.leads.sourceAd,
+        metaCampaignId: schema.leads.metaCampaignId,
+        metaAdId: schema.leads.metaAdId,
       })
       .from(schema.leads)
       .where(
@@ -255,6 +259,7 @@ export default async function LeadDistributionPage({
       assignmentStrategy: schema.leadQueues.assignmentStrategy,
       capacityEnabled: schema.leadQueues.capacityEnabled,
       capacityPerBroker: schema.leadQueues.capacityPerBroker,
+      aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
     }).from(schema.leadQueues).leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)))
       .orderBy(schema.leadQueues.name),

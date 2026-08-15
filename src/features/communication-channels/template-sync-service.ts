@@ -379,10 +379,25 @@ export async function sendTenantTemplateTestMessage(
 
   const components: any[] = [];
   if (variables && variables.length > 0) {
-    components.push({
-      type: "body",
-      parameters: variables.map((v) => ({ type: "text", text: v })),
-    });
+    const rawComponents = (template.componentsJson as any[]) || [];
+    const bodyComp = rawComponents.find((c: any) => c.type === "BODY" || c.type === "body");
+    const namedParams = bodyComp?.example?.body_text_named_params as Array<{ param_name: string }> | undefined;
+
+    if (namedParams && namedParams.length > 0) {
+      components.push({
+        type: "body",
+        parameters: variables.map((v, i) => ({
+          type: "text",
+          parameter_name: namedParams[i]?.param_name || String(i + 1),
+          text: v,
+        })),
+      });
+    } else {
+      components.push({
+        type: "body",
+        parameters: variables.map((v) => ({ type: "text", text: v })),
+      });
+    }
   }
 
   const response = await sendMetaCloudTemplateTest(

@@ -93,7 +93,7 @@ export async function loadTenantAiAgentConfig(
       requiredFields: config.requiredFields as string[] | undefined,
       initialMessage: config.initialMessage ?? undefined,
       maxQuestions: config.maxQuestions ?? 6,
-      enabled: config.enabled ?? false,
+      enabled: config.enabled ?? true,
       handoffMessage: config.handoffMessage ?? undefined,
     };
   } catch {

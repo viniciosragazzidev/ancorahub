@@ -23,6 +23,7 @@ type Queue = {
   assignmentStrategy: string;
   capacityEnabled: boolean;
   capacityPerBroker: number | null;
+  aiQualificationEnabled?: boolean;
   waiting: number;
   members: number;
   activeLeads: number;
@@ -50,6 +51,7 @@ const emptyQueue = {
   assignmentStrategy: "capacity",
   capacityEnabled: false,
   capacityPerBroker: "10",
+  aiQualificationEnabled: true,
   status: "active",
 };
 
@@ -160,6 +162,7 @@ export function QueueControlCenter({
       assignmentStrategy: queue.assignmentStrategy,
       capacityEnabled: queue.capacityEnabled,
       capacityPerBroker: String(queue.capacityPerBroker ?? 10),
+      aiQualificationEnabled: queue.aiQualificationEnabled ?? true,
       status: queue.status,
     });
     setEditorOpen(true);
@@ -199,12 +202,21 @@ export function QueueControlCenter({
       assignmentStrategy: form.assignmentStrategy,
       capacityEnabled: form.capacityEnabled,
       capacityPerBroker: form.capacityEnabled ? Number(form.capacityPerBroker) : null,
+      aiQualificationEnabled: form.aiQualificationEnabled,
       status: form.status,
     });
     setSaving(false);
     if (!result.success) return toast.error(result.error ?? "Não foi possível salvar a fila.");
     toast.success(result.message);
     setEditorOpen(false);
+  }
+
+  async function toggleCampaignForQueue(campaignId: string, queueId: string, enabled: boolean) {
+    setSavingCampaignRoute(true);
+    const result = await saveMetaCampaignQueueRouteAction({ campaignId, queueId: enabled ? queueId : null, enabled });
+    setSavingCampaignRoute(false);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.");
+    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."));
   }
 
   async function runSimulation() {
@@ -264,6 +276,8 @@ export function QueueControlCenter({
               const multiBranchCount = (queue.allowedBranchIds?.length ?? 0) + (queue.branchId ? 1 : 0);
               const hasSpecificBrokers = (queue.allowedBrokerIds?.length ?? 0) > 0;
               const dutyScheduleName = dutySchedules.find((ds) => ds.id === queue.exclusiveDutyScheduleId)?.name;
+              const queueCampaignRoutes = campaignRoutes.filter((r) => r.queueId === queue.id && r.enabled);
+              const queueCampaigns = campaigns.filter((c) => queueCampaignRoutes.some((r) => r.campaignId === c.campaignId));
 
               return (
                 <Card key={queue.id} variant="compact" className="group transition-[border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-primary/30 motion-reduce:transition-none">
@@ -281,6 +295,15 @@ export function QueueControlCenter({
                           {queue.exclusiveDutyScheduleId && (
                             <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]">
                               ⚡ Plantão: {dutyScheduleName || "Exclusivo"}
+                            </Badge>
+                          )}
+                          {queue.aiQualificationEnabled !== false ? (
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] gap-1">
+                              <MagicWand className="size-3" /> Bot IA Ativo
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1">
+                              Bot IA Pausado
                             </Badge>
                           )}
                         </CardDescription>
@@ -305,6 +328,45 @@ export function QueueControlCenter({
                         </Badge>
                       ) : (
                         <span>{queue.capacityEnabled ? `${queue.capacityPerBroker}/corretor` : "Sem limite"}</span>
+                      )}
+                    </div>
+
+                    {/* Campanhas vinculadas à fila diretamente no card */}
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          🎯 Campanhas enviando para esta fila ({queueCampaigns.length})
+                        </span>
+                      </div>
+                      {displayedCampaigns.length > 0 ? (
+                        <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                          {displayedCampaigns.map((campaign) => {
+                            const route = campaignRoutes.find((r) => r.campaignId === campaign.campaignId);
+                            const isChecked = route?.queueId === queue.id && route.enabled;
+                            const isOtherQueue = route?.queueId && route.queueId !== queue.id && route.enabled;
+                            return (
+                              <label key={campaign.campaignId} className="flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-background/80 p-1 rounded">
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked ?? false}
+                                    disabled={!canEdit || savingCampaignRoute}
+                                    onChange={(e) => void toggleCampaignForQueue(campaign.campaignId, queue.id, e.target.checked)}
+                                    className="rounded border-input text-primary focus:ring-primary shrink-0"
+                                  />
+                                  <span className="truncate text-[11px] font-medium">{campaign.name}</span>
+                                </span>
+                                {isOtherQueue && (
+                                  <span className="text-[9px] text-muted-foreground shrink-0 truncate max-w-[90px]">
+                                    (Em: {route.queueName})
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic">Nenhuma campanha Meta cadastrada.</p>
                       )}
                     </div>
 
@@ -718,6 +780,74 @@ export function QueueControlCenter({
                   </select>
                 </label>
               </div>
+
+              {/* Qualificação por Bot de IA */}
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-1.5">
+                <label className="flex items-center justify-between text-sm font-semibold text-foreground cursor-pointer">
+                  <span className="flex items-center gap-2">
+                    <MagicWand className="size-4 text-primary" /> Ativar Qualificação por Bot de IA
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={form.aiQualificationEnabled}
+                    onChange={(event) => setForm({ ...form, aiQualificationEnabled: event.target.checked })}
+                    className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                  />
+                </label>
+                <p className="text-[11px] text-muted-foreground">
+                  Quando ativada, o Bot de IA do WhatsApp qualifica automaticamente os leads direcionados a esta fila.
+                </p>
+              </div>
+
+              {/* Campanhas Meta vinculadas a esta fila */}
+              {campaigns.length > 0 && (
+                <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    🎯 Campanhas Meta que enviam leads para esta fila
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Marque as campanhas que direcionarão leads automaticamente para esta fila:
+                  </p>
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 pt-1 pr-1">
+                    {displayedCampaigns.map((c) => {
+                      const route = campaignRoutes.find((r) => r.campaignId === c.campaignId);
+                      const isAssignedToThisQueue = route?.queueId === editingId && route.enabled;
+                      const isAssignedToOtherQueue = route?.queueId && route.queueId !== editingId && route.enabled;
+                      return (
+                        <label
+                          key={c.campaignId}
+                          className="flex items-center justify-between gap-2 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <input
+                              type="checkbox"
+                              checked={isAssignedToThisQueue ?? false}
+                              disabled={!editingId || savingCampaignRoute}
+                              onChange={(e) => {
+                                if (editingId) {
+                                  void toggleCampaignForQueue(c.campaignId, editingId, e.target.checked);
+                                }
+                              }}
+                              className="rounded border-input text-primary focus:ring-primary shrink-0"
+                            />
+                            <span className="truncate">{c.name}</span>
+                          </span>
+                          {isAssignedToOtherQueue && (
+                            <Badge variant="outline" className="text-[9px] shrink-0 text-muted-foreground">
+                              Em: {route?.queueName}
+                            </Badge>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {!editingId && (
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Você poderá selecionar as campanhas assim que salvar a criação da fila.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={form.capacityEnabled} onChange={(event) => setForm({ ...form, capacityEnabled: event.target.checked })} />

@@ -31,7 +31,7 @@ import { BulkReassignDialog } from "@/components/ui/bulk-reassign-dialog";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
-import { QualifyingLeadActions } from "./_components/qualifying-lead-actions";
+import { QualifyingLeadActions, StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsPagination } from "./_components/leads-pagination";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
@@ -449,7 +449,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 1: QUALIFICAÇÕES ─── */}
         <TabsContent value="qualificacoes" className="mt-4">
-          <Card variant="subtle" className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
+          <Card className="rounded-2xl border-0 shadow-none bg-transparent p-0 overflow-hidden">
             <CardContent className="p-0">
               {qualifyingLeads.length === 0 ? (
                 <EmptyState
@@ -583,7 +583,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
         <TabsContent value="list" className="mt-4">
-          <Card variant="subtle" className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
+          <Card className="rounded-2xl border-0 shadow-none bg-transparent p-0 overflow-hidden">
             <CardContent className="p-0">
               <div className="hidden divide-y divide-border max-[559px]:block">
                 {leads.map((lead) => (
@@ -667,6 +667,11 @@ export function LeadsWorkspace({
                         <p className={`text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
                           {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
                         </p>
+                        {lead.sourceCampaign ? (
+                          <Badge variant="secondary" className="mt-1 text-[10px] bg-primary/10 text-primary border-primary/20 max-w-[200px] truncate">
+                            🎯 {lead.sourceCampaign}
+                          </Badge>
+                        ) : null}
                       </TableCell>
                       <TableCell className={contextRole === "broker" ? "hidden" : ""}>
                         <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
@@ -860,6 +865,10 @@ export function LeadsWorkspace({
                     </Button>
                   </TabsContent>
                   <TabsContent value="actions" className="mt-4 space-y-3">
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                      <p className="text-xs font-semibold text-foreground mb-1.5">Qualificação Manual por IA</p>
+                      <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
+                    </div>
                     {contextRole === "manager" || contextRole === "director" ? (
                       <LeadDrawerManagementActions
                         leadId={selectedLead.id}

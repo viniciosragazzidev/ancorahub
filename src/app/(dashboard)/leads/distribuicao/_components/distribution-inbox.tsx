@@ -21,6 +21,7 @@ import {
   distributeLeadBatchAction,
   distributeLeadAutomaticallyAction,
   routeAndAssignLeadAction,
+  routeLeadToBranchAction,
   type DistributionActionState,
 } from "@/features/lead-distribution/actions";
 
@@ -31,6 +32,10 @@ type Lead = {
   branchId: string | null;
   distributionStatus: string;
   createdAt: string;
+  sourceCampaign?: string | null;
+  sourceAd?: string | null;
+  metaCampaignId?: string | null;
+  metaAdId?: string | null;
 };
 type Branch = { id: string; name: string };
 type Broker = {
@@ -168,6 +173,7 @@ export function DistributionInbox({
     setBatchBrokerId("");
   }
 
+
   const stateAction = useActionState(distributeLeadBatchAction, {});
   const [batchState, batchAction, batchPending] = stateAction;
   const [assignState, assignAction, assignPending] = useActionState(
@@ -233,7 +239,6 @@ export function DistributionInbox({
                 <AppSelect
                   aria-label="Corretor em massa"
                   size="sm"
-                  className="w-44"
                   value={batchBrokerId}
                   onValueChange={setBatchBrokerId}
                   placeholder="Corretor..."
@@ -355,11 +360,22 @@ export function DistributionInbox({
                         <TableCell>
                           <p className="font-medium">{lead.name}</p>
                           <p className="text-xs text-muted-foreground">{lead.phone}</p>
+                          {(lead.sourceCampaign || lead.metaCampaignId) && (
+                            <div className="mt-1 flex flex-wrap items-center gap-1">
+                              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-primary/20 max-w-[220px] truncate">
+                                🎯 {lead.sourceCampaign || lead.metaCampaignId}
+                              </Badge>
+                              {(lead.sourceAd || lead.metaAdId) && (
+                                <Badge variant="outline" className="text-[10px] max-w-[180px] truncate">
+                                  📢 {lead.sourceAd || lead.metaAdId}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
-                            {branches.find((branch) => branch.id === lead.branchId)?.name ??
-                              "Inbox geral"}
+                            {branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral"}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -414,37 +430,23 @@ export function DistributionInbox({
                             ) : role === "director" ? (
                               <>
                                 <AppSelect
-                                  aria-label={`Corretor para ${lead.name}`}
+                                  aria-label={`Unidade para ${lead.name}`}
                                   size="sm"
                                   className="w-36"
-                                  value={brokerByLead[lead.id] ?? ""}
-                                  onValueChange={(val) =>
-                                    setBrokerByLead((current) => ({ ...current, [lead.id]: val }))
-                                  }
-                                  placeholder="Corretor..."
-                                  options={[
-                                    { value: "", label: "Corretor" },
-                                    ...brokers
-                                      .filter(
-                                        (b) =>
-                                          b.branchId === branchId &&
-                                          b.availabilityStatus === "available",
-                                      )
-                                      .map((b) => ({ value: b.id, label: b.name })),
-                                  ]}
+                                  value={branchId}
+                                  onValueChange={setBranchId}
+                                  placeholder="Unidade..."
+                                  options={branches.map((branch) => ({
+                                    value: branch.id,
+                                    label: branch.name,
+                                  }))}
                                 />
-                                {brokerByLead[lead.id] ? (
-                                  <ActionForm
-                                    action={routeAndAssignLeadAction}
-                                    fields={{
-                                      leadId: lead.id,
-                                      branchId,
-                                      brokerId: brokerByLead[lead.id],
-                                    }}
-                                  >
-                                    <UserList /> Rotear + Atribuir
-                                  </ActionForm>
-                                ) : null}
+                                <ActionForm
+                                  action={routeLeadToBranchAction}
+                                  fields={{ leadId: lead.id, branchId }}
+                                >
+                                  <ArrowRight /> Enviar para unidade
+                                </ActionForm>
                               </>
                             ) : null}
                           </div>

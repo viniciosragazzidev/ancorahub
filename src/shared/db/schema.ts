@@ -593,6 +593,7 @@ export const leadQueues = pgTable(
     assignmentStrategy: text("assignment_strategy").notNull().default("capacity"),
     capacityEnabled: boolean("capacity_enabled").notNull().default(false),
     capacityPerBroker: integer("capacity_per_broker"),
+    aiQualificationEnabled: boolean("ai_qualification_enabled").notNull().default(true),
     isDefault: boolean("is_default").notNull().default(false),
     createdAt,
     updatedAt,

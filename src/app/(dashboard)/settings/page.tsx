@@ -19,6 +19,8 @@ import { AgentTrainingTab } from "./_components/agent-training-tab";
 import { DistributionPolicyPanel } from "./_components/distribution-policy-panel";
 import { getAgentTrainingCenter } from "@/features/agent-training/actions";
 import { ExtensionTab } from "./extension/extension-tab";
+import { FollowUpRulesPanel } from "@/features/ai-qualification/components/followup-rules-panel";
+import { getFollowUpRules } from "@/features/ai-qualification/followup-service";
 
 import { RelatedActions } from "@/components/related-actions";
 
@@ -47,17 +49,21 @@ export default async function SettingsPage() {
   const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "ia", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "seguranca"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
+  const followUpRules = canEditFeedback ? await getFollowUpRules(context.tenantId) : [];
 
   const atendimento = canEditFeedback ? (
-    <FeedbackTab
-      feedbackReminderInterval={tenantData?.feedbackReminderIntervalMinutes ?? "30"}
-      feedbackReminderMaxAttempts={tenantData?.feedbackReminderMaxAttempts ?? 5}
-      feedbackPushEnabled={tenantData?.feedbackPushEnabled ?? true}
-      feedbackToastEnabled={tenantData?.feedbackToastEnabled ?? true}
-      feedbackRequiredEnabled={tenantData?.feedbackRequiredEnabled ?? true}
-      maxActiveLeadsLimit={tenantData?.maxActiveLeadsLimit ?? 10}
-      canEdit={context.role === "director"}
-    />
+    <div className="space-y-6">
+      <FeedbackTab
+        feedbackReminderInterval={tenantData?.feedbackReminderIntervalMinutes ?? "30"}
+        feedbackReminderMaxAttempts={tenantData?.feedbackReminderMaxAttempts ?? 5}
+        feedbackPushEnabled={tenantData?.feedbackPushEnabled ?? true}
+        feedbackToastEnabled={tenantData?.feedbackToastEnabled ?? true}
+        feedbackRequiredEnabled={tenantData?.feedbackRequiredEnabled ?? true}
+        maxActiveLeadsLimit={tenantData?.maxActiveLeadsLimit ?? 10}
+        canEdit={context.role === "director"}
+      />
+      <FollowUpRulesPanel rules={followUpRules as any} canEdit={context.role === "director"} />
+    </div>
   ) : undefined;
 
   const whatsapp = <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>WhatsApp pessoal de atendimento</CardTitle><CardDescription>Conecte somente o número usado por você. A conexão é isolada por usuário e não altera a identidade da corretora.</CardDescription></CardHeader><CardContent><Button render={<a href="/integrations/whatsapp" />}><WhatsappLogo /> Configurar meu WhatsApp</Button></CardContent></Card>;

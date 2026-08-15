@@ -104,6 +104,57 @@ async function loadDistributionPolicy(tenantId: string, queueId: string | null, 
   return { enabled: row?.enabled ?? true, value: readDistributionPolicy(row?.policy) };
 }
 
+export async function validateCampaignQueueRoute(
+  db: ReturnType<typeof getDatabase>,
+  tenantId: string,
+  leadId: string,
+  targetQueueId: string,
+): Promise<{ allowed: boolean; reason?: string }> {
+  const [lead] = await db
+    .select({
+      id: schema.leads.id,
+      metaCampaignId: schema.leads.metaCampaignId,
+      sourceCampaign: schema.leads.sourceCampaign,
+    })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)))
+    .limit(1);
+
+  if (!lead) return { allowed: true };
+
+  const campaignId = lead.metaCampaignId || lead.sourceCampaign;
+  if (!campaignId) return { allowed: true };
+
+  const [route] = await db
+    .select({
+      queueId: schema.metaCampaignQueueRoutes.queueId,
+      enabled: schema.metaCampaignQueueRoutes.enabled,
+    })
+    .from(schema.metaCampaignQueueRoutes)
+    .where(
+      and(
+        eq(schema.metaCampaignQueueRoutes.tenantId, tenantId),
+        eq(schema.metaCampaignQueueRoutes.campaignId, campaignId),
+      ),
+    )
+    .limit(1);
+
+  if (route && route.enabled && route.queueId && route.queueId !== targetQueueId) {
+    const [targetQueue] = await db
+      .select({ name: schema.leadQueues.name })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.id, targetQueueId), eq(schema.leadQueues.tenantId, tenantId)))
+      .limit(1);
+
+    return {
+      allowed: false,
+      reason: `Bloqueio de Regra: A campanha "${campaignId}" está vinculada exclusivamente a outra fila. Vincule a campanha à fila "${targetQueue?.name ?? "de destino"}" antes de transferir.`,
+    };
+  }
+
+  return { allowed: true };
+}
+
 export async function routeLeadToBranch(context: TenantContext, leadId: string, branchId: string, reason = "Distribuição manual para unidade"): Promise<LeadRoutingResult> {
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem distribuir leads.");
   assertBranchScope(context, branchId);
@@ -113,6 +164,12 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   const queueId = await ensureDefaultQueue(context.tenantId, branchId, context.userId);
   const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "failed", code: "LEAD_NOT_FOUND" };
+
+  const campaignCheck = await validateCampaignQueueRoute(db, context.tenantId, leadId, queueId);
+  if (!campaignCheck.allowed) {
+    throw new AuthorizationError(campaignCheck.reason ?? "Campanha não permitida para esta fila.");
+  }
+
   const updated = await db.transaction(async (tx) => {
     const result = await tx.update(schema.leads).set({ branchId, queueId, corretorId: null, distributionStatus: "queued", distributionOrigin: context.role === "director" ? "parent" : "unit", unitAssignedAt: new Date(), assignmentSource: context.role === "director" ? "manual_director" : "manual_manager", assignmentStrategy: "manual", distributionUpdatedAt: new Date() }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
     if (!result.length) return false;
@@ -137,6 +194,7 @@ export async function routeLeadToBranchAndAssignBroker(
   const [branch] = await db
     .select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status })
     .from(schema.branches)
+
     .where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId)))
     .limit(1);
   if (!branch || branch.status !== "active" || !branch.acceptingLeads)
@@ -169,12 +227,18 @@ export async function routeLeadToBranchAndAssignBroker(
       ),
     )
     .limit(1);
-  if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };
 
-  // 4. Ensure default queue
-  const queueId = await ensureDefaultQueue(context.tenantId, branchId, context.userId);
+  if (!broker) return { status: "conflict", leadId, reason: "Corretor indisponível ou não pertence a esta unidade." };
 
-  // 5. Combined transaction: route + assign
+  const [targetQueue] = await db
+    .select({ id: schema.leadQueues.id })
+    .from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.branchId, branchId), eq(schema.leadQueues.status, "active")))
+    .limit(1);
+
+  const queueId = targetQueue?.id ?? null;
+  const notificationWarnings: string[] = [];
+
   const assigned = await db.transaction(async (tx) => {
     const result = await tx
       .update(schema.leads)
@@ -223,12 +287,6 @@ export async function routeLeadToBranchAndAssignBroker(
     return true;
   });
 
-  const notificationWarnings: string[] = [];
-  if (assigned) {
-    const notifyResult = await notifyNewLead(leadId, context.tenantId, branchId, brokerId, lead.nome).catch(() => undefined);
-    if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
-  }
-
   return assigned
     ? { status: "assigned", leadId, brokerId, strategy: "manual", notificationWarnings: notificationWarnings.length ? notificationWarnings : undefined }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
@@ -240,6 +298,14 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, queueId: schema.leads.queueId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "conflict", leadId, reason: "Lead não encontrado." };
   if (!lead.branchId) return { status: "conflict", leadId, reason: "Envie o lead para uma unidade antes de atribuir um corretor." };
+
+  if (lead.queueId) {
+    const campaignCheck = await validateCampaignQueueRoute(db, context.tenantId, leadId, lead.queueId);
+    if (!campaignCheck.allowed) {
+      return { status: "conflict", leadId, reason: campaignCheck.reason ?? "Campanha não permitida para esta fila." };
+    }
+  }
+
   assertBranchScope(context, lead.branchId);
   const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), eq(schema.tenantMemberships.branchId, lead.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
   if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };

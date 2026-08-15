@@ -526,6 +526,20 @@
       "when": 1786724962422,
       "tag": "0124_lead_queue_exclusive_duty_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1786729000000,
+      "tag": "0125_add_lead_queue_ai_qualification",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1786730000000,
+      "tag": "0126_meta_whatsapp_templates_tables",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -110,6 +111,10 @@ export function SupervisionPanel({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Button className="h-8 text-xs gap-1.5" render={<Link href={`/conversas?leadId=${leadId}`} />} variant="outline">
+              <ChatCircleText className="size-3.5 text-primary" />
+              Abrir Conversa
+            </Button>
             <LeadAssignedNotificationButton leadId={leadId} compact />
             <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-xs">
               Modo Supervisor

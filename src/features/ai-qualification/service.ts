@@ -55,7 +55,8 @@ async function getOrCreateConfig(tenantId: string) {
 
 export async function startAiQualificationForLead(input: { tenantId: string; leadId: string; actorUserId: string }) {
   if ((await getSystemSetting("feature_qualification_engine_enabled")) === "true") {
-    return startQualificationConversationForLead(input);
+    const engineResult = await startQualificationConversationForLead(input).catch(() => ({ started: false as const, reason: "failed" as const }));
+    if (engineResult.started) return engineResult;
   }
   const db = getDatabase();
   const config = await getOrCreateConfig(input.tenantId);
@@ -66,7 +67,10 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   }
   const [lead] = await db.select({ id: schema.leads.id, phone: schema.leads.telefone }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
   if (!lead?.phone) return { started: false, reason: "missing_phone" as const };
-  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
+  let [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true))).limit(1);
+  if (!channel) {
+    [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.status, "active"))).limit(1);
+  }
   if (!channel) return { started: false, reason: "missing_channel" as const };
   const existing = await db.select({ id: schema.aiQualificationSessions.id, status: schema.aiQualificationSessions.status }).from(schema.aiQualificationSessions).where(and(eq(schema.aiQualificationSessions.tenantId, input.tenantId), eq(schema.aiQualificationSessions.leadId, input.leadId))).limit(1);
   if (existing[0] && !["failed", "expired", "handed_off"].includes(existing[0].status)) return { started: false, reason: "already_started" as const };

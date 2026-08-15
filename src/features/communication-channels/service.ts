@@ -60,14 +60,25 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
   return { messageId };
 }
 
-function normalizePhone(phone: string) {
+export function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
 }
 
-function samePhone(left: string, right: string) {
+export function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
   const b = normalizePhone(right);
-  return Boolean(a && b) && (a === b || a.endsWith(b) || b.endsWith(a) || a.slice(-11) === b.slice(-11));
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.endsWith(b) || b.endsWith(a)) return true;
+  const a11 = a.length >= 11 ? a.slice(-11) : a;
+  const b11 = b.length >= 11 ? b.slice(-11) : b;
+  if (a11 === b11) return true;
+  const a10 = a.length >= 10 ? a.slice(-10) : a;
+  const b10 = b.length >= 10 ? b.slice(-10) : b;
+  if (a10 === b10) return true;
+  const a8 = a.length >= 8 ? a.slice(-8) : a;
+  const b8 = b.length >= 8 ? b.slice(-8) : b;
+  return a8.length >= 8 && a8 === b8;
 }
 
 export function matchesKnownBrokerPhone(phone: string, brokerPhones: readonly string[]) {

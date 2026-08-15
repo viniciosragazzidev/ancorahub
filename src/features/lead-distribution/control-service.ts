@@ -11,8 +11,8 @@ import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, reso
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
-  branchId: z.string().uuid().nullable().optional(),
-  exclusiveDutyScheduleId: z.string().uuid().nullable().optional(),
+  branchId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
+  exclusiveDutyScheduleId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   allowedBranchIds: z.array(z.string().uuid()).default([]),
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
   name: z.string().trim().min(3).max(60),
@@ -20,6 +20,7 @@ const queueInput = z.object({
   assignmentStrategy: z.enum(["round_robin", "capacity"]),
   capacityEnabled: z.boolean(),
   capacityPerBroker: z.number().int().min(1).max(200).nullable(),
+  aiQualificationEnabled: z.boolean().default(true),
   status: z.enum(["active", "inactive"]),
 });
 
@@ -108,13 +109,14 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
 
   const now = new Date();
   const values = {
-    branchId: input.branchId ?? null,
-    exclusiveDutyScheduleId: input.exclusiveDutyScheduleId ?? null,
+    branchId: input.branchId || null,
+    exclusiveDutyScheduleId: input.exclusiveDutyScheduleId || null,
     name: input.name,
     assignmentMode: input.assignmentMode,
     assignmentStrategy: input.assignmentStrategy,
     capacityEnabled: input.capacityEnabled,
     capacityPerBroker: input.capacityEnabled ? input.capacityPerBroker : null,
+    aiQualificationEnabled: input.aiQualificationEnabled,
     status: input.status,
     updatedAt: now,
   };

@@ -110,7 +110,12 @@ export function parseHumanRequest(value: string | null | undefined) {
 
 export function parseOptOut(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
-  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens)$/.test(text);
+  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text);
+}
+
+export function parseStartQualification(value: string | null | undefined) {
+  const text = normalizeQuickReplyText(value);
+  return /^(iniciar atendimento|iniciar|iniciar qualificacao|comecar|vamos la|quero iniciar)$/.test(text);
 }
 
 export function parseWrongNumber(value: string | null | undefined) {
@@ -168,6 +173,9 @@ export function isQuickReplySuppressed(input: { templateKey: string; ruleKey: st
 }
 
 export function resolveQuickReply(input: QuickReplyInput): QuickReplyResolution {
+  if (parseStartQualification(input.body)) {
+    return { resolved: false, intent: "GREETING", ruleKey: "start_qualification", templateKey: null, nextState: "AI_ACTIVE", notifyHuman: false };
+  }
   const rule = [...quickReplyRules].sort((a, b) => b.priority - a.priority).find((candidate) => candidate.resolve(input));
   if (!rule) return { resolved: false, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
   const suppressed = isQuickReplySuppressed({ templateKey: rule.templateKey, ruleKey: rule.key, cooldown: input.cooldown, now: input.now });
@@ -186,7 +194,7 @@ export function getDefaultQuickReplyTemplates(): Record<string, QuickReplyTempla
     "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor respons\u00e1vel.", active: true },
     "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Ol\u00e1 novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
     "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "Ol\u00e1! Vou fazer algumas perguntas r\u00e1pidas para preparar seu atendimento.", active: true },
-    "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: "Certo. Vou encaminhar seu atendimento para um corretor.", active: true },
+    "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: "Certo! Estou transferindo seu atendimento para a fila de um corretor especialista agora mesmo. Para agilizar seu atendimento, pode me informar seu nome e para quantas pessoas busca o plano?", active: true },
     "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Entendido. Registrei sua solicita\u00e7\u00e3o e o atendimento autom\u00e1tico ser\u00e1 interrompido.", active: true },
     "wrong_number.confirmed": { ruleKey: "wrong_number.confirmed", templateKey: "wrong_number.confirmed", body: "Entendido. Vou interromper este atendimento e sinalizar o contato para a equipe.", active: true },
     "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi o arquivo. O corretor respons\u00e1vel foi avisado para verificar.", active: true },

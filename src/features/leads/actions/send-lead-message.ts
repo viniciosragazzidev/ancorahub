@@ -24,8 +24,9 @@ export async function sendLeadMessageAction(leadId: string, body: string): Promi
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
       .limit(1);
     if (!lead) return { success: false, error: "Lead não encontrado." };
-    if (lead.status === "distributed") return { success: false, error: "Inicie o atendimento antes de enviar mensagens." };
-    if (lead.corretorId !== context.userId) return { success: false, error: "Este atendimento está sob responsabilidade de outro corretor. Para responder, assuma o atendimento primeiro." };
+    const isManagement = context.role === "director" || context.role === "manager";
+    if (lead.status === "distributed" && context.role === "broker") return { success: false, error: "Inicie o atendimento antes de enviar mensagens." };
+    if (lead.corretorId && lead.corretorId !== context.userId && !isManagement) return { success: false, error: "Este atendimento está sob responsabilidade de outro corretor. Para responder, assuma o atendimento primeiro." };
 
     const officialChannel = await getPreferredMetaCloudChannel({ tenantId: context.tenantId, branchId: lead.branchId, userId: context.userId });
     if (officialChannel) {

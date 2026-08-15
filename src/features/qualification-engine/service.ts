@@ -61,7 +61,7 @@ export type DeterministicQualificationTurn = {
  * conversation must not be restarted automatically.
  */
 export function shouldStartOrResumeAiQualification(qualificationStatus: string | null | undefined) {
-  return qualificationStatus === "pending";
+  return !qualificationStatus || qualificationStatus === "pending" || qualificationStatus === "qualifying";
 }
 
 const ALL_QUESTIONS_DEFINITIONS: Record<string, QualificationQuestionDefinition> = {
@@ -294,7 +294,7 @@ export async function persistQualificationEvaluation(input: {
       qualificationScore: result.score,
       qualificationStatus: result.qualificationStatus,
       qualificationProfileKey: input.policy.qualification.profileKey,
-      qualificationCompletedAt: result.state === "QUALIFIED" ? now : null,
+      qualificationCompletedAt: ["QUALIFIED", "PARTIAL", "NOT_INTERESTED"].includes(result.state) ? now : null,
       qualificationDetails: {
         completedFields: result.completedFields,
         missingFields: result.missingFields,

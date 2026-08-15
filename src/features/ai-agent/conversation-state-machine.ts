@@ -77,20 +77,51 @@ async function sendAiOutbound(input: {
   openWaSessionId?: string | null;
   wahaRunId?: string | null;
 }) {
-  if (input.transport === "openwa") {
-    if (!input.openWaSessionId) return { status: "failed" as const, messageId: null };
-    const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
-    return { status: "sent" as const, messageId: sent.messageId ?? null };
+  if (input.transport === "openwa" && input.openWaSessionId) {
+    try {
+      const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
+      if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
+    } catch (err) {
+      console.warn("[sendAiOutbound] openwa primary failed", err);
+    }
   }
-  if (input.transport === "waha") {
-    if (!input.wahaRunId) return { status: "failed" as const, messageId: null };
-    const messageId = await enqueueWahaAiReply({ tenantId: input.tenantId, runId: input.wahaRunId, body: input.body });
-    return { status: "sent" as const, messageId };
+
+  if (input.transport === "waha" && input.wahaRunId) {
+    try {
+      const messageId = await enqueueWahaAiReply({ tenantId: input.tenantId, runId: input.wahaRunId, body: input.body });
+      if (messageId) return { status: "sent" as const, messageId };
+    } catch (err) {
+      console.warn("[sendAiOutbound] waha primary failed", err);
+    }
   }
+
   const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
-  if (!channel) return { status: "skipped_no_channel" as const, messageId: null };
-  const sent = await sendMetaCloudChannelText({ channel, to: input.phone, body: input.body });
-  return { status: "sent" as const, messageId: sent.messageId };
+  if (channel) {
+    try {
+      const sent = await sendMetaCloudChannelText({ channel, to: input.phone, body: input.body });
+      if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
+    } catch (err) {
+      console.warn("[sendAiOutbound] meta cloud failed", err);
+    }
+  }
+
+  // Fallback para sessão conectada no OpenWA legado se houver
+  const db = getDatabase();
+  const [openWaConn] = await db
+    .select({ sessionId: schema.whatsappConnections.sessionId })
+    .from(schema.whatsappConnections)
+    .where(and(eq(schema.whatsappConnections.tenantId, input.tenantId), eq(schema.whatsappConnections.status, "ready")))
+    .limit(1);
+  if (openWaConn?.sessionId) {
+    try {
+      const sent = await sendOpenWaText(openWaConn.sessionId, input.phone, input.body);
+      if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
+    } catch (err) {
+      console.warn("[sendAiOutbound] openwa fallback failed", err);
+    }
+  }
+
+  return { status: "skipped_no_channel" as const, messageId: null };
 }
 
 let tablesEnsured = true;
@@ -344,6 +375,35 @@ export async function transitionConversationState({
         eq(schema.aiConversations.tenantId, tenantId),
       ),
     );
+
+  const [convLead] = await db
+    .select({ leadId: schema.aiConversations.leadId })
+    .from(schema.aiConversations)
+    .where(
+      and(
+        eq(schema.aiConversations.id, conversationId),
+        eq(schema.aiConversations.tenantId, tenantId)
+      )
+    )
+    .limit(1);
+
+  if (convLead?.leadId) {
+    if (newStatus === "WAITING_HUMAN" || newStatus === "HUMAN_ACTIVE") {
+      await db.update(schema.leads).set({
+        qualificationStatus: sql`CASE WHEN ${schema.leads.qualificationStatus} IN ('qualifying', 'pending') THEN 'qualified' ELSE ${schema.leads.qualificationStatus} END`,
+        qualificationState: sql`CASE WHEN ${schema.leads.qualificationState} IN ('IN_PROGRESS', 'PENDING') THEN 'QUALIFIED' ELSE ${schema.leads.qualificationState} END`,
+        qualificationCompletedAt: sql`COALESCE(${schema.leads.qualificationCompletedAt}, ${now})`,
+        updatedAt: now,
+      }).where(and(eq(schema.leads.id, convLead.leadId), eq(schema.leads.tenantId, tenantId)));
+    } else if (newStatus === "CLOSED") {
+      await db.update(schema.leads).set({
+        qualificationStatus: sql`CASE WHEN ${schema.leads.qualificationStatus} IN ('qualifying', 'pending') THEN 'cold' ELSE ${schema.leads.qualificationStatus} END`,
+        qualificationState: sql`CASE WHEN ${schema.leads.qualificationState} IN ('IN_PROGRESS', 'PENDING') THEN 'NOT_INTERESTED' ELSE ${schema.leads.qualificationState} END`,
+        qualificationCompletedAt: sql`COALESCE(${schema.leads.qualificationCompletedAt}, ${now})`,
+        updatedAt: now,
+      }).where(and(eq(schema.leads.id, convLead.leadId), eq(schema.leads.tenantId, tenantId)));
+    }
+  }
 }
 
 async function persistLeadFieldsFromQualification(input: {
@@ -557,7 +617,7 @@ export async function processInboundAiResponse({
   // 2. Verificar se a IA pode responder
   if (conversation.status === "HUMAN_ACTIVE") {
     console.log(`[ai-agent] Conversa ${conversation.id} está em HUMAN_ACTIVE. Atendimento assumido por humano. IA em silêncio.`);
-    // Quick Reply below may send a deterministic acknowledgement, but never invokes AI.
+    return { status: "ignored_human_active" };
   }
 
   if (conversation.status === "CLOSED" || conversation.status === "FAILED") {
@@ -699,6 +759,15 @@ export async function processInboundAiResponse({
     if (quickReply.notifyHuman && leadOwner?.corretorId) {
       notifiedUserId = leadOwner.corretorId;
       await publishNotification({ capability: "quick_reply_human", tenantId, recipientUserId: leadOwner.corretorId, leadId, type: "quick_reply_human", title: "Nova mensagem no atendimento", message: suppressed ? "O lead enviou nova mensagem; a resposta foi suprimida pelo cooldown." : "O lead enviou uma mensagem e o atendimento foi sinalizado.", pushTitle: "Mensagem de lead", pushBody: "Verifique o atendimento na plataforma.", url: `/leads/${leadId}`, tag: `quick-reply-${leadId}` });
+    }
+    if (quickReply.intent === "REQUEST_HUMAN") {
+      await transitionConversationState({
+        tenantId,
+        conversationId: conversation.id,
+        newStatus: "WAITING_HUMAN",
+        reason: "Solicitação explícita de atendimento humano",
+      });
+      await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
     }
     const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < 30 * 60 * 1000;
     const isWaitRule = quickReply.ruleKey === "waiting_human" || quickReply.ruleKey === "waiting_response";

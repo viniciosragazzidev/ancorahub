@@ -148,11 +148,14 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
   void notifyLeadArrived(leadId, tenantId, branchId, normalizedName, `lead-arrived:${leadId}`).catch((err) => console.error("[createLeadFromWebhookSync] notifyLeadArrived error:", err));
 
-  if (qualificationEngineEnabled && !bypassPlantao) {
-    const qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId }).catch(() => ({ started: false as const, reason: "failed" as const }));
-    if (!qualificationStart.started) {
-      await enqueueLeadEffect({ tenantId, leadId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${leadId}:distribution-fallback`, payload: { branchId, leadName: normalizedName } }).catch(() => undefined);
-    }
+  let qualificationStart: { started: boolean } | null = null;
+  try {
+    qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId });
+  } catch {
+    qualificationStart = { started: false };
+  }
+  if (qualificationStart && !qualificationStart.started && !bypassPlantao) {
+    await enqueueLeadEffect({ tenantId, leadId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${leadId}:distribution-fallback`, payload: { branchId, leadName: normalizedName } }).catch(() => undefined);
   }
   return { success: true, leadId, duplicate: false };
 }

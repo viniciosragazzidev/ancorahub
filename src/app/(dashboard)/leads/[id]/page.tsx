@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +20,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { StartServiceButton } from "./start-service-button";
 import { SupervisionPanel } from "./supervision-panel";
 import { DeleteLeadControl } from "./delete-lead-control";
+import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -27,7 +29,8 @@ import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
 import { BeneficiariesSection } from "./beneficiaries-section";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
 import { maskPhone, maskName } from "@/features/quotes/utils";
-import { Phone, Clock, Share, Buildings, UserPlus, LockKey } from "@/components/huge-icons";
+import Link from "next/link";
+import { Phone, Clock, Share, Buildings, UserPlus, LockKey, ChatCircleText } from "@/components/huge-icons";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import {
   resolveLeadNextBestAction,
@@ -195,6 +198,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
               {/* Quick Header Actions */}
               <div id="lead-actions" className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}`} />} variant="outline">
+                  <ChatCircleText className="size-3.5 text-primary" />
+                  Conversas
+                </Button>
+                <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
                 {context.role === "director" ? <DeleteLeadControl leadId={lead.id} leadName={lead.nome} /> : null}
                 {context.role === "broker" && context.userId === lead.corretorId && lead.status === "distributed" && (
                   <StartServiceButton leadId={lead.id} />
@@ -351,6 +359,22 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className="rounded-lg border border-border/50 bg-muted/15 px-4 py-3 text-sm text-muted-foreground dark:border-border/70 dark:bg-muted/20">
                   Esta é a etapa atual. As próximas etapas são liberadas conforme o status do lead avança.
                 </div>
+
+                <Card className="border-amber-500/20 bg-amber-500/5 shadow-none">
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                          Qualificação por Agente de IA
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Ideal para leads antigos ou importados. Clique para disparar o template oficial de qualificação no WhatsApp.
+                        </CardDescription>
+                      </div>
+                      <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="default" size="sm" />
+                    </div>
+                  </CardHeader>
+                </Card>
                 {(qualificationDetails.numberOfLives || qualificationDetails.averageAge || qualificationDetails.individualAges) && (
                   <Card className="border-border/60 bg-card/80 shadow-none dark:border-border dark:bg-card">
                     <CardHeader className="pb-3">
@@ -427,7 +451,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
                   <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
                 </div>
-                <LeadChat phone={canSeePersonalData ? lead.telefone : null} />
+                <LeadChat leadId={lead.id} phone={canSeePersonalData ? lead.telefone : null} />
               </TabsContent>
 
               <TabsContent value="documents" className="mt-4">

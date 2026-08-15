@@ -45,10 +45,13 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { cn } from "@/lib/utils";
+import { Sparkles, RefreshCw } from "lucide-react";
 import {
   takeoverConversationAction,
   closeConversationAction,
   resetAiConversationAction,
+  resumeAiQualificationAction,
+  syncSingleLeadConversationAction,
 } from "@/features/ai-agent/actions";
 import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-message";
 
@@ -291,7 +294,22 @@ export function ConversationsWorkspace({
                 role={role}
               />
               <ConversationHistory client={selected} />
-              <ConversationChannelNotice phone={selected.telefone} />
+              <ChatInput
+                leadId={selected.id}
+                onMessageSent={(msg) => {
+                  setConversations((prev) =>
+                    prev.map((item) =>
+                      item.id === selected.id
+                        ? {
+                            ...item,
+                            latestMessage: { body: msg.body, direction: msg.direction, sentAt: msg.sentAt },
+                            messages: [...item.messages, msg],
+                          }
+                        : item,
+                    ),
+                  );
+                }}
+              />
             </>
           ) : (
             <EmptyConversation />
@@ -352,7 +370,7 @@ function ConversationHeader({
   const isAssignedToMe = client.aiConversation?.assignedUserId === userId;
 
   async function handleTakeover() {
-    if (!tenantId || !client.aiConversation?.id || !userId) return;
+    if (!client.aiConversation?.id) return;
     setIsPending(true);
     await takeoverConversationAction(client.aiConversation.id);
     setIsPending(false);
@@ -360,12 +378,34 @@ function ConversationHeader({
   }
 
   async function handleResetChat() {
-    if (!tenantId || !client.aiConversation?.id) return;
+    if (!client.aiConversation?.id) return;
     if (!confirm("Tem certeza que deseja resetar a qualificação da inteligência artificial e limpar a memória deste lead? O robô de IA iniciará a conversa do zero.")) return;
     setIsPending(true);
     await resetAiConversationAction(client.aiConversation.id);
     setIsPending(false);
     router.refresh();
+  }
+
+  async function handleResumeAi() {
+    setIsPending(true);
+    const result = await resumeAiQualificationAction(client.id);
+    setIsPending(false);
+    if (!result.success) {
+      alert(result.error);
+    } else {
+      router.refresh();
+    }
+  }
+
+  async function handleSyncChat() {
+    setIsPending(true);
+    const result = await syncSingleLeadConversationAction(client.id);
+    setIsPending(false);
+    if (!result.success) {
+      alert(result.error ?? "Erro ao sincronizar histórico.");
+    } else {
+      router.refresh();
+    }
   }
 
   return (
@@ -397,6 +437,35 @@ function ConversationHeader({
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <Button
+          className="h-8 text-xs font-semibold gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+          disabled={isPending}
+          onClick={handleResumeAi}
+          size="sm"
+          type="button"
+        >
+          <Sparkles className="size-3.5" />
+          Continuar Atendimento IA
+        </Button>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                aria-label="Sincronizar chat deste lead"
+                disabled={isPending}
+                onClick={handleSyncChat}
+                size="icon-sm"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw className={cn("size-3.5", isPending && "animate-spin")} />
+              </Button>
+            }
+          />
+          <TooltipContent>Sincronizar todo o chat</TooltipContent>
+        </Tooltip>
+
         {role === "director" && client.aiConversation?.id && (
           <Button
             className="h-8 text-xs font-semibold gap-1.5 border-destructive text-destructive hover:bg-destructive/10"
@@ -523,7 +592,7 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
   }, [client.messages.length]);
 
   if (!client.messages.length) {
-    return <HistoryEmptyState phone={client.telefone} />;
+    return <HistoryEmptyState client={client} />;
   }
 
   const getGroupKey = (dir: string) => {
@@ -656,22 +725,78 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
   );
 }
 
-function HistoryEmptyState({ phone }: { phone: string }) {
+function HistoryEmptyState({ client }: { client: ConversationItem }) {
+  const router = useRouter();
+  const [isPending, setIsPending] = useState(false);
+  const isAi = client.aiConversation?.status === "AI_ACTIVE" || client.aiConversation?.status === "WAITING_CUSTOMER";
+  const summary = client.aiConversation?.qualificationSummary;
+
+  async function handleStartAi() {
+    setIsPending(true);
+    const result = await resumeAiQualificationAction(client.id);
+    setIsPending(false);
+    if (!result.success) alert(result.error);
+    else router.refresh();
+  }
+
+  async function handleSync() {
+    setIsPending(true);
+    const result = await syncSingleLeadConversationAction(client.id);
+    setIsPending(false);
+    if (!result.success) alert(result.error ?? "Erro ao sincronizar.");
+    else router.refresh();
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-5 sm:p-8">
-      <EmptyState
-        animated
-        icon={ChatCircleText}
-        title="Nenhuma mensagem sincronizada"
-        description="Este atendimento ainda não possui histórico na plataforma. Continue o contato pelo WhatsApp e o histórico aparecerá quando a sincronização estiver disponível."
-        action={
-          <Button render={<a href={getWhatsAppUrl(phone)} rel="noreferrer" target="_blank" />} size="sm">
-            <WhatsappLogo className="size-4" />
-            Abrir WhatsApp
-            <ArrowSquareOut className="size-4" />
-          </Button>
-        }
-      />
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-5 sm:p-8">
+      <div className="w-full max-w-md space-y-4 text-center">
+        <EmptyState
+          animated
+          icon={ChatCircleText}
+          title={isAi ? "Qualificação por IA em andamento" : "Aguardando histórico de mensagens"}
+          description={
+            summary
+              ? `Resumo da qualificação: ${summary}`
+              : isAi
+                ? "A Inteligência Artificial está qualificando o lead via WhatsApp. Caso envie uma mensagem abaixo, você assumirá a conversa."
+                : "Este atendimento ainda não possui histórico sincronizado. Você pode forçar a sincronização ou iniciar o atendimento por IA."
+          }
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+              <Button
+                className="bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"
+                disabled={isPending}
+                onClick={handleStartAi}
+                size="sm"
+                type="button"
+              >
+                <Sparkles className="size-4" />
+                {isAi ? "Continuar Qualificação IA" : "Iniciar Qualificação por IA"}
+              </Button>
+              <Button
+                disabled={isPending}
+                onClick={handleSync}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw className={cn("size-4", isPending && "animate-spin")} />
+                Sincronizar Chat
+              </Button>
+              <Button render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />} size="sm" variant="ghost">
+                <WhatsappLogo className="size-4" />
+                Abrir WhatsApp
+                <ArrowSquareOut className="size-4" />
+              </Button>
+            </div>
+          }
+        />
+        {client.aiConversation?.transferReason && (
+          <div className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground text-left">
+            <strong>Contexto do Atendimento Virtual:</strong> {client.aiConversation.transferReason}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

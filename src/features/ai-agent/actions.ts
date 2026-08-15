@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -137,5 +137,91 @@ export async function resetAiConversationAction(conversationId: string): Promise
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível reiniciar a conversa." };
+  }
+}
+
+export async function resumeAiQualificationAction(leadId: string): Promise<ConversationActionResult> {
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+    const [lead] = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+    if (!lead) return { success: false, error: "Lead não encontrado." };
+
+    const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
+    const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId });
+    
+    // Also reset conversation status to WAITING_CUSTOMER if an aiConversation row exists
+    const [conv] = await db.select({ id: schema.aiConversations.id }).from(schema.aiConversations).where(and(eq(schema.aiConversations.leadId, lead.id), eq(schema.aiConversations.tenantId, context.tenantId))).limit(1);
+    if (conv) {
+      await transitionConversationState({
+        tenantId: context.tenantId,
+        conversationId: conv.id,
+        newStatus: "WAITING_CUSTOMER",
+        reason: "Atendimento de qualificação retomado manualmente",
+        assignedUserId: null,
+      });
+      await auditConversationAction({ userId: context.userId, conversationId: conv.id, action: "ai_conversation.resumed_by_user" });
+    }
+
+    revalidatePath("/conversas");
+    revalidatePath(`/leads/${leadId}`);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível retomar o atendimento da IA." };
+  }
+}
+
+export async function syncSingleLeadConversationAction(leadId: string): Promise<{ success: boolean; messagesCount?: number; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+
+    const [lead] = await db
+      .select({ id: schema.leads.id, phone: schema.leads.telefone })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .limit(1);
+
+    if (!lead) return { success: false, error: "Lead não encontrado." };
+
+    const digits = lead.phone ? lead.phone.replace(/\D/g, "") : "";
+    if (digits) {
+      const last8 = digits.slice(-8);
+      if (last8.length >= 8) {
+        await db
+          .update(schema.whatsappMessages)
+          .set({ leadId: lead.id })
+          .where(and(
+            eq(schema.whatsappMessages.tenantId, context.tenantId),
+            isNull(schema.whatsappMessages.leadId),
+            sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') LIKE ${`%${last8}`}`
+          ))
+          .catch(() => undefined);
+      }
+    }
+
+    const messages = await db
+      .select({ id: schema.whatsappMessages.id })
+      .from(schema.whatsappMessages)
+      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, leadId)));
+
+    if (messages.length === 0) {
+      const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
+      await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId }).catch(() => undefined);
+    }
+
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "lead_conversation",
+      entidadeId: leadId,
+      acao: "lead_conversation.synced",
+    });
+
+    revalidatePath("/conversas");
+    revalidatePath(`/leads/${leadId}`);
+    return { success: true, messagesCount: messages.length };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao sincronizar histórico do chat." };
   }
 }
