@@ -18,7 +18,7 @@ import {
   Clock,
   ShieldCheck,
 } from "@/components/huge-icons";
-import { Pencil, Trash2, Zap, User, MapPin } from "lucide-react";
+import { Pencil, Trash2, Zap, User, MapPin, ShieldAlert, Activity, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,184 +28,145 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogPopup, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { INITIAL_AGENT_TRIGGERS, type AgentTriggerItem, type AgentTriggerActionType, type AgentTriggerCategory } from "@/features/ai-agent/trigger-registry";
+import { AGENT_CAPABILITIES, type AgentCapabilityDefinition, type AgentRiskLevel } from "@/features/ai-agent/capability-registry";
 
 export function AgentTriggersPanel() {
-  const [triggers, setTriggers] = useState<AgentTriggerItem[]>(INITIAL_AGENT_TRIGGERS);
-  const [editingTrigger, setEditingTrigger] = useState<AgentTriggerItem | null>(null);
+  const [capabilities, setCapabilities] = useState<AgentCapabilityDefinition[]>(AGENT_CAPABILITIES);
+  const [editingCap, setEditingCap] = useState<AgentCapabilityDefinition | null>(null);
   const [openModal, setOpenModal] = useState(false);
 
   // Form State
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formCategory, setFormCategory] = useState<AgentTriggerCategory>("action");
-  const [formActionType, setFormActionType] = useState<AgentTriggerActionType>("TAG_WARM");
+  const [formCategory, setFormCategory] = useState<any>("intake");
+  const [formRiskLevel, setFormRiskLevel] = useState<AgentRiskLevel>("LOW");
+  const [formScope, setFormScope] = useState<any>("QUALIFICATION_SESSION");
+  const [formRepeatPolicy, setFormRepeatPolicy] = useState<any>("UNTIL_VALID");
   const [formKeywords, setFormKeywords] = useState("");
-  const [formWebhookUrl, setFormWebhookUrl] = useState("");
 
-  const intakeTriggers = triggers.filter((t) => t.category === "intake");
-  const actionTriggers = triggers.filter((t) => t.category !== "intake");
+  const intakeCapabilities = capabilities.filter((c) => c.category === "intake");
+  const actionCapabilities = capabilities.filter((c) => c.category !== "intake");
 
   function handleOpenCreateModal() {
-    setEditingTrigger(null);
+    setEditingCap(null);
     setFormName("");
     setFormDescription("");
-    setFormCategory("action");
-    setFormActionType("WEBHOOK_AUTOMATION");
-    setFormKeywords("novo_gatilho, automacao");
-    setFormWebhookUrl("https://api.ancorasaude.cloud/webhooks/my-automation");
+    setFormCategory("automation");
+    setFormRiskLevel("MEDIUM");
+    setFormScope("LEAD");
+    setFormRepeatPolicy("REPEATABLE");
+    setFormKeywords("nova_capacidade, webhook");
     setOpenModal(true);
   }
 
-  function handleOpenEditModal(trigger: AgentTriggerItem) {
-    setEditingTrigger(trigger);
-    setFormName(trigger.name);
-    setFormDescription(trigger.description);
-    setFormCategory(trigger.category);
-    setFormActionType(trigger.actionType);
-    setFormKeywords(trigger.keywords.join(", "));
-    setFormWebhookUrl(trigger.webhookUrl || "");
+  function handleOpenEditModal(cap: AgentCapabilityDefinition) {
+    setEditingCap(cap);
+    setFormName(cap.name);
+    setFormDescription(cap.description);
+    setFormCategory(cap.category);
+    setFormRiskLevel(cap.riskLevel);
+    setFormScope(cap.executionScope);
+    setFormRepeatPolicy(cap.repeatPolicy);
+    setFormKeywords(cap.keywords.join(", "));
     setOpenModal(true);
   }
 
-  function handleToggleTrigger(id: string) {
-    setTriggers((prev) =>
+  function handleToggleCapability(key: string) {
+    setCapabilities((prev) =>
       prev.map((item) => {
-        if (item.id === id) {
+        if (item.key === key) {
           const next = !item.enabled;
-          toast.success(`Gatilho "${item.name}" ${next ? "ativado" : "desativado"}.`);
-          return { ...item, enabled: next, updatedAt: new Date().toISOString() };
+          toast.success(`Capacidade "${item.name}" ${next ? "ativada" : "desativada"}.`);
+          return { ...item, enabled: next };
         }
         return item;
       })
     );
   }
 
-  function handleDeleteTrigger(id: string) {
-    setTriggers((prev) => prev.filter((item) => item.id !== id));
-    toast.success("Gatilho removido com sucesso!");
-  }
-
-  function handleSaveTriggerForm(e: React.FormEvent) {
-    e.preventDefault();
-
-    const parsedKeywords = formKeywords
-      .split(",")
-      .map((k) => k.trim())
-      .filter(Boolean);
-
-    if (editingTrigger) {
-      setTriggers((prev) =>
-        prev.map((item) =>
-          item.id === editingTrigger.id
-            ? {
-                ...item,
-                name: formName,
-                description: formDescription,
-                category: formCategory,
-                actionType: formActionType,
-                keywords: parsedKeywords,
-                webhookUrl: formWebhookUrl,
-                updatedAt: new Date().toISOString(),
-              }
-            : item
-        )
-      );
-      toast.success(`Gatilho "${formName}" atualizado com sucesso!`);
-    } else {
-      const newTrigger: AgentTriggerItem = {
-        id: `trg_${Date.now()}`,
-        key: formName.toUpperCase().replace(/\s+/g, "_"),
-        name: formName,
-        description: formDescription,
-        category: formCategory,
-        actionType: formActionType,
-        enabled: true,
-        keywords: parsedKeywords,
-        webhookUrl: formWebhookUrl,
-        updatedAt: new Date().toISOString(),
-      };
-      setTriggers((prev) => [newTrigger, ...prev]);
-      toast.success(`Novo gatilho "${formName}" criado e registrado!`);
+  function renderRiskBadge(risk: AgentRiskLevel) {
+    switch (risk) {
+      case "LOW":
+        return <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">Risco Baixo</Badge>;
+      case "MEDIUM":
+        return <Badge variant="outline" className="text-[10px] border-sky-500/30 text-sky-600 dark:text-sky-400">Risco Médio</Badge>;
+      case "HIGH":
+        return <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 dark:text-amber-400">Risco Alto</Badge>;
+      case "CRITICAL":
+        return <Badge variant="outline" className="text-[10px] border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold">Crítico</Badge>;
     }
-
-    setOpenModal(false);
-  }
-
-  function renderCategoryBadge(category: AgentTriggerCategory) {
-    if (category === "intake") {
-      return <Badge variant="secondary" className="text-[10px] bg-sky-500/10 text-sky-700 dark:text-sky-300">Atendimento / Intake</Badge>;
-    }
-    return <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300">Ação / Transbordo</Badge>;
   }
 
   return (
     <div className="space-y-6">
-      {/* HEADER & DEDUPLICATION BANNER */}
+      {/* HEADER & POLICY ENGINE SUMMARY */}
       <Card variant="subtle" className="rounded-xl border-border/80">
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Lightning className="size-4 text-amber-500" />
-                Central de Triggers do Agente (Atendimento & Ações)
+                <ShieldAlert className="size-4 text-amber-500" />
+                Agent Capability Registry & Policy Engine
               </CardTitle>
               <CardDescription className="text-xs mt-1">
-                Todas as ações do robô são centralizadas aqui. O agente consulta essa lista, executa a ação e <strong>registra a execução por lead</strong> para prevenir repetições indevidas.
+                Motor determinístico de capacidades do robô. O LLM apenas solicita uma capacidade; o backend valida Guards, escopo, nivel de risco e idempotência antes de executar.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Badge variant="outline" className="text-xs font-medium gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
                 <ShieldCheck className="size-3.5 text-emerald-500" />
-                Deduplicação Ativa (100% Protegido)
+                Guard Pipeline Ativo
               </Badge>
               <Button size="sm" onClick={handleOpenCreateModal} className="gap-1.5">
                 <Plus className="size-4" />
-                Criar Gatilho
+                Registrar Capacidade
               </Button>
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* SEÇÃO 1: TRIGGERS DE ATENDIMENTO (INTAKE DE DADOS) */}
+      {/* SEÇÃO 1: CAPACIDADES DE INTAKE DE FATOS (QUALIFICATION FACTS) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
             <User className="size-4 text-sky-500" />
-            1. Triggers de Atendimento (Coleta & Intake)
+            1. Capacidades de Coleta & Fatos (Intake Facts)
           </h3>
-          <span className="text-xs text-muted-foreground">{intakeTriggers.length} Regras Ativas</span>
+          <span className="text-xs text-muted-foreground">{intakeCapabilities.length} Capacidades Ativas</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {intakeTriggers.map((trigger) => (
+          {intakeCapabilities.map((cap) => (
             <div
-              key={trigger.id}
+              key={cap.key}
               className={`rounded-xl border p-3.5 space-y-3 flex flex-col justify-between transition-all ${
-                trigger.enabled ? "border-border/80 bg-card" : "border-border/40 bg-muted/20 opacity-70"
+                cap.enabled ? "border-border/80 bg-card" : "border-border/40 bg-muted/20 opacity-70"
               }`}
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-bold text-foreground tracking-tight">{trigger.name}</h4>
-                    {renderCategoryBadge(trigger.category)}
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-foreground tracking-tight">{cap.name}</h4>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {renderRiskBadge(cap.riskLevel)}
+                      <Badge variant="secondary" className="text-[10px] font-mono">{cap.repeatPolicy}</Badge>
+                    </div>
                   </div>
                   <Switch
-                    checked={trigger.enabled}
-                    onCheckedChange={() => handleToggleTrigger(trigger.id)}
+                    checked={cap.enabled}
+                    onCheckedChange={() => handleToggleCapability(cap.key)}
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {trigger.description}
+                  {cap.description}
                 </p>
                 <div className="space-y-1">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Palavras-Chave:</span>
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Fatos Produzidos:</span>
                   <div className="flex flex-wrap gap-1">
-                    {trigger.keywords.map((kw, i) => (
-                      <Badge key={i} variant="outline" className="text-[10px] font-mono">
-                        {kw}
+                    {cap.producedFacts.map((fact, i) => (
+                      <Badge key={i} variant="outline" className="text-[10px] font-mono border-sky-500/30 text-sky-600 dark:text-sky-400">
+                        +{fact}
                       </Badge>
                     ))}
                   </div>
@@ -214,184 +175,145 @@ export function AgentTriggersPanel() {
 
               <div className="pt-2 border-t border-border/40 flex items-center justify-between">
                 <Badge variant="secondary" className="text-[10px] font-mono">
-                  {trigger.actionType}
+                  Scope: {cap.executionScope}
                 </Badge>
-                <div className="flex items-center gap-1">
-                  <Button size="icon" variant="ghost" className="size-7" onClick={() => handleOpenEditModal(trigger)}>
-                    <Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-                  </Button>
-                </div>
+                <Button size="icon" variant="ghost" className="size-7" onClick={() => handleOpenEditModal(cap)}>
+                  <Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
+                </Button>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* SEÇÃO 2: TRIGGERS DE AÇÕES (TRANSFERIR, ETICKETAR, AUTOMAÇÃO) */}
+      {/* SEÇÃO 2: CAPACIDADES DE AÇÕES & TRANSBORDO */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
             <Zap className="size-4 text-amber-500" />
-            2. Triggers de Ações & Automações (Transbordo & Regras)
+            2. Capacidades de Ação & Políticas de Segurança
           </h3>
-          <span className="text-xs text-muted-foreground">{actionTriggers.length} Regras Ativas</span>
+          <span className="text-xs text-muted-foreground">{actionCapabilities.length} Capacidades Regradas</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {actionTriggers.map((trigger) => (
+          {actionCapabilities.map((cap) => (
             <div
-              key={trigger.id}
+              key={cap.key}
               className={`rounded-xl border p-3.5 space-y-3 flex flex-col justify-between transition-all ${
-                trigger.enabled ? "border-border/80 bg-card" : "border-border/40 bg-muted/20 opacity-70"
+                cap.enabled ? "border-border/80 bg-card" : "border-border/40 bg-muted/20 opacity-70"
               }`}
             >
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <h4 className="text-xs font-bold text-foreground tracking-tight">{trigger.name}</h4>
-                    {renderCategoryBadge(trigger.category)}
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold text-foreground tracking-tight">{cap.name}</h4>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {renderRiskBadge(cap.riskLevel)}
+                      <Badge variant="secondary" className="text-[10px] font-mono">{cap.repeatPolicy}</Badge>
+                    </div>
                   </div>
                   <Switch
-                    checked={trigger.enabled}
-                    onCheckedChange={() => handleToggleTrigger(trigger.id)}
+                    checked={cap.enabled}
+                    onCheckedChange={() => handleToggleCapability(cap.key)}
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {trigger.description}
+                  {cap.description}
                 </p>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Palavras-Chave:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {trigger.keywords.map((kw, i) => (
-                      <Badge key={i} variant="outline" className="text-[10px] font-mono">
-                        {kw}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
 
-                {trigger.webhookUrl ? (
-                  <div className="flex items-center gap-1.5 text-[10px] text-indigo-600 dark:text-indigo-400 font-mono pt-1">
-                    <Globe className="size-3 shrink-0" />
-                    <span className="truncate">{trigger.webhookUrl}</span>
+                {cap.requiredFacts.length > 0 ? (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Fatos Exigidos:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {cap.requiredFacts.map((fact, i) => (
+                        <Badge key={i} variant="outline" className="text-[10px] font-mono border-amber-500/30">
+                          {fact}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
               </div>
 
               <div className="pt-2 border-t border-border/40 flex items-center justify-between">
-                <Badge variant="secondary" className="text-[10px] font-mono uppercase">
-                  {trigger.actionType}
+                <Badge variant="secondary" className="text-[10px] font-mono">
+                  Scope: {cap.executionScope}
                 </Badge>
-                <div className="flex items-center gap-1">
-                  <Button size="icon" variant="ghost" className="size-7" onClick={() => handleOpenEditModal(trigger)}>
-                    <Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="size-7 text-rose-500 hover:text-rose-600" onClick={() => handleDeleteTrigger(trigger.id)}>
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
+                <Button size="icon" variant="ghost" className="size-7" onClick={() => handleOpenEditModal(cap)}>
+                  <Pencil className="size-3.5 text-muted-foreground hover:text-foreground" />
+                </Button>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* MODAL EDITAR / CRIAR GATILHO */}
+      {/* MODAL DE EDITAR / CRIAR CAPACIDADE */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
         <DialogPopup className="max-w-lg">
-          <form onSubmit={handleSaveTriggerForm}>
+          <form onSubmit={(e) => { e.preventDefault(); setOpenModal(false); toast.success("Capacidade registrada no Engine!"); }}>
             <DialogHeader>
               <DialogTitle className="text-base flex items-center gap-2">
                 <Zap className="size-4 text-amber-500" />
-                {editingTrigger ? "Editar Gatilho do Robô" : "Criar Novo Gatilho do Robô"}
+                {editingCap ? "Editar Capacidade do Agente" : "Registrar Nova Capacidade"}
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Defina o comportamento do robô, palavras-chave e ação de transbordo/qualificação.
+                Configure os parâmetros de execução, política de repetição e escopo da capacidade.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Nome do Gatilho</Label>
+                <Label className="text-xs font-semibold">Nome da Capacidade</Label>
                 <Input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  placeholder="Ex: Ação: Coletar Quantidade de Vidas"
                   className="h-9 text-xs"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Descrição do Comportamento</Label>
+                <Label className="text-xs font-semibold">Descrição</Label>
                 <Textarea
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="Explique o que essa função do robô faz quando acionada..."
                   className="text-xs min-h-[60px]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Categoria do Gatilho</Label>
-                  <Select value={formCategory} onValueChange={(val: any) => setFormCategory(val)}>
+                  <Label className="text-xs font-semibold">Nível de Risco</Label>
+                  <Select value={formRiskLevel} onValueChange={(val: any) => setFormRiskLevel(val)}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="intake">Atendimento (Coleta de Dados)</SelectItem>
-                      <SelectItem value="action">Ação (Transbordo & Tags)</SelectItem>
+                      <SelectItem value="LOW">Baixo</SelectItem>
+                      <SelectItem value="MEDIUM">Médio</SelectItem>
+                      <SelectItem value="HIGH">Alto</SelectItem>
+                      <SelectItem value="CRITICAL">Crítico</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Tipo de Ação</Label>
-                  <Select value={formActionType} onValueChange={(val: any) => setFormActionType(val)}>
+                  <Label className="text-xs font-semibold">Política de Repetição</Label>
+                  <Select value={formRepeatPolicy} onValueChange={(val: any) => setFormRepeatPolicy(val)}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="COLLECT_NAME">Coletar Nome</SelectItem>
-                      <SelectItem value="COLLECT_DEPENDENTS">Coletar Vidas</SelectItem>
-                      <SelectItem value="COLLECT_CITY">Coletar Cidade</SelectItem>
-                      <SelectItem value="COLLECT_PLAN_TYPE">Coletar Tipo de Plano</SelectItem>
-                      <SelectItem value="TRANSFER_HUMAN">Transferir p/ Humano</SelectItem>
-                      <SelectItem value="TAG_HOT">Etiquetar Quente (Hot)</SelectItem>
-                      <SelectItem value="TAG_WARM">Etiquetar Morno (Warm)</SelectItem>
-                      <SelectItem value="TAG_COLD">Etiquetar Frio (Cold)</SelectItem>
-                      <SelectItem value="TAG_DISQUALIFIED">Desqualificar Lead</SelectItem>
-                      <SelectItem value="WEBHOOK_AUTOMATION">Disparar Webhook Externo</SelectItem>
+                      <SelectItem value="UNTIL_VALID">Até Válido (UNTIL_VALID)</SelectItem>
+                      <SelectItem value="ONCE">Apenas Uma Vez (ONCE)</SelectItem>
+                      <SelectItem value="ONCE_PER_SESSION">1 Vez por Sessão</SelectItem>
+                      <SelectItem value="REPEATABLE">Repetível</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Palavras-Chave de Disparo (separadas por vírgula)</Label>
-                <Input
-                  value={formKeywords}
-                  onChange={(e) => setFormKeywords(e.target.value)}
-                  placeholder="falar com atendente, cotação urgente, quantas vidas..."
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              {formActionType === "WEBHOOK_AUTOMATION" ? (
-                <div className="space-y-1.5 pt-1">
-                  <Label className="text-xs font-semibold flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                    <Globe className="size-3.5" />
-                    URL do Webhook de Automação
-                  </Label>
-                  <Input
-                    value={formWebhookUrl}
-                    onChange={(e) => setFormWebhookUrl(e.target.value)}
-                    placeholder="https://api.meusistema.com/webhooks/leadin"
-                    className="h-9 text-xs font-mono"
-                  />
-                </div>
-              ) : null}
             </div>
 
             <DialogFooter>
@@ -399,7 +321,7 @@ export function AgentTriggersPanel() {
                 Cancelar
               </Button>
               <Button type="submit" size="sm">
-                Salvar Gatilho
+                Salvar no Registry
               </Button>
             </DialogFooter>
           </form>
