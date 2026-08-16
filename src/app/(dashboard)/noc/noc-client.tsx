@@ -686,18 +686,18 @@ export function NocHeaderSlot() {
   });
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="hidden items-center gap-1.5 rounded-full border border-border/70 bg-muted/30 px-2.5 py-1 text-xs tabular-nums sm:flex text-muted-foreground font-medium">
-        <WifiHigh className="size-3.5 text-emerald-500" weight="fill" />
-        <span>{formattedDate ? `${formattedDate},` : ""}</span>
-        <span className="font-semibold text-foreground">{formattedTime ?? "--:--"}</span>
+    <div className="flex items-center gap-2 shrink-0">
+      <div className="hidden items-center gap-1.5 rounded-full border border-border/70 bg-muted/30 px-2.5 py-1 text-xs tabular-nums sm:flex text-muted-foreground font-medium shrink-0">
+        <WifiHigh className="size-3.5 text-emerald-500 shrink-0" weight="fill" />
+        <span className="shrink-0">{formattedDate ? `${formattedDate},` : ""}</span>
+        <span className="font-semibold text-foreground shrink-0">{formattedTime ?? "--:--"}</span>
       </div>
-      <Badge className="gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-none">
-        <span className="relative flex size-2">
+      <Badge showIcon={false} className="shrink-0 gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-none">
+        <span className="relative flex size-2 shrink-0">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
         </span>
-        Ao vivo
+        <span className="shrink-0">Ao vivo</span>
       </Badge>
     </div>
   );

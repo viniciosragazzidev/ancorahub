@@ -19,6 +19,7 @@ import {
 import { getLeadEffectOutboxHealth } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { retryLeadEffectAction } from "@/features/lead-distribution/actions";
 import { QueueControlCenter } from "./_components/queue-control-center";
+import { DistributionTabsContainer } from "./_components/distribution-tabs-container";
 import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 
@@ -405,94 +406,87 @@ export default async function LeadDistributionPage({
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        <Tabs defaultValue={view} variant="segment" className="w-full space-y-6">
-          <TabsList className="max-w-2xl w-full justify-start overflow-x-auto">
-            <TabsTrigger value="filas">Central de Filas</TabsTrigger>
-            <TabsTrigger value="operar">Operar Fila</TabsTrigger>
-            <TabsTrigger value="plantao">Plantão & Equipe</TabsTrigger>
-            <TabsTrigger value="saude_historico">Saúde & Histórico</TabsTrigger>
-          </TabsList>
-
-          {/* ABA 1: CENTRAL DE FILAS */}
-          <TabsContent value="filas" className="space-y-6">
-            <QueueControlCenter
-              queues={queuesForControl}
-              branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-              brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId ?? "", branchName: broker.branchName ?? "" }))}
-              dutySchedules={dutySchedules}
-              campaigns={metaCampaigns}
-              ads={metaAds}
-              campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
-              adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
-              canEdit
-            />
-            <DistributionPolicyPanel
-              canEdit={context.role === "director"}
-              brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
-              policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
-            />
-          </TabsContent>
-
-          {/* ABA 2: OPERAR FILA */}
-          <TabsContent value="operar" className="space-y-6">
-            <DistributionMetrics
-              metrics={{
-                totalBranches,
-                acceptingBranches,
-                autoDistributeBranches,
-                totalBrokers,
-                totalAvailable,
-                totalNewLeads,
-              }}
-            />
-            <section aria-labelledby="filas-de-acao" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <div className="md:col-span-2 xl:col-span-3">
-                <h2 id="filas-de-acao" className="text-base font-semibold">Filas de ação rápida</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Comece pela fila mais antiga que está sob sua responsabilidade.</p>
-              </div>
-              {queueCards.map((queue) => (
-                <Card key={queue.status} variant="overview" className="gap-0">
-                  <CardHeader className="p-4 pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="text-base">{queue.title}</CardTitle>
-                        <CardDescription className="mt-1">{queue.description}</CardDescription>
-                      </div>
-                      <Badge variant={queue.count > 0 ? "warning" : "success"}>{queue.count}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-between gap-3 border-t border-border/60 p-4 pt-3">
-                    <span className="text-xs text-muted-foreground">{queue.oldestLabel}</span>
-                    <Button render={<Link href={`/leads/distribuicao?view=operar&status=${queue.status}#inbox-distribuicao`} />} size="xs" variant="outline">
-                      Abrir fila
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </section>
-            <div id="inbox-distribuicao">
-              <DistributionInbox
-                key={queueFilter}
-                role={context.role}
-                initialStatusFilter={queueFilter}
+        <DistributionTabsContainer
+          initialView={view}
+          filasContent={
+            <>
+              <QueueControlCenter
+                queues={queuesForControl}
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-                brokers={brokers.map((broker) => ({
-                  id: broker.id,
-                  name: broker.name,
-                  branchId: broker.branchId,
-                  availabilityStatus: broker.availabilityStatus,
-                  activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-                }))}
-                leads={unassignedLeads.map((lead) => ({
-                  ...lead,
-                  createdAt: lead.createdAt.toISOString(),
-                }))}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId ?? "", branchName: broker.branchName ?? "" }))}
+                dutySchedules={dutySchedules}
+                campaigns={metaCampaigns}
+                ads={metaAds}
+                campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
+                adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
+                canEdit
               />
-            </div>
-          </TabsContent>
-
-          {/* ABA 3: PLANTÃO & EQUIPE */}
-          <TabsContent value="plantao" className="space-y-6">
+              <DistributionPolicyPanel
+                canEdit={context.role === "director"}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
+              />
+            </>
+          }
+          operarContent={
+            <>
+              <DistributionMetrics
+                metrics={{
+                  totalBranches,
+                  acceptingBranches,
+                  autoDistributeBranches,
+                  totalBrokers,
+                  totalAvailable,
+                  totalNewLeads,
+                }}
+              />
+              <section aria-labelledby="filas-de-acao" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="md:col-span-2 xl:col-span-3">
+                  <h2 id="filas-de-acao" className="text-base font-semibold">Filas de ação rápida</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Comece pela fila mais antiga que está sob sua responsabilidade.</p>
+                </div>
+                {queueCards.map((queue) => (
+                  <Card key={queue.status} variant="overview" className="gap-0">
+                    <CardHeader className="p-4 pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <CardTitle className="text-base">{queue.title}</CardTitle>
+                          <CardDescription className="mt-1">{queue.description}</CardDescription>
+                        </div>
+                        <Badge variant={queue.count > 0 ? "warning" : "success"}>{queue.count}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-between gap-3 border-t border-border/60 p-4 pt-3">
+                      <span className="text-xs text-muted-foreground">{queue.oldestLabel}</span>
+                      <Button render={<Link href={`/leads/distribuicao?view=operar&status=${queue.status}#inbox-distribuicao`} />} size="xs" variant="outline">
+                        Abrir fila
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </section>
+              <div id="inbox-distribuicao">
+                <DistributionInbox
+                  key={queueFilter}
+                  role={context.role}
+                  initialStatusFilter={queueFilter}
+                  branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                  brokers={brokers.map((broker) => ({
+                    id: broker.id,
+                    name: broker.name,
+                    branchId: broker.branchId,
+                    availabilityStatus: broker.availabilityStatus,
+                    activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+                  }))}
+                  leads={unassignedLeads.map((lead) => ({
+                    ...lead,
+                    createdAt: lead.createdAt.toISOString(),
+                  }))}
+                />
+              </div>
+            </>
+          }
+          plantaoContent={
             <DistributionPanel
               branches={enrichedBranches}
               brokers={brokers.map((broker) => ({
@@ -506,10 +500,8 @@ export default async function LeadDistributionPage({
               }))}
               canManageAcceptingLeads={context.role === "director"}
             />
-          </TabsContent>
-
-          {/* ABA 4: SAÚDE & HISTÓRICO */}
-          <TabsContent value="saude_historico" className="space-y-6">
+          }
+          saudeHistoricoContent={
             <div className="grid gap-6 lg:grid-cols-2">
               <Card variant="overview">
                 <CardHeader>
@@ -647,8 +639,8 @@ export default async function LeadDistributionPage({
                 </Card>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          }
+        />
       </main>
     </>
   );

@@ -4,7 +4,8 @@ import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDownIcon, ChevronRightIcon, ChartBar, CheckCircle, Lightning, MagnifyingGlass, Phone, Users, Megaphone, Buildings } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -195,9 +196,12 @@ export function CampaignsDashboardView({
                           </TableCell>
                           <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums py-2.5">{camp.conversionRate || 0}%</TableCell>
                           <TableCell className="pr-4 text-right py-2.5">
-                            <Button render={<Link href={`/marketing/campanhas/${camp.id}`} />} size="sm" variant="ghost" className="h-8 text-xs gap-1">
+                            <Link
+                              href={`/marketing/campanhas/${encodeURIComponent(camp.id || camp.campaignId)}`}
+                              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs gap-1")}
+                            >
                               Detalhes <ArrowRight className="size-3.5" />
-                            </Button>
+                            </Link>
                           </TableCell>
                         </TableRow>
 
