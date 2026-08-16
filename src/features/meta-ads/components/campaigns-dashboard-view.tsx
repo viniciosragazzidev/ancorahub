@@ -38,7 +38,7 @@ export function CampaignsDashboardView({
 
   const filteredCampaigns = useMemo(() => {
     return campaigns
-      .filter((campaign) => campaign.status.trim().toUpperCase() === "ACTIVE")
+      .filter((campaign) => campaign.status.trim().toUpperCase() === "ACTIVE" || (campaign.conversationsCount || 0) > 0)
       .filter((c) => c.name.toLowerCase().includes(search.toLowerCase().trim()))
       .sort((a, b) => (b.leadsCount || 0) - (a.leadsCount || 0));
   }, [campaigns, search]);
@@ -94,7 +94,7 @@ export function CampaignsDashboardView({
               <Megaphone className="size-5 text-primary" /> Desempenho por Conta de Anúncios, Campanha & Anúncio
             </CardTitle>
             <CardDescription className="text-xs">
-              Apenas campanhas ativas, agrupadas por conta de anúncios. Pausadas e arquivadas permanecem fora desta lista operacional.
+              Campanhas ativas e campanhas pausadas com leads ativos em atendimento, agrupadas por conta de anúncios.
             </CardDescription>
           </div>
           <div className="relative w-64">

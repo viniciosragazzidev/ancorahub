@@ -20,6 +20,7 @@ export type CampaignAdItem = {
   status: string;
   adSetId: string;
   leadsCount: number;
+  activeLeadsCount?: number;
 };
 
 export function CampaignDetailView({
@@ -43,7 +44,8 @@ export function CampaignDetailView({
   const conversionRate = campaign.conversionRate || 0;
 
   const sortedAds = useMemo(() => {
-    return [...ads].sort((a, b) => {
+    const visible = ads.filter((ad) => ad.status.trim().toUpperCase() === "ACTIVE" || (ad.activeLeadsCount || 0) > 0);
+    return visible.sort((a, b) => {
       const aActive = a.status === "ACTIVE" || a.status === "active";
       const bActive = b.status === "ACTIVE" || b.status === "active";
       if (aActive && !bActive) return -1;

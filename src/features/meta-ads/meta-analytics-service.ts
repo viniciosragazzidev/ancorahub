@@ -5,11 +5,18 @@ import { getDatabase, schema } from "@/shared/db";
 import type { MetaCampaignItem } from "./types";
 
 /**
- * Paused campaigns remain visible when they have historical lead attribution.
- * This preserves marketing attribution without showing inactive empty campaigns.
+ * Paused campaigns remain visible when they have active leads currently in funnel.
+ * This preserves operational tracking for active leads without cluttering inactive campaigns.
  */
-export function shouldDisplayCampaign(status: string | null | undefined, leadsCount: number): boolean {
-  return status?.toUpperCase() === "ACTIVE" || leadsCount > 0;
+export function shouldDisplayCampaign(status: string | null | undefined, activeLeadsCount: number): boolean {
+  return status?.toUpperCase() === "ACTIVE" || activeLeadsCount > 0;
+}
+
+/**
+ * Paused ads remain visible when they have active leads currently in funnel.
+ */
+export function shouldDisplayAd(status: string | null | undefined, activeLeadsCount: number): boolean {
+  return status?.toUpperCase() === "ACTIVE" || activeLeadsCount > 0;
 }
 
 export async function getTenantMetaCampaignsPerformance(tenantId: string): Promise<{
@@ -45,7 +52,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
   }
 
   // 2. Buscar campanhas do tenant. The final visibility rule is applied only
-  // after lead attribution is known, so a paused campaign with results remains
+  // after lead attribution is known, so a paused campaign with active leads remains
   // available for historical performance analysis.
   const campaignsList = await db
     .select({
@@ -123,22 +130,35 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
   const leadsPerAd = await db
     .select({
       adId: schema.leads.metaAdId,
+      status: schema.leads.status,
       totalCount: count(),
     })
     .from(schema.leads)
     .where(and(eq(schema.leads.tenantId, tenantId), sql`${schema.leads.metaAdId} IS NOT NULL`))
-    .groupBy(schema.leads.metaAdId);
-  const leadsByAdMap = new Map(leadsPerAd.map((item) => [item.adId!, Number(item.totalCount)]));
+    .groupBy(schema.leads.metaAdId, schema.leads.status);
 
-  const adsByCampaignMap = new Map<string, Array<{ id: string; adId: string; name: string; status: string; leadsCount: number }>>();
+  const leadsByAdMap = new Map<string, { total: number; active: number }>();
+  for (const item of leadsPerAd) {
+    const current = leadsByAdMap.get(item.adId!) || { total: 0, active: 0 };
+    const countVal = Number(item.totalCount);
+    current.total += countVal;
+    if (item.status !== "converted" && item.status !== "lost") {
+      current.active += countVal;
+    }
+    leadsByAdMap.set(item.adId!, current);
+  }
+
+  const adsByCampaignMap = new Map<string, Array<{ id: string; adId: string; name: string; status: string; leadsCount: number; activeLeadsCount: number }>>();
   for (const ad of adsWithCampaign) {
     const list = adsByCampaignMap.get(ad.campaignId) || [];
+    const adStats = leadsByAdMap.get(ad.adId) || { total: 0, active: 0 };
     list.push({
       id: ad.id,
       adId: ad.adId,
       name: ad.name,
       status: ad.status,
-      leadsCount: leadsByAdMap.get(ad.adId) || 0,
+      leadsCount: adStats.total,
+      activeLeadsCount: adStats.active,
     });
     adsByCampaignMap.set(ad.campaignId, list);
   }
@@ -170,7 +190,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
 
   const resultCampaigns: MetaCampaignItem[] = campaignsList.flatMap((c) => {
     const leadStats = leadsMap.get(c.campaignId) || leadsMap.get(c.name) || { total: 0, active: 0, converted: 0 };
-    if (!shouldDisplayCampaign(c.status, leadStats.total)) return [];
+    if (!shouldDisplayCampaign(c.status, leadStats.active)) return [];
     const saleStats = salesMap.get(c.campaignId) || salesMap.get(c.name) || { count: 0, revenue: 0 };
 
     const leadsCount = leadStats.total;
@@ -183,6 +203,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     totalConversationsOverall += conversationsCount;
     totalSalesOverall += salesCount;
     totalRevenueOverall += revenueTotal;
+
+    const allAds = adsByCampaignMap.get(c.campaignId) || [];
+    const visibleAds = allAds.filter((ad) => shouldDisplayAd(ad.status, ad.activeLeadsCount));
 
     return [{
       id: c.id,
@@ -201,7 +224,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       salesCount,
       revenueTotal,
       conversionRate,
-      ads: adsByCampaignMap.get(c.campaignId) || [],
+      ads: visibleAds,
     }];
   });
 

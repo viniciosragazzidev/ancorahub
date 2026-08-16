@@ -72,6 +72,7 @@ export type MetaAdSummaryItem = {
   name: string;
   status: string;
   leadsCount?: number;
+  activeLeadsCount?: number;
 };
 
 export type MetaCampaignItem = {

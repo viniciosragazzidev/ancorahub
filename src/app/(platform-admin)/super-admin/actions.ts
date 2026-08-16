@@ -766,3 +766,21 @@ export async function updateLeadManagementActionsSettingsAction(formData: FormDa
   revalidatePath("/leads");
 }
 
+export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("metaShowPausedCampaignsWithActiveLeadsEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_meta_show_paused_campaigns_with_active_leads_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "meta_show_paused_campaigns_with_active_leads_feature.updated",
+    targetType: "system_settings",
+    targetId: "meta_show_paused_campaigns_with_active_leads",
+    metadata: { enabled },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
+  revalidatePath("/marketing/campanhas");
+}
+
