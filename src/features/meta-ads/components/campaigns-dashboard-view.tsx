@@ -199,6 +199,7 @@ export function CampaignsDashboardView({
                             <Link
                               href={`/marketing/campanhas/${encodeURIComponent(camp.id || camp.campaignId)}`}
                               className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs gap-1")}
+                              onClick={(e) => e.stopPropagation()}
                             >
                               Detalhes <ArrowRight className="size-3.5" />
                             </Link>

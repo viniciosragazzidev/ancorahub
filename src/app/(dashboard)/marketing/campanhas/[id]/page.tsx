@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { and, count, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CampaignDetailView } from "@/features/meta-ads/components/campaign-detail-view";
 import { getTenantMetaCampaignsPerformance } from "@/features/meta-ads/meta-analytics-service";
@@ -17,7 +17,45 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
   const db = getDatabase();
 
   const data = await getTenantMetaCampaignsPerformance(context.tenantId);
-  const campaign = data.campaigns.find((c) => c.id === params.id || c.campaignId === params.id);
+  let campaign = data.campaigns.find((c) => c.id === params.id || c.campaignId === params.id);
+
+  if (!campaign) {
+    const [dbCampaign] = await db
+      .select({
+        id: schema.metaCampaigns.id,
+        tenantId: schema.metaCampaigns.tenantId,
+        adAccountId: schema.metaCampaigns.adAccountId,
+        campaignId: schema.metaCampaigns.campaignId,
+        name: schema.metaCampaigns.name,
+        objective: schema.metaCampaigns.objective,
+        status: schema.metaCampaigns.status,
+        dailyBudget: schema.metaCampaigns.dailyBudget,
+        lifetimeBudget: schema.metaCampaigns.lifetimeBudget,
+        startTime: schema.metaCampaigns.startTime,
+        stopTime: schema.metaCampaigns.stopTime,
+      })
+      .from(schema.metaCampaigns)
+      .where(
+        and(
+          eq(schema.metaCampaigns.tenantId, context.tenantId),
+          or(eq(schema.metaCampaigns.id, params.id), eq(schema.metaCampaigns.campaignId, params.id))
+        )
+      )
+      .limit(1);
+
+    if (dbCampaign) {
+      campaign = {
+        ...dbCampaign,
+        adAccountName: `Conta ${dbCampaign.adAccountId}`,
+        leadsCount: 0,
+        conversationsCount: 0,
+        salesCount: 0,
+        revenueTotal: 0,
+        conversionRate: 0,
+        ads: [],
+      };
+    }
+  }
 
   if (!campaign) {
     notFound();
