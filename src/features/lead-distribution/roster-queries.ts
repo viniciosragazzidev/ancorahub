@@ -66,6 +66,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         inArray(schema.tenantMemberships.branchId, branchIds),
         eq(schema.tenantMemberships.role, "broker"),
+        eq(schema.tenantMemberships.jobTitle, "broker"),
         eq(schema.tenantMemberships.status, "active"),
         eq(schema.user.active, true),
         eq(schema.user.status, "active"),

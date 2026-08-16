@@ -39,10 +39,11 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
 
   function handleSubmit(formData: FormData) {
     const name = String(formData.get("name") ?? "");
+    const titleLabel = jobTitles.find((t) => t.value === jobTitle)?.label ?? "Funcionário";
     startTransition(async () => {
       const result = await createTeamUserAction({ success: false }, formData);
       if (result.success) {
-        toast.success("Perfil profissional criado com sucesso.");
+        toast.success(`Acesso de ${titleLabel} criado com sucesso.`);
         setWhatsappStatus(result.whatsappStatus ?? "not_available");
         setCreatedName(name);
         const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -178,7 +179,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                     setJobTitle(val);
                     if (val === "director") setRole("director");
                     else if (val === "manager") setRole("manager");
-                    else setRole("broker");
+                    else if (val === "supervisor") setRole("supervisor");
                   }} disabled={pending} labels={Object.fromEntries(jobTitles.map((t) => [t.value, t.label]))}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cargo" /></SelectTrigger>
                     <SelectContent>
@@ -194,12 +195,12 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                     if (!val) return;
                     setRole(val);
                     if (val === "director") setJobTitle("director");
-                    else if (val === "manager") setJobTitle("manager");
-                  }} disabled={pending || jobTitle === "broker" || jobTitle === "manager" || jobTitle === "director"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
+                    else if (val === "manager" && (jobTitle === "director" || jobTitle === "broker")) setJobTitle("manager");
+                  }} disabled={pending || jobTitle === "manager" || jobTitle === "director"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o perfil" /></SelectTrigger>
                     <SelectContent>
                       {canInviteDirector ? <SelectItem value="director">Acesso Global (Direção)</SelectItem> : null}
-                      {canInviteManager && jobTitle !== "broker" && jobTitle !== "director" ? <SelectItem value="manager">Gestão da unidade</SelectItem> : null}
+                      {canInviteManager && jobTitle !== "director" ? <SelectItem value="manager">Gestão da unidade</SelectItem> : null}
                       {jobTitle !== "manager" && jobTitle !== "director" ? <SelectItem value="broker">Operação individual</SelectItem> : null}
                     </SelectContent>
                   </Select>

@@ -10,6 +10,8 @@ import {
 
 import { Button } from "@/components/ui/button";
 
+import { AppSelect } from "@/components/ui/select";
+
 interface DataTablePaginationProps<TData> {
   table: Table<TData>;
   showSelectionCount?: boolean;
@@ -35,19 +37,16 @@ export function DataTablePagination<TData>({
       <div className="flex flex-wrap items-center gap-6 lg:gap-8">
         <div className="flex items-center space-x-2">
           <p className="text-xs font-medium text-muted-foreground">Linhas por página</p>
-          <select
-            className="h-8 w-16 rounded-xl border border-border/70 bg-card px-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-foreground"
-            value={table.getState().pagination.pageSize}
-            onChange={(e) => {
-              table.setPageSize(Number(e.target.value));
-            }}
-          >
-            {[10, 20, 30, 50, 100].map((pageSize) => (
-              <option key={pageSize} value={pageSize}>
-                {pageSize}
-              </option>
-            ))}
-          </select>
+          <AppSelect
+            size="sm"
+            className="w-20"
+            value={String(table.getState().pagination.pageSize)}
+            onValueChange={(val) => table.setPageSize(Number(val))}
+            options={[10, 20, 30, 50, 100].map((pageSize) => ({
+              value: String(pageSize),
+              label: String(pageSize),
+            }))}
+          />
         </div>
 
         <div className="flex w-[100px] items-center justify-center text-xs font-medium font-mono text-muted-foreground">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import type { ReportDefinition, ReportFormat } from "@/features/reports/report-registry";
 import { toast } from "sonner";
 
@@ -149,37 +150,50 @@ export function ReportCenter({ reports, branches = [], userRole, defaultBranchId
             </DialogHeader>
             <div className="grid gap-4" aria-busy={isGenerating}>
               {branches.length > 0 && (userRole === "director" || userRole === "manager") && (
-                <label className="grid gap-1.5 text-sm font-medium">
+                <div className="grid gap-1.5 text-sm font-medium">
                   Unidade
-                  <select
+                  <AppSelect
                     value={selectedBranchId}
-                    onChange={(event) => setSelectedBranchId(event.target.value)}
+                    onValueChange={(val) => setSelectedBranchId(val)}
                     disabled={isGenerating || userRole === "manager"}
-                    className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none"
-                  >
-                    {userRole === "director" && <option value="all">Todas as Unidades (Visão Global)</option>}
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={[
+                      ...(userRole === "director" ? [{ value: "all", label: "Todas as Unidades (Visão Global)" }] : []),
+                      ...branches.map((b) => ({ value: b.id, label: b.name })),
+                    ]}
+                  />
+                </div>
               )}
-              <label className="grid gap-1.5 text-sm font-medium">Período
-                <select value={preset} onChange={(event) => changePreset(event.target.value as RangePreset)} disabled={isGenerating} className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none">
-                  <option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="custom">Personalizado</option>
-                </select>
-              </label>
+              <div className="grid gap-1.5 text-sm font-medium">
+                Período
+                <AppSelect
+                  value={preset}
+                  onValueChange={(val) => changePreset(val as RangePreset)}
+                  disabled={isGenerating}
+                  options={[
+                    { value: "30", label: "Últimos 30 dias" },
+                    { value: "90", label: "Últimos 90 dias" },
+                    { value: "custom", label: "Personalizado" },
+                  ]}
+                />
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5 text-sm font-medium">Data inicial<Input type="date" value={start} onChange={(event) => { setStart(event.target.value); setPreset("custom"); }} disabled={isGenerating} /></label>
                 <label className="grid gap-1.5 text-sm font-medium">Data final<Input type="date" value={end} onChange={(event) => { setEnd(event.target.value); setPreset("custom"); }} disabled={isGenerating} /></label>
               </div>
-              <label className="grid gap-1.5 text-sm font-medium">Formato
-                <select value={format} onChange={(event) => setFormat(event.target.value as ReportFormat)} disabled={isGenerating} className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none">
-                  {selected?.formats.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}
-                </select>
-              </label>
+              <div className="grid gap-1.5 text-sm font-medium">
+                Formato
+                <AppSelect
+                  value={format}
+                  onValueChange={(val) => setFormat(val as ReportFormat)}
+                  disabled={isGenerating}
+                  options={
+                    selected?.formats.map((item) => ({
+                      value: item,
+                      label: item.toUpperCase(),
+                    })) ?? []
+                  }
+                />
+              </div>
               <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">O escopo é aplicado no servidor conforme a sua função. Dados financeiros não são incluídos em relatórios de supervisor.</p>
               <p aria-live="polite" className="min-h-5 text-xs text-muted-foreground">{isGenerating ? "Preparando arquivo seguro para download…" : ""}</p>
             </div>

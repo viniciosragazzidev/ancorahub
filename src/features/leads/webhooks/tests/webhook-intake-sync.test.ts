@@ -4,7 +4,8 @@ const state = vi.hoisted(() => {
   const schema = { webhookDeliveries: Symbol("deliveries"), leads: Symbol("leads"), leadInteractions: Symbol("interactions"), auditLogs: Symbol("audit"), leadDistributionEvents: Symbol("events") };
   const inserts: Array<{ table: symbol; values: Record<string, unknown> }> = [];
   const updates: Array<{ table: symbol; values: Record<string, unknown> }> = [];
-  const select = vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => []) })) })) }));
+  const createQueryMock = () => Object.assign(Promise.resolve([]), { limit: vi.fn(async () => []) });
+  const select = vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => createQueryMock()) })) }));
   const db = {
     insert: vi.fn((table: symbol) => ({ values: vi.fn((values: Record<string, unknown>) => {
       inserts.push({ table, values });
@@ -18,7 +19,7 @@ const state = vi.hoisted(() => {
 });
 
 vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schema }));
-vi.mock("drizzle-orm", () => ({ and: vi.fn(() => "and"), eq: vi.fn(() => "eq") }));
+vi.mock("drizzle-orm", () => ({ and: vi.fn(() => "and"), eq: vi.fn(() => "eq"), isNull: vi.fn(() => "isNull") }));
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => "false") }));
 vi.mock("@/features/ai-qualification/service", () => ({ startAiQualificationForLead: vi.fn() }));
 vi.mock("@/features/leads/webhooks/services/lead-effect-outbox", () => ({ enqueueLeadEffectTx: state.enqueueTx, enqueueLeadEffect: state.enqueue }));

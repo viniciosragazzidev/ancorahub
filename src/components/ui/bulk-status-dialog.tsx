@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { AppSelect } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { DistributionActionState } from "@/features/lead-distribution/actions";
@@ -73,45 +74,38 @@ export function BulkStatusDialog({
 
           <div className="space-y-2">
             <Label htmlFor="target-status">Novo status</Label>
-            <select
+            <AppSelect
               id="target-status"
               name="newStatus"
               value={targetStatus}
-              onChange={(e) => setTargetStatus(e.target.value)}
+              onValueChange={setTargetStatus}
+              placeholder="Selecione..."
               required
-              className="flex h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-            >
-              <option value="">Selecione...</option>
-              {validTargets.map((status) => (
-                <option key={status} value={status}>
-                  {LEAD_STATUS_LABELS[status] ?? status}
-                </option>
-              ))}
-            </select>
+              options={validTargets.map((status) => ({
+                value: status,
+                label: LEAD_STATUS_LABELS[status] ?? status,
+              }))}
+            />
           </div>
 
           {targetStatus === "lost" && (
             <div className="space-y-2">
               <Label htmlFor="motivo-perda">Motivo da perda</Label>
-              <select
+              <AppSelect
                 id="motivo-perda"
                 name="motivoPerda"
                 required
-                className="flex h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-              >
-                <option value="">Selecione um motivo...</option>
-                <option value="preco">Preço acima do esperado</option>
-                <option value="carência">Período de carência incompatível</option>
-                <option value="encontrou_mais_barato">
-                  Encontrou opção mais barata
-                </option>
-                <option value="desistiu">Desistiu da contratação</option>
-                <option value="problema_saude">
-                  Problema de saúde não coberto
-                </option>
-                <option value="nao_qualificado">Lead não qualificado</option>
-                <option value="outro">Outro motivo</option>
-              </select>
+                placeholder="Selecione um motivo..."
+                options={[
+                  { value: "preco", label: "Preço acima do esperado" },
+                  { value: "carência", label: "Período de carência incompatível" },
+                  { value: "encontrou_mais_barato", label: "Encontrou opção mais barata" },
+                  { value: "desistiu", label: "Desistiu da contratação" },
+                  { value: "problema_saude", label: "Problema de saúde não coberto" },
+                  { value: "nao_qualificado", label: "Lead não qualificado" },
+                  { value: "outro", label: "Outro motivo" },
+                ]}
+              />
             </div>
           )}
 

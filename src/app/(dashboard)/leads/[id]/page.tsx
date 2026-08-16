@@ -144,7 +144,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const brokers = (context.role === "manager" || context.role === "director") && lead.branchId
     ? await getDatabase().select({ id: schema.user.id, name: schema.user.name }).from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.branchId, lead.branchId!), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true)))
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.branchId, lead.branchId!), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true)))
     : [];
 
   const isManagement = context.role === "manager" || context.role === "director";
@@ -322,8 +322,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               return <NextBestActionCard action={leadNextBestAction} className="mb-4" />;
             })()}
 
-            <Tabs defaultValue={defaultLeadTab} orientation="horizontal" className="min-h-0 min-w-0 gap-5 overflow-hidden">
-              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="h-30 w-full py-8 max-w-full min-w-0 flex-row items-stretch gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/50 bg-muted/15 p-2 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-border/70 dark:bg-muted/20" variant="line">
+            <Tabs defaultValue={defaultLeadTab} variant="segment" className="min-h-0 min-w-0 gap-5 overflow-hidden">
+              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="h-30 w-full py-8 max-w-full min-w-0 flex-row items-stretch gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/50 bg-muted/15 p-2 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-border/70 dark:bg-muted/20">
                 <TabsTrigger value="service" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left"><span className="flex flex-col items-start gap-0.5"><span>Atendimento</span><span className="text-[11px] font-normal text-muted-foreground">Contato inicial</span></span></TabsTrigger>
                 <TabsTrigger value="documents" disabled={stageRank < 5} className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1">{stageRank < 5 ? <LockKey className="size-3.5 text-muted-foreground" /> : null}<span className="flex flex-col items-start gap-0.5"><span>Documentos {leadDocs.length > 0 ? `(${leadDocs.length})` : ""}</span><span className="text-[11px] font-normal text-muted-foreground">Análise cadastral</span></span></TabsTrigger>
                 <TabsTrigger value="history" className="min-w-[132px] flex-none justify-start px-3 py-2 text-left md:w-full md:min-w-0 md:flex-1"><span className="flex flex-col items-start gap-0.5"><span>Histórico</span><span className="text-[11px] font-normal text-muted-foreground">Linha do tempo</span></span></TabsTrigger>

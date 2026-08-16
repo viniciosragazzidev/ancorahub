@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { AppSelect } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { bulkReassignLeadsAction } from "@/app/(dashboard)/leads/status-actions";
 
@@ -63,21 +64,18 @@ export function BulkReassignDialog({
 
           <div className="space-y-2">
             <Label htmlFor="broker-select">Corretor</Label>
-            <select
+            <AppSelect
               id="broker-select"
               name="brokerId"
               value={selectedBrokerId}
-              onChange={(e) => setSelectedBrokerId(e.target.value)}
+              onValueChange={setSelectedBrokerId}
+              placeholder="Selecione um corretor..."
               required
-              className="flex h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-            >
-              <option value="">Selecione um corretor...</option>
-              {brokers.map((broker) => (
-                <option key={broker.id} value={broker.id}>
-                  {broker.name}
-                </option>
-              ))}
-            </select>
+              options={brokers.map((broker) => ({
+                value: broker.id,
+                label: broker.name,
+              }))}
+            />
           </div>
 
           <DialogFooter>

@@ -388,7 +388,7 @@ export function LeadsWorkspace({
   return (
     <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-5">
 
-        <div className="grid gap-3 rounded-2xl border border-border/50 bg-card/70 p-1 dark:border-border/70 dark:bg-card/80 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3">
         <StatCard
           label="Sem responsável"
           value={unassignedCount}
@@ -837,8 +837,8 @@ export function LeadsWorkspace({
                     </p>
                   </div>
                 )}
-                <Tabs defaultValue="summary" className="min-h-0">
-                  <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start" variant="line">
+                <Tabs defaultValue="summary" variant="underline" className="min-h-0">
+                  <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start">
                     <TabsTrigger value="summary">Resumo</TabsTrigger>
                     {!shouldMask(selectedLead) && <TabsTrigger value="actions">Ações</TabsTrigger>}
                   </TabsList>

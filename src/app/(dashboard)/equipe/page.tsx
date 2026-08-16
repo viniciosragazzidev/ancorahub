@@ -102,7 +102,7 @@ export default async function TeamPage() {
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         branchScope,
-        sql`(${schema.tenantMemberships.role}::text <> 'broker' or ${schema.brokerProfiles.id} is null)`
+        sql`(${schema.tenantMemberships.jobTitle}::text <> 'broker' or ${schema.tenantMemberships.role}::text <> 'broker' or ${schema.brokerProfiles.id} is null)`
       )),
     getDatabase()
       .select({ count: sql<number>`count(*)::int` })

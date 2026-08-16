@@ -71,8 +71,8 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
         </p>
       </header>
 
-      <Tabs defaultValue="connection" className="w-full space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+      <Tabs defaultValue="connection" variant="segment" className="w-full space-y-6">
+        <TabsList className="max-w-md">
           <TabsTrigger value="connection">Número & Conexão</TabsTrigger>
           <TabsTrigger value="templates">Templates Meta</TabsTrigger>
           <TabsTrigger value="usages">Eventos & Usos</TabsTrigger>

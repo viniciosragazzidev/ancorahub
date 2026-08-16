@@ -142,8 +142,8 @@ export function IntegrationsTab({ integrations, branches }: Props) {
     <Card className="border-transparent bg-transparent shadow-none">
       <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Catálogo de integrações</p><p className="mt-1 text-sm text-muted-foreground">Escolha Meta, WhatsApp, fontes de site e os próximos conectores da operação.</p></div><Button render={<Link href="/integrations" />}>Abrir integrações</Button></CardContent>
     </Card>
-  <Tabs className="gap-5" defaultValue="sources">
-    <TabsList variant="line" className="w-full justify-start border-b border-border">
+  <Tabs className="gap-5" defaultValue="sources" variant="underline">
+    <TabsList className="w-full justify-start">
       <TabsTrigger value="sources"><LinkSimple /> Webhooks & Pixels</TabsTrigger>
     </TabsList>
     <TabsContent value="sources" className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">

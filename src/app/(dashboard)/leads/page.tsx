@@ -268,6 +268,7 @@ export default async function LeadsPage({
             and(
               eq(schema.tenantMemberships.tenantId, context.tenantId),
               eq(schema.tenantMemberships.role, "broker"),
+              eq(schema.tenantMemberships.jobTitle, "broker"),
               eq(schema.tenantMemberships.status, "active"),
               eq(schema.user.active, true),
               context.role === "manager" && context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : undefined
@@ -463,7 +464,7 @@ export default async function LeadsPage({
           </div>
         ) : (
           /* RCD: Directional empty state — eliminates cognitive void, guides to next action */
-          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border bg-card/40 px-6 py-14 text-center">
+          <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border px-6 py-14 text-center">
             {!isFiltered && (
               <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/15">
                 <Target className="size-7 text-primary" />

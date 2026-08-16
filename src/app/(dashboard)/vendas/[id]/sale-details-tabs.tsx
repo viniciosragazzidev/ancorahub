@@ -58,9 +58,9 @@ export function SaleDetailsTabs({ sale, schedule, canManage }: SaleDetailProps) 
   const paidCount = schedule.filter((i) => i.status === "paid").length;
 
   return (
-    <Tabs defaultValue="schedule" className="w-full space-y-6">
+    <Tabs defaultValue="schedule" variant="underline" className="w-full space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
-        <TabsList variant="line" className="h-10 p-0 bg-transparent">
+        <TabsList className="h-10 border-none">
           <TabsTrigger value="schedule" className="gap-2 px-4 py-2 text-sm">
             <CalendarBlank className="size-4" />
             Cronograma de Repasse

@@ -257,16 +257,16 @@ export function PropostasClient({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <Tabs defaultValue="todas" className="w-full">
+        <Tabs defaultValue="todas" variant="segment" className="w-full">
           <div className="flex items-center justify-between border-b border-border/40 pb-2">
-            <TabsList className="bg-muted/40 p-1 rounded-lg">
-              <TabsTrigger value="todas" className="text-xs px-3 py-1.5 rounded-md">
+            <TabsList>
+              <TabsTrigger value="todas" className="text-xs">
                 Todas ({proposals.length})
               </TabsTrigger>
-              <TabsTrigger value="abertas" className="text-xs px-3 py-1.5 rounded-md">
+              <TabsTrigger value="abertas" className="text-xs">
                 Abertas ({openProposals.length})
               </TabsTrigger>
-              <TabsTrigger value="expirando" className="text-xs px-3 py-1.5 rounded-md">
+              <TabsTrigger value="expirando" className="text-xs">
                 Expirando ({expiringProposals.length})
               </TabsTrigger>
             </TabsList>

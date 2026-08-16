@@ -43,7 +43,7 @@ export function ProfileHeader({ data }: { data: PerfilData }) {
 
   const roleName = membership.customRoleName ?? roleLabel[membership.role] ?? membership.role;
   const displayName = broker?.professionalName ?? user.name;
-  const isBroker = membership.role === "broker";
+  const isBroker = membership.role === "broker" && (membership.jobTitle === "broker" || !membership.jobTitle);
 
   return (
     <Card variant="overview" className="overflow-visible bg-card/80 shadow-2xs">

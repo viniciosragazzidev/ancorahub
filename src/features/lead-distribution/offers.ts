@@ -156,7 +156,7 @@ export async function handleLeadOfferWebhookResponse(input: {
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
     .leftJoin(schema.brokerProfiles, eq(schema.brokerProfiles.userId, schema.user.id))
-    .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.role, "broker")));
+    .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker")));
 
   const broker = allUsers.find((u) => u.phone && samePhone(u.phone, phone));
   if (!broker) return { processed: false, reason: "broker_not_found" };

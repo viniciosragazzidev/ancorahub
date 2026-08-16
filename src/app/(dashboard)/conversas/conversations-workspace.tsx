@@ -1422,7 +1422,7 @@ function ProfileSection({ action, children, title }: { action?: ReactNode; child
   return <section><div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold text-foreground">{title}</h3>{action}</div><div className="mt-2.5">{children}</div></section>;
 }
 
-function ProfileAction({ children, label, render }: { children: ReactNode; label: string; render: React.ReactElement }) {
+function ProfileAction({ children, label, render }: { children: ReactNode; label: string; render: React.ReactElement<any> }) {
   return <Button className="h-auto min-h-14 flex-col gap-1 px-2 py-2 text-[11px]" render={render} size="sm" variant="outline">{children}<span className="truncate">{label}</span></Button>;
 }
 

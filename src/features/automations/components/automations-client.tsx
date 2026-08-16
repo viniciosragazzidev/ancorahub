@@ -202,10 +202,10 @@ export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: 
         )}
       </div>
 
-      <Tabs defaultValue="automations" className="space-y-4">
-        <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-          <TabsTrigger value="automations" className="rounded-md">Regras de Automacao</TabsTrigger>
-          <TabsTrigger value="history" className="rounded-md">Fila e Historico</TabsTrigger>
+      <Tabs defaultValue="automations" variant="segment" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="automations">Regras de Automacao</TabsTrigger>
+          <TabsTrigger value="history">Fila e Historico</TabsTrigger>
         </TabsList>
 
         <TabsContent value="automations" className="space-y-4">

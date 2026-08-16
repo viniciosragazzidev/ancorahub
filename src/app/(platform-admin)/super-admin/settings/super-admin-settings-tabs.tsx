@@ -41,9 +41,9 @@ export function SuperAdminSettingsTabs({ children }: SuperAdminSettingsTabsProps
   const visibleCards = Children.toArray(children).filter((_, index) => tabForCard[index] === activeTab);
 
   return (
-    <Tabs value={activeTab} onValueChange={selectTab} className="gap-5">
+    <Tabs value={activeTab} onValueChange={selectTab} variant="underline" className="gap-5">
       <div className="sticky top-0 z-10 -mx-4 border-y border-border/70 bg-background/95 px-4 backdrop-blur-sm lg:-mx-6 lg:px-6">
-        <TabsList variant="line" aria-label="Categorias de configurações" className="max-w-full overflow-x-auto">
+        <TabsList aria-label="Categorias de configurações" className="max-w-full overflow-x-auto">
           {tabs.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id} className="shrink-0">
               {tab.label}

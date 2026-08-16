@@ -147,6 +147,7 @@ export default async function LeadDistributionPage({
           eq(schema.tenantMemberships.tenantId, context.tenantId),
           inArray(schema.tenantMemberships.branchId, branchIds),
           eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.jobTitle, "broker"),
           eq(schema.tenantMemberships.status, "active"),
           eq(schema.user.active, true),
         ),
@@ -200,6 +201,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.tenantMemberships.tenantId, context.tenantId),
           eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.jobTitle, "broker"),
           eq(schema.tenantMemberships.status, "active"),
           inArray(schema.tenantMemberships.branchId, branchIds),
         ),
@@ -403,8 +405,8 @@ export default async function LeadDistributionPage({
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        <Tabs defaultValue={view} className="w-full space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 max-w-2xl">
+        <Tabs defaultValue={view} variant="segment" className="w-full space-y-6">
+          <TabsList className="max-w-2xl w-full justify-start">
             <TabsTrigger value="filas">
               <Link href="/leads/distribuicao?view=filas" className="w-full">Central de Filas</Link>
             </TabsTrigger>

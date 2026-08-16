@@ -136,6 +136,10 @@ export async function getTeamMemberProfile(memberUserId: string) {
     id: randomUUID(), userId: context.userId, entidade: "team_member_profile", entidadeId: member.userId, acao: "team_member_profile.viewed",
   });
 
+  if (member.jobTitle !== "broker") {
+    member.brokerCode = null;
+  }
+
   return {
     member,
     metrics: {
