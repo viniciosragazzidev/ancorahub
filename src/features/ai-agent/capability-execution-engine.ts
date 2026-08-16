@@ -4,6 +4,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { AGENT_CAPABILITIES, type AgentCapabilityDefinition, type QualificationFact } from "./capability-registry";
 import { runCapabilityGuardPipeline, type GuardContext, type GuardCheckResult } from "./capability-guards";
 import { transitionConversationState } from "./conversation-state-machine";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
 export interface RequestCapabilityInput {
   capabilityKey: string;
@@ -196,17 +197,19 @@ export async function requestAgentCapability(input: RequestCapabilityInput): Pro
   }
 
   // 7. Salvar Interação e Log de Auditoria
+  const resolvedUserId = input.actorUserId || await resolveSystemUserId(input.tenantId);
+
   await db.insert(schema.leadInteractions).values({
     id: randomUUID(),
     leadId: input.leadId,
-    userId: input.actorUserId || "system",
+    userId: resolvedUserId,
     tipo: "system_alert",
     conteudo: `Capacidade [${capability.key}] ${capability.name} executada com sucesso. RiskLevel: ${capability.riskLevel}.`,
   });
 
   await db.insert(schema.auditLogs).values({
     id: randomUUID(),
-    userId: input.actorUserId || "system",
+    userId: resolvedUserId,
     entidade: "lead",
     entidadeId: input.leadId,
     acao: `capability_registry.${capability.key.toLowerCase()}`,

@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
 function normalizePhone(phone: string) {
@@ -443,9 +444,10 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         });
       }
 
+      const systemUserId = await resolveSystemUserId(offer.tenantId);
       await db.insert(schema.auditLogs).values({
         id: randomUUID(),
-        userId: "system",
+        userId: systemUserId,
         entidade: "lead_offer",
         entidadeId: offer.id,
         acao: "lead_offer_expired",

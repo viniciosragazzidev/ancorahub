@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, inArray, isNotNull, lt, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { transitionConversationState } from "./conversation-state-machine";
 
 export interface QualificationTimeoutSweepResult {
@@ -71,7 +72,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active")))
       .limit(1);
 
-    const systemUserId = anyMember?.userId || "system";
+    const systemUserId = anyMember?.userId || await resolveSystemUserId(tenant.id);
 
     for (const lead of pendingLeads) {
       timedOutLeadsCount += 1;

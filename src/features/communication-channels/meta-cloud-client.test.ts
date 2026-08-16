@@ -6,7 +6,26 @@ vi.mock("./meta-cloud-config", () => ({
   getMetaLeadAdsServerConfig: () => ({ accessToken: "platform-token", graphVersion: "v25.0" }),
 }));
 
-import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, registerMetaPhoneNumber, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
+import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, formatE164Phone, registerMetaPhoneNumber, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
+
+describe("formatE164Phone", () => {
+  it("formats Brazilian numbers for DDD >= 31 removing 9th digit (e.g., DDD 41)", () => {
+    expect(formatE164Phone("+55 41 92002-2871")).toBe("554120022871");
+    expect(formatE164Phone("5541920022871")).toBe("554120022871");
+    expect(formatE164Phone("41920022871")).toBe("554120022871");
+    expect(formatE164Phone("4120022871")).toBe("554120022871");
+  });
+
+  it("formats Brazilian numbers for DDD <= 28 keeping or adding 9th digit (e.g., DDD 11)", () => {
+    expect(formatE164Phone("+55 11 98765-4321")).toBe("5511987654321");
+    expect(formatE164Phone("551187654321")).toBe("5511987654321");
+    expect(formatE164Phone("11987654321")).toBe("5511987654321");
+  });
+
+  it("preserves international phone numbers", () => {
+    expect(formatE164Phone("+1 (415) 555-2671")).toBe("14155552671");
+  });
+});
 
 describe("Meta Cloud template payload", () => {
   it("registers the selected phone server-side without exposing the two-step PIN", async () => {

@@ -15,6 +15,7 @@ import {
   createDefaultGuardrailPipeline,
   runGuardrailPipeline,
 } from "./guardrails";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -85,6 +86,7 @@ export async function handleInitialMessageFailure({
   try {
     const db = getDatabase();
     const now = new Date();
+    const systemUserId = await resolveSystemUserId(tenantId);
 
     if (conversationId) {
       await db
@@ -132,7 +134,7 @@ export async function handleInitialMessageFailure({
       .values({
         id: randomUUID(),
         leadId,
-        userId: "system",
+        userId: systemUserId,
         tipo: "note",
         conteudo: "⚠️ Falha no envio da mensagem via WhatsApp pelo bot virtual. O atendimento da IA foi encerrado automaticamente, o lead foi desqualificado e transferido para a fila de distribuição geral.",
         createdAt: now,
@@ -143,7 +145,7 @@ export async function handleInitialMessageFailure({
       .insert(schema.auditLogs)
       .values({
         id: randomUUID(),
-        userId: "system",
+        userId: systemUserId,
         entidade: "lead",
         entidadeId: leadId,
         acao: `lead.initial_message_failed_distributed:${reason}`,

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { transitionConversationState } from "./conversation-state-machine";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { INITIAL_AGENT_TRIGGERS } from "./trigger-registry";
 
 /**
@@ -92,10 +93,12 @@ export async function executeAgentTrigger(params: {
   }
 
   // Registrar interação no histórico do lead (registro permanente para deduplicação)
+  const resolvedUserId = params.actorUserId || await resolveSystemUserId(params.tenantId);
+
   await db.insert(schema.leadInteractions).values({
     id: randomUUID(),
     leadId: params.leadId,
-    userId: params.actorUserId || "system",
+    userId: resolvedUserId,
     tipo: "system_alert",
     conteudo: `Gatilho [${triggerDef.key}] executado com sucesso: ${triggerDef.name}.`,
   });
@@ -103,7 +106,7 @@ export async function executeAgentTrigger(params: {
   // Registrar log de auditoria
   await db.insert(schema.auditLogs).values({
     id: randomUUID(),
-    userId: params.actorUserId || "system",
+    userId: resolvedUserId,
     entidade: "lead",
     entidadeId: params.leadId,
     acao: `agent_trigger.${triggerDef.key.toLowerCase()}`,

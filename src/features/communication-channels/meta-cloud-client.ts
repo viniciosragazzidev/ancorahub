@@ -204,12 +204,48 @@ export async function subscribePageToLeadgen(pageId: string, pageAccessToken?: s
 
 }
 
+/**
+ * Formats phone numbers for Meta WhatsApp Business Cloud API.
+ * 
+ * Rules for Brazil (country code 55):
+ * Meta's WhatsApp Cloud API directory registers Brazilian mobile numbers according to area code (DDD):
+ * - DDDs 11 to 28: Requires 13 digits (55 + DDD + 9 + 8 digits).
+ *   If a 12-digit number is provided (55 + DDD + 8 digits), insert the 9th digit '9'.
+ * - DDDs 31 to 99 (e.g., DDD 41 PR): Meta Cloud API expects 12 digits (55 + DDD + 8 digits).
+ *   If a 13-digit number is provided (55 + DDD + 9 + 8 digits), remove the 9th digit '9'.
+ */
 export function formatE164Phone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
+  const trimmed = phone.trim();
+  let digits = phone.replace(/\D/g, "");
   if (!digits) return "";
-  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
-    return `55${digits}`;
+
+  if (trimmed.startsWith("+") && !trimmed.startsWith("+55")) {
+    return digits;
   }
+
+  if ((digits.length === 10 || digits.length === 11) && !digits.startsWith("55")) {
+    const ddd = parseInt(digits.slice(0, 2), 10);
+    const thirdDigit = digits[2];
+    if (ddd >= 11 && ddd <= 99 && (digits.length === 10 || thirdDigit === "9")) {
+      digits = `55${digits}`;
+    }
+  }
+
+  if (digits.startsWith("55")) {
+    if (digits.length === 13) {
+      const ddd = parseInt(digits.slice(2, 4), 10);
+      const fifthDigit = digits[4];
+      if (ddd >= 31 && fifthDigit === "9") {
+        return `${digits.slice(0, 4)}${digits.slice(5)}`;
+      }
+    } else if (digits.length === 12) {
+      const ddd = parseInt(digits.slice(2, 4), 10);
+      if (ddd >= 11 && ddd <= 28) {
+        return `${digits.slice(0, 4)}9${digits.slice(4)}`;
+      }
+    }
+  }
+
   return digits;
 }
 
