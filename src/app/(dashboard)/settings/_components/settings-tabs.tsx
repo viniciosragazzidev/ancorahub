@@ -37,13 +37,11 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
   useEffect(() => {
     if (effectiveRequested && tabs.some((tab) => tab.id === effectiveRequested)) {
       setActive(effectiveRequested);
-    } else {
-      setActive(tabs[0]?.id ?? "conta");
     }
-  }, [effectiveRequested, tabs]);
+  }, [effectiveRequested]);
 
   useEffect(() => {
-    if (isPasskeyRequested || window.location.hash === "#passkey-section") {
+    if (isPasskeyRequested || (typeof window !== "undefined" && window.location.hash === "#passkey-section")) {
       const el = document.getElementById("passkey-section");
       if (el) {
         setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 100);
@@ -58,7 +56,6 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
       params.set("tab", tabId);
       const newUrl = `${pathname}?${params.toString()}`;
       window.history.replaceState(null, "", newUrl);
-      router.replace(newUrl, { scroll: false });
     } catch (e) {
       // Fallback
     }

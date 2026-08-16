@@ -281,7 +281,6 @@ export function QualificationHubClient({
       params.set("tab", tabId);
       const newUrl = `${pathname}?${params.toString()}`;
       window.history.replaceState(null, "", newUrl);
-      router.replace(newUrl, { scroll: false });
     } catch (e) {
       // Fallback
     }
