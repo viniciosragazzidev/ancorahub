@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
-import { MetaCloudApiError } from "./meta-cloud-client";
+import { formatE164Phone, MetaCloudApiError } from "./meta-cloud-client";
 
 export type MetaTemplateHeaderType = "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
 export type MetaTemplateCategory = "UTILITY" | "MARKETING" | "AUTHENTICATION";
@@ -129,7 +129,7 @@ export async function sendMetaCloudTemplateTest(
   const payload = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: destinationPhone,
+    to: formatE164Phone(destinationPhone),
     type: "template",
     template: {
       name: templateName,
