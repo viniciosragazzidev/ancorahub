@@ -166,7 +166,7 @@ export function AnimatedBadge({
       ) : null}
       {showIcon ? (
         <span className="relative z-10 inline-flex items-center justify-center overflow-hidden shrink-0">
-          <AnimatePresence mode="popLayout" initial={false}>
+          <AnimatePresence mode="sync" initial={false}>
             <motion.span
               key={status}
               aria-hidden
@@ -194,7 +194,7 @@ export function AnimatedBadge({
       ) : null}
       {children != null ? (
         <span className="relative z-10 inline-flex overflow-hidden">
-          <AnimatePresence mode="popLayout" initial={false}>
+          <AnimatePresence mode="sync" initial={false}>
             <motion.span
               key={resolvedContentKey}
               data-badge-label

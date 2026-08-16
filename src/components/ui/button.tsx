@@ -42,7 +42,10 @@ export interface ButtonProps extends MotionButtonProps, ButtonVariants {
 // ---------------------------------------------------------------------------
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  {
+  props,
+  ref,
+) {
+  const {
     className,
     variant = "default",
     size = "default",
@@ -52,42 +55,53 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     whileTap,
     whileHover,
     transition,
-    ...props
-  },
-  ref,
-) {
+    children,
+    ...restProps
+  } = props;
+
   const reduce = useReducedMotion();
 
   if (render && React.isValidElement(render)) {
     const element = render as React.ReactElement<{
       className?: string;
+      children?: React.ReactNode;
       [key: string]: unknown;
     }>;
-    const merged = cn(
+    const mergedClassName = cn(
       buttonVariants({ variant, size }),
       className,
       element.props.className,
     );
-    const MotionSlot = typeof motion.create === "function" ? motion.create(Slot) : typeof motion === "function" ? (motion as unknown as (c: typeof Slot) => typeof Slot)(Slot) : Slot;
+    const elementChildren = element.props.children ?? children;
+    const MotionSlot =
+      typeof motion.create === "function"
+        ? motion.create(Slot)
+        : typeof motion === "function"
+          ? (motion as unknown as (c: typeof Slot) => typeof Slot)(Slot)
+          : Slot;
+
     return (
       <MotionSlot
         ref={ref}
         data-slot="button"
-        className={merged}
+        className={mergedClassName}
         whileTap={reduce ? undefined : { scale: pressScale }}
         whileHover={reduce ? undefined : { y: -1 }}
         transition={pressTransition}
-        {...(props as Record<string, unknown>)}
+        {...(restProps as Record<string, unknown>)}
       >
-        {React.cloneElement(element, {
-          className: undefined,
-        })}
+        {React.cloneElement(element, { className: undefined }, elementChildren)}
       </MotionSlot>
     );
   }
 
   if (asChild) {
-    const MotionSlot = typeof motion.create === "function" ? motion.create(Slot) : typeof motion === "function" ? (motion as unknown as (c: typeof Slot) => typeof Slot)(Slot) : Slot;
+    const MotionSlot =
+      typeof motion.create === "function"
+        ? motion.create(Slot)
+        : typeof motion === "function"
+          ? (motion as unknown as (c: typeof Slot) => typeof Slot)(Slot)
+          : Slot;
     return (
       <MotionSlot
         ref={ref}
@@ -96,8 +110,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         whileTap={reduce ? undefined : { scale: pressScale }}
         whileHover={reduce ? undefined : { y: -1 }}
         transition={pressTransition}
-        {...(props as Record<string, unknown>)}
-      />
+        {...(restProps as Record<string, unknown>)}
+      >
+        {children}
+      </MotionSlot>
     );
   }
 
@@ -105,14 +121,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     <motion.button
       ref={ref}
       data-slot="button"
-      type={(props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ?? "button"}
+      type={(restProps as React.ButtonHTMLAttributes<HTMLButtonElement>).type ?? "button"}
       className={cn(buttonVariants({ variant, size }), className)}
       whileTap={reduce ? undefined : { scale: pressScale }}
       whileHover={reduce ? undefined : { y: -1 }}
       transition={pressTransition}
-      {...props}
-    />
+      {...(restProps as Record<string, unknown>)}
+    >
+      {children}
+    </motion.button>
   );
 });
+
+Button.displayName = "Button";
 
 export { Button, buttonVariants };

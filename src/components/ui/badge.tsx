@@ -57,19 +57,20 @@ function Badge({
   status: explicitStatus,
   size = "sm",
   children,
-  showIcon = true,
+  showIcon,
   pulse,
   icon,
   render,
   ...props
 }: BadgeProps) {
   const status = explicitStatus ?? VARIANT_STATUS_MAP[variant ?? "default"] ?? "neutral";
+  const resolvedShowIcon = showIcon ?? (explicitStatus != null || icon != null);
 
   return (
     <AnimatedBadge
       status={status}
       size={size}
-      showIcon={showIcon}
+      showIcon={resolvedShowIcon}
       pulse={pulse}
       icon={icon}
       className={cn("whitespace-nowrap font-medium", className)}
