@@ -74,54 +74,28 @@ const ICONS: Record<AnimatedBadgeStatus, LucideIcon> = {
 
 const ICON_ROLL_VARIANTS: Variants = {
   initial: {
-    opacity: 0.72,
-    y: "80%",
+    opacity: 0,
     scale: 0.92,
-    rotate: -8,
-    filter: "blur(6px)",
   },
   animate: {
     opacity: 1,
-    y: "0%",
     scale: 1,
-    rotate: 0,
-    filter: "blur(0px)",
-    transition: {
-      y: { type: "spring", stiffness: 210, damping: 24, mass: 0.85 },
-      scale: { type: "spring", stiffness: 250, damping: 24, mass: 0.75 },
-      rotate: { duration: 0.28, ease: EASE_OUT },
-      opacity: { duration: 0.28, ease: EASE_OUT },
-      filter: { duration: 0.42, ease: EASE_OUT },
-    },
+    transition: { duration: 0.2, ease: EASE_OUT },
   },
   exit: {
-    opacity: 0.5,
-    y: "-80%",
-    scale: 0.96,
-    rotate: 8,
-    filter: "blur(6px)",
-    transition: { duration: 0.22, ease: EASE_OUT },
+    opacity: 0,
+    scale: 0.92,
+    transition: { duration: 0.15, ease: EASE_OUT },
   },
 };
 
 const TEXT_ROLL_VARIANTS: Variants = {
-  initial: { opacity: 0.76, y: "85%", filter: "blur(6px)" },
+  initial: { opacity: 0 },
   animate: {
     opacity: 1,
-    y: "0%",
-    filter: "blur(0px)",
-    transition: {
-      y: { type: "spring", stiffness: 210, damping: 24, mass: 0.85 },
-      opacity: { duration: 0.3, ease: EASE_OUT },
-      filter: { duration: 0.42, ease: EASE_OUT },
-    },
-  },
-  exit: {
-    opacity: 0.5,
-    y: "-85%",
-    filter: "blur(6px)",
     transition: { duration: 0.2, ease: EASE_OUT },
   },
+  exit: { opacity: 0, transition: { duration: 0.15, ease: EASE_OUT } },
 };
 
 export function AnimatedBadge({
@@ -148,7 +122,7 @@ export function AnimatedBadge({
       layout
       transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.7 }}
       className={cn(
-        "relative inline-flex shrink-0 items-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums select-none",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums select-none",
         "transition-colors duration-300",
         STATUS_CLASS[status],
         SIZE_CLASS[size],
@@ -202,7 +176,7 @@ export function AnimatedBadge({
               initial={reduce ? false : "initial"}
               animate={reduce ? { opacity: 1 } : "animate"}
               exit={reduce ? undefined : "exit"}
-              className="inline-block will-change-transform"
+              className="inline-flex items-center gap-1.5 will-change-transform"
             >
               {children}
             </motion.span>

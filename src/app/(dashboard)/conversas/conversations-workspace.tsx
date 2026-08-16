@@ -221,44 +221,42 @@ export function ConversationsWorkspace({
       className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
     >
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-5">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight">Atendimentos</h2>
-              <Badge className="tabular-nums" variant="secondary">
-                {conversations.length}
-              </Badge>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-sm font-semibold tracking-tight">Atendimentos</h2>
+            <Badge className="tabular-nums" variant="secondary">
+              {conversations.length}
+            </Badge>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {role === "director" && branches.length > 0 ? (
+              <Select
+                labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
+                onValueChange={(value) => setBranchFilter(value ?? "all")}
+                value={branchFilter}
+              >
+                <SelectTrigger aria-label="Filtrar atendimentos por unidade" className="w-auto min-w-[150px]" size="sm">
+                  <SelectValue placeholder="Todas as unidades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as unidades</SelectItem>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
+            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
+              <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
+              <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
+              <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
+              <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">Histórico e contexto de cada lead no seu escopo.</p>
           </div>
-
-          {role === "director" && branches.length > 0 ? (
-            <Select
-              labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
-              onValueChange={(value) => setBranchFilter(value ?? "all")}
-              value={branchFilter}
-            >
-              <SelectTrigger aria-label="Filtrar atendimentos por unidade" className="ml-auto w-full sm:ml-0 sm:w-52" size="sm">
-                <SelectValue placeholder="Todas as unidades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as unidades</SelectItem>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-
-          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
-            <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
-            <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
-            <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
-            <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
-          </div>
-
         </div>
       </header>
 

@@ -406,19 +406,11 @@ export default async function LeadDistributionPage({
       <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <Tabs defaultValue={view} variant="segment" className="w-full space-y-6">
-          <TabsList className="max-w-2xl w-full justify-start">
-            <TabsTrigger value="filas">
-              <Link href="/leads/distribuicao?view=filas" className="w-full">Central de Filas</Link>
-            </TabsTrigger>
-            <TabsTrigger value="operar">
-              <Link href="/leads/distribuicao?view=operar" className="w-full">Operar Fila</Link>
-            </TabsTrigger>
-            <TabsTrigger value="plantao">
-              <Link href="/leads/distribuicao?view=plantao" className="w-full">Plantão & Equipe</Link>
-            </TabsTrigger>
-            <TabsTrigger value="saude_historico">
-              <Link href="/leads/distribuicao?view=saude_historico" className="w-full">Saúde & Histórico</Link>
-            </TabsTrigger>
+          <TabsList className="max-w-2xl w-full justify-start overflow-x-auto">
+            <TabsTrigger value="filas">Central de Filas</TabsTrigger>
+            <TabsTrigger value="operar">Operar Fila</TabsTrigger>
+            <TabsTrigger value="plantao">Plantão & Equipe</TabsTrigger>
+            <TabsTrigger value="saude_historico">Saúde & Histórico</TabsTrigger>
           </TabsList>
 
           {/* ABA 1: CENTRAL DE FILAS */}
