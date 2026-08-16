@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, type ReactNode, useMemo } from "react";
+import { Children, type ReactNode, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,15 +27,31 @@ export function SuperAdminSettingsTabs({ children }: SuperAdminSettingsTabsProps
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = useMemo<SettingsTab>(() => {
-    const requested = searchParams.get("tab");
-    return tabs.some((tab) => tab.id === requested) ? (requested as SettingsTab) : "platform";
-  }, [searchParams]);
+
+  const requested = searchParams.get("tab");
+  const defaultTab = tabs.some((tab) => tab.id === requested) ? (requested as SettingsTab) : "platform";
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(defaultTab);
+
+  useEffect(() => {
+    if (requested && tabs.some((tab) => tab.id === requested)) {
+      setActiveTab(requested as SettingsTab);
+    } else {
+      setActiveTab("platform");
+    }
+  }, [requested]);
 
   function selectTab(tab: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tab);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setActiveTab(tab as SettingsTab);
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tab);
+      const newUrl = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+      router.replace(newUrl, { scroll: false });
+    } catch (e) {
+      // Fallback
+    }
   }
 
   const visibleCards = Children.toArray(children).filter((_, index) => tabForCard[index] === activeTab);

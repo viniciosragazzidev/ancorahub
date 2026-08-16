@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Building06Icon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
@@ -23,11 +23,24 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
     { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },
     { id: "extensao", label: "Extensão", icon: PuzzleIcon },
   ];
-  const tabs = allTabs.filter((tab) => tabIds.includes(tab.id));
+  const tabs = useMemo(() => {
+    return allTabs.filter((tab) => tabIds.includes(tab.id));
+  }, [tabIds, allTabs]);
+
   const requested = searchParams.get("tab") as string | null;
   const isPasskeyRequested = requested === "passkey";
   const effectiveRequested = isPasskeyRequested ? "seguranca" : (requested as TabId | null);
-  const active = tabs.some((tab) => tab.id === effectiveRequested) ? effectiveRequested! : tabs[0]?.id ?? "conta";
+  const defaultTab = tabs.some((tab) => tab.id === effectiveRequested) ? effectiveRequested! : tabs[0]?.id ?? "conta";
+
+  const [active, setActive] = useState<TabId>(defaultTab);
+
+  useEffect(() => {
+    if (effectiveRequested && tabs.some((tab) => tab.id === effectiveRequested)) {
+      setActive(effectiveRequested);
+    } else {
+      setActive(tabs[0]?.id ?? "conta");
+    }
+  }, [effectiveRequested, tabs]);
 
   useEffect(() => {
     if (isPasskeyRequested || window.location.hash === "#passkey-section") {
@@ -39,9 +52,16 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
   }, [isPasskeyRequested]);
 
   function selectTab(tabId: TabId) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", tabId);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setActive(tabId);
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tabId);
+      const newUrl = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+      router.replace(newUrl, { scroll: false });
+    } catch (e) {
+      // Fallback
+    }
   }
 
   return (

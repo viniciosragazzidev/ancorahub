@@ -14,16 +14,18 @@ export async function NextUrgentLeadButton() {
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger>
-          <Button
-            render={<Link href={`/leads/${urgentLead.id}`} />}
-            size="sm"
-            className="gap-1.5 border border-amber-500/20 bg-amber-500/10 text-[11px] font-semibold uppercase text-amber-700 transition-[background-color,border-color,color] hover:border-amber-500/40 hover:bg-amber-500/15 dark:text-amber-400"
-          >
-            <Lightning className="size-4 shrink-0 text-amber-500" />
-            <span className="truncate tracking-wide">Próximo lead</span>
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              render={<Link href={`/leads/${urgentLead.id}`} />}
+              size="sm"
+              className="shrink-0 gap-1.5 border border-amber-500/25 bg-amber-500/10 text-[11px] font-semibold uppercase text-amber-700 hover:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30"
+            >
+              <Lightning className="size-3.5 shrink-0 text-amber-500" />
+              <span className="truncate tracking-wide">Próximo lead</span>
+            </Button>
+          }
+        />
         <TooltipContent side="bottom" className="text-xs">
           <p className="font-semibold">{urgentLead.nome}</p>
           <p className="text-[11px] text-muted-foreground">{urgentLead.urgentReason}</p>

@@ -10,7 +10,8 @@ import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, Me
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -48,7 +49,6 @@ import {
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import { cn } from "@/lib/utils";
 import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen } from "lucide-react";
 import {
   takeoverConversationAction,
@@ -221,22 +221,25 @@ export function ConversationsWorkspace({
       className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
     >
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <h2 className="text-sm font-semibold tracking-tight">Atendimentos</h2>
-            <Badge className="tabular-nums" variant="secondary">
-              {conversations.length}
-            </Badge>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold tracking-tight">Atendimentos</h2>
+              <Badge className="tabular-nums" variant="secondary">
+                {conversations.length}
+              </Badge>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">Histórico e contexto de cada lead no seu escopo.</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 lg:gap-3 shrink-0">
             {role === "director" && branches.length > 0 ? (
               <Select
                 labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
                 onValueChange={(value) => setBranchFilter(value ?? "all")}
                 value={branchFilter}
               >
-                <SelectTrigger aria-label="Filtrar atendimentos por unidade" className="w-auto min-w-[150px]" size="sm">
+                <SelectTrigger aria-label="Filtrar atendimentos por unidade" className="w-auto min-w-[150px] shrink-0" size="sm">
                   <SelectValue placeholder="Todas as unidades" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,7 +253,7 @@ export function ConversationsWorkspace({
               </Select>
             ) : null}
 
-            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar shrink-0">
               <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
               <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
               <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
@@ -467,136 +470,148 @@ function ConversationHeader({
   }
 
   return (
-    <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-3 flex-1 min-w-[200px]">
-        <Button aria-label="Voltar para atendimentos" className="lg:hidden shrink-0" onClick={onBack} size="icon-sm" type="button" variant="ghost">
-          <ArrowLeft className="size-3.5" />
-        </Button>
-        <ContactAvatar name={client.nome} className="shrink-0" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-sm font-semibold tracking-tight text-foreground truncate max-w-[220px] sm:max-w-xs">{client.nome}</h2>
-            <Badge className="hidden shrink-0 sm:inline-flex" variant="outline">
-              {LEAD_STATUS_LABELS[client.status] ?? client.status}
-            </Badge>
-            {isAiActive ? (
-              <Badge className="bg-primary/10 text-primary border-primary/25 shrink-0" variant="outline">
-                Atendente Virtual
+    <header className="shrink-0 border-b border-border bg-card px-4 py-2.5 sm:px-5">
+      <div className="flex items-center justify-between gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <Button aria-label="Voltar para atendimentos" className="lg:hidden shrink-0" onClick={onBack} size="icon-sm" type="button" variant="ghost">
+            <ArrowLeft className="size-3.5" />
+          </Button>
+          <ContactAvatar name={client.nome} className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-sm font-semibold tracking-tight text-foreground truncate" title={client.nome}>{client.nome}</h2>
+              <Badge className="hidden shrink-0 md:inline-flex" variant="outline">
+                {LEAD_STATUS_LABELS[client.status] ?? client.status}
               </Badge>
-            ) : isWaitingHuman ? (
-              <Badge className="bg-warning/15 text-warning border-warning/30 font-semibold shrink-0" variant="outline">
-                Aguardando Humano
-              </Badge>
-            ) : isHumanActive ? (
-              <Badge className="bg-success/15 text-success border-success/30 font-semibold shrink-0" variant="outline">
-                Atendimento Humano
-              </Badge>
-            ) : null}
+              {isAiActive ? (
+                <Badge className="hidden shrink-0 bg-primary/10 text-primary border-primary/25 sm:inline-flex" variant="outline">
+                  Atendente Virtual
+                </Badge>
+              ) : isWaitingHuman ? (
+                <Badge className="hidden shrink-0 bg-warning/15 text-warning border-warning/30 font-semibold sm:inline-flex" variant="outline">
+                  Aguardando Humano
+                </Badge>
+              ) : isHumanActive ? (
+                <Badge className="hidden shrink-0 bg-success/15 text-success border-success/30 font-semibold sm:inline-flex" variant="outline">
+                  Atendimento Humano
+                </Badge>
+              ) : null}
+            </div>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
           </div>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
         </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
-        <Button
-          className="h-8 text-xs font-semibold gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
-          disabled={isPending}
-          onClick={handleResumeAi}
-          size="sm"
-          type="button"
-        >
-          <Sparkles className="size-3.5" />
-          Continuar Atendimento IA
-        </Button>
 
-        <Tooltip>
-          <TooltipTrigger
-            render={
+        <div className="flex items-center gap-1.5 shrink-0 sm:gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button
+              className="h-8 px-2.5 text-xs font-semibold gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 shrink-0"
+              disabled={isPending}
+              onClick={handleResumeAi}
+              size="sm"
+              type="button"
+            >
+              <Sparkles className="size-3.5" />
+              <span className="hidden md:inline">Continuar Atendimento IA</span>
+              <span className="md:hidden">Retomar IA</span>
+            </Button>
+
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label="Sincronizar chat deste lead"
+                    disabled={isPending}
+                    onClick={handleSyncChat}
+                    size="icon-sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <RefreshCw className={cn("size-3.5", isPending && "animate-spin")} />
+                  </Button>
+                }
+              />
+              <TooltipContent>Sincronizar todo o chat</TooltipContent>
+            </Tooltip>
+
+            {role === "director" && client.aiConversation?.id && (
               <Button
-                aria-label="Sincronizar chat deste lead"
+                className="hidden xl:inline-flex h-8 text-xs font-semibold gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 shrink-0"
                 disabled={isPending}
-                onClick={handleSyncChat}
-                size="icon-sm"
-                type="button"
+                onClick={handleResetChat}
+                size="sm"
                 variant="outline"
               >
-                <RefreshCw className={cn("size-3.5", isPending && "animate-spin")} />
+                Resetar Chat IA
               </Button>
-            }
-          />
-          <TooltipContent>Sincronizar todo o chat</TooltipContent>
-        </Tooltip>
+            )}
 
-        {role === "director" && client.aiConversation?.id && (
-          <Button
-            className="h-8 text-xs font-semibold gap-1.5 border-destructive text-destructive hover:bg-destructive/10"
-            disabled={isPending}
-            onClick={handleResetChat}
-            size="sm"
-            variant="outline"
-          >
-            Resetar Chat IA
-          </Button>
-        )}
-        {client.aiConversation?.id && (
-          isHumanActive ? (
-            !isAssignedToMe && (role === "director" || role === "manager") ? (
-              <Button
-                className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
-                disabled={isPending}
-                onClick={handleTakeover}
-                size="sm"
-              >
-                Assumir e pausar automação
-              </Button>
-            ) : null
-          ) : (
-            <Button
-              className="h-8 text-xs font-semibold gap-1.5 bg-primary/90 text-primary-foreground hover:bg-primary"
-              disabled={isPending}
-              onClick={handleTakeover}
-              size="sm"
-            >
-              Assumir e pausar automação
-            </Button>
-          )
-        )}
-        <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Ligar para cliente" render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} />} size="icon-sm" variant="ghost"><Phone className="size-3.5" /></Button>} />
-          <TooltipContent>Ligar</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir WhatsApp do cliente" render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" />} size="icon-sm" variant="ghost"><WhatsappLogo className="size-3.5" /></Button>} />
-          <TooltipContent>Abrir WhatsApp</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir perfil do atendimento" className="lg:hidden" onClick={onOpenProfile} size="icon-sm" type="button" variant="ghost"><UserList className="size-3.5" /></Button>} />
-          <TooltipContent>Ver perfil</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger render={<Button aria-label="Abrir lead completo" render={<Link href={`/leads/${client.id}`} />} size="icon-sm" variant="ghost"><ArrowSquareOut className="size-3.5" /></Button>} />
-          <TooltipContent>Abrir lead</TooltipContent>
-        </Tooltip>
-        <div className="ml-1 hidden border-l border-border pl-2 lg:block">
-          <Tooltip>
-            <TooltipTrigger
-              render={
+            {client.aiConversation?.id && (
+              isHumanActive ? (
+                !isAssignedToMe && (role === "director" || role === "manager") ? (
+                  <Button
+                    className="h-8 px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                    disabled={isPending}
+                    onClick={handleTakeover}
+                    size="sm"
+                  >
+                    <span className="hidden lg:inline">Assumir e pausar automação</span>
+                    <span className="lg:hidden">Assumir</span>
+                  </Button>
+                ) : null
+              ) : (
                 <Button
-                  aria-label={profileOpen ? "Recolher painel lateral" : "Expandir painel lateral"}
-                  onClick={onToggleProfile}
-                  size="icon-sm"
-                  type="button"
-                  variant="ghost"
+                  className="h-8 px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                  disabled={isPending}
+                  onClick={handleTakeover}
+                  size="sm"
                 >
-                  {profileOpen ? (
-                    <PanelRightClose className="size-4 text-muted-foreground hover:text-foreground" />
-                  ) : (
-                    <PanelRightOpen className="size-4 text-muted-foreground hover:text-foreground" />
-                  )}
+                  <span className="hidden lg:inline">Assumir e pausar automação</span>
+                  <span className="lg:hidden">Assumir</span>
                 </Button>
-              }
-            />
-            <TooltipContent>{profileOpen ? "Recolher painel" : "Expandir painel"}</TooltipContent>
-          </Tooltip>
+              )
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 border-l border-border/60 pl-1.5 sm:pl-2">
+            <Tooltip>
+              <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))} />} />
+              <TooltipContent>Ligar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" aria-label="Abrir WhatsApp do cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><WhatsappLogo className="size-3.5" /></a>} />
+              <TooltipContent>Abrir WhatsApp</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger render={<Button aria-label="Abrir perfil do atendimento" className="lg:hidden" onClick={onOpenProfile} size="icon-sm" type="button" variant="ghost"><UserList className="size-3.5" /></Button>} />
+              <TooltipContent>Ver perfil</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger render={<Link href={`/leads/${client.id}`} aria-label="Abrir lead completo" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><ArrowSquareOut className="size-3.5" /></Link>} />
+              <TooltipContent>Abrir lead</TooltipContent>
+            </Tooltip>
+            <div className="hidden border-l border-border/60 pl-1 lg:block">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label={profileOpen ? "Recolher painel lateral" : "Expandir painel lateral"}
+                      onClick={onToggleProfile}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {profileOpen ? (
+                        <PanelRightClose className="size-4 text-muted-foreground hover:text-foreground" />
+                      ) : (
+                        <PanelRightOpen className="size-4 text-muted-foreground hover:text-foreground" />
+                      )}
+                    </Button>
+                  }
+                />
+                <TooltipContent>{profileOpen ? "Recolher painel" : "Expandir painel"}</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
         </div>
       </div>
     </header>
