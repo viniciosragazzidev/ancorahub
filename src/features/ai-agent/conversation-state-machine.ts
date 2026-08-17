@@ -435,17 +435,22 @@ export async function startQualificationConversationForLead(
 
   const memory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
 
-  // CHECK IF THE LEAD ALREADY HAS ASSISTANT MESSAGES IN WHATSAPP MESSAGES HISTORY
+  // CHECK IF THE LEAD ALREADY HAS ASSISTANT MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE
   const [existingAssistantMsg] = await db
     .select({ id: schema.whatsappMessages.id })
     .from(schema.whatsappMessages)
     .where(
       and(
         eq(schema.whatsappMessages.tenantId, input.tenantId),
-        eq(schema.whatsappMessages.leadId, input.leadId),
+        or(
+          eq(schema.whatsappMessages.leadId, input.leadId),
+          eq(schema.whatsappMessages.conversationId, conversation.id),
+          eq(schema.whatsappMessages.phone, lead.telefone)
+        ),
         or(
           eq(schema.whatsappMessages.senderRole, "assistant"),
           eq(schema.whatsappMessages.senderRole, "system"),
+          eq(schema.whatsappMessages.senderRole, "agent"),
           eq(schema.whatsappMessages.direction, "outbound"),
           eq(schema.whatsappMessages.direction, "outgoing")
         )
@@ -453,7 +458,12 @@ export async function startQualificationConversationForLead(
     )
     .limit(1);
 
-  if (existingAssistantMsg) {
+  const isExistingConversation = Boolean(existingAssistantMsg)
+    || conversation.status !== "NEW"
+    || Boolean(conversation.lastProcessedMessageId)
+    || Boolean(conversation.startedAt && Date.now() - conversation.startedAt.getTime() > 1000);
+
+  if (isExistingConversation) {
     // Reactivate AI state
     await db.update(schema.aiConversations).set({
       status: "WAITING_CUSTOMER",
@@ -476,7 +486,11 @@ export async function startQualificationConversationForLead(
       .where(
         and(
           eq(schema.whatsappMessages.tenantId, input.tenantId),
-          eq(schema.whatsappMessages.leadId, input.leadId),
+          or(
+            eq(schema.whatsappMessages.leadId, input.leadId),
+            eq(schema.whatsappMessages.conversationId, conversation.id),
+            eq(schema.whatsappMessages.phone, lead.telefone)
+          ),
           or(
             eq(schema.whatsappMessages.direction, "incoming"),
             eq(schema.whatsappMessages.direction, "inbound")
@@ -495,10 +509,15 @@ export async function startQualificationConversationForLead(
       .where(
         and(
           eq(schema.whatsappMessages.tenantId, input.tenantId),
-          eq(schema.whatsappMessages.leadId, input.leadId),
+          or(
+            eq(schema.whatsappMessages.leadId, input.leadId),
+            eq(schema.whatsappMessages.conversationId, conversation.id),
+            eq(schema.whatsappMessages.phone, lead.telefone)
+          ),
           or(
             eq(schema.whatsappMessages.senderRole, "assistant"),
             eq(schema.whatsappMessages.senderRole, "system"),
+            eq(schema.whatsappMessages.senderRole, "agent"),
             eq(schema.whatsappMessages.direction, "outbound"),
             eq(schema.whatsappMessages.direction, "outgoing")
           )
@@ -533,7 +552,11 @@ export async function startQualificationConversationForLead(
         .where(
           and(
             eq(schema.whatsappMessages.tenantId, input.tenantId),
-            eq(schema.whatsappMessages.leadId, input.leadId),
+            or(
+              eq(schema.whatsappMessages.leadId, input.leadId),
+              eq(schema.whatsappMessages.conversationId, conversation.id),
+              eq(schema.whatsappMessages.phone, lead.telefone)
+            ),
             or(
               eq(schema.whatsappMessages.direction, "incoming"),
               eq(schema.whatsappMessages.direction, "inbound")
