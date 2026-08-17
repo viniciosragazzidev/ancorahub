@@ -641,36 +641,56 @@ export async function startQualificationConversationForLead(
     const credentials = await resolveMetaChannelCredentials(input.tenantId);
 
     if (credentials.phoneNumberId && credentials.accessToken) {
-      const [template] = await db
+      const [firstContactTemplate] = await db
         .select()
         .from(schema.metaWhatsAppTemplates)
         .where(
           and(
             eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
+            eq(schema.metaWhatsAppTemplates.name, "lead_first_contact"),
             eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
             isNull(schema.metaWhatsAppTemplates.deletedAt)
           )
         )
         .limit(1);
 
+      const template = firstContactTemplate ?? (
+        await db
+          .select()
+          .from(schema.metaWhatsAppTemplates)
+          .where(
+            and(
+              eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
+              eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+              isNull(schema.metaWhatsAppTemplates.deletedAt)
+            )
+          )
+          .limit(1)
+      )[0];
+
       if (template) {
         const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
         const namedParams = bodyComp?.example?.body_text_named_params;
-        const components = [
-          {
-            type: "body",
-            parameters:
-              namedParams && namedParams.length > 0
-                ? [
-                    { type: "text", parameter_name: "nome", text: lead.nome || "Cliente" },
-                    { type: "text", parameter_name: "empresa", text: "Âncora Saúde" },
-                  ]
-                : [
-                    { type: "text", text: lead.nome || "Cliente" },
-                    { type: "text", text: "Âncora Saúde" },
-                  ],
-          },
-        ];
+        let parameters: any[] = [];
+        if (namedParams && namedParams.length > 0) {
+          parameters = namedParams.map((p: any) => {
+            const pName = p.param_name || p.parameter_name;
+            if (pName === "nome_bot" || pName === "bot_name") {
+              return { type: "text", parameter_name: pName, text: "Assistente Âncora Saúde" };
+            }
+            if (pName === "empresa" || pName === "company") {
+              return { type: "text", parameter_name: pName, text: "Âncora Saúde" };
+            }
+            return { type: "text", parameter_name: pName || "nome", text: lead.nome || "Cliente" };
+          });
+        } else {
+          parameters = [
+            { type: "text", text: lead.nome || "Cliente" },
+            { type: "text", text: "Assistente Âncora Saúde" },
+          ];
+        }
+
+        const components = [{ type: "body", parameters }];
 
         const response = await sendMetaCloudTemplateTest(
           credentials.phoneNumberId,
@@ -689,8 +709,9 @@ export async function startQualificationConversationForLead(
         if (rendered) {
           rendered = rendered
             .replace(/\{\{1\}\}/g, lead.nome || "Cliente")
-            .replace(/\{\{2\}\}/g, "Âncora Saúde")
+            .replace(/\{\{2\}\}/g, "Assistente Âncora Saúde")
             .replace(/\{\{nome\}\}/g, lead.nome || "Cliente")
+            .replace(/\{\{nome_bot\}\}/g, "Assistente Âncora Saúde")
             .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
         } else {
           rendered = body;

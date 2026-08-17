@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, notInArray, isNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { META_CLOUD_PROVIDER } from "./types";
@@ -180,6 +180,7 @@ export async function syncTenantTemplates(tenantId: string) {
 
   // Mark local templates not returned by Meta as soft deleted
   if (remoteMetaIds.size > 0) {
+    const names = Array.from(remoteMetaIds);
     await db
       .update(schema.metaWhatsAppTemplates)
       .set({ deletedAt: now, status: "DELETED", updatedAt: now })
@@ -188,6 +189,7 @@ export async function syncTenantTemplates(tenantId: string) {
           eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
           eq(schema.metaWhatsAppTemplates.wabaId, credentials.wabaId),
           isNull(schema.metaWhatsAppTemplates.deletedAt),
+          notInArray(schema.metaWhatsAppTemplates.name, names)
         ),
       );
   }

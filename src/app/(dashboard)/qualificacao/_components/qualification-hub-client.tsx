@@ -445,7 +445,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen space-y-6">
       <DashboardHeader
         breadcrumb="Qualificação IA"
         title="Qualificação IA"
@@ -465,18 +465,21 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         }
       />
 
-      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-        {/* STATS CARDS SUMMARY BAR */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="space-y-6">
+        {/* TOP METRICS SUMMARY */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-              <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Operação Hoje
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                Leads Atendidos
+                <Activity className="size-4 text-primary" />
+              </CardDescription>
+
+              <CardTitle className="text-2xl font-bold tracking-tight">
+                {initialStats.operation.startedToday}
               </CardTitle>
-              <Activity className="size-3.5 text-primary" />
             </CardHeader>
-            <CardContent className="px-4 pb-3 space-y-1">
-              <div className="text-xl font-extrabold">{initialStats.operation.startedToday}</div>
+            <CardContent>
               <p className="text-[11px] text-muted-foreground">
                 {initialStats.operation.active} ativos | {initialStats.operation.transferredToHuman} trans. humano
               </p>
@@ -484,14 +487,18 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </Card>
 
           <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-              <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Qualificados
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                Taxa Qualificação
+                <Sparkles className="size-4 text-amber-500" />
+              </CardDescription>
+
+              <CardTitle className="text-2xl font-bold tracking-tight">
+                {initialStats.qualification.totalQualified}
               </CardTitle>
-              <UserCheck className="size-3.5 text-emerald-500" />
             </CardHeader>
-            <CardContent className="px-4 pb-3 space-y-1">
-              <div className="text-xl font-extrabold">{initialStats.qualification.totalQualified}</div>
+
+            <CardContent>
               <p className="text-[11px] text-muted-foreground">
                 {initialStats.qualification.hotLeads} quentes | {initialStats.qualification.completionRatePct}% conclusão
               </p>
@@ -499,14 +506,18 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </Card>
 
           <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-              <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Distribuição
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                Fila de Espera
+                <Clock className="size-4 text-purple-500" />
+              </CardDescription>
+
+              <CardTitle className="text-2xl font-bold tracking-tight">
+                {initialStats.distribution.waitingQueue}
               </CardTitle>
-              <ArrowRightLeft className="size-3.5 text-sky-500" />
             </CardHeader>
-            <CardContent className="px-4 pb-3 space-y-1">
-              <div className="text-xl font-extrabold">{initialStats.distribution.distributed}</div>
+
+            <CardContent>
               <p className="text-[11px] text-muted-foreground">
                 {initialStats.distribution.waitingQueue} em fila | SLA méd. 45s
               </p>
@@ -514,14 +525,17 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </Card>
 
           <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-              <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Custos IA & Whats
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                Custo de Operação
+                <DollarSign className="size-4 text-emerald-500" />
+              </CardDescription>
+
+              <CardTitle className="text-2xl font-bold tracking-tight">
+                R$ {(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}
               </CardTitle>
-              <DollarSign className="size-3.5 text-amber-500" />
             </CardHeader>
-            <CardContent className="px-4 pb-3 space-y-1">
-              <div className="text-xl font-extrabold">R$ {(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}</div>
+            <CardContent>
               <p className="text-[11px] text-muted-foreground">
                 R$ {initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento
               </p>
@@ -529,14 +543,18 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </Card>
 
           <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-              <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Follow-ups
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                Follow-ups Ativos
+                <RotateCcw className="size-4 text-sky-500" />
+              </CardDescription>
+
+              <CardTitle className="text-2xl font-bold tracking-tight">
+                {initialStats.followup.sent} enviados
               </CardTitle>
-              <Clock className="size-3.5 text-purple-500" />
             </CardHeader>
-            <CardContent className="px-4 pb-3 space-y-1">
-              <div className="text-xl font-extrabold">{initialStats.followup.sent} enviados</div>
+
+            <CardContent>
               <p className="text-[11px] text-muted-foreground">
                 {initialStats.followup.conversionsPostFollowup} rec. pós-followup
               </p>
@@ -545,10 +563,10 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         </div>
 
         {/* 2-COLUMN SETTINGS-STYLE LAYOUT */}
-        <div className="grid gap-4 lg:grid-cols-[14.5rem_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[16.5rem_1fr] items-start">
           {/* MOBILE HORIZONTAL SUBNAV */}
           <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
-            <nav className="flex gap-1 pb-1">
+            <nav className="flex gap-1.5 pb-2">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -558,13 +576,13 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                     type="button"
                     onClick={() => handleSelectTab(tab.id)}
                     className={cn(
-                      "flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                      "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all",
                       isActive
-                        ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs"
-                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                        ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                   >
-                    <Icon className={cn("size-4", tab.color)} />
+                    <Icon className="size-3.5 shrink-0" />
                     {tab.label}
                   </button>
                 );
@@ -573,7 +591,10 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </ScrollArea>
 
           {/* DESKTOP SIDEBAR SUBNAV */}
-          <nav className="hidden gap-1 lg:flex lg:flex-col">
+          <nav className="hidden lg:flex lg:flex-col gap-1 p-2 rounded-2xl border bg-card/80 backdrop-blur-xs shadow-2xs sticky top-4">
+            <div className="px-3 py-2 text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase border-b mb-1">
+              Menu de Configuração IA
+            </div>
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -583,14 +604,14 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                   type="button"
                   onClick={() => handleSelectTab(tab.id)}
                   className={cn(
-                    "flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs transition-all text-left w-full",
                     isActive
-                      ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                      ? "bg-primary/10 text-primary font-semibold border-l-4 border-l-primary shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground font-medium"
                   )}
                 >
-                  <Icon className={cn("size-4", tab.color)} />
-                  {tab.label}
+                  <Icon className={cn("size-4 shrink-0", tab.color ?? "text-muted-foreground")} />
+                  <span className="truncate">{tab.label}</span>
                 </button>
               );
             })}
@@ -598,7 +619,6 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
 
           {/* ACTIVE TAB CONTENT */}
           <div className="min-w-0 space-y-6">
-            {/* TAB 1: VISÃO GERAL & ATIVAÇÃO */}
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">

@@ -184,10 +184,15 @@ export async function acknowledgeAlertAction(alertId: string) {
 export async function fetchMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
-  const { listTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
+  const { listTenantTemplates, syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, eq, isNull } = await import("drizzle-orm");
   const { randomUUID } = await import("node:crypto");
+
+  // Automatically sync with Meta Cloud API to ensure all approved templates are populated
+  await syncTenantTemplates(context.tenantId).catch((err) => {
+    console.warn("[fetchMetaTemplatesAction] auto-sync error:", err);
+  });
 
   const db = getDatabase();
   const [existingFirstContact] = await db
