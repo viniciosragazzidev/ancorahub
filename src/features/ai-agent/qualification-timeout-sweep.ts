@@ -4,7 +4,9 @@ import { and, eq, inArray, isNotNull, lt, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
+import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { transitionConversationState } from "./conversation-state-machine";
+import { resolveQualificationTimeoutRoute } from "./qualification-timeout-routing";
 
 export interface QualificationTimeoutSweepResult {
   tenantsChecked: number;
@@ -53,6 +55,10 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         telefone: schema.leads.telefone,
         qualificationStatus: schema.leads.qualificationStatus,
         qualificationState: schema.leads.qualificationState,
+        queueId: schema.leads.queueId,
+        branchId: schema.leads.branchId,
+        metaCampaignId: schema.leads.metaCampaignId,
+        sourceCampaign: schema.leads.sourceCampaign,
         updatedAt: schema.leads.updatedAt,
       })
       .from(schema.leads)
@@ -97,6 +103,30 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       const hasInteracted = Boolean(incomingMessage);
       const targetQualificationStatus = hasInteracted ? "warm" : "cold";
 
+      const campaignId = lead.metaCampaignId || lead.sourceCampaign;
+      const [configuredRoute] = campaignId
+        ? await db
+          .select({
+            queueId: schema.leadQueues.id,
+            branchId: schema.leadQueues.branchId,
+          })
+          .from(schema.metaCampaignQueueRoutes)
+          .innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+          .where(and(
+            eq(schema.metaCampaignQueueRoutes.tenantId, tenant.id),
+            eq(schema.metaCampaignQueueRoutes.campaignId, campaignId),
+            eq(schema.metaCampaignQueueRoutes.enabled, true),
+            eq(schema.leadQueues.tenantId, tenant.id),
+            eq(schema.leadQueues.status, "active"),
+          ))
+          .limit(1)
+        : [];
+      const targetRoute = resolveQualificationTimeoutRoute({
+        currentQueueId: lead.queueId,
+        currentBranchId: lead.branchId,
+        configuredRoute,
+      });
+
       await db.transaction(async (tx) => {
         // 1. Atualizar Lead: Status Morno/Frio conforme interação + Finalizar Qualificação + Mover p/ Fila de Distribuição
         await tx
@@ -105,8 +135,11 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
             qualificationStatus: targetQualificationStatus,
             qualificationState: "QUALIFIED",
             qualificationCompletedAt: updateTime,
-            status: "distributed",
+            queueId: targetRoute.queueId || null,
+            branchId: targetRoute.branchId,
+            status: "new",
             distributionStatus: "queued",
+            distributionUpdatedAt: updateTime,
             updatedAt: updateTime,
           })
           .where(eq(schema.leads.id, lead.id));
@@ -118,8 +151,23 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           userId: systemUserId,
           tipo: "system_alert",
           conteudo: hasInteracted
-            ? `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead interagiu com o atendimento e foi qualificado como Morno (Warm), sendo transferido para a Fila de Distribuição.`
-            : `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead não respondeu a nenhuma mensagem e foi qualificado como Frio (Cold), sendo transferido para a Fila de Distribuição.`,
+            ? `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead interagiu com o atendimento e foi qualificado como Morno (Warm), permanecendo na fila de distribuição configurada.`
+            : `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead não respondeu a nenhuma mensagem e foi qualificado como Frio (Cold), permanecendo na fila de distribuição configurada.`,
+        });
+
+        await tx.insert(schema.leadDistributionEvents).values({
+          id: randomUUID(),
+          tenantId: tenant.id,
+          leadId: lead.id,
+          fromBranchId: lead.branchId,
+          toBranchId: targetRoute.branchId,
+          toQueueId: targetRoute.queueId || null,
+          action: "qualification_timeout_queued",
+          source: "qualification_timeout",
+          strategy: "automatic",
+          reason: `Tempo de resposta da qualificação excedido (${timeoutMinutes} min).`,
+          actorId: systemUserId,
+          createdAt: updateTime,
         });
 
         // 3. Registrar Log de Auditoria
@@ -131,6 +179,9 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           acao: "qualification.timeout_auto_distributed",
         });
       });
+
+      // The durable job is created only after the queue/branch transition commits.
+      await enqueueLeadDistributionJob({ tenantId: tenant.id, leadId: lead.id });
 
       // 4. Encerrar Atendimento do Robô de IA para este Lead
       const [conv] = await db

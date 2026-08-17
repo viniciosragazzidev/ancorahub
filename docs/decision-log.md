@@ -1,5 +1,34 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-080 — Timeout da qualificação respeita a fila configurada no intake
+
+**Estado:** Aceita
+**Data:** 2026-08-17
+
+Ao exceder o tempo de resposta da qualificação, o lead é mantido na fila ativa
+configurada para sua campanha/tipo de entrada; se não houver regra ativa, preserva
+a fila já definida no intake. O job persistente é criado após o commit desta
+transição e seleciona corretores somente da unidade proprietária da fila. Não há
+seleção cruzada de unidade. Sem corretor elegível, o lead permanece em fila e o
+trabalho é repetido com motivo auditável, sem descartar a atribuição de fila.
+
+## DEC-079 — Notificação oficial ao corretor em toda atribuição de lead
+
+**Estado:** Aceita
+**Data:** 2026-08-17
+
+Sempre que um corretor se tornar responsável por um lead — distribuição inicial,
+atribuição manual ou redistribuição por SLA — o CRM enfileira o template oficial
+`new_lead_broker` no número corporativo da Meta. A atribuição do lead é persistida
+antes do efeito externo e nunca é revertida por falha de canal, template ou entrega.
+
+O efeito é idempotente por versão de atribuição e usa o `lead_id` somente no botão
+de URL dinâmica; o corpo contém apenas cargo do corretor, nome do corretor, nome do
+lead e produto de interesse. A capacidade global já existente de notificação de
+atribuição controla também este canal, de forma reversível pelo Super-admin. Cada
+mensagem enfileirada fica no ledger de saída e recebe auditoria; reentregas são
+tratadas pela outbox existente.
+
 ## DEC-077 — Retomada de qualificação pendente por mensagem inbound
 
 **Estado:** Aceita

@@ -19,6 +19,7 @@ import { META_WHATSAPP_TEMPLATE_PURPOSES, type MetaWhatsAppTemplatePurpose } fro
 export type EventKey =
   | "BROKER_WELCOME"
   | "LEAD_ASSIGNMENT"
+  | "LEAD_OFFER"
   | "LEAD_ASSIGNMENT_CONFIRMED"
   | "LEAD_ASSIGNMENT_UNAVAILABLE"
   | "LEAD_ASSIGNMENT_EXPIRED"
@@ -29,6 +30,7 @@ export type EventKey =
 export const CRM_EVENT_LABEL_MAP: Record<EventKey, string> = {
   BROKER_WELCOME: "Cadastro de Corretor / Primeiro Acesso",
   LEAD_ASSIGNMENT: "Novo Lead Atribuído",
+  LEAD_OFFER: "Oferta de Lead para Aceite",
   LEAD_ASSIGNMENT_CONFIRMED: "Confirmação de Aceite pelo Corretor",
   LEAD_ASSIGNMENT_UNAVAILABLE: "Lead Indisponível / Já Resgatado",
   LEAD_ASSIGNMENT_EXPIRED: "Expiração de Fila de Plantão",
@@ -435,7 +437,8 @@ export class WhatsAppTemplateResolver {
     // Map purpose string to eventKey
     let eventKey: EventKey | null = null;
     if (purpose === "brokerInvitation") eventKey = "BROKER_WELCOME";
-    else if (purpose === "newLeadAssignment") eventKey = "LEAD_ASSIGNMENT";
+    else if (purpose === "brokerLeadNotification") eventKey = "LEAD_ASSIGNMENT";
+    else if (purpose === "newLeadAssignment") eventKey = "LEAD_OFFER";
     else if (purpose === "leadAssignmentConfirmed") eventKey = "LEAD_ASSIGNMENT_CONFIRMED";
     else if (purpose === "leadAssignmentUnavailable") eventKey = "LEAD_ASSIGNMENT_UNAVAILABLE";
     else if (purpose === "leadAssignmentExpired") eventKey = "LEAD_ASSIGNMENT_EXPIRED";

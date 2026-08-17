@@ -1,5 +1,5 @@
 export const notificationCapabilities = [
-  { id: "lead_assignment", label: "Lead atribuído ou reatribuído", description: "Aviso ao corretor, gestor e diretor quando um lead é distribuído.", channels: "Toast + push" },
+  { id: "lead_assignment", label: "Lead atribuído ou reatribuído", description: "Aviso ao corretor, gestor e diretor quando um lead é distribuído; ao corretor, também usa o template oficial aprovado.", channels: "Toast + push + WhatsApp" },
   { id: "lead_feedback_overdue", label: "Lead devolvido por SLA", description: "Aviso quando o primeiro contato não acontece dentro do prazo.", channels: "Toast/in-app" },
   { id: "lead_feedback_reminder", label: "Lembrete de feedback", description: "Lembrete recorrente com intervalo configurável para registrar o andamento do atendimento.", channels: "Toast + push" },
   { id: "lead_sla", label: "Alertas de SLA e estagnação", description: "Alertas de lead não trabalhado ou parado na etapa.", channels: "Toast/in-app" },

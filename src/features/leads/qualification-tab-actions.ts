@@ -342,6 +342,17 @@ export async function manuallyChangeQualificationStageAction(input: {
         });
       });
 
+      if (brokerToAssign) {
+        void notifyNewLead(
+          lead.id,
+          context.tenantId,
+          lead.branchId || context.branchId || null,
+          brokerToAssign,
+          lead.nome,
+          `lead-assigned:${randomUUID()}`,
+        ).catch(console.error);
+      }
+
       if (input.sendMessageToCustomer && lead.telefone) {
         const messageText = input.customCustomerMessage?.trim() || `Olá, ${lead.nome || "Cliente"}! Recebemos todas as suas informações com sucesso. Em breve um de nossos consultores especializados entrará em contato para enviar uma cotação perfeita para a sua necessidade!`;
         const msgId = `msg_manual_qual_${randomUUID()}`;

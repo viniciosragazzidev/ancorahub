@@ -8,7 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { MetaCloudApiError, sendMetaCloudTemplate, sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
-import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, type MetaWhatsAppTemplatePurpose } from "./templates";
+import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables, type MetaWhatsAppTemplatePurpose } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
@@ -155,6 +155,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
       } else {
         const variableNames = getMetaWhatsAppTemplateVariableNames(row.purpose);
         const rawVariables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
+        const templateVariables = splitMetaWhatsAppTemplateVariables(row.purpose, rawVariables);
+        urlButtonParameter ??= templateVariables.urlButtonParameter;
         try {
           metaResponse = await sendMetaCloudTemplate({
             phoneNumberId,
@@ -162,7 +164,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
             to: row.destinationPhone,
             templateName: row.templateName,
             languageCode: row.templateLanguage,
-            variables: rawVariables,
+            variables: templateVariables.bodyVariables,
             variableNames,
             urlButtonParameter,
           });
@@ -179,7 +181,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
                   to: row.destinationPhone,
                   templateName: row.templateName,
                   languageCode: lang,
-                  variables: rawVariables,
+                  variables: templateVariables.bodyVariables,
                   variableNames,
                   urlButtonParameter,
                 });

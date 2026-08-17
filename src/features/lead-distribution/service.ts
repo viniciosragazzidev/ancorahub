@@ -239,6 +239,7 @@ export async function routeLeadToBranchAndAssignBroker(
 
   const queueId = targetQueue?.id ?? null;
   const notificationWarnings: string[] = [];
+  const assignmentNotificationKey = `lead-assigned:${randomUUID()}`;
 
   const assigned = await db.transaction(async (tx) => {
     const result = await tx
@@ -288,6 +289,11 @@ export async function routeLeadToBranchAndAssignBroker(
     return true;
   });
 
+  if (assigned) {
+    const notifyResult = await notifyNewLead(leadId, context.tenantId, branchId, brokerId, lead.nome, assignmentNotificationKey).catch(() => undefined);
+    if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
+  }
+
   return assigned
     ? { status: "assigned", leadId, brokerId, strategy: "manual", notificationWarnings: notificationWarnings.length ? notificationWarnings : undefined }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
@@ -313,22 +319,23 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   if (excludeBrokerId && brokerId === excludeBrokerId) return { status: "conflict", leadId, reason: "O corretor que perdeu o SLA não pode receber este lead novamente." };
   const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
   const assignedAt = new Date();
+  const assignmentEventId = randomUUID();
   const feedbackDueAt = new Date(assignedAt.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000);
   const assigned = await db.transaction(async (tx) => {
-    const result = await tx.update(schema.leads).set({ corretorId: brokerId, status: "distributed", distributionStatus: "assigned", distributionOrigin: source === "manual_director" ? "parent" : source === "manual_manager" ? "unit" : lead.distributionOrigin ?? (context.role === "director" ? "parent" : "unit"), assignedAt: new Date(), assignmentSource: source ?? (context.role === "director" ? "manual_director" : "manual_manager"), assignmentStrategy: "manual", distributionUpdatedAt: new Date() }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
+    const result = await tx.update(schema.leads).set({ corretorId: brokerId, status: "distributed", distributionStatus: "assigned", distributionOrigin: source === "manual_director" ? "parent" : source === "manual_manager" ? "unit" : lead.distributionOrigin ?? (context.role === "director" ? "parent" : "unit"), assignedAt, assignmentSource: source ?? (context.role === "director" ? "manual_director" : "manual_manager"), assignmentStrategy: "manual", distributionUpdatedAt: assignedAt }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
     if (!result.length) return false;
     if (tenantPolicy?.feedbackRequiredEnabled !== false) {
       const [attemptCount] = await tx.select({ total: count(schema.leadAssignmentAttempts.id) }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), eq(schema.leadAssignmentAttempts.leadId, leadId)));
       await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: context.tenantId, leadId, brokerId, sequence: Number(attemptCount?.total ?? 0) + 1, assignedAt, feedbackDueAt, status: "open", createdAt: assignedAt });
     }
-    await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: lead.branchId, fromQueueId: lead.queueId, toQueueId: lead.queueId, previousOwnerId: lead.corretorId, newOwnerId: brokerId, action: "assigned", source: source ?? "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: new Date() });
+    await tx.insert(schema.leadDistributionEvents).values({ id: assignmentEventId, tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: lead.branchId, fromQueueId: lead.queueId, toQueueId: lead.queueId, previousOwnerId: lead.corretorId, newOwnerId: brokerId, action: "assigned", source: source ?? "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: assignedAt });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.assigned" });
     if (source === "automatic") {
       await enqueueLeadEffectTx(tx, {
         tenantId: context.tenantId,
         leadId,
         type: "NOTIFY_LEAD_ASSIGNED",
-        idempotencyKey: `lead-assigned:${leadId}:${brokerId}`,
+        idempotencyKey: `lead-assigned:${assignmentEventId}`,
         payload: { branchId: lead.branchId, brokerId, leadName: lead.nome },
       });
     }
@@ -336,7 +343,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   });
   const notificationWarnings: string[] = [];
   if (assigned && source !== "automatic") {
-    const notifyResult = await notifyNewLead(leadId, context.tenantId, lead.branchId, brokerId, lead.nome).catch(() => undefined);
+    const notifyResult = await notifyNewLead(leadId, context.tenantId, lead.branchId, brokerId, lead.nome, `lead-assigned:${assignmentEventId}`).catch(() => undefined);
     if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
   }
   return assigned
@@ -355,9 +362,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (!branch.autoDistribute) return { status: "queued", leadId, reason: "A distribuição automática está desativada nesta unidade." };
   const intelligentPolicy = await loadDistributionPolicy(context.tenantId, lead.queueId, lead.qualificationProfileKey);
   if (!intelligentPolicy.enabled || intelligentPolicy.value.excludedBranchIds.includes(lead.branchId)) return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta unidade." };
-  const [queue] = lead.queueId ? await db.select({ strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
+  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (queue?.mode === "manual") return { status: "queued", leadId, reason: "A fila está em modo manual." };
-  const targetBranchIds = Array.from(new Set([lead.branchId, ...(intelligentPolicy.value.allowedBranchIds ?? [])]));
+  if (queue?.branchId && queue.branchId !== lead.branchId) return { status: "queued", leadId, reason: "A fila configurada pertence a outra unidade." };
+  // A queue belongs to one branch. Branch allowances are routing rules, not a
+  // permit to select a broker from another branch and fail the final assignment.
+  const targetBranchIds = [lead.branchId];
   const allBrokers = await db.select({ id: schema.user.id, createdAt: schema.user.createdAt }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), inArray(schema.tenantMemberships.branchId, targetBranchIds), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(asc(schema.user.createdAt));
   const rosterBrokerIds = await getRosterBrokerIds(context.tenantId, lead.branchId, new Date(), lead.webhookCredentialId);
   const allowedBrokerSet = intelligentPolicy.value.allowedBrokerIds?.length ? new Set(intelligentPolicy.value.allowedBrokerIds) : null;

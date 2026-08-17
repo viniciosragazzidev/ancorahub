@@ -79,7 +79,7 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
 
 export function isDeferredDistributionReason(reason: string) {
   const normalized = reason.toLocaleLowerCase("pt-BR");
-  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacity") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada");
+  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacity") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada") || normalized.includes("fila configurada pertence");
 }
 
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {

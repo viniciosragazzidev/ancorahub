@@ -65,6 +65,30 @@ describe("Meta Cloud template payload", () => {
     ]);
   });
 
+  it("keeps the lead id out of the broker notification body and puts it in the dynamic URL", () => {
+    const payload = buildMetaCloudTemplatePayload({
+      to: "+55 21 99999-9999",
+      templateName: "new_lead_broker",
+      languageCode: "pt_BR",
+      variables: ["Corretor(a)", "André", "Maria Lurdes", "Plano Familiar"],
+      variableNames: ["cargo", "corretor_nome", "lead_nome", "produto_interesse"],
+      urlButtonParameter: "dfdb965c-f480-4009-affb-c67057412dc9",
+    });
+
+    expect(payload.template.components).toEqual([
+      {
+        type: "body",
+        parameters: [
+          { type: "text", parameter_name: "cargo", text: "Corretor(a)" },
+          { type: "text", parameter_name: "corretor_nome", text: "André" },
+          { type: "text", parameter_name: "lead_nome", text: "Maria Lurdes" },
+          { type: "text", parameter_name: "produto_interesse", text: "Plano Familiar" },
+        ],
+      },
+      { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: "dfdb965c-f480-4009-affb-c67057412dc9" }] },
+    ]);
+  });
+
   it("rejects a mismatched named-parameter contract before calling Meta", () => {
     expect(() => buildMetaCloudTemplatePayload({
       to: "+55 21 99999-9999",

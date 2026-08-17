@@ -4,6 +4,7 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
   brokerInvitation: { name: "broker_first_access", language: "pt_BR" },
   taskReminder: { name: "ancora_lembrete_tarefa", language: "pt_BR" },
   clientNotice: { name: "ancora_aviso_cliente", language: "pt_BR" },
+  brokerLeadNotification: { name: "new_lead_broker", language: "pt_BR" },
   newLeadAssignment: { name: "novo_lead_", language: "pt_BR" },
   leadAssignmentConfirmed: { name: "lead_assignment_confirmed", language: "pt_BR" },
   leadAssignmentUnavailable: { name: "lead_assignment_unavailable", language: "pt_BR" },
@@ -24,5 +25,27 @@ export function getMetaWhatsAppTemplate(purpose: string) {
  * {{cargo}}, rather than positional {{1}}, {{2}} and {{3}} placeholders.
  */
 export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
-  return purpose === "brokerInvitation" ? ["nome", "empresa", "cargo"] : undefined;
+  if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo"];
+  if (purpose === "brokerLeadNotification") return ["cargo", "corretor_nome", "lead_nome", "produto_interesse"];
+  return undefined;
+}
+
+/**
+ * The lead id is stored with the durable outbound message exclusively for the
+ * dynamic URL button. It is not a body parameter of `new_lead_broker`.
+ */
+export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: string[]) {
+  if (purpose !== "brokerLeadNotification") {
+    return { bodyVariables: variables, urlButtonParameter: undefined };
+  }
+
+  const [cargo, corretorNome, leadNome, produtoInteresse, leadId] = variables;
+  if (!cargo || !corretorNome || !leadNome || !produtoInteresse || !leadId) {
+    throw new Error("O template new_lead_broker exige cargo, corretor, lead, produto e identificador do lead.");
+  }
+
+  return {
+    bodyVariables: [cargo, corretorNome, leadNome, produtoInteresse],
+    urlButtonParameter: leadId,
+  };
 }

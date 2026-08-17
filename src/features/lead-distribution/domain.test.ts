@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isValidDutyWindow, rankBrokers, resolveDistributionCandidate } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -54,5 +54,10 @@ describe("lead distribution domain", () => {
     ], { ...defaultIntelligentDistributionPolicy, ranking: { ...defaultIntelligentDistributionPolicy.ranking, enabled: false } }, "capacity");
     expect(decision.selected?.id).toBe("available");
     expect(decision.eligible.map((broker) => broker.id)).toEqual(["available"]);
+  });
+
+  it("keeps a queue retryable while its configured unit has no eligible broker", () => {
+    expect(isDeferredDistributionReason("Nenhum corretor elegível nesta unidade.")).toBe(true);
+    expect(isDeferredDistributionReason("A fila configurada pertence a outra unidade.")).toBe(true);
   });
 });

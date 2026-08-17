@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { notifyNewLead } from "@/features/notifications/send-push-helper";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -330,6 +331,15 @@ export async function handleLeadOfferWebhookResponse(input: {
         idempotencyKey: `lead-confirmed:${result.lead.id}:${result.broker.id}`,
       });
     }
+
+    await notifyNewLead(
+      result.lead.id,
+      input.tenantId,
+      result.lead.branchId,
+      result.broker.id,
+      result.lead.nome,
+      `lead-assigned:offer:${offer.id}`,
+    ).catch(console.error);
 
     // Notify other candidate brokers that lead was assigned to someone else
     const losingOffers = await db

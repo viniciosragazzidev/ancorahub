@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, isNull, or } from "drizzle-orm";
 import webpush from "web-push";
 
-import { createLeadOffersForBrokers } from "@/features/lead-distribution/offers";
+import { enqueueBrokerLeadNotification } from "./broker-lead-whatsapp";
 import { getDatabase, schema } from "@/shared/db";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isNotificationCapabilityEnabled } from "./queries";
@@ -193,28 +193,25 @@ export async function notifyNewLead(
   let whatsappError: string | undefined;
   let pushError: string | undefined;
 
-  if (corretorId) {
-    try {
-      await createLeadOffersForBrokers({
-        tenantId,
-        leadId,
-        brokerIds: [corretorId],
-        requestedBy: null,
-      });
-    } catch (err) {
-      whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
-      console.error("[notifyNewLead] WhatsApp lead offer error:", err);
-    }
-  }
-
   try {
-    if (!(await isNotificationCapabilityEnabled("lead_assignment"))) {
-      if (whatsappError) return { notificationError: `WhatsApp: ${whatsappError}` };
-      return;
-    }
+    if (!(await isNotificationCapabilityEnabled("lead_assignment"))) return;
   } catch (err) {
     pushError = err instanceof Error ? err.message : "Erro ao verificar capabilities";
     console.error("[notifyNewLead] Capability check error:", err);
+  }
+
+  if (corretorId && !pushError) {
+    try {
+      await enqueueBrokerLeadNotification({
+        tenantId,
+        leadId,
+        brokerId: corretorId,
+        idempotencyKey: idempotencyPrefix,
+      });
+    } catch (err) {
+      whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("[notifyNewLead] WhatsApp broker notification error:", err);
+    }
   }
 
   if (!pushError) {
