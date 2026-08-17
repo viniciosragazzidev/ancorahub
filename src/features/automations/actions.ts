@@ -37,7 +37,7 @@ const aiAgentInputSchema = z.object({
   formOfAddress: z.enum(["voce", "primeiro_nome", "senhor_senhora"]),
   maxQuestions: z.coerce.number().int().min(1).max(12),
   businessContext: z.string().trim().max(1200).optional().default(""),
-  customInstructions: z.string().trim().max(2000).optional().default(""),
+  customInstructions: z.string().trim().max(100000).optional().default(""),
   requiredFields: z.array(z.string()).optional().default([]),
 });
 

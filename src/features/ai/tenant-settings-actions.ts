@@ -8,13 +8,13 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
-const settingsSchema = z.object({
-  assistantName: z.string().trim().min(2).max(80),
-  initialMessage: z.string().trim().min(1).max(1000),
-  finalMessage: z.string().trim().min(1).max(1000),
-  handoffMessage: z.string().trim().min(1).max(1000),
-  outOfHoursMessage: z.string().trim().min(1).max(1000),
-  absenceMessage: z.string().trim().min(1).max(1000),
+export const settingsSchema = z.object({
+  assistantName: z.string().trim().min(2).max(100),
+  initialMessage: z.string().trim().min(1).max(5000),
+  finalMessage: z.string().trim().min(1).max(5000),
+  handoffMessage: z.string().trim().min(1).max(5000),
+  outOfHoursMessage: z.string().trim().min(1).max(5000),
+  absenceMessage: z.string().trim().min(1).max(5000),
   language: z.enum(["pt-BR", "en", "es"]),
   tone: z.enum(["friendly", "professional", "direct"]),
   useEmojis: z.boolean(),
@@ -22,12 +22,12 @@ const settingsSchema = z.object({
   maxConversationMinutes: z.coerce.number().int().min(5).max(1440),
   maxQuestions: z.coerce.number().int().min(1).max(12),
   objectives: z.array(z.enum(["understand_need", "qualify_budget", "route_to_broker", "schedule_follow_up"])).max(4),
-  businessContext: z.string().trim().max(1200).optional().default(""),
+  businessContext: z.string().trim().max(100000).optional().default(""),
   businessHoursStart: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").optional().or(z.literal("")),
   businessHoursEnd: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").optional().or(z.literal("")),
   businessDays: z.string().trim().optional().or(z.literal("")),
   requiredFields: z.array(z.string().min(1)).optional().default([]),
-  customInstructions: z.string().trim().max(2000).optional().default(""),
+  customInstructions: z.string().trim().max(100000).optional().default(""),
 });
 
 export type AiTenantSettings = z.infer<typeof settingsSchema> & { enabled: boolean; version: number };

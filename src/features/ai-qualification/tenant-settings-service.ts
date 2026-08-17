@@ -14,15 +14,15 @@ export const updateTenantSettingsSchema = z.object({
   enabled: z.boolean(),
   pauseMode: z.enum(pauseModeValues).default("handoff_active"),
   assistantName: z.string().trim().min(2).max(100).default("Assistente Âncora Corretora"),
-  initialMessage: z.string().trim().min(5).max(1000),
-  handoffMessage: z.string().trim().min(5).max(1000),
-  outOfHoursMessage: z.string().trim().min(5).max(1000),
-  absenceMessage: z.string().trim().min(5).max(1000),
+  initialMessage: z.string().trim().min(5).max(5000),
+  handoffMessage: z.string().trim().min(5).max(5000),
+  outOfHoursMessage: z.string().trim().min(5).max(5000),
+  absenceMessage: z.string().trim().min(5).max(5000),
   tone: z.string().trim().default("friendly"),
   useEmojis: z.boolean().default(false),
   timeoutMinutes: z.number().int().min(5).max(1440).default(30),
-  businessContext: z.string().trim().max(4000).optional().default(""),
-  customInstructions: z.string().trim().max(4000).optional().default(""),
+  businessContext: z.string().trim().max(100000).optional().default(""),
+  customInstructions: z.string().trim().max(100000).optional().default(""),
 });
 
 export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;
