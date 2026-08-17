@@ -315,8 +315,6 @@ export interface SelectContentProps {
 
 export function SelectContent({ className, children }: SelectContentProps) {
   const ctx = useSelectContext("SelectContent");
-  const innerRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ left: 0, top: 0, width: 0 });
   const open = ctx.open;
@@ -326,11 +324,11 @@ export function SelectContent({ className, children }: SelectContentProps) {
 
   const updatePosition = useCallback(() => {
     const trigger = ctx.triggerElement;
-    const node = innerRef.current;
+    const node = ctx.contentElement;
     if (!trigger || !node) return;
 
     const rect = trigger.getBoundingClientRect();
-    const dropdownHeight = node.offsetHeight;
+    const dropdownHeight = Math.max(node.scrollHeight, node.getBoundingClientRect().height);
     const below = window.innerHeight - rect.bottom;
     const above = rect.top;
     const nextPlacement: Placement = below < dropdownHeight + 16 && above > below ? "top" : "bottom";
@@ -343,20 +341,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
       top: nextPlacement === "top" ? Math.max(8, rect.top - dropdownHeight - 6) : rect.bottom + 6,
       width,
     });
-  }, [ctx.triggerElement, setPlacement]);
-
-  useLayoutEffect(() => {
-    const node = innerRef.current;
-    if (!node || typeof ResizeObserver === "undefined") return;
-    const measure = () => {
-      setHeight(node.offsetHeight);
-      updatePosition();
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [updatePosition]);
+  }, [ctx.contentElement, ctx.triggerElement, setPlacement]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -388,10 +373,10 @@ export function SelectContent({ className, children }: SelectContentProps) {
       initial={false}
       animate={
         ctx.reduce
-          ? { opacity: open ? 1 : 0, height: open ? height : 0 }
+          ? { opacity: open ? 1 : 0 }
           : {
               opacity: open ? 1 : 0,
-              height: open ? height : 0,
+              scaleY: open ? 1 : 0.96,
               borderTopLeftRadius: isTop ? 12 : nearRadius,
               borderTopRightRadius: isTop ? 12 : nearRadius,
               borderBottomLeftRadius: isTop ? nearRadius : 12,
@@ -405,9 +390,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
               opacity: open
                 ? { duration: 0.18 }
                 : { duration: 0.16, delay: 0.12 },
-              height: open
-                ? { type: "spring", duration: 0.42, bounce: 0.14 }
-                : { duration: 0.26, ease: EASE_OUT, delay: 0.14 },
+              scaleY: { duration: 0.16, ease: EASE_OUT },
               borderTopLeftRadius: isTop ? INSTANT_TRANSITION : radiusT,
               borderTopRightRadius: isTop ? INSTANT_TRANSITION : radiusT,
               borderBottomLeftRadius: isTop ? radiusT : INSTANT_TRANSITION,
@@ -421,7 +404,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
         width: position.width,
         zIndex: 100,
         transformOrigin: isTop ? "bottom" : "top",
-        overflow: "hidden",
+        display: open ? "block" : "none",
         pointerEvents: open ? "auto" : "none",
       }}
       className={cn(
@@ -429,13 +412,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
         className,
       )}
     >
-      <motion.div
-        ref={innerRef}
-        variants={ctx.reduce ? undefined : LIST_VARIANTS}
-        initial={false}
-        animate={open ? "show" : "hidden"}
-        className="p-1"
-      >
+      <motion.div variants={ctx.reduce ? undefined : LIST_VARIANTS} initial={false} animate={open ? "show" : "hidden"} className="p-1">
         {children}
       </motion.div>
     </motion.div>,

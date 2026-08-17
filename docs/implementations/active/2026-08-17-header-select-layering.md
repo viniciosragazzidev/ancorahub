@@ -11,9 +11,11 @@ que a lista ficasse acima da superfície da aplicação.
 
 `SelectContent`, o primitivo compartilhado, agora renderiza a lista em um portal
 no `document.body`, com posição `fixed` ancorada no trigger. A posição é
-recalculada em scroll, redimensionamento e alteração do conteúdo. O fechamento
-por Escape, clique externo e clique em opções continua preservado, inclusive
-quando a lista está fora da árvore DOM do trigger.
+recalculada em scroll e redimensionamento. A lista não depende mais de animação
+de altura ou de `ResizeObserver` para se tornar visível: assim, uma medição inicial
+indisponível não pode deixá-la recolhida. O fechamento por Escape, clique externo
+e clique em opções continua preservado, inclusive quando a lista está fora da
+árvore DOM do trigger.
 
 ## Validação
 
