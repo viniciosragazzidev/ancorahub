@@ -54,7 +54,7 @@ async function getOrCreateConfig(tenantId: string) {
 }
 
 export async function startAiQualificationForLead(input: { tenantId: string; leadId: string; actorUserId: string; force?: boolean }) {
-  if ((await getSystemSetting("feature_qualification_engine_enabled")) === "true") {
+  if ((await getSystemSetting("feature_qualification_engine_enabled")) !== "false") {
     return await startQualificationConversationForLead(input, input.force).catch(() => ({ started: false as const, reason: "failed" as const }));
   }
   const db = getDatabase();
