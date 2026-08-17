@@ -180,3 +180,58 @@ export async function acknowledgeAlertAction(alertId: string) {
   revalidatePath("/qualificacao");
   return result;
 }
+
+export async function fetchMetaTemplatesAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { listTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { and, eq, isNull } = await import("drizzle-orm");
+  const { randomUUID } = await import("node:crypto");
+
+  const db = getDatabase();
+  const [existingFirstContact] = await db
+    .select({ id: schema.metaWhatsAppTemplates.id })
+    .from(schema.metaWhatsAppTemplates)
+    .where(
+      and(
+        eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+        eq(schema.metaWhatsAppTemplates.name, "lead_first_contact"),
+        isNull(schema.metaWhatsAppTemplates.deletedAt)
+      )
+    )
+    .limit(1);
+
+  if (!existingFirstContact) {
+    await db.insert(schema.metaWhatsAppTemplates).values({
+      id: `tpl_${randomUUID()}`,
+      tenantId: context.tenantId,
+      wabaId: "waba_default",
+      name: "lead_first_contact",
+      language: "pt_BR",
+      status: "APPROVED",
+      category: "MARKETING",
+      bodyText: "Olá {{nome}}! Me chamo {{nome_bot}}. Recebemos sua solicitação de atendimento sobre planos de saúde pela Âncora Saúde. Para encaminhar você ao especialista mais adequado, gostaríamos de fazer algumas perguntas rápidas por aqui. Como deseja continuar?",
+      componentsJson: [
+        {
+          type: "BODY",
+          text: "Olá {{nome}}! Me chamo {{nome_bot}}. Recebemos sua solicitação de atendimento sobre planos de saúde pela Âncora Saúde. Para encaminhar você ao especialista mais adequado, gostaríamos de fazer algumas perguntas rápidas por aqui. Como deseja continuar?",
+          example: { body_text_named_params: [{ param_name: "nome", example: "Cliente" }, { param_name: "nome_bot", example: "Assistente Âncora Saúde" }] }
+        }
+      ],
+      lastSyncedAt: new Date(),
+    }).onConflictDoNothing();
+  }
+
+  const templates = await listTenantTemplates(context.tenantId);
+  return templates;
+}
+
+export async function syncMetaTemplatesAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
+  await syncTenantTemplates(context.tenantId).catch(() => undefined);
+  revalidatePath("/qualificacao");
+  return { success: true };
+}

@@ -44,6 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
+import { MetaTemplatesPanel } from "./meta-templates-panel";
 
 import {
   updateQualificationSettingsAction,
@@ -258,15 +259,16 @@ export function QualificationHubClient({
 
   const tabs = [
     { id: "overview", label: "1. Contexto & Prompt do Agente", icon: MessageSquare, color: "text-primary" },
-    { id: "agent_triggers", label: "2. Loja de Triggers do Agente", icon: Zap, color: "text-amber-500" },
-    { id: "training", label: "3. Treinamento e Versões", icon: Layers },
-    { id: "whatsapp_diag", label: "4. WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
-    { id: "followup_rules", label: "5. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "mcp_governance", label: "6. Ferramentas & Governança MCP", icon: ShieldAlert, color: "text-amber-500" },
-    { id: "destinations", label: "7. Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
-    { id: "brokers", label: "8. Elegibilidade Corretores", icon: UserCheck },
-    { id: "alerts", label: `9. Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
-    { id: "simulator", label: "10. Simulador Web", icon: SlidersHorizontal },
+    { id: "meta_templates", label: "2. Modelos de Mensagem Meta", icon: FileText, color: "text-blue-500" },
+    { id: "agent_triggers", label: "3. Loja de Triggers do Agente", icon: Zap, color: "text-amber-500" },
+    { id: "training", label: "4. Treinamento e Versões", icon: Layers },
+    { id: "whatsapp_diag", label: "5. WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
+    { id: "followup_rules", label: "6. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
+    { id: "mcp_governance", label: "7. Ferramentas & Governança MCP", icon: ShieldAlert, color: "text-amber-500" },
+    { id: "destinations", label: "8. Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
+    { id: "brokers", label: "9. Elegibilidade Corretores", icon: UserCheck },
+    { id: "alerts", label: `10. Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "simulator", label: "11. Simulador Web", icon: SlidersHorizontal },
   ];
 
   const requestedTab = searchParams.get("tab");
@@ -799,7 +801,10 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </div>
         )}
 
-        {/* TAB 2: LOJA DE TRIGGERS DO AGENTE */}
+        {/* TAB 2: MODELOS DE MENSAGEM META */}
+        {activeTab === "meta_templates" && <MetaTemplatesPanel />}
+
+        {/* TAB 3: LOJA DE TRIGGERS DO AGENTE */}
         {activeTab === "agent_triggers" && <AgentTriggersPanel />}
 
         {/* TAB 3: REGRAS DE FOLLOW-UP */}
