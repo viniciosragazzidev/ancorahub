@@ -624,17 +624,17 @@ export function QueueControlCenter({
 
       {/* Editor Modal */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogPopup className="max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogPanel>
-            <DialogHeader>
+        <DialogPopup className="sm:max-w-2xl max-h-[88vh] p-0 flex flex-col overflow-hidden">
+          <DialogPanel className="flex flex-col h-full min-h-0">
+            <DialogHeader className="p-5 sm:p-6 border-b border-border/70 bg-card shrink-0">
               <DialogTitle>{editingId ? "Editar fila" : "Criar fila"}</DialogTitle>
               <DialogDescription>As mudanças afetam os próximos leads distribuídos. Leads já atribuídos mantêm seu histórico.</DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4 py-2">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 sm:p-6 space-y-4 min-h-0">
               <label className="grid gap-1.5 text-sm font-medium">
                 Nome da fila
-                <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Leads Quentes, Plantão Central" />
+                <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Leads Quentes, Plantão Central" className="w-full" />
               </label>
 
               {/* Unidade Principal */}
@@ -652,12 +652,12 @@ export function QueueControlCenter({
               </label>
 
               {/* Exclusividade de Plantão */}
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <Lightning className="size-4 text-emerald-500" /> Exclusividade de Plantão Agendado ou Ativo
+                  <Lightning className="size-4 text-emerald-500 shrink-0" /> Exclusividade de Plantão Agendado ou Ativo
                 </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Se selecinoado, os leads direcionados a esta fila serão entregues exclusivamente aos corretores em escala ou ativos neste plantão.
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Se selecionado, os leads direcionados a esta fila serão entregues exclusivamente aos corretores em escala ou ativos neste plantão.
                 </p>
                 <AppSelect
                   aria-label="Exclusividade de Plantão"
@@ -675,11 +675,11 @@ export function QueueControlCenter({
 
               {/* Multi-Unidades Adicionais */}
               {branches.length > 1 && (
-                <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
                   <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Buildings className="size-4 text-primary" /> Unidades adicionais atendidas por esta fila
+                    <Buildings className="size-4 text-primary shrink-0" /> Unidades adicionais atendidas por esta fila
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
                     Marque outras unidades que também poderão enviar ou compartilhar corretores para esta fila.
                   </p>
                   <div className="grid gap-2 pt-1 sm:grid-cols-2">
@@ -688,14 +688,14 @@ export function QueueControlCenter({
                       .map((branch) => {
                         const isChecked = form.allowedBranchIds.includes(branch.id);
                         return (
-                          <label key={branch.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                          <label key={branch.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer min-w-0">
                             <input
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => toggleAllowedBranch(branch.id)}
-                              className="rounded border-input text-primary focus:ring-primary"
+                              className="rounded border-input text-primary focus:ring-primary shrink-0"
                             />
-                            <span>{branch.name}</span>
+                            <span className="truncate">{branch.name}</span>
                           </label>
                         );
                       })}
@@ -704,40 +704,42 @@ export function QueueControlCenter({
               )}
 
               {/* Escopo e Seleção de Corretores */}
-              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <UserList className="size-4 text-primary" /> Corretores participantes da fila
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                  <p className="text-xs font-semibold text-foreground flex items-center gap-1.5 shrink-0">
+                    <UserList className="size-4 text-primary shrink-0" /> Corretores participantes
                   </p>
-                  <AppSelect
-                    aria-label="Escopo de corretores"
-                    size="sm"
-                    value={form.brokerScopeMode}
-                    onValueChange={(val) => setForm({ ...form, brokerScopeMode: val as "all" | "selected" })}
-                    options={[
-                      { value: "all", label: "Todos os corretores elegíveis da(s) unidade(s)" },
-                      { value: "selected", label: "Selecionar corretores específicos" },
-                    ]}
-                  />
+                  <div className="w-full sm:w-auto min-w-[200px]">
+                    <AppSelect
+                      aria-label="Escopo de corretores"
+                      size="sm"
+                      value={form.brokerScopeMode}
+                      onValueChange={(val) => setForm({ ...form, brokerScopeMode: val as "all" | "selected" })}
+                      options={[
+                        { value: "all", label: "Todos os corretores elegíveis" },
+                        { value: "selected", label: "Selecionar corretores específicos" },
+                      ]}
+                    />
+                  </div>
                 </div>
 
                 {form.brokerScopeMode === "selected" ? (
-                  <div className="space-y-2 border-t border-border/60 pt-2">
+                  <div className="space-y-2 border-t border-border/60 pt-2.5">
                     <p className="text-[11px] text-muted-foreground">
                       Selecione apenas os corretores que receberão leads desta fila:
                     </p>
-                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                    <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1.5 pr-1">
                       {availableBrokersForForm.length ? (
                         availableBrokersForForm.map((broker) => {
                           const isChecked = form.allowedBrokerIds.includes(broker.id);
                           return (
-                            <label key={broker.id} className="flex items-center justify-between gap-2 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer">
-                              <span className="flex items-center gap-2 truncate">
+                            <label key={broker.id} className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0">
+                              <span className="flex items-center gap-2 truncate min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={() => toggleAllowedBroker(broker.id)}
-                                  className="rounded border-input text-primary focus:ring-primary"
+                                  className="rounded border-input text-primary focus:ring-primary shrink-0"
                                 />
                                 <span className="truncate">{broker.name}</span>
                               </span>
@@ -767,14 +769,14 @@ export function QueueControlCenter({
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5 text-sm font-medium">
                   Modo
-                  <select className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm" value={form.assignmentMode} onChange={(event) => setForm({ ...form, assignmentMode: event.target.value })}>
+                  <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={form.assignmentMode} onChange={(event) => setForm({ ...form, assignmentMode: event.target.value })}>
                     <option value="automatic">Automática</option>
                     <option value="manual">Manual</option>
                   </select>
                 </label>
                 <label className="grid gap-1.5 text-sm font-medium">
                   Estratégia
-                  <select className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm" value={form.assignmentStrategy} onChange={(event) => setForm({ ...form, assignmentStrategy: event.target.value })}>
+                  <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={form.assignmentStrategy} onChange={(event) => setForm({ ...form, assignmentStrategy: event.target.value })}>
                     <option value="capacity">Menor carga</option>
                     <option value="round_robin">Round robin</option>
                   </select>
@@ -782,33 +784,33 @@ export function QueueControlCenter({
               </div>
 
               {/* Qualificação por Bot de IA */}
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-1.5">
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-1.5">
                 <label className="flex items-center justify-between text-sm font-semibold text-foreground cursor-pointer">
                   <span className="flex items-center gap-2">
-                    <MagicWand className="size-4 text-primary" /> Ativar Qualificação por Bot de IA
+                    <MagicWand className="size-4 text-primary shrink-0" /> Ativar Qualificação por Bot de IA
                   </span>
                   <input
                     type="checkbox"
                     checked={form.aiQualificationEnabled}
                     onChange={(event) => setForm({ ...form, aiQualificationEnabled: event.target.checked })}
-                    className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                    className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer shrink-0"
                   />
                 </label>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Quando ativada, o Bot de IA do WhatsApp qualifica automaticamente os leads direcionados a esta fila.
                 </p>
               </div>
 
               {/* Campanhas Meta vinculadas a esta fila */}
               {campaigns.length > 0 && (
-                <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
                   <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     🎯 Campanhas Meta que enviam leads para esta fila
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Marque as campanhas que direcionarão leads automaticamente para esta fila:
                   </p>
-                  <div className="max-h-40 overflow-y-auto space-y-1.5 pt-1 pr-1">
+                  <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1.5 pt-1 pr-1">
                     {displayedCampaigns.map((c) => {
                       const route = campaignRoutes.find((r) => r.campaignId === c.campaignId);
                       const isAssignedToThisQueue = route?.queueId === editingId && route.enabled;
@@ -816,9 +818,9 @@ export function QueueControlCenter({
                       return (
                         <label
                           key={c.campaignId}
-                          className="flex items-center justify-between gap-2 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer"
+                          className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0"
                         >
-                          <span className="flex items-center gap-2 truncate">
+                          <span className="flex items-center gap-2 truncate min-w-0">
                             <input
                               type="checkbox"
                               checked={isAssignedToThisQueue ?? false}
@@ -849,28 +851,29 @@ export function QueueControlCenter({
                 </div>
               )}
 
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={form.capacityEnabled} onChange={(event) => setForm({ ...form, capacityEnabled: event.target.checked })} />
-                Limitar leads ativos por corretor <InfoTooltip title="Capacidade" description="Quando o limite é atingido, o corretor deixa de ser elegível para novos leads dessa fila." />
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input type="checkbox" checked={form.capacityEnabled} onChange={(event) => setForm({ ...form, capacityEnabled: event.target.checked })} className="rounded border-input text-primary focus:ring-primary shrink-0" />
+                <span>Limitar leads ativos por corretor</span>
+                <InfoTooltip title="Capacidade" description="Quando o limite é atingido, o corretor deixa de ser elegível para novos leads dessa fila." />
               </label>
 
               {form.capacityEnabled ? (
                 <label className="grid gap-1.5 text-sm font-medium">
                   Máximo por corretor
-                  <Input type="number" min={1} max={200} value={form.capacityPerBroker} onChange={(event) => setForm({ ...form, capacityPerBroker: event.target.value })} />
+                  <Input type="number" min={1} max={200} value={form.capacityPerBroker} onChange={(event) => setForm({ ...form, capacityPerBroker: event.target.value })} className="w-full" />
                 </label>
               ) : null}
 
               <label className="grid gap-1.5 text-sm font-medium">
                 Estado
-                <select className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+                <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
                   <option value="active">Ativa</option>
                   <option value="inactive">Pausada</option>
                 </select>
               </label>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 shrink-0 flex items-center justify-end gap-2">
               <Button variant="outline" onClick={() => setEditorOpen(false)} disabled={saving}>Cancelar</Button>
               <Button onClick={saveQueue} disabled={saving || !form.name.trim()}>
                 {saving ? "Salvando…" : "Salvar fila"}
@@ -882,14 +885,14 @@ export function QueueControlCenter({
 
       {/* Simulator Modal */}
       <Dialog open={simulatorOpen} onOpenChange={setSimulatorOpen}>
-        <DialogPopup className="max-w-2xl">
-          <DialogPanel>
-            <DialogHeader>
+        <DialogPopup className="sm:max-w-2xl max-h-[85vh] p-0 flex flex-col overflow-hidden">
+          <DialogPanel className="flex flex-col h-full min-h-0">
+            <DialogHeader className="p-5 sm:p-6 border-b border-border/70 bg-card shrink-0">
               <DialogTitle>Simular distribuição</DialogTitle>
               <DialogDescription>Veja a decisão provável antes de alterar uma regra. A simulação não cria eventos nem altera a fila.</DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 sm:p-6 space-y-4 min-h-0">
               <div className="grid gap-3 sm:grid-cols-2">
                 <AppSelect aria-label="Unidade da simulação" value={simulationForm.branchId} onValueChange={(branchId) => setSimulationForm({ ...simulationForm, branchId, queueId: "" })} options={branches.map((branch) => ({ value: branch.id, label: branch.name }))} />
                 <AppSelect aria-label="Fila da simulação" value={simulationForm.queueId} onValueChange={(queueId) => setSimulationForm({ ...simulationForm, queueId })} options={[{ value: "", label: "Fila padrão da unidade" }, ...branchQueues.map((queue) => ({ value: queue.id, label: queue.name }))]} />
@@ -898,7 +901,7 @@ export function QueueControlCenter({
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5 text-sm font-medium">
                   Temperatura
-                  <select className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm" value={simulationForm.temperature} onChange={(event) => setSimulationForm({ ...simulationForm, temperature: event.target.value })}>
+                  <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={simulationForm.temperature} onChange={(event) => setSimulationForm({ ...simulationForm, temperature: event.target.value })}>
                     <option value="hot">Quente</option>
                     <option value="warm">Morno</option>
                     <option value="cold">Frio</option>
@@ -906,7 +909,7 @@ export function QueueControlCenter({
                 </label>
                 <label className="grid gap-1.5 text-sm font-medium">
                   Score
-                  <Input type="number" min={0} max={100} value={simulationForm.score} onChange={(event) => setSimulationForm({ ...simulationForm, score: event.target.value })} />
+                  <Input type="number" min={0} max={100} value={simulationForm.score} onChange={(event) => setSimulationForm({ ...simulationForm, score: event.target.value })} className="w-full" />
                 </label>
               </div>
 
@@ -940,7 +943,7 @@ export function QueueControlCenter({
               ) : null}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 shrink-0 flex items-center justify-end">
               <Button variant="outline" onClick={() => setSimulatorOpen(false)}>Fechar</Button>
             </DialogFooter>
           </DialogPanel>
