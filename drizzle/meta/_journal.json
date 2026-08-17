@@ -561,6 +561,13 @@
       "when": 1786899600000,
       "tag": "0129_meta_lead_ads_routing_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1786903200000,
+      "tag": "0130_allow_tenant_wide_lead_queues",
+      "breakpoints": true
     }
   ]
 }

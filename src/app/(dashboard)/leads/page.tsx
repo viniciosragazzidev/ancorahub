@@ -24,6 +24,7 @@ import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
+import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
 
 export default async function LeadsPage({
   searchParams,
@@ -41,6 +42,7 @@ export default async function LeadsPage({
     page?: string;
     pageSize?: string;
     period?: string;
+    eligibleCampaigns?: string;
   }>;
 }) {
   await connection();
@@ -65,6 +67,7 @@ export default async function LeadsPage({
   );
 
   const period = parsePeriod(filters.period);
+  const eligibleCampaignsOnly = filters.eligibleCampaigns === "1";
 
   // Pagination parameters
   const pageParam = parseInt(filters.page ?? "1", 10);
@@ -164,6 +167,38 @@ export default async function LeadsPage({
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
+  const metaCampaignEligibility = eligibleCampaignsOnly
+    ? await Promise.all([
+        getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`).catch(() => null),
+        db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled })
+          .from(schema.metaCampaignQueueRoutes)
+          .where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId))
+          .catch(() => []),
+        db.select({ id: schema.metaAdQueueRoutes.id })
+          .from(schema.metaAdQueueRoutes)
+          .where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId))
+          .limit(1)
+          .catch(() => []),
+        db.select({ id: schema.metaFormQueueRoutes.id })
+          .from(schema.metaFormQueueRoutes)
+          .where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId))
+          .limit(1)
+          .catch(() => []),
+      ]).then(([storedMode, campaignRules, adRules, formRules]) => resolveMetaCampaignEligibility({
+        storedMode,
+        campaignRules,
+        hasTenantRules: campaignRules.length > 0 || adRules.length > 0 || formRules.length > 0,
+      }))
+    : null;
+  const eligibleCampaignFilter = !metaCampaignEligibility
+    ? null
+    : metaCampaignEligibility.mode === "disabled"
+      ? sql`false`
+      : metaCampaignEligibility.mode === "all"
+        ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), isNotNull(schema.leads.metaCampaignId))
+        : metaCampaignEligibility.campaignIds.length
+          ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), inArray(schema.leads.metaCampaignId, metaCampaignEligibility.campaignIds))
+          : sql`false`;
 
   const qualifiedOrDistributedFilter = or(
     isNotNull(schema.leads.corretorId),
@@ -185,6 +220,7 @@ export default async function LeadsPage({
     ...(origemFilter ? [origemFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),
     ...(corretorFilter ? [corretorFilter] : []),
+    ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
     ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
   );
 
@@ -313,6 +349,7 @@ export default async function LeadsPage({
             isNull(schema.leads.qualificationStatus)
           ),
           notInArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified", "waiting_human"]),
+          ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
           context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
         )
       )
@@ -379,7 +416,8 @@ export default async function LeadsPage({
     filters.branch ||
     filters.origem ||
     filters.tipo ||
-    filters.qualification
+    filters.qualification ||
+    eligibleCampaignsOnly
   );
 
   return (
@@ -440,6 +478,7 @@ export default async function LeadsPage({
           initialSearch={filters.search}
           initialStatus={filters.status}
           initialTipo={filters.tipo}
+          initialEligibleCampaigns={filters.eligibleCampaigns}
         />
 
         {/* Workspace or RCD Directional Empty State */}

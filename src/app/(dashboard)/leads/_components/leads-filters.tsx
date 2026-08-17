@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
-import { X, SlidersHorizontal, ListChecks } from "@/components/huge-icons";
+import { X, SlidersHorizontal } from "@/components/huge-icons";
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string };
@@ -23,6 +24,7 @@ export function LeadsFilters({
   initialQualification,
   initialCorretor,
   initialPageSize,
+  initialEligibleCampaigns,
   branches,
   brokers,
 }: {
@@ -34,11 +36,13 @@ export function LeadsFilters({
   initialQualification?: string;
   initialCorretor?: string;
   initialPageSize?: string;
+  initialEligibleCampaigns?: string;
   branches: Branch[];
   brokers: Broker[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const [open, setOpen] = useState(false);
 
@@ -51,6 +55,7 @@ export function LeadsFilters({
   const [qualification, setQualification] = useState(initialQualification ?? "");
   const [corretor, setCorretor] = useState(initialCorretor ?? "");
   const [pageSize, setPageSize] = useState(initialPageSize ?? "20");
+  const [eligibleCampaigns, setEligibleCampaigns] = useState(initialEligibleCampaigns === "1");
 
   const activeCount = [
     status,
@@ -59,6 +64,7 @@ export function LeadsFilters({
     origem,
     qualification,
     corretor,
+    eligibleCampaigns ? "eligible-campaigns" : "",
     pageSize !== "20" ? pageSize : "",
   ].filter(Boolean).length;
 
@@ -75,13 +81,12 @@ export function LeadsFilters({
     if (origem) params.set("origem", origem); else params.delete("origem");
     if (qualification) params.set("qualification", qualification); else params.delete("qualification");
     if (corretor) params.set("corretor", corretor); else params.delete("corretor");
+    if (eligibleCampaigns) params.set("eligibleCampaigns", "1"); else params.delete("eligibleCampaigns");
     if (pageSize && pageSize !== "20") params.set("pageSize", pageSize); else params.delete("pageSize");
 
     const queryStr = params.toString();
     const newUrl = `/leads${queryStr ? `?${queryStr}` : ""}`;
-    router.push(newUrl);
-    router.refresh();
-    setOpen(false);
+    startTransition(() => router.push(newUrl));
   }
 
   function handleReset() {
@@ -92,11 +97,10 @@ export function LeadsFilters({
     setOrigem("");
     setQualification("");
     setCorretor("");
+    setEligibleCampaigns(false);
     setPageSize("20");
 
-    router.push("/leads");
-    router.refresh();
-    setOpen(false);
+    startTransition(() => router.push("/leads"));
   }
 
   const statusLabels: Record<string, string> = {
@@ -152,7 +156,7 @@ export function LeadsFilters({
             )}
           </PopoverTrigger>
 
-          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 rounded-xl border border-border bg-popover p-0 shadow-[0_18px_45px_rgb(15_23_42/0.14)] sm:w-96">
+          <PopoverContent aria-busy={isPending} align="end" side="bottom" sideOffset={8} className="w-84 rounded-xl border border-border bg-popover p-0 shadow-[0_18px_45px_rgb(15_23_42/0.14)] sm:w-96">
             <div className="flex items-center justify-between border-b border-border/70 p-3.5">
               <div className="flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
@@ -175,8 +179,8 @@ export function LeadsFilters({
               )}
             </div>
 
-            <ScrollArea className="max-h-[65dvh] p-4">
-              <div className="space-y-4">
+            <ScrollArea className="h-[min(65dvh,32rem)]">
+              <div className="space-y-4 p-4 pb-6">
                 {/* Tipo (PF / PME) - Segmented Control */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tipo de Lead</label>
@@ -225,6 +229,21 @@ export function LeadsFilters({
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Campanhas Meta</label>
+                  <AppSelect
+                    aria-label="Campanhas Meta"
+                    className="h-8.5"
+                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                    onValueChange={(value) => setEligibleCampaigns(value === "1")}
+                    options={[
+                      { value: "", label: "Todas as campanhas" },
+                      { value: "1", label: "Somente elegíveis agora" },
+                    ]}
+                    value={eligibleCampaigns ? "1" : ""}
+                  />
                 </div>
 
                 {/* Status / Etapa */}
@@ -334,6 +353,7 @@ export function LeadsFilters({
                 type="button"
                 variant="ghost"
                 size="sm"
+                disabled={isPending}
                 onClick={handleReset}
                 className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
@@ -341,16 +361,16 @@ export function LeadsFilters({
                 Limpar
               </Button>
 
-              <Button
-                type="button"
-                size="sm"
-                variant="default"
+              <StatefulButton
+                state={isPending ? "loading" : "idle"}
+                loadingText="Aplicando..."
                 onClick={applyFilters}
+                size="sm"
                 className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
+                icon={<SlidersHorizontal className="size-3.5" />}
               >
-                <SlidersHorizontal className="size-3.5" />
                 Aplicar
-              </Button>
+              </StatefulButton>
             </div>
           </PopoverContent>
         </Popover>
@@ -392,6 +412,11 @@ export function LeadsFilters({
           {origem && (
             <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
               Origem: {origem === "manual" ? "Manual" : "Webhook"}
+            </Badge>
+          )}
+          {eligibleCampaigns && (
+            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
+              Meta: campanhas elegíveis
             </Badge>
           )}
           {qualification && (
