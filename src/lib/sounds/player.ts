@@ -68,14 +68,17 @@ export interface Shimmer {
   lowpass?: number;
 }
 
-export interface Layer extends Source {
+export type Layer = (
+  | { type: Waveform; frequency: Frequency; fm?: FM; detune?: number; color?: never }
+  | { type: "noise"; color?: NoiseColor; frequency?: never; fm?: never; detune?: never }
+) & {
   gain?: number;
   delay?: number;
   envelope?: Envelope;
   filter?: Filter;
   reverb?: Reverb;
   shimmer?: Shimmer;
-}
+};
 
 export interface Patch {
   layers?: Layer[];

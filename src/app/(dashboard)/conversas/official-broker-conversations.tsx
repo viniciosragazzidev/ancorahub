@@ -71,7 +71,7 @@ export function OfficialBrokerConversations({ enabled, conversations }: { enable
   }
 
   return (
-    <section aria-label="Conversas oficiais com corretores" className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card">
+    <section aria-label="Conversas oficiais com corretores" className="flex h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:h-full w-full flex-col overflow-hidden bg-card">
       <header className="shrink-0 border-b border-border px-4 py-3 lg:px-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0">
@@ -82,7 +82,7 @@ export function OfficialBrokerConversations({ enabled, conversations }: { enable
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(17rem,0.72fr)_minmax(0,1.7fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(17rem,0.72fr)_minmax(0,1.7fr)]">
         <section aria-label="Corretores com histórico no canal oficial" className={cn("flex min-h-0 flex-col border-r border-border bg-card", selected && "max-lg:hidden")}>
           <div className="border-b border-border p-3">
             <div className="relative"><MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input aria-label="Buscar corretor ou unidade" className="h-8 pl-8 text-xs" onChange={(event) => setQuery(event.target.value)} placeholder="Buscar corretor ou unidade" value={query} /></div>

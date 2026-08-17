@@ -226,7 +226,7 @@ export function ConversationsWorkspace({
   return (
     <section
       aria-label="Central de conversas"
-      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
+      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:h-full w-full flex-col overflow-hidden bg-card"
     >
       <header className="shrink-0 border-b border-border bg-card px-4 py-2.5 sm:px-5">
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -273,7 +273,7 @@ export function ConversationsWorkspace({
 
       <div
           className={cn(
-            "grid min-h-0 flex-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
+            "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
             profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
           )}
       >
@@ -514,13 +514,15 @@ function ConversationHeader({
             <DropdownMenuTrigger
               render={
                 <Button
+                  aria-label="Ações do atendimento"
                   size="sm"
-                  className="h-8 px-3 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs shrink-0"
+                  className="h-8 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs shrink-0"
                   disabled={isPending}
                 >
                   <Sparkles className="size-3.5 text-amber-300" />
-                  <span>Ações do Atendimento</span>
-                  <ChevronDown className="size-3.5 opacity-70 ml-0.5" />
+                  <span className="hidden sm:inline">Ações do Atendimento</span>
+                  <span className="sm:hidden">Ações</span>
+                  <ChevronDown className="size-3.5 opacity-70 ml-0.5 hidden sm:inline-block" />
                 </Button>
               }
             />
@@ -604,7 +606,7 @@ function ConversationHeader({
               <TooltipContent>Ver perfil</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger render={<Link href={`/leads/${client.id}`} aria-label="Abrir lead completo" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><ArrowSquareOut className="size-3.5" /></Link>} />
+              <TooltipTrigger render={<Link href={`/leads/${client.id}`} aria-label="Abrir lead completo" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), "max-[559px]:hidden")}><ArrowSquareOut className="size-3.5" /></Link>} />
               <TooltipContent>Abrir lead</TooltipContent>
             </Tooltip>
             <div className="hidden border-l border-border/60 pl-1 lg:block">
