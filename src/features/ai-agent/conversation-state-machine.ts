@@ -184,8 +184,8 @@ export async function sendAiOutbound(input: {
 
   if (lastOutbound?.sentAt) {
     const elapsedMs = Date.now() - new Date(lastOutbound.sentAt).getTime();
-    if (elapsedMs < 15_000) {
-      console.info(`[anti-spam-15s] Outbound message to ${input.phone} throttled (${Math.ceil((15000 - elapsedMs) / 1000)}s remaining).`);
+    if (elapsedMs < 1_500) {
+      console.info(`[anti-spam-1.5s] Outbound message to ${input.phone} throttled (${Math.ceil((1500 - elapsedMs) / 1000)}s remaining).`);
       return { status: "throttled" as const, messageId: null };
     }
   }
@@ -1105,8 +1105,8 @@ export async function processInboundAiResponse({
   if (!skipDebounce && process.env.NODE_ENV !== "test") {
     const { getSystemSetting } = await import("@/features/system-settings/queries");
     const debounceSetting = await getSystemSetting("ai_debounce_delay_seconds");
-    const debounceSeconds = debounceSetting ? parseInt(debounceSetting, 10) : 10;
-    const debounceMs = Math.max(2000, Math.min(60000, (isNaN(debounceSeconds) ? 10 : debounceSeconds) * 1000));
+    const debounceSeconds = debounceSetting ? parseInt(debounceSetting, 10) : 1;
+    const debounceMs = Math.max(500, Math.min(2000, (isNaN(debounceSeconds) ? 1 : Math.min(2, debounceSeconds)) * 1000));
 
     await new Promise((resolve) => setTimeout(resolve, debounceMs));
 

@@ -398,36 +398,35 @@ export async function generateAiResponse({
     };
   } catch (error: unknown) {
     const latencyMs = Date.now() - startTime;
-    if (typeof error === "object" && error !== null && "status" in error && "errText" in error) {
-      const { status, errText } = error as { status: number; errText: string };
-      const safeError = safeProviderError(errText || `Erro HTTP na chamada de IA (HTTP ${status})`);
-      console.error("[ai-wpp] ai.failed", { tenantId, status, error: safeError, latencyMs });
-      return {
-        success: false,
-        modelUsed: "ai-router",
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        estimatedCost: "0",
-        latencyMs,
-        shouldTransferToHuman: true,
-        transferReason: `Erro HTTP na chamada de IA: ${status}`,
-        error: safeError,
-        detectedLanguage: "pt-BR",
-      };
-    }
-    console.error("[ai-wpp] ai.exception", { tenantId, latencyMs, error: safeProviderError(error) });
+    const errObj = (typeof error === "object" && error !== null && "status" in error) ? (error as { status: number; errText?: string }) : null;
+    const safeErr = safeProviderError(errObj?.errText || error);
+    console.error("[ai-wpp] ai.exception_fallback", { tenantId, latencyMs, error: safeErr });
+
+    const fallback = createSafeFallbackResponse(leadName, memoryContext);
+    const lastUserMsg = messages[messages.length - 1]?.content.toLowerCase() || "";
+    const isQuotationOrHuman = explicitHumanRequest || lastUserMsg.includes("cotação") || lastUserMsg.includes("humano") || lastUserMsg.includes("atendente");
+
+    const content = isQuotationOrHuman
+      ? "Entendi! Vou transferir seu atendimento para um de nossos consultores especializados agora mesmo."
+      : fallback.message;
+
     return {
-      success: false,
-      modelUsed: "ai-router",
+      success: true,
+      content,
+      structured: {
+        ...fallback,
+        message: content,
+        shouldTransfer: isQuotationOrHuman,
+        transferReason: isQuotationOrHuman ? "Solicitou cotação ou atendimento humano" : "Fallback de indisponibilidade temporária de IA",
+      },
+      modelUsed: "fallback-rule-engine",
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,
       estimatedCost: "0",
       latencyMs,
-      shouldTransferToHuman: true,
-      transferReason: "Falha de rede na chamada de IA",
-      error: safeProviderError(error),
+      shouldTransferToHuman: isQuotationOrHuman,
+      transferReason: isQuotationOrHuman ? "Solicitou cotação ou atendimento humano" : "Fallback de indisponibilidade temporária de IA",
       detectedLanguage: "pt-BR",
     };
   }

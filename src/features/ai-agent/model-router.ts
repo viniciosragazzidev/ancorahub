@@ -161,6 +161,7 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
       try {
         const response = await fetch(pair.endpoint, {
           method: "POST",
+          signal: AbortSignal.timeout(8000),
           headers: {
             "Authorization": `Bearer ${pair.apiKey}`,
             "Content-Type": "application/json",
