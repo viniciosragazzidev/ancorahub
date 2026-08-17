@@ -12,6 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency } from "@/features/quotes/utils";
 import type { MetaCampaignItem } from "../types";
 
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { toggleMetaCampaignCaptureEligibilityAction } from "../actions";
+
 export function CampaignsDashboardView({
   campaigns,
   totals,
@@ -25,8 +29,10 @@ export function CampaignsDashboardView({
     conversionRate: number;
   };
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(new Set());
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const toggleExpand = (campaignId: string) => {
     setExpandedCampaignIds((prev) => {
@@ -37,11 +43,34 @@ export function CampaignsDashboardView({
     });
   };
 
+  const handleToggleEligibility = async (campaignId: string, currentEnabled: boolean) => {
+    setTogglingId(campaignId);
+    try {
+      const res = await toggleMetaCampaignCaptureEligibilityAction({
+        campaignId,
+        enabled: !currentEnabled,
+      });
+      if (res.success) {
+        toast.success(!currentEnabled ? "Campanha ativada para captura no CRM!" : "Captura desativada para esta campanha.");
+        router.refresh();
+      } else {
+        toast.error(res.error || "Erro ao atualizar elegibilidade da campanha.");
+      }
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const filteredCampaigns = useMemo(() => {
     return campaigns
       .filter((campaign) => campaign.status.trim().toUpperCase() === "ACTIVE" || (campaign.conversationsCount || 0) > 0)
       .filter((c) => c.name.toLowerCase().includes(search.toLowerCase().trim()))
-      .sort((a, b) => (b.leadsCount || 0) - (a.leadsCount || 0));
+      .sort((a, b) => {
+        const aEligible = a.isEligibleForCapture ? 1 : 0;
+        const bEligible = b.isEligibleForCapture ? 1 : 0;
+        if (bEligible !== aEligible) return bEligible - aEligible;
+        return (b.leadsCount || 0) - (a.leadsCount || 0);
+      });
   }, [campaigns, search]);
 
   // Agrupamento de campanhas por Conta de Anúncios
@@ -171,6 +200,15 @@ export function CampaignsDashboardView({
                                     {camp.ads!.length} {camp.ads!.length === 1 ? "anúncio" : "anúncios"}
                                   </Badge>
                                 )}
+                                {camp.isEligibleForCapture ? (
+                                  <Badge variant="success" className="text-[9px] h-4 px-1.5 font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40">
+                                    ✓ Captura Ativa
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-muted-foreground">
+                                    ✕ Ignorar Leads
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground bg-muted/20">
@@ -196,13 +234,30 @@ export function CampaignsDashboardView({
                           </TableCell>
                           <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums py-2.5">{camp.conversionRate || 0}%</TableCell>
                           <TableCell className="pr-4 text-right py-2.5">
-                            <Link
-                              href={`/marketing/campanhas/${encodeURIComponent(camp.id || camp.campaignId)}`}
-                              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs gap-1")}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Detalhes <ArrowRight className="size-3.5" />
-                            </Link>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant={camp.isEligibleForCapture ? "outline" : "default"}
+                                disabled={togglingId === camp.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleToggleEligibility(camp.campaignId, Boolean(camp.isEligibleForCapture));
+                                }}
+                                className={cn(
+                                  "h-7 text-[11px] px-2 font-medium",
+                                  !camp.isEligibleForCapture && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                )}
+                              >
+                                {togglingId === camp.id ? "…" : camp.isEligibleForCapture ? "Desativar Captura" : "Capturar Leads"}
+                              </Button>
+                              <Link
+                                href={`/marketing/campanhas/${encodeURIComponent(camp.id || camp.campaignId)}`}
+                                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 text-xs px-2 gap-1")}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Detalhes <ArrowRight className="size-3.5" />
+                              </Link>
+                            </div>
                           </TableCell>
                         </TableRow>
 

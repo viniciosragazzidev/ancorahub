@@ -21,7 +21,7 @@ export type MetaConnectionAssets = {
   pixels: Array<{ id: string; name: string; status: string }>;
   datasets: Array<{ id: string; name: string; status: string }>;
   leadForms: Array<{ id: string; name: string; status: string; pageId: string }>;
-  campaigns: Array<{ id: string; name: string; status: string; adAccountId: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; adAccountId: string; isEligibleForCapture?: boolean }>;
   ads: Array<{ id: string; name: string; status: string; adSetId: string }>;
 };
 
@@ -92,6 +92,7 @@ export type MetaCampaignItem = {
   salesCount?: number;
   revenueTotal?: number;
   conversionRate?: number;
+  isEligibleForCapture?: boolean;
   ads?: MetaAdSummaryItem[];
 };
 

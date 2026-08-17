@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { ArrowLeft, ArrowRight, ArrowsClockwise, Globe, Lightning, Power } from "@/components/huge-icons";
+import { ArrowLeft, ArrowRight, ArrowsClockwise, CheckCircle, Globe, Lightning, Power } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-import { disconnectMetaConnection, triggerManualMetaSync } from "../actions";
+import { disconnectMetaConnection, toggleMetaCampaignCaptureEligibilityAction, triggerManualMetaSync } from "../actions";
 import type { MetaConnectionAssets, MetaConnectionInfo, MetaSyncLogItem } from "../types";
 import { MetaMarketingWizard } from "./meta-marketing-wizard";
 
@@ -73,7 +74,7 @@ export function MetaIntegrationView({ connection, assets, logs, canConfigure = t
       </CardContent>
     </Card>
 
-    {connected && assets ? <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Perfil e ativos conectados</CardTitle><CardDescription>Veja apenas os ativos autorizados para esta corretora. Em Distribuição de Leads você escolhe quais campanhas entram no CRM e a fila de cada uma.</CardDescription></CardHeader><CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs text-muted-foreground">Portfólio empresarial</p><p className="mt-1 truncate text-sm font-semibold">{connection.businessName ?? "Nome não informado"}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{connection.businessId}</p></div><MetricCard label="Páginas autorizadas" value={assets.pages.length} /><MetricCard label="Campanhas sincronizadas" value={assets.campaigns.length} /><MetricCard label="Anúncios sincronizados" value={assets.ads.length} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Páginas conectadas" empty="Nenhuma página selecionada." items={assets.pages.map((asset) => ({ ...asset, detail: asset.id }))} /><AssetList title="Contas de anúncios" empty="Nenhuma conta de anúncios selecionada." items={assets.adAccounts.map((asset) => ({ ...asset, detail: `${asset.id} · ${asset.currency}` }))} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Pixels" empty="Nenhum pixel sincronizado ainda." items={assets.pixels.map((asset) => ({ ...asset, detail: asset.id }))} /><AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Formulários de Lead Ads" empty="Nenhum formulário sincronizado ainda." items={assets.leadForms.map((asset) => ({ ...asset, detail: `Página ${asset.pageId}` }))} /><AssetList title="Campanhas" empty="Nenhuma campanha sincronizada ainda." items={assets.campaigns.map((asset) => ({ ...asset, detail: asset.adAccountId }))} /></div><AssetList title="Anúncios" empty="Nenhum anúncio sincronizado ainda." items={assets.ads.map((asset) => ({ ...asset, detail: `Conjunto ${asset.adSetId}` }))} /></CardContent></Card> : null}
+    {connected && assets ? <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Perfil e ativos conectados</CardTitle><CardDescription>Veja os ativos autorizados para esta corretora. Escolha abaixo ou em Marketing/Campanhas quais campanhas capturam leads no CRM.</CardDescription></CardHeader><CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs text-muted-foreground">Portfólio empresarial</p><p className="mt-1 truncate text-sm font-semibold">{connection.businessName ?? "Nome não informado"}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{connection.businessId}</p></div><MetricCard label="Páginas autorizadas" value={assets.pages.length} /><MetricCard label="Campanhas sincronizadas" value={assets.campaigns.length} /><MetricCard label="Anúncios sincronizados" value={assets.ads.length} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Páginas conectadas" empty="Nenhuma página selecionada." items={assets.pages.map((asset) => ({ ...asset, detail: asset.id }))} /><AssetList title="Contas de anúncios" empty="Nenhuma conta de anúncios selecionada." items={assets.adAccounts.map((asset) => ({ ...asset, detail: `${asset.id} · ${asset.currency}` }))} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Pixels" empty="Nenhum pixel sincronizado ainda." items={assets.pixels.map((asset) => ({ ...asset, detail: asset.id }))} /><AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} /></div><div className="grid gap-4 lg:grid-cols-2"><AssetList title="Formulários de Lead Ads" empty="Nenhum formulário sincronizado ainda." items={assets.leadForms.map((asset) => ({ ...asset, detail: `Página ${asset.pageId}` }))} /><CampaignsAssetList campaigns={assets.campaigns} canConfigure={canConfigure} /></div><AssetList title="Anúncios" empty="Nenhum anúncio sincronizado ainda." items={assets.ads.map((asset) => ({ ...asset, detail: `Conjunto ${asset.adSetId}` }))} /></CardContent></Card> : null}
 
     <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Sincronizações recentes</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{logs.length ? <SyncLogsList logs={logs} /> : <p className="text-muted-foreground">Nenhuma sincronização registrada.</p>}</CardContent></Card>
     {wizardOpen ? <MetaMarketingWizard onClose={() => setWizardOpen(false)} /> : null}
@@ -117,6 +118,121 @@ function PaginationFooter({ page, totalPages, total, start, end, onPageChange }:
       <div className="flex items-center gap-1">
         <Button disabled={page <= 1} onClick={() => onPageChange(page - 1)} size="sm" variant="outline"><ArrowLeft className="size-4" />Anterior</Button>
         <Button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} size="sm" variant="outline">Próxima<ArrowRight className="size-4" /></Button>
+      </div>
+    </div>
+  );
+}
+
+function CampaignsAssetList({
+  campaigns,
+  canConfigure,
+}: {
+  campaigns: Array<{ id: string; name: string; status: string; adAccountId: string; isEligibleForCapture?: boolean }>;
+  canConfigure: boolean;
+}) {
+  const router = useRouter();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const handleToggle = async (campaignId: string, currentEligible: boolean) => {
+    setTogglingId(campaignId);
+    try {
+      const res = await toggleMetaCampaignCaptureEligibilityAction({
+        campaignId,
+        enabled: !currentEligible,
+      });
+      if (res.success) {
+        toast.success(!currentEligible ? "Campanha ativada para captura de leads no CRM!" : "Captura de leads desativada para esta campanha.");
+        router.refresh();
+      } else {
+        toast.error(res.error || "Erro ao atualizar elegibilidade.");
+      }
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const sortedCampaigns = [...campaigns].sort((a, b) => {
+    const aEligible = a.isEligibleForCapture ? 1 : 0;
+    const bEligible = b.isEligibleForCapture ? 1 : 0;
+    if (bEligible !== aEligible) return bEligible - aEligible;
+
+    const aActive = a.status === "active" || a.status === "ACTIVE";
+    const bActive = b.status === "active" || b.status === "ACTIVE";
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const { page, totalPages, total, start, end, visible, setPage } = usePaged(sortedCampaigns);
+  const eligibleCount = campaigns.filter((c) => c.isEligibleForCapture).length;
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold flex items-center gap-2">
+            Campanhas & Captura CRM
+          </p>
+          <p className="text-xs text-muted-foreground">Elegíveis no topo. Apenas campanhas ativas capturam leads no CRM.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="success" className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+            {eligibleCount} elegível{eligibleCount === 1 ? "" : "s"}
+          </Badge>
+          <span className="font-mono text-xs text-muted-foreground">{campaigns.length} total</span>
+        </div>
+      </div>
+      <div className="divide-y divide-border">
+        {visible.length ? (
+          visible.map((item) => {
+            const isEligible = Boolean(item.isEligibleForCapture);
+            const isToggling = togglingId === item.id;
+            return (
+              <div
+                className={cn(
+                  "flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors",
+                  isEligible ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-l-4 border-l-emerald-500" : ""
+                )}
+                key={item.id}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="truncate text-sm font-semibold">{item.name}</p>
+                    {isEligible ? (
+                      <Badge variant="success" className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold border-emerald-500/40">
+                        ✓ Elegível p/ Captura
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                        ✕ Captura Desativada
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="truncate font-mono text-xs text-muted-foreground mt-0.5">Conta: {item.adAccountId}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={item.status === "active" || item.status === "ACTIVE" ? "outline" : "secondary"} className="text-[10px]">
+                    {item.status === "active" || item.status === "ACTIVE" ? "Ativa" : item.status}
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant={isEligible ? "outline" : "default"}
+                    disabled={!canConfigure || isToggling}
+                    onClick={() => void handleToggle(item.id, isEligible)}
+                    className={cn("h-7 text-xs font-medium", !isEligible && "bg-emerald-600 hover:bg-emerald-700 text-white")}
+                  >
+                    {isToggling ? "Salvando…" : isEligible ? "Desativar Captura" : "Tornar Elegível"}
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <p className="px-4 py-3 text-sm text-muted-foreground">Nenhuma campanha sincronizada ainda.</p>
+        )}
+      </div>
+      <div className="border-t border-border px-4 py-2.5">
+        <PaginationFooter page={page} totalPages={totalPages} total={total} start={start} end={end} onPageChange={setPage} />
       </div>
     </div>
   );

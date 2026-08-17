@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
@@ -39,7 +39,7 @@ export async function getMetaConnectionState(): Promise<{
     };
   }
 
-  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs] = await Promise.all([
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes] = await Promise.all([
     db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))).orderBy(schema.metaPages.name),
     db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.status, "active"))).orderBy(schema.metaAdAccounts.name),
     db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.status, "active"))).orderBy(schema.metaPixels.name),
@@ -49,11 +49,21 @@ export async function getMetaConnectionState(): Promise<{
     db.select({ id: schema.metaAdSets.adSetId, campaignId: schema.metaAdSets.campaignId }).from(schema.metaAdSets).where(eq(schema.metaAdSets.tenantId, context.tenantId)),
     db.select({ id: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status, adSetId: schema.metaAds.adSetId }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
     db.select().from(schema.metaSyncLogs).where(eq(schema.metaSyncLogs.tenantId, context.tenantId)).orderBy(desc(schema.metaSyncLogs.startedAt)).limit(60),
+    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)),
   ]);
 
   const activeAccountIds = new Set(adAccounts.map((account) => account.id));
   const activePageIds = new Set(pages.map((page) => page.id));
-  const activeCampaigns = campaigns.filter((campaign) => activeAccountIds.has(campaign.adAccountId));
+  const routeMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
+  const hasTenantRules = campaignRoutes.length > 0;
+
+  const activeCampaigns = campaigns
+    .filter((campaign) => activeAccountIds.has(campaign.adAccountId))
+    .map((c) => ({
+      ...c,
+      isEligibleForCapture: routeMap.has(c.id) ? Boolean(routeMap.get(c.id)) : !hasTenantRules,
+    }));
+
   const activeCampaignIds = new Set(activeCampaigns.map((campaign) => campaign.id));
   const activeAdSetIds = new Set(adSets.filter((adSet) => activeCampaignIds.has(adSet.campaignId)).map((adSet) => adSet.id));
   const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadForms: leadForms.filter((form) => activePageIds.has(form.pageId)), campaigns: activeCampaigns, ads: ads.filter((ad) => activeAdSetIds.has(ad.adSetId)) };
@@ -392,4 +402,63 @@ export async function getMetaSyncDiagnosticAction() {
   const { getMetaSyncAuditDiagnostic } = await import("./meta-diagnostic-service");
   const context = await getRequiredTenantContext();
   return getMetaSyncAuditDiagnostic(context.tenantId);
+}
+
+/** Alternar elegibilidade de captura de leads da campanha */
+export async function toggleMetaCampaignCaptureEligibilityAction(input: {
+  campaignId: string;
+  enabled: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+
+    const [campaign] = await db
+      .select({ id: schema.metaCampaigns.id, campaignId: schema.metaCampaigns.campaignId })
+      .from(schema.metaCampaigns)
+      .where(
+        and(
+          eq(schema.metaCampaigns.tenantId, context.tenantId),
+          or(eq(schema.metaCampaigns.id, input.campaignId), eq(schema.metaCampaigns.campaignId, input.campaignId))
+        )
+      )
+      .limit(1);
+
+    if (!campaign) {
+      return { success: false, error: "Campanha Meta não encontrada." };
+    }
+
+    const now = new Date();
+    await db
+      .insert(schema.metaCampaignQueueRoutes)
+      .values({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        campaignId: campaign.campaignId,
+        queueId: null,
+        enabled: input.enabled,
+        createdBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
+        set: { enabled: input.enabled, updatedAt: now },
+      });
+
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "meta_campaign_queue_route",
+      entidadeId: campaign.campaignId,
+      acao: input.enabled ? "meta_campaign.capture_enabled" : "meta_campaign.capture_disabled",
+    });
+
+    revalidatePath("/integrations/meta");
+    revalidatePath("/marketing/campanhas");
+    revalidatePath("/leads/distribuicao");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a elegibilidade da campanha." };
+  }
 }

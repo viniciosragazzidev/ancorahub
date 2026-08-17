@@ -108,6 +108,17 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     .where(eq(schema.metaAdAccounts.tenantId, tenantId));
   const adAccountNameMap = new Map(adAccountsList.map((a) => [a.adAccountId, a.name]));
 
+  // 4b. Buscar regras de elegibilidade por campanha
+  const campaignRoutes = await db
+    .select({
+      campaignId: schema.metaCampaignQueueRoutes.campaignId,
+      enabled: schema.metaCampaignQueueRoutes.enabled,
+    })
+    .from(schema.metaCampaignQueueRoutes)
+    .where(eq(schema.metaCampaignQueueRoutes.tenantId, tenantId));
+  const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
+  const hasTenantRules = campaignRoutes.length > 0;
+
   // 5. Buscar anúncios vinculados às campanhas do tenant
   const adsWithCampaign = await db
     .select({
@@ -207,6 +218,12 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     const allAds = adsByCampaignMap.get(c.campaignId) || [];
     const visibleAds = allAds.filter((ad) => shouldDisplayAd(ad.status, ad.activeLeadsCount));
 
+    const isEligibleForCapture = campaignRouteMap.has(c.campaignId)
+      ? Boolean(campaignRouteMap.get(c.campaignId))
+      : campaignRouteMap.has(c.id)
+        ? Boolean(campaignRouteMap.get(c.id))
+        : !hasTenantRules;
+
     return [{
       id: c.id,
       campaignId: c.campaignId,
@@ -224,6 +241,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       salesCount,
       revenueTotal,
       conversionRate,
+      isEligibleForCapture,
       ads: visibleAds,
     }];
   });

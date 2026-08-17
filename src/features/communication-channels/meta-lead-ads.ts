@@ -204,9 +204,15 @@ export async function configureMetaLeadAdsSource(input: { tenantId: string; bran
 export function resolveMetaCampaignIntake(input: {
   adRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
   campaignRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
+  hasTenantCampaignRules?: boolean;
 }) {
   const route = input.adRoute ?? input.campaignRoute;
-  if (!route) return { action: "capture" as const, queueId: null };
+  if (!route) {
+    if (input.hasTenantCampaignRules) {
+      return { action: "ignore" as const, queueId: null };
+    }
+    return { action: "capture" as const, queueId: null };
+  }
   if (!route.enabled) return { action: "ignore" as const, queueId: null };
   if (route.queueId && route.queueStatus === "active") {
     return { action: "capture" as const, queueId: route.queueId };
@@ -294,7 +300,11 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           .leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
           .where(and(eq(schema.metaAdQueueRoutes.tenantId, source.tenantId), eq(schema.metaAdQueueRoutes.adId, lead.adId)))
           .limit(1) : [];
-        const campaignIntake = resolveMetaCampaignIntake({ adRoute, campaignRoute });
+        const [anyTenantRoute] = await db.select({ id: schema.metaCampaignQueueRoutes.id })
+          .from(schema.metaCampaignQueueRoutes)
+          .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId), eq(schema.metaCampaignQueueRoutes.enabled, true)))
+          .limit(1);
+        const campaignIntake = resolveMetaCampaignIntake({ adRoute, campaignRoute, hasTenantCampaignRules: Boolean(anyTenantRoute) });
         if (campaignIntake.action === "ignore") {
           await db.insert(schema.auditLogs).values({
             id: randomUUID(), userId: credential.createdBy, entidade: adRoute ? "meta_ad_queue_route" : "meta_campaign_queue_route", entidadeId: lead.adId ?? lead.campaignId ?? lead.externalId,
