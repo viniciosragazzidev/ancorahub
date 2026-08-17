@@ -216,28 +216,34 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
 
         if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
-          try {
-            const aiResult = await processInboundAiResponse({
-              tenantId: channel.tenantId,
-              leadId: activeLeadId,
-              phone: message.from,
-              userMessageBody: text,
-              messageKind,
-              communicationChannelId: channel.id,
-              providerMessageId: message.id,
-            });
+          const aiPromise = processInboundAiResponse({
+            tenantId: channel.tenantId,
+            leadId: activeLeadId,
+            phone: message.from,
+            userMessageBody: text,
+            messageKind,
+            communicationChannelId: channel.id,
+            providerMessageId: message.id,
+          }).then((aiResult) => {
             console.info("[ai-wpp] inbound.completed", {
               tenantId: channel.tenantId,
               leadId: activeLeadId,
               status: aiResult.status,
               deliveryStatus: "deliveryStatus" in aiResult ? aiResult.deliveryStatus : undefined,
             });
-          } catch (error) {
+          }).catch((error) => {
             console.error("[ai-wpp] inbound.failed", {
               tenantId: channel.tenantId,
               leadId: activeLeadId,
               error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
             });
+          });
+
+          try {
+            const { waitUntil } = require("next/server");
+            if (typeof waitUntil === "function") waitUntil(aiPromise);
+          } catch {
+            // Fallback: non-blocking execution in environment without waitUntil
           }
         } else if (activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_non_pending_qualification", {

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -164,6 +164,7 @@ async function sendAiOutbound(input: {
   transport: AiTransport;
   openWaSessionId?: string | null;
   wahaRunId?: string | null;
+  currentMessageId?: string;
 }) {
   const db = getDatabase();
   const [lastOutbound] = await db
@@ -173,7 +174,8 @@ async function sendAiOutbound(input: {
       and(
         eq(schema.whatsappMessages.tenantId, input.tenantId),
         eq(schema.whatsappMessages.phone, input.phone),
-        eq(schema.whatsappMessages.direction, "outbound")
+        eq(schema.whatsappMessages.direction, "outbound"),
+        input.currentMessageId ? ne(schema.whatsappMessages.id, input.currentMessageId) : undefined
       )
     )
     .orderBy(desc(schema.whatsappMessages.sentAt))
@@ -588,7 +590,7 @@ export async function startQualificationConversationForLead(
       sentAt: new Date(),
     }).onConflictDoNothing();
 
-    const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body: finalBody, transport: "meta" }).catch(() => ({ status: "failed" as const, messageId: null }));
+    const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body: finalBody, transport: "meta", currentMessageId: finalMessageId }).catch(() => ({ status: "failed" as const, messageId: null }));
 
     if (sent.status === "skipped_no_channel" || sent.status === "failed") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
@@ -786,6 +788,7 @@ async function completeDeterministicQualificationTurn(input: {
       transport: input.transport,
       openWaSessionId: input.openWaSessionId,
       wahaRunId: input.wahaRunId,
+      currentMessageId: messageId,
     });
     if (sent.status === "sent") {
       deliveryStatus = "sent";
@@ -834,7 +837,7 @@ async function completeDeterministicQualificationTurn(input: {
     latencyMs: 0,
     status: deliveryStatus === "sent" ? "success" : "delivery_failed",
     sourceMessageId: input.sourceIdentifier ?? null,
-  }).catch((error) => console.warn("[qualification] attendance_log_failed", { conversationId: input.conversationId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" }));
+  }).onConflictDoNothing().catch((error) => console.warn("[qualification] attendance_log_failed", { conversationId: input.conversationId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" }));
 
   console.info("[qualification] deterministic_turn_completed", {
     tenantId: input.tenantId,
@@ -1045,7 +1048,7 @@ export async function processInboundAiResponse({
       messageId = `quick_reply_${crypto.randomUUID()}`;
       await db.insert(schema.whatsappMessages).values({ id: messageId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: template.body, sentAt: now });
       try {
-        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId, wahaRunId });
+        const sent = await sendAiOutbound({ tenantId, phone, body: template.body, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
         deliveryStatus = sent.status;
         if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       } catch (error) {
@@ -1171,7 +1174,7 @@ export async function processInboundAiResponse({
     });
     let deliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId, wahaRunId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: handoffMessage, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
       deliveryStatus = sent.status;
       if (sent.messageId) {
         await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId })
@@ -1182,9 +1185,10 @@ export async function processInboundAiResponse({
     }
     await transitionConversationState({ tenantId, conversationId: conversation.id, newStatus: "WAITING_HUMAN", reason: "Solicitação explícita de atendimento humano" });
     const humanQualification = await persistQualificationEvaluation({ tenantId, leadId, conversationId: conversation.id, actorUserId: null, policy: behavior.policy, memory: updatedMemory, reason: "human_requested" });
-    if ((await getSystemSetting("feature_distribution_by_qualification_enabled")) === "true") {
-      await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
-    }
+    const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+    await distributeQualifiedLead({ tenantId, leadId, actorUserId: null }).catch((distErr) => {
+      console.warn("[qualification] human_requested.distribution_failed", { tenantId, leadId, error: distErr });
+    });
     console.info("[qualification] human_requested", { tenantId, leadId, conversationId: conversation.id, state: humanQualification.state, score: humanQualification.score });
     return { status: "transferred_to_human", deliveryStatus, reply: handoffMessage };
   }
@@ -1288,7 +1292,7 @@ export async function processInboundAiResponse({
 
     // 2. Send fallback message to WhatsApp
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId, wahaRunId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: fallbackMessage, transport, openWaSessionId, wahaRunId, currentMessageId: fallbackMsgId });
       if (sent.status === "sent") {
         console.info("[ai-wpp] fallback.sent", { tenantId, leadId, phone });
       } else {
@@ -1365,7 +1369,7 @@ export async function processInboundAiResponse({
 
     let fallbackDeliveryStatus = "failed";
     try {
-      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId, wahaRunId });
+      const sent = await sendAiOutbound({ tenantId, phone, body: safeFallback.message, transport, openWaSessionId, wahaRunId, currentMessageId: fallbackMessageId });
       if (sent.status === "sent") {
         await db.update(schema.whatsappMessages)
           .set({ providerStatus: "sent", messageId: sent.messageId ?? undefined })
@@ -1415,7 +1419,7 @@ export async function processInboundAiResponse({
       latencyMs: aiResult.latencyMs,
       status: "success",
       sourceMessageId: sourceIdentifier ?? null,
-    });
+    }).onConflictDoNothing();
   } catch (logErr) {
     console.warn("[ai-agent] Failed to insert aiAttendanceLogs:", logErr);
   }
@@ -1597,7 +1601,7 @@ export async function processInboundAiResponse({
   let deliveryStatus = "failed";
   let providerMessageId: string | null = null;
   try {
-    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId });
+    const sent = await sendAiOutbound({ tenantId, phone, body: aiResult.content, transport, openWaSessionId, wahaRunId, currentMessageId: messageId });
     if (sent.status === "sent") {
       await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, messageId), eq(schema.whatsappMessages.tenantId, tenantId)));
       deliveryStatus = "sent";

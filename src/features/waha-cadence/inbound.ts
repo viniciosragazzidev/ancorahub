@@ -62,7 +62,11 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   // lead-centric, so it only answers after a tenant-scoped lead is resolved.
   if (leadId && number.capabilities.ai && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
     const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
-    await processInboundAiResponse({ tenantId: run.tenantId, leadId, phone: event.message.from, userMessageBody: event.message.body, communicationChannelId: null, providerMessageId: event.message.id, transport: "waha", wahaRunId: run.id });
+    const aiPromise = processInboundAiResponse({ tenantId: run.tenantId, leadId, phone: event.message.from, userMessageBody: event.message.body, communicationChannelId: null, providerMessageId: event.message.id, transport: "waha", wahaRunId: run.id }).catch((err) => console.error("[waha-ai] inbound.failed", err));
+    try {
+      const { waitUntil } = require("next/server");
+      if (typeof waitUntil === "function") waitUntil(aiPromise);
+    } catch {}
   }
   await db.update(schema.wahaWebhookEvents).set({ status: "processed", processedAt: new Date() }).where(eq(schema.wahaWebhookEvents.id, registered.id));
   return { processed: 1 };
