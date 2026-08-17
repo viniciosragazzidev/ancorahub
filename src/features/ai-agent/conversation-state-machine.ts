@@ -522,6 +522,7 @@ export async function startQualificationConversationForLead(
         communicationChannelId: latestIncoming.communicationChannelId,
         providerMessageId: latestIncoming.messageId,
         transport: (latestIncoming.provider as any) ?? "meta",
+        skipDebounce: true,
       }).catch((err) => console.error("[resumeAi] processInboundAiResponse error:", err));
     } else {
       // Re-evaluate current memory & next question if customer didn't send a new message
@@ -986,6 +987,7 @@ export async function processInboundAiResponse({
   transport = "meta",
   openWaSessionId,
   wahaRunId,
+  skipDebounce = false,
 }: {
   tenantId: string;
   leadId: string;
@@ -998,6 +1000,7 @@ export async function processInboundAiResponse({
   transport?: AiTransport;
   openWaSessionId?: string | null;
   wahaRunId?: string | null;
+  skipDebounce?: boolean;
 }) {
   const db = getDatabase();
 
@@ -1014,6 +1017,39 @@ export async function processInboundAiResponse({
     leadId,
     communicationChannelId,
   });
+
+  const nowReceived = new Date();
+  await db
+    .update(schema.aiConversations)
+    .set({ lastActivityAt: nowReceived, updatedAt: nowReceived })
+    .where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)));
+
+  // 1b. Debounce Buffer Window: aggregate rapid multi-message bursts into a single consolidated turn
+  if (!skipDebounce && process.env.NODE_ENV !== "test") {
+    const { getSystemSetting } = await import("@/features/platform-admin/service");
+    const debounceSetting = await getSystemSetting("ai_debounce_delay_seconds");
+    const debounceSeconds = debounceSetting ? parseInt(debounceSetting, 10) : 10;
+    const debounceMs = Math.max(2000, Math.min(60000, (isNaN(debounceSeconds) ? 10 : debounceSeconds) * 1000));
+
+    await new Promise((resolve) => setTimeout(resolve, debounceMs));
+
+    const [freshConv] = await db
+      .select({ lastActivityAt: schema.aiConversations.lastActivityAt })
+      .from(schema.aiConversations)
+      .where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)))
+      .limit(1);
+
+    if (freshConv?.lastActivityAt && freshConv.lastActivityAt.getTime() > nowReceived.getTime()) {
+      console.info("[ai-wpp] inbound.debounced_superceded", {
+        tenantId,
+        leadId,
+        receivedAt: nowReceived.toISOString(),
+        latestActivityAt: freshConv.lastActivityAt.toISOString(),
+      });
+      return { status: "debounced_superceded" as const };
+    }
+  }
+
   const behavior = await resolvePublishedAgentBehavior(tenantId, conversation.behaviorVersionId);
   if (!conversation.behaviorVersionId && behavior.versionId) {
     await db.update(schema.aiConversations).set({ behaviorVersionId: behavior.versionId, updatedAt: new Date() })
