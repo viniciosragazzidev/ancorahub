@@ -49,7 +49,15 @@ import {
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   takeoverConversationAction,
   closeConversationAction,
@@ -502,75 +510,85 @@ function ConversationHeader({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 sm:gap-2">
-          <div className="flex items-center gap-1.5">
-            <Button
-              className="h-8 px-2.5 text-xs font-semibold gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 shrink-0"
-              disabled={isPending}
-              onClick={handleResumeAi}
-              size="sm"
-              type="button"
-            >
-              <Sparkles className="size-3.5" />
-              <span className="hidden md:inline">Continuar Atendimento IA</span>
-              <span className="md:hidden">Retomar IA</span>
-            </Button>
-
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label="Sincronizar chat deste lead"
-                    disabled={isPending}
-                    onClick={handleSyncChat}
-                    size="icon-sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <RefreshCw className={cn("size-3.5", isPending && "animate-spin")} />
-                  </Button>
-                }
-              />
-              <TooltipContent>Sincronizar todo o chat</TooltipContent>
-            </Tooltip>
-
-            {role === "director" && client.aiConversation?.id && (
-              <Button
-                className="hidden xl:inline-flex h-8 text-xs font-semibold gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 shrink-0"
-                disabled={isPending}
-                onClick={handleResetChat}
-                size="sm"
-                variant="outline"
-              >
-                Resetar Chat IA
-              </Button>
-            )}
-
-            {client.aiConversation?.id && (
-              isHumanActive ? (
-                !isAssignedToMe && (role === "director" || role === "manager") ? (
-                  <Button
-                    className="h-8 px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-                    disabled={isPending}
-                    onClick={handleTakeover}
-                    size="sm"
-                  >
-                    <span className="hidden lg:inline">Assumir e pausar automação</span>
-                    <span className="lg:hidden">Assumir</span>
-                  </Button>
-                ) : null
-              ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
                 <Button
-                  className="h-8 px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-                  disabled={isPending}
-                  onClick={handleTakeover}
                   size="sm"
+                  className="h-8 px-3 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs shrink-0"
+                  disabled={isPending}
                 >
-                  <span className="hidden lg:inline">Assumir e pausar automação</span>
-                  <span className="lg:hidden">Assumir</span>
+                  <Sparkles className="size-3.5 text-amber-300" />
+                  <span>Ações do Atendimento</span>
+                  <ChevronDown className="size-3.5 opacity-70 ml-0.5" />
                 </Button>
-              )
-            )}
-          </div>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-64 p-1.5 space-y-0.5">
+              <DropdownMenuLabel className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase px-2 py-1">
+                Ações & Automações por IA
+              </DropdownMenuLabel>
+
+              {/* CONTINUAR ATENDIMENTO IA */}
+              <DropdownMenuItem
+                onClick={handleResumeAi}
+                disabled={isPending}
+                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg text-emerald-700 dark:text-emerald-300 focus:bg-emerald-500/10"
+              >
+                <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div className="flex flex-col">
+                  <span className="font-semibold text-emerald-800 dark:text-emerald-200">Continuar Atendimento IA</span>
+                  <span className="text-[10px] text-muted-foreground">Retoma a qualificação automática por IA</span>
+                </div>
+              </DropdownMenuItem>
+
+              {/* ASSUMIR E PAUSAR AUTOMAÇÃO */}
+              {client.aiConversation?.id && (
+                <DropdownMenuItem
+                  onClick={handleTakeover}
+                  disabled={isPending}
+                  className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg text-blue-700 dark:text-blue-300 focus:bg-blue-500/10"
+                >
+                  <UserCheck className="size-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-blue-800 dark:text-blue-200">Assumir e Pausar Automação</span>
+                    <span className="text-[10px] text-muted-foreground">Pausa o robô e assume para atendimento humano</span>
+                  </div>
+                </DropdownMenuItem>
+              )}
+
+              {/* SINCRONIZAR HISTÓRICO CHAT */}
+              <DropdownMenuItem
+                onClick={handleSyncChat}
+                disabled={isPending}
+                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg focus:bg-muted"
+              >
+                <RefreshCw className={cn("size-4 shrink-0 text-muted-foreground mt-0.5", isPending && "animate-spin")} />
+                <div className="flex flex-col">
+                  <span className="font-medium text-foreground">Sincronizar Histórico Chat</span>
+                  <span className="text-[10px] text-muted-foreground">Atualiza mensagens recentes do WhatsApp</span>
+                </div>
+              </DropdownMenuItem>
+
+              {/* RESETAR CHAT IA (DIRETORES) */}
+              {role === "director" && client.aiConversation?.id && (
+                <>
+                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuItem
+                    onClick={handleResetChat}
+                    disabled={isPending}
+                    className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg text-destructive focus:bg-destructive/10"
+                  >
+                    <RotateCcw className="size-4 text-destructive shrink-0 mt-0.5" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-destructive">Resetar Chat IA</span>
+                      <span className="text-[10px] text-muted-foreground">Limpa a memória para retestar a qualificação</span>
+                    </div>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <div className="flex items-center gap-1 border-l border-border/60 pl-1.5 sm:pl-2">
             <Tooltip>
