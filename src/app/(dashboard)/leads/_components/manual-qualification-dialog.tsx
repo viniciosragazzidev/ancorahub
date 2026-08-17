@@ -47,6 +47,11 @@ export function ManualQualificationDialog({
   const [note, setNote] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
 
+  const defaultMsgTemplate = `Olá, ${leadName || "Cliente"}! Recebemos todas as suas informações com sucesso. Em breve um de nossos consultores especializados entrará em contato para enviar uma cotação perfeita para a sua necessidade!`;
+
+  const [sendMessage, setSendMessage] = useState<boolean>(true);
+  const [customMessage, setCustomMessage] = useState<string>(defaultMsgTemplate);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -57,6 +62,8 @@ export function ManualQualificationDialog({
       targetStage: isQualified ? "qualificado" : "humano",
       brokerId: targetBrokerId || null,
       rating,
+      sendMessageToCustomer: isQualified && sendMessage,
+      customCustomerMessage: sendMessage ? customMessage : undefined,
     });
 
     setBusy(false);
@@ -78,7 +85,7 @@ export function ManualQualificationDialog({
           Qualificar Lead Manualmente
         </DialogTitle>
         <DialogDescription>
-          Defina a classificação e os responsáveis para o lead <strong>{leadName}</strong>. Ele será promovido para a etapa de leads qualificados.
+          Defina a classificação, corretor e mensagem enviada para <strong>{leadName}</strong>.
         </DialogDescription>
 
         <form onSubmit={handleSubmit} className="grid gap-4 mt-3">
@@ -157,6 +164,46 @@ export function ManualQualificationDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Mensagem Padrão para o Cliente no WhatsApp */}
+          {rating !== "not_qualified" && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 grid gap-2.5">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="send-whatsapp-msg"
+                  checked={sendMessage}
+                  onChange={(e) => setSendMessage(e.target.checked)}
+                  className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                />
+                <Label htmlFor="send-whatsapp-msg" className="text-xs font-semibold cursor-pointer select-none">
+                  Enviar mensagem de confirmação no WhatsApp do cliente
+                </Label>
+              </div>
+
+              {sendMessage && (
+                <div className="grid gap-2 mt-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] font-medium text-muted-foreground">Modelo de Mensagem:</Label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomMessage(defaultMsgTemplate)}
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      Restaurar Padrão
+                    </button>
+                  </div>
+                  <textarea
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-md border border-border bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    placeholder="Digite ou edite a mensagem enviada..."
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Observação / Auditoria */}
           <div className="grid gap-2">

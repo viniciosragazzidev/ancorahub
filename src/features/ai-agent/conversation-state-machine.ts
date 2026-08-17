@@ -157,7 +157,7 @@ export async function handleInitialMessageFailure({
   }
 }
 
-async function sendAiOutbound(input: {
+export async function sendAiOutbound(input: {
   tenantId: string;
   phone: string;
   body: string;
@@ -1026,7 +1026,7 @@ export async function processInboundAiResponse({
 
   // 1b. Debounce Buffer Window: aggregate rapid multi-message bursts into a single consolidated turn
   if (!skipDebounce && process.env.NODE_ENV !== "test") {
-    const { getSystemSetting } = await import("@/features/platform-admin/service");
+    const { getSystemSetting } = await import("@/features/system-settings/queries");
     const debounceSetting = await getSystemSetting("ai_debounce_delay_seconds");
     const debounceSeconds = debounceSetting ? parseInt(debounceSetting, 10) : 10;
     const debounceMs = Math.max(2000, Math.min(60000, (isNaN(debounceSeconds) ? 10 : debounceSeconds) * 1000));

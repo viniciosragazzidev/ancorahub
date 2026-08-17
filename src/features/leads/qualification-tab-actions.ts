@@ -239,6 +239,8 @@ export async function manuallyChangeQualificationStageAction(input: {
   targetStage: "qualificacoes" | "qualificado" | "humano";
   brokerId?: string | null;
   rating?: "qualified" | "hot" | "warm" | "cold" | "not_qualified";
+  sendMessageToCustomer?: boolean;
+  customCustomerMessage?: string;
 }) {
   try {
     const context = await getRequiredTenantContext();
@@ -254,6 +256,7 @@ export async function manuallyChangeQualificationStageAction(input: {
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
         branchId: schema.leads.branchId,
       })
       .from(schema.leads)
@@ -338,6 +341,31 @@ export async function manuallyChangeQualificationStageAction(input: {
           acao: `qualification.manually_moved_to_${input.targetStage}`,
         });
       });
+
+      if (input.sendMessageToCustomer && lead.telefone) {
+        const messageText = input.customCustomerMessage?.trim() || `Olá, ${lead.nome || "Cliente"}! Recebemos todas as suas informações com sucesso. Em breve um de nossos consultores especializados entrará em contato para enviar uma cotação perfeita para a sua necessidade!`;
+        const msgId = `msg_manual_qual_${randomUUID()}`;
+
+        await db.insert(schema.whatsappMessages).values({
+          id: msgId,
+          tenantId: context.tenantId,
+          leadId: lead.id,
+          senderRole: "assistant",
+          provider: "meta",
+          phone: lead.telefone,
+          direction: "outbound",
+          body: messageText,
+          sentAt: now,
+        }).onConflictDoNothing();
+
+        const { sendAiOutbound } = await import("@/features/ai-agent/conversation-state-machine");
+        await sendAiOutbound({
+          tenantId: context.tenantId,
+          phone: lead.telefone,
+          body: messageText,
+          currentMessageId: msgId,
+        }).catch((err: unknown) => console.warn("[manuallyChangeQualificationStageAction] Outbound send error:", err));
+      }
     }
 
     revalidatePath("/leads");
