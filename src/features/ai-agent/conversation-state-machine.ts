@@ -435,8 +435,10 @@ export async function startQualificationConversationForLead(
 
   const memory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
 
-  // CHECK IF THE LEAD ALREADY HAS ASSISTANT MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE
-  const [existingAssistantMsg] = await db
+  const cleanPhone = lead.telefone.replace(/\D/g, "");
+
+  // CHECK IF THE LEAD ALREADY HAS ANY MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE
+  const [existingMsg] = await db
     .select({ id: schema.whatsappMessages.id })
     .from(schema.whatsappMessages)
     .where(
@@ -445,26 +447,19 @@ export async function startQualificationConversationForLead(
         or(
           eq(schema.whatsappMessages.leadId, input.leadId),
           eq(schema.whatsappMessages.conversationId, conversation.id),
-          eq(schema.whatsappMessages.phone, lead.telefone)
-        ),
-        or(
-          eq(schema.whatsappMessages.senderRole, "assistant"),
-          eq(schema.whatsappMessages.senderRole, "system"),
-          eq(schema.whatsappMessages.senderRole, "agent"),
-          eq(schema.whatsappMessages.direction, "outbound"),
-          eq(schema.whatsappMessages.direction, "outgoing")
+          sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') = ${cleanPhone}`
         )
       )
     )
     .limit(1);
 
-  const isExistingConversation = Boolean(existingAssistantMsg)
+  const isExistingConversation = Boolean(existingMsg)
     || conversation.status !== "NEW"
     || Boolean(conversation.lastProcessedMessageId)
-    || Boolean(conversation.startedAt && Date.now() - conversation.startedAt.getTime() > 1000);
+    || Boolean(conversation.startedAt);
 
   if (isExistingConversation) {
-    // Reactivate AI state
+    // Reactivate AI state without resending initial template greeting
     await db.update(schema.aiConversations).set({
       status: "WAITING_CUSTOMER",
       automationState: "AI_ACTIVE",
@@ -489,7 +484,7 @@ export async function startQualificationConversationForLead(
           or(
             eq(schema.whatsappMessages.leadId, input.leadId),
             eq(schema.whatsappMessages.conversationId, conversation.id),
-            eq(schema.whatsappMessages.phone, lead.telefone)
+            sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') = ${cleanPhone}`
           ),
           or(
             eq(schema.whatsappMessages.direction, "incoming"),
@@ -512,7 +507,7 @@ export async function startQualificationConversationForLead(
           or(
             eq(schema.whatsappMessages.leadId, input.leadId),
             eq(schema.whatsappMessages.conversationId, conversation.id),
-            eq(schema.whatsappMessages.phone, lead.telefone)
+            sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') = ${cleanPhone}`
           ),
           or(
             eq(schema.whatsappMessages.senderRole, "assistant"),
@@ -543,61 +538,6 @@ export async function startQualificationConversationForLead(
         transport: (latestIncoming.provider as any) ?? "meta",
         skipDebounce: true,
       }).catch((err) => console.error("[resumeAi] processInboundAiResponse error:", err));
-    } else {
-      // Re-evaluate current memory & next question if customer didn't send a new message
-      let updatedMemory = memory;
-      const allIncoming = await db
-        .select({ body: schema.whatsappMessages.body })
-        .from(schema.whatsappMessages)
-        .where(
-          and(
-            eq(schema.whatsappMessages.tenantId, input.tenantId),
-            or(
-              eq(schema.whatsappMessages.leadId, input.leadId),
-              eq(schema.whatsappMessages.conversationId, conversation.id),
-              eq(schema.whatsappMessages.phone, lead.telefone)
-            ),
-            or(
-              eq(schema.whatsappMessages.direction, "incoming"),
-              eq(schema.whatsappMessages.direction, "inbound")
-            )
-          )
-        );
-      for (const inc of allIncoming) {
-        if (inc.body) updatedMemory = extractFieldsFromMessage(inc.body, updatedMemory);
-      }
-
-      const { resolveDeterministicQualificationTurn } = await import("@/features/qualification-engine/service");
-      const turn = resolveDeterministicQualificationTurn({ memory: updatedMemory, policy: behavior.policy });
-
-      if (turn.kind === "collecting" && turn.reply) {
-        const messageId = `ai_msg_resume_${crypto.randomUUID()}`;
-        await db.insert(schema.whatsappMessages).values({
-          id: messageId,
-          tenantId: input.tenantId,
-          leadId: input.leadId,
-          communicationChannelId: null,
-          conversationId: conversation.id,
-          senderRole: "assistant",
-          provider: "meta",
-          phone: lead.telefone,
-          direction: "outbound",
-          body: turn.reply,
-          sentAt: new Date(),
-        }).onConflictDoNothing();
-
-        await sendAiOutbound({
-          tenantId: input.tenantId,
-          phone: lead.telefone,
-          body: turn.reply,
-          currentMessageId: messageId,
-        }).catch((err) => console.warn("[startQualification] outbound resume failed:", err));
-
-        await db.update(schema.aiConversations).set({
-          memory: { ...updatedMemory, lastQuestionAsked: turn.reply },
-          updatedAt: new Date(),
-        }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
-      }
     }
 
     return { started: true as const, conversationId: conversation.id, resumed: true };
