@@ -4,12 +4,14 @@ import { z } from "zod";
 
 import {
   createTenantAccessAction,
+  resetTenantOperationalDataAction,
   setTenantStatusAction,
   updateCleanUiOperationalLegacyTenantAction,
   updateMetaLeadAdsPilotAction,
   updateTenantCustomRolesPilotAction,
 } from "../../actions";
 import { CreateTenantAccessForm } from "./_components/create-tenant-access-form";
+import { ResetTenantDataCard } from "./_components/reset-tenant-data-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -258,6 +260,8 @@ export default async function SuperAdminTenantDetailPage({
                 <CreateTenantAccessForm action={createTenantAccessAction} branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))} tenantId={tenant.id} />
               </CardContent>
             </Card>
+
+            <ResetTenantDataCard action={resetTenantOperationalDataAction} tenantId={tenant.id} tenantName={tenant.name} />
           </div>
         </section>
       </main>

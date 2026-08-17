@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
@@ -245,4 +245,129 @@ export async function purgeUserLGPD(userId: string) {
     }).where(eq(schema.user.id, userId));
   });
   await writeAudit("lgpd.user_purged", "user", userId);
+}
+
+export async function purgeTenantOperationalData(tenantId: string) {
+  const admin = await getRequiredPlatformAdmin();
+  const db = getDatabase();
+  const now = new Date();
+
+  return await db.transaction(async (tx) => {
+    // Counts for audit record before purging
+    const [{ count: leadsCount }] = await tx
+      .select({ count: count() })
+      .from(schema.leads)
+      .where(eq(schema.leads.tenantId, tenantId));
+
+    const [{ count: conversationsCount }] = await tx
+      .select({ count: count() })
+      .from(schema.aiConversations)
+      .where(eq(schema.aiConversations.tenantId, tenantId));
+
+    // 1. Delete dependent outboxes and cadence runs
+    await tx.delete(schema.wahaDeliveryOutbox).where(eq(schema.wahaDeliveryOutbox.tenantId, tenantId));
+    await tx.delete(schema.wahaCadenceRuns).where(eq(schema.wahaCadenceRuns.tenantId, tenantId));
+    await tx.delete(schema.leadEffectOutbox).where(eq(schema.leadEffectOutbox.tenantId, tenantId));
+    await tx.delete(schema.leadDistributionJobs).where(eq(schema.leadDistributionJobs.tenantId, tenantId));
+    await tx.delete(schema.leadDistributionEvents).where(eq(schema.leadDistributionEvents.tenantId, tenantId));
+
+    // 2. Delete AI logs, events, sessions, and messages
+    await tx.delete(schema.aiAttendanceLogs).where(eq(schema.aiAttendanceLogs.tenantId, tenantId));
+    await tx.delete(schema.aiQuickReplyEvents).where(eq(schema.aiQuickReplyEvents.tenantId, tenantId));
+    await tx.delete(schema.whatsappMessages).where(eq(schema.whatsappMessages.tenantId, tenantId));
+    await tx.delete(schema.aiConversations).where(eq(schema.aiConversations.tenantId, tenantId));
+    await tx.delete(schema.aiQualificationSessions).where(eq(schema.aiQualificationSessions.tenantId, tenantId));
+    await tx.delete(schema.agentTrainingSimulations).where(eq(schema.agentTrainingSimulations.tenantId, tenantId));
+
+    // 3. Delete notifications, feedbacks, attempts
+    await tx.delete(schema.notifications).where(eq(schema.notifications.tenantId, tenantId));
+    await tx.delete(schema.leadFeedbacks).where(eq(schema.leadFeedbacks.tenantId, tenantId));
+    await tx.delete(schema.leadAssignmentAttempts).where(eq(schema.leadAssignmentAttempts.tenantId, tenantId));
+
+    // 4. Delete lead interactions and beneficiaries
+    const tenantLeadsForInteractions = await tx
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(eq(schema.leads.tenantId, tenantId));
+    if (tenantLeadsForInteractions.length > 0) {
+      await tx.delete(schema.leadInteractions).where(
+        inArray(schema.leadInteractions.leadId, tenantLeadsForInteractions.map((l) => l.id))
+      );
+    }
+    await tx.delete(schema.leadBeneficiaries).where(eq(schema.leadBeneficiaries.tenantId, tenantId));
+
+    // 5. Delete lead offers, checklist, documents
+    await tx.delete(schema.leadOffers).where(eq(schema.leadOffers.tenantId, tenantId));
+    await tx.delete(schema.leadDocumentChecklist).where(eq(schema.leadDocumentChecklist.tenantId, tenantId));
+    await tx.delete(schema.leadDocuments).where(eq(schema.leadDocuments.tenantId, tenantId));
+
+    // 6. Delete sales & commission schedules
+    await tx.delete(schema.sales).where(eq(schema.sales.tenantId, tenantId));
+    await tx.delete(schema.commissionSchedule).where(eq(schema.commissionSchedule.tenantId, tenantId));
+
+    // 7. Delete marketing import results & batches
+    const importBatches = await tx
+      .select({ id: schema.marketingImports.id })
+      .from(schema.marketingImports)
+      .where(eq(schema.marketingImports.tenantId, tenantId));
+    if (importBatches.length > 0) {
+      await tx.delete(schema.marketingImportResults).where(
+        inArray(schema.marketingImportResults.importId, importBatches.map((b) => b.id))
+      );
+    }
+    await tx.delete(schema.marketingImports).where(eq(schema.marketingImports.tenantId, tenantId));
+
+    // 8. Delete outbound messages & tasks
+    await tx.delete(schema.whatsappOutboundMessages).where(eq(schema.whatsappOutboundMessages.tenantId, tenantId));
+
+    const tenantTaskIds = await tx
+      .select({ id: schema.leadTasks.id })
+      .from(schema.leadTasks)
+      .where(eq(schema.leadTasks.tenantId, tenantId));
+    if (tenantTaskIds.length > 0) {
+      await tx.delete(schema.leadTaskAssignees).where(
+        inArray(schema.leadTaskAssignees.taskId, tenantTaskIds.map((t) => t.id))
+      );
+    }
+    await tx.delete(schema.leadTasks).where(eq(schema.leadTasks.tenantId, tenantId));
+
+    // 9. Delete quotes and quote line items
+    const tenantQuoteIds = await tx
+      .select({ id: schema.quotes.id })
+      .from(schema.quotes)
+      .where(eq(schema.quotes.tenantId, tenantId));
+    if (tenantQuoteIds.length > 0) {
+      const qIds = tenantQuoteIds.map((q) => q.id);
+      await tx.delete(schema.quoteLineItems).where(inArray(schema.quoteLineItems.quoteId, qIds));
+      await tx.delete(schema.quoteItems).where(inArray(schema.quoteItems.quoteId, qIds));
+    }
+    await tx.delete(schema.quotes).where(eq(schema.quotes.tenantId, tenantId));
+
+    // 10. Delete clients & webhook deliveries
+    await tx.delete(schema.clients).where(eq(schema.clients.tenantId, tenantId));
+    await tx.delete(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.tenantId, tenantId));
+
+    // 11. Delete all leads
+    await tx.delete(schema.leads).where(eq(schema.leads.tenantId, tenantId));
+
+    // 12. Record audit log
+    await tx.insert(schema.platformAuditLogs).values({
+      id: randomUUID(),
+      actorUserId: admin.userId,
+      action: "tenant.operational_reset",
+      targetType: "tenant",
+      targetId: tenantId,
+      metadata: {
+        deletedLeadsCount: Number(leadsCount),
+        deletedConversationsCount: Number(conversationsCount),
+        resetAt: now.toISOString(),
+      },
+      createdAt: now,
+    });
+
+    return {
+      deletedLeadsCount: Number(leadsCount),
+      deletedConversationsCount: Number(conversationsCount),
+    };
+  });
 }

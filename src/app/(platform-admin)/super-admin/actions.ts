@@ -9,6 +9,7 @@ import {
   setPlatformTenantStatus,
   terminateSession,
   purgeUserLGPD,
+  purgeTenantOperationalData,
   getPlatformAuditLogs,
   getTenantAuditLogs,
 } from "@/features/platform-admin/service";
@@ -782,5 +783,30 @@ export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formDat
   });
   revalidatePath("/super-admin/settings");
   revalidatePath("/marketing/campanhas");
+}
+
+export async function resetTenantOperationalDataAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const rawTenantId = String(formData.get("tenantId") ?? "").trim();
+  const confirmation = String(formData.get("confirmation") ?? "").trim();
+
+  const parsed = z.string().uuid().safeParse(rawTenantId);
+  if (!parsed.success) {
+    throw new Error("ID da empresa é inválido.");
+  }
+
+  if (confirmation !== "RESET") {
+    throw new Error('Confirmação inválida. Digite "RESET" para confirmar a operação.');
+  }
+
+  const result = await purgeTenantOperationalData(parsed.data);
+
+  revalidatePath(`/super-admin/tenants/${parsed.data}`);
+  revalidatePath("/super-admin/tenants");
+  revalidatePath("/leads");
+  revalidatePath("/conversas");
+  revalidatePath("/dashboard");
+
+  return result;
 }
 
