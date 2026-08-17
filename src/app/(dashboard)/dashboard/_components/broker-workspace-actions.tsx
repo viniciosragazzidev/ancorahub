@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { ArrowRight, CheckCircle } from "@/components/huge-icons";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ContextNote } from "@/components/ui/context-note";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { toggleLeadTaskAction, type LeadTaskState } from "@/features/leads/task-actions";
@@ -42,7 +42,7 @@ export function BrokerWorkspaceActionButtons({ nextAction, viewer }: { nextActio
     onConfirmed: () => toast.success("Tarefa concluída. A fila será atualizada."),
   });
 
-  return <div className="grid gap-2"><div className="flex flex-wrap gap-2"><Button render={<Link href={nextAction.href} />} size="sm">{actionLabel(nextAction)} <ArrowRight aria-hidden="true" /></Button>{nextAction.taskId ? <Button disabled={completeTask.isPending || completed} onClick={() => completeTask.mutate(nextAction.taskId!)} size="sm" variant="outline"><CheckCircle aria-hidden="true" /> {completed ? "Concluída" : "Concluir"}</Button> : null}</div>{completeTask.syncError ? <ContextNote title="Não foi possível sincronizar" variant="error">A alteração local foi desfeita. Tente novamente.</ContextNote> : null}</div>;
+  return <div className="grid gap-2"><div className="flex flex-wrap gap-2"><Link href={nextAction.href} className={buttonVariants({ size: "sm" })}>{actionLabel(nextAction)} <ArrowRight aria-hidden="true" /></Link>{nextAction.taskId ? <Button disabled={completeTask.isPending || completed} onClick={() => completeTask.mutate(nextAction.taskId!)} size="sm" variant="outline"><CheckCircle aria-hidden="true" /> {completed ? "Concluída" : "Concluir"}</Button> : null}</div>{completeTask.syncError ? <ContextNote title="Não foi possível sincronizar" variant="error">A alteração local foi desfeita. Tente novamente.</ContextNote> : null}</div>;
 }
 
 export function BrokerWorkspaceTaskCompleteButton({ taskId, taskTitle, viewer }: { taskId: string; taskTitle: string; viewer: Viewer }) {

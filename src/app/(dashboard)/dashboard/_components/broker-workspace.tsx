@@ -15,7 +15,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { VoxelIllustration } from "@/components/illustrations/voxel-illustration";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContextNote } from "@/components/ui/context-note";
 import { Progress } from "@/components/ui/progress";
@@ -65,9 +65,9 @@ export function BrokerWorkspace({
         rightSlot={
           <>
             <BrokerAvailabilityButton initialStatus={data.viewer.availabilityStatus} />
-            <Button render={<Link href="/leads" />} size="sm">
+            <Link href="/leads" className={buttonVariants({ size: "sm" })}>
               <Plus aria-hidden="true" /> Novo lead
-            </Button>
+            </Link>
           </>
         }
       />
@@ -115,7 +115,7 @@ export function BrokerWorkspace({
           <Card variant="subtle" data-onboarding="lead-queue" className="overflow-hidden bg-card/95">
             <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div className="min-w-0 flex-1"><CardTitle>Minha fila prioritária</CardTitle><CardDescription>Ordenada pela próxima ação e pelos prazos operacionais.</CardDescription></div>
-              <Button render={<Link href="/minha-fila" />} size="sm" variant="ghost" className="shrink-0">Ver fila <ArrowRight aria-hidden="true" /></Button>
+              <Link href="/minha-fila" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "shrink-0")}>Ver fila <ArrowRight aria-hidden="true" /></Link>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollContain className="px-6 pb-6 pr-5" style={{ maxHeight: queueMaxHeight }}>
@@ -133,7 +133,7 @@ export function BrokerWorkspace({
 
           <div className="grid content-start gap-5">
             <Card variant="subtle" data-onboarding="daily-tasks" className="h-full">
-              <CardHeader className="flex flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Button render={<Link href="/tarefas" />} size="sm" variant="ghost" className="shrink-0">Ver todas</Button></CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Agenda</CardTitle><CardDescription>Próximos retornos e tarefas.</CardDescription></div><Link href="/tarefas" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "shrink-0")}>Ver todas</Link></CardHeader>
               <CardContent>
                 {data.agenda.length ? <div className="grid gap-2">{data.agenda.map((task) => <div className="flex items-center gap-2.5 rounded-md border border-border/60 bg-background/40 px-3 py-2.5" key={task.id}>
                   <span className={cn("size-2 shrink-0 rounded-full", isOverdue(task.dueAt) ? "bg-destructive" : task.priority === "urgent" ? "bg-warning" : "bg-primary")} />
@@ -144,14 +144,14 @@ export function BrokerWorkspace({
             </Card>
 
             <Card variant="subtle" className="h-full">
-              <CardHeader className="flex flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Minha meta</CardTitle><CardDescription>Progresso individual do período vigente.</CardDescription></div><Button render={<Link href="/minha-meta" />} size="sm" variant="ghost" className="shrink-0">Detalhes</Button></CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Minha meta</CardTitle><CardDescription>Progresso individual do período vigente.</CardDescription></div><Link href="/minha-meta" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "shrink-0")}>Detalhes</Link></CardHeader>
               <CardContent>{data.goal ? <div className="space-y-3"><div className="flex items-end justify-between gap-3"><div><p className="text-sm font-medium">{data.goal.name}</p><p className="text-xs text-muted-foreground">{data.goal.currentValue} de {data.goal.targetValue}</p></div><strong className="text-lg tabular-nums">{Math.round(data.goal.percentage)}%</strong></div><Progress value={Math.min(100, Math.max(0, data.goal.percentage))} /></div> : <EmptyWorkspaceState icon={Target} message="Nenhuma meta individual ativa neste período." />}</CardContent>
             </Card>
           </div>
         </section>
 
         <Card variant="subtle" className="bg-card/95">
-          <CardHeader className="flex flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Inbox operacional</CardTitle><CardDescription>Mensagens, pendências e alertas que merecem atenção.</CardDescription></div><Button render={<Link href="/notificacoes" />} size="sm" variant="ghost" className="shrink-0 max-w-24"><Bell aria-hidden="true" /> <span className="truncate">{data.today.unreadNotifications}</span></Button></CardHeader>
+          <CardHeader className="flex flex-row items-start justify-between gap-3"><div className="min-w-0 flex-1"><CardTitle>Inbox operacional</CardTitle><CardDescription>Mensagens, pendências e alertas que merecem atenção.</CardDescription></div><Link href="/notificacoes" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "shrink-0 max-w-24")}><Bell aria-hidden="true" /> <span className="truncate">{data.today.unreadNotifications}</span></Link></CardHeader>
           <CardContent>{data.inbox.length ? <div className="divide-y divide-border/60">{data.inbox.map((item) => <Link className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0" href={item.href} key={item.id}><Badge className="mt-0.5 shrink-0" variant={item.severity === "critical" ? "destructive" : item.severity === "warning" ? "warning" : "outline"}>{sourceLabels[item.source]}</Badge><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium group-hover:text-primary">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.description}</span></span><ArrowRight aria-hidden="true" className="mt-0.5 size-4 text-muted-foreground group-hover:text-primary" /></Link>)}</div> : <EmptyWorkspaceState icon={Bell} illustration="empty-inbox" message="Nenhum alerta novo. As atualizações aparecerão aqui." />}</CardContent>
         </Card>
       </main>

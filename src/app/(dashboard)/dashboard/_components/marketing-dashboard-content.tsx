@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { Megaphone, ArrowUpRight, ChartBar, CheckCircle, Lightning, SlidersHorizontal, Users, UserList, Redistribute, FileArrowDown } from "@/components/huge-icons";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { PeriodSelect } from "@/components/period-select";
@@ -59,12 +60,12 @@ export default function MarketingDashboardContent({
             </div>
 
             <div className="flex flex-wrap gap-2 shrink-0">
-              <Button render={<Link href="/marketing/campanhas" />} size="sm">
+              <Link href="/marketing/campanhas" className={cn(buttonVariants({ size: "sm" }))}>
                 <Megaphone className="size-4" /> Gerenciar Campanhas
-              </Button>
-              <Button render={<Link href="/leads/distribuicao?view=filas" />} variant="outline" size="sm">
+              </Link>
+              <Link href="/leads/distribuicao?view=filas" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
                 <Redistribute className="size-4" /> Regras de Filas
-              </Button>
+              </Link>
             </div>
           </div>
         </section>
@@ -181,17 +182,17 @@ export default function MarketingDashboardContent({
                   </CardTitle>
                   <CardDescription>Destino e filas configuradas por campanha.</CardDescription>
                 </div>
-                <Button render={<Link href="/marketing/campanhas" />} size="xs" variant="ghost">
+                <Link href="/marketing/campanhas" className={cn(buttonVariants({ variant: "ghost", size: "xs" }))}>
                   Ver todas <ArrowUpRight className="size-3" />
-                </Button>
+                </Link>
               </CardHeader>
               <CardContent className="space-y-3">
                 {!data.campaigns.length ? (
                   <div className="py-8 text-center space-y-2">
                     <p className="text-xs text-muted-foreground">Nenhuma campanha Meta sincronizada.</p>
-                    <Button render={<Link href="/integrations" />} size="xs" variant="outline">
+                    <Link href="/integrations" className={cn(buttonVariants({ variant: "outline", size: "xs" }))}>
                       Conectar Meta Ads
-                    </Button>
+                    </Link>
                   </div>
                 ) : (
                   data.campaigns.slice(0, 5).map((camp) => (
@@ -236,15 +237,15 @@ export default function MarketingDashboardContent({
                 <CardTitle className="text-sm">Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2">
-                <Button render={<Link href="/marketing/campanhas" />} variant="outline" size="sm" className="justify-start gap-2">
+                <Link href="/marketing/campanhas" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start gap-2")}>
                   <Megaphone className="size-4 text-primary" /> Vincular Fila por Campanha
-                </Button>
-                <Button render={<Link href="/leads/distribuicao?view=filas" />} variant="outline" size="sm" className="justify-start gap-2">
+                </Link>
+                <Link href="/leads/distribuicao?view=filas" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start gap-2")}>
                   <Redistribute className="size-4 text-primary" /> Central de Filas & Roteamento
-                </Button>
-                <Button render={<Link href="/marketing/importacoes" />} variant="outline" size="sm" className="justify-start gap-2">
+                </Link>
+                <Link href="/marketing/importacoes" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-start gap-2")}>
                   <FileArrowDown className="size-4 text-primary" /> Importar Leads via CSV
-                </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>

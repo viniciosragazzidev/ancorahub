@@ -141,7 +141,7 @@ export async function getManagerDashboardData(period: PeriodValue = DEFAULT_PERI
   ]);
   const now = Date.now();
   const unworked = leads.filter((lead) => lead.status === "distributed" && lead.assignedAt && now - lead.assignedAt.getTime() > 15 * 60 * 1000).length;
-  const stalled = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status) && now - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000).length;
+  const stalled = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status) && lead.stageEnteredAt && now - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000).length;
 
   const trendMap = new Map(trendRaw.map((r) => [r.date, r]));
   const trend = fillTrendDays(period, trendMap);
@@ -191,7 +191,7 @@ export async function getDirectorDashboardData(period: PeriodValue = DEFAULT_PER
   const active = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status));
   const now = Date.now();
   const unworked = leads.filter((lead) => lead.status === "distributed" && lead.assignedAt && now - lead.assignedAt.getTime() > 15 * 60 * 1000).length;
-  const stalled = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status) && now - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000).length;
+  const stalled = leads.filter((lead) => (activeLeadStatuses as readonly string[]).includes(lead.status) && lead.stageEnteredAt && now - lead.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000).length;
   const stage = (status: string) => status === "new" || status === "distributed" ? "Novo" : status === "in_contact" ? "Contato" : status === "quote_sent" ? "Cotação" : status === "negotiation" ? "Negociação" : status === "converted" ? "Conversão" : "Em análise";
   const stageNames = ["Novo", "Contato", "Cotação", "Negociação", "Conversão"];
   const funnel = stageNames.map((name) => ({ stage: name, volume: leads.filter((lead) => stage(lead.status) === name).length }));

@@ -41,7 +41,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { NocHeaderSlot } from "@/app/(dashboard)/noc/noc-client";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -191,14 +191,12 @@ function DirectorTopActionHeader({ data }: { data: DirectorDashboardData }) {
           <div className="my-1">
             <p className="text-xs text-muted-foreground truncate">Roleta de distribuição ativa</p>
           </div>
-          <Button
-            render={<Link href="/leads/distribuicao/plantao" />}
-            size="sm"
-            variant="outline"
-            className="w-full h-7 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+          <Link
+            href="/leads/distribuicao/plantao"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full h-7 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer")}
           >
             <WifiHigh className="size-3.5" /> Ver Plantão
-          </Button>
+          </Link>
         </div>
       </div>
     </section>
@@ -584,9 +582,9 @@ function ManagerNocContent({ data }: { data: ManagerDashboardData }) {
               </p>
             </div>
           </div>
-          <Button render={<Link href="/leads/distribuicao/plantao" />} size="sm" variant="outline" className="border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 h-8 text-xs font-semibold gap-1.5">
+          <Link href="/leads/distribuicao/plantao" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 h-8 text-xs font-semibold gap-1.5")}>
             <WifiHigh className="size-4" /> Escala do Plantão
-          </Button>
+          </Link>
         </div>
       </Card>
 
@@ -907,9 +905,9 @@ const activities = [
               Status: <span className="font-bold">{data.availabilityStatus === "available" ? "Disponível para Receber Leads" : data.availabilityStatus === "paused" ? "Pausado" : "Offline"}</span> • {data.branchName}
             </p>
           </div>
-          <Button render={<Link href="/minha-fila" />} size="sm" variant="default" className="h-9 px-4 text-xs font-semibold gap-2 shrink-0">
+          <Link href="/minha-fila" className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9 px-4 text-xs font-semibold gap-2 shrink-0")}>
             <WifiHigh className="size-4" /> Ir para Minha Fila
-          </Button>
+          </Link>
         </div>
       </Card>
 
@@ -937,9 +935,9 @@ const activities = [
                 <CardTitle>Minha Carteira de Leads</CardTitle>
                 <CardDescription>Leads sob sua responsabilidade</CardDescription>
               </div>
-              <Button render={<Link href="/leads" />} size="sm" variant="outline" className="text-xs h-8">
+              <Link href="/leads" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs h-8")}>
                 Ver Todos
-              </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 flex flex-col justify-between">
@@ -952,9 +950,9 @@ const activities = [
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <LeadStatusBadge status={lead.status} />
-                    <Button render={<Link href={`/conversas?leadId=${lead.id}`} />} size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                    <Link href={`/conversas?leadId=${lead.id}`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 px-2 text-xs")}>
                       Atender
-                    </Button>
+                    </Link>
                   </div>
                 </div>
               ))}
