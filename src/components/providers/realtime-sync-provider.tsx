@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-
-import { SoundProvider } from "react-sounds";
-
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import {
   createIncomingLeadQueueState,
@@ -216,7 +213,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, []);
 
   return (
-    <SoundProvider initialEnabled={true} preload={["notification/alert"]}>
+    <>
       {isEligibleForLeadNotifications ? (
         <IncomingLeadCard
           item={incomingLeads.queue[0] ?? null}
@@ -226,6 +223,6 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       ) : null}
       {!isOnline ? <div role="status" className="fixed inset-x-0 bottom-3 z-[70] mx-auto w-fit rounded-full border border-warning/30 bg-card px-3 py-1.5 text-xs text-warning shadow-lg">Conexão de atualização indisponível · os dados serão reconciliados ao retornar</div> : null}
       <div data-local-first-sync={lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined}>{children}</div>
-    </SoundProvider>
+    </>
   );
 }

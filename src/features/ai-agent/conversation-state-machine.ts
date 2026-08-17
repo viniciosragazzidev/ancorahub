@@ -168,14 +168,24 @@ export async function sendAiOutbound(input: {
 }) {
   const transport = input.transport ?? "meta";
   const db = getDatabase();
+  const last8Digits = input.phone.replace(/\D/g, "").slice(-8);
   const [lastOutbound] = await db
     .select({ sentAt: schema.whatsappMessages.sentAt })
     .from(schema.whatsappMessages)
     .where(
       and(
         eq(schema.whatsappMessages.tenantId, input.tenantId),
-        eq(schema.whatsappMessages.phone, input.phone),
-        eq(schema.whatsappMessages.direction, "outbound"),
+        or(
+          eq(schema.whatsappMessages.phone, input.phone),
+          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+        ),
+        or(
+          eq(schema.whatsappMessages.senderRole, "assistant"),
+          eq(schema.whatsappMessages.senderRole, "system"),
+          eq(schema.whatsappMessages.senderRole, "agent"),
+          eq(schema.whatsappMessages.direction, "outbound"),
+          eq(schema.whatsappMessages.direction, "outgoing")
+        ),
         input.currentMessageId ? ne(schema.whatsappMessages.id, input.currentMessageId) : undefined
       )
     )
@@ -184,9 +194,8 @@ export async function sendAiOutbound(input: {
 
   if (lastOutbound?.sentAt) {
     const elapsedMs = Date.now() - new Date(lastOutbound.sentAt).getTime();
-    if (elapsedMs < 1_500) {
-      console.info(`[anti-spam-1.5s] Outbound message to ${input.phone} throttled (${Math.ceil((1500 - elapsedMs) / 1000)}s remaining).`);
-      return { status: "throttled" as const, messageId: null };
+    if (elapsedMs < 1_000) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000 - elapsedMs));
     }
   }
 
@@ -435,7 +444,7 @@ export async function startQualificationConversationForLead(
 
   const memory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
 
-  const cleanPhone = lead.telefone.replace(/\D/g, "");
+  const last8Digits = lead.telefone.replace(/\D/g, "").slice(-8);
 
   // CHECK IF THE LEAD ALREADY HAS ANY MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE
   const [existingMsg] = await db
@@ -447,7 +456,7 @@ export async function startQualificationConversationForLead(
         or(
           eq(schema.whatsappMessages.leadId, input.leadId),
           eq(schema.whatsappMessages.conversationId, conversation.id),
-          sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') = ${cleanPhone}`
+          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
         )
       )
     )
@@ -484,7 +493,7 @@ export async function startQualificationConversationForLead(
           or(
             eq(schema.whatsappMessages.leadId, input.leadId),
             eq(schema.whatsappMessages.conversationId, conversation.id),
-            sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') = ${cleanPhone}`
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
           ),
           or(
             eq(schema.whatsappMessages.direction, "incoming"),
@@ -507,7 +516,7 @@ export async function startQualificationConversationForLead(
           or(
             eq(schema.whatsappMessages.leadId, input.leadId),
             eq(schema.whatsappMessages.conversationId, conversation.id),
-            sql`REPLACE(${schema.whatsappMessages.phone}, '+', '') = ${cleanPhone}`
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
           ),
           or(
             eq(schema.whatsappMessages.senderRole, "assistant"),
@@ -1050,18 +1059,32 @@ export async function processInboundAiResponse({
 
     await new Promise((resolve) => setTimeout(resolve, debounceMs));
 
-    const [freshConv] = await db
-      .select({ lastActivityAt: schema.aiConversations.lastActivityAt })
-      .from(schema.aiConversations)
-      .where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)))
+    const last8DigitsPhone = phone.replace(/\D/g, "").slice(-8);
+    const [newerIncoming] = await db
+      .select({ id: schema.whatsappMessages.id })
+      .from(schema.whatsappMessages)
+      .where(
+        and(
+          eq(schema.whatsappMessages.tenantId, tenantId),
+          or(
+            eq(schema.whatsappMessages.leadId, leadId),
+            eq(schema.whatsappMessages.conversationId, conversation.id),
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8DigitsPhone}`
+          ),
+          or(
+            eq(schema.whatsappMessages.direction, "incoming"),
+            eq(schema.whatsappMessages.direction, "inbound")
+          ),
+          gt(schema.whatsappMessages.sentAt, nowReceived)
+        )
+      )
       .limit(1);
 
-    if (freshConv?.lastActivityAt && freshConv.lastActivityAt.getTime() > nowReceived.getTime()) {
+    if (newerIncoming) {
       console.info("[ai-wpp] inbound.debounced_superceded", {
         tenantId,
         leadId,
         receivedAt: nowReceived.toISOString(),
-        latestActivityAt: freshConv.lastActivityAt.toISOString(),
       });
       return { status: "debounced_superceded" as const };
     }

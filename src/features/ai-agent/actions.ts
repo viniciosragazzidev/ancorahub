@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -144,32 +144,108 @@ export async function resumeAiQualificationAction(leadId: string): Promise<Conve
   try {
     const context = await getRequiredTenantContext();
     const db = getDatabase();
-    const [lead] = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+    const [lead] = await db
+      .select({ id: schema.leads.id, telefone: schema.leads.telefone })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .limit(1);
+
     if (!lead) return { success: false, error: "Lead não encontrado." };
+    if (!lead.telefone) return { success: false, error: "Este lead não possui um número de telefone cadastrado." };
 
-    const { startAiQualificationForLead } = await import("@/features/ai-qualification/service");
-    const started = await startAiQualificationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId, force: true });
+    const { getOrCreateAiConversation, transitionConversationState, processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
+    const conversation = await getOrCreateAiConversation({ tenantId: context.tenantId, leadId: lead.id });
 
-    if (!started.started) {
-      if (started.reason === "missing_channel") {
-        return { success: false, error: "Não há nenhum canal do WhatsApp ativo (Meta Cloud, OpenWA ou WAHA) configurado para enviar mensagens." };
-      }
-      if (started.reason === "missing_phone") {
-        return { success: false, error: "Este lead não possui um número de telefone cadastrado." };
-      }
-    }
+    // Reactivate AI state
+    await transitionConversationState({
+      tenantId: context.tenantId,
+      conversationId: conversation.id,
+      newStatus: "WAITING_CUSTOMER",
+      reason: "Atendimento de qualificação retomado manualmente",
+      assignedUserId: null,
+    });
 
-    const [conv] = await db.select({ id: schema.aiConversations.id }).from(schema.aiConversations).where(and(eq(schema.aiConversations.leadId, lead.id), eq(schema.aiConversations.tenantId, context.tenantId))).limit(1);
-    if (conv) {
-      await transitionConversationState({
+    await db
+      .update(schema.leads)
+      .set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: new Date() })
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+
+    const last8Digits = lead.telefone.replace(/\D/g, "").slice(-8);
+
+    // 1. Fetch latest incoming message from lead (checking leadId, conversationId, or last 8 digits of phone)
+    const [latestIncoming] = await db
+      .select({
+        body: schema.whatsappMessages.body,
+        messageId: schema.whatsappMessages.messageId,
+        communicationChannelId: schema.whatsappMessages.communicationChannelId,
+        provider: schema.whatsappMessages.provider,
+        sentAt: schema.whatsappMessages.sentAt,
+      })
+      .from(schema.whatsappMessages)
+      .where(
+        and(
+          eq(schema.whatsappMessages.tenantId, context.tenantId),
+          or(
+            eq(schema.whatsappMessages.leadId, lead.id),
+            eq(schema.whatsappMessages.conversationId, conversation.id),
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+          ),
+          or(
+            eq(schema.whatsappMessages.direction, "incoming"),
+            eq(schema.whatsappMessages.direction, "inbound")
+          )
+        )
+      )
+      .orderBy(desc(schema.whatsappMessages.sentAt))
+      .limit(1);
+
+    // 2. Fetch latest outbound assistant message
+    const [latestOutbound] = await db
+      .select({ sentAt: schema.whatsappMessages.sentAt })
+      .from(schema.whatsappMessages)
+      .where(
+        and(
+          eq(schema.whatsappMessages.tenantId, context.tenantId),
+          or(
+            eq(schema.whatsappMessages.leadId, lead.id),
+            eq(schema.whatsappMessages.conversationId, conversation.id),
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+          ),
+          or(
+            eq(schema.whatsappMessages.senderRole, "assistant"),
+            eq(schema.whatsappMessages.senderRole, "system"),
+            eq(schema.whatsappMessages.senderRole, "agent"),
+            eq(schema.whatsappMessages.direction, "outbound"),
+            eq(schema.whatsappMessages.direction, "outgoing")
+          )
+        )
+      )
+      .orderBy(desc(schema.whatsappMessages.sentAt))
+      .limit(1);
+
+    const hasUnansweredIncoming = latestIncoming?.sentAt && latestOutbound?.sentAt
+      ? latestIncoming.sentAt.getTime() > latestOutbound.sentAt.getTime()
+      : Boolean(latestIncoming?.sentAt && !latestOutbound?.sentAt);
+
+    if (hasUnansweredIncoming && latestIncoming?.body) {
+      // Process the unanswered incoming customer message immediately
+      await processInboundAiResponse({
         tenantId: context.tenantId,
-        conversationId: conv.id,
-        newStatus: "WAITING_CUSTOMER",
-        reason: "Atendimento de qualificação retomado manualmente",
-        assignedUserId: null,
-      });
-      await auditConversationAction({ userId: context.userId, conversationId: conv.id, action: "ai_conversation.resumed_by_user" });
+        leadId: lead.id,
+        phone: lead.telefone,
+        userMessageBody: latestIncoming.body,
+        communicationChannelId: latestIncoming.communicationChannelId,
+        providerMessageId: latestIncoming.messageId,
+        transport: (latestIncoming.provider as any) ?? "meta",
+        skipDebounce: true,
+      }).catch((err) => console.error("[resumeAiQualificationAction] processInboundAiResponse error:", err));
+    } else if (!latestIncoming && !latestOutbound) {
+      // Brand new lead with zero messages ever — start first contact
+      const { startQualificationConversationForLead } = await import("@/features/ai-agent/conversation-state-machine");
+      await startQualificationConversationForLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId }, false);
     }
+
+    await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.resumed_by_user" });
 
     revalidatePath("/conversas");
     revalidatePath(`/leads/${leadId}`);
