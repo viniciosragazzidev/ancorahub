@@ -592,6 +592,7 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
   enabled: boolean;
 }): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
+    if (!input.assetIds.length) return { success: true, count: 0 };
     const context = await getRequiredTenantContext();
     const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
     await ensureMetaLeadAdsSchema();
@@ -599,29 +600,66 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
     const now = new Date();
 
     if (input.assetType === "campaigns") {
-      for (const id of input.assetIds) {
-        await db.insert(schema.metaCampaignQueueRoutes).values({
-          id: randomUUID(), tenantId: context.tenantId, campaignId: id, queueId: null, enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
-        }).onConflictDoUpdate({ target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId], set: { enabled: input.enabled, updatedAt: now } });
-      }
+      const records = input.assetIds.map((id) => ({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        campaignId: id,
+        queueId: null,
+        enabled: input.enabled,
+        createdBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await db
+        .insert(schema.metaCampaignQueueRoutes)
+        .values(records)
+        .onConflictDoUpdate({
+          target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
+          set: { enabled: input.enabled, updatedAt: now },
+        });
     } else if (input.assetType === "ads") {
-      for (const id of input.assetIds) {
-        await db.insert(schema.metaAdQueueRoutes).values({
-          id: randomUUID(), tenantId: context.tenantId, adId: id, queueId: null, enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
-        }).onConflictDoUpdate({ target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId], set: { enabled: input.enabled, updatedAt: now } });
-      }
+      const records = input.assetIds.map((id) => ({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        adId: id,
+        queueId: null,
+        enabled: input.enabled,
+        createdBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await db
+        .insert(schema.metaAdQueueRoutes)
+        .values(records)
+        .onConflictDoUpdate({
+          target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
+          set: { enabled: input.enabled, updatedAt: now },
+        });
     } else if (input.assetType === "forms") {
-      for (const id of input.assetIds) {
-        await db.insert(schema.metaFormQueueRoutes).values({
-          id: randomUUID(), tenantId: context.tenantId, formId: id, queueId: null, enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
-        }).onConflictDoUpdate({ target: [schema.metaFormQueueRoutes.tenantId, schema.metaFormQueueRoutes.formId], set: { enabled: input.enabled, updatedAt: now } });
-      }
+      const records = input.assetIds.map((id) => ({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        formId: id,
+        queueId: null,
+        enabled: input.enabled,
+        createdBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      await db
+        .insert(schema.metaFormQueueRoutes)
+        .values(records)
+        .onConflictDoUpdate({
+          target: [schema.metaFormQueueRoutes.tenantId, schema.metaFormQueueRoutes.formId],
+          set: { enabled: input.enabled, updatedAt: now },
+        });
     }
 
     revalidatePath("/integrations/meta");
     revalidatePath("/marketing/campanhas");
     return { success: true, count: input.assetIds.length };
   } catch (error) {
+    console.error("[batchSetMetaCaptureEligibilityAction] Error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Erro na atualização em lote." };
   }
 }

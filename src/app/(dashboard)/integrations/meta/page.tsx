@@ -9,13 +9,26 @@ export const dynamic = "force-dynamic";
 export default async function MetaIntegrationPage() {
   const context = await getRequiredTenantContext();
   await requireCapability(context, "acessar_integracao_meta");
-  const marketing = await getMetaConnectionState();
+  const marketing = await getMetaConnectionState().catch((err) => {
+    console.error("[MetaIntegrationPage] Failed to fetch connection state:", err);
+    return {
+      connection: null,
+      assets: null,
+      logs: [],
+      isConfigured: false,
+    };
+  });
   const canConfigure = context.role === "director" || context.jobTitle === "marketing" || context.role === "manager";
 
-  return <>
-    <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" />
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 lg:p-6">
-      <MetaIntegrationHub marketing={{ connection: marketing.connection, assets: marketing.assets, logs: marketing.logs }} canConfigure={canConfigure} />
-    </main>
-  </>;
+  return (
+    <>
+      <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" />
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 lg:p-6">
+        <MetaIntegrationHub
+          marketing={{ connection: marketing.connection, assets: marketing.assets, logs: marketing.logs }}
+          canConfigure={canConfigure}
+        />
+      </main>
+    </>
+  );
 }
