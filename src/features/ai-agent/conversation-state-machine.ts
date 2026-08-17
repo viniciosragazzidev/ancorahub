@@ -445,7 +445,9 @@ export async function startQualificationConversationForLead(
         eq(schema.whatsappMessages.leadId, input.leadId),
         or(
           eq(schema.whatsappMessages.senderRole, "assistant"),
-          eq(schema.whatsappMessages.direction, "outbound")
+          eq(schema.whatsappMessages.senderRole, "system"),
+          eq(schema.whatsappMessages.direction, "outbound"),
+          eq(schema.whatsappMessages.direction, "outgoing")
         )
       )
     )
@@ -475,7 +477,10 @@ export async function startQualificationConversationForLead(
         and(
           eq(schema.whatsappMessages.tenantId, input.tenantId),
           eq(schema.whatsappMessages.leadId, input.leadId),
-          eq(schema.whatsappMessages.direction, "incoming")
+          or(
+            eq(schema.whatsappMessages.direction, "incoming"),
+            eq(schema.whatsappMessages.direction, "inbound")
+          )
         )
       )
       .orderBy(desc(schema.whatsappMessages.sentAt))
@@ -493,7 +498,9 @@ export async function startQualificationConversationForLead(
           eq(schema.whatsappMessages.leadId, input.leadId),
           or(
             eq(schema.whatsappMessages.senderRole, "assistant"),
-            eq(schema.whatsappMessages.direction, "outbound")
+            eq(schema.whatsappMessages.senderRole, "system"),
+            eq(schema.whatsappMessages.direction, "outbound"),
+            eq(schema.whatsappMessages.direction, "outgoing")
           )
         )
       )
@@ -526,7 +533,10 @@ export async function startQualificationConversationForLead(
           and(
             eq(schema.whatsappMessages.tenantId, input.tenantId),
             eq(schema.whatsappMessages.leadId, input.leadId),
-            eq(schema.whatsappMessages.direction, "incoming")
+            or(
+              eq(schema.whatsappMessages.direction, "incoming"),
+              eq(schema.whatsappMessages.direction, "inbound")
+            )
           )
         );
       for (const inc of allIncoming) {
