@@ -2,10 +2,14 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refreshMock, disconnectMock, syncMock, toastSuccessMock, toastWarningMock, toastErrorMock } = vi.hoisted(() => ({
+const { refreshMock, disconnectMock, syncMock, toggleCampaignMock, toggleAdMock, toggleFormMock, batchEligibilityMock, toastSuccessMock, toastWarningMock, toastErrorMock } = vi.hoisted(() => ({
   refreshMock: vi.fn(),
   disconnectMock: vi.fn(),
   syncMock: vi.fn(),
+  toggleCampaignMock: vi.fn(),
+  toggleAdMock: vi.fn(),
+  toggleFormMock: vi.fn(),
+  batchEligibilityMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastWarningMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -19,6 +23,10 @@ vi.mock("../actions", () => ({
   getMetaMarketingAttemptAssets: vi.fn(),
   recordMetaMarketingOnboardingStep: vi.fn(),
   triggerManualMetaSync: syncMock,
+  toggleMetaCampaignCaptureEligibilityAction: toggleCampaignMock,
+  toggleMetaAdCaptureEligibilityAction: toggleAdMock,
+  toggleMetaFormCaptureEligibilityAction: toggleFormMock,
+  batchSetMetaCaptureEligibilityAction: batchEligibilityMock,
 }));
 vi.mock("../meta-marketing-oauth-url", () => ({ createMetaMarketingOAuthUrl: vi.fn(() => "https://meta.example/auth") }));
 
@@ -41,7 +49,7 @@ const connectedAssets = {
 };
 
 afterEach(() => {
-  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); syncMock.mockReset(); toastSuccessMock.mockClear(); toastWarningMock.mockClear(); toastErrorMock.mockClear();
+  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); syncMock.mockReset(); toggleCampaignMock.mockReset(); toggleAdMock.mockReset(); toggleFormMock.mockReset(); batchEligibilityMock.mockReset(); toastSuccessMock.mockClear(); toastWarningMock.mockClear(); toastErrorMock.mockClear();
 });
 
 describe("MetaIntegrationView", () => {
@@ -105,5 +113,16 @@ describe("MetaIntegrationView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sincronizar" }));
     await waitFor(() => expect(toastWarningMock).toHaveBeenCalledWith("Sincronização parcial da Meta.", { description: "Grant ads_read." }));
     expect(toastSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("updates campaign eligibility locally without refreshing the route tree", async () => {
+    toggleCampaignMock.mockResolvedValue({ success: true });
+    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
+
+    fireEvent.click(within(screen.getByRole("region", { name: "Campanhas & Captura CRM" })).getByRole("button", { name: "Tornar Elegível" }));
+
+    await waitFor(() => expect(toggleCampaignMock).toHaveBeenCalledWith({ campaignId: "campaign-1", enabled: true }));
+    expect(screen.getByText("✓ Elegível p/ Captura")).toBeInTheDocument();
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 });

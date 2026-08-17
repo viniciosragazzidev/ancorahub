@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -10,38 +10,11 @@ import { isMetaLeadAdsEnabled } from "./meta-lead-ads";
 import { getMetaLeadAdsPlatformIdentity } from "./meta-lead-ads-platform";
 import { META_CLOUD_PROVIDER } from "./types";
 
-let schemaEnsured = false;
-
-export async function ensureMetaLeadAdsSchema() {
-  if (schemaEnsured) return;
-  try {
-    const db = getDatabase();
-    await db.execute(sql`ALTER TABLE meta_lead_ad_sources ADD COLUMN IF NOT EXISTS distribution_mode text DEFAULT 'direct_leads'`);
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS meta_form_queue_routes (
-        id text PRIMARY KEY,
-        tenant_id text NOT NULL,
-        form_id text NOT NULL,
-        queue_id text,
-        enabled boolean NOT NULL DEFAULT true,
-        created_by text,
-        created_at timestamp WITH TIME ZONE DEFAULT NOW(),
-        updated_at timestamp WITH TIME ZONE DEFAULT NOW()
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS meta_form_queue_routes_tenant_form_unique ON meta_form_queue_routes (tenant_id, form_id);
-    `);
-    schemaEnsured = true;
-  } catch (err) {
-    console.error("[ensureMetaLeadAdsSchema] Failed DDL execution:", err);
-  }
-}
-
 /**
  * Read model for the guided Meta setup. The caller provides only the trusted
  * server-side session context; no tenant identifier crosses the browser boundary.
  */
 export async function getManualMetaIntegrationWorkspaceData(context: TenantContext) {
-  await ensureMetaLeadAdsSchema();
   const db = getDatabase();
   const leadAdsConfig = getMetaLeadAdsConfigurationState();
 

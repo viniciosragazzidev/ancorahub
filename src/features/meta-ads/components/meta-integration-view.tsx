@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -387,11 +387,20 @@ function SelectableAssetList({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [eligibilityOverrides, setEligibilityOverrides] = useState<Map<string, boolean>>(new Map());
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [batchUpdating, setBatchUpdating] = useState(false);
   const router = useRouter();
 
-  const filteredItems = items.filter(
+  const effectiveItems = useMemo(
+    () => items.map((item) => ({
+      ...item,
+      isEligibleForCapture: eligibilityOverrides.get(item.id) ?? item.isEligibleForCapture,
+    })),
+    [eligibilityOverrides, items],
+  );
+
+  const filteredItems = effectiveItems.filter(
     (item) =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -449,7 +458,11 @@ function SelectableAssetList({
             : `Captura desativada para ${ids.length} item(s).`
         );
         setSelectedIds(new Set());
-        router.refresh();
+        setEligibilityOverrides((current) => {
+          const next = new Map(current);
+          ids.forEach((id) => next.set(id, enabled));
+          return next;
+        });
       } else {
         toast.error(res.error || "Erro na atualização em lote.");
       }
@@ -478,7 +491,7 @@ function SelectableAssetList({
             ? "Ativado para captura de leads no CRM!"
             : "Captura desativada para este item."
         );
-        router.refresh();
+        setEligibilityOverrides((current) => new Map(current).set(item.id, nextEligible));
       } else {
         toast.error(res.error || "Erro ao atualizar elegibilidade.");
       }
@@ -487,10 +500,10 @@ function SelectableAssetList({
     }
   };
 
-  const eligibleCount = items.filter((i) => i.isEligibleForCapture).length;
+  const eligibleCount = effectiveItems.filter((i) => i.isEligibleForCapture).length;
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <section aria-label={title} className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between border-b border-border bg-muted/30 px-4 py-3 gap-3">
         <div>
           <p className="text-sm font-semibold">{title}</p>
@@ -628,7 +641,7 @@ function SelectableAssetList({
       <div className="border-t border-border px-4 py-2.5">
         <PaginationFooter page={page} totalPages={totalPages} total={total} start={start} end={end} onPageChange={setPage} />
       </div>
-    </div>
+    </section>
   );
 }
 

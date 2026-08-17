@@ -40,10 +40,7 @@ export async function getMetaConnectionState(): Promise<{
   }
 
   const { getSystemSetting } = await import("@/features/system-settings/queries");
-  const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
-  await ensureMetaLeadAdsSchema();
-
-  const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`);
+  const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`).catch(() => null);
 
   const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes] = await Promise.all([
     db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))).orderBy(schema.metaPages.name),
@@ -558,8 +555,6 @@ export async function toggleMetaFormCaptureEligibilityAction(input: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
-    const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
-    await ensureMetaLeadAdsSchema();
     const db = getDatabase();
     const now = new Date();
     await db
@@ -594,8 +589,6 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
   try {
     if (!input.assetIds.length) return { success: true, count: 0 };
     const context = await getRequiredTenantContext();
-    const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
-    await ensureMetaLeadAdsSchema();
     const db = getDatabase();
     const now = new Date();
 

@@ -246,8 +246,6 @@ export async function pauseMetaLeadAdsSource(input: { tenantId: string; sourceId
 }
 
 export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayload, _rawPayload: string, request: Request) {
-  const { ensureMetaLeadAdsSchema } = await import("./manual-meta-queries");
-  await ensureMetaLeadAdsSchema();
   const enabled = await isMetaLeadAdsEnabled();
   console.log("[ingestMetaLeadAdsWebhook] start", { object: payload.object, enabled, entriesCount: payload.entry?.length });
   if (payload.object !== "page" || !enabled) {
