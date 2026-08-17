@@ -40,6 +40,9 @@ export async function getMetaConnectionState(): Promise<{
   }
 
   const { getSystemSetting } = await import("@/features/system-settings/queries");
+  const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
+  await ensureMetaLeadAdsSchema();
+
   const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`);
 
   const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes] = await Promise.all([
@@ -52,9 +55,9 @@ export async function getMetaConnectionState(): Promise<{
     db.select({ id: schema.metaAdSets.adSetId, campaignId: schema.metaAdSets.campaignId }).from(schema.metaAdSets).where(eq(schema.metaAdSets.tenantId, context.tenantId)),
     db.select({ id: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status, adSetId: schema.metaAds.adSetId }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
     db.select().from(schema.metaSyncLogs).where(eq(schema.metaSyncLogs.tenantId, context.tenantId)).orderBy(desc(schema.metaSyncLogs.startedAt)).limit(60),
-    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)),
-    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled }).from(schema.metaAdQueueRoutes).where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId)),
-    db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled }).from(schema.metaFormQueueRoutes).where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId)),
+    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)).catch(() => []),
+    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled }).from(schema.metaAdQueueRoutes).where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId)).catch(() => []),
+    db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled }).from(schema.metaFormQueueRoutes).where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId)).catch(() => []),
   ]);
 
   const activeAccountIds = new Set(adAccounts.map((account) => account.id));
@@ -555,6 +558,8 @@ export async function toggleMetaFormCaptureEligibilityAction(input: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
+    await ensureMetaLeadAdsSchema();
     const db = getDatabase();
     const now = new Date();
     await db
@@ -588,6 +593,8 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
 }): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    const { ensureMetaLeadAdsSchema } = await import("@/features/communication-channels/manual-meta-queries");
+    await ensureMetaLeadAdsSchema();
     const db = getDatabase();
     const now = new Date();
 
