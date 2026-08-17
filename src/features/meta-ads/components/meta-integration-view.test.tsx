@@ -2,10 +2,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refreshMock, disconnectMock, syncMock, toggleCampaignMock, toggleAdMock, toggleFormMock, batchEligibilityMock, toastSuccessMock, toastWarningMock, toastErrorMock } = vi.hoisted(() => ({
+const { refreshMock, disconnectMock, syncMock, setGlobalModeMock, toggleCampaignMock, toggleAdMock, toggleFormMock, batchEligibilityMock, toastSuccessMock, toastWarningMock, toastErrorMock } = vi.hoisted(() => ({
   refreshMock: vi.fn(),
   disconnectMock: vi.fn(),
   syncMock: vi.fn(),
+  setGlobalModeMock: vi.fn(),
   toggleCampaignMock: vi.fn(),
   toggleAdMock: vi.fn(),
   toggleFormMock: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("../actions", () => ({
   toggleMetaAdCaptureEligibilityAction: toggleAdMock,
   toggleMetaFormCaptureEligibilityAction: toggleFormMock,
   batchSetMetaCaptureEligibilityAction: batchEligibilityMock,
+  setMetaGlobalCaptureModeAction: setGlobalModeMock,
 }));
 vi.mock("../meta-marketing-oauth-url", () => ({ createMetaMarketingOAuthUrl: vi.fn(() => "https://meta.example/auth") }));
 
@@ -49,7 +51,7 @@ const connectedAssets = {
 };
 
 afterEach(() => {
-  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); syncMock.mockReset(); toggleCampaignMock.mockReset(); toggleAdMock.mockReset(); toggleFormMock.mockReset(); batchEligibilityMock.mockReset(); toastSuccessMock.mockClear(); toastWarningMock.mockClear(); toastErrorMock.mockClear();
+  cleanup(); refreshMock.mockClear(); disconnectMock.mockReset(); syncMock.mockReset(); setGlobalModeMock.mockReset(); toggleCampaignMock.mockReset(); toggleAdMock.mockReset(); toggleFormMock.mockReset(); batchEligibilityMock.mockReset(); toastSuccessMock.mockClear(); toastWarningMock.mockClear(); toastErrorMock.mockClear();
 });
 
 describe("MetaIntegrationView", () => {
@@ -123,6 +125,18 @@ describe("MetaIntegrationView", () => {
 
     await waitFor(() => expect(toggleCampaignMock).toHaveBeenCalledWith({ campaignId: "campaign-1", enabled: true }));
     expect(screen.getByText("✓ Elegível p/ Captura")).toBeInTheDocument();
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it("updates the master capture mode locally without refreshing the route tree", async () => {
+    setGlobalModeMock.mockResolvedValue({ success: true });
+    render(<MetaIntegrationView canConfigure connection={{ ...connectedConnection, globalCaptureMode: "all" }} assets={connectedAssets} logs={[]} />);
+
+    fireEvent.click(screen.getByLabelText("Controle Mestre de Captura Meta Lead Ads"));
+    fireEvent.click(screen.getByRole("option", { name: /Capturar Apenas Selecionados/ }));
+
+    await waitFor(() => expect(setGlobalModeMock).toHaveBeenCalledWith({ mode: "selective" }));
+    expect(screen.getByText(/MODO SELETIVO/)).toBeInTheDocument();
     expect(refreshMock).not.toHaveBeenCalled();
   });
 });

@@ -258,14 +258,15 @@ function MetaMasterCaptureControl({
   globalMode: "all" | "selective" | "disabled";
   canConfigure: boolean;
 }) {
-  const router = useRouter();
   const [updating, setUpdating] = useState(false);
+  const [currentMode, setCurrentMode] = useState(globalMode);
 
   const handleModeChange = async (newMode: "all" | "selective" | "disabled") => {
     setUpdating(true);
     try {
       const res = await setMetaGlobalCaptureModeAction({ mode: newMode });
       if (res.success) {
+        setCurrentMode(newMode);
         if (newMode === "disabled") {
           toast.success("Captura geral desativada! Nenhum lead Meta entrará no CRM.", { description: "Todos os webhooks Meta serão ignorados até reativar." });
         } else if (newMode === "all") {
@@ -273,7 +274,6 @@ function MetaMasterCaptureControl({
         } else {
           toast.success("Modo seletivo ativado!", { description: "Apenas as campanhas, anúncios ou formulários selecionados capturarão leads." });
         }
-        router.refresh();
       } else {
         toast.error(res.error || "Erro ao alterar modo de captura.");
       }
@@ -296,11 +296,11 @@ function MetaMasterCaptureControl({
             </CardDescription>
           </div>
           <div>
-            {globalMode === "disabled" ? (
+            {currentMode === "disabled" ? (
               <Badge variant="destructive" className="px-3 py-1 text-xs font-semibold">
                 🚫 CAPTURA GERAL DESATIVADA (PAUSADA)
               </Badge>
-            ) : globalMode === "all" ? (
+            ) : currentMode === "all" ? (
               <Badge variant="success" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 px-3 py-1 text-xs font-semibold">
                 🟢 CAPTURA GLOBAL ATIVA (TODAS)
               </Badge>
@@ -316,8 +316,9 @@ function MetaMasterCaptureControl({
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
             <AppSelect
+              aria-label="Controle Mestre de Captura Meta Lead Ads"
               disabled={!canConfigure || updating}
-              value={globalMode}
+              value={currentMode}
               onValueChange={(val) => void handleModeChange(val as "all" | "selective" | "disabled")}
               options={[
                 {
@@ -336,7 +337,7 @@ function MetaMasterCaptureControl({
             />
           </div>
           <div className="flex items-center gap-2">
-            {globalMode !== "disabled" ? (
+            {currentMode !== "disabled" ? (
               <Button
                 variant="destructive"
                 size="sm"
