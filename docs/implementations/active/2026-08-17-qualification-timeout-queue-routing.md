@@ -12,8 +12,10 @@ mesma unidade.
   tenant e está ativa; sem rota, mantém a fila de intake.
 - A alteração do lead, interação, evento de distribuição e auditoria são
   transacionais. O job de distribuição é enfileirado somente após o commit.
-- O processador seleciona corretores apenas da unidade da fila. A falta de
-  elegíveis mantém o job em retry, sem esgotar o lead como conflito.
+- O processador seleciona corretores da unidade da fila quando ela é local. Para
+  fila geral, seleciona apenas as unidades permitidas na política; Matriz é ponto
+  de entrada e nunca um destino. A falta de elegíveis mantém o job em retry,
+  sem esgotar o lead como conflito.
 
 ## Validação
 

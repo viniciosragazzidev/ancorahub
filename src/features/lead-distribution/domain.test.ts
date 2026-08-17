@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -59,5 +59,26 @@ describe("lead distribution domain", () => {
   it("keeps a queue retryable while its configured unit has no eligible broker", () => {
     expect(isDeferredDistributionReason("Nenhum corretor elegível nesta unidade.")).toBe(true);
     expect(isDeferredDistributionReason("A fila configurada pertence a outra unidade.")).toBe(true);
+  });
+
+  it("uses only the configured policy units for a general queue", () => {
+    expect(resolveQueueCandidateBranchIds({
+      queueBranchId: null,
+      allowedBranchIds: ["centro-1", "centro-2", "centro-1"],
+    })).toEqual(["centro-1", "centro-2"]);
+  });
+
+  it("keeps a unit queue local even when its policy contains other units", () => {
+    expect(resolveQueueCandidateBranchIds({
+      queueBranchId: "matriz",
+      allowedBranchIds: ["centro-1", "centro-2"],
+    })).toEqual(["matriz"]);
+  });
+
+  it("does not turn the headquarters intake point into a distribution unit", () => {
+    expect(resolveQueueCandidateBranchIds({
+      queueBranchId: null,
+      allowedBranchIds: [],
+    })).toEqual([]);
   });
 });

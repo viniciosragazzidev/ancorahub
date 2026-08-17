@@ -97,6 +97,7 @@ export type ConversationItem = {
   qualificationStatus?: string | null;
   origem: string;
   branchId: string | null;
+  queueName: string | null;
   corretorId: string | null;
   corretorNome: string | null;
   branchName: string | null;
@@ -1304,7 +1305,7 @@ function ClientProfile({
                 </div>
                 <div className="pt-2 flex items-center justify-between border-t border-border/40">
                   <span className="text-[11px] text-muted-foreground">Fila de Atendimento</span>
-                  <span className="text-xs font-semibold text-foreground">Distribuição Geral</span>
+                  <span className="text-xs font-semibold text-foreground">{client.queueName ?? "Sem fila configurada"}</span>
                 </div>
                 <Button
                   type="button"

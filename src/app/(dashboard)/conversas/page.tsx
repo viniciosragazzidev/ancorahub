@@ -41,6 +41,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
         qualificationStatus: schema.leads.qualificationStatus,
         origem: schema.leads.origem,
         branchId: schema.leads.branchId,
+        queueName: schema.leadQueues.name,
         corretorId: schema.leads.corretorId,
         corretorNome: schema.user.name,
         branchName: schema.branches.name,
@@ -53,6 +54,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+      .leftJoin(schema.leadQueues, and(eq(schema.leads.queueId, schema.leadQueues.id), eq(schema.leadQueues.tenantId, context.tenantId)))
       .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
       .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
       .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), ...(scope ? [scope] : [])))

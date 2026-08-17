@@ -8,9 +8,11 @@
 Ao exceder o tempo de resposta da qualificação, o lead é mantido na fila ativa
 configurada para sua campanha/tipo de entrada; se não houver regra ativa, preserva
 a fila já definida no intake. O job persistente é criado após o commit desta
-transição e seleciona corretores somente da unidade proprietária da fila. Não há
-seleção cruzada de unidade. Sem corretor elegível, o lead permanece em fila e o
-trabalho é repetido com motivo auditável, sem descartar a atribuição de fila.
+transição. Fila vinculada a uma unidade seleciona somente corretores daquela unidade;
+fila geral seleciona somente unidades explicitamente permitidas em sua política e
+nunca usa a Matriz como destino. A Matriz é ponto administrativo de entrada. Sem
+corretor ou unidade elegível, o lead permanece em fila e o trabalho é repetido com
+motivo auditável, sem descartar a atribuição de fila.
 
 ## DEC-079 — Notificação oficial ao corretor em toda atribuição de lead
 

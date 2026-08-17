@@ -79,7 +79,20 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
 
 export function isDeferredDistributionReason(reason: string) {
   const normalized = reason.toLocaleLowerCase("pt-BR");
-  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacity") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada") || normalized.includes("fila configurada pertence");
+  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacity") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada") || normalized.includes("fila configurada pertence") || normalized.includes("nenhuma unidade elegível") || normalized.includes("fila geral não possui unidades");
+}
+
+/**
+ * A queue tied to one unit can only select brokers from that unit. A general
+ * queue is deliberately different: it may distribute only to the unit IDs
+ * explicitly allowed in its policy, never to every tenant unit by default.
+ */
+export function resolveQueueCandidateBranchIds(input: {
+  queueBranchId: string | null;
+  allowedBranchIds: string[];
+}) {
+  if (input.queueBranchId) return [input.queueBranchId];
+  return Array.from(new Set(input.allowedBranchIds));
 }
 
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {
