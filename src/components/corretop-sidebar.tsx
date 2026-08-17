@@ -161,6 +161,14 @@ const marketingHiddenPaths = [
 ];
 
 const brokerHiddenPaths = ["/cotacao", "/automacoes"];
+const managerHiddenPaths = [
+  "/marketing",
+  "/integrations",
+  "/inteligencia",
+  "/qualificacao",
+  "/leads/distribuicao",
+  "/automacoes",
+];
 
 function canShowItem(item: SidebarItem, user: UserDisplayInfo | null, roleKey: UserDisplayInfo["roleKey"]) {
   if (!roleKey) return false;
@@ -168,6 +176,9 @@ function canShowItem(item: SidebarItem, user: UserDisplayInfo | null, roleKey: U
     return false;
   }
   if (roleKey === "broker" && brokerHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
+    return false;
+  }
+  if (roleKey === "manager" && managerHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
     return false;
   }
   return user?.permissions?.includes(item.permission) ?? false;
@@ -234,7 +245,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
         )}
 
-        {onDuty ? (
+        {onDuty && roleKey !== "manager" ? (
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton

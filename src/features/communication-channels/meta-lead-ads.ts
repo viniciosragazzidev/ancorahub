@@ -224,7 +224,25 @@ export function resolveMetaCampaignIntake(input: {
     return { action: "capture" as const, queueId: null };
   }
 
-  // Selective mode: require explicit route with enabled === true
+  // A selected campaign is the baseline authorization for every attribution
+  // below it. Historical disabled ad/form rows must not discard its lead.
+  // An enabled child rule can still select its own active queue.
+  if (input.campaignRoute?.enabled) {
+    const enabledRoute = input.adRoute?.enabled
+      ? input.adRoute
+      : input.formRoute?.enabled
+        ? input.formRoute
+        : input.campaignRoute;
+    if (enabledRoute.queueId && enabledRoute.queueStatus === "active") {
+      return { action: "capture" as const, queueId: enabledRoute.queueId };
+    }
+    if (input.campaignRoute.queueId && input.campaignRoute.queueStatus === "active") {
+      return { action: "capture" as const, queueId: input.campaignRoute.queueId };
+    }
+    return { action: "capture" as const, queueId: null };
+  }
+
+  // Selective mode: require an explicitly enabled asset or campaign route.
   if (!route || !route.enabled) {
     return { action: "ignore" as const, queueId: null };
   }

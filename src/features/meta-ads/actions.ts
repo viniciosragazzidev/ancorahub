@@ -465,29 +465,64 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
     }
 
     const now = new Date();
-    await db
-      .insert(schema.metaCampaignQueueRoutes)
-      .values({
-        id: randomUUID(),
-        tenantId: context.tenantId,
-        campaignId: campaign.campaignId,
-        queueId: null,
-        enabled: input.enabled,
-        createdBy: context.userId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
-        set: { enabled: input.enabled, updatedAt: now },
-      });
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(schema.metaCampaignQueueRoutes)
+        .values({
+          id: randomUUID(),
+          tenantId: context.tenantId,
+          campaignId: campaign.campaignId,
+          queueId: null,
+          enabled: input.enabled,
+          createdBy: context.userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
+          set: { enabled: input.enabled, updatedAt: now },
+        });
 
-    await db.insert(schema.auditLogs).values({
-      id: randomUUID(),
-      userId: context.userId,
-      entidade: "meta_campaign_queue_route",
-      entidadeId: campaign.campaignId,
-      acao: input.enabled ? "meta_campaign.capture_enabled" : "meta_campaign.capture_disabled",
+      if (input.enabled) {
+        const relatedAds = await tx
+          .select({ adId: schema.metaAds.adId })
+          .from(schema.metaAds)
+          .innerJoin(schema.metaAdSets, and(
+            eq(schema.metaAds.tenantId, schema.metaAdSets.tenantId),
+            eq(schema.metaAds.adSetId, schema.metaAdSets.adSetId),
+          ))
+          .where(and(
+            eq(schema.metaAds.tenantId, context.tenantId),
+            eq(schema.metaAdSets.campaignId, campaign.campaignId),
+          ));
+
+        if (relatedAds.length) {
+          await tx
+            .insert(schema.metaAdQueueRoutes)
+            .values(relatedAds.map((ad) => ({
+              id: randomUUID(),
+              tenantId: context.tenantId,
+              adId: ad.adId,
+              queueId: null,
+              enabled: true,
+              createdBy: context.userId,
+              createdAt: now,
+              updatedAt: now,
+            })))
+            .onConflictDoUpdate({
+              target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
+              set: { enabled: true, updatedAt: now },
+            });
+        }
+      }
+
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "meta_campaign_queue_route",
+        entidadeId: campaign.campaignId,
+        acao: input.enabled ? "meta_campaign.capture_enabled_with_ads" : "meta_campaign.capture_disabled",
+      });
     });
 
     revalidatePath("/integrations/meta");

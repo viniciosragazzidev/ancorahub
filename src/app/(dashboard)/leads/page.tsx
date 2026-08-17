@@ -479,6 +479,7 @@ export default async function LeadsPage({
           initialStatus={filters.status}
           initialTipo={filters.tipo}
           initialEligibleCampaigns={filters.eligibleCampaigns}
+          storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
         />
 
         {/* Workspace or RCD Directional Empty State */}

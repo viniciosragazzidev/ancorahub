@@ -39,11 +39,27 @@ describe("Meta Lead Ads normalization", () => {
       .toEqual({ action: "capture", queueId: null });
   });
 
-  it("gives an ad rule precedence over the campaign rule", () => {
+  it("uses an enabled child route to refine the queue selected by an eligible campaign", () => {
     expect(resolveMetaCampaignIntake({
       adRoute: { enabled: true, queueId: "queue-ad", queueStatus: "active" },
       campaignRoute: { enabled: true, queueId: "queue-campaign", queueStatus: "active" },
     })).toEqual({ action: "capture", queueId: "queue-ad" });
+  });
+
+  it("does not let an old disabled ad or form rule discard an eligible campaign lead", () => {
+    const campaignRoute = { enabled: true, queueId: "queue-campaign", queueStatus: "active" } as const;
+
+    expect(resolveMetaCampaignIntake({
+      adRoute: { enabled: false, queueId: null, queueStatus: null },
+      campaignRoute,
+      globalMode: "selective",
+    })).toEqual({ action: "capture", queueId: "queue-campaign" });
+
+    expect(resolveMetaCampaignIntake({
+      formRoute: { enabled: false, queueId: null, queueStatus: null },
+      campaignRoute,
+      globalMode: "selective",
+    })).toEqual({ action: "capture", queueId: "queue-campaign" });
   });
 
   it("maps Meta standard fields without retaining unrelated form answers", () => {

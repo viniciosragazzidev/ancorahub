@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,11 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "@/components/huge-icons";
+import {
+  hasLeadFilterQuery,
+  parseLeadFilterPreferences,
+  type LeadFilterPreferences,
+} from "@/features/leads/lead-filter-preferences";
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string };
@@ -25,6 +30,7 @@ export function LeadsFilters({
   initialCorretor,
   initialPageSize,
   initialEligibleCampaigns,
+  storageKey,
   branches,
   brokers,
 }: {
@@ -37,6 +43,7 @@ export function LeadsFilters({
   initialCorretor?: string;
   initialPageSize?: string;
   initialEligibleCampaigns?: string;
+  storageKey: string;
   branches: Branch[];
   brokers: Broker[];
 }) {
@@ -56,6 +63,52 @@ export function LeadsFilters({
   const [corretor, setCorretor] = useState(initialCorretor ?? "");
   const [pageSize, setPageSize] = useState(initialPageSize ?? "20");
   const [eligibleCampaigns, setEligibleCampaigns] = useState(initialEligibleCampaigns === "1");
+  const [restored, setRestored] = useState(false);
+
+  const currentPreferences = (): LeadFilterPreferences => ({
+    search, status, branch, tipo, origem, qualification, corretor, pageSize, eligibleCampaigns,
+  });
+
+  function applyPreferenceState(preferences: LeadFilterPreferences) {
+    setSearch(preferences.search);
+    setStatus(preferences.status);
+    setBranch(preferences.branch);
+    setTipo(preferences.tipo);
+    setOrigem(preferences.origem);
+    setQualification(preferences.qualification);
+    setCorretor(preferences.corretor);
+    setPageSize(preferences.pageSize);
+    setEligibleCampaigns(preferences.eligibleCampaigns);
+  }
+
+  function buildUrl(preferences: LeadFilterPreferences) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+
+    if (preferences.search) params.set("search", preferences.search); else params.delete("search");
+    if (preferences.status) params.set("status", preferences.status); else params.delete("status");
+    if (preferences.branch) params.set("branch", preferences.branch); else params.delete("branch");
+    if (preferences.tipo) params.set("tipo", preferences.tipo); else params.delete("tipo");
+    if (preferences.origem) params.set("origem", preferences.origem); else params.delete("origem");
+    if (preferences.qualification) params.set("qualification", preferences.qualification); else params.delete("qualification");
+    if (preferences.corretor) params.set("corretor", preferences.corretor); else params.delete("corretor");
+    if (preferences.eligibleCampaigns) params.set("eligibleCampaigns", "1"); else params.delete("eligibleCampaigns");
+    if (preferences.pageSize !== "20") params.set("pageSize", preferences.pageSize); else params.delete("pageSize");
+
+    const queryStr = params.toString();
+    return `/leads${queryStr ? `?${queryStr}` : ""}`;
+  }
+
+  useEffect(() => {
+    if (restored || hasLeadFilterQuery(searchParams)) return;
+    setRestored(true);
+    const stored = parseLeadFilterPreferences(window.localStorage.getItem(storageKey));
+    if (!stored) return;
+    applyPreferenceState(stored);
+    startTransition(() => router.replace(buildUrl(stored)));
+  // Local preferences restore once; an explicit URL remains authoritative.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restored, searchParams, storageKey]);
 
   const activeCount = [
     status,
@@ -71,22 +124,9 @@ export function LeadsFilters({
   const hasAnyFilter = Boolean(search || activeCount > 0);
 
   function applyFilters() {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("page");
-
-    if (search) params.set("search", search); else params.delete("search");
-    if (status) params.set("status", status); else params.delete("status");
-    if (branch) params.set("branch", branch); else params.delete("branch");
-    if (tipo) params.set("tipo", tipo); else params.delete("tipo");
-    if (origem) params.set("origem", origem); else params.delete("origem");
-    if (qualification) params.set("qualification", qualification); else params.delete("qualification");
-    if (corretor) params.set("corretor", corretor); else params.delete("corretor");
-    if (eligibleCampaigns) params.set("eligibleCampaigns", "1"); else params.delete("eligibleCampaigns");
-    if (pageSize && pageSize !== "20") params.set("pageSize", pageSize); else params.delete("pageSize");
-
-    const queryStr = params.toString();
-    const newUrl = `/leads${queryStr ? `?${queryStr}` : ""}`;
-    startTransition(() => router.push(newUrl));
+    const preferences = currentPreferences();
+    window.localStorage.setItem(storageKey, JSON.stringify(preferences));
+    startTransition(() => router.push(buildUrl(preferences)));
   }
 
   function handleReset() {
@@ -100,6 +140,7 @@ export function LeadsFilters({
     setEligibleCampaigns(false);
     setPageSize("20");
 
+    window.localStorage.removeItem(storageKey);
     startTransition(() => router.push("/leads"));
   }
 
