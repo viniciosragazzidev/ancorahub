@@ -13,6 +13,7 @@ import {
   Check,
   Send,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,8 @@ import {
 import {
   fetchMetaTemplatesAction,
   syncMetaTemplatesAction,
+  setDefaultMetaTemplateAction,
+  deleteMetaTemplateAction,
 } from "@/features/ai-qualification/actions";
 
 type MetaTemplateItem = {
@@ -45,6 +48,7 @@ type MetaTemplateItem = {
   footerText?: string | null;
   componentsJson?: any;
   syncedAt?: Date | string | null;
+  isDefault?: boolean;
 };
 
 export function MetaTemplatesPanel() {
@@ -52,7 +56,6 @@ export function MetaTemplatesPanel() {
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [defaultTemplateName, setDefaultTemplateName] = useState<string>("lead_first_contact");
   const [newModalOpen, setNewModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -85,9 +88,25 @@ export function MetaTemplatesPanel() {
     }
   }
 
-  function handleSetDefault(name: string) {
-    setDefaultTemplateName(name);
-    toast.success(`Modelo "${name}" definido como padrão de primeiro atendimento!`);
+  async function handleSetDefault(item: MetaTemplateItem) {
+    try {
+      await setDefaultMetaTemplateAction(item.id);
+      toast.success(`Modelo "${item.name}" definido como padrão de primeiro atendimento!`);
+      await loadTemplates();
+    } catch (err) {
+      toast.error("Erro ao definir modelo padrão.");
+    }
+  }
+
+  async function handleDelete(item: MetaTemplateItem) {
+    if (!confirm(`Deseja realmente remover o modelo "${item.name}" da lista?`)) return;
+    try {
+      await deleteMetaTemplateAction(item.id);
+      toast.success(`Modelo "${item.name}" removido com sucesso!`);
+      await loadTemplates();
+    } catch (err) {
+      toast.error("Erro ao remover modelo.");
+    }
   }
 
   const filtered = templates.filter((t) =>
@@ -154,13 +173,13 @@ export function MetaTemplatesPanel() {
           <FileText className="size-8 text-muted-foreground mx-auto mb-2 opacity-50" />
           <p className="text-sm font-semibold">Nenhum modelo encontrado</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Clique em "Sincronizar com Meta" para importar modelos aprovados ou crie um modelo.
+            Clique em "Sincronizar com Meta" para importar modelos aprovados.
           </p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map((item) => {
-            const isDefault = item.name === defaultTemplateName;
+            const isDefault = Boolean(item.isDefault);
             return (
               <Card
                 key={item.id}
@@ -203,10 +222,10 @@ export function MetaTemplatesPanel() {
                     {item.bodyText || "Conteúdo do modelo sem prévia disponível."}
                   </div>
 
-                  {/* Variables listing */}
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t">
+                  {/* Variables listing and action buttons */}
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-foreground">Variáveis detectadas:</span>
+                      <span className="font-medium text-foreground">Variáveis:</span>
                       <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-[10px] text-primary">
                         {"{{nome}}"}
                       </code>
@@ -215,17 +234,29 @@ export function MetaTemplatesPanel() {
                       </code>
                     </div>
 
-                    {!isDefault && item.status === "APPROVED" && (
+                    <div className="flex items-center gap-1 ml-auto">
+                      {!isDefault && item.status === "APPROVED" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSetDefault(item)}
+                          className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10 gap-1 px-2"
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                          Definir como Padrão
+                        </Button>
+                      )}
+
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleSetDefault(item.name)}
-                        className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10 gap-1"
+                        onClick={() => handleDelete(item)}
+                        className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 px-2"
                       >
-                        <CheckCircle2 className="size-3.5" />
-                        Definir como Padrão
+                        <Trash2 className="size-3.5" />
+                        Excluir
                       </Button>
-                    )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -288,8 +319,8 @@ export function MetaTemplatesPanel() {
             <Button
               size="sm"
               onClick={() => {
-                toast.success("Modelo lead_first_contact salvo e definido como padrão!");
-                setDefaultTemplateName("lead_first_contact");
+                toast.success("Modelo salvo com sucesso!");
+                loadTemplates();
                 setNewModalOpen(false);
               }}
             >

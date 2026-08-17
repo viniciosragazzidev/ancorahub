@@ -187,49 +187,120 @@ export async function fetchMetaTemplatesAction() {
   const { listTenantTemplates, syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, eq, isNull } = await import("drizzle-orm");
-  const { randomUUID } = await import("node:crypto");
 
-  // Automatically sync with Meta Cloud API to ensure all approved templates are populated
+  const db = getDatabase();
+
+  // Purge synthetic placeholder templates with wabaId = "waba_default"
+  await db
+    .delete(schema.metaWhatsAppTemplates)
+    .where(
+      and(
+        eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+        eq(schema.metaWhatsAppTemplates.wabaId, "waba_default")
+      )
+    )
+    .catch(() => undefined);
+
+  // Automatically sync real templates from Meta Graph API
   await syncTenantTemplates(context.tenantId).catch((err) => {
     console.warn("[fetchMetaTemplatesAction] auto-sync error:", err);
   });
 
-  const db = getDatabase();
-  const [existingFirstContact] = await db
-    .select({ id: schema.metaWhatsAppTemplates.id })
-    .from(schema.metaWhatsAppTemplates)
+  // Fetch active default usage
+  const [defaultUsage] = await db
+    .select({ templateId: schema.metaWhatsAppTemplateUsages.templateId })
+    .from(schema.metaWhatsAppTemplateUsages)
     .where(
       and(
-        eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
-        eq(schema.metaWhatsAppTemplates.name, "lead_first_contact"),
-        isNull(schema.metaWhatsAppTemplates.deletedAt)
+        eq(schema.metaWhatsAppTemplateUsages.tenantId, context.tenantId),
+        eq(schema.metaWhatsAppTemplateUsages.eventKey, "FIRST_CONTACT"),
+        eq(schema.metaWhatsAppTemplateUsages.active, true)
       )
     )
     .limit(1);
 
-  if (!existingFirstContact) {
-    await db.insert(schema.metaWhatsAppTemplates).values({
-      id: `tpl_${randomUUID()}`,
+  const templates = await listTenantTemplates(context.tenantId);
+
+  return templates.map((t) => ({
+    ...t,
+    isDefault: defaultUsage ? t.id === defaultUsage.templateId : t.name === "lead_first_contact",
+  }));
+}
+
+export async function setDefaultMetaTemplateAction(templateId: string) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { and, eq } = await import("drizzle-orm");
+  const { randomUUID } = await import("node:crypto");
+
+  const db = getDatabase();
+
+  // Deactivate existing FIRST_CONTACT usages
+  await db
+    .update(schema.metaWhatsAppTemplateUsages)
+    .set({ active: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.metaWhatsAppTemplateUsages.tenantId, context.tenantId),
+        eq(schema.metaWhatsAppTemplateUsages.eventKey, "FIRST_CONTACT")
+      )
+    );
+
+  // Insert or activate usage
+  const [existingUsage] = await db
+    .select({ id: schema.metaWhatsAppTemplateUsages.id })
+    .from(schema.metaWhatsAppTemplateUsages)
+    .where(
+      and(
+        eq(schema.metaWhatsAppTemplateUsages.tenantId, context.tenantId),
+        eq(schema.metaWhatsAppTemplateUsages.eventKey, "FIRST_CONTACT"),
+        eq(schema.metaWhatsAppTemplateUsages.templateId, templateId)
+      )
+    )
+    .limit(1);
+
+  if (existingUsage) {
+    await db
+      .update(schema.metaWhatsAppTemplateUsages)
+      .set({ active: true, updatedAt: new Date() })
+      .where(eq(schema.metaWhatsAppTemplateUsages.id, existingUsage.id));
+  } else {
+    await db.insert(schema.metaWhatsAppTemplateUsages).values({
+      id: `usage_${randomUUID()}`,
       tenantId: context.tenantId,
-      wabaId: "waba_default",
-      name: "lead_first_contact",
-      language: "pt_BR",
-      status: "APPROVED",
-      category: "MARKETING",
-      bodyText: "Olá {{nome}}! Me chamo {{nome_bot}}. Recebemos sua solicitação de atendimento sobre planos de saúde pela Âncora Saúde. Para encaminhar você ao especialista mais adequado, gostaríamos de fazer algumas perguntas rápidas por aqui. Como deseja continuar?",
-      componentsJson: [
-        {
-          type: "BODY",
-          text: "Olá {{nome}}! Me chamo {{nome_bot}}. Recebemos sua solicitação de atendimento sobre planos de saúde pela Âncora Saúde. Para encaminhar você ao especialista mais adequado, gostaríamos de fazer algumas perguntas rápidas por aqui. Como deseja continuar?",
-          example: { body_text_named_params: [{ param_name: "nome", example: "Cliente" }, { param_name: "nome_bot", example: "Assistente Âncora Saúde" }] }
-        }
-      ],
-      lastSyncedAt: new Date(),
-    }).onConflictDoNothing();
+      eventKey: "FIRST_CONTACT",
+      templateId,
+      active: true,
+      variableMappingsJson: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
   }
 
-  const templates = await listTenantTemplates(context.tenantId);
-  return templates;
+  revalidatePath("/qualificacao");
+  return { success: true };
+}
+
+export async function deleteMetaTemplateAction(templateId: string) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { and, eq } = await import("drizzle-orm");
+
+  const db = getDatabase();
+  await db
+    .update(schema.metaWhatsAppTemplates)
+    .set({ deletedAt: new Date(), status: "DELETED", updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+        eq(schema.metaWhatsAppTemplates.id, templateId)
+      )
+    );
+
+  revalidatePath("/qualificacao");
+  return { success: true };
 }
 
 export async function syncMetaTemplatesAction() {

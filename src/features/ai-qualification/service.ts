@@ -88,7 +88,35 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
     const credentials = await resolveMetaChannelCredentials(input.tenantId);
 
     if (credentials.phoneNumberId && credentials.accessToken) {
-      const [firstContactTemplate] = await db
+      // 1. Check metaWhatsAppTemplateUsages for user-selected default FIRST_CONTACT template
+      const [userDefaultTemplate] = await db
+        .select({
+          id: schema.metaWhatsAppTemplates.id,
+          name: schema.metaWhatsAppTemplates.name,
+          language: schema.metaWhatsAppTemplates.language,
+          category: schema.metaWhatsAppTemplates.category,
+          status: schema.metaWhatsAppTemplates.status,
+          bodyText: schema.metaWhatsAppTemplates.bodyText,
+          componentsJson: schema.metaWhatsAppTemplates.componentsJson,
+        })
+        .from(schema.metaWhatsAppTemplateUsages)
+        .innerJoin(
+          schema.metaWhatsAppTemplates,
+          eq(schema.metaWhatsAppTemplateUsages.templateId, schema.metaWhatsAppTemplates.id)
+        )
+        .where(
+          and(
+            eq(schema.metaWhatsAppTemplateUsages.tenantId, input.tenantId),
+            eq(schema.metaWhatsAppTemplateUsages.eventKey, "FIRST_CONTACT"),
+            eq(schema.metaWhatsAppTemplateUsages.active, true),
+            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+            isNull(schema.metaWhatsAppTemplates.deletedAt)
+          )
+        )
+        .limit(1);
+
+      // 2. Fall back to template named lead_first_contact
+      const [firstContactTemplate] = userDefaultTemplate ? [null] : await db
         .select()
         .from(schema.metaWhatsAppTemplates)
         .where(
@@ -101,7 +129,8 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
         )
         .limit(1);
 
-      const template = firstContactTemplate ?? (
+      // 3. Fall back to any approved template
+      const template = userDefaultTemplate ?? firstContactTemplate ?? (
         await db
           .select()
           .from(schema.metaWhatsAppTemplates)
@@ -116,6 +145,10 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
       )[0];
 
       if (template) {
+        const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
+        const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
+        const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
+
         const leadName = lead.nome || "Cliente";
         const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
         const namedParams = bodyComp?.example?.body_text_named_params;
@@ -124,7 +157,7 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
           parameters = namedParams.map((p: any) => {
             const pName = p.param_name || p.parameter_name;
             if (pName === "nome_bot" || pName === "bot_name") {
-              return { type: "text", parameter_name: pName, text: "Assistente Âncora Saúde" };
+              return { type: "text", parameter_name: pName, text: botName };
             }
             if (pName === "empresa" || pName === "company") {
               return { type: "text", parameter_name: pName, text: "Âncora Saúde" };
@@ -134,7 +167,7 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
         } else {
           parameters = [
             { type: "text", text: leadName },
-            { type: "text", text: "Assistente Âncora Saúde" },
+            { type: "text", text: botName },
           ];
         }
 
@@ -157,9 +190,9 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
         if (rendered) {
           rendered = rendered
             .replace(/\{\{1\}\}/g, leadName)
-            .replace(/\{\{2\}\}/g, "Assistente Âncora Saúde")
+            .replace(/\{\{2\}\}/g, botName)
             .replace(/\{\{nome\}\}/g, leadName)
-            .replace(/\{\{nome_bot\}\}/g, "Assistente Âncora Saúde")
+            .replace(/\{\{nome_bot\}\}/g, botName)
             .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
         } else {
           rendered = finalBody;
