@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 
+import { playSound } from "react-sounds";
+
 import { ArrowRight, BellRinging, X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +28,16 @@ export function IncomingLeadCard({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (item?.notificationId) {
+      try {
+        playSound("notification/alert", { volume: 0.8 });
+      } catch {
+        // Fallback if browser requires user gesture for audio context
+      }
+    }
+  }, [item?.notificationId]);
 
   const cardContent = (
     <AnimatePresence initial={false}>

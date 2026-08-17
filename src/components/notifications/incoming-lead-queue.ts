@@ -15,11 +15,10 @@ export function isAssignedLeadNotification(
   row: { tenant_id?: string; recipient_user_id?: string; type?: string; lead_id?: string | null },
   tenantId: string,
   userId: string,
-): row is { tenant_id: string; recipient_user_id: string; type: "agent.lead_assigned"; lead_id: string } {
-  return row.tenant_id === tenantId
-    && row.recipient_user_id === userId
-    && row.type === "agent.lead_assigned"
-    && Boolean(row.lead_id);
+): row is { tenant_id: string; recipient_user_id: string; type: string; lead_id: string } {
+  if (row.tenant_id !== tenantId || row.recipient_user_id !== userId || !row.lead_id) return false;
+  const type = row.type ?? "";
+  return type === "agent.lead_assigned" || type === "lead_arrived" || type === "lead_reassigned" || type.startsWith("lead");
 }
 
 export function createIncomingLeadQueueState(): IncomingLeadQueueState {

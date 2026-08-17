@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { SoundProvider } from "react-sounds";
+
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import {
   createIncomingLeadQueueState,
@@ -38,7 +40,7 @@ type RecentNotification = {
 
 const LEADS_REVISION_KEY = "ancorahub:leads-revision";
 const LIVE_REFRESH_DELAY_MS = 160;
-const BROKER_RECONCILIATION_MS = 60_000;
+const RECONCILIATION_MS = 60_000;
 
 export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
   const router = useRouter();
@@ -50,6 +52,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
+
+  const isEligibleForLeadNotifications = role === "director" || role === "manager" || role === "broker";
 
   const isFormElementFocused = useCallback(() => {
     const element = document.activeElement;
@@ -86,8 +90,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     if (broadcast) localBroadcastRef.current?.postMessage({ type: "local-first.invalidate", detail });
   }, [queryClient, scheduleServerRefresh, tenantId, userId]);
 
-  const reconcileRecentBrokerNotifications = useCallback(async (notificationId?: string) => {
-    if (role !== "broker") return;
+  const reconcileRecentNotifications = useCallback(async (notificationId?: string) => {
+    if (!isEligibleForLeadNotifications) return;
     try {
       const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
       if (!response.ok) return;
@@ -109,22 +113,22 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
         setIncomingLeads((state) => enqueueIncomingLead(state, {
           notificationId: resolvedNotificationId!,
           leadId: resolvedLeadId!,
-          title: notification.title ?? "Novo lead atribuído",
-          message: notification.message ?? "Você recebeu um novo lead para atender.",
+          title: notification.title ?? "Novo lead recebido",
+          message: notification.message ?? "Uma nova oportunidade entrou no sistema.",
           createdAt: notification.createdAt ?? new Date().toISOString(),
         }));
       }
     } catch {
       // The next authenticated reconciliation retries without exposing data to Realtime.
     }
-  }, [role, tenantId, userId]);
+  }, [isEligibleForLeadNotifications, tenantId, userId]);
 
   const handleRemoteSignal = useCallback((detail: RealtimeSyncBrowserDetail) => {
     syncClientState(detail);
     if (detail.kind === "notification.created") {
-      void reconcileRecentBrokerNotifications(detail.notificationId);
+      void reconcileRecentNotifications(detail.notificationId);
     }
-  }, [reconcileRecentBrokerNotifications, syncClientState]);
+  }, [reconcileRecentNotifications, syncClientState]);
 
   useEffect(() => {
     shellStartedAtRef.current = Date.now();
@@ -191,16 +195,16 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [handleRemoteSignal, syncTopic]);
 
   useEffect(() => {
-    if (role !== "broker") return;
-    const initialReconciliation = window.setTimeout(() => void reconcileRecentBrokerNotifications(), 0);
+    if (!isEligibleForLeadNotifications) return;
+    const initialReconciliation = window.setTimeout(() => void reconcileRecentNotifications(), 0);
     const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") void reconcileRecentBrokerNotifications();
-    }, BROKER_RECONCILIATION_MS);
+      if (document.visibilityState === "visible") void reconcileRecentNotifications();
+    }, RECONCILIATION_MS);
     return () => {
       window.clearTimeout(initialReconciliation);
       window.clearInterval(interval);
     };
-  }, [reconcileRecentBrokerNotifications, role]);
+  }, [isEligibleForLeadNotifications, reconcileRecentNotifications]);
 
   const resolveIncoming = useCallback((item: IncomingLead) => {
     setIncomingLeads((state) => resolveIncomingLead(state, item.notificationId));
@@ -212,10 +216,16 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, []);
 
   return (
-    <>
-      {role === "broker" ? <IncomingLeadCard item={incomingLeads.queue[0] ?? null} queuedCount={Math.max(0, incomingLeads.queue.length - 1)} onResolve={resolveIncoming} /> : null}
+    <SoundProvider initialEnabled={true} preload={["notification/alert"]}>
+      {isEligibleForLeadNotifications ? (
+        <IncomingLeadCard
+          item={incomingLeads.queue[0] ?? null}
+          queuedCount={Math.max(0, incomingLeads.queue.length - 1)}
+          onResolve={resolveIncoming}
+        />
+      ) : null}
       {!isOnline ? <div role="status" className="fixed inset-x-0 bottom-3 z-[70] mx-auto w-fit rounded-full border border-warning/30 bg-card px-3 py-1.5 text-xs text-warning shadow-lg">Conexão de atualização indisponível · os dados serão reconciliados ao retornar</div> : null}
       <div data-local-first-sync={lastSyncedAt ? new Date(lastSyncedAt).toISOString() : undefined}>{children}</div>
-    </>
+    </SoundProvider>
   );
 }
