@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getUrgentLeadForUser } from "@/features/leads/queries";
 
-export async function NextUrgentLeadButton() {
-  const urgentLead = await getUrgentLeadForUser().catch(() => null);
+export type UrgentLeadData = Awaited<ReturnType<typeof getUrgentLeadForUser>>;
+
+export async function NextUrgentLeadButton({ lead }: { lead?: UrgentLeadData }) {
+  const urgentLead = lead ?? (await getUrgentLeadForUser().catch(() => null));
 
   if (!urgentLead) {
     return null;

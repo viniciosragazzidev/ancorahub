@@ -13,6 +13,7 @@ export type MetaConnectionInfo = {
   pagesCount: number;
   adAccountsCount: number;
   whatsappConnected: boolean;
+  globalCaptureMode?: "all" | "selective" | "disabled";
 };
 
 export type MetaConnectionAssets = {
@@ -20,9 +21,9 @@ export type MetaConnectionAssets = {
   adAccounts: Array<{ id: string; name: string; currency: string; status: string }>;
   pixels: Array<{ id: string; name: string; status: string }>;
   datasets: Array<{ id: string; name: string; status: string }>;
-  leadForms: Array<{ id: string; name: string; status: string; pageId: string }>;
+  leadForms: Array<{ id: string; name: string; status: string; pageId: string; isEligibleForCapture?: boolean }>;
   campaigns: Array<{ id: string; name: string; status: string; adAccountId: string; isEligibleForCapture?: boolean }>;
-  ads: Array<{ id: string; name: string; status: string; adSetId: string }>;
+  ads: Array<{ id: string; name: string; status: string; adSetId: string; isEligibleForCapture?: boolean }>;
 };
 
 export type MetaDiscoveredAssets = {

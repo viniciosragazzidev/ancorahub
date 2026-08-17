@@ -9,10 +9,12 @@ import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
 import { LeadsPagination } from "./_components/leads-pagination";
 import { LeadsWorkspace } from "./leads-workspace";
+import { LeadsHeaderActions } from "./_components/leads-header-actions";
 import { WifiHigh, Plus, Target } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
+import { getUrgentLeadForUser } from "@/features/leads/queries";
 import { ContextNote } from "@/components/ui/context-note";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -22,7 +24,6 @@ import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
-import { PeriodSelect } from "@/components/period-select";
 
 export default async function LeadsPage({
   searchParams,
@@ -202,6 +203,7 @@ export default async function LeadsPage({
     brokers,
     rawQualifyingLeads,
     activeQueues,
+    urgentLead,
   ] = await Promise.all([
     db.select({ total: count() }).from(schema.leads).innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id)).where(where),
     listAvailableCatalogPlans(context),
@@ -323,6 +325,7 @@ export default async function LeadsPage({
       })
       .from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))),
+    getUrgentLeadForUser().catch(() => null),
   ]);
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
@@ -385,12 +388,19 @@ export default async function LeadsPage({
         breadcrumb="Operação comercial"
         title="Leads"
         rightSlot={
-          <div className="flex items-center gap-2">
-            <PeriodSelect value={period} />
-            <NextUrgentLeadButton />
-            <BulkLeadImportDialog branches={branches} queues={activeQueues} role={context.role} jobTitle={context.jobTitle} branchId={context.branchId} />
-            <ManualLeadSheet initiallyOpen={filters.new === "1"} plans={plans} />
-          </div>
+          <LeadsHeaderActions
+            period={period}
+            plans={plans}
+            branches={branches}
+            queues={activeQueues}
+            role={context.role}
+            jobTitle={context.jobTitle}
+            branchId={context.branchId}
+            urgentLead={urgentLead}
+            initiallyOpen={filters.new === "1"}
+          >
+            <NextUrgentLeadButton lead={urgentLead} />
+          </LeadsHeaderActions>
         }
       />
       <LeadsLiveSync />

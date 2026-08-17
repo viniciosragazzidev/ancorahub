@@ -414,8 +414,8 @@ export function LeadsWorkspace({
 
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs defaultValue={qualifyingLeads.length > 0 ? "qualificacoes" : "list"} className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between border-b border-border/50 pb-2">
-          <TabsList aria-label="Visualização de leads">
+        <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+          <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
             <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
               <Target className="size-4 text-primary" />
               Qualificações
@@ -427,17 +427,19 @@ export function LeadsWorkspace({
             </TabsTrigger>
             <TabsTrigger value="list" className="text-xs gap-1.5">
               <UserList className="size-4" />
-              Leads Qualificados & Distribuídos
+              <span className="hidden sm:inline">Leads Qualificados & Distribuídos</span>
+              <span className="sm:hidden">Distribuídos</span>
             </TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs gap-1.5">
               <SquaresFour className="size-4" />
-              Kanban do Funil
+              <span className="hidden sm:inline">Kanban do Funil</span>
+              <span className="sm:hidden">Kanban</span>
             </TabsTrigger>
           </TabsList>
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="gap-1.5 text-xs" />}>
+            <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
               <SlidersHorizontal className="size-3.5" />
-              Colunas
+              <span className="hidden sm:inline">Colunas</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>
@@ -469,13 +471,13 @@ export function LeadsWorkspace({
             <div className="space-y-4">
               <div className="hidden divide-y divide-border max-[559px]:block">
                 {visibleQualifyingLeads.map((lead) => (
-                  <div key={lead.id} className="p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">{lead.nome}</span>
-                      <Badge variant="outline" className="text-[10px]">{lead.queueName ?? "Geral"}</Badge>
+                  <div key={lead.id} className="space-y-2 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-medium">{lead.nome}</span>
+                      <Badge variant="outline" className="shrink-0 text-[10px]">{lead.queueName ?? "Geral"}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">{lead.telefone}</p>
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <LeadQualificationBadge status={lead.qualificationStatus} />
                       <span className="text-xs font-semibold">{lead.qualificationScore} pts</span>
                     </div>
@@ -591,30 +593,54 @@ export function LeadsWorkspace({
           <div className="space-y-4">
             <div className="hidden divide-y divide-border max-[559px]:block">
               {visibleLeads.map((lead) => (
-                <button
-                  key={lead.id}
-                  type="button"
-                  onClick={() => setSelectedLead(lead)}
-                  className="flex min-h-20 w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-[var(--duration-quick)] ease-out active:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                      {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
+                <div key={lead.id} className="flex items-start gap-2.5 px-4 py-3 transition-colors duration-[var(--duration-quick)] ease-out active:bg-accent">
+                  <div
+                    className="pt-0.5"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Checkbox
+                      aria-label={`Selecionar ${lead.nome}`}
+                      checked={multiSelect.isSelected(lead.id)}
+                      onCheckedChange={() => multiSelect.toggle(lead.id)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLead(lead)}
+                    className="min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
+                          {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
+                        </span>
+                        <span className={`mt-0.5 block truncate text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
+                          {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
+                        </span>
+                      </span>
+                      <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                     </span>
-                    <span className={`mt-1 block truncate text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                      {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
+                    <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <LeadStatusBadge status={lead.status} />
+                      <LeadQualificationBadge status={lead.qualificationStatus} />
+                      <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
+                      <span className="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                        {formatDate(lead.createdAt, { day: "2-digit", month: "short" })}
+                      </span>
                     </span>
-                      <span className="mt-2 flex items-center gap-2">
-                        <LeadStatusBadge status={lead.status} />
-                        <LeadQualificationBadge status={lead.qualificationStatus} />
-                        <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
-                    </span>
-                    <span className="mt-1 flex items-center gap-2">
+                    {lead.sourceCampaign ? (
+                      <span className="mt-2 block">
+                        <Badge variant="secondary" className="max-w-full truncate border-primary/20 bg-primary/10 text-[10px] text-primary">
+                          🎯 {lead.sourceCampaign}
+                        </Badge>
+                      </span>
+                    ) : null}
+                    <span className="mt-1.5 flex items-center gap-2">
                       <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="truncate text-xs" />
                     </span>
-                  </span>
-                  <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                </button>
+                  </button>
+                </div>
               ))}
             </div>
             <SelectionToolbar

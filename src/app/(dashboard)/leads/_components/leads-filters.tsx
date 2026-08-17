@@ -141,9 +141,10 @@ export function LeadsFilters({
 
         {/* Filter Popup Button */}
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger render={<Button size="sm" variant={activeCount > 0 ? "default" : "outline"} className="h-9 gap-2 px-3.5 text-xs font-medium shrink-0 shadow-xs" />}>
+          <PopoverTrigger render={<Button size="sm" variant={activeCount > 0 ? "default" : "outline"} className="h-9 gap-2 px-3 text-xs font-medium shrink-0 shadow-xs sm:px-3.5" />}>
             <SlidersHorizontal className="size-4" />
-            Filtros Avançados
+            <span className="hidden sm:inline">Filtros Avançados</span>
+            <span className="sm:hidden">Filtros</span>
             {activeCount > 0 && (
               <Badge variant="secondary" className="ml-0.5 rounded-full px-1.5 py-0 text-[10px] font-bold">
                 {activeCount}

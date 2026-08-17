@@ -39,7 +39,10 @@ export async function getMetaConnectionState(): Promise<{
     };
   }
 
-  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes] = await Promise.all([
+  const { getSystemSetting } = await import("@/features/system-settings/queries");
+  const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`);
+
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes] = await Promise.all([
     db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))).orderBy(schema.metaPages.name),
     db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.status, "active"))).orderBy(schema.metaAdAccounts.name),
     db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.status, "active"))).orderBy(schema.metaPixels.name),
@@ -50,23 +53,55 @@ export async function getMetaConnectionState(): Promise<{
     db.select({ id: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status, adSetId: schema.metaAds.adSetId }).from(schema.metaAds).where(eq(schema.metaAds.tenantId, context.tenantId)).orderBy(schema.metaAds.name),
     db.select().from(schema.metaSyncLogs).where(eq(schema.metaSyncLogs.tenantId, context.tenantId)).orderBy(desc(schema.metaSyncLogs.startedAt)).limit(60),
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)),
+    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled }).from(schema.metaAdQueueRoutes).where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId)),
+    db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled }).from(schema.metaFormQueueRoutes).where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId)),
   ]);
 
   const activeAccountIds = new Set(adAccounts.map((account) => account.id));
   const activePageIds = new Set(pages.map((page) => page.id));
-  const routeMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
-  const hasTenantRules = campaignRoutes.length > 0;
+
+  const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
+  const adRouteMap = new Map(adRoutes.map((r) => [r.adId, r.enabled]));
+  const formRouteMap = new Map(formRoutes.map((r) => [r.formId, r.enabled]));
+
+  const hasTenantRules = campaignRoutes.length > 0 || adRoutes.length > 0 || formRoutes.length > 0;
+  const globalCaptureMode: "all" | "selective" | "disabled" = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
+    ? storedGlobalMode
+    : (hasTenantRules ? "selective" : "all");
 
   const activeCampaigns = campaigns
     .filter((campaign) => activeAccountIds.has(campaign.adAccountId))
     .map((c) => ({
       ...c,
-      isEligibleForCapture: routeMap.has(c.id) ? Boolean(routeMap.get(c.id)) : !hasTenantRules,
+      isEligibleForCapture: globalCaptureMode === "disabled" ? false : campaignRouteMap.has(c.id) ? Boolean(campaignRouteMap.get(c.id)) : globalCaptureMode === "all",
     }));
 
   const activeCampaignIds = new Set(activeCampaigns.map((campaign) => campaign.id));
   const activeAdSetIds = new Set(adSets.filter((adSet) => activeCampaignIds.has(adSet.campaignId)).map((adSet) => adSet.id));
-  const assets: MetaConnectionAssets = { pages, adAccounts, pixels, datasets, leadForms: leadForms.filter((form) => activePageIds.has(form.pageId)), campaigns: activeCampaigns, ads: ads.filter((ad) => activeAdSetIds.has(ad.adSetId)) };
+
+  const filteredAds = ads
+    .filter((ad) => activeAdSetIds.has(ad.adSetId))
+    .map((ad) => ({
+      ...ad,
+      isEligibleForCapture: globalCaptureMode === "disabled" ? false : adRouteMap.has(ad.id) ? Boolean(adRouteMap.get(ad.id)) : globalCaptureMode === "all",
+    }));
+
+  const filteredLeadForms = leadForms
+    .filter((form) => activePageIds.has(form.pageId))
+    .map((form) => ({
+      ...form,
+      isEligibleForCapture: globalCaptureMode === "disabled" ? false : formRouteMap.has(form.id) ? Boolean(formRouteMap.get(form.id)) : globalCaptureMode === "all",
+    }));
+
+  const assets: MetaConnectionAssets = {
+    pages,
+    adAccounts,
+    pixels,
+    datasets,
+    leadForms: filteredLeadForms,
+    campaigns: activeCampaigns,
+    ads: filteredAds,
+  };
 
   const connectionStatus: MetaConnectionInfo["status"] = connection.status === "connected"
     || connection.status === "disconnected"
@@ -87,6 +122,7 @@ export async function getMetaConnectionState(): Promise<{
     pagesCount: pages.length,
     adAccountsCount: adAccounts.length,
     whatsappConnected: false,
+    globalCaptureMode,
   };
 
   return {
@@ -460,5 +496,125 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a elegibilidade da campanha." };
+  }
+}
+
+/** Definir modo mestre global de captura Meta (all | selective | disabled) */
+export async function setMetaGlobalCaptureModeAction(input: {
+  mode: "all" | "selective" | "disabled";
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const { setSystemSetting } = await import("@/features/system-settings/queries");
+    await setSystemSetting(`meta_lead_capture_mode_${context.tenantId}`, input.mode);
+    revalidatePath("/integrations/meta");
+    revalidatePath("/marketing/campanhas");
+    revalidatePath("/leads/distribuicao");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao alterar modo de captura mestre." };
+  }
+}
+
+/** Alternar elegibilidade de captura de um anúncio (Ad) */
+export async function toggleMetaAdCaptureEligibilityAction(input: {
+  adId: string;
+  enabled: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+    const now = new Date();
+    await db
+      .insert(schema.metaAdQueueRoutes)
+      .values({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        adId: input.adId,
+        queueId: null,
+        enabled: input.enabled,
+        createdBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
+        set: { enabled: input.enabled, updatedAt: now },
+      });
+    revalidatePath("/integrations/meta");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar anúncio." };
+  }
+}
+
+/** Alternar elegibilidade de captura de um formulário (Form) */
+export async function toggleMetaFormCaptureEligibilityAction(input: {
+  formId: string;
+  enabled: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+    const now = new Date();
+    await db
+      .insert(schema.metaFormQueueRoutes)
+      .values({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        formId: input.formId,
+        queueId: null,
+        enabled: input.enabled,
+        createdBy: context.userId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [schema.metaFormQueueRoutes.tenantId, schema.metaFormQueueRoutes.formId],
+        set: { enabled: input.enabled, updatedAt: now },
+      });
+    revalidatePath("/integrations/meta");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar formulário." };
+  }
+}
+
+/** Atualização em lote (batch) de elegibilidade para múltiplos ativos */
+export async function batchSetMetaCaptureEligibilityAction(input: {
+  assetType: "campaigns" | "ads" | "forms";
+  assetIds: string[];
+  enabled: boolean;
+}): Promise<{ success: boolean; count?: number; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+    const now = new Date();
+
+    if (input.assetType === "campaigns") {
+      for (const id of input.assetIds) {
+        await db.insert(schema.metaCampaignQueueRoutes).values({
+          id: randomUUID(), tenantId: context.tenantId, campaignId: id, queueId: null, enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
+        }).onConflictDoUpdate({ target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId], set: { enabled: input.enabled, updatedAt: now } });
+      }
+    } else if (input.assetType === "ads") {
+      for (const id of input.assetIds) {
+        await db.insert(schema.metaAdQueueRoutes).values({
+          id: randomUUID(), tenantId: context.tenantId, adId: id, queueId: null, enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
+        }).onConflictDoUpdate({ target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId], set: { enabled: input.enabled, updatedAt: now } });
+      }
+    } else if (input.assetType === "forms") {
+      for (const id of input.assetIds) {
+        await db.insert(schema.metaFormQueueRoutes).values({
+          id: randomUUID(), tenantId: context.tenantId, formId: id, queueId: null, enabled: input.enabled, createdBy: context.userId, createdAt: now, updatedAt: now,
+        }).onConflictDoUpdate({ target: [schema.metaFormQueueRoutes.tenantId, schema.metaFormQueueRoutes.formId], set: { enabled: input.enabled, updatedAt: now } });
+      }
+    }
+
+    revalidatePath("/integrations/meta");
+    revalidatePath("/marketing/campanhas");
+    return { success: true, count: input.assetIds.length };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro na atualização em lote." };
   }
 }

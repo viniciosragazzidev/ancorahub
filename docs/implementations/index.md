@@ -2,6 +2,7 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- |
+| 2026-08-17 | `completed/2026-08-17-leads-mobile-responsiveness.md` | concluído | Refino da responsividade mobile de /leads: header com menu "Mais ações" abaixo de lg, abas com rolagem e rótulos curtos, lista mobile com seleção em lote, campanha e data, e filtros compactos. |
 | 2026-08-13 | `completed/2026-08-13-confirmation-dialog-action-response.md` | concluído | Exclusão de lead redireciona a resposta da Server Action para a lista ativa, evitando diálogo pendente após a exclusão lógica. |
 | 2026-07-28 | `completed/2026-07-28-engineering-harness.md` | concluído | Harness de engenharia, scripts diagnósticos e baseline auditado. |
 | 2026-07-28 | `completed/2026-07-28-whatsapp-extension-native-panel.md` | concluído | Painel contextual nativo, visibilidade estrita por corretor/unidade e instalação guiada. |

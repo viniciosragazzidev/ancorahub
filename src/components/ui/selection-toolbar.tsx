@@ -24,9 +24,9 @@ export function SelectionToolbar({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -10, scale: 0.97 }}
           transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
-          className="flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/[0.04] px-4 py-2.5 shadow-xs"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/[0.04] px-3 py-2.5 shadow-xs sm:gap-4 sm:px-4"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <span className="text-sm font-medium tabular-nums">
               {selectedCount} de {totalCount} selecionado
               {selectedCount === 1 ? "" : "s"}
@@ -41,7 +41,7 @@ export function SelectionToolbar({
               Limpar
             </Button>
           </div>
-          <div className="flex items-center gap-2">{children}</div>
+          <div className="flex flex-wrap items-center gap-2">{children}</div>
         </motion.div>
       )}
     </AnimatePresence>

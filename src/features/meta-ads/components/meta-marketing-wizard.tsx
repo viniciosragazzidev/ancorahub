@@ -224,8 +224,12 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
       {error ? <p role="alert" className="flex items-start gap-2 text-sm text-destructive"><Warning className="mt-0.5 size-4 shrink-0" />{error}</p> : null}
     </div> : null}
 
-    {step === "review" && assets ? <div className="py-2">
+    {step === "review" && assets ? <div className="py-2 space-y-3">
       <DialogDescription>Escolha apenas os ativos desta corretora. Nenhum item é conectado automaticamente; esta etapa grava a seleção e ativa a sincronização. O WhatsApp possui um conector independente.</DialogDescription>
+      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs leading-5 text-muted-foreground">
+        <p className="font-medium text-foreground">💡 Captura de Leads Seletiva por Campanha / Anúncio / Formulário</p>
+        <p>Após confirmar os ativos, você poderá pesquisar e marcar exatamente quais campanhas, anúncios ou formulários deverão virar leads no CRM, ou pausar a captura global se desejar.</p>
+      </div>
       <MetaAssetsReview assets={{ ...assets, pages: assets.pages.filter((page) => selectedPageIds.includes(page.id)), adAccounts: assets.adAccounts.filter((account) => selectedAdAccountIds.includes(account.id)) }} error={error} />
       <AssetSelector title="Páginas para captar Lead Ads" description="Somente as páginas marcadas serão assinadas pelo CRM." items={assets.pages} selectedIds={selectedPageIds} onChange={setSelectedPageIds} />
       <AssetSelector title="Contas de anúncios para sincronizar" description="Somente as contas marcadas terão campanhas, anúncios e pixels sincronizados." items={assets.adAccounts} selectedIds={selectedAdAccountIds} onChange={setSelectedAdAccountIds} />
@@ -248,6 +252,7 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
       <div className="rounded-lg border border-border">
         <p className="border-b border-border px-4 py-3 text-sm font-semibold">Próximos passos</p>
         <ul className="divide-y divide-border">
+          <NextStep href="/integrations/meta" label="Escolher campanhas, anúncios e formulários para captura" hint="Selecione com filtro e checkbox exatamente quais ativos virarão leads." />
           <NextStep href="/integrations/whatsapp" label="Conectar o número oficial do WhatsApp" hint="O canal corporativo é independente do Marketing." />
           <NextStep href="/marketing" label="Conferir campanhas e formulários" hint="Veja o que já veio da Meta na primeira sincronização." />
           <NextStep href="/leads/distribuicao" label="Configurar as filas de distribuição" hint="Decida como os novos leads são distribuídos à equipe." />

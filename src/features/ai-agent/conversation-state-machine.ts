@@ -433,13 +433,39 @@ export async function startQualificationConversationForLead(
 ) {
   if ((await getSystemSetting("feature_qualification_engine_enabled")) === "false") return { started: false as const, reason: "disabled" as const };
   const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, telefone: schema.leads.telefone, origem: schema.leads.origem, sourceCampaign: schema.leads.sourceCampaign, tipo: schema.leads.tipo, branchId: schema.leads.branchId, nome: schema.leads.nome })
+  const [lead] = await db.select({
+    id: schema.leads.id,
+    telefone: schema.leads.telefone,
+    origem: schema.leads.origem,
+    sourceCampaign: schema.leads.sourceCampaign,
+    tipo: schema.leads.tipo,
+    branchId: schema.leads.branchId,
+    nome: schema.leads.nome,
+    qualificationStatus: schema.leads.qualificationStatus,
+    qualificationState: schema.leads.qualificationState,
+  })
     .from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
   if (!lead?.telefone) return { started: false as const, reason: "missing_phone" as const };
   const behavior = await resolvePublishedAgentBehavior(input.tenantId);
   const { leadMatchesQualificationEntryRules } = await import("@/features/qualification-engine/service");
   if (!leadMatchesQualificationEntryRules({ origem: lead.origem, sourceCampaign: lead.sourceCampaign, tipo: lead.tipo, branchId: lead.branchId }, behavior.policy)) return { started: false as const, reason: "not_eligible" as const };
   const conversation = await getOrCreateAiConversation({ tenantId: input.tenantId, leadId: input.leadId });
+
+  const isAlreadyQualifiedOrInHumanState =
+    ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(conversation.status) ||
+    lead.qualificationState === "QUALIFIED" ||
+    ["waiting_human", "qualified", "hot", "warm", "cold", "disqualified"].includes(lead.qualificationStatus ?? "");
+
+  if (isAlreadyQualifiedOrInHumanState && !force) {
+    console.info("[startQualificationConversationForLead] Lead já qualificado/em atendimento humano; pulando requalificação:", {
+      leadId: input.leadId,
+      convStatus: conversation.status,
+      qualState: lead.qualificationState,
+      qualStatus: lead.qualificationStatus,
+    });
+    return { started: false as const, reason: "already_qualified" as const };
+  }
+
   if (!force && !["NEW", "AI_ACTIVE"].includes(conversation.status)) return { started: false as const, reason: "already_started" as const };
 
   const memory = (conversation.memory as ConversationMemory | null) ?? createEmptyMemory();
@@ -468,6 +494,14 @@ export async function startQualificationConversationForLead(
     || Boolean(conversation.startedAt);
 
   if (isExistingConversation) {
+    if (isAlreadyQualifiedOrInHumanState) {
+      console.info("[startQualificationConversationForLead] Conversa existente já qualificada ou com atendimento humano ativo; preservando estado:", {
+        leadId: input.leadId,
+        convStatus: conversation.status,
+      });
+      return { started: false as const, reason: "already_qualified" as const };
+    }
+
     // Reactivate AI state without resending initial template greeting
     await db.update(schema.aiConversations).set({
       status: "WAITING_CUSTOMER",

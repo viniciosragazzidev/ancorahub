@@ -17,6 +17,19 @@ export async function ensureMetaLeadAdsSchema() {
   try {
     const db = getDatabase();
     await db.execute(sql`ALTER TABLE meta_lead_ad_sources ADD COLUMN IF NOT EXISTS distribution_mode text DEFAULT 'direct_leads'`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS meta_form_queue_routes (
+        id text PRIMARY KEY,
+        tenant_id text NOT NULL,
+        form_id text NOT NULL,
+        queue_id text,
+        enabled boolean NOT NULL DEFAULT true,
+        created_by text,
+        created_at timestamp WITH TIME ZONE DEFAULT NOW(),
+        updated_at timestamp WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS meta_form_queue_routes_tenant_form_unique ON meta_form_queue_routes (tenant_id, form_id);
+    `);
     schemaEnsured = true;
   } catch (err) {
     console.error("[ensureMetaLeadAdsSchema] Failed DDL execution:", err);

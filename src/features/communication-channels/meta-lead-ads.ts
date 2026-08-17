@@ -204,21 +204,33 @@ export async function configureMetaLeadAdsSource(input: { tenantId: string; bran
 export function resolveMetaCampaignIntake(input: {
   adRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
   campaignRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
+  formRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
+  globalMode?: "all" | "selective" | "disabled";
   hasTenantCampaignRules?: boolean;
 }) {
-  const route = input.adRoute ?? input.campaignRoute;
-  if (!route) {
-    if (input.hasTenantCampaignRules) {
-      return { action: "ignore" as const, queueId: null };
+  const mode = input.globalMode ?? (input.hasTenantCampaignRules ? "selective" : "all");
+
+  if (mode === "disabled") {
+    return { action: "ignore" as const, queueId: null };
+  }
+
+  const route = input.adRoute ?? input.formRoute ?? input.campaignRoute;
+
+  if (mode === "all") {
+    if (route && !route.enabled) return { action: "ignore" as const, queueId: null };
+    if (route?.queueId && route.queueStatus === "active") {
+      return { action: "capture" as const, queueId: route.queueId };
     }
     return { action: "capture" as const, queueId: null };
   }
-  if (!route.enabled) return { action: "ignore" as const, queueId: null };
+
+  // Selective mode: require explicit route with enabled === true
+  if (!route || !route.enabled) {
+    return { action: "ignore" as const, queueId: null };
+  }
   if (route.queueId && route.queueStatus === "active") {
     return { action: "capture" as const, queueId: route.queueId };
   }
-  // A paused or removed queue must never discard a lead silently. Fall back to
-  // the Page/default route until a Director or Manager corrects the rule.
   return { action: "capture" as const, queueId: null };
 }
 
@@ -300,15 +312,41 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           .leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
           .where(and(eq(schema.metaAdQueueRoutes.tenantId, source.tenantId), eq(schema.metaAdQueueRoutes.adId, lead.adId)))
           .limit(1) : [];
-        const [anyTenantRoute] = await db.select({ id: schema.metaCampaignQueueRoutes.id })
+        const [formRoute] = lead.formId ? await db.select({
+          queueId: schema.metaFormQueueRoutes.queueId,
+          enabled: schema.metaFormQueueRoutes.enabled,
+          queueStatus: schema.leadQueues.status,
+        })
+          .from(schema.metaFormQueueRoutes)
+          .leftJoin(schema.leadQueues, eq(schema.metaFormQueueRoutes.queueId, schema.leadQueues.id))
+          .where(and(eq(schema.metaFormQueueRoutes.tenantId, source.tenantId), eq(schema.metaFormQueueRoutes.formId, lead.formId)))
+          .limit(1) : [];
+
+        const [anyCampaignRoute] = await db.select({ id: schema.metaCampaignQueueRoutes.id })
           .from(schema.metaCampaignQueueRoutes)
-          .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId), eq(schema.metaCampaignQueueRoutes.enabled, true)))
+          .where(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId))
           .limit(1);
-        const campaignIntake = resolveMetaCampaignIntake({ adRoute, campaignRoute, hasTenantCampaignRules: Boolean(anyTenantRoute) });
+        const [anyAdRoute] = await db.select({ id: schema.metaAdQueueRoutes.id })
+          .from(schema.metaAdQueueRoutes)
+          .where(eq(schema.metaAdQueueRoutes.tenantId, source.tenantId))
+          .limit(1);
+        const [anyFormRoute] = await db.select({ id: schema.metaFormQueueRoutes.id })
+          .from(schema.metaFormQueueRoutes)
+          .where(eq(schema.metaFormQueueRoutes.tenantId, source.tenantId))
+          .limit(1);
+
+        const { getSystemSetting } = await import("@/features/system-settings/queries");
+        const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${source.tenantId}`);
+        const hasTenantRules = Boolean(anyCampaignRoute || anyAdRoute || anyFormRoute);
+        const globalMode: "all" | "selective" | "disabled" = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
+          ? storedGlobalMode
+          : (hasTenantRules ? "selective" : "all");
+
+        const campaignIntake = resolveMetaCampaignIntake({ adRoute, campaignRoute, formRoute, globalMode });
         if (campaignIntake.action === "ignore") {
           await db.insert(schema.auditLogs).values({
-            id: randomUUID(), userId: credential.createdBy, entidade: adRoute ? "meta_ad_queue_route" : "meta_campaign_queue_route", entidadeId: lead.adId ?? lead.campaignId ?? lead.externalId,
-            acao: adRoute ? "meta_lead_ads.ad_ignored" : "meta_lead_ads.campaign_ignored", createdAt: receivedAt,
+            id: randomUUID(), userId: credential.createdBy, entidade: adRoute ? "meta_ad_queue_route" : formRoute ? "meta_form_queue_route" : "meta_campaign_queue_route", entidadeId: lead.adId ?? lead.formId ?? lead.campaignId ?? lead.externalId,
+            acao: adRoute ? "meta_lead_ads.ad_ignored" : formRoute ? "meta_lead_ads.form_ignored" : "meta_lead_ads.campaign_ignored", createdAt: receivedAt,
           });
           ignored += 1;
           continue;

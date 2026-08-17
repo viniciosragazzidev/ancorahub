@@ -1684,6 +1684,25 @@ export const metaAdQueueRoutes = pgTable(
   ],
 );
 
+/** Regra de entrada para um formulário de Lead Ads Meta. */
+export const metaFormQueueRoutes = pgTable(
+  "meta_form_queue_routes",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    formId: text("form_id").notNull(),
+    queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_form_queue_routes_tenant_form_unique").on(table.tenantId, table.formId),
+    index("meta_form_queue_routes_queue_idx").on(table.tenantId, table.queueId),
+  ],
+);
+
 /**
  * One-time, server-owned authorization handoff for a Meta product. Browser
  * values are never credentials; the callback validates the state then stores

@@ -21,19 +21,29 @@ export function BulkLeadImportDialog({
   role,
   jobTitle,
   branchId,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   branches: Branch[];
   queues?: LeadQueue[];
   role: TenantRole;
   jobTitle: string;
   branchId: string | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const router = useRouter();
   const isCentralMarketing = jobTitle === "marketing" && branchId === null;
   const canChooseBranch = role === "director" || isCentralMarketing;
   const canImport = role === "director" || role === "manager" || role === "supervisor" || isCentralMarketing;
 
-  const [open, setOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  };
   const [selectedBranch, setSelectedBranch] = useState(branchId ?? "");
   const [selectedQueue, setSelectedQueue] = useState<string>("");
   const [selectedTipo, setSelectedTipo] = useState("PF");
@@ -98,9 +108,11 @@ export function BulkLeadImportDialog({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} variant="outline">
-        <FileText /> Importar leads
-      </Button>
+      {!isControlled ? (
+        <Button onClick={() => setOpen(true)} variant="outline">
+          <FileText /> Importar leads
+        </Button>
+      ) : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPopup className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
           <DialogTitle>Importar leads em massa</DialogTitle>

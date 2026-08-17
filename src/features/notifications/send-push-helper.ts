@@ -219,7 +219,21 @@ export async function notifyNewLead(
 
   if (!pushError) {
     try {
-      const recipients = await getDatabase()
+      const db = getDatabase();
+      const [leadInfo] = await db
+        .select({
+          qualificationState: schema.leads.qualificationState,
+          qualificationStatus: schema.leads.qualificationStatus,
+        })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)))
+        .limit(1);
+
+      const isQualifiedByAi =
+        leadInfo?.qualificationState === "QUALIFIED" ||
+        ["waiting_human", "qualified", "hot", "warm"].includes(leadInfo?.qualificationStatus ?? "");
+
+      const recipients = await db
         .select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role })
         .from(schema.tenantMemberships)
         .where(
@@ -250,20 +264,28 @@ export async function notifyNewLead(
             recipientUserId: target.userId,
             leadId,
             type: "agent.lead_assigned",
-            title: isBroker ? "Novo lead atribuído" : isDirector ? "Novo lead na corretora" : "Novo lead na unidade",
+            title: isBroker
+              ? isQualifiedByAi ? "Lead qualificado atribuído" : "Novo lead atribuído"
+              : isDirector
+              ? isQualifiedByAi ? "Lead qualificado na corretora" : "Novo lead na corretora"
+              : isQualifiedByAi ? "Lead qualificado na unidade" : "Novo lead na unidade",
             message: isBroker
-              ? `Você recebeu o lead ${leadName} para atender.`
+              ? isQualifiedByAi ? `Você recebeu o lead qualificado ${leadName} para atender.` : `Você recebeu o lead ${leadName} para atender.`
               : corretorId
-              ? `"${leadName}" chegou e foi distribuído.`
-              : `"${leadName}" chegou e está aguardando distribuição.`,
-            pushTitle: isBroker ? "Novo Lead Atribuído! ⚡" : isDirector ? "Novo Lead na Corretora! 🏢" : "Novo Lead na Unidade! 📍",
+              ? isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e distribuído.` : `"${leadName}" chegou e foi distribuído.`
+              : isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e aguarda atendimento.` : `"${leadName}" chegou e está aguardando distribuição.`,
+            pushTitle: isBroker
+              ? isQualifiedByAi ? "Lead Qualificado Atribuído! ⚡" : "Novo Lead Atribuído! ⚡"
+              : isDirector
+              ? isQualifiedByAi ? "Lead Qualificado na Corretora! ✨" : "Novo Lead na Corretora! 🏢"
+              : isQualifiedByAi ? "Lead Qualificado na Unidade! ✨" : "Novo Lead na Unidade! 📍",
             pushBody: isBroker
-              ? `O lead "${leadName}" foi distribuído para você.`
+              ? isQualifiedByAi ? `O lead "${leadName}" foi qualificado pela IA e distribuído para você.` : `O lead "${leadName}" foi distribuído para você.`
               : corretorId
-              ? `"${leadName}" chegou e foi distribuído.`
-              : `"${leadName}" está aguardando distribuição.`,
+              ? isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e distribuído.` : `"${leadName}" chegou e foi distribuído.`
+              : isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e aguarda atendimento.` : `"${leadName}" está aguardando distribuição.`,
             url: `/leads/${leadId}`,
-          tag: "corretop-leads",
+            tag: "corretop-leads",
             idempotencyKey: idempotencyPrefix ? `${idempotencyPrefix}:${target.userId}` : undefined,
           });
         })
