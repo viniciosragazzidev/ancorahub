@@ -36,3 +36,10 @@ Em 17/08, o papel Gestor deixou de visualizar e acessar diretamente Marketing Me
 Integrações, Inteligência do Tenant, Qualificação IA, Distribuição & Plantão e
 Automações & Regras. O bloqueio existe tanto no menu quanto em layouts server-side
 que abrangem as rotas filhas, redirecionando acesso direto para `/access-denied`.
+
+## Ajustes operacionais da fila
+
+Os filtros persistidos de `/leads` passam a recarregar a rota nativamente com seus
+parâmetros de URL, garantindo que a consulta server-side aplique o filtro salvo. Em
+`/leads/distribuicao`, as áreas de entrada por campanha e exceção por anúncio possuem
+busca por nome e rolagem própria para seleção e regras configuradas extensas.

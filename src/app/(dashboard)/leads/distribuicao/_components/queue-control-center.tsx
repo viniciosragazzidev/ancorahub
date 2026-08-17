@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
-import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Lightning } from "@/components/huge-icons";
+import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Lightning, MagnifyingGlass } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import { deleteDistributionQueueAction, saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction } from "@/features/lead-distribution/actions";
 import { toast } from "sonner";
@@ -91,6 +92,8 @@ export function QueueControlCenter({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showOnlyActiveCampaigns, setShowOnlyActiveCampaigns] = useState(true);
   const [showOnlyActiveAds, setShowOnlyActiveAds] = useState(true);
+  const [campaignSearch, setCampaignSearch] = useState("");
+  const [adSearch, setAdSearch] = useState("");
 
   const activeCampaigns = useMemo(
     () => campaigns.filter((c) => (c.status ?? "").toUpperCase() === "ACTIVE"),
@@ -100,6 +103,10 @@ export function QueueControlCenter({
     () => (showOnlyActiveCampaigns && activeCampaigns.length > 0 ? activeCampaigns : campaigns),
     [showOnlyActiveCampaigns, activeCampaigns, campaigns],
   );
+  const filteredCampaigns = useMemo(() => {
+    const query = campaignSearch.trim().toLocaleLowerCase("pt-BR");
+    return query ? displayedCampaigns.filter((campaign) => campaign.name.toLocaleLowerCase("pt-BR").includes(query)) : displayedCampaigns;
+  }, [campaignSearch, displayedCampaigns]);
 
   const activeAds = useMemo(
     () => ads.filter((a) => (a.status ?? "").toUpperCase() === "ACTIVE"),
@@ -109,6 +116,10 @@ export function QueueControlCenter({
     () => (showOnlyActiveAds && activeAds.length > 0 ? activeAds : ads),
     [showOnlyActiveAds, activeAds, ads],
   );
+  const filteredAds = useMemo(() => {
+    const query = adSearch.trim().toLocaleLowerCase("pt-BR");
+    return query ? displayedAds.filter((ad) => ad.name.toLocaleLowerCase("pt-BR").includes(query)) : displayedAds;
+  }, [adSearch, displayedAds]);
 
   async function handleDeleteQueue(queue: Queue) {
     if (!confirm(`Tem certeza que deseja excluir a fila "${queue.name}"?`)) return;
@@ -424,13 +435,19 @@ export function QueueControlCenter({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <label className="relative block">
+            <span className="sr-only">Buscar campanha Meta</span>
+            <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={campaignSearch} onChange={(event) => setCampaignSearch(event.target.value)} placeholder="Buscar campanha por nome..." className="h-9 pl-9 text-sm" />
+          </label>
           {displayedCampaigns.length && queues.length ? (
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
               <AppSelect
                 aria-label="Campanha Meta"
                 value={campaignRoute.campaignId}
                 onValueChange={(campaignId) => setCampaignRoute({ ...campaignRoute, campaignId })}
-                options={displayedCampaigns.map((campaign) => {
+                contentClassName="max-h-72 overflow-y-auto"
+                options={filteredCampaigns.map((campaign) => {
                   const isActive = (campaign.status ?? "").toUpperCase() === "ACTIVE";
                   return {
                     value: campaign.campaignId,
@@ -482,8 +499,12 @@ export function QueueControlCenter({
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Regras de Campanhas Configuradas ({campaignRoutes.length})
               </div>
-              <div className="divide-y divide-border/40 rounded-lg border border-border/60 bg-muted/20">
-                {campaignRoutes.map((route) => {
+              <ScrollArea className="max-h-64 rounded-lg border border-border/60 bg-muted/20">
+                <div className="divide-y divide-border/40">
+                {campaignRoutes.filter((route) => {
+                  const campaign = campaigns.find((item) => item.campaignId === route.campaignId);
+                  return !campaignSearch.trim() || (campaign?.name ?? route.campaignId).toLocaleLowerCase("pt-BR").includes(campaignSearch.trim().toLocaleLowerCase("pt-BR"));
+                }).map((route) => {
                   const matched = campaigns.find((c) => c.campaignId === route.campaignId);
                   const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
                   return (
@@ -503,7 +524,8 @@ export function QueueControlCenter({
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              </ScrollArea>
             </div>
           ) : null}
         </CardContent>
@@ -538,13 +560,19 @@ export function QueueControlCenter({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <label className="relative block">
+            <span className="sr-only">Buscar anúncio Meta</span>
+            <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={adSearch} onChange={(event) => setAdSearch(event.target.value)} placeholder="Buscar anúncio por nome..." className="h-9 pl-9 text-sm" />
+          </label>
           {displayedAds.length && queues.length ? (
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
               <AppSelect
                 aria-label="Anúncio Meta"
                 value={adRoute.adId}
                 onValueChange={(adId) => setAdRoute({ ...adRoute, adId })}
-                options={displayedAds.map((ad) => {
+                contentClassName="max-h-72 overflow-y-auto"
+                options={filteredAds.map((ad) => {
                   const isActive = (ad.status ?? "").toUpperCase() === "ACTIVE";
                   return {
                     value: ad.adId,
@@ -595,8 +623,12 @@ export function QueueControlCenter({
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Exceções de Anúncios Configuradas ({adRoutes.length})
               </div>
-              <div className="divide-y divide-border/40 rounded-lg border border-border/60 bg-muted/20">
-                {adRoutes.map((route) => {
+              <ScrollArea className="max-h-64 rounded-lg border border-border/60 bg-muted/20">
+                <div className="divide-y divide-border/40">
+                {adRoutes.filter((route) => {
+                  const ad = ads.find((item) => item.adId === route.adId);
+                  return !adSearch.trim() || (ad?.name ?? route.adId).toLocaleLowerCase("pt-BR").includes(adSearch.trim().toLocaleLowerCase("pt-BR"));
+                }).map((route) => {
                   const matched = ads.find((a) => a.adId === route.adId);
                   const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
                   return (
@@ -616,7 +648,8 @@ export function QueueControlCenter({
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              </ScrollArea>
             </div>
           ) : null}
         </CardContent>

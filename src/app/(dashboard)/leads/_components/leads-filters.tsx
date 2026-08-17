@@ -69,18 +69,6 @@ export function LeadsFilters({
     search, status, branch, tipo, origem, qualification, corretor, pageSize, eligibleCampaigns,
   });
 
-  function applyPreferenceState(preferences: LeadFilterPreferences) {
-    setSearch(preferences.search);
-    setStatus(preferences.status);
-    setBranch(preferences.branch);
-    setTipo(preferences.tipo);
-    setOrigem(preferences.origem);
-    setQualification(preferences.qualification);
-    setCorretor(preferences.corretor);
-    setPageSize(preferences.pageSize);
-    setEligibleCampaigns(preferences.eligibleCampaigns);
-  }
-
   function buildUrl(preferences: LeadFilterPreferences) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
@@ -104,8 +92,13 @@ export function LeadsFilters({
     setRestored(true);
     const stored = parseLeadFilterPreferences(window.localStorage.getItem(storageKey));
     if (!stored) return;
-    applyPreferenceState(stored);
-    startTransition(() => router.replace(buildUrl(stored)));
+    const target = buildUrl(stored);
+    // localStorage is unavailable to the Server Component. A native replace
+    // guarantees the first data query receives the restored filters instead
+    // of only repainting the filter controls with their saved values.
+    if (`${window.location.pathname}${window.location.search}` !== target) {
+      window.location.replace(target);
+    }
   // Local preferences restore once; an explicit URL remains authoritative.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restored, searchParams, storageKey]);
