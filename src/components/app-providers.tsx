@@ -28,12 +28,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
-    // Emergency PWA recovery: a previously installed worker can keep an App
-    // Router transition on its loading boundary even after a deployment.
-    // The CRM must always prefer live operational pages over offline caching.
+    // The worker deliberately bypasses App Router navigations and RSC requests
+    // (see public/sw.js). Keep it registered: browser push depends on a ready
+    // Service Worker and unregistering it leaves the activation card loading.
     void navigator.serviceWorker
-      .getRegistrations()
-      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+      .register("/sw.js", { scope: "/" })
+      .then((registration) => registration.update())
       .catch(() => undefined);
   }, []);
 

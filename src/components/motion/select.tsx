@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
@@ -51,6 +52,10 @@ interface SelectContextValue {
   disabled: boolean;
   placement: Placement;
   setPlacement: (p: Placement) => void;
+  triggerElement: HTMLButtonElement | null;
+  setTriggerElement: (element: HTMLButtonElement | null) => void;
+  contentElement: HTMLDivElement | null;
+  setContentElement: (element: HTMLDivElement | null) => void;
 }
 
 const SelectContext = createContext<SelectContextValue | null>(null);
@@ -91,6 +96,8 @@ export function Select<V extends string = string>({
   const [internal, setInternal] = useState<string | undefined>(defaultValue);
   const [labels, setLabels] = useState<Map<string, ReactNode>>(new Map());
   const [placement, setPlacement] = useState<Placement>("bottom");
+  const [triggerElement, setTriggerElement] = useState<HTMLButtonElement | null>(null);
+  const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
 
   const controlled = value !== undefined;
   const current = controlled ? (value ?? undefined) : internal;
@@ -129,7 +136,12 @@ export function Select<V extends string = string>({
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     const onPointer = (e: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !contentElement?.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -139,7 +151,7 @@ export function Select<V extends string = string>({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("pointerdown", onPointer);
     };
-  }, [open]);
+  }, [open, contentElement]);
 
   const ctx = useMemo<SelectContextValue>(
     () => ({
@@ -156,6 +168,10 @@ export function Select<V extends string = string>({
       disabled,
       placement,
       setPlacement,
+      triggerElement,
+      setTriggerElement,
+      contentElement,
+      setContentElement,
     }),
     [
       current,
@@ -168,6 +184,8 @@ export function Select<V extends string = string>({
       baseId,
       disabled,
       placement,
+      triggerElement,
+      contentElement,
     ],
   );
 
@@ -211,6 +229,7 @@ export function SelectTrigger({
 
   return (
     <motion.button
+      ref={ctx.setTriggerElement}
       type="button"
       id={id ?? ctx.triggerId}
       disabled={isDisabled}
@@ -298,47 +317,72 @@ export function SelectContent({ className, children }: SelectContentProps) {
   const ctx = useSelectContext("SelectContent");
   const innerRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  const [position, setPosition] = useState({ left: 0, top: 0, width: 0 });
   const open = ctx.open;
   const { setPlacement } = ctx;
+
+  useEffect(() => setMounted(true), []);
+
+  const updatePosition = useCallback(() => {
+    const trigger = ctx.triggerElement;
+    const node = innerRef.current;
+    if (!trigger || !node) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const dropdownHeight = node.offsetHeight;
+    const below = window.innerHeight - rect.bottom;
+    const above = rect.top;
+    const nextPlacement: Placement = below < dropdownHeight + 16 && above > below ? "top" : "bottom";
+    const width = Math.min(rect.width, Math.max(0, window.innerWidth - 16));
+    const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
+
+    setPlacement(nextPlacement);
+    setPosition({
+      left,
+      top: nextPlacement === "top" ? Math.max(8, rect.top - dropdownHeight - 6) : rect.bottom + 6,
+      width,
+    });
+  }, [ctx.triggerElement, setPlacement]);
 
   useLayoutEffect(() => {
     const node = innerRef.current;
     if (!node || typeof ResizeObserver === "undefined") return;
-    const measure = () => setHeight(node.offsetHeight);
+    const measure = () => {
+      setHeight(node.offsetHeight);
+      updatePosition();
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  });
+  }, [updatePosition]);
 
   useLayoutEffect(() => {
     if (!open) return;
-    const trigger = document.getElementById(ctx.triggerId);
-    const node = innerRef.current;
-    if (!trigger || !node) return;
-    const rect = trigger.getBoundingClientRect();
-    const h = node.offsetHeight;
-    const below = window.innerHeight - rect.bottom;
-    const above = rect.top;
-    setPlacement(below < h + 16 && above > below ? "top" : "bottom");
-  }, [open, ctx.triggerId, setPlacement]);
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, updatePosition]);
 
   const isTop = ctx.placement === "top";
-  const nearGap = open ? 6 : 0;
   const nearRadius = open ? 12 : 0;
-
-  const gapT: Transition = open
-    ? { type: "spring", duration: 0.6, bounce: 0.5, delay: 0.12 }
-    : { type: "spring", duration: 0.3, bounce: 0.1 };
   const radiusT: Transition = open
     ? { duration: 0.3, ease: EASE_OUT, delay: 0.14 }
     : { duration: 0.16, ease: EASE_OUT };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <motion.div
+      ref={ctx.setContentElement}
       id={ctx.listId}
       role="listbox"
-      aria-labelledby={ctx.triggerId}
+      aria-labelledby={ctx.triggerElement?.id ?? ctx.triggerId}
       aria-hidden={!open}
       inert={!open}
       initial={false}
@@ -348,8 +392,6 @@ export function SelectContent({ className, children }: SelectContentProps) {
           : {
               opacity: open ? 1 : 0,
               height: open ? height : 0,
-              marginTop: isTop ? 0 : nearGap,
-              marginBottom: isTop ? nearGap : 0,
               borderTopLeftRadius: isTop ? 12 : nearRadius,
               borderTopRightRadius: isTop ? 12 : nearRadius,
               borderBottomLeftRadius: isTop ? nearRadius : 12,
@@ -366,8 +408,6 @@ export function SelectContent({ className, children }: SelectContentProps) {
               height: open
                 ? { type: "spring", duration: 0.42, bounce: 0.14 }
                 : { duration: 0.26, ease: EASE_OUT, delay: 0.14 },
-              marginTop: isTop ? INSTANT_TRANSITION : gapT,
-              marginBottom: isTop ? gapT : INSTANT_TRANSITION,
               borderTopLeftRadius: isTop ? INSTANT_TRANSITION : radiusT,
               borderTopRightRadius: isTop ? INSTANT_TRANSITION : radiusT,
               borderBottomLeftRadius: isTop ? radiusT : INSTANT_TRANSITION,
@@ -375,13 +415,17 @@ export function SelectContent({ className, children }: SelectContentProps) {
             }
       }
       style={{
+        position: "fixed",
+        left: position.left,
+        top: position.top,
+        width: position.width,
+        zIndex: 100,
         transformOrigin: isTop ? "bottom" : "top",
         overflow: "hidden",
         pointerEvents: open ? "auto" : "none",
       }}
       className={cn(
-        "absolute left-0 right-0 z-50 max-h-60 overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-lg",
-        isTop ? "bottom-full" : "top-full",
+        "max-h-60 overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-lg",
         className,
       )}
     >
@@ -394,7 +438,8 @@ export function SelectContent({ className, children }: SelectContentProps) {
       >
         {children}
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 
