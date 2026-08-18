@@ -442,7 +442,7 @@ export default async function LeadsPage({
         }
       />
       <LeadsLiveSync />
-      <main className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-5 bg-background p-4 pb-8 lg:gap-6 lg:p-6">
+      <main className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-5 bg-background p-4 pb-28 lg:gap-6 lg:p-6 lg:pb-8">
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}
 

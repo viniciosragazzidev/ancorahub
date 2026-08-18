@@ -125,7 +125,7 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-border/75 bg-card shadow-[var(--shadow-card)]">
+      <div className="overflow-hidden rounded-xl border border-border/75 bg-white shadow-[var(--shadow-card)] dark:bg-card">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-transparent border-b border-border">
