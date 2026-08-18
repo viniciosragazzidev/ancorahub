@@ -7,6 +7,9 @@ import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { ClientesList } from "./clientes-list";
 
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightClientsList, type LightClientItem } from "@/features/broker-workspace/components/light-clients-list";
+
 export const dynamic = "force-dynamic";
 
 export default async function CustomersPage({
@@ -47,6 +50,24 @@ export default async function CustomersPage({
         : undefined;
 
   const periodStartDate = periodStart(period);
+
+  const experienceMode = await getExperienceMode(context);
+
+  if (experienceMode === "LIGHT" && context.role === "broker") {
+    const clients = await db
+      .select({
+        id: schema.clients.id,
+        name: schema.clients.nome,
+        phone: schema.clients.telefone,
+        email: schema.clients.email,
+        convertedAt: schema.clients.convertedAt,
+      })
+      .from(schema.clients)
+      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId)))
+      .orderBy(desc(schema.clients.convertedAt));
+
+    return <LightClientsList clients={clients} />;
+  }
 
   // Parallel queries for metrics and client list
   const [

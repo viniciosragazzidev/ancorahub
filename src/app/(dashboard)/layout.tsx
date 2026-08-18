@@ -18,6 +18,7 @@ import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-prov
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
 
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -30,17 +31,27 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     throw error;
   }
 
+  const experienceMode = await getExperienceMode(context);
+  const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
+
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") || "";
+
+  if (isLightBroker) {
+    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/leads", "/clientes", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
+    const isAllowed = allowedLightPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix));
+    if (!isAllowed && pathname !== "") {
+      redirect("/dashboard");
+    }
+  }
+
   if (!hasPermission(context.role, "acessar_conversas")) {
-    const headersList = await headers();
-    const pathname = headersList.get("x-pathname") || "";
     if (pathname === "/conversas" || pathname.startsWith("/conversas/")) {
       redirect("/minha-fila");
     }
   }
 
   if (context.jobTitle === "marketing") {
-    const headersList = await headers();
-    const pathname = headersList.get("x-pathname") || "";
     const restrictedPrefixes = ["/conversas", "/tarefas", "/documentos", "/clientes", "/vendas", "/checklist", "/minha-fila", "/corretor", "/metas", "/relatorios", "/noc", "/filiais", "/unidades", "/gestor", "/diretor"];
     const isRestricted = restrictedPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"));
     if (isRestricted) {
@@ -62,6 +73,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   return (
     <AgentDrawerProvider>
       <AppShell
+        isLightBroker={isLightBroker}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

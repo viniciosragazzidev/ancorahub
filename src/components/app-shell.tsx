@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -9,8 +7,10 @@ import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { LightBottomNav } from "@/components/light-bottom-nav";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
+import { cn } from "@/lib/utils";
 
 type Branding = {
   brandColor: string | null;
@@ -31,9 +31,11 @@ function getReadableForeground(hex: string) {
 export function AppShell({
   children,
   branding,
+  isLightBroker = false,
 }: {
   children: ReactNode;
   branding?: Branding;
+  isLightBroker?: boolean;
 }) {
   const pathname = usePathname();
   const isFinanceiro = pathname === "/financeiro" || pathname.startsWith("/financeiro/");
@@ -74,7 +76,7 @@ export function AppShell({
         className="min-h-dvh overflow-hidden"
         style={
           {
-            "--sidebar-width": "16rem",
+            "--sidebar-width": isLightBroker ? "0px" : "16rem",
             "--header-height": "4rem",
             ...(branding?.brandColor
               ? {
@@ -89,22 +91,25 @@ export function AppShell({
           } as CSSProperties
         }
       >
-        {isFinanceiro ? (
+        {isLightBroker ? null : isFinanceiro ? (
           <CorreTopFinanceiroSidebar />
         ) : (
           <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
         )}
         <SidebarInset
-          className="app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+          className={cn(
+            "app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]",
+            isLightBroker ? "pb-24 max-w-full" : "max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+          )}
           style={{
             scrollPaddingTop: "var(--header-height)",
-            scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
+            scrollPaddingBottom: isLightBroker ? "6rem" : "calc(7rem + env(safe-area-inset-bottom))",
           }}
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SidebarInset>
-        <MobileBottomNav />
-        <OnboardingWelcomeDialog />
+        {isLightBroker ? <LightBottomNav /> : <MobileBottomNav />}
+        {!isLightBroker ? <OnboardingWelcomeDialog /> : null}
       </SidebarProvider>
     </OnboardingProvider>
   );

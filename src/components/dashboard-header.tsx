@@ -14,6 +14,7 @@ type DashboardHeaderProps = {
   title: string;
   rightSlot?: React.ReactNode;
   showModeToggle?: boolean;
+  showSidebarTrigger?: boolean;
 };
 
 export function DashboardHeader({
@@ -21,14 +22,19 @@ export function DashboardHeader({
   title,
   rightSlot,
   showModeToggle = true,
+  showSidebarTrigger = true,
 }: DashboardHeaderProps) {
   return (
     <header
       className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
-      <SidebarTrigger className="size-8 shrink-0" />
-      <div className="h-4 w-px bg-border/50 shrink-0 max-[559px]:hidden" />
+      {showSidebarTrigger ? (
+        <>
+          <SidebarTrigger className="size-8 shrink-0" />
+          <div className="h-4 w-px bg-border/50 shrink-0 max-[559px]:hidden" />
+        </>
+      ) : null}
       <div className="min-w-0 flex-1">
         <AnimatedPageTitle breadcrumb={breadcrumb} title={title} />
       </div>
