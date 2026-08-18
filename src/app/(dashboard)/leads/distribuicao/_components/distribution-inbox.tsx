@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useState, useId } from "react";
 import { toast } from "sonner";
 import { ArrowRight, CheckCircle, MagicWand, UserList } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
@@ -67,9 +67,24 @@ function ActionForm({
   children: React.ReactNode;
   fields: Record<string, string>;
 }) {
+  const formKey = useId();
   const [state, formAction, pending] = useActionState(action, {});
+  const [formVersion, setFormVersion] = useState(0);
+
+  // Reset form by changing key when action completes
+  const prevSuccessRef = useState(state.success);
+  if (state.success !== prevSuccessRef[0]) {
+    prevSuccessRef[0] = state.success;
+    if (state.success) setFormVersion((v) => v + 1);
+  }
+  const prevErrorRef = useState(state.error);
+  if (state.error !== prevErrorRef[0]) {
+    prevErrorRef[0] = state.error;
+    if (state.error) setFormVersion((v) => v + 1);
+  }
+
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2">
+    <form key={`${formKey}-${formVersion}`} action={formAction} className="flex flex-wrap items-center gap-2">
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} name={name} type="hidden" value={value} />
       ))}

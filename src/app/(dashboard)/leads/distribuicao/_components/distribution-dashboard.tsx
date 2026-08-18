@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, useId } from "react";
 import { motion } from "motion/react";
 import {
   Buildings,
@@ -89,9 +89,21 @@ function ToggleCell({
   enabled: boolean;
   action: (prev: BranchActionState, formData: FormData) => Promise<BranchActionState>;
 }) {
+  const formKey = useId();
   const [state, formAction, pending] = useActionState<BranchActionState, FormData>(action, {});
+  const [formVersion, setFormVersion] = useState(0);
+  const prevSuccess = useState(state.success);
+  if (state.success !== prevSuccess[0]) {
+    prevSuccess[0] = state.success;
+    if (state.success) setFormVersion((v) => v + 1);
+  }
+  const prevError = useState(state.error);
+  if (state.error !== prevError[0]) {
+    prevError[0] = state.error;
+    if (state.error) setFormVersion((v) => v + 1);
+  }
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form key={`${formKey}-${formVersion}`} action={formAction} className="flex items-center gap-2">
       <input type="hidden" name="branchId" value={branchId} />
       <Button
         type="submit"
@@ -113,13 +125,25 @@ function ToggleCell({
 }
 
 function BrokerAvailabilityToggle({ broker }: { broker: BrokerItem }) {
+  const formKey = useId();
   const [state, formAction, pending] = useActionState<BranchActionState, FormData>(
     toggleBrokerAvailabilityAction,
     {},
   );
+  const [formVersion, setFormVersion] = useState(0);
   const available = broker.availabilityStatus === "available";
+  const prevSuccess = useState(state.success);
+  if (state.success !== prevSuccess[0]) {
+    prevSuccess[0] = state.success;
+    if (state.success) setFormVersion((v) => v + 1);
+  }
+  const prevError = useState(state.error);
+  if (state.error !== prevError[0]) {
+    prevError[0] = state.error;
+    if (state.error) setFormVersion((v) => v + 1);
+  }
   return (
-    <form action={formAction}>
+    <form key={`${formKey}-${formVersion}`} action={formAction}>
       <input name="brokerId" type="hidden" value={broker.id} />
       <Button
         aria-label={

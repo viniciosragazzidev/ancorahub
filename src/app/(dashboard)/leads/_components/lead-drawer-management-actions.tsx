@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -76,6 +76,10 @@ export function LeadDrawerManagementActions({
     }
   }
 
+  const reassignFormKey = useId();
+  const assumeFormKey = useId();
+  const routeFormKey = useId();
+
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
   const [routeState, routeAction, routePending] = useActionState(
@@ -83,30 +87,47 @@ export function LeadDrawerManagementActions({
     {},
   );
 
+  // Track form keys that change on success/error to force remount and reset pending state
+  const [reassignKey, setReassignKey] = useState(0);
+  const [assumeKey, setAssumeKey] = useState(0);
+  const [routeKey, setRouteKey] = useState(0);
+
   useEffect(() => {
     if (reassignState.success) {
       toast.success("Lead reatribuído e SLA reiniciado.");
+      setReassignKey((k) => k + 1);
       if (onSuccess) onSuccess();
     }
-    if (reassignState.error) toast.error(reassignState.error);
+    if (reassignState.error) {
+      toast.error(reassignState.error);
+      setReassignKey((k) => k + 1);
+    }
   }, [reassignState, onSuccess]);
   useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState.success, router]);
 
   useEffect(() => {
     if (assumeState.success) {
       toast.success("Lead assumido para investigação.");
+      setAssumeKey((k) => k + 1);
       if (onSuccess) onSuccess();
     }
-    if (assumeState.error) toast.error(assumeState.error);
+    if (assumeState.error) {
+      toast.error(assumeState.error);
+      setAssumeKey((k) => k + 1);
+    }
   }, [assumeState, onSuccess]);
   useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState.success, router]);
 
   useEffect(() => {
     if (routeState.success) {
       toast.success(routeState.message ?? "Lead enviado para a unidade.");
+      setRouteKey((k) => k + 1);
       if (onSuccess) onSuccess();
     }
-    if (routeState.error) toast.error(routeState.error);
+    if (routeState.error) {
+      toast.error(routeState.error);
+      setRouteKey((k) => k + 1);
+    }
   }, [routeState, onSuccess]);
   useEffect(() => { if (routeState.success) router.refresh(); }, [routeState.success, router]);
 
@@ -148,7 +169,7 @@ export function LeadDrawerManagementActions({
           <p className="text-xs text-muted-foreground leading-normal">
             Este lead ainda não foi atribuído a nenhuma unidade. Selecione uma filial para enviá-lo à fila de distribuição.
           </p>
-          <form action={routeAction} className="flex items-center gap-2">
+          <form key={`route-${routeKey}`} action={routeAction} className="flex items-center gap-2">
             <input name="leadId" type="hidden" value={leadId} />
             <Select name="branchId" onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
               <SelectTrigger className="h-9 flex-1 text-xs" aria-label="Selecionar unidade">
@@ -243,7 +264,7 @@ export function LeadDrawerManagementActions({
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
       {mode === "reassign" ? (
-        <form action={reassign} className="space-y-3">
+        <form key={`reassign-${reassignKey}`} action={reassign} className="space-y-3">
           <input name="leadId" type="hidden" value={leadId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">Novo responsável</Label>
@@ -263,7 +284,7 @@ export function LeadDrawerManagementActions({
           </Button>
         </form>
       ) : (
-        <form action={assume} className="space-y-3">
+        <form key={`assume-${assumeKey}`} action={assume} className="space-y-3">
           <input name="leadId" type="hidden" value={leadId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-investigation-reason-drawer" className="text-xs">Motivo da investigação</Label>
