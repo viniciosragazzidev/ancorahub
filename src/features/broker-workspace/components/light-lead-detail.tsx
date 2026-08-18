@@ -64,13 +64,11 @@ const DECLINE_REASONS = [
 ];
 
 const STEP_OPTIONS = [
-  { id: "trying_contact", label: "Tentando contato", description: "Tentando falar com o cliente" },
-  { id: "customer_replied", label: "Cliente respondeu", description: "Cliente respondeu ao contato" },
-  { id: "quote_sent", label: "Cotação enviada", description: "Cotação enviada para o cliente" },
-  { id: "negotiation", label: "Em negociação", description: "Negociando condições da proposta" },
-  { id: "converted", label: "Venda realizada", description: "Cliente confirmou a contratação" },
-  { id: "no_interest", label: "Sem interesse", description: "Cliente optou por não seguir" },
-  { id: "no_contact", label: "Não consegui contato", description: "Sem retorno após tentativas" },
+  { id: "quote_sent", label: "Cotação enviada", description: "Cotação enviada para o cliente", targetStatus: "quote_sent" },
+  { id: "negotiation", label: "Em negociação", description: "Negociando condições da proposta", targetStatus: "negotiation" },
+  { id: "converted", label: "Venda realizada", description: "Cliente confirmou a contratação", targetStatus: "converted" },
+  { id: "no_interest", label: "Sem interesse", description: "Cliente optou por não seguir", targetStatus: "lost" },
+  { id: "no_contact", label: "Não consegui contato", description: "Sem retorno após tentativas", targetStatus: "lost" },
 ];
 
 export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailData; brokerName: string }) {
@@ -85,7 +83,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   const [declining, startDeclineTransition] = useTransition();
 
   const [showUpdateSheet, setShowUpdateSheet] = useState(false);
-  const [selectedStep, setSelectedStep] = useState<string>("customer_replied");
+  const [selectedStep, setSelectedStep] = useState<string>("quote_sent");
   const [followupOption, setFollowupOption] = useState<string>("tomorrow");
   const [observation, setObservation] = useState<string>("");
   const [lossReason, setLossReason] = useState<string>("Preço");
@@ -96,6 +94,23 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
+
+  function handleOpenUpdateModal() {
+    if (leadStatus === "in_contact") setSelectedStep("quote_sent");
+    else if (leadStatus === "quote_sent") setSelectedStep("negotiation");
+    else if (leadStatus === "negotiation") setSelectedStep("converted");
+    else setSelectedStep("quote_sent");
+
+    setObservation("");
+    setShowSaleConfirm(false);
+    setShowUpdateSheet(true);
+  }
+
+  function resetStepDialog() {
+    setShowUpdateSheet(false);
+    setShowSaleConfirm(false);
+    setObservation("");
+  }
 
   // Check if lead is unavailable for this broker
   if (!lead.isCurrentBroker && isDistributed === false) {
@@ -129,13 +144,13 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
       let res;
       try {
         res = await startLeadServiceAction({}, formData);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o lead.");
+      } catch {
+        toast.error("Não foi possível aceitar o lead no momento.");
         return;
       }
 
       if (!res.success) {
-        toast.error(res.error ?? "Este lead já foi aceito ou não está mais disponível.");
+        toast.error(res.error ?? "Não foi possível aceitar o lead.");
         return;
       }
 
@@ -143,43 +158,36 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
       setLeadStatus("in_contact");
       setPhoneUnlocked(true);
 
-      toast.success("Lead aceito com sucesso.", {
-        description: "O contato já está disponível.",
-      });
+      toast.success("Lead aceito! Você já pode iniciar o contato.");
     });
   }
 
   // Handle Decline Lead
   function handleConfirmDecline() {
     if (declining) return;
-    startDeclineTransition(async () => {
-      const res = await declineLeadAction(lead.id, declineReason);
-      if (!res.success) {
-        toast.error(res.error ?? "Não foi possível recusar o lead.");
-        return;
-      }
+    const formData = new FormData();
+    formData.append("leadId", lead.id);
+    formData.append("motivoRecusa", declineReason);
 
-      setShowDeclineModal(false);
-      toast.success("O lead foi devolvido para redistribuição.");
-      router.push("/minha-fila");
+    startDeclineTransition(async () => {
+      try {
+        const res = await declineLeadAction(lead.id, declineReason);
+        if (!res.success) {
+          toast.error(res.error ?? "Não foi possível recusar o lead.");
+          return;
+        }
+
+        toast.info("Lead devolvido para a fila.");
+        router.push("/minha-fila");
+      } catch {
+        toast.error("Não foi possível recusar no momento.");
+      }
     });
   }
 
   const greetingName = lead.nome.split(" ")[0];
   const initialMsg = `Olá, ${greetingName}! Tudo bem? Sou ${brokerName.split(" ")[0]}, consultor responsável pelo seu atendimento.`;
   const waUrl = buildWhatsAppUrl(lead.telefone, initialMsg);
-
-  // Handle WhatsApp Click
-  function handleOpenWhatsApp() {
-    if (!waUrl) {
-      toast.error("Telefone não disponível.");
-      return;
-    }
-
-    const nowStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    setWhatsappOpenedAt(nowStr);
-    window.open(waUrl, "_blank");
-  }
 
   // Handle Step Update Save
   function handleSaveStep() {
@@ -190,11 +198,8 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
       return;
     }
 
-    let targetStatus = "in_contact";
-    if (selectedStep === "quote_sent") targetStatus = "quote_sent";
-    if (selectedStep === "negotiation") targetStatus = "negotiation";
-    if (selectedStep === "converted") targetStatus = "converted";
-    if (selectedStep === "no_interest" || selectedStep === "no_contact") targetStatus = "lost";
+    const stepInfo = STEP_OPTIONS.find(s => s.id === selectedStep);
+    const targetStatus = stepInfo?.targetStatus || "in_contact";
 
     const formData = new FormData();
     formData.append("leadId", lead.id);
@@ -211,27 +216,32 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
 
     startUpdateTransition(async () => {
       try {
+        if (targetStatus === leadStatus && selectedStep !== "no_interest" && selectedStep !== "no_contact") {
+          toast.info("O lead já está nesta etapa.");
+          resetStepDialog();
+          return;
+        }
+
         const res = await changeLeadStatusAction({}, formData);
+        resetStepDialog();
+
         if (!res.success) {
           toast.error(res.error ?? "Não foi possível atualizar a etapa.");
           return;
         }
 
         setLeadStatus(targetStatus);
-        setShowUpdateSheet(false);
-        setShowSaleConfirm(false);
-
+        
         if (targetStatus === "converted") {
           setSaleSuccessAnim(true);
           toast.success("Venda registrada com sucesso.", {
             description: "Parabéns! O lead foi marcado como concluído.",
           });
         } else {
-          toast.success("Etapa atualizada.", {
-            description: "Lembraremos você no momento certo.",
-          });
+          toast.success("Etapa atualizada.");
         }
-      } catch (err) {
+      } catch {
+        resetStepDialog();
         toast.error("Não foi possível atualizar no momento.");
       }
     });
@@ -391,7 +401,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowUpdateSheet(true)}
+                onClick={handleOpenUpdateModal}
                 className="h-8 text-xs font-semibold gap-1.5"
               >
                 REGISTRAR ETAPA

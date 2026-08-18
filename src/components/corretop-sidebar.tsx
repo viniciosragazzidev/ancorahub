@@ -373,7 +373,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     Meu perfil
                   </DropdownMenuItem>
                 ) : null}
-                {roleKey && user?.permissions?.includes("acessar_configuracoes") ? (
+                {roleKey && (user?.permissions?.includes("acessar_configuracoes") || user?.permissions?.includes("acessar_configuracoes_pessoais") || roleKey === "broker") ? (
                   <DropdownMenuItem render={<Link href="/settings" />}>
                     <SlidersHorizontal className="size-4" />
                     Configurações

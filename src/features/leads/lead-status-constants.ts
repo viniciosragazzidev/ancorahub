@@ -11,19 +11,17 @@ export const LEAD_STATUS_ORDER: Record<string, number> = {
 };
 
 /** Mapa de transições válidas entre status do pipeline.
- *  Cada chave lista os status para os quais é possível avançar.
- *  "lost" pode surgir de qualquer status ativo.
- *  Ao reabrir de "lost", pode voltar para qualquer status ativo. */
+ *  Permite fluxo flexível e natural para corretores avançarem entre etapas ativas. */
 export const VALID_TRANSITIONS: Record<string, readonly string[]> = {
-  new: ["distributed", "lost"],
-  distributed: ["in_contact", "new", "lost"],
-  in_contact: ["quote_sent", "lost"],
-  quote_sent: ["negotiation", "lost"],
-  negotiation: ["documentation_pending", "lost"],
-  documentation_pending: ["under_analysis", "lost"],
-  under_analysis: ["converted", "lost"],
-  converted: [],
-  lost: ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"],
+  new: ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  distributed: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "new", "lost"],
+  in_contact: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  quote_sent: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  negotiation: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  documentation_pending: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  under_analysis: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted", "lost"],
+  converted: ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "lost"],
+  lost: ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis", "converted"],
 };
 
 export const LEAD_STATUS_LABELS: Record<string, string> = {
