@@ -130,6 +130,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
     const lightBeneficiaries = await getLeadBeneficiaries(id);
     const lightFormData = readFormData(lead.formData);
+    const lightRequirements = await getRequirementsForLead(id);
 
     const lightLead: LightLeadDetailData = {
       id: lead.id,
@@ -162,7 +163,19 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       consentimentoLgpd: lead.consentimentoLgpd,
     };
 
-    return <LightLeadDetail lead={lightLead} brokerName={brokerUser?.name || "Corretor"} />;
+    return (
+      <LightLeadDetail
+        lead={lightLead}
+        brokerName={brokerUser?.name || "Corretor"}
+        requirements={lightRequirements.map((req) => ({
+          id: req.id,
+          name: req.name,
+          description: req.description,
+          required: Boolean(req.required),
+          appliesPerBeneficiary: Boolean(req.appliesPerBeneficiary),
+        }))}
+      />
+    );
   }
   const formData = readFormData(lead.formData);
   const slaMinutes = Number((await getDatabase().select({ minutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1))[0]?.minutes ?? 15);

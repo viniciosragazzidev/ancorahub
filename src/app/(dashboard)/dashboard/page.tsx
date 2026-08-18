@@ -9,6 +9,8 @@ import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardDa
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
+import { eq } from "drizzle-orm";
+import { getDatabase, schema } from "@/shared/db";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +37,12 @@ export default async function DashboardPage({
 
   const mode = await getExperienceMode(context);
   if (mode === "LIGHT") {
-    return <LightDashboard data={await getBrokerWorkspaceData()} />;
+    const [tenant] = await getDatabase()
+      .select({ logoUrl: schema.tenants.logoUrl })
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, context.tenantId))
+      .limit(1);
+    return <LightDashboard data={await getBrokerWorkspaceData()} logoUrl={tenant?.logoUrl ?? null} />;
   }
 
   if ((await isBrokerWorkspaceEnabled()) && await isCleanUiOperationalEnabled(context.tenantId)) {

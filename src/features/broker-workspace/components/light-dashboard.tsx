@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle, Clock, Lightning, Users } from "@/components/huge-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AncoraLogo } from "@/components/ancora-logo";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,13 @@ function getGreeting() {
   return "Boa noite";
 }
 
-export function LightDashboard({ data }: { data: BrokerWorkspaceData }) {
+export function LightDashboard({
+  data,
+  logoUrl,
+}: {
+  data: BrokerWorkspaceData;
+  logoUrl?: string | null;
+}) {
   const firstName = data.viewer.name.split(" ")[0] || "Corretor";
   const greeting = getGreeting();
 
@@ -27,15 +34,10 @@ export function LightDashboard({ data }: { data: BrokerWorkspaceData }) {
   const hasActionableItems = data.queue.length > 0 || Boolean(data.nextAction);
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6">
-      {/* Header bar for Light Mode */}
-      <header className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Modo Light</span>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            {greeting}, {firstName}
-          </h1>
-        </div>
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 pb-24 sm:px-6">
+      {/* Header: tenant logo + mode toggle */}
+      <header className="flex items-center justify-between gap-3">
+        <AncoraLogo src={logoUrl} className="h-9 w-auto max-w-[180px] object-contain" />
         <div className="flex items-center gap-2">
           <ExperienceModeToggle variant="badge" />
         </div>
@@ -43,41 +45,55 @@ export function LightDashboard({ data }: { data: BrokerWorkspaceData }) {
 
       {/* Primary Question: Tenho algo para fazer agora? */}
       <section aria-label="Resumo do dia" className="space-y-4">
-        <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-xs sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Tenho algo para fazer agora?</p>
-          
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Aguardando resposta</span>
+        <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card to-card p-5 shadow-xs sm:p-6">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {greeting}, {firstName}
+            </h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Tenho algo para fazer agora?</p>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <Lightning className="size-4" />
+                </span>
                 <Badge variant={awaitingResponse > 0 ? "warning" : "outline"} className="text-[11px] font-bold">
                   {awaitingResponse}
                 </Badge>
               </div>
-              <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{awaitingResponse}</strong>
-              <p className="mt-1 text-[11px] text-muted-foreground">Leads com nova mensagem</p>
+              <strong className="mt-3 block text-3xl font-bold tabular-nums text-foreground">{awaitingResponse}</strong>
+              <p className="mt-1 text-xs font-medium text-foreground">Aguardando resposta</p>
+              <p className="text-[11px] text-muted-foreground">Leads com nova mensagem</p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Em atendimento</span>
+            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <Users className="size-4" />
+                </span>
                 <Badge variant="outline" className="text-[11px] font-bold">
                   {inService}
                 </Badge>
               </div>
-              <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{inService}</strong>
-              <p className="mt-1 text-[11px] text-muted-foreground">Em negociação ativa</p>
+              <strong className="mt-3 block text-3xl font-bold tabular-nums text-foreground">{inService}</strong>
+              <p className="mt-1 text-xs font-medium text-foreground">Em atendimento</p>
+              <p className="text-[11px] text-muted-foreground">Em negociação ativa</p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Aguardando atualização</span>
+            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <Clock className="size-4" />
+                </span>
                 <Badge variant={pendingUpdate > 0 ? "destructive" : "outline"} className="text-[11px] font-bold">
                   {pendingUpdate}
                 </Badge>
               </div>
-              <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{pendingUpdate}</strong>
-              <p className="mt-1 text-[11px] text-muted-foreground">Tarefas e retornos pendentes</p>
+              <strong className="mt-3 block text-3xl font-bold tabular-nums text-foreground">{pendingUpdate}</strong>
+              <p className="mt-1 text-xs font-medium text-foreground">Aguardando atualização</p>
+              <p className="text-[11px] text-muted-foreground">Tarefas e retornos pendentes</p>
             </div>
           </div>
 

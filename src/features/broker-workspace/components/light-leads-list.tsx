@@ -65,7 +65,7 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
   }, [leads, filter, searchQuery]);
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 pb-24 sm:px-6">
       {/* Top Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
         <div>

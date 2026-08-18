@@ -569,11 +569,18 @@
       "tag": "0130_allow_tenant_wide_lead_queues",
       "breakpoints": true
     },
-    {
+{
       "idx": 81,
       "version": "7",
       "when": 1786910000000,
       "tag": "0131_add_preferred_experience_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1787000000000,
+      "tag": "0132_add_lead_documents_expected_contract_period",
       "breakpoints": true
     }
   ]

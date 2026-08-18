@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Gear, House, ListChecks, Users } from "@/components/huge-icons";
+import { Dock, DockIcon } from "@/components/ui/dock";
 import { cn } from "@/lib/utils";
 
 const LIGHT_NAV_ITEMS = [
@@ -18,9 +19,9 @@ export function LightBottomNav() {
   return (
     <nav
       aria-label="Navegação Light do Corretor"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/80 bg-card/95 px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgb(0_0_0/0.12)] backdrop-blur-xl"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
     >
-      <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-2">
+      <Dock className="pointer-events-auto">
         {LIGHT_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
           const active =
             pathname === href ||
@@ -28,23 +29,33 @@ export function LightBottomNav() {
             (href !== "/dashboard" && pathname.startsWith(`${href}/`));
 
           return (
-            <Link
+            <DockIcon
               key={href}
-              href={href}
-              aria-current={active ? "page" : undefined}
+              aria-label={label}
+              title={label}
               className={cn(
-                "flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs font-semibold transition-all duration-150 ease-out",
-                active
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                "relative text-foreground",
+                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon aria-hidden="true" className="size-5" />
-              <span className="truncate">{label}</span>
-            </Link>
+              <Icon aria-hidden="true" className="size-6" />
+              {active ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-primary"
+                />
+              ) : null}
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className="absolute inset-0 rounded-full"
+              >
+                <span className="sr-only">{label}</span>
+              </Link>
+            </DockIcon>
           );
         })}
-      </div>
+      </Dock>
     </nav>
   );
 }

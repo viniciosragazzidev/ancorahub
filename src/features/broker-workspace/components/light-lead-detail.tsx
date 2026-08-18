@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AppSelect } from "@/components/ui/select";
 import {
   Dialog,
   DialogPopup,
@@ -31,11 +32,20 @@ import {
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
+import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
+
+export type LiteRequirement = {
+  id: string;
+  name: string;
+  description: string | null;
+  required: boolean;
+  appliesPerBeneficiary: boolean;
+};
 
 export type LightLeadDetailData = {
   id: string;
@@ -85,7 +95,15 @@ const STEP_OPTIONS = [
   { id: "no_contact", label: "Não consegui contato", description: "Sem retorno após tentativas", targetStatus: "lost" },
 ];
 
-export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailData; brokerName: string }) {
+export function LightLeadDetail({
+  lead,
+  brokerName,
+  requirements = [],
+}: {
+  lead: LightLeadDetailData;
+  brokerName: string;
+  requirements?: LiteRequirement[];
+}) {
   const router = useRouter();
   const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
   const [leadStatus, setLeadStatus] = useState(lead.status);
@@ -106,6 +124,14 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
 
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
   const [requestingSale, startRequestSaleTransition] = useTransition();
+
+  const [saleDocOpen, setSaleDocOpen] = useState(false);
+  const [docRequirementId, setDocRequirementId] = useState("");
+  const [docBeneficiaryId, setDocBeneficiaryId] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docObservation, setDocObservation] = useState("");
+  const [isSaleClosing, setIsSaleClosing] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
 
@@ -245,31 +271,98 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
     });
   }
 
-  // Handle Request Sale - changes status to documentation_pending
+  // Open Sale Document Dialog - broker goes to documentation stage
   function handleRequestSale() {
     if (requestingSale) return;
 
+    setDocRequirementId("");
+    setDocBeneficiaryId(lead.beneficiaries?.find((b) => b.isHolder)?.id ?? lead.beneficiaries?.[0]?.id ?? "");
+    setDocFile(null);
+    setDocObservation("");
+    setIsSaleClosing(true);
+    setSaleDocOpen(true);
+  }
+
+  // Upload sale documentation and move lead to documentation_pending
+  function handleSubmitSaleDocument() {
+    if (requestingSale) return;
+
+    const beneficiaries = lead.beneficiaries ?? [];
+    if (!docFile) {
+      toast.error("Selecione um arquivo para enviar.");
+      return;
+    }
+    if (beneficiaries.length === 0) {
+      toast.error("Cadastre o titular ou dependentes antes de enviar documentos.");
+      return;
+    }
+    const requirement = requirements.find((r) => r.id === docRequirementId) ?? null;
+    if (requirement?.appliesPerBeneficiary && !docBeneficiaryId) {
+      toast.error("Selecione o dono deste documento.");
+      return;
+    }
+
     startRequestSaleTransition(async () => {
+      const formData = new FormData();
+      formData.append("file", docFile);
+      formData.append("leadId", lead.id);
+
       try {
-        const formData = new FormData();
-        formData.append("leadId", lead.id);
-        formData.append("newStatus", "documentation_pending");
-        formData.append("status", "documentation_pending");
+        const uploadRes = await fetch("/api/documents/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-        const res = await changeLeadStatusAction({}, formData);
+        if (!uploadRes.ok) {
+          const errorData = (await uploadRes.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(errorData?.error || "Erro no upload do documento.");
+        }
 
-        if (!res.success) {
-          toast.error(res.error ?? "Não foi possível solicitar a venda.");
+        const data = await uploadRes.json();
+
+        const res = await confirmDocumentUploadAction({
+          leadId: lead.id,
+          requirementId: requirement?.id ?? null,
+          beneficiaryId: docBeneficiaryId || null,
+          filename: data.filename,
+          fileUrl: data.fileUrl,
+          storageKey: data.storageKey,
+          category: isSaleClosing ? "contratacao" : "outros",
+          description: docObservation.trim() || null,
+          mimeType: data.mimeType,
+          sizeBytes: data.sizeBytes,
+          checksumSha256: data.checksumSha256,
+        });
+
+        if (res.error) {
+          toast.error(res.error);
           return;
         }
 
+        const statusFormData = new FormData();
+        statusFormData.append("leadId", lead.id);
+        statusFormData.append("newStatus", "documentation_pending");
+        statusFormData.append("status", "documentation_pending");
+
+        const statusRes = await changeLeadStatusAction({}, statusFormData);
+        if (!statusRes.success) {
+          toast.error(statusRes.error ?? "Não foi possível solicitar a venda.");
+          return;
+        }
+
+        setSaleDocOpen(false);
+        setDocFile(null);
+        setDocObservation("");
         setLeadStatus("documentation_pending");
-        toast.success("Solicitação de venda enviada!", {
-          description: "Envie a documentação de comprovação da venda para o supervisor aprovar.",
+
+        toast.success(isSaleClosing ? "Documento de venda enviado!" : "Documento enviado!", {
+          description: isSaleClosing
+            ? "Solicitação de venda enviada. Aguardando aprovação do supervisor."
+            : "Envie os demais documentos de comprovação para o supervisor aprovar.",
           duration: 8000,
         });
-      } catch {
-        toast.error("Não foi possível solicitar a venda no momento.");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Não foi possível enviar o documento.");
       }
     });
   }
@@ -453,7 +546,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
                 size="sm"
                 onClick={handleRequestSale}
                 disabled={requestingSale}
-                className="w-full text-xs font-bold gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                className="w-full text-xs font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <FileText className="size-4" />
                 {requestingSale ? "Enviando..." : "REGISTRAR VENDA"}
@@ -682,6 +775,116 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
               className="flex-1 text-xs font-bold bg-primary text-primary-foreground"
             >
               {updatingStep ? "Salvando..." : "SALVAR"}
+            </Button>
+          </div>
+        </DialogPopup>
+      </Dialog>
+
+      {/* Sale Documentation Dialog */}
+      <Dialog open={saleDocOpen} onOpenChange={setSaleDocOpen}>
+        <DialogPopup className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold">Documentação da venda</DialogTitle>
+            <DialogDescription className="text-xs">
+              Envie o documento de comprovação da venda para o supervisor aprovar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-1">
+            {/* Tipo de documento */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground block">Tipo de documento</span>
+              <AppSelect
+                value={docRequirementId}
+                onValueChange={setDocRequirementId}
+                placeholder={requirements.length ? "Selecione o tipo de documento" : "Nenhum tipo configurado"}
+                options={
+                  requirements.length
+                    ? requirements.map((req) => ({ value: req.id, label: req.name }))
+                    : [{ value: "__none__", label: "Nenhum tipo configurado", disabled: true }]
+                }
+              />
+            </div>
+
+            {/* Dono do documento */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground block">Dono do documento</span>
+              <AppSelect
+                value={docBeneficiaryId}
+                onValueChange={setDocBeneficiaryId}
+                placeholder="Selecione o titular ou dependente"
+                options={(lead.beneficiaries ?? []).map((b) => ({
+                  value: b.id,
+                  label: b.isHolder ? `${b.name} (Titular)` : `${b.name} (Dependente)`,
+                }))}
+              />
+              {(lead.beneficiaries ?? []).length === 0 ? (
+                <p className="text-[11px] text-amber-600">
+                  Cadastre o titular ou dependentes antes de enviar documentos.
+                </p>
+              ) : null}
+            </div>
+
+            {/* Arquivo */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground block">
+                Arquivo (PDF, JPG ou PNG até 10 MB)
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-primary"
+              />
+            </div>
+
+            {/* Observação */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground block">Observação (opcional)</span>
+              <input
+                type="text"
+                placeholder="Ex: Contrato assinado pelo titular"
+                value={docObservation}
+                onChange={(e) => setDocObservation(e.target.value)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs"
+              />
+            </div>
+
+            {/* Fechamento de venda */}
+            <label className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSaleClosing}
+                onChange={(e) => setIsSaleClosing(e.target.checked)}
+                className="mt-0.5 accent-primary"
+              />
+              <span>
+                <span className="font-semibold text-foreground block">Este documento é o fechamento da venda</span>
+                <span className="text-muted-foreground text-[11px] block">
+                  Marque para registrar como documento de venda e enviar para aprovação do supervisor.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={requestingSale}
+              onClick={() => setSaleDocOpen(false)}
+              className="flex-1 text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              disabled={requestingSale || !docFile || (lead.beneficiaries ?? []).length === 0}
+              onClick={handleSubmitSaleDocument}
+              className="flex-1 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {requestingSale ? "Enviando..." : "ENVIAR DOCUMENTAÇÃO"}
             </Button>
           </div>
         </DialogPopup>

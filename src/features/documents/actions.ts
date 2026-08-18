@@ -164,6 +164,8 @@ export async function confirmDocumentUploadAction({
   storageKey,
   category,
   description,
+  coverageStartDate,
+  expirationDate,
   mimeType,
   sizeBytes,
   checksumSha256,
@@ -177,6 +179,8 @@ export async function confirmDocumentUploadAction({
   storageKey?: string | null;
   category?: string;
   description?: string | null;
+  coverageStartDate?: string | null;
+  expirationDate?: string | null;
   mimeType?: string | null;
   sizeBytes?: number | null;
   checksumSha256?: string | null;
@@ -190,6 +194,12 @@ export async function confirmDocumentUploadAction({
     if (!parsedCategory.success) return { error: "Categoria documental inválida." };
     if (!filename || filename.length > 180) return { error: "Nome de arquivo inválido." };
     if (!fileUrl.startsWith("/api/documents/download?key=")) return { error: "Referência de arquivo inválida." };
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (coverageStartDate && !datePattern.test(coverageStartDate)) return { error: "Data de início previsto inválida." };
+    if (expirationDate && !datePattern.test(expirationDate)) return { error: "Data de fim previsto inválida." };
+    if (coverageStartDate && expirationDate && expirationDate < coverageStartDate) {
+      return { error: "O fim previsto do contrato não pode ser antes do início." };
+    }
 
     const [lead] = await db
       .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId })
@@ -243,6 +253,8 @@ export async function confirmDocumentUploadAction({
         storageKey: storageKey || null,
         category: parsedCategory.data,
         description: description?.trim().slice(0, 500) || null,
+        coverageStartDate: coverageStartDate || null,
+        expirationDate: expirationDate || null,
         mimeType: mimeType || null,
         sizeBytes: sizeBytes ?? null,
         checksumSha256: checksumSha256 || null,

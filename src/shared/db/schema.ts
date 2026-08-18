@@ -2678,6 +2678,8 @@ export const leadDocuments = pgTable(
     storageKey: text("storage_key"),
     category: text("category").notNull().default("outros"),
     description: text("description"),
+    coverageStartDate: date("coverage_start_date", { mode: "string" }),
+    expirationDate: date("expiration_date", { mode: "string" }),
     mimeType: text("mime_type"),
     sizeBytes: integer("size_bytes"),
     checksumSha256: text("checksum_sha256"),

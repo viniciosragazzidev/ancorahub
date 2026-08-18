@@ -61,7 +61,7 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-5 px-4 py-8 text-center">
+    <div className="mx-auto w-full max-w-md space-y-5 px-4 py-8 pb-24 text-center">
       <Card variant="subtle" className="p-6 bg-card/95 shadow-md space-y-4">
         <div>
           <span className="text-xs font-semibold uppercase tracking-wider text-primary">Atualização Rápida</span>
