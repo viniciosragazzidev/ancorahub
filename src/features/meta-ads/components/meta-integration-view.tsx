@@ -230,7 +230,7 @@ export function MetaIntegrationView({
       </Card>
       {wizardOpen ? <MetaMarketingWizard onClose={() => setWizardOpen(false)} /> : null}
       <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
-        <DialogPopup className="sm:max-w-md">
+        <DialogPopup key={disconnectOpen ? "open" : "closed"} className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Desconectar Marketing da Meta?</DialogTitle>
             <DialogDescription>

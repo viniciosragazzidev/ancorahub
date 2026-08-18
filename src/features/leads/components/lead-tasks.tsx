@@ -60,7 +60,7 @@ export function LeadTasks({ leadId, tasks, assignees }: { leadId: string; tasks:
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger render={<Button size="sm"><Plus /> Nova tarefa</Button>} />
-          <DialogPopup className="sm:max-w-xl">
+          <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Nova tarefa</DialogTitle>
               <DialogDescription>Registre um próximo passo objetivo para este lead.</DialogDescription>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -97,11 +97,14 @@ export function DocumentsWorkspace({
   const multiSelect = useMultiSelect(pendingIds);
   const [reqState, reqFormAction, reqPending] = useActionState(createRequirementAction, {});
   const [, startTransition] = useTransition();
+  const reqFormRef = useRef<HTMLFormElement>(null);
+  const [reqKey, setReqKey] = useState(0);
 
   useEffect(() => {
     if (reqState.success) {
       toast.success("Requisito criado com sucesso!");
-      window.location.reload();
+      reqFormRef.current?.reset();
+      setReqKey((k) => k + 1);
     }
     if (reqState.error) {
       toast.error(reqState.error);
@@ -426,7 +429,7 @@ export function DocumentsWorkspace({
               <CardDescription>Defina as regras de documentos obrigatórios.</CardDescription>
             </CardHeader>
             <CardContent>
-              <form action={reqFormAction} className="space-y-4">
+              <form key={reqKey} ref={reqFormRef} action={reqFormAction} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Nome do documento</Label>
                   <Input id="name" name="name" placeholder="Ex.: RG / CNH do Titular" required />
