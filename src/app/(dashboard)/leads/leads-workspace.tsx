@@ -33,12 +33,12 @@ import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
-import { QualifyingLeadActions, StartQualificationButton } from "./_components/qualifying-lead-actions";
-import { LeadsPagination } from "./_components/leads-pagination";
+import { StartQualificationButton } from "./_components/qualifying-lead-actions";
+import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import {
   Sheet,
@@ -51,14 +51,6 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { maskPhone, maskName, formatDate } from "@/features/quotes/utils";
 import { OwnershipContext } from "@/components/ownership-context";
@@ -212,7 +204,6 @@ export function LeadsWorkspace({
   brokers = [],
   branches = [],
   pageSize = 20,
-  pagination,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -233,24 +224,10 @@ export function LeadsWorkspace({
   };
 }) {
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
-  const [qualifyingPage, setQualifyingPage] = useState(1);
-  const [listPage, setListPage] = useState(1);
   const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
-  const totalQualifyingPages = Math.max(1, Math.ceil(qualifyingLeads.length / pageSize));
-  const visibleQualifyingLeads = useMemo(
-    () => qualifyingLeads.slice((qualifyingPage - 1) * pageSize, qualifyingPage * pageSize),
-    [qualifyingLeads, qualifyingPage, pageSize]
-  );
-
-  const totalListPages = Math.max(1, Math.ceil(leads.length / pageSize));
-  const safeListPage = Math.min(Math.max(1, listPage), totalListPages);
-  const visibleLeads = useMemo(
-    () => leads.slice((safeListPage - 1) * pageSize, safeListPage * pageSize),
-    [leads, safeListPage, pageSize]
-  );
   const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
     const saved = loadKanbanConfig();
     return saved?.ordered ?? kanbanStatuses;
@@ -470,181 +447,33 @@ export function LeadsWorkspace({
               description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
             />
           ) : (
-            <div className="space-y-4">
-              <div className="hidden divide-y divide-border max-[559px]:block">
-                {visibleQualifyingLeads.map((lead) => (
-                  <div key={lead.id} className="space-y-2 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 truncate text-sm font-medium">{lead.nome}</span>
-                      <Badge variant="outline" className="shrink-0 text-[10px]">{lead.queueName ?? "Geral"}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{lead.telefone}</p>
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <LeadQualificationBadge status={lead.qualificationStatus} />
-                      <span className="text-xs font-semibold">{lead.qualificationScore} pts</span>
-                    </div>
-                    <div className="pt-2 flex justify-end">
-                      <QualifyingLeadActions
-                        leadId={lead.id}
-                        leadName={lead.nome}
-                        currentQueueId={lead.queueId ?? null}
-                        currentQueueName={lead.queueName ?? null}
-                        queues={queues}
-                        onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Table className="max-[559px]:hidden">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-4">Lead</TableHead>
-                    <TableHead>Origem / Canal</TableHead>
-                    <TableHead>Fila de Destino</TableHead>
-                    <TableHead>Qualificação IA</TableHead>
-                    <TableHead className="hidden lg:table-cell">Entrada</TableHead>
-                    <TableHead className="pr-5 text-right">Ações de Controle</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleQualifyingLeads.map((lead) => (
-                    <TableRow key={lead.id} className="group/row">
-                      <TableCell className="pl-4 font-medium">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{lead.nome}</p>
-                          <p className="text-xs text-muted-foreground">{lead.telefone}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {lead.sourceChannel === "bulk_import" ? "Importação CSV" : lead.origem}
-                          </Badge>
-                          {lead.sourceCampaign ? (
-                            <p className="text-[11px] text-muted-foreground truncate max-w-36 mt-0.5">
-                              {lead.sourceCampaign}
-                            </p>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {lead.queueName ?? "Geral da unidade"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <LeadQualificationBadge status={lead.qualificationStatus} />
-                          <span className="text-xs font-semibold text-foreground">
-                            {lead.qualificationScore} pts
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                        {formatDate(lead.createdAt, { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                      </TableCell>
-                      <TableCell className="pr-5 text-right">
-                        <QualifyingLeadActions
-                          leadId={lead.id}
-                          leadName={lead.nome}
-                          currentQueueId={lead.queueId ?? null}
-                          currentQueueName={lead.queueName ?? null}
-                          queues={queues}
-                          onOpenDetails={() => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {qualifyingLeads.length > pageSize ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-3 text-xs text-muted-foreground">
-                  <span>
-                    Mostrando {(qualifyingPage - 1) * pageSize + 1} a {Math.min(qualifyingPage * pageSize, qualifyingLeads.length)} de {qualifyingLeads.length} leads em qualificação ({pageSize} por página)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={qualifyingPage <= 1}
-                      onClick={() => setQualifyingPage((p) => Math.max(1, p - 1))}
-                    >
-                      Anterior
-                    </Button>
-                    <span className="font-medium text-foreground">Página {qualifyingPage} de {totalQualifyingPages}</span>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={qualifyingPage >= totalQualifyingPages}
-                      onClick={() => setQualifyingPage((p) => Math.min(totalQualifyingPages, p + 1))}
-                    >
-                      Próxima
-                    </Button>
-                  </div>
+            <Card className="border-transparent bg-transparent shadow-none">
+              <CardHeader className="border-b border-border/50 p-4">
+                <div className="flex flex-col gap-1">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Target size={17} />
+                    Leads em qualificação por IA
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {qualifyingLeads.length} lead(s) em triagem · o robô qualifica e encaminha para a fila de distribuição.
+                  </CardDescription>
                 </div>
-              ) : null}
-            </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <QualifyingLeadsDataTable
+                  leads={qualifyingLeads}
+                  queues={queues}
+                  pageSize={pageSize}
+                  onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+                />
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
         {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
         <TabsContent value="list" className="mt-4">
           <div className="space-y-4">
-            <div className="hidden divide-y divide-border max-[559px]:block">
-              {visibleLeads.map((lead) => (
-                <div key={lead.id} className="flex items-start gap-2.5 px-4 py-3 transition-colors duration-[var(--duration-quick)] ease-out active:bg-accent">
-                  <div
-                    className="pt-0.5"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Checkbox
-                      aria-label={`Selecionar ${lead.nome}`}
-                      checked={multiSelect.isSelected(lead.id)}
-                      onCheckedChange={() => multiSelect.toggle(lead.id)}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedLead(lead)}
-                    className="min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
-                        </span>
-                        <span className={`mt-0.5 block truncate text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
-                        </span>
-                      </span>
-                      <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                    </span>
-                    <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                      <LeadStatusBadge status={lead.status} />
-                      <LeadQualificationBadge status={lead.qualificationStatus} />
-                      <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
-                      <span className="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                        {formatDate(lead.createdAt, { day: "2-digit", month: "short" })}
-                      </span>
-                    </span>
-                    {lead.sourceCampaign ? (
-                      <span className="mt-2 block">
-                        <Badge variant="secondary" className="max-w-full truncate border-primary/20 bg-primary/10 text-[10px] text-primary">
-                          🎯 {lead.sourceCampaign}
-                        </Badge>
-                      </span>
-                    ) : null}
-                    <span className="mt-1.5 flex items-center gap-2">
-                      <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="truncate text-xs" />
-                    </span>
-                  </button>
-                </div>
-              ))}
-            </div>
             <SelectionToolbar
               selectedCount={multiSelect.count}
               totalCount={leads.length}
@@ -652,104 +481,37 @@ export function LeadsWorkspace({
             >
               {selectionActions}
             </SelectionToolbar>
-            <Table className="max-[559px]:hidden">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10 pl-4">
-                    <Checkbox
-                      aria-label="Selecionar todos"
-                      checked={multiSelect.isAllSelected}
-                      onCheckedChange={multiSelect.selectAll}
-                    />
-                  </TableHead>
-                  <TableHead className="pl-0">Lead</TableHead>
-                  <TableHead className={contextRole === "broker" ? "hidden" : ""}>Tipo</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Qualificação</TableHead>
-                  <TableHead className="hidden md:table-cell">Saúde</TableHead>
-                  <TableHead className="hidden md:table-cell">Responsável</TableHead>
-                  <TableHead className="hidden lg:table-cell">Entrada</TableHead>
-                  <TableHead className="pr-5 text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleLeads.map((lead) => (
-                  <TableRow
-                    key={lead.id}
-                    className="cursor-pointer group/row data-[selected]:bg-muted/40 data-[active]:bg-muted/15"
-                    data-selected={multiSelect.isSelected(lead.id) || undefined}
-                    data-active={lead.status !== "converted" && lead.status !== "lost" || undefined}
-                    onClick={() => setSelectedLead(lead)}
-                  >
-                    <TableCell className="w-10 pl-4">
-                      <div onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                        <Checkbox
-                          aria-label={`Selecionar ${lead.nome}`}
-                          checked={multiSelect.isSelected(lead.id)}
-                          onCheckedChange={() => {
-                            multiSelect.toggle(lead.id);
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="pl-0">
-                      <p className={`font-medium ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                        {shouldMask(lead) ? maskName(lead.nome) : lead.nome}
-                      </p>
-                      <p className={`text-xs text-muted-foreground ${shouldMask(lead) ? "blur-[3px] select-none" : ""}`}>
-                        {shouldMask(lead) ? "••••-••••" : (contextRole === "broker" && lead.status === "distributed" ? maskPhone(lead.telefone) : lead.telefone)}
-                      </p>
-                      {lead.sourceCampaign ? (
-                        <Badge variant="secondary" className="mt-1 text-[10px] bg-primary/10 text-primary border-primary/20 max-w-[200px] truncate">
-                          🎯 {lead.sourceCampaign}
-                        </Badge>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className={contextRole === "broker" ? "hidden" : ""}>
-                      <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
-                        {lead.tipo}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <LeadStatusBadge status={lead.status} />
-                    </TableCell>
-                    <TableCell>
-                      <LeadQualificationBadge status={lead.qualificationStatus} />
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <LeadHealthBadge
-                        health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)}
-                      />
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-sm" />
-                    </TableCell>
-                    <TableCell className="hidden text-muted-foreground lg:table-cell">
-                      {formatDate(lead.createdAt, { day: "2-digit", month: "short" })}
-                    </TableCell>
-                    <TableCell className="pr-5 text-right">
-                      <Button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelectedLead(lead);
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Detalhes <ArrowUpRight />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <LeadsPagination
-              currentPage={safeListPage}
-              totalPages={totalListPages}
-              totalItems={leads.length}
-              pageSize={pageSize}
-              onPageChange={setListPage}
-            />
+            <Card className="border-transparent bg-transparent shadow-none">
+              <CardHeader className="border-b border-border/50 p-4">
+                <div className="flex flex-col gap-1">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <UserList size={17} />
+                    Leads qualificados & distribuídos
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {leads.length} lead(s) no total · ordenados pela entrada mais recente.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <LeadsDataTable
+                  leads={leads}
+                  contextRole={contextRole}
+                  shouldMask={shouldMask}
+                  slaFirstContactMinutes={slaFirstContactMinutes}
+                  slaStagnantDays={slaStagnantDays}
+                  pageSize={pageSize}
+                  selectedIds={multiSelect.selectedIds}
+                  isAllSelected={multiSelect.isAllSelected}
+                  onToggleRow={multiSelect.toggle}
+                  onSelectAll={(checked) => {
+                    if (checked) multiSelect.setSelected(leadsIds);
+                    else multiSelect.clear();
+                  }}
+                  onRowClick={setSelectedLead}
+                />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

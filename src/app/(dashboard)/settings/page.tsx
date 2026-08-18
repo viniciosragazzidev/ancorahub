@@ -78,16 +78,18 @@ export default async function SettingsPage() {
           tabIds={tabIds}
         />
 
-        <RelatedActions
-          title="Configurações Relacionadas"
-          description="Navegação rápida para parâmetros avançados e módulos."
-          links={[
-            { label: "Qualificação & Robô IA", href: "/qualificacao", description: "Prompt, WhatsApp Diagnóstico e MCP" },
-            { label: "Equipe & Corretores", href: "/equipe", description: "Convites de usuários e permissões" },
-            { label: "Regras de Distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
-            { label: "Guia & Manual do Sistema", href: "/guia", description: "Tours e definições de domínio" },
-          ]}
-        />
+        {context.role !== "broker" && (
+          <RelatedActions
+            title="Configurações Relacionadas"
+            description="Navegação rápida para parâmetros avançados e módulos."
+            links={[
+              { label: "Qualificação & Robô IA", href: "/qualificacao", description: "Prompt, WhatsApp Diagnóstico e MCP" },
+              { label: "Equipe & Corretores", href: "/equipe", description: "Convites de usuários e permissões" },
+              { label: "Regras de Distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
+              { label: "Guia & Manual do Sistema", href: "/guia", description: "Tours e definições de domínio" },
+            ]}
+          />
+        )}
       </div>
     </>
   );

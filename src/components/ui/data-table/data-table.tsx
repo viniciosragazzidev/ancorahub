@@ -41,6 +41,7 @@ interface DataTableProps<TData, TValue> {
   headerSlot?: React.ReactNode;
   pageSize?: number;
   getRowClassName?: (row: TData) => string | undefined;
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -54,6 +55,7 @@ export function DataTable<TData, TValue>({
   headerSlot,
   pageSize = 10,
   getRowClassName,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -150,7 +152,12 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className={cn("group/row h-12 border-b border-border/70 transition-colors duration-[var(--duration-quick)] hover:bg-muted/40 motion-reduce:transition-none", getRowClassName?.(row.original))}
+                    className={cn(
+                      "group/row h-12 border-b border-border/70 transition-colors duration-[var(--duration-quick)] hover:bg-muted/40 motion-reduce:transition-none",
+                      onRowClick && "cursor-pointer",
+                      getRowClassName?.(row.original)
+                    )}
+                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="px-4 py-2.5 text-sm font-normal text-foreground">

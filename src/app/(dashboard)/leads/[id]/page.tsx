@@ -237,7 +237,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="inline-flex min-w-0 items-center gap-1.5"><Phone className="size-3.5 shrink-0" />{canSeePersonalData ? <a className="truncate text-primary hover:underline" href={`tel:${lead.telefone.replace(/\D/g, "")}`}>{lead.telefone}</a> : maskedPhone}</span>
                   <span className="hidden text-border sm:inline">•</span>
-                  <span className="inline-flex min-w-0 items-center gap-1.5"><Share className="size-3.5 shrink-0" />{canSeePersonalData && lead.email ? <a className="max-w-[220px] truncate text-primary hover:underline" href={`mailto:${lead.email}`}>{lead.email}</a> : canSeePersonalData ? "Não informado" : maskedEmail}</span>
+                  <span className="inline-flex min-w-0 items-center gap-1.5"><Share className="size-[10px] shrink-0" />{canSeePersonalData && lead.email ? <a className="max-w-[220px] truncate text-primary hover:underline" href={`mailto:${lead.email}`}>{lead.email}</a> : canSeePersonalData ? "Não informado" : maskedEmail}</span>
                   <span className="hidden text-border sm:inline">•</span>
                   <span className="inline-flex items-center gap-1.5"><Buildings className="size-3.5 shrink-0" />{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</span>
                   <span className="hidden text-border sm:inline">•</span>
