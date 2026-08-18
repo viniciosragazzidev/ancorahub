@@ -23,7 +23,7 @@ export function ReviewMessageForm() {
       <Textarea id="review-message" name="message" defaultValue="Mensagem de teste enviada pelo CorreTop CRM." maxLength={4096} required />
     </div>
     {state.error ? <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive" role="alert">{state.error}</p> : null}
-    {state.success ? <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground" role="status"><ShieldCheck className="mr-2 inline size-4 text-primary" />{state.success} ID: <code className="text-xs">{state.messageId}</code></p> : null}
+    {state.success ? <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground" role="status"><ShieldCheck className="mr-2 size-4 text-primary" />{state.success} ID: <code className="text-xs">{state.messageId}</code></p> : null}
     <Button type="submit" disabled={pending}><PaperPlaneTilt />{pending ? "Enviando…" : "Enviar mensagem de teste"}</Button>
   </form>;
 }

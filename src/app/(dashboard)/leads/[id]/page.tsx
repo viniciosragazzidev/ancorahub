@@ -170,13 +170,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const remainingMinutes = Math.max(0, slaMinutes - elapsedMinutes);
   const slaUrgent = remainingMinutes <= Math.max(5, Math.round(slaMinutes * 0.25));
 
-  const [interactions, tasks, requirements, leadDocs, checklist, beneficiaries, carriers] = await Promise.all([
+  // CRITICAL: data needed for the page to render
+  const [interactions, tasks, leadDocs] = await Promise.all([
     getLeadTimeline(id),
     getDatabase().select({ id: schema.leadTasks.id, title: schema.leadTasks.title, description: schema.leadTasks.description, priority: schema.leadTasks.priority, dueAt: schema.leadTasks.dueAt, completedAt: schema.leadTasks.completedAt, createdAt: schema.leadTasks.createdAt, assignedTo: schema.leadTasks.assignedTo, assigneeName: schema.user.name })
       .from(schema.leadTasks).leftJoin(schema.user, eq(schema.leadTasks.assignedTo, schema.user.id)).where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.leadId, id)))
       .orderBy(schema.leadTasks.completedAt, schema.leadTasks.dueAt, schema.leadTasks.createdAt),
-    getRequirementsForLead(id),
     getLeadDocuments(id),
+  ]);
+
+  // OPTIONAL: secondary data that can degrade independently
+  const [requirementsResult, checklistResult, beneficiariesResult, carriersResult] = await Promise.allSettled([
+    getRequirementsForLead(id),
     getLeadDocumentChecklist(id),
     getLeadBeneficiaries(id),
     getDatabase().select({ id: schema.carriers.id, name: schema.carriers.name })
@@ -184,6 +189,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active")))
       .orderBy(schema.carriers.name),
   ]);
+  const requirements = requirementsResult.status === "fulfilled" ? requirementsResult.value : [];
+  const checklist = checklistResult.status === "fulfilled" ? checklistResult.value : [];
+  const beneficiaries = beneficiariesResult.status === "fulfilled" ? beneficiariesResult.value : [];
+  const carriers = carriersResult.status === "fulfilled" ? carriersResult.value : [];
 
   if (!interactions) notFound();
 

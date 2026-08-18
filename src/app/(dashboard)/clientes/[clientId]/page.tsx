@@ -324,7 +324,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
               <Card className="border-border bg-card shadow-sm">
                 <CardHeader className="border-b border-border/40 pb-3">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    <CalendarCheck className="mr-1.5 inline size-3.5 text-warning" />
+                    <CalendarCheck className="mr-1.5 size-3.5 text-warning" />
                     Vigência e renovação
                   </CardTitle>
                 </CardHeader>

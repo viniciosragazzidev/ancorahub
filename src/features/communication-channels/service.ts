@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
@@ -177,10 +177,27 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         }
 
         if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
-        const [leads, clients] = await Promise.all([
-          db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus }).from(schema.leads).where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt))),
-          db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, channel.tenantId)),
-        ]);
+        // OPTIMIZED: Query only leads matching the incoming phone (last 8 digits) instead of fetching ALL leads
+        const incomingDigits = normalizePhone(phone);
+        const suffix8 = incomingDigits.slice(-8);
+        const suffix10 = incomingDigits.slice(-10);
+        const suffix11 = incomingDigits.slice(-11);
+        const phoneConditions = [suffix8, suffix10, suffix11]
+          .filter((s) => s.length >= 8)
+          .map((s) => sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') LIKE ${'%' + s}`);
+        const leads = phoneConditions.length
+          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus })
+              .from(schema.leads)
+              .where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt), or(...phoneConditions)))
+          : [];
+        const clientPhoneConditions = [suffix8, suffix10, suffix11]
+          .filter((s) => s.length >= 8)
+          .map((s) => sql`regexp_replace(${schema.clients.telefone}, '[^0-9]', '', 'g') LIKE ${'%' + s}`);
+        const clients = clientPhoneConditions.length
+          ? await db.select({ id: schema.clients.id, phone: schema.clients.telefone })
+              .from(schema.clients)
+              .where(and(eq(schema.clients.tenantId, channel.tenantId), or(...clientPhoneConditions)))
+          : [];
         const matchingLeads = leads.filter((item) => samePhone(item.phone, phone));
         const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
         const matchedClient = clients.find((item) => samePhone(item.phone, phone));

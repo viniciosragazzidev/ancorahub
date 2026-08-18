@@ -330,7 +330,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
           {/* Email - always visible after acceptance */}
           {phoneUnlocked && lead.email ? (
             <p className="mt-0.5 text-xs text-muted-foreground">
-              <Share className="mr-1 size-3 inline" />
+              <Share className="mr-1 size-3" />
               {lead.email}
             </p>
           ) : null}

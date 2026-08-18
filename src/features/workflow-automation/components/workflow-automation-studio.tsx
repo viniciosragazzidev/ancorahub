@@ -1033,7 +1033,7 @@ function Inspector({
           </div>
         ) : (
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-200">
-            <CheckCircle className="mr-1 inline size-4" />
+            <CheckCircle className="mr-1 size-4" />
             Configuração pronta para continuar.
           </div>
         )}
