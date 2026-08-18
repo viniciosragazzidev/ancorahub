@@ -275,7 +275,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6 pb-24 sm:px-6">
       {/* Top Header Navigation */}
       <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
         <Link
