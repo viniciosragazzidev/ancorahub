@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText } from "@/components/huge-icons";
@@ -50,22 +50,35 @@ export function SupervisionPanel({
   const [reason, setReason] = useState("");
   const [isAssuming, setIsAssuming] = useState(false);
 
+  const formKey = useId();
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
+
+  // Reset form key on success/error to force remount and clear pending state
+  const [reassignVersion, setReassignVersion] = useState(0);
+  const [assumeVersion, setAssumeVersion] = useState(0);
 
   useEffect(() => {
     if (reassignState.success) {
       toast.success("Lead reatribuído e SLA reiniciado.");
+      setReassignVersion((v) => v + 1);
     }
-    if (reassignState.error) toast.error(reassignState.error);
+    if (reassignState.error) {
+      toast.error(reassignState.error);
+      setReassignVersion((v) => v + 1);
+    }
   }, [reassignState]);
   useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState.success, router]);
 
   useEffect(() => {
     if (assumeState.success) {
       toast.success("Lead assumido para investigação.");
+      setAssumeVersion((v) => v + 1);
     }
-    if (assumeState.error) toast.error(assumeState.error);
+    if (assumeState.error) {
+      toast.error(assumeState.error);
+      setAssumeVersion((v) => v + 1);
+    }
   }, [assumeState]);
   useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState.success, router]);
 
@@ -216,7 +229,7 @@ export function SupervisionPanel({
 
           <div className="rounded-lg border border-border bg-muted/[0.15] p-4">
             {mode === "reassign" ? (
-              <form action={reassign} className="space-y-4">
+              <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4">
                 <input name="leadId" type="hidden" value={leadId} />
                 <div className="space-y-2">
                   <Label htmlFor="lead-reassign-broker-panel" className="text-xs">Selecionar novo corretor</Label>
@@ -236,7 +249,7 @@ export function SupervisionPanel({
                 </Button>
               </form>
             ) : (
-              <form action={assume} className="space-y-4">
+              <form key={`${formKey}-assume-${assumeVersion}`} action={assume} className="space-y-4">
                 <input name="leadId" type="hidden" value={leadId} />
                 <div className="space-y-2">
                   <Label htmlFor="lead-investigation-reason-panel" className="text-xs">Motivo da investigação</Label>
