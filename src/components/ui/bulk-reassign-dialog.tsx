@@ -48,7 +48,7 @@ export function BulkReassignDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="outline"><UserSwitch className="size-4" /> Reatribuir</Button>} />
-      <DialogPopup className="sm:max-w-sm">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Reatribuir leads em lote</DialogTitle>
           <DialogDescription>

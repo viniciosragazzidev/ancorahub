@@ -191,7 +191,7 @@ export function QualifyingLeadActions({
       </Button>
 
       <Dialog open={openQueueDialog} onOpenChange={setOpenQueueDialog}>
-        <DialogPopup className="sm:max-w-md">
+        <DialogPopup key={openQueueDialog ? "open" : "closed"} className="sm:max-w-md">
           <DialogTitle>Alterar Fila de Destino</DialogTitle>
           <DialogDescription>
             Escolha a fila para onde o lead <strong>{leadName}</strong> será encaminhado assim que a qualificação for concluída.

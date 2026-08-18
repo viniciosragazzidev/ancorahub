@@ -67,7 +67,7 @@ export function LeadReminder({ leadId }: { leadId: string }) {
           </Button>
         }
       />
-      <DialogPopup className="sm:max-w-sm">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-sm">
         <DialogTitle>Agendar lembrete de retorno</DialogTitle>
         <DialogDescription>
           Crie uma tarefa para lembrar de retornar o contato com este lead.

@@ -79,7 +79,7 @@ export function ManualQualificationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="sm:max-w-md">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
         <DialogTitle className="flex items-center gap-2">
           <Sparkle className="size-5 text-primary" />
           Qualificar Lead Manualmente

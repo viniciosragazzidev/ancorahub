@@ -56,7 +56,7 @@ export function BulkStatusDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="outline">Alterar status</Button>} />
-      <DialogPopup className="sm:max-w-sm">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Alterar status em lote</DialogTitle>
           <DialogDescription>

@@ -113,7 +113,7 @@ function EditMemberDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="sm:max-w-lg">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-lg">
         <DialogTitle>Editar membro</DialogTitle>
         <DialogDescription>
           Atualize os dados, a filial e o papel operacional desse acesso.
@@ -263,7 +263,7 @@ function DeleteMemberDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="sm:max-w-md">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
         <DialogTitle>Excluir membro</DialogTitle>
         <DialogDescription>
           Essa ação remove o acesso desta empresa, a associação de equipe e as sessões ativas. O histórico operacional é preservado.
@@ -550,7 +550,7 @@ function TransferLeadsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="sm:max-w-md">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
         <DialogTitle>Transferir Leads em Lote</DialogTitle>
         <DialogDescription>
           Mova todos os leads sob responsabilidade de <strong>{member.name ?? member.email}</strong> para outro corretor ativo.

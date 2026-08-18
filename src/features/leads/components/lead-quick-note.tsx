@@ -45,7 +45,7 @@ export function LeadQuickNote({ leadId }: { leadId: string }) {
           </Button>
         }
       />
-      <DialogPopup className="sm:max-w-md">
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
         <DialogTitle>Adicionar nota ao lead</DialogTitle>
         <DialogDescription>
           Registre uma observação, follow-up ou informação relevante sobre este

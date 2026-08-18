@@ -52,7 +52,7 @@ export function LeadFeedbackDialog({ leadId, open, onOpenChange }: { leadId: str
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogPopup className="overflow-hidden p-0 sm:max-w-xl">
+    <DialogPopup key={open ? "open" : "closed"} className="overflow-hidden p-0 sm:max-w-xl">
       <DialogPanel className="gap-0">
         <div className="border-b border-border bg-primary/[0.04] px-5 py-4 sm:px-6">
           <div className="flex items-center gap-2 text-primary"><MagicWand className="size-4" /><span className="text-xs font-semibold uppercase tracking-[0.16em]">Memória do atendimento</span></div>

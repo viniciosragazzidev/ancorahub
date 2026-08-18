@@ -89,7 +89,7 @@ export function RegisterSalePanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup className="max-h-[min(90vh,48rem)] max-w-2xl overflow-y-auto">
+      <DialogPopup key={open ? "open" : "closed"} className="max-h-[min(90vh,48rem)] max-w-2xl overflow-y-auto">
         <DialogPanel className="space-y-6">
           <div className="space-y-1">
             <DialogTitle className="text-lg font-bold">Declarar Venda e Registrar Pós-Venda</DialogTitle>
