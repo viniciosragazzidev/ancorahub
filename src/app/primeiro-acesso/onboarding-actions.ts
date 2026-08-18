@@ -2,7 +2,7 @@
 
 import { randomUUID, createHash } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -124,17 +124,46 @@ export async function completeOnboardingAction(
         password: hashedPassword,
       });
 
-      // Create tenant membership
-      const membershipId = randomUUID();
-      await tx.insert(schema.tenantMemberships).values({
-        id: membershipId,
-        tenantId: invitation.tenantId,
-        userId,
-        branchId: invitation.branchId,
-        role: invitation.role,
-        jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
-        status: "active",
-      });
+      // Ensure preferred_experience_mode column exists
+      await tx.execute(
+        sql`ALTER TABLE "tenant_memberships" ADD COLUMN IF NOT EXISTS "preferred_experience_mode" text DEFAULT 'LIGHT' NOT NULL;`
+      ).catch(() => {});
+
+      // Upsert tenant membership
+      const [existingMembership] = await tx
+        .select({ id: schema.tenantMemberships.id })
+        .from(schema.tenantMemberships)
+        .where(
+          and(
+            eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+            eq(schema.tenantMemberships.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (existingMembership) {
+        await tx
+          .update(schema.tenantMemberships)
+          .set({
+            branchId: invitation.branchId,
+            role: invitation.role,
+            jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
+            status: "active",
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.tenantMemberships.id, existingMembership.id));
+      } else {
+        const membershipId = randomUUID();
+        await tx.insert(schema.tenantMemberships).values({
+          id: membershipId,
+          tenantId: invitation.tenantId,
+          userId,
+          branchId: invitation.branchId,
+          role: invitation.role,
+          jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
+          status: "active",
+        });
+      }
 
       // Update broker profile
       await tx
