@@ -32,6 +32,7 @@ import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions"
 import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 import { getPendingFeedbackCountAction } from "@/features/leads/feedback-queries";
 import { Badge } from "@/components/ui/badge";
+import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 
 type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey; requiresFeature?: boolean };
 
@@ -171,6 +172,11 @@ export function CorretorSidebar() {
               </span>
               <SignOut className="ml-auto size-4 shrink-0 text-sidebar-foreground/55 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
+            <div className="p-1">
+              <ExperienceModeToggle variant="menu-item" />
+            </div>
           </SidebarMenuItem>
           <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
             <SidebarMenuButton

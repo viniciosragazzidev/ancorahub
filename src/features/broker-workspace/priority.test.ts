@@ -41,7 +41,7 @@ describe("prioritizeBrokerWorkspace", () => {
       tasks: [task({ dueAt: new Date("2026-08-03T11:00:00.000Z") })],
     });
 
-    expect(result[0]).toMatchObject({ kind: "awaiting_response", href: "/conversas?leadId=lead-a" });
+    expect(result[0]).toMatchObject({ kind: "awaiting_response", href: "/leads/lead-a" });
   });
 
   it("orders overdue SLA before overdue tasks and respects the deadline in ties", () => {

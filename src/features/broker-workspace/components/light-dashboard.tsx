@@ -1,0 +1,172 @@
+"use client";
+
+import Link from "next/link";
+import { ArrowRight, CheckCircle, Clock, Lightning, Users } from "@/components/huge-icons";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
+import { cn } from "@/lib/utils";
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+export function LightDashboard({ data }: { data: BrokerWorkspaceData }) {
+  const firstName = data.viewer.name.split(" ")[0] || "Corretor";
+  const greeting = getGreeting();
+
+  const awaitingResponse = data.today.awaitingResponse;
+  const inService = data.queue.filter((q) => q.status === "in_contact").length;
+  const pendingUpdate = data.today.returnsDue + data.today.overdueTasks;
+
+  const hasActionableItems = data.queue.length > 0 || Boolean(data.nextAction);
+
+  return (
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+      {/* Header bar for Light Mode */}
+      <header className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Modo Light</span>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {greeting}, {firstName}
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExperienceModeToggle variant="badge" />
+        </div>
+      </header>
+
+      {/* Primary Question: Tenho algo para fazer agora? */}
+      <section aria-label="Resumo do dia" className="space-y-4">
+        <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-xs sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Tenho algo para fazer agora?</p>
+          
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Aguardando resposta</span>
+                <Badge variant={awaitingResponse > 0 ? "warning" : "outline"} className="text-[11px] font-bold">
+                  {awaitingResponse}
+                </Badge>
+              </div>
+              <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{awaitingResponse}</strong>
+              <p className="mt-1 text-[11px] text-muted-foreground">Leads com nova mensagem</p>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Em atendimento</span>
+                <Badge variant="outline" className="text-[11px] font-bold">
+                  {inService}
+                </Badge>
+              </div>
+              <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{inService}</strong>
+              <p className="mt-1 text-[11px] text-muted-foreground">Em negociação ativa</p>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Aguardando atualização</span>
+                <Badge variant={pendingUpdate > 0 ? "destructive" : "outline"} className="text-[11px] font-bold">
+                  {pendingUpdate}
+                </Badge>
+              </div>
+              <strong className="mt-2 block text-3xl font-bold tabular-nums text-foreground">{pendingUpdate}</strong>
+              <p className="mt-1 text-[11px] text-muted-foreground">Tarefas e retornos pendentes</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Link
+              href="/minha-fila?filter=awaiting"
+              className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto font-semibold gap-2 shadow-sm")}
+            >
+              <Lightning className="size-4" />
+              VER LEADS AGUARDANDO
+              <ArrowRight className="size-4" />
+            </Link>
+            <Link
+              href="/minha-fila"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full sm:w-auto font-medium")}
+            >
+              Ver meus leads
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Próximas Ações */}
+      <section aria-label="Próximas ações" className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">Próximas ações</h2>
+
+        {hasActionableItems ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {data.queue.slice(0, 4).map((item) => {
+              const nextKind = item.nextAction?.kind;
+              const isNew = item.status === "distributed" || nextKind === "new_lead";
+              const isAwaiting = nextKind === "awaiting_response";
+              const isOverdue = nextKind === "task_overdue" || nextKind === "sla_overdue";
+              const summaryText = item.nextAction?.description || (item.status === "distributed" ? "Novo lead aguardando aceite" : "Em atendimento");
+
+              return (
+                <Card key={item.id} variant="subtle" className="flex flex-col justify-between p-4 bg-card/95 hover:border-primary/30 transition-colors">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge
+                        variant={isNew ? "warning" : isOverdue ? "destructive" : "secondary"}
+                        className="text-[10px] font-semibold"
+                      >
+                        {isNew ? "Novo lead" : isAwaiting ? "Aguardando sua resposta" : isOverdue ? "Atualização pendente" : "Em atendimento"}
+                      </Badge>
+                    </div>
+                    <h3 className="text-base font-semibold text-foreground truncate">{item.name}</h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{summaryText}</p>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Clock className="size-3" />
+                      {isNew ? "Aguardando aceite" : "Atualizar hoje"}
+                    </span>
+                    <Button
+                      size="sm"
+                      render={<Link href={`/leads/${item.id}`} />}
+                      className="h-8 px-3 text-xs font-semibold gap-1"
+                    >
+                      {isNew ? "ABRIR" : "ATUALIZAR"}
+                      <ArrowRight className="size-3.5" />
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          /* Estado Vazio Tranquilo - Sem confete, sem exagero */
+          <Card variant="subtle" className="flex flex-col items-center justify-center p-8 text-center bg-card/95 border-dashed">
+            <div className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary">
+              <CheckCircle className="size-6" />
+            </div>
+            <h3 className="mt-3 text-base font-semibold text-foreground">Tudo certo por aqui</h3>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground leading-relaxed">
+              Você não tem nenhuma ação pendente no momento. Assim que receber um novo lead, ele aparecerá aqui.
+            </p>
+            <div className="mt-4">
+              <Link
+                href="/minha-fila"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs font-medium")}
+              >
+                Ver todos os meus leads
+              </Link>
+            </div>
+          </Card>
+        )}
+      </section>
+    </div>
+  );
+}

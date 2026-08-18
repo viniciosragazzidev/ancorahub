@@ -8,10 +8,13 @@ import { getDatabase, schema } from "@/shared/db";
 import { BrokerQueueClient } from "./_components/queue-client";
 import { BrokerAvailabilityButton } from "./_components/broker-availability";
 import { Sparkline } from "./_components/sparkline";
-import { ChatCircleText, ClipboardText, ListChecks, Target, Users, Warning, XCircle, ChartLineUp } from "@/components/huge-icons";
+import { ChatCircleText, ClipboardText, ListChecks, Target, Users, Warning, XCircle, ChartLineUp, ArrowRight } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
 
 const activeLeadStatuses = [
   "new",
@@ -28,6 +31,7 @@ export const dynamic = "force-dynamic";
 export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const experienceMode = await getExperienceMode(context);
 
   // ─── Availability Status ───
   const [membership] = await db
@@ -216,6 +220,18 @@ export default async function MinhaFilaPage() {
     (t) => t.dueAt && t.dueAt.getTime() < Date.now(),
   ).length;
 
+  if (experienceMode === "LIGHT") {
+    const lightLeads: LightLeadItem[] = leads.map((l) => ({
+      id: l.id,
+      name: l.name,
+      phone: l.phone,
+      status: l.status,
+      createdAt: l.createdAt,
+      updatedAt: l.stageEnteredAt,
+    }));
+    return <LightLeadsList leads={lightLeads} />;
+  }
+
   const enrichedLeads = leads.map((lead) => ({
     ...lead,
     lastInteractionAt: latestInteraction.get(lead.id) ?? null,
@@ -391,7 +407,7 @@ export default async function MinhaFilaPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {leadsNeedingResponse.slice(0, 4).map((lead) => (
-                <Link key={lead.id} href={`/conversas?leadId=${lead.id}`} className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
+                <Link key={lead.id} href={`/leads/${lead.id}`} className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
                   <span className="size-1.5 shrink-0 rounded-full bg-accent" />
                   <span className="min-w-0 flex-1 truncate text-xs font-medium group-hover:text-primary">{lead.name}</span>
                 </Link>
@@ -399,8 +415,8 @@ export default async function MinhaFilaPage() {
               {!leadsNeedingResponse.length && (
                 <p className="px-2 py-3 text-center text-xs text-muted-foreground">Todas as conversas em dia.</p>
               )}
-              <Button className="w-full" render={<Link href="/conversas" />} size="sm" variant="ghost">
-                Abrir conversas <ChatCircleText className="ml-1 size-3.5" />
+              <Button className="w-full" render={<Link href="/leads" />} size="sm" variant="ghost">
+                Ver meus leads <ArrowRight className="ml-1 size-3.5" />
               </Button>
             </CardContent>
           </Card>

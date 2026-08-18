@@ -12,6 +12,7 @@ describe("lead distribution jobs", () => {
   it("keeps operational waits recoverable instead of consuming attempts", () => {
     expect(isDeferredDistributionReason("Nenhum corretor elegível nesta unidade.")).toBe(true);
     expect(isDeferredDistributionReason("A fila está em modo manual.")).toBe(true);
+    expect(isDeferredDistributionReason("O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído.")).toBe(true);
     expect(isDeferredDistributionReason("Falha de conexão inesperada.")).toBe(false);
   });
 });

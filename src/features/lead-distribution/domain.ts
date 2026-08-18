@@ -79,7 +79,18 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
 
 export function isDeferredDistributionReason(reason: string) {
   const normalized = reason.toLocaleLowerCase("pt-BR");
-  return normalized.includes("nenhum corretor") || normalized.includes("atingiram a capacity") || normalized.includes("modo manual") || normalized.includes("desativada") || normalized.includes("pausada") || normalized.includes("fila configurada pertence") || normalized.includes("nenhuma unidade elegível") || normalized.includes("fila geral não possui unidades");
+  return (
+    normalized.includes("nenhum corretor") ||
+    normalized.includes("atingiram a capacity") ||
+    normalized.includes("modo manual") ||
+    normalized.includes("desativada") ||
+    normalized.includes("pausada") ||
+    normalized.includes("fila configurada pertence") ||
+    normalized.includes("nenhuma unidade elegível") ||
+    normalized.includes("fila geral não possui unidades") ||
+    normalized.includes("qualificação por ia") ||
+    normalized.includes("qualificação em andamento")
+  );
 }
 
 /**

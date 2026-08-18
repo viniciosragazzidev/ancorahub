@@ -355,8 +355,19 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
 export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Você não pode executar a distribuição automática.");
   const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, queueId: schema.leads.queueId, webhookCredentialId: schema.leads.webhookCredentialId, qualificationProfileKey: schema.leads.qualificationProfileKey }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.distributionStatus, "queued"))).limit(1);
+  const [lead] = await db.select({
+    id: schema.leads.id,
+    branchId: schema.leads.branchId,
+    queueId: schema.leads.queueId,
+    webhookCredentialId: schema.leads.webhookCredentialId,
+    qualificationProfileKey: schema.leads.qualificationProfileKey,
+    qualificationState: schema.leads.qualificationState,
+    qualificationStatus: schema.leads.qualificationStatus,
+  }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.distributionStatus, "queued"))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
+    return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
+  }
   const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) return { status: "queued", leadId, reason: "A fila configurada não está ativa." };
   if (queue?.mode === "manual") return { status: "queued", leadId, reason: "A fila está em modo manual." };

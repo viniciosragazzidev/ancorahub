@@ -46,4 +46,5 @@ public/downloads/
 # Temporary reference repos & build artifacts
 /temp_deskcomm_crm/
 /tmp/
+/graphify-out/
 

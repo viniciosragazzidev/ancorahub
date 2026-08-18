@@ -105,7 +105,7 @@ export function BrokerWorkspace({
 
         <section aria-labelledby="today-title" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-onboarding="sla-indicator">
           <h2 className="sr-only" id="today-title">Meu dia</h2>
-          <TodayLink count={data.today.awaitingResponse} href="/conversas" icon={ChatCircleText} label="Conversas aguardando" tone="warning" />
+          <TodayLink count={data.today.awaitingResponse} href="/minha-fila" icon={ChatCircleText} label="Conversas aguardando" tone="warning" />
           <TodayLink count={data.today.overdueTasks} href="/tarefas?attention=overdue" icon={Warning} label="Tarefas vencidas" tone="critical" />
           <TodayLink count={data.today.returnsDue} href="/tarefas" icon={CalendarCheck} label="Retornos em 24 horas" tone="normal" />
           <TodayLink count={data.today.newLeads} href="/minha-fila" icon={Lightning} label="Novos leads" tone="warning" />

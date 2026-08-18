@@ -7,6 +7,9 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
 import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardData, getMarketingDashboardData } from "./data";
 
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
+
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
@@ -29,6 +32,12 @@ export default async function DashboardPage({
   if (context.role === "manager") {
     return <NocDashboardContent role="manager" data={await getManagerDashboardData(period)} period={period} />;
   }
+
+  const mode = await getExperienceMode(context);
+  if (mode === "LIGHT") {
+    return <LightDashboard data={await getBrokerWorkspaceData()} />;
+  }
+
   if ((await isBrokerWorkspaceEnabled()) && await isCleanUiOperationalEnabled(context.tenantId)) {
     return <BrokerWorkspace data={await getBrokerWorkspaceData()} />;
   }

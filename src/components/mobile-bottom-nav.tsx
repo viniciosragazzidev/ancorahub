@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
-  ChatCircleText,
-  ClipboardText,
+  House,
+  ListChecks,
   MoreHorizontalIcon,
   Users,
 } from "@/components/huge-icons";
@@ -13,8 +13,8 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { label: "Leads", href: "/leads", icon: Users },
-  { label: "Tarefas", href: "/tarefas", icon: ClipboardText },
+  { label: "Início", href: "/dashboard", icon: House },
+  { label: "Meus Leads", href: "/minha-fila", icon: ListChecks },
 ] as const;
 
 export function MobileBottomNav() {

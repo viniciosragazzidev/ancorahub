@@ -6,19 +6,21 @@ import { GlobalSearch } from "@/components/global-search";
 import { NotificationPopover } from "@/components/notification-popover";
 import { AnimatedPageTitle } from "@/components/motion/animated-page-title";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-
+import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { HelpCircle } from "lucide-react";
 
 type DashboardHeaderProps = {
   breadcrumb: string;
   title: string;
   rightSlot?: React.ReactNode;
+  showModeToggle?: boolean;
 };
 
 export function DashboardHeader({
   breadcrumb,
   title,
   rightSlot,
+  showModeToggle = true,
 }: DashboardHeaderProps) {
   return (
     <header
@@ -36,6 +38,7 @@ export function DashboardHeader({
             {rightSlot}
           </div>
         ) : null}
+        {showModeToggle ? <div className="max-[559px]:hidden"><ExperienceModeToggle variant="pill" /></div> : null}
         <div className="max-[559px]:hidden"><GlobalSearch /></div>
         <div className="max-[559px]:hidden"><ThemeToggle /></div>
         <Button

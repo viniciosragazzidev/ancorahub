@@ -82,7 +82,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else setOpen(true); }}>
-      <DialogTrigger render={<Button><UserPlus weight="bold" /> Novo Funcionário</Button>} />
+      <DialogTrigger render={<Button aria-label="Novo Funcionário"><UserPlus weight="bold" /><span className="max-[559px]:hidden">Novo Funcionário</span></Button>} />
       <DialogPopup className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
         {createdLink ? (
           <div className="space-y-4 pt-2">

@@ -18,6 +18,8 @@ import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-prov
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
 
+import { hasPermission } from "@/shared/auth/permissions";
+
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
   try {
@@ -26,6 +28,14 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     if (error instanceof AuthenticationError) redirect("/login");
     if (error instanceof AuthorizationError) redirect("/access-denied");
     throw error;
+  }
+
+  if (!hasPermission(context.role, "acessar_conversas")) {
+    const headersList = await headers();
+    const pathname = headersList.get("x-pathname") || "";
+    if (pathname === "/conversas" || pathname.startsWith("/conversas/")) {
+      redirect("/minha-fila");
+    }
   }
 
   if (context.jobTitle === "marketing") {

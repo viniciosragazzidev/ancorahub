@@ -16,10 +16,13 @@ import { LeadChat } from "@/features/leads/components/lead-chat";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { getLeadTimeline } from "@/features/leads/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { StartServiceButton } from "./start-service-button";
 import { SupervisionPanel } from "./supervision-panel";
 import { DeleteLeadControl } from "./delete-lead-control";
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
@@ -117,6 +120,35 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   if (!lead) notFound();
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
+
+  if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+    const [brokerUser] = await db
+      .select({ name: schema.user.name })
+      .from(schema.user)
+      .where(eq(schema.user.id, context.userId))
+      .limit(1);
+
+    const lightLead: LightLeadDetailData = {
+      id: lead.id,
+      nome: lead.nome,
+      telefone: lead.telefone,
+      email: lead.email,
+      status: lead.status,
+      qualificationStatus: lead.qualificationStatus,
+      qualificationState: lead.qualificationState,
+      corretorId: lead.corretorId,
+      corretorNome: lead.corretorNome,
+      branchName: lead.branchNome,
+      summary: qualificationDetails?.resumoAtendimento || qualificationDetails?.resumoNecessidade || null,
+      livesCount: qualificationDetails?.qtdVidas ? Number(qualificationDetails.qtdVidas) : null,
+      urgency: qualificationDetails?.urgenciaContratacao || null,
+      city: qualificationDetails?.cidade || null,
+      createdAt: lead.createdAt,
+      isCurrentBroker: lead.corretorId === context.userId,
+    };
+
+    return <LightLeadDetail lead={lightLead} brokerName={brokerUser?.name || "Corretor"} />;
+  }
   const formData = readFormData(lead.formData);
   const slaMinutes = Number((await getDatabase().select({ minutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1))[0]?.minutes ?? 15);
   const elapsedMinutes = Math.max(0, Math.round((getCurrentTimestamp() - lead.stageEnteredAt.getTime()) / 60000));
@@ -200,10 +232,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
               {/* Quick Header Actions */}
               <div id="lead-actions" className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}`} />} variant="outline">
-                  <ChatCircleText className="size-3.5 text-primary" />
-                  Conversas
-                </Button>
+                {hasPermission(context.role, "acessar_conversas") ? (
+                  <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}`} />} variant="outline">
+                    <ChatCircleText className="size-3.5 text-primary" />
+                    Conversas
+                  </Button>
+                ) : null}
                 {lead.status !== "distributed" && lead.qualificationState !== "QUALIFIED" && (!lead.qualificationStatus || ["pending", "qualifying"].includes(lead.qualificationStatus)) ? (
                   <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
                 ) : null}
@@ -357,6 +391,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     isOwner={context.userId === lead.corretorId}
                     phone={canSeePersonalData ? lead.telefone : null}
                     canSeePersonalData={canSeePersonalData}
+                    canAccessConversas={hasPermission(context.role, "acessar_conversas")}
                     showFeedback={context.role === "broker" && context.userId === lead.corretorId && lead.status !== "lost" && lead.status !== "converted"}
                   />
                 )}
@@ -455,7 +490,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
                   <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
                 </div>
-                <LeadChat leadId={lead.id} phone={canSeePersonalData ? lead.telefone : null} />
+                {hasPermission(context.role, "acessar_conversas") ? (
+                  <LeadChat leadId={lead.id} phone={canSeePersonalData ? lead.telefone : null} />
+                ) : null}
               </TabsContent>
 
               <TabsContent value="documents" className="mt-4">

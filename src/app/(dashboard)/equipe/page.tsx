@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { ShieldCheck } from "@/components/huge-icons";
 import { StatCard } from "@/components/dashboard/metric-card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -167,7 +168,7 @@ export default async function TeamPage() {
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe"
-        rightSlot={<div className="flex items-center gap-2">{context.role === "director" ? <Button render={<Link href="/equipe/cargos" />} variant="outline">Cargos e permissões</Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} /></div>}
+        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} /></div>}
       />
       <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
@@ -181,7 +182,7 @@ export default async function TeamPage() {
           </p>
         </section>
         */}
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
           <StatCard label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
           <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />

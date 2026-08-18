@@ -4,6 +4,7 @@ import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getVpsHealth } from "@/lib/server/vps-api";
 import { getDatabase, schema } from "@/shared/db";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function SuperDevIntegrityPage() {
   const db = getDatabase();
 
-  const [auditLogs, tenantCount, leadCount] = await Promise.all([
+  const [auditLogs, tenantCount, leadCount, vpsHealth] = await Promise.all([
     db
       .select({
         id: schema.auditLogs.id,
@@ -26,6 +27,7 @@ export default async function SuperDevIntegrityPage() {
       .limit(50),
     db.select({ count: count() }).from(schema.tenants),
     db.select({ count: count() }).from(schema.leads),
+    getVpsHealth(),
   ]);
 
   const actionLabels: Record<string, string> = {
@@ -79,6 +81,34 @@ export default async function SuperDevIntegrityPage() {
             </CardContent>
           </Card>
         </section>
+
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Infraestrutura VPS</CardTitle>
+              <CardDescription>Conexão privada Vercel → Caddy → Fastify</CardDescription>
+            </div>
+            <Badge variant={vpsHealth.status === "online" ? "success" : "destructive"} className="gap-1.5">
+              <span aria-hidden className={vpsHealth.status === "online" ? "size-1.5 rounded-full bg-success-foreground" : "size-1.5 rounded-full bg-destructive-foreground"} />
+              {vpsHealth.status === "online" ? "Online" : "Indisponível"}
+            </Badge>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+            {vpsHealth.status === "online" ? (
+              <>
+                <p><span className="font-medium text-foreground">Fastify:</span> OK</p>
+                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(vpsHealth.checkedAt))}</p>
+                <p><span className="font-medium text-foreground">Latência:</span> {vpsHealth.latencyMs} ms</p>
+              </>
+            ) : (
+              <>
+                <p><span className="font-medium text-foreground">Último erro:</span> {vpsHealth.errorCode.toUpperCase()}</p>
+                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(vpsHealth.checkedAt))}</p>
+                <p><span className="font-medium text-foreground">Latência:</span> {vpsHealth.latencyMs} ms</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Audit Logs */}
         <Card className="border-transparent bg-transparent shadow-none">

@@ -14,13 +14,13 @@ import { InlineFeedbackForm } from "@/app/(dashboard)/leads/[id]/inline-feedback
 
 
 type NextTask = { title: string; dueAt: string | null; priority: "low" | "normal" | "urgent"; assigneeName: string | null };
-type LeadActionHubProps = { leadId: string; status: string; currentOwner: string | null; hasPendingDocuments: boolean; nextTask: NextTask | null; isOwner: boolean; phone: string | null; canSeePersonalData: boolean; showFeedback?: boolean };
+type LeadActionHubProps = { leadId: string; status: string; currentOwner: string | null; hasPendingDocuments: boolean; nextTask: NextTask | null; isOwner: boolean; phone: string | null; canSeePersonalData: boolean; showFeedback?: boolean; canAccessConversas?: boolean };
 type Action = { href: string; label: string; icon: typeof FileText };
 
 function getCurrentTimestamp() { return Date.now(); }
-function getFallbackAction({ leadId, status, hasPendingDocuments }: Pick<LeadActionHubProps, "leadId" | "status" | "hasPendingDocuments">): Action {
+function getFallbackAction({ leadId, status, hasPendingDocuments, canAccessConversas = false }: Pick<LeadActionHubProps, "leadId" | "status" | "hasPendingDocuments" | "canAccessConversas">): Action {
   if (hasPendingDocuments) return { href: "#documentos", label: "Revisar documentos", icon: FileText };
-  if (status === "distributed" || status === "new") return { href: "#lead-actions", label: "Ver ação do atendimento", icon: ChatCircleText };
+  if (status === "distributed" || status === "new" || !canAccessConversas) return { href: "#lead-actions", label: "Ver ação do atendimento", icon: ChatCircleText };
   if (status === "converted") return { href: "/clientes", label: "Acompanhar cliente", icon: CheckCircle };
   return { href: "/conversas?leadId=" + leadId, label: "Abrir conversa", icon: ChatCircleText };
 }
@@ -32,13 +32,13 @@ function formatDueAt(value: string | null) {
   return date.getTime() < Date.now() ? "Vencida em " + formatted : "Até " + formatted;
 }
 
-export function LeadActionHub({ leadId, status, currentOwner, hasPendingDocuments, nextTask, isOwner, phone, canSeePersonalData, showFeedback = false }: LeadActionHubProps) {
+export function LeadActionHub({ leadId, status, currentOwner, hasPendingDocuments, nextTask, isOwner, phone, canSeePersonalData, showFeedback = false, canAccessConversas = false }: LeadActionHubProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackDone, setFeedbackDone] = useState(false);
 
   if (!isOwner) return null;
 
-  const fallbackAction = getFallbackAction({ leadId, status, hasPendingDocuments });
+  const fallbackAction = getFallbackAction({ leadId, status, hasPendingDocuments, canAccessConversas });
   const primaryAction: Action = nextTask ? { href: "/tarefas?leadId=" + leadId, label: "Abrir tarefa", icon: ListChecks } : fallbackAction;
   const Icon = primaryAction.icon;
   const isOverdue = Boolean(nextTask?.dueAt && new Date(nextTask.dueAt).getTime() < getCurrentTimestamp());
@@ -76,7 +76,7 @@ export function LeadActionHub({ leadId, status, currentOwner, hasPendingDocument
       <nav aria-label="Atalhos do lead" className="mt-3 flex flex-wrap gap-2">
         {canSeePersonalData && phone ? <Button className="h-8 px-2.5 text-xs" render={<a href={`tel:${phone.replace(/\D/g, "")}`} />} size="sm" variant="outline"><Phone className="size-4" /> Ligar</Button> : null}
         {canSeePersonalData && phone ? <Button className="h-8 px-2.5 text-xs" render={<a href={`https://wa.me/${phone.replace(/\D/g, "")}`} rel="noreferrer" target="_blank" />} size="sm" variant="outline"><WhatsappLogo className="size-4" /> WhatsApp</Button> : null}
-        <Button className="h-8 px-2.5 text-xs" render={<Link href={"/conversas?leadId=" + leadId} />} size="sm" variant="outline"><ChatCircleText className="size-4" /> Conversar</Button>
+        {canAccessConversas ? <Button className="h-8 px-2.5 text-xs" render={<Link href={"/conversas?leadId=" + leadId} />} size="sm" variant="outline"><ChatCircleText className="size-4" /> Conversar</Button> : null}
         <LeadQuickNote leadId={leadId} />
         <Button className="h-8 px-2.5 text-xs" render={<Link href={"/tarefas?leadId=" + leadId} />} size="sm" variant="outline"><ListChecks className="size-4" /> Tarefas</Button>
         <LeadReminder leadId={leadId} />

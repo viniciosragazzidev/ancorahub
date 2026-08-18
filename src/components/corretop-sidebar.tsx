@@ -30,6 +30,7 @@ import {
   UserCircle,
   WifiHigh,
 } from "@/components/huge-icons";
+import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { AncoraLogo } from "@/components/ancora-logo";
 import {
   DropdownMenu,
@@ -378,6 +379,10 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     Configurações
                   </DropdownMenuItem>
                 ) : null}
+                <DropdownMenuSeparator />
+                <div className="px-1 py-1">
+                  <ExperienceModeToggle variant="menu-item" />
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={handleLogout}>
                   <SignOut className="size-4" />

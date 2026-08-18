@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 
@@ -12,6 +13,7 @@ import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
+import { hasPermission } from "@/shared/auth/permissions";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
 export const dynamic = "force-dynamic";
@@ -20,15 +22,16 @@ export const maxDuration = 300;
 export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ leadId?: string; tab?: string }> }) {
   const { leadId, tab } = await searchParams;
   const context = await getRequiredTenantContext();
+  if (!hasPermission(context.role, "acessar_conversas")) {
+    redirect("/minha-fila");
+  }
   const db = getDatabase();
 
   const isDirector = context.role === "director";
   const officialBrokerTab = isDirector && tab === "corretores";
-  const scope = context.role === "broker"
-    ? eq(schema.leads.corretorId, context.userId)
-    : context.role === "manager" && context.branchId
-      ? eq(schema.leads.branchId, context.branchId)
-      : undefined;
+  const scope = context.role === "manager" && context.branchId
+    ? eq(schema.leads.branchId, context.branchId)
+    : undefined;
 
   const [leads, branches] = await Promise.all([
     db

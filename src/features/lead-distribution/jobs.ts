@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -82,6 +82,8 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
     .where(and(
       eq(schema.leads.distributionStatus, "queued"),
       isNull(schema.leads.corretorId),
+      ne(schema.leads.qualificationState, "IN_PROGRESS"),
+      ne(schema.leads.qualificationStatus, "qualifying"),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
     ))

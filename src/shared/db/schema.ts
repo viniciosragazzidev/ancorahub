@@ -2410,6 +2410,7 @@ export const tenantMemberships = pgTable(
     customRoleId: text("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     status: membershipStatus("status").notNull().default("active"),
     availabilityStatus: availabilityStatus("availability_status").notNull().default("available"),
+    preferredExperienceMode: text("preferred_experience_mode").notNull().default("LIGHT"),
     onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
     createdAt,
     updatedAt,

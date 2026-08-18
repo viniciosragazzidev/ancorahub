@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadTimeline } from "@/features/leads/components/lead-timeline";
 import { getLeadTimeline } from "@/features/leads/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { Phone, Clock, Buildings, CalendarCheck, ShieldCheck, FileText, CurrencyCircleDollar, ArrowRight } from "@/components/huge-icons";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -218,11 +219,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                   : "Acompanhe as apólices, tarefas de relacionamento e histórico comercial deste cliente."}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button size="sm" className="h-9 px-4 text-xs font-semibold gap-1.5" render={<Link href={`/conversas?leadId=${client.leadId}`} />}>
-                Enviar Mensagem Pós-Venda <ArrowRight className="size-4" />
-              </Button>
-            </div>
+            {hasPermission(context.role, "acessar_conversas") ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" className="h-9 px-4 text-xs font-semibold gap-1.5" render={<Link href={`/conversas?leadId=${client.leadId}`} />}>
+                  Enviar Mensagem Pós-Venda <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            ) : null}
           </div>
         </Card>
 

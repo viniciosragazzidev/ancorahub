@@ -28,6 +28,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { BulkStatusDialog } from "@/components/ui/bulk-status-dialog";
 import { BulkReassignDialog } from "@/components/ui/bulk-reassign-dialog";
+import { hasPermission } from "@/shared/auth/permissions";
+import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
@@ -929,15 +931,17 @@ export function LeadsWorkspace({
                       />
                     ) : (
                       <>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className={cn("grid gap-2", hasPermission(contextRole, "acessar_conversas") ? "grid-cols-2" : "grid-cols-1")}>
                           <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />}>
                             <ArrowUpRight />
                             Abrir atendimento
                           </Button>
-                          <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />} variant="outline">
-                            <ChatCircleText />
-                            Conversas
-                          </Button>
+                          {hasPermission(contextRole, "acessar_conversas") ? (
+                            <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />} variant="outline">
+                              <ChatCircleText />
+                              Conversas
+                            </Button>
+                          ) : null}
                         </div>
                         {canCall ? (
                           <div className="grid grid-cols-2 gap-2">

@@ -97,7 +97,7 @@ function addLeadPriority(
     referenceAt,
     title: lead.name,
     description,
-    href: isConversation ? `/conversas?leadId=${lead.id}` : `/leads/${lead.id}`,
+    href: `/leads/${lead.id}`,
   });
 }
 
