@@ -471,15 +471,14 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
         )}
       </Card>
 
-      {/* ── Pessoas da Contratação + Dados Organizados (side by side) ── */}
+      {/* ── Pessoas da Contratação + Dados Organizados ──────────────────── */}
       {!isDistributed && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-<BeneficiariesSection
-          leadId={lead.id}
-          contactName={lead.nome}
-          initialBeneficiaries={lead.beneficiaries || []}
-          livesCount={lead.livesCount}
-        />
+        <div className="space-y-5">
+          <BeneficiariesSection
+            leadId={lead.id}
+            contactName={lead.nome}
+            initialBeneficiaries={lead.beneficiaries || []}
+          />
           <PersonRecordDetails
             kind="lead"
             createdAt={new Date(lead.createdAt)}

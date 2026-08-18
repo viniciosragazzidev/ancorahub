@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addLeadBeneficiaryAction, removeLeadBeneficiaryAction } from "@/features/post-sale/actions";
-import { updateLeadLivesCountAction } from "@/features/leads/actions";
 
 type Beneficiary = {
   id: string;
@@ -42,12 +41,10 @@ export function BeneficiariesSection({
   leadId,
   contactName,
   initialBeneficiaries,
-  livesCount: initialLivesCount,
 }: {
   leadId: string;
   contactName: string;
   initialBeneficiaries: Beneficiary[];
-  livesCount?: number | null;
 }) {
   const [beneficiaries, setBeneficiaries] = useState(initialBeneficiaries);
   const [pending, startTransition] = useTransition();
@@ -55,10 +52,6 @@ export function BeneficiariesSection({
   const [birthDate, setBirthDate] = useState("");
   const [relationship, setRelationship] = useState<Relationship>("filho");
   const [beneficiaryToDelete, setBeneficiaryToDelete] = useState<Beneficiary | null>(null);
-  const [livesCount, setLivesCount] = useState<number>(
-    initialLivesCount && initialLivesCount > 0 ? initialLivesCount : 1,
-  );
-  const [updatingLives, startLivesTransition] = useTransition();
 
   const holder = beneficiaries.find((beneficiary) => beneficiary.isHolder);
   const isCompletingHolder = !holder;
@@ -112,31 +105,6 @@ export function BeneficiariesSection({
     });
   }
 
-  function handleUpdateLives(newCount: number) {
-    if (updatingLives || newCount < 1 || newCount > 100) return;
-    const previous = livesCount;
-    setLivesCount(newCount);
-
-    const formData = new FormData();
-    formData.append("leadId", leadId);
-    formData.append("livesCount", String(newCount));
-
-    startLivesTransition(async () => {
-      try {
-        const res = await updateLeadLivesCountAction({}, formData);
-        if (!res.success) {
-          setLivesCount(previous);
-          toast.error(res.error ?? "Não foi possível atualizar a quantidade de vidas.");
-          return;
-        }
-        toast.success(`Quantidade de vidas atualizada para ${newCount}.`);
-      } catch {
-        setLivesCount(previous);
-        toast.error("Não foi possível atualizar no momento.");
-      }
-    });
-  }
-
   return (
     <Card className="border-border bg-card shadow-none">
       <CardHeader className="gap-1">
@@ -146,40 +114,6 @@ export function BeneficiariesSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {initialLivesCount !== undefined && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Quantidade de vidas</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Total de pessoas na contratação</p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={livesCount <= 1 || updatingLives}
-                onClick={() => handleUpdateLives(livesCount - 1)}
-                className="flex size-7 cursor-pointer items-center justify-center rounded-md border border-border/80 bg-card text-xs font-bold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                title="Diminuir vidas"
-                aria-label="Diminuir vidas"
-              >
-                -
-              </button>
-              <span className="min-w-[44px] text-center text-sm font-bold">
-                {livesCount} {livesCount === 1 ? "vida" : "vidas"}
-              </span>
-              <button
-                type="button"
-                disabled={livesCount >= 100 || updatingLives}
-                onClick={() => handleUpdateLives(livesCount + 1)}
-                className="flex size-7 cursor-pointer items-center justify-center rounded-md border border-border/80 bg-card text-xs font-bold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                title="Aumentar vidas"
-                aria-label="Aumentar vidas"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
           {isCompletingHolder ? (
             <div className="flex items-start justify-between gap-3 bg-muted/30 px-3 py-3 text-sm">
