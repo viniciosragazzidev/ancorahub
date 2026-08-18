@@ -12,6 +12,7 @@ import {
   Clock,
   FileText,
   Phone,
+  Share,
   Sparkle,
   Users,
   WhatsappLogo,
@@ -34,6 +35,8 @@ import { updateLeadLivesCountAction } from "@/features/leads/actions";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
+import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
+import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 
 export type LightLeadDetailData = {
   id: string;
@@ -54,6 +57,18 @@ export type LightLeadDetailData = {
   summary?: string | null;
   createdAt: Date | string;
   isCurrentBroker: boolean;
+  tipo?: string | null;
+  origem?: string | null;
+  sourceCampaign?: string | null;
+  beneficiaries?: Array<{
+    id: string;
+    name: string;
+    birthDate: string;
+    relationship: string;
+    isHolder: boolean;
+  }>;
+  formData?: Record<string, string | null> | null;
+  consentimentoLgpd?: boolean;
 };
 
 const DECLINE_REASONS = [
@@ -67,7 +82,6 @@ const DECLINE_REASONS = [
 const STEP_OPTIONS = [
   { id: "quote_sent", label: "Cotação enviada", description: "Cotação enviada para o cliente", targetStatus: "quote_sent" },
   { id: "negotiation", label: "Em negociação", description: "Negociando condições da proposta", targetStatus: "negotiation" },
-  { id: "converted", label: "Venda realizada", description: "Cliente confirmou a contratação", targetStatus: "converted" },
   { id: "no_interest", label: "Sem interesse", description: "Cliente optou por não seguir", targetStatus: "lost" },
   { id: "no_contact", label: "Não consegui contato", description: "Sem retorno após tentativas", targetStatus: "lost" },
 ];
@@ -88,7 +102,6 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   const [followupOption, setFollowupOption] = useState<string>("tomorrow");
   const [observation, setObservation] = useState<string>("");
   const [lossReason, setLossReason] = useState<string>("Preço");
-  const [showSaleConfirm, setShowSaleConfirm] = useState(false);
   const [saleSuccessAnim, setSaleSuccessAnim] = useState(false);
   const [updatingStep, startUpdateTransition] = useTransition();
 
@@ -126,17 +139,14 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   function handleOpenUpdateModal() {
     if (leadStatus === "in_contact") setSelectedStep("quote_sent");
     else if (leadStatus === "quote_sent") setSelectedStep("negotiation");
-    else if (leadStatus === "negotiation") setSelectedStep("converted");
     else setSelectedStep("quote_sent");
 
     setObservation("");
-    setShowSaleConfirm(false);
     setShowUpdateSheet(true);
   }
 
   function resetStepDialog() {
     setShowUpdateSheet(false);
-    setShowSaleConfirm(false);
     setObservation("");
   }
 
@@ -221,11 +231,6 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   function handleSaveStep() {
     if (updatingStep) return;
 
-    if (selectedStep === "converted" && !showSaleConfirm) {
-      setShowSaleConfirm(true);
-      return;
-    }
-
     const stepInfo = STEP_OPTIONS.find(s => s.id === selectedStep);
     const targetStatus = stepInfo?.targetStatus || "in_contact";
 
@@ -259,15 +264,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
         }
 
         setLeadStatus(targetStatus);
-        
-        if (targetStatus === "converted") {
-          setSaleSuccessAnim(true);
-          toast.success("Venda registrada com sucesso.", {
-            description: "Parabéns! O lead foi marcado como concluído.",
-          });
-        } else {
-          toast.success("Etapa atualizada.");
-        }
+        toast.success("Etapa atualizada.");
       } catch {
         resetStepDialog();
         toast.error("Não foi possível atualizar no momento.");
@@ -300,7 +297,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
         </Card>
       ) : null}
 
-      {/* Main Lead Header */}
+      {/* Main Lead Header Card */}
       <Card variant="subtle" className="p-5 bg-card/95 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge
@@ -328,9 +325,16 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
               Contato pessoal liberado após o aceite.
             </p>
           ) : null}
+          {/* Email - always visible after acceptance */}
+          {phoneUnlocked && lead.email ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              <Share className="mr-1 size-3 inline" />
+              {lead.email}
+            </p>
+          ) : null}
         </div>
 
-        {/* Operational Overview Grid (Safe before acceptance) */}
+        {/* Operational Overview Grid */}
         <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-muted/20 p-3.5 text-xs">
           <div>
             <span className="text-muted-foreground block text-[11px]">Produto / Plano</span>
@@ -363,12 +367,20 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
             </div>
           </div>
           <div>
+            <span className="text-muted-foreground block text-[11px]">Tipo de Lead</span>
+            <strong className="font-semibold text-foreground truncate block">{lead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}</strong>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-[11px]">Origem</span>
+            <strong className="font-semibold text-foreground truncate block">{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</strong>
+          </div>
+          <div>
             <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
             <strong className="font-semibold text-foreground truncate block">{lead.city || lead.branchName || "Não informada"}</strong>
           </div>
           <div>
-            <span className="text-muted-foreground block text-[11px]">Urgência</span>
-            <strong className="font-semibold text-foreground block">{lead.urgency || "Contratação imediata"}</strong>
+            <span className="text-muted-foreground block text-[11px]">Responsável</span>
+            <strong className="font-semibold text-foreground truncate block">{lead.corretorNome || brokerName}</strong>
           </div>
         </div>
 
@@ -458,9 +470,52 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
                 <ArrowRight className="size-3.5" />
               </Button>
             </div>
+
+            {/* Sale Registration Button - only when not yet converted */}
+            {leadStatus !== "converted" && leadStatus !== "lost" && (
+              <Button
+                size="sm"
+                onClick={() => router.push(`/leads/${lead.id}`)}
+                className="w-full text-xs font-bold gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                <FileText className="size-4" />
+                REGISTRAR VENDA
+              </Button>
+            )}
           </div>
         )}
       </Card>
+
+      {/* ── Pessoas da Contratação (Beneficiaries) ────────────────────── */}
+      {!isDistributed && (
+        <BeneficiariesSection
+          leadId={lead.id}
+          contactName={lead.nome}
+          initialBeneficiaries={lead.beneficiaries || []}
+        />
+      )}
+
+      {/* ── Dados Organizados (PersonRecordDetails) ──────────────────── */}
+      <PersonRecordDetails
+        kind="lead"
+        createdAt={new Date(lead.createdAt)}
+        consentimentoLgpd={lead.consentimentoLgpd ?? false}
+        dependents={(lead.beneficiaries || []).map((b) => ({
+          id: b.id,
+          name: b.name,
+          birthDate: b.birthDate,
+          relationship: b.relationship,
+          isHolder: b.isHolder,
+        }))}
+        documentCount={0}
+        formData={lead.formData ? {
+          dependentes: lead.formData.dependentes,
+          mediaIdades: lead.formData.mediaIdades,
+          razaoSocial: lead.formData.razaoSocial,
+          cnpj: lead.formData.cnpj,
+          funcionarios: lead.formData.funcionarios,
+        } : undefined}
+      />
 
       {/* Refuse Lead Modal */}
       <Dialog open={showDeclineModal} onOpenChange={setShowDeclineModal}>
@@ -551,7 +606,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
             ))}
 
             {/* Conditional Follow-up date pickers */}
-            {(selectedStep === "trying_contact" || selectedStep === "no_contact") && (
+            {selectedStep === "no_contact" && (
               <div className="mt-3 rounded-xl border border-primary/20 bg-muted/20 p-3 space-y-2 text-xs">
                 <span className="font-semibold text-foreground block">Quando deseja tentar novamente?</span>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -642,38 +697,6 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
               className="flex-1 text-xs font-bold bg-primary text-primary-foreground"
             >
               {updatingStep ? "Salvando..." : "SALVAR"}
-            </Button>
-          </div>
-        </DialogPopup>
-      </Dialog>
-
-      {/* Sale Confirmation Dialog */}
-      <Dialog open={showSaleConfirm} onOpenChange={setShowSaleConfirm}>
-        <DialogPopup className="sm:max-w-sm text-center">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold text-center">Venda realizada?</DialogTitle>
-            <DialogDescription className="text-xs text-center">
-              Confirme somente se o cliente realmente fechou o plano.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex items-center gap-2 pt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={updatingStep}
-              onClick={() => setShowSaleConfirm(false)}
-              className="flex-1 text-xs"
-            >
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              disabled={updatingStep}
-              onClick={handleSaveStep}
-              className="flex-1 text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              {updatingStep ? "Salvando..." : "CONFIRMAR VENDA"}
             </Button>
           </div>
         </DialogPopup>

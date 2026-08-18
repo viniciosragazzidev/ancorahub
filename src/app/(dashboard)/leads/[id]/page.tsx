@@ -128,6 +128,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       .where(eq(schema.user.id, context.userId))
       .limit(1);
 
+    const lightBeneficiaries = await getLeadBeneficiaries(id);
+    const lightFormData = readFormData(lead.formData);
+
     const lightLead: LightLeadDetailData = {
       id: lead.id,
       nome: lead.nome,
@@ -145,6 +148,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       city: qualificationDetails?.cidade || null,
       createdAt: lead.createdAt,
       isCurrentBroker: lead.corretorId === context.userId,
+      tipo: lead.tipo,
+      origem: lead.origem,
+      sourceCampaign: lead.sourceCampaign,
+      beneficiaries: lightBeneficiaries.map((b) => ({
+        id: b.id,
+        name: b.name,
+        birthDate: b.birthDate,
+        relationship: b.relationship,
+        isHolder: b.isHolder,
+      })),
+      formData: lightFormData,
+      consentimentoLgpd: lead.consentimentoLgpd,
     };
 
     return <LightLeadDetail lead={lightLead} brokerName={brokerUser?.name || "Corretor"} />;
