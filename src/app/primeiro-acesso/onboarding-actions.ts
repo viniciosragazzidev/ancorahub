@@ -124,11 +124,6 @@ export async function completeOnboardingAction(
         password: hashedPassword,
       });
 
-      // Ensure preferred_experience_mode column exists
-      await tx.execute(
-        sql`ALTER TABLE "tenant_memberships" ADD COLUMN IF NOT EXISTS "preferred_experience_mode" text DEFAULT 'LIGHT' NOT NULL;`
-      ).catch(() => {});
-
       // Upsert tenant membership
       const [existingMembership] = await tx
         .select({ id: schema.tenantMemberships.id })

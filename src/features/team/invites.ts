@@ -36,7 +36,6 @@ export async function createTeamInvite(rawInput: unknown) {
     await db.insert(schema.user).values({ id: userId, name: input.name, email: input.email, emailVerified: false, active: false, status: "pending" });
   }
   const token = randomBytes(32).toString("hex");
-  await db.execute(sql`ALTER TABLE "tenant_memberships" ADD COLUMN IF NOT EXISTS "preferred_experience_mode" text DEFAULT 'LIGHT' NOT NULL;`).catch(() => {});
   await db.insert(schema.tenantMemberships).values({ id: randomUUID(), tenantId: context.tenantId, userId, branchId: input.branchId, role: input.role, status: "active" });
   await db.insert(schema.invites).values({ id: randomUUID(), userId, tokenHash: digest(token), expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), invitedBy: context.userId });
   return { token, role: input.role as CreatableTeamRole };
