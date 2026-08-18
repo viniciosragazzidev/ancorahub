@@ -36,7 +36,18 @@ type RecentNotification = {
 };
 
 const LEADS_REVISION_KEY = "ancorahub:leads-revision";
-const LIVE_REFRESH_DELAY_MS = 160;
+
+/**
+ * Debounce coalescing: multiple events within this window produce a single refresh.
+ * 500ms balances responsiveness (user sees updates within half a second) against
+ * server load (a burst of 5 events produces 1 server render, not 5).
+ */
+const REFRESH_COALESCE_MS = 500;
+
+/**
+ * Reconciliation interval: how often to check for missed notifications when the
+ * tab is visible. 60s is a safety net; the primary update path is Supabase Realtime.
+ */
 const RECONCILIATION_MS = 60_000;
 
 export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
@@ -45,6 +56,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
   const refreshPendingRef = useRef(false);
+  const pendingEventsRef = useRef(0);
   const shellStartedAtRef = useRef<number | null>(null);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
@@ -61,26 +73,40 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       element.closest('[role="dialog"]') !== null;
   }, []);
 
+  /**
+   * Coalesced server refresh: events arriving within REFRESH_COALESCE_MS are
+   * consolidated into a single router.refresh(). This prevents a burst of 5
+   * realtime events from triggering 5 separate server re-renders.
+   */
   const scheduleServerRefresh = useCallback(() => {
     if (document.visibilityState !== "visible" || isFormElementFocused()) {
       refreshPendingRef.current = true;
       return;
     }
     refreshPendingRef.current = false;
+    pendingEventsRef.current += 1;
+
+    // If a timer is already running, it will pick up the coalesced event.
     if (refreshTimerRef.current !== null) return;
+
     refreshTimerRef.current = window.setTimeout(() => {
       refreshTimerRef.current = null;
+      pendingEventsRef.current = 0;
       router.refresh();
-    }, LIVE_REFRESH_DELAY_MS);
+    }, REFRESH_COALESCE_MS);
   }, [isFormElementFocused, router]);
 
+  /**
+   * Client-only state sync: invalidates React Query cache, dispatches browser
+   * events, and schedules a coalesced server refresh.
+   */
   const syncClientState = useCallback((detail: RealtimeSyncBrowserDetail, broadcast = true) => {
     void queryClient.invalidateQueries({ queryKey: ["local-first", tenantId, userId] });
     setLastSyncedAt(Date.now());
     try {
       window.sessionStorage.setItem(LEADS_REVISION_KEY, String(Date.now()));
     } catch {
-      // The immediate refresh remains sufficient when browser storage is unavailable.
+      // Browser storage unavailable — the coalesced refresh is still sufficient.
     }
     dispatchRealtimeSyncEvent(detail);
     scheduleServerRefresh();

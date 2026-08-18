@@ -39,29 +39,16 @@ export function NotificationCountProvider({
     }
   }, []);
 
-  // The server Broadcast signal is the primary update path. The slower fallback
-  // covers a missed WebSocket frame without creating a constant request stream.
   useEffect(() => {
+    // Initial fetch on mount
     const initialFetch = window.setTimeout(() => void fetchCount(), 0);
 
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void fetchCount();
-      }
-    }, 120_000);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void fetchCount();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // POLLING REMOVED: RealtimeSyncProvider handles 60s reconciliation + realtime events.
+    // The previous 120s polling was redundant with the realtime path.
+    // Visibility change still triggers a single reconciliation through RealtimeSyncProvider.
 
     return () => {
       window.clearTimeout(initialFetch);
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [fetchCount]);
 
