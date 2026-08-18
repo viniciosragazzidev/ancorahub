@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Sparkle, SlidersHorizontal, Check } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { setExperienceModeAction, type ExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { getUserDisplayInfo } from "@/shared/auth/actions";
 import { cn } from "@/lib/utils";
 
 type ExperienceModeToggleProps = {
@@ -21,6 +22,21 @@ export function ExperienceModeToggle({
 }: ExperienceModeToggleProps) {
   const [mode, setMode] = useState<ExperienceMode>(initialMode);
   const [pending, startTransition] = useTransition();
+  const [isBroker, setIsBroker] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getUserDisplayInfo().then((info) => {
+      if (info) {
+        setIsBroker(info.role === "broker" || info.jobTitle === "broker");
+      } else {
+        setIsBroker(false);
+      }
+    }).catch(() => setIsBroker(false));
+  }, []);
+
+  if (isBroker === false) {
+    return null;
+  }
 
   function handleToggle(targetMode?: ExperienceMode) {
     if (pending) return;

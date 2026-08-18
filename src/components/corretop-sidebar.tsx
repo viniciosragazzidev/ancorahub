@@ -379,10 +379,14 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     Configurações
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuSeparator />
-                <div className="px-1 py-1">
-                  <ExperienceModeToggle variant="menu-item" />
-                </div>
+                {(userRole === "broker" || roleKey === "broker" || user?.jobTitle === "broker") ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-1 py-1">
+                      <ExperienceModeToggle variant="menu-item" />
+                    </div>
+                  </>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={handleLogout}>
                   <SignOut className="size-4" />

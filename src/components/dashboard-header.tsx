@@ -21,7 +21,7 @@ export function DashboardHeader({
   breadcrumb,
   title,
   rightSlot,
-  showModeToggle = true,
+  showModeToggle = false,
   showSidebarTrigger = true,
 }: DashboardHeaderProps) {
   return (

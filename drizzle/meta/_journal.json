@@ -568,6 +568,13 @@
       "when": 1786903200000,
       "tag": "0130_allow_tenant_wide_lead_queues",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1786910000000,
+      "tag": "0131_add_preferred_experience_mode",
+      "breakpoints": true
     }
   ]
 }

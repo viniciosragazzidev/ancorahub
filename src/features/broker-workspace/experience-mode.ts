@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -11,6 +11,20 @@ import type { TenantContext } from "@/shared/auth/types";
 export type ExperienceMode = "LIGHT" | "NORMAL";
 
 const COOKIE_NAME = "ancora_experience_mode";
+
+let schemaEnsured = false;
+async function ensureSchema() {
+  if (schemaEnsured) return;
+  try {
+    const db = getDatabase();
+    await db.execute(
+      sql`ALTER TABLE "tenant_memberships" ADD COLUMN IF NOT EXISTS "preferred_experience_mode" text DEFAULT 'LIGHT' NOT NULL;`
+    );
+    schemaEnsured = true;
+  } catch {
+    // Non-fatal if DB permissions restrict DDL or already executed
+  }
+}
 
 /**
  * Resolves the active experience mode for the current request.
@@ -36,6 +50,9 @@ export async function getExperienceMode(customContext?: TenantContext): Promise<
   }
 
   if (!context) return "LIGHT";
+
+  // Ensure DB column exists automatically
+  void ensureSchema().catch(() => {});
 
   try {
     const db = getDatabase();
@@ -69,6 +86,8 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
     const context = await getRequiredTenantContext();
     const mode: ExperienceMode = newMode === "NORMAL" ? "NORMAL" : "LIGHT";
 
+    await ensureSchema().catch(() => {});
+
     const db = getDatabase();
     await db
       .update(schema.tenantMemberships)
@@ -77,7 +96,7 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         eq(schema.tenantMemberships.userId, context.userId)
       ))
-      .catch(() => { /* Non-fatal if schema mismatch during dev */ });
+      .catch(() => { /* Non-fatal if schema mismatch */ });
 
     const cookieStore = await cookies();
     cookieStore.set(COOKIE_NAME, mode, {
