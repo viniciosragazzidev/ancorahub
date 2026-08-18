@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { KeyboardShortcutsProvider } from "@/components/keyboard-shortcuts-provider";
 import { useRegisterDefaultShortcuts } from "@/components/keyboard-shortcuts";
+import { PerformanceMonitor } from "@/components/providers/performance-monitor";
 
 function ShortcutRegistrar() {
   useRegisterDefaultShortcuts();
@@ -44,8 +45,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           {children}
         </QueryClientProvider>
-      </KeyboardShortcutsProvider>
+      </KeyboardShortcutsProvider>      <PerformanceMonitor />
       <PwaInstallPrompt />
-    </ThemeProvider>
-  );
+    </ThemeProvider>);
 }
