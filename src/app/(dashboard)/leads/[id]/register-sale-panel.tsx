@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function RegisterSalePanel({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [policyNumber, setPolicyNumber] = useState("");
   const [coverageStartDate, setCoverageStartDate] = useState("");
@@ -81,7 +83,7 @@ export function RegisterSalePanel({
 
       toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
       onOpenChange(false);
-      window.location.reload();
+      setTimeout(() => router.refresh(), 0);
     });
   }
 

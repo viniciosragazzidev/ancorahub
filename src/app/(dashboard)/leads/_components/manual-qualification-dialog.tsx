@@ -71,7 +71,7 @@ export function ManualQualificationDialog({
     if (res.success) {
       toast.success(`Lead "${leadName}" qualificado com sucesso!`);
       onOpenChange(false);
-      router.refresh();
+      setTimeout(() => router.refresh(), 0);
     } else {
       toast.error(res.error ?? "Erro ao qualificar lead.");
     }

@@ -96,10 +96,12 @@ function EditMemberDialog({
       toast.success("Membro atualizado com sucesso.");
       onOpenChange(false);
       formRef.current?.reset();
-      router.refresh();
     }
     if (state.error) toast.error(state.error);
-  }, [onOpenChange, router, state.error, state.success]);
+  }, [onOpenChange, state.error, state.success]);
+  useEffect(() => {
+    if (state.success) router.refresh();
+  }, [router, state.success]);
 
   useEffect(() => {
     if (!open) {
@@ -252,10 +254,12 @@ function DeleteMemberDialog({
       toast.success("Membro removido com sucesso.");
       onOpenChange(false);
       formRef.current?.reset();
-      router.refresh();
     }
     if (state.error) toast.error(state.error);
-  }, [onOpenChange, router, state.error, state.success]);
+  }, [onOpenChange, state.error, state.success]);
+  useEffect(() => {
+    if (state.success) router.refresh();
+  }, [router, state.success]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -537,10 +541,12 @@ function TransferLeadsDialog({
       toast.success("Leads transferidos com sucesso.");
       onOpenChange(false);
       formRef.current?.reset();
-      router.refresh();
     }
     if (state.error) toast.error(state.error);
-  }, [onOpenChange, router, state.error, state.success]);
+  }, [onOpenChange, state.error, state.success]);
+  useEffect(() => {
+    if (state.success) router.refresh();
+  }, [router, state.success]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
