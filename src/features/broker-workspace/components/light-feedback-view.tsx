@@ -7,6 +7,7 @@ import { ArrowRight, CheckCircle, WhatsappLogo } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 type FeedbackViewProps = {
   leadId: string;
@@ -29,14 +30,20 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
   const [selectedLabel, setSelectedLabel] = useState("");
   const [pending, startTransition] = useTransition();
 
+  const waUrl = buildWhatsAppUrl(phone);
+
   function handleSelectOption(opt: typeof FEEDBACK_OPTIONS[number]) {
     if (pending || submitted) return;
 
     setSelectedLabel(opt.label);
     const formData = new FormData();
     formData.append("leadId", leadId);
+    formData.append("newStatus", opt.status);
     formData.append("status", opt.status);
-    if (opt.lossReason) formData.append("lossReason", opt.lossReason);
+    if (opt.lossReason) {
+      formData.append("motivoPerda", opt.lossReason);
+      formData.append("lossReason", opt.lossReason);
+    }
 
     startTransition(async () => {
       try {
@@ -51,15 +58,6 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
         toast.error("Não foi possível registrar no momento.");
       }
     });
-  }
-
-  function handleBackToWhatsApp() {
-    const rawPhone = phone?.replace(/\D/g, "");
-    if (!rawPhone) {
-      window.location.assign("/minha-fila");
-      return;
-    }
-    window.open(`https://wa.me/55${rawPhone}`, "_blank");
   }
 
   return (
@@ -84,15 +82,16 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
             </div>
 
             <div className="pt-2 space-y-2">
-              {phone ? (
-                <Button
-                  size="lg"
-                  onClick={handleBackToWhatsApp}
-                  className="w-full h-11 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              {waUrl ? (
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-lg shadow-sm"
                 >
                   <WhatsappLogo className="size-4" />
                   VOLTAR PARA O WHATSAPP
-                </Button>
+                </a>
               ) : null}
 
               <Button

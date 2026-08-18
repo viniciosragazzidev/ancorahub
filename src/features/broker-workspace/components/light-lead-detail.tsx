@@ -17,7 +17,7 @@ import {
   WhatsappLogo,
   XCircle,
 } from "@/components/huge-icons";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,6 +31,7 @@ import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-act
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
 
 export type LightLeadDetailData = {
@@ -164,23 +165,20 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
     });
   }
 
+  const greetingName = lead.nome.split(" ")[0];
+  const initialMsg = `Olá, ${greetingName}! Tudo bem? Sou ${brokerName.split(" ")[0]}, consultor responsável pelo seu atendimento.`;
+  const waUrl = buildWhatsAppUrl(lead.telefone, initialMsg);
+
   // Handle WhatsApp Click
   function handleOpenWhatsApp() {
-    const rawPhone = lead.telefone?.replace(/\D/g, "");
-    if (!rawPhone) {
+    if (!waUrl) {
       toast.error("Telefone não disponível.");
       return;
     }
 
-    const greetingName = lead.nome.split(" ")[0];
-    const initialMsg = encodeURIComponent(
-      `Olá, ${greetingName}! Tudo bem? Sou ${brokerName.split(" ")[0]}, consultor responsável pelo seu atendimento.`
-    );
-
     const nowStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     setWhatsappOpenedAt(nowStr);
-
-    window.open(`https://wa.me/55${rawPhone}?text=${initialMsg}`, "_blank");
+    window.open(waUrl, "_blank");
   }
 
   // Handle Step Update Save
@@ -193,8 +191,6 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
     }
 
     let targetStatus = "in_contact";
-    let subStatus: string | undefined = undefined;
-
     if (selectedStep === "quote_sent") targetStatus = "quote_sent";
     if (selectedStep === "negotiation") targetStatus = "negotiation";
     if (selectedStep === "converted") targetStatus = "converted";
@@ -202,8 +198,15 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
 
     const formData = new FormData();
     formData.append("leadId", lead.id);
+    formData.append("newStatus", targetStatus);
     formData.append("status", targetStatus);
-    if (selectedStep === "no_interest") formData.append("lossReason", lossReason);
+
+    if (selectedStep === "no_interest" || selectedStep === "no_contact") {
+      const reason = selectedStep === "no_contact" ? "Sem contato / Não atende" : (lossReason || "Sem interesse");
+      formData.append("motivoPerda", reason);
+      formData.append("lossReason", reason);
+    }
+
     if (observation.trim()) formData.append("notes", observation);
 
     startUpdateTransition(async () => {
@@ -350,14 +353,27 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
         ) : (
           /* State 2: AFTER ACCEPTANCE / IN SERVICE */
           <div className="pt-2 space-y-3">
-            <Button
-              size="lg"
-              onClick={handleOpenWhatsApp}
-              className="w-full h-12 text-sm font-bold gap-2.5 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white"
+            <a
+              href={waUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!waUrl) {
+                  e.preventDefault();
+                  toast.error("Telefone não disponível.");
+                  return;
+                }
+                const nowStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                setWhatsappOpenedAt(nowStr);
+              }}
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "w-full h-12 text-sm font-bold gap-2.5 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-xl"
+              )}
             >
               <WhatsappLogo className="size-5" />
               ABRIR NO WHATSAPP
-            </Button>
+            </a>
 
             {whatsappOpenedAt ? (
               <p className="text-center text-[11px] text-emerald-600 font-medium">

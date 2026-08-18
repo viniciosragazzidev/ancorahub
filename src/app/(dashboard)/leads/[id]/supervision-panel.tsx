@@ -56,18 +56,18 @@ export function SupervisionPanel({
   useEffect(() => {
     if (reassignState.success) {
       toast.success("Lead reatribuído e SLA reiniciado.");
-      router.refresh();
     }
     if (reassignState.error) toast.error(reassignState.error);
-  }, [reassignState, router]);
+  }, [reassignState]);
+  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState.success, router]);
 
   useEffect(() => {
     if (assumeState.success) {
       toast.success("Lead assumido para investigação.");
-      router.refresh();
     }
     if (assumeState.error) toast.error(assumeState.error);
-  }, [assumeState, router]);
+  }, [assumeState]);
+  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState.success, router]);
 
   // SLA calculations
   const elapsedMinutes = Math.max(0, Math.round((Date.now() - stageEnteredAt.getTime()) / 60000));

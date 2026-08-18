@@ -6,6 +6,7 @@ import { ArrowRight, MagnifyingGlass, UserCheck, WhatsappLogo } from "@/componen
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
 
 export type LightClientItem = {
@@ -79,15 +80,19 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {rawPhone ? (
-                      <Button
-                        size="sm"
-                        onClick={() => window.open(`https://wa.me/55${rawPhone}`, "_blank")}
-                        className="h-9 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    {buildWhatsAppUrl(client.phone) ? (
+                      <a
+                        href={buildWhatsAppUrl(client.phone)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                          buttonVariants({ size: "sm" }),
+                          "h-9 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center"
+                        )}
                       >
                         <WhatsappLogo className="size-4" />
                         WhatsApp
-                      </Button>
+                      </a>
                     ) : null}
                     <Link
                       href={`/clientes/${client.id}`}

@@ -86,29 +86,29 @@ export function LeadDrawerManagementActions({
   useEffect(() => {
     if (reassignState.success) {
       toast.success("Lead reatribuído e SLA reiniciado.");
-      router.refresh();
       if (onSuccess) onSuccess();
     }
     if (reassignState.error) toast.error(reassignState.error);
-  }, [reassignState, router, onSuccess]);
+  }, [reassignState, onSuccess]);
+  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState.success, router]);
 
   useEffect(() => {
     if (assumeState.success) {
       toast.success("Lead assumido para investigação.");
-      router.refresh();
       if (onSuccess) onSuccess();
     }
     if (assumeState.error) toast.error(assumeState.error);
-  }, [assumeState, router, onSuccess]);
+  }, [assumeState, onSuccess]);
+  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState.success, router]);
 
   useEffect(() => {
     if (routeState.success) {
       toast.success(routeState.message ?? "Lead enviado para a unidade.");
-      router.refresh();
       if (onSuccess) onSuccess();
     }
     if (routeState.error) toast.error(routeState.error);
-  }, [routeState, router, onSuccess]);
+  }, [routeState, onSuccess]);
+  useEffect(() => { if (routeState.success) router.refresh(); }, [routeState.success, router]);
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";

@@ -99,9 +99,9 @@ export async function changeLeadStatusAction(
   formData: FormData,
 ): Promise<StatusChangeState> {
   const rawInput: ChangeLeadStatusInput = {
-    leadId: formData.get("leadId") as string,
-    newStatus: formData.get("newStatus") as string,
-    motivoPerda: formData.get("motivoPerda") as string | null,
+    leadId: (formData.get("leadId") ?? "") as string,
+    newStatus: (formData.get("newStatus") ?? formData.get("status") ?? "") as string,
+    motivoPerda: (formData.get("motivoPerda") ?? formData.get("lossReason")) as string | null,
   };
 
   try {
