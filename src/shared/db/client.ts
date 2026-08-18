@@ -3,6 +3,8 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+// Timing for DB is managed by tenant-context.ts and session.ts
+// Individual query timing can be added via Drizzle query hooks if needed
 
 type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
@@ -47,7 +49,32 @@ export function usesPostgresJsDriver(databaseUrl: string): boolean {
   }
 }
 
+/**
+ * Log database configuration for observability (no credentials).
+ */
+function logDbConfig(databaseUrl: string): void {
+  try {
+    const url = new URL(databaseUrl);
+    const isPooled = url.hostname.includes("pooler") || url.hostname.includes("ep-");
+    const poolMax = connectionLimit();
+    console.log(
+      JSON.stringify({
+        type: "db_config",
+        hostname: url.hostname,
+        isPooled,
+        poolMax,
+        driver: usesPostgresJsDriver(databaseUrl) ? "postgres.js" : "neon-serverless",
+        env: process.env.NODE_ENV,
+      }),
+    );
+  } catch {
+    // URL parsing failed — non-critical
+  }
+}
+
 function createPostgresDatabase(databaseUrl: string): Database {
+  logDbConfig(databaseUrl);
+
   return drizzlePostgres(
     postgres(databaseUrl, {
       prepare: false,
@@ -55,10 +82,7 @@ function createPostgresDatabase(databaseUrl: string): Database {
       connect_timeout: 10,
       idle_timeout: 5,
       max_lifetime: 60,
-      // With the pool increased to 3 and cron routes wrapped in try/catch,
-      // a single slow query no longer blocks all page requests.
-      // If deeper query-level control is needed, pass ?statement_timeout=25000
-      // in the connection URL or use a Drizzle query hook.
+      onnotice: () => {}, // Suppress noisy notices
     }),
     { schema },
   );
