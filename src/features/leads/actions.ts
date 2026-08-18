@@ -99,3 +99,54 @@ export async function addLeadNoteAction(
     return { error: error instanceof Error ? error.message : "Não foi possível registrar a nota." };
   }
 }
+
+export async function updateLeadLivesCountAction(
+  _previous: { success?: boolean; error?: string },
+  formData: FormData,
+): Promise<{ success?: boolean; error?: string }> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const livesCount = Math.max(1, Math.min(100, Number(formData.get("livesCount") ?? 1)));
+  if (!leadId) return { error: "ID do lead não fornecido." };
+
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+    const [lead] = await db
+      .select({
+        id: schema.leads.id,
+        tenantId: schema.leads.tenantId,
+        corretorId: schema.leads.corretorId,
+        qualificationDetails: schema.leads.qualificationDetails,
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .limit(1);
+
+    if (!lead) return { error: "Lead não encontrado." };
+    if (context.role === "broker" && lead.corretorId !== context.userId) {
+      return { error: "Você só pode alterar dados dos seus leads." };
+    }
+
+    const currentDetails = (typeof lead.qualificationDetails === "object" && lead.qualificationDetails !== null)
+      ? (lead.qualificationDetails as Record<string, unknown>)
+      : {};
+
+    const updatedDetails = {
+      ...currentDetails,
+      qtdVidas: livesCount,
+      quantidadeVidas: livesCount,
+    };
+
+    await db
+      .update(schema.leads)
+      .set({ qualificationDetails: updatedDetails })
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+
+    revalidatePath(`/leads/${lead.id}`);
+    revalidatePath("/minha-fila");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível atualizar a quantidade de vidas." };
+  }
+}

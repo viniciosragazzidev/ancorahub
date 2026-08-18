@@ -30,6 +30,7 @@ import {
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
+import { updateLeadLivesCountAction } from "@/features/leads/actions";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,33 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   const [updatingStep, startUpdateTransition] = useTransition();
 
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
+  const [livesCount, setLivesCount] = useState<number>(lead.livesCount || 1);
+  const [updatingLives, startLivesTransition] = useTransition();
+
+  function handleUpdateLives(newCount: number) {
+    if (updatingLives || newCount < 1 || newCount > 100) return;
+    const previous = livesCount;
+    setLivesCount(newCount);
+
+    const formData = new FormData();
+    formData.append("leadId", lead.id);
+    formData.append("livesCount", String(newCount));
+
+    startLivesTransition(async () => {
+      try {
+        const res = await updateLeadLivesCountAction({}, formData);
+        if (!res.success) {
+          setLivesCount(previous);
+          toast.error(res.error ?? "Não foi possível atualizar a quantidade de vidas.");
+          return;
+        }
+        toast.success(`Quantidade de vidas atualizada para ${newCount}.`);
+      } catch {
+        setLivesCount(previous);
+        toast.error("Não foi possível atualizar no momento.");
+      }
+    });
+  }
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
 
@@ -309,8 +337,30 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
             <strong className="font-semibold text-foreground truncate block">{lead.planName || lead.carrierName || "Plano Familiar"}</strong>
           </div>
           <div>
-            <span className="text-muted-foreground block text-[11px]">Quantidade de Vidas</span>
-            <strong className="font-semibold text-foreground block">{lead.livesCount ? `${lead.livesCount} vidas` : "A consultar"}</strong>
+            <span className="text-muted-foreground block text-[11px] font-medium">Vidas / Dependentes</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <button
+                type="button"
+                disabled={livesCount <= 1 || updatingLives}
+                onClick={() => handleUpdateLives(livesCount - 1)}
+                className="size-6 rounded-md border border-border/80 bg-card hover:bg-muted text-foreground flex items-center justify-center font-bold text-xs disabled:opacity-40 transition-colors cursor-pointer"
+                title="Diminuir vidas"
+              >
+                -
+              </button>
+              <span className="font-bold text-foreground text-xs min-w-[32px] text-center">
+                {livesCount} {livesCount === 1 ? "vida" : "vidas"}
+              </span>
+              <button
+                type="button"
+                disabled={livesCount >= 100 || updatingLives}
+                onClick={() => handleUpdateLives(livesCount + 1)}
+                className="size-6 rounded-md border border-border/80 bg-card hover:bg-muted text-foreground flex items-center justify-center font-bold text-xs disabled:opacity-40 transition-colors cursor-pointer"
+                title="Aumentar vidas"
+              >
+                +
+              </button>
+            </div>
           </div>
           <div>
             <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
