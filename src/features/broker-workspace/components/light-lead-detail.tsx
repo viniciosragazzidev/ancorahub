@@ -31,7 +31,6 @@ import {
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
-import { updateLeadLivesCountAction } from "@/features/leads/actions";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
@@ -106,33 +105,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
   const [updatingStep, startUpdateTransition] = useTransition();
 
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
-  const [livesCount, setLivesCount] = useState<number>(lead.livesCount || 1);
-  const [updatingLives, startLivesTransition] = useTransition();
-
-  function handleUpdateLives(newCount: number) {
-    if (updatingLives || newCount < 1 || newCount > 100) return;
-    const previous = livesCount;
-    setLivesCount(newCount);
-
-    const formData = new FormData();
-    formData.append("leadId", lead.id);
-    formData.append("livesCount", String(newCount));
-
-    startLivesTransition(async () => {
-      try {
-        const res = await updateLeadLivesCountAction({}, formData);
-        if (!res.success) {
-          setLivesCount(previous);
-          toast.error(res.error ?? "Não foi possível atualizar a quantidade de vidas.");
-          return;
-        }
-        toast.success(`Quantidade de vidas atualizada para ${newCount}.`);
-      } catch {
-        setLivesCount(previous);
-        toast.error("Não foi possível atualizar no momento.");
-      }
-    });
-  }
+  const [requestingSale, startRequestSaleTransition] = useTransition();
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
 
@@ -272,6 +245,35 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
     });
   }
 
+  // Handle Request Sale - changes status to documentation_pending
+  function handleRequestSale() {
+    if (requestingSale) return;
+
+    startRequestSaleTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.append("leadId", lead.id);
+        formData.append("newStatus", "documentation_pending");
+        formData.append("status", "documentation_pending");
+
+        const res = await changeLeadStatusAction({}, formData);
+
+        if (!res.success) {
+          toast.error(res.error ?? "Não foi possível solicitar a venda.");
+          return;
+        }
+
+        setLeadStatus("documentation_pending");
+        toast.success("Solicitação de venda enviada!", {
+          description: "Envie a documentação de comprovação da venda para o supervisor aprovar.",
+          duration: 8000,
+        });
+      } catch {
+        toast.error("Não foi possível solicitar a venda no momento.");
+      }
+    });
+  }
+
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6 sm:px-6">
       {/* Top Header Navigation */}
@@ -341,32 +343,6 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
             <strong className="font-semibold text-foreground truncate block">{lead.planName || lead.carrierName || "Plano Familiar"}</strong>
           </div>
           <div>
-            <span className="text-muted-foreground block text-[11px] font-medium">Vidas / Dependentes</span>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <button
-                type="button"
-                disabled={livesCount <= 1 || updatingLives}
-                onClick={() => handleUpdateLives(livesCount - 1)}
-                className="size-6 rounded-md border border-border/80 bg-card hover:bg-muted text-foreground flex items-center justify-center font-bold text-xs disabled:opacity-40 transition-colors cursor-pointer"
-                title="Diminuir vidas"
-              >
-                -
-              </button>
-              <span className="font-bold text-foreground text-xs min-w-[32px] text-center">
-                {livesCount} {livesCount === 1 ? "vida" : "vidas"}
-              </span>
-              <button
-                type="button"
-                disabled={livesCount >= 100 || updatingLives}
-                onClick={() => handleUpdateLives(livesCount + 1)}
-                className="size-6 rounded-md border border-border/80 bg-card hover:bg-muted text-foreground flex items-center justify-center font-bold text-xs disabled:opacity-40 transition-colors cursor-pointer"
-                title="Aumentar vidas"
-              >
-                +
-              </button>
-            </div>
-          </div>
-          <div>
             <span className="text-muted-foreground block text-[11px]">Tipo de Lead</span>
             <strong className="font-semibold text-foreground truncate block">{lead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}</strong>
           </div>
@@ -378,7 +354,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
             <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
             <strong className="font-semibold text-foreground truncate block">{lead.city || lead.branchName || "Não informada"}</strong>
           </div>
-          <div>
+          <div className="col-span-2">
             <span className="text-muted-foreground block text-[11px]">Responsável</span>
             <strong className="font-semibold text-foreground truncate block">{lead.corretorNome || brokerName}</strong>
           </div>
@@ -457,7 +433,7 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
               <div>
                 <span className="text-[11px] text-muted-foreground block">Etapa atual</span>
                 <strong className="text-xs font-semibold text-foreground">
-                  {leadStatus === "in_contact" ? "Em atendimento" : leadStatus === "quote_sent" ? "Cotação enviada" : leadStatus === "negotiation" ? "Em negociação" : leadStatus === "converted" ? "Venda realizada" : "Contato iniciado"}
+                  {leadStatus === "in_contact" ? "Em atendimento" : leadStatus === "quote_sent" ? "Cotação enviada" : leadStatus === "negotiation" ? "Em negociação" : leadStatus === "converted" ? "Venda realizada" : leadStatus === "documentation_pending" ? "Documentação pendente" : "Contato iniciado"}
                 </strong>
               </div>
               <Button
@@ -471,51 +447,61 @@ export function LightLeadDetail({ lead, brokerName }: { lead: LightLeadDetailDat
               </Button>
             </div>
 
-            {/* Sale Registration Button - only when not yet converted */}
-            {leadStatus !== "converted" && leadStatus !== "lost" && (
+            {/* Sale Registration Button - only when not yet converted and not pending */}
+            {leadStatus !== "converted" && leadStatus !== "lost" && leadStatus !== "documentation_pending" && (
               <Button
                 size="sm"
-                onClick={() => router.push(`/leads/${lead.id}`)}
+                onClick={handleRequestSale}
+                disabled={requestingSale}
                 className="w-full text-xs font-bold gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 <FileText className="size-4" />
-                REGISTRAR VENDA
+                {requestingSale ? "Enviando..." : "REGISTRAR VENDA"}
               </Button>
+            )}
+
+            {/* Pending sale status */}
+            {leadStatus === "documentation_pending" && (
+              <div className="rounded-xl border border-amber-300/30 bg-amber-50 p-3 text-xs text-center">
+                <p className="font-semibold text-amber-700">Documentação de venda pendente</p>
+                <p className="mt-1 text-amber-600">Aguardando aprovação do supervisor.</p>
+              </div>
             )}
           </div>
         )}
       </Card>
 
-      {/* ── Pessoas da Contratação (Beneficiaries) ────────────────────── */}
+      {/* ── Pessoas da Contratação + Dados Organizados (side by side) ── */}
       {!isDistributed && (
-        <BeneficiariesSection
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+<BeneficiariesSection
           leadId={lead.id}
           contactName={lead.nome}
           initialBeneficiaries={lead.beneficiaries || []}
+          livesCount={lead.livesCount}
         />
+          <PersonRecordDetails
+            kind="lead"
+            createdAt={new Date(lead.createdAt)}
+            consentimentoLgpd={lead.consentimentoLgpd ?? false}
+            dependents={(lead.beneficiaries || []).map((b) => ({
+              id: b.id,
+              name: b.name,
+              birthDate: b.birthDate,
+              relationship: b.relationship,
+              isHolder: b.isHolder,
+            }))}
+            documentCount={0}
+            formData={lead.formData ? {
+              dependentes: lead.formData.dependentes,
+              mediaIdades: lead.formData.mediaIdades,
+              razaoSocial: lead.formData.razaoSocial,
+              cnpj: lead.formData.cnpj,
+              funcionarios: lead.formData.funcionarios,
+            } : undefined}
+          />
+        </div>
       )}
-
-      {/* ── Dados Organizados (PersonRecordDetails) ──────────────────── */}
-      <PersonRecordDetails
-        kind="lead"
-        createdAt={new Date(lead.createdAt)}
-        consentimentoLgpd={lead.consentimentoLgpd ?? false}
-        dependents={(lead.beneficiaries || []).map((b) => ({
-          id: b.id,
-          name: b.name,
-          birthDate: b.birthDate,
-          relationship: b.relationship,
-          isHolder: b.isHolder,
-        }))}
-        documentCount={0}
-        formData={lead.formData ? {
-          dependentes: lead.formData.dependentes,
-          mediaIdades: lead.formData.mediaIdades,
-          razaoSocial: lead.formData.razaoSocial,
-          cnpj: lead.formData.cnpj,
-          funcionarios: lead.formData.funcionarios,
-        } : undefined}
-      />
 
       {/* Refuse Lead Modal */}
       <Dialog open={showDeclineModal} onOpenChange={setShowDeclineModal}>
