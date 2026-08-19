@@ -288,13 +288,87 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   };
 }
 
+export type QueueDependencyInfo = {
+  campaignRoutes: Array<{ campaignId: string; campaignName: string | null }>;
+  adRoutes: Array<{ adId: string; adName: string | null }>;
+  queuedLeads: number;
+};
+
+export async function getQueueDependencies(context: TenantContext, queueId: string): Promise<QueueDependencyInfo> {
+  const db = getDatabase();
+  const [queue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt))).limit(1);
+  if (!queue) throw new AuthorizationError("Fila não encontrada.");
+
+  const [campaignRoutes, adRoutes, queuedLeadsResult] = await Promise.all([
+    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, campaignName: schema.metaCampaigns.name })
+      .from(schema.metaCampaignQueueRoutes)
+      .leftJoin(schema.metaCampaigns, and(eq(schema.metaCampaignQueueRoutes.campaignId, schema.metaCampaigns.campaignId), eq(schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaigns.tenantId)))
+      .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), eq(schema.metaCampaignQueueRoutes.queueId, queueId), eq(schema.metaCampaignQueueRoutes.enabled, true))),
+    db.select({ adId: schema.metaAdQueueRoutes.adId, adName: schema.metaAds.name })
+      .from(schema.metaAdQueueRoutes)
+      .leftJoin(schema.metaAds, and(eq(schema.metaAdQueueRoutes.adId, schema.metaAds.adId), eq(schema.metaAdQueueRoutes.tenantId, schema.metaAds.tenantId)))
+      .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), eq(schema.metaAdQueueRoutes.queueId, queueId), eq(schema.metaAdQueueRoutes.enabled, true))),
+    db.select({ count: count(schema.leads.id) }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, queueId), isNull(schema.leads.deletedAt), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]))).limit(1),
+  ]);
+
+  return {
+    campaignRoutes: campaignRoutes.map((r) => ({ campaignId: r.campaignId, campaignName: r.campaignName })),
+    adRoutes: adRoutes.map((r) => ({ adId: r.adId, adName: r.adName })),
+    queuedLeads: Number(queuedLeadsResult[0]?.count ?? 0),
+  };
+}
+
+export async function forceDeleteQueue(context: TenantContext, queueId: string) {
+  const db = getDatabase();
+  const deps = await getQueueDependencies(context, queueId);
+  const now = new Date();
+
+  // 1. Desvincular campanhas: volta à fila geral (queueId=null, enabled=true)
+  if (deps.campaignRoutes.length) {
+    for (const route of deps.campaignRoutes) {
+      await db.update(schema.metaCampaignQueueRoutes)
+        .set({ queueId: null, enabled: true, updatedAt: now })
+        .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, route.campaignId)));
+    }
+  }
+
+  // 2. Desvincular anúncios
+  if (deps.adRoutes.length) {
+    for (const route of deps.adRoutes) {
+      await db.update(schema.metaAdQueueRoutes)
+        .set({ queueId: null, enabled: true, updatedAt: now })
+        .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), eq(schema.metaAdQueueRoutes.adId, route.adId)));
+    }
+  }
+
+  // 3. Limpar leads na fila: remove vínculo com a fila
+  if (deps.queuedLeads > 0) {
+    await db.update(schema.leads)
+      .set({ queueId: null, distributionUpdatedAt: now })
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, queueId), isNull(schema.leads.deletedAt)));
+  }
+
+  // 4. Excluir a fila (soft delete)
+  await db.update(schema.leadQueues)
+    .set({ status: "inactive", deletedAt: now, updatedAt: now })
+    .where(eq(schema.leadQueues.id, queueId));
+
+  // 5. Auditoria
+  const summary = `${deps.campaignRoutes.length} campanha(s), ${deps.adRoutes.length} anuncio(s), ${deps.queuedLeads} lead(s) desvinculados`;
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queueId,
+    acao: `queue.force_deleted — ${summary}`,
+  });
+}
+
 export async function deleteDistributionQueue(context: TenantContext, queueId: string) {
   const db = getDatabase();
   const [queue] = await db
     .select({
       id: schema.leadQueues.id,
       branchId: schema.leadQueues.branchId,
-      isDefault: schema.leadQueues.isDefault,
     })
     .from(schema.leadQueues)
     .where(
@@ -307,7 +381,6 @@ export async function deleteDistributionQueue(context: TenantContext, queueId: s
     .limit(1);
 
   if (!queue) throw new AuthorizationError("Fila não encontrada ou já removida.");
-  if (queue.isDefault) throw new Error("A fila padrão da unidade não pode ser excluída.");
   assertManager(context, queue.branchId);
 
   const now = new Date();

@@ -10,7 +10,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
-import { deleteDistributionQueueAction, saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction } from "@/features/lead-distribution/actions";
+import { deleteDistributionQueueAction, deleteMetaAdQueueRouteAction, deleteMetaCampaignQueueRouteAction, forceDeleteQueueAction, getQueueDependenciesAction, saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction, type QueueDependencyInfo } from "@/features/lead-distribution/actions";
 import { toast } from "@/components/ui/sonner";
 import { Loader2Icon } from "@/components/huge-icons";
 import { cn } from "@/utils/core/cn";
@@ -96,6 +96,12 @@ export function QueueControlCenter({
   const [showOnlyActiveAds, setShowOnlyActiveAds] = useState(true);
   const [campaignSearch, setCampaignSearch] = useState("");
   const [adSearch, setAdSearch] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Queue | null>(null);
+  const [deleteDependencies, setDeleteDependencies] = useState<QueueDependencyInfo | null>(null);
+  const [loadingDependencies, setLoadingDependencies] = useState(false);
+  const [forceDeleting, setForceDeleting] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<{ type: "campaign" | "ad"; id: string; queueId: string } | null>(null);
 
   const activeCampaigns = useMemo(
     () => campaigns.filter((c) => (c.status ?? "").toUpperCase() === "ACTIVE"),
@@ -124,12 +130,35 @@ export function QueueControlCenter({
   }, [adSearch, displayedAds]);
 
   async function handleDeleteQueue(queue: Queue) {
-    if (!confirm(`Tem certeza que deseja excluir a fila "${queue.name}"?`)) return;
-    setDeletingId(queue.id);
-    const result = await deleteDistributionQueueAction(queue.id);
+    setDeleteTarget(queue);
+    setDeleteConfirmOpen(true);
+    setDeleteDependencies(null);
+    setLoadingDependencies(true);
+    const result = await getQueueDependenciesAction(queue.id);
+    setLoadingDependencies(false);
+    if (result.success && result.dependencies) setDeleteDependencies(result.dependencies);
+  }
+
+  async function confirmDeleteQueue() {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
+    setDeleteConfirmOpen(false);
+    const result = await deleteDistributionQueueAction(deleteTarget.id);
     setDeletingId(null);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.", { description: "Verifique se a fila não está em uso por campanhas ativas." });
-    toast.success(result.message, { description: `A fila "${queue.name}" foi removida.` });
+    if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.");
+    toast.success(result.message, { description: `A fila "${deleteTarget.name}" foi removida.` });
+  }
+
+  async function forceDeleteQueue() {
+    if (!deleteTarget) return;
+    setForceDeleting(true);
+    const result = await forceDeleteQueueAction(deleteTarget.id);
+    setForceDeleting(false);
+    setDeleteConfirmOpen(false);
+    setDeleteTarget(null);
+    setDeleteDependencies(null);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível forçar a exclusão.");
+    toast.success(result.message, { description: `A fila "${deleteTarget.name}" e todas as dependências foram removidas.` });
   }
 
   const branchQueues = useMemo(
@@ -266,6 +295,20 @@ export function QueueControlCenter({
     setSavingAdRoute(false);
     if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar o anúncio.", { description: "Verifique se a fila está ativa." });
     toast.success(result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."), { description: enabled ? "Leads deste anúncio serão direcionados automaticamente." : "O anúncio não será registrado no CRM." });
+  }
+
+  async function deleteMetaCampaignRoute(campaignId: string) {
+    if (!confirm("Remover esta regra de campanha? A campanha voltará a usar a fila geral.")) return;
+    const result = await deleteMetaCampaignQueueRouteAction(campaignId);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível remover a regra.");
+    toast.success(result.message);
+  }
+
+  async function deleteMetaAdRoute(adId: string) {
+    if (!confirm("Remover esta regra de anúncio? O anúncio voltará a usar a fila geral.")) return;
+    const result = await deleteMetaAdQueueRouteAction(adId);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível remover a regra.");
+    toast.success(result.message);
   }
 
   return (
@@ -544,9 +587,34 @@ export function QueueControlCenter({
                           </Badge>
                         )}
                       </div>
-                      <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
-                        {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
+                          {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
+                        </Badge>
+                        {canEdit && (
+                          <>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => {
+                                setCampaignRoute({ campaignId: route.campaignId, queueId: route.queueId ?? queues[0]?.id ?? "" });
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }}
+                              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => void deleteMetaCampaignRoute(route.campaignId)}
+                              className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              Excluir
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -669,9 +737,34 @@ export function QueueControlCenter({
                           </Badge>
                         )}
                       </div>
-                      <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
-                        {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
+                          {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
+                        </Badge>
+                        {canEdit && (
+                          <>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => {
+                                setAdRoute({ adId: route.adId, queueId: route.queueId ?? queues[0]?.id ?? "" });
+                                window.scrollTo({ top: 0, behavior: "smooth" });
+                              }}
+                              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => void deleteMetaAdRoute(route.adId)}
+                              className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              Excluir
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -951,6 +1044,87 @@ export function QueueControlCenter({
                   "Salvar fila"
                 )}
               </Button>
+            </DialogFooter>
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
+
+      {/* Delete Queue Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogPopup className="sm:max-w-md p-0">
+          <DialogPanel>
+            <DialogHeader className="p-5 sm:p-6 border-b border-border/70">
+              <DialogTitle>Excluir fila</DialogTitle>
+              <DialogDescription>
+                {deleteTarget ? `Tem certeza que deseja excluir a fila "${deleteTarget.name}"?` : "Verificando pendências..."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-5 sm:p-6 space-y-4">
+              {loadingDependencies ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> Verificando pendências...
+                </div>
+              ) : deleteDependencies ? (
+                <div className="space-y-3">
+                  {(deleteDependencies.campaignRoutes.length > 0 || deleteDependencies.adRoutes.length > 0 || deleteDependencies.queuedLeads > 0) ? (
+                    <>
+                      <p className="text-sm font-medium text-foreground">Pendências encontradas:</p>
+                      <div className="space-y-2">
+                        {deleteDependencies.campaignRoutes.length > 0 && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">🎯 {deleteDependencies.campaignRoutes.length} campanha(s) vinculada(s)</p>
+                            <div className="mt-1 space-y-0.5">
+                              {deleteDependencies.campaignRoutes.map((r) => (
+                                <p key={r.campaignId} className="text-[11px] text-muted-foreground">• {r.campaignName ?? r.campaignId}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {deleteDependencies.adRoutes.length > 0 && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">📢 {deleteDependencies.adRoutes.length} anuncio(s) vinculado(s)</p>
+                            <div className="mt-1 space-y-0.5">
+                              {deleteDependencies.adRoutes.map((r) => (
+                                <p key={r.adId} className="text-[11px] text-muted-foreground">• {r.adName ?? r.adId}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {deleteDependencies.queuedLeads > 0 && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">📋 {deleteDependencies.queuedLeads} lead(s) na fila</p>
+                            <p className="text-[11px] text-muted-foreground">Leaves sem unidade ficarão na inbox geral.</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nenhuma pendência encontrada. A fila pode ser excluída normalmente.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={forceDeleting} className="active:scale-[0.97] transition-transform">Cancelar</Button>
+              {deleteDependencies && (deleteDependencies.campaignRoutes.length > 0 || deleteDependencies.adRoutes.length > 0 || deleteDependencies.queuedLeads > 0) ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => void forceDeleteQueue()}
+                  disabled={forceDeleting}
+                  className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", forceDeleting && "pointer-events-none")}
+                >
+                  {forceDeleting ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Desvinculando...</> : "Desvincular e excluir fila"}
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  onClick={() => void confirmDeleteQueue()}
+                  disabled={!deleteDependencies}
+                  className="active:scale-[0.97] transition-transform"
+                >
+                  Excluir fila
+                </Button>
+              )}
             </DialogFooter>
           </DialogPanel>
         </DialogPopup>

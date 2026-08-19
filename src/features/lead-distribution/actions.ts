@@ -14,7 +14,7 @@ import { enqueueLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { deleteDistributionQueue, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { deleteDistributionQueue, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -22,6 +22,7 @@ export type DistributionActionState = {
   error?: string;
   processed?: number;
   conflicts?: number;
+  campaignConflict?: { campaignId: string; queueName: string | null; leadId: string; branchId: string };
 };
 const leadId = z.string().uuid();
 const branchId = z.string().uuid();
@@ -127,6 +128,53 @@ export async function deleteDistributionQueueAction(queueId: string) {
   }
 }
 
+export type QueueDependencyInfo = {
+  campaignRoutes: Array<{ campaignId: string; campaignName: string | null }>; adRoutes: Array<{ adId: string; adName: string | null }>; queuedLeads: number;
+};
+
+export async function getQueueDependenciesAction(queueId: string): Promise<{ success: boolean; dependencies?: QueueDependencyInfo; error?: string }> {
+  try {
+    const context = await getRequiredTenantContext();
+    const deps = await getQueueDependencies(context, queueId);
+    return { success: true, dependencies: deps };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível verificar dependências da fila." };
+  }
+}
+
+export async function forceDeleteQueueAction(queueId: string) {
+  try {
+    await forceDeleteQueue(await getRequiredTenantContext(), queueId);
+    refreshDistribution();
+    return { success: true, message: "Fila excluída e dependências desvinculadas." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível forçar a exclusão da fila." };
+  }
+}
+
+export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
+  try {
+    const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), { campaignId, queueId: null, enabled: false });
+    refreshDistribution();
+    revalidatePath("/integrations/meta");
+    revalidatePath("/marketing/campanhas");
+    return { success: true, route, message: "Regra de campanha removida." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra da campanha." };
+  }
+}
+
+export async function deleteMetaAdQueueRouteAction(adId: string) {
+  try {
+    const route = await saveMetaAdQueueRoute(await getRequiredTenantContext(), { adId, queueId: null, enabled: false });
+    refreshDistribution();
+    revalidatePath("/integrations/meta");
+    return { success: true, route, message: "Regra de anúncio removida." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra do anúncio." };
+  }
+}
+
 export async function simulateDistributionAction(input: unknown) {
   try {
     return { success: true, ...(await simulateDistribution(await getRequiredTenantContext(), input)) };
@@ -198,11 +246,12 @@ export async function routeLeadToBranchAction(
   formData: FormData,
 ): Promise<DistributionActionState> {
   const parsed = z
-    .object({ leadId, branchId, reason: z.string().trim().min(3).max(200).optional() })
+    .object({ leadId, branchId, reason: z.string().trim().min(3).max(200).optional(), overrideCampaign: z.coerce.boolean().optional() })
     .safeParse({
       leadId: formData.get("leadId"),
       branchId: formData.get("branchId"),
       reason: String(formData.get("reason") ?? "") || undefined,
+      overrideCampaign: formData.get("overrideCampaign") === "true" ? true : undefined,
     });
   if (!parsed.success)
     return { error: parsed.error.issues[0]?.message ?? "Selecione uma unidade válida." };
@@ -213,7 +262,13 @@ export async function routeLeadToBranchAction(
       parsed.data.leadId,
       parsed.data.branchId,
       parsed.data.reason,
+      parsed.data.overrideCampaign,
     );
+    if (result.status === "campaign_conflict")
+      return {
+        error: "Este lead pertence a uma campanha vinculada a outra fila.",
+        campaignConflict: { campaignId: result.campaignId, queueName: result.queueName, leadId: parsed.data.leadId, branchId: parsed.data.branchId },
+      };
     if (result.status !== "routed")
       return {
         error:

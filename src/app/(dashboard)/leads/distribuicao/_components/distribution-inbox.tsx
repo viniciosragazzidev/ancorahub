@@ -25,6 +25,7 @@ import {
   routeLeadToBranchAction,
   type DistributionActionState,
 } from "@/features/lead-distribution/actions";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/utils/core/cn";
 
 type Lead = {
@@ -123,6 +124,7 @@ function ActionForm({
   children,
   fields,
   label,
+  onCampaignConflict,
 }: {
   action: (
     previous: DistributionActionState,
@@ -131,6 +133,7 @@ function ActionForm({
   children: React.ReactNode;
   fields: Record<string, string>;
   label: string;
+  onCampaignConflict?: (conflict: NonNullable<DistributionActionState["campaignConflict"]>, fields: Record<string, string>) => void;
 }) {
   const router = useRouter();
   const formKey = useId();
@@ -140,6 +143,15 @@ function ActionForm({
 
   // Feedback imediato via toast
   useActionFeedback(state, label);
+
+  // Detect campaign conflict and notify parent
+  const prevConflictRef = useState(state.campaignConflict);
+  if (state.campaignConflict !== prevConflictRef[0]) {
+    prevConflictRef[0] = state.campaignConflict;
+    if (state.campaignConflict && onCampaignConflict) {
+      onCampaignConflict(state.campaignConflict, fields);
+    }
+  }
 
   // Reset form + flash de sucesso
   const prevSuccessRef = useState(state.success);
@@ -194,6 +206,8 @@ export function DistributionInbox({
   const [unitFilter, setUnitFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [page, setPage] = useState(1);
+  const [campaignConflictDialog, setCampaignConflictDialog] = useState<DistributionActionState["campaignConflict"] | null>(null);
+  const [pendingOverrideFields, setPendingOverrideFields] = useState<Record<string, string> | null>(null);
 
   const selectable = useMemo(
     () =>
@@ -311,6 +325,7 @@ export function DistributionInbox({
   }, [assignState.success, router]);
 
   return (
+    <>
     <Card variant="overview" data-onboarding="manager-team-performance">
       <CardHeader className="border-b border-border px-5 pb-4 pt-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -568,6 +583,7 @@ export function DistributionInbox({
                                   action={routeLeadToBranchAction}
                                   fields={{ leadId: lead.id, branchId }}
                                   label={`enviar lead ${lead.name} para a unidade`}
+                                  onCampaignConflict={(conflict, f) => { setCampaignConflictDialog(conflict); setPendingOverrideFields(f); }}
                                 >
                                   <ArrowRight /> Enviar para unidade
                                 </ActionForm>
@@ -614,5 +630,76 @@ export function DistributionInbox({
         )}
       </CardContent>
     </Card>
+
+    {/* Campaign Conflict Dialog */}
+    <CampaignConflictDialog
+      conflict={campaignConflictDialog}
+      fields={pendingOverrideFields}
+      onClose={() => { setCampaignConflictDialog(null); setPendingOverrideFields(null); }}
+    />
+    </>
+  );
+}
+
+function CampaignConflictDialog({
+  conflict,
+  fields,
+  onClose,
+}: {
+  conflict: DistributionActionState["campaignConflict"] | null;
+  fields: Record<string, string> | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [overriding, setOverriding] = useState(false);
+
+  async function handleOverride() {
+    if (!fields) return;
+    setOverriding(true);
+    const formData = new FormData();
+    for (const [k, v] of Object.entries(fields)) formData.set(k, v);
+    formData.set("overrideCampaign", "true");
+    const result = await routeLeadToBranchAction({}, formData);
+    setOverriding(false);
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.success) {
+      toast.success(result.message ?? "Lead enviado com sucesso.", { description: "A regra da campanha foi ignorada (override manual)." });
+      router.refresh();
+    }
+    onClose();
+  }
+
+  return (
+    <Dialog open={!!conflict} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogPopup className="sm:max-w-md p-0">
+        <DialogPanel>
+          <DialogHeader className="p-5 sm:p-6 border-b border-border/70">
+            <DialogTitle>Conflito de campanha</DialogTitle>
+            <DialogDescription>
+              Este lead pertence à campanha "{conflict?.campaignId}" que está vinculada a outra fila{conflict?.queueName ? ` ("${conflict.queueName}")` : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-5 sm:p-6">
+            <p className="text-sm text-muted-foreground">
+              Você pode alterar a regra da campanha para incluir esta unidade, ou forçar o envio ignorando a regra existente.
+            </p>
+          </div>
+          <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={overriding} className="active:scale-[0.97] transition-transform">
+              Cancelar
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => void handleOverride()}
+              disabled={overriding}
+              className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", overriding && "pointer-events-none")}
+            >
+              {overriding ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Enviando...</> : "Forçar envio (override)"}
+            </Button>
+          </DialogFooter>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
   );
 }

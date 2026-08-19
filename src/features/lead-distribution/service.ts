@@ -155,7 +155,7 @@ export async function validateCampaignQueueRoute(
   return { allowed: true };
 }
 
-export async function routeLeadToBranch(context: TenantContext, leadId: string, branchId: string, reason = "Distribuição manual para unidade"): Promise<LeadRoutingResult> {
+export async function routeLeadToBranch(context: TenantContext, leadId: string, branchId: string, reason = "Distribuição manual para unidade", overrideCampaign = false): Promise<LeadRoutingResult> {
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem distribuir leads.");
   assertBranchScope(context, branchId);
   const db = getDatabase();
@@ -168,13 +168,15 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   } catch {
     // Unidade sem fila: roteamento continua sem fila vinculada
   }
-  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, metaCampaignId: schema.leads.metaCampaignId, sourceCampaign: schema.leads.sourceCampaign }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "failed", code: "LEAD_NOT_FOUND" };
 
-  if (queueId) {
+  if (queueId && !overrideCampaign) {
     const campaignCheck = await validateCampaignQueueRoute(db, context.tenantId, leadId, queueId);
     if (!campaignCheck.allowed) {
-      throw new AuthorizationError(campaignCheck.reason ?? "Campanha não permitida para esta fila.");
+      const campaignId = lead.metaCampaignId || lead.sourceCampaign;
+      const [targetQueue] = queueId ? await db.select({ name: schema.leadQueues.name }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1) : [];
+      return { status: "campaign_conflict", campaignId: campaignId ?? "unknown", queueName: targetQueue?.name ?? null, targetBranchId: branchId };
     }
   }
 
