@@ -25,6 +25,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/internal/jobs/purge",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/internal/jobs/waha-cadence",
       "schedule": "*/5 * * * *"
     }

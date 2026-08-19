@@ -72,6 +72,19 @@ function logDbConfig(databaseUrl: string): void {
   }
 }
 
+/**
+ * Server-wide guard: no single statement may monopolize a pooled connection.
+ * Supabase pooler connections are shared by every route; a slow statement
+ * (full scans, unbounded deletes) blocks all requests behind it. Bounded
+ * here so runaway queries fail fast instead of hanging the whole app.
+ * Operators can tune or disable via DB_STATEMENT_TIMEOUT_MS.
+ */
+function statementTimeoutMs(): number {
+  const configured = Number.parseInt(process.env.DB_STATEMENT_TIMEOUT_MS ?? "", 10);
+  if (Number.isFinite(configured) && configured >= 1_000) return configured;
+  return 30_000;
+}
+
 function createPostgresDatabase(databaseUrl: string): Database {
   logDbConfig(databaseUrl);
 
@@ -82,6 +95,10 @@ function createPostgresDatabase(databaseUrl: string): Database {
       connect_timeout: 10,
       idle_timeout: 5,
       max_lifetime: 60,
+      connection: {
+        statement_timeout: statementTimeoutMs(),
+        idle_in_transaction_session_timeout: 60_000,
+      },
       onnotice: () => {}, // Suppress noisy notices
     }),
     { schema },
@@ -100,6 +117,7 @@ export function getDatabase(): Database {
         max: connectionLimit(),
         idleTimeoutMillis: 5000,
         connectionTimeoutMillis: 5000,
+        options: `-c statement_timeout=${statementTimeoutMs()}`,
       }),
       { schema },
     ) as unknown as Database;

@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { resetTenantOperationalDataAction } from "@/app/(platform-admin)/super-admin/actions";
 import { purgeTenantOperationalData } from "./service";
 
+const { startPurgeJobMock, processPurgeJobMock } = vi.hoisted(() => ({
+  startPurgeJobMock: vi.fn().mockResolvedValue({ jobId: "job-123" }),
+  processPurgeJobMock: vi.fn().mockResolvedValue({ completed: false }),
+}));
+
+vi.mock("./purge-job", () => ({
+  startPurgeJob: (...args: unknown[]) => startPurgeJobMock(...args),
+  processPurgeJob: (...args: unknown[]) => processPurgeJobMock(...args),
+}));
+
 vi.mock("@/shared/auth/platform-admin", () => ({
   getRequiredPlatformAdmin: vi.fn().mockResolvedValue({
     userId: "admin-user-123",
@@ -118,15 +128,14 @@ describe("Operational Data Reset (Super Admin)", () => {
     );
   });
 
-  it("resetTenantOperationalDataAction executes successfully with valid inputs", async () => {
+  it("resetTenantOperationalDataAction starts an async purge job and returns its id", async () => {
     const formData = new FormData();
     formData.append("tenantId", validTenantId);
     formData.append("confirmation", "RESET");
 
     const result = await resetTenantOperationalDataAction(formData);
-    expect(result).toEqual({
-      deletedLeadsCount: 5,
-      deletedConversationsCount: 5,
-    });
+    expect(result).toEqual({ jobId: "job-123", started: true });
+    expect(startPurgeJobMock).toHaveBeenCalledWith(validTenantId);
+    expect(processPurgeJobMock).toHaveBeenCalledWith("job-123", { timeBudgetMs: 45_000 });
   });
 });

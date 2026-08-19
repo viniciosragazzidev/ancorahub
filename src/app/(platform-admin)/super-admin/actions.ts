@@ -830,9 +830,9 @@ export async function resetTenantOperationalDataAction(formData: FormData) {
   // Start async purge job — returns immediately
   const { jobId } = await startPurgeJob(parsed.data);
 
-  // Fire-and-forget: process the job in background
-  // The UI will poll for progress via getPurgeJobStatusAction
-  processPurgeJob(jobId).catch((err) => {
+  // Kick an initial time-boxed slice; the /api/internal/jobs/purge cron
+  // resumes any pending/running job until it reaches "completed".
+  processPurgeJob(jobId, { timeBudgetMs: 45_000 }).catch((err) => {
     console.error("[purge-job] Background processing failed:", err);
   });
 
