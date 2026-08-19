@@ -111,6 +111,14 @@ export function DocumentsWorkspace({
     }
   }, [reqState]);
 
+  useEffect(() => {
+    setRequirements(initialRequirements);
+  }, [initialRequirements]);
+
+  useEffect(() => {
+    setPendingDocs(initialPendingDocs);
+  }, [initialPendingDocs]);
+
   const handleDeleteReq = (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este requisito?")) return;
     startTransition(async () => {

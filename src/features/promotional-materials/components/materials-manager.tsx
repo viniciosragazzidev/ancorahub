@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +93,7 @@ export function MaterialsManager({ materials }: { materials: Material[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<FormDataState>(emptyForm);
+  const router = useRouter();
 
   const [createState, createFormAction, createPending] =
     useActionState<PromotionalMaterialActionState, FormData>(
@@ -136,14 +138,20 @@ export function MaterialsManager({ materials }: { materials: Material[] }) {
   async function handleToggle(id: string, currentActive: boolean) {
     const result = await togglePromotionalMaterialActive(id, !currentActive);
     if (result.error) toast.error(result.error);
-    else toast.success(currentActive ? "Material desativado." : "Material ativado.");
+    else {
+      toast.success(currentActive ? "Material desativado." : "Material ativado.");
+      router.refresh();
+    }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("Tem certeza que deseja excluir este material?")) return;
     const result = await deletePromotionalMaterial(id);
     if (result.error) toast.error(result.error);
-    else toast.success("Material excluído.");
+    else {
+      toast.success("Material excluído.");
+      router.refresh();
+    }
   }
 
   return (

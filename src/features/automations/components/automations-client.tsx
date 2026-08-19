@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: AutomationsClientProps) {
   const automations = initialAutomations;
   const logs = initialLogs;
+  const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [editingAutomation, setEditingAutomation] = React.useState<Automation | null>(null);
 
@@ -127,7 +129,7 @@ export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: 
       setTemplateBody("");
       setDescription("");
       // Realreload or state update
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao criar automacao.");
     }
@@ -149,7 +151,7 @@ export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: 
     if (res.success) {
       toast.success("Automacao atualizada com sucesso.");
       setEditingAutomation(null);
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao atualizar automacao.");
     }
@@ -159,7 +161,7 @@ export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: 
     const res = await updateAutomationAction(id, { status });
     if (res.success) {
       toast.success(`Status atualizado para ${STATUS_LABELS[status]}.`);
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao alterar status.");
     }
@@ -170,7 +172,7 @@ export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: 
     const res = await deleteAutomationAction(id);
     if (res.success) {
       toast.success("Automacao excluida com sucesso.");
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao excluir automacao.");
     }
@@ -180,7 +182,7 @@ export function AutomationsClient({ initialAutomations, initialLogs, isAdmin }: 
     const res = await retryAutomationLogAction(logId);
     if (res.success) {
       toast.success("Log reenviado para a fila de execucao.");
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao tentar reprocessar.");
     }

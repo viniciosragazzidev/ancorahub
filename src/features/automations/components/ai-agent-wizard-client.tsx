@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ interface AiAgentWizardClientProps {
 
 export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps) {
   const [step, setStep] = React.useState(1);
+  const router = useRouter();
   const [enabled, setEnabled] = React.useState(initialConfig.enabled);
   const [assistantName, setAssistantName] = React.useState(initialConfig.assistantName);
   const [initialMessage, setInitialMessage] = React.useState(initialConfig.initialMessage);
@@ -69,7 +71,7 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
 
     if (res.success) {
       toast.success("Configuracoes do assistente de IA salvas com sucesso.");
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao salvar configuracoes.");
     }

@@ -89,6 +89,7 @@ export async function createPromotionalMaterial(
 
     revalidatePath("/super-admin/materiais-divulgacao");
     revalidatePath("/materiais-divulgacao");
+    revalidatePath("/materiais-divulgacao/gerenciar");
 
     return { success: true };
   } catch (error) {
@@ -146,6 +147,7 @@ export async function updatePromotionalMaterial(
 
     revalidatePath("/super-admin/materiais-divulgacao");
     revalidatePath("/materiais-divulgacao");
+    revalidatePath("/materiais-divulgacao/gerenciar");
 
     return { success: true };
   } catch (error) {
@@ -175,6 +177,7 @@ export async function togglePromotionalMaterialActive(
 
     revalidatePath("/super-admin/materiais-divulgacao");
     revalidatePath("/materiais-divulgacao");
+    revalidatePath("/materiais-divulgacao/gerenciar");
 
     return { success: true };
   } catch (error) {

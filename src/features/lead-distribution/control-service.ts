@@ -233,6 +233,38 @@ export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unk
   return { adId: ad.adId, queueId: queue?.id ?? null, enabled: input.enabled };
 }
 
+export async function deleteMetaCampaignQueueRoute(context: TenantContext, campaignId: string) {
+  const db = getDatabase();
+  const [route] = await db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId })
+    .from(schema.metaCampaignQueueRoutes)
+    .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, campaignId)))
+    .limit(1);
+  if (!route) throw new AuthorizationError("Regra de campanha não encontrada.");
+  await db.delete(schema.metaCampaignQueueRoutes)
+    .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, campaignId)));
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaignId,
+    acao: "meta_campaign_queue_route.deleted",
+  });
+  return { campaignId };
+}
+
+export async function deleteMetaAdQueueRoute(context: TenantContext, adId: string) {
+  const db = getDatabase();
+  const [route] = await db.select({ adId: schema.metaAdQueueRoutes.adId })
+    .from(schema.metaAdQueueRoutes)
+    .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), eq(schema.metaAdQueueRoutes.adId, adId)))
+    .limit(1);
+  if (!route) throw new AuthorizationError("Regra de anúncio não encontrada.");
+  await db.delete(schema.metaAdQueueRoutes)
+    .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), eq(schema.metaAdQueueRoutes.adId, adId)));
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: context.userId, entidade: "meta_ad_queue_route", entidadeId: adId,
+    acao: "meta_ad_queue_route.deleted",
+  });
+  return { adId };
+}
+
 export async function simulateDistribution(context: TenantContext, rawInput: unknown) {
   const input = simulationInput.parse(rawInput);
   if (input.branchId) {

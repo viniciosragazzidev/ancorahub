@@ -14,7 +14,7 @@ import { enqueueLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { deleteDistributionQueue, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -106,7 +106,10 @@ export async function saveDistributionPolicyAction(
   }
 }
 
-function refreshDistribution() {}
+function refreshDistribution() {
+  revalidatePath("/leads/distribuicao");
+  revalidatePath("/leads/distribuicao/plantao");
+}
 
 export async function saveDistributionQueueAction(input: unknown) {
   try {
@@ -154,11 +157,11 @@ export async function forceDeleteQueueAction(queueId: string) {
 
 export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
   try {
-    const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), { campaignId, queueId: null, enabled: false });
+    const route = await deleteMetaCampaignQueueRoute(await getRequiredTenantContext(), campaignId);
     refreshDistribution();
     revalidatePath("/integrations/meta");
     revalidatePath("/marketing/campanhas");
-    return { success: true, route, message: "Regra de campanha removida." };
+    return { success: true, route, message: "Regra de campanha removida. A campanha voltará a usar a fila geral." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra da campanha." };
   }
@@ -166,10 +169,10 @@ export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
 
 export async function deleteMetaAdQueueRouteAction(adId: string) {
   try {
-    const route = await saveMetaAdQueueRoute(await getRequiredTenantContext(), { adId, queueId: null, enabled: false });
+    const route = await deleteMetaAdQueueRoute(await getRequiredTenantContext(), adId);
     refreshDistribution();
     revalidatePath("/integrations/meta");
-    return { success: true, route, message: "Regra de anúncio removida." };
+    return { success: true, route, message: "Regra de anúncio removida. O anúncio voltará a usar a fila geral." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra do anúncio." };
   }

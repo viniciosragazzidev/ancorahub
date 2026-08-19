@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ComponentType } from "react";
+import { useRouter } from "next/navigation";
 import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Lightning, MagnifyingGlass } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,7 @@ export function QueueControlCenter({
   const [loadingDependencies, setLoadingDependencies] = useState(false);
   const [forceDeleting, setForceDeleting] = useState(false);
   const [editingRoute, setEditingRoute] = useState<{ type: "campaign" | "ad"; id: string; queueId: string } | null>(null);
+  const router = useRouter();
 
   const activeCampaigns = useMemo(
     () => campaigns.filter((c) => (c.status ?? "").toUpperCase() === "ACTIVE"),
@@ -147,6 +149,7 @@ export function QueueControlCenter({
     setDeletingId(null);
     if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.");
     toast.success(result.message, { description: `A fila "${deleteTarget.name}" foi removida.` });
+    router.refresh();
   }
 
   async function forceDeleteQueue() {
@@ -159,6 +162,7 @@ export function QueueControlCenter({
     setDeleteDependencies(null);
     if (!result.success) return toast.error(result.error ?? "Não foi possível forçar a exclusão.");
     toast.success(result.message, { description: `A fila "${deleteTarget.name}" e todas as dependências foram removidas.` });
+    router.refresh();
   }
 
   const branchQueues = useMemo(
@@ -263,6 +267,7 @@ export function QueueControlCenter({
     if (!result.success) return toast.error(result.error ?? "Não foi possível salvar a fila.", { description: "Verifique os dados e tente novamente." });
     toast.success(result.message, { description: editingId ? `A fila "${form.name}" foi atualizada.` : `A fila "${form.name}" está pronta para receber leads.` });
     setEditorOpen(false);
+    router.refresh();
   }
 
   async function toggleCampaignForQueue(campaignId: string, queueId: string, enabled: boolean) {
@@ -271,6 +276,7 @@ export function QueueControlCenter({
     setSavingCampaignRoute(false);
     if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.", { description: "Verifique se a fila está ativa." });
     toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."), { description: enabled ? "Leads dessa campanha serão direcionados automaticamente." : "A campanha voltará a usar a fila geral." });
+    router.refresh();
   }
 
   async function runSimulation() {
@@ -287,6 +293,7 @@ export function QueueControlCenter({
     setSavingCampaignRoute(false);
     if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.", { description: "Verifique se a fila está ativa." });
     toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Campanha ignorada pelo CRM."), { description: enabled ? "Leads serão direcionados automaticamente." : "A campanha não será registrada no CRM." });
+    router.refresh();
   }
 
   async function saveAdRoute(enabled: boolean) {
@@ -295,6 +302,7 @@ export function QueueControlCenter({
     setSavingAdRoute(false);
     if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar o anúncio.", { description: "Verifique se a fila está ativa." });
     toast.success(result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."), { description: enabled ? "Leads deste anúncio serão direcionados automaticamente." : "O anúncio não será registrado no CRM." });
+    router.refresh();
   }
 
   async function deleteMetaCampaignRoute(campaignId: string) {
@@ -302,6 +310,7 @@ export function QueueControlCenter({
     const result = await deleteMetaCampaignQueueRouteAction(campaignId);
     if (!result.success) return toast.error(result.error ?? "Não foi possível remover a regra.");
     toast.success(result.message);
+    router.refresh();
   }
 
   async function deleteMetaAdRoute(adId: string) {
@@ -309,6 +318,7 @@ export function QueueControlCenter({
     const result = await deleteMetaAdQueueRouteAction(adId);
     if (!result.success) return toast.error(result.error ?? "Não foi possível remover a regra.");
     toast.success(result.message);
+    router.refresh();
   }
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ const FLOW_TEMPLATES = [
 
 export function WhatsappFlowsClient({ initialFlows }: WhatsappFlowsClientProps) {
   const flows = initialFlows;
+  const router = useRouter();
   const [activeTemplate, setActiveTemplate] = React.useState<typeof FLOW_TEMPLATES[number] | null>(null);
 
   // Config form states
@@ -92,7 +94,7 @@ export function WhatsappFlowsClient({ initialFlows }: WhatsappFlowsClientProps) 
     if (res.success) {
       toast.success("Fluxo operacional criado com sucesso.");
       setActiveTemplate(null);
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao criar fluxo.");
     }
@@ -103,7 +105,7 @@ export function WhatsappFlowsClient({ initialFlows }: WhatsappFlowsClientProps) 
     const res = await updateWhatsappFlowAction(flow.id, { status: newStatus });
     if (res.success) {
       toast.success(`Fluxo ${flow.status === "active" ? "pausado" : "ativado"} com sucesso.`);
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao alterar status.");
     }
@@ -114,7 +116,7 @@ export function WhatsappFlowsClient({ initialFlows }: WhatsappFlowsClientProps) 
     const res = await deleteWhatsappFlowAction(id);
     if (res.success) {
       toast.success("Fluxo excluido com sucesso.");
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao excluir fluxo.");
     }

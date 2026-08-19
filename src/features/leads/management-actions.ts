@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -67,7 +66,6 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       void notifyLeadReassigned(lead.id, lead.tenantId, lead.corretorId, lead.nome).catch(console.error);
     }
 
-    revalidatePath(`/leads/${lead.id}`); revalidatePath("/leads"); revalidatePath("/dashboard");
     return { success: true };
   } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível reatribuir o lead." }; }
 }
@@ -84,7 +82,6 @@ export async function assumeLeadForInvestigationAction(_prev: ManagementActionSt
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead assumido para investigação por ${context.role === "director" ? "Diretor" : "Gestor"}. Motivo: ${reason}` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "assumiu_lead_investigacao" });
     });
-    revalidatePath(`/leads/${lead.id}`); revalidatePath("/leads"); revalidatePath("/dashboard");
     return { success: true };
   } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível assumir o lead para investigação." }; }
 }
@@ -109,7 +106,6 @@ export async function assumeLeadForMessagingAction(leadId: string): Promise<Mana
       return true;
     });
     if (!updated) throw new Error("Este atendimento foi assumido por outra pessoa. Atualize a página.");
-    revalidatePath(`/leads/${lead.id}`); revalidatePath("/leads"); revalidatePath("/dashboard");
     return { success: true };
   } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível assumir o atendimento." }; }
 }

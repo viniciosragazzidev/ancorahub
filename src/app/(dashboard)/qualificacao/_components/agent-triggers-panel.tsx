@@ -77,11 +77,64 @@ export function AgentTriggersPanel() {
         if (item.key === key) {
           const next = !item.enabled;
           toast.success(`Capacidade "${item.name}" ${next ? "ativada" : "desativada"}.`);
-          return { ...item, enabled: next };
+          return { ...item, enabled: next, version: item.version + 1 };
         }
         return item;
       })
     );
+  }
+
+  function handleSaveCapability() {
+    if (!formName.trim()) {
+      toast.error("Informe o nome da capacidade.");
+      return;
+    }
+    if (editingCap) {
+      setCapabilities((prev) =>
+        prev.map((item) =>
+          item.key === editingCap.key
+            ? {
+                ...item,
+                name: formName.trim(),
+                description: formDescription.trim(),
+                category: formCategory,
+                riskLevel: formRiskLevel,
+                executionScope: formScope,
+                repeatPolicy: formRepeatPolicy,
+                keywords: formKeywords.split(",").map((k) => k.trim()).filter(Boolean),
+                version: item.version + 1,
+              }
+            : item,
+        ),
+      );
+      toast.success(`Capacidade "${formName.trim()}" atualizada no Registry.`);
+    } else {
+      const key = `CUSTOM_${formName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+      const capability: AgentCapabilityDefinition = {
+        key,
+        name: formName.trim(),
+        description: formDescription.trim(),
+        category: formCategory,
+        riskLevel: formRiskLevel,
+        executionScope: formScope,
+        repeatPolicy: formRepeatPolicy,
+        keywords: formKeywords.split(",").map((k) => k.trim()).filter(Boolean),
+        allowedConversationStates: [],
+        requiredPermissions: [],
+        requiredFacts: [],
+        producedFacts: [],
+        preconditions: [],
+        postconditions: [],
+        idempotencyStrategy: `${key.toLowerCase()}:{eventId}`,
+        canRunWhenHumanActive: true,
+        canRunAfterOptOut: false,
+        enabled: true,
+        version: 1,
+      };
+      setCapabilities((prev) => [...prev, capability]);
+      toast.success(`Capacidade "${formName.trim()}" registrada no Engine.`);
+    }
+    setOpenModal(false);
   }
 
   function renderRiskBadge(risk: AgentRiskLevel) {
@@ -252,7 +305,7 @@ export function AgentTriggersPanel() {
       {/* MODAL DE EDITAR / CRIAR CAPACIDADE */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
         <DialogPopup className="max-w-lg">
-          <form onSubmit={(e) => { e.preventDefault(); setOpenModal(false); toast.success("Capacidade registrada no Engine!"); }}>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveCapability(); }}>
             <DialogHeader>
               <DialogTitle className="text-base flex items-center gap-2">
                 <Zap className="size-4 text-amber-500" />

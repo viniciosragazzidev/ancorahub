@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useCallback } from "react";
+import { useActionState, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,26 @@ export function FeedbackTemplatesClient({ initialTemplates }: Props) {
     {},
   );
 
+  const router = useRouter();
+
+  useEffect(() => {
+    setTemplates(initialTemplates);
+  }, [initialTemplates]);
+
+  useEffect(() => {
+    if (!createState.success && !createState.error) return;
+    if (createState.error) {
+      toast.error(createState.error);
+      return;
+    }
+    toast.success("Template criado com sucesso!");
+    setEditing(false);
+    setName("");
+    setDescription("");
+    setItems([{ id: crypto.randomUUID(), question: "", answerType: "boolean", options: [], required: true }]);
+    router.refresh();
+  }, [createState, router]);
+
   const addItem = useCallback(() => {
     setItems((prev) => [...prev, { id: crypto.randomUUID(), question: "", answerType: "boolean", options: [], required: true }]);
   }, []);
@@ -66,14 +87,6 @@ export function FeedbackTemplatesClient({ initialTemplates }: Props) {
     ));
 
     createAction(formData);
-    if (createState.success) {
-      toast.success("Template criado com sucesso!");
-      setEditing(false);
-      setName("");
-      setDescription("");
-      setItems([{ id: crypto.randomUUID(), question: "", answerType: "boolean", options: [], required: true }]);
-    }
-    if (createState.error) toast.error(createState.error);
   };
 
   return (
@@ -210,7 +223,10 @@ export function FeedbackTemplatesClient({ initialTemplates }: Props) {
                 <Button
                   formAction={async (fd: FormData) => {
                     const result = await toggleChecklistTemplateAction({}, fd);
-                    if (result.success) toast.success("Template atualizado.");
+                    if (result.success) {
+                      toast.success("Template atualizado.");
+                      router.refresh();
+                    }
                     if (result.error) toast.error(result.error);
                   }}
                   size="xs"
