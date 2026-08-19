@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   createTenantAccessAction,
   resetTenantOperationalDataAction,
+  getPurgeJobStatusAction,
   setTenantStatusAction,
   updateCleanUiOperationalLegacyTenantAction,
   updateMetaLeadAdsPilotAction,
@@ -261,7 +262,12 @@ export default async function SuperAdminTenantDetailPage({
               </CardContent>
             </Card>
 
-            <ResetTenantDataCard action={resetTenantOperationalDataAction} tenantId={tenant.id} tenantName={tenant.name} />
+            <ResetTenantDataCard
+              action={resetTenantOperationalDataAction}
+              getPurgeStatus={getPurgeJobStatusAction}
+              tenantId={tenant.id}
+              tenantName={tenant.name}
+            />
           </div>
         </section>
       </main>

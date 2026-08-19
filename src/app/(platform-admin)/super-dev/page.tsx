@@ -6,12 +6,17 @@ import { Buildings, ShieldStar, WarningCircle, Clock, ChartLineUp } from "@/comp
 import Link from "next/link";
 
 export default async function SuperDevDashboard() {
-  const [tenants, sessions, lossAlerts, logs] = await Promise.all([
+  const [tenantsResult, sessionsResult, lossAlertsResult, logsResult] = await Promise.allSettled([
     getPlatformTenants(),
-    getActiveSessions(),
+    getActiveSessions(100),
     getLossRateAlerts(),
-    getPlatformAuditLogs(),
+    getPlatformAuditLogs(50),
   ]);
+
+  const tenants = tenantsResult.status === "fulfilled" ? tenantsResult.value : [];
+  const sessions = sessionsResult.status === "fulfilled" ? sessionsResult.value : [];
+  const lossAlerts = lossAlertsResult.status === "fulfilled" ? lossAlertsResult.value : [];
+  const logs = logsResult.status === "fulfilled" ? logsResult.value : [];
 
   const activeTenants = tenants.filter(t => t.status === "active").length;
 

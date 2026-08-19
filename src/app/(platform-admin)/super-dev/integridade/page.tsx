@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function SuperDevIntegrityPage() {
   const db = getDatabase();
 
-  const [auditLogs, tenantCount, leadCount, vpsHealth, healthMatrix, metricsSummary] = await Promise.all([
+  const [auditLogsResult, tenantCountResult, leadCountResult, vpsHealthResult, healthMatrixResult, metricsSummaryResult] = await Promise.allSettled([
     db
       .select({
         id: schema.auditLogs.id,
@@ -33,6 +33,13 @@ export default async function SuperDevIntegrityPage() {
     runHealthChecks().catch(() => null),
     Promise.resolve(getMetricsSummary(300_000)),
   ]);
+
+  const auditLogs = auditLogsResult.status === "fulfilled" ? auditLogsResult.value : [];
+  const tenantCount = tenantCountResult.status === "fulfilled" ? tenantCountResult.value : [];
+  const leadCount = leadCountResult.status === "fulfilled" ? leadCountResult.value : [];
+  const vpsHealth = vpsHealthResult.status === "fulfilled" ? vpsHealthResult.value : { status: "offline" as const, checkedAt: new Date().toISOString(), latencyMs: 0, errorCode: "timeout" };
+  const healthMatrix = healthMatrixResult.status === "fulfilled" ? healthMatrixResult.value : null;
+  const metricsSummary = metricsSummaryResult.status === "fulfilled" ? metricsSummaryResult.value : null;
 
   const actionLabels: Record<string, string> = {
     create: "Criação",

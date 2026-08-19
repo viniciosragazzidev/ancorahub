@@ -143,7 +143,7 @@ export async function createTenantAccess(rawInput: unknown) {
   await writeAudit("tenant_access.created", "tenant_membership", userId, { tenantId: input.tenantId, role: input.role });
 }
 
-export async function getPlatformAuditLogs() {
+export async function getPlatformAuditLogs(limit = 100) {
   await getRequiredPlatformAdmin();
   const db = getDatabase();
   return db.select({
@@ -157,7 +157,8 @@ export async function getPlatformAuditLogs() {
     actorEmail: schema.user.email,
   }).from(schema.platformAuditLogs)
     .innerJoin(schema.user, eq(schema.platformAuditLogs.actorUserId, schema.user.id))
-    .orderBy(schema.platformAuditLogs.createdAt);
+    .orderBy(schema.platformAuditLogs.createdAt)
+    .limit(limit);
 }
 
 export async function getTenantAuditLogs() {
@@ -177,7 +178,7 @@ export async function getTenantAuditLogs() {
     .orderBy(schema.auditLogs.createdAt);
 }
 
-export async function getActiveSessions() {
+export async function getActiveSessions(limit = 200) {
   await getRequiredPlatformAdmin();
   const db = getDatabase();
   return db.select({
@@ -191,7 +192,8 @@ export async function getActiveSessions() {
     userId: schema.user.id,
   }).from(schema.session)
     .innerJoin(schema.user, eq(schema.session.userId, schema.user.id))
-    .orderBy(schema.session.createdAt);
+    .orderBy(schema.session.createdAt)
+    .limit(limit);
 }
 
 export async function terminateSession(sessionId: string) {
@@ -205,6 +207,8 @@ export async function getLossRateAlerts() {
   await getRequiredPlatformAdmin();
   const db = getDatabase();
 
+  // Filtrar no DB: apenas corretores com >= 3 leads E >= 75% perda.
+  // Isso evita carregar TODOS os leads para calcular no JS.
   const brokersLeads = await db.select({
     corretorId: schema.leads.corretorId,
     corretorNome: schema.user.name,
@@ -213,17 +217,14 @@ export async function getLossRateAlerts() {
     lost: sql<number>`count(case when ${schema.leads.status} = 'lost' then 1 end)::int`,
   }).from(schema.leads)
     .innerJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
-    .groupBy(schema.leads.corretorId, schema.user.name, schema.user.email);
+    .groupBy(schema.leads.corretorId, schema.user.name, schema.user.email)
+    .having(sql`count(${schema.leads.id}) >= 3 AND count(case when ${schema.leads.status} = 'lost' then 1 end)::float / nullif(count(${schema.leads.id}), 0) >= 0.75`)
+    .limit(50);
 
-  return brokersLeads
-    .map((broker) => {
-      const rate = broker.total > 0 ? (broker.lost / broker.total) * 100 : 0;
-      return {
-        ...broker,
-        rate: Math.round(rate),
-      };
-    })
-    .filter((broker) => broker.rate >= 75 && broker.total >= 3); // Minimum 3 leads to avoid noise
+  return brokersLeads.map((broker) => ({
+    ...broker,
+    rate: Math.round((broker.lost / broker.total) * 100),
+  }));
 }
 
 export async function purgeUserLGPD(userId: string) {

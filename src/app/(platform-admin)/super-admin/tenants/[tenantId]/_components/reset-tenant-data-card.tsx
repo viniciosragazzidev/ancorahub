@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AlertCircleIcon, Delete02Icon, Loading02Icon, ShieldKeyIcon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, CheckmarkCircle02Icon, Delete02Icon, Loading02Icon, ShieldKeyIcon } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,19 +19,90 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/utils/core/cn";
+
+type PurgeJobStatus = {
+  status: string;
+  totalLeads: number | null;
+  deletedLeads: number | null;
+  totalConversations: number | null;
+  deletedConversations: number | null;
+  currentPhase: string | null;
+  error: string | null;
+  completedAt: Date | null;
+};
+
+const PHASE_LABELS: Record<string, string> = {
+  starting: "Preparando...",
+  outboxes: "Limpando filas de envio...",
+  ai_logs: "Removendo logs de IA...",
+  notifications: "Removendo notificações...",
+  interactions: "Removendo interações...",
+  documents: "Removendo documentos...",
+  sales: "Removendo vendas e comissões...",
+  marketing: "Removendo dados de marketing...",
+  tasks: "Removendo tarefas...",
+  quotes: "Removendo cotações...",
+  clients: "Removendo clientes...",
+  leads: "Removendo leads...",
+  completed: "Concluído!",
+  failed: "Falha",
+};
 
 export function ResetTenantDataCard({
   tenantId,
   tenantName,
   action,
+  getPurgeStatus,
 }: {
   tenantId: string;
   tenantName: string;
-  action: (formData: FormData) => Promise<{ deletedLeadsCount: number; deletedConversationsCount: number }>;
+  action: (formData: FormData) => Promise<{ jobId: string; started: boolean }>;
+  getPurgeStatus: (jobId: string) => Promise<PurgeJobStatus>;
 }) {
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [purgeJobId, setPurgeJobId] = useState<string | null>(null);
+  const [purgeStatus, setPurgeStatus] = useState<PurgeJobStatus | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  const startPolling = useCallback(
+    (jobId: string) => {
+      setPurgeJobId(jobId);
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await getPurgeStatus(jobId);
+          setPurgeStatus(status);
+          if (status.status === "completed" || status.status === "failed") {
+            stopPolling();
+            if (status.status === "completed") {
+              toast.success(
+                `Purge concluído! ${status.deletedLeads ?? 0} leads e ${status.deletedConversations ?? 0} conversas removidos.`,
+              );
+              setOpen(false);
+            } else {
+              toast.error(`Purge falhou: ${status.error ?? "Erro desconhecido"}`);
+            }
+          }
+        } catch {
+          // Polling error — ignore, will retry
+        }
+      }, 2000);
+    },
+    [getPurgeStatus, stopPolling],
+  );
 
   const handleReset = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,10 +118,8 @@ export function ResetTenantDataCard({
         formData.append("confirmation", confirmation);
 
         const result = await action(formData);
-        toast.success(
-          `Operação concluída! ${result.deletedLeadsCount} leads e ${result.deletedConversationsCount} conversas zerados em ${tenantName}.`
-        );
-        setOpen(false);
+        toast.info("Purge iniciado! A operação roda em background.");
+        startPolling(result.jobId);
         setConfirmation("");
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Erro ao resetar dados da empresa.";
@@ -111,49 +180,105 @@ export function ResetTenantDataCard({
               </DialogHeader>
 
               <div className="py-4 space-y-3">
-                <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive space-y-1">
-                  <p className="font-semibold">⚠️ Ação irreversível!</p>
-                  <p>A equipe, números de WhatsApp, anúncios Meta e treinamentos de IA permanecerão intactos.</p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirmation-code" className="text-xs">
-                    Para confirmar, digite <strong className="text-foreground">RESET</strong> abaixo:
-                  </Label>
-                  <Input
-                    id="confirmation-code"
-                    value={confirmation}
-                    onChange={(e) => setConfirmation(e.target.value)}
-                    placeholder="RESET"
-                    autoComplete="off"
-                    className="font-mono uppercase text-xs"
-                  />
-                </div>
+                {purgeStatus && purgeStatus.status !== "completed" && purgeStatus.status !== "failed" ? (
+                  /* ── Progress View ── */
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <HugeiconsIcon icon={Loading02Icon} className="size-4 animate-spin text-primary" />
+                      <span className="text-sm font-semibold">Purge em andamento...</span>
+                    </div>
+                    <div className="rounded-md bg-muted/50 p-3 space-y-2">
+                      <p className="text-xs font-medium text-foreground">
+                        {PHASE_LABELS[purgeStatus.currentPhase ?? ""] ?? purgeStatus.currentPhase}
+                      </p>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width] duration-500"
+                          style={{
+                            width: `${purgeStatus.totalLeads
+                              ? Math.min(100, Math.round(((purgeStatus.deletedLeads ?? 0) / purgeStatus.totalLeads) * 100))
+                              : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {purgeStatus.deletedLeads ?? 0} / {purgeStatus.totalLeads ?? "?"} leads · {purgeStatus.deletedConversations ?? 0} / {purgeStatus.totalConversations ?? "?"} conversas
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      A operação roda em background. Você pode fechar este diálogo e continuar usando o CRM.
+                    </p>
+                  </div>
+                ) : purgeStatus?.status === "completed" ? (
+                  /* ── Success View ── */
+                  <div className="flex flex-col items-center gap-2 rounded-md bg-emerald-500/10 p-4 text-center">
+                    <HugeiconsIcon icon={CheckmarkCircle02Icon} className="size-8 text-emerald-600 dark:text-emerald-400" />
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Reset Concluído!</p>
+                    <p className="text-xs text-muted-foreground">
+                      {purgeStatus.deletedLeads ?? 0} leads e {purgeStatus.deletedConversations ?? 0} conversas removidos.
+                    </p>
+                  </div>
+                ) : purgeStatus?.status === "failed" ? (
+                  /* ── Error View ── */
+                  <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+                    <p className="font-semibold">❌ Falha no purge</p>
+                    <p>{purgeStatus.error ?? "Erro desconhecido. Tente novamente."}</p>
+                  </div>
+                ) : (
+                  /* ── Confirmation View ── */
+                  <>
+                    <div className="rounded-md bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+                      <p className="font-semibold">⚠️ Ação irreversível!</p>
+                      <p>A equipe, números de WhatsApp, anúncios Meta e treinamentos de IA permanecerão intactos.</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="confirmation-code" className="text-xs">
+                        Para confirmar, digite <strong className="text-foreground">RESET</strong> abaixo:
+                      </Label>
+                      <Input
+                        id="confirmation-code"
+                        value={confirmation}
+                        onChange={(e) => setConfirmation(e.target.value)}
+                        placeholder="RESET"
+                        autoComplete="off"
+                        className="font-mono uppercase text-xs"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <DialogFooter className="gap-2 sm:gap-0">
-                <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)} disabled={isPending}>
-                  Cancelar
-                </Button>
                 <Button
-                  type="submit"
-                  variant="destructive"
+                  type="button"
+                  variant="outline"
                   size="sm"
-                  disabled={confirmation !== "RESET" || isPending}
-                  className="gap-1.5 text-xs"
+                  onClick={() => { setOpen(false); stopPolling(); setPurgeStatus(null); }}
+                  disabled={isPending && !purgeStatus}
                 >
-                  {isPending ? (
-                    <>
-                      <HugeiconsIcon icon={Loading02Icon} className="size-4 animate-spin" />
-                      Resetando...
-                    </>
-                  ) : (
-                    <>
-                      <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-                      Confirmar Reset Definitivo
-                    </>
-                  )}
+                  {purgeStatus?.status === "running" || purgeStatus?.status === "pending" ? "Fechar" : "Cancelar"}
                 </Button>
+                {!purgeStatus || purgeStatus.status === "failed" ? (
+                  <Button
+                    type="submit"
+                    variant="destructive"
+                    size="sm"
+                    disabled={confirmation !== "RESET" || isPending}
+                    className="gap-1.5 text-xs"
+                  >
+                    {isPending ? (
+                      <>
+                        <HugeiconsIcon icon={Loading02Icon} className="size-4 animate-spin" />
+                        Iniciando...
+                      </>
+                    ) : (
+                      <>
+                        <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+                        Confirmar Reset Definitivo
+                      </>
+                    )}
+                  </Button>
+                ) : null}
               </DialogFooter>
             </form>
           </DialogPopup>

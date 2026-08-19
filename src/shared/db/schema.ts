@@ -2329,6 +2329,34 @@ export const platformAuditLogs = pgTable(
   (table) => [index("platform_audit_logs_actor_idx").on(table.actorUserId)],
 );
 
+/** Admin purge jobs — tracks batched deletion of tenant operational data. */
+export const platformPurgeJobs = pgTable(
+  "platform_purge_jobs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    actorUserId: text("actor_user_id")
+      .notNull()
+      .references(() => user.id),
+    status: text("status").notNull().default("pending"), // pending | running | completed | failed
+    totalLeads: integer("total_leads").default(0),
+    deletedLeads: integer("deleted_leads").default(0),
+    totalConversations: integer("total_conversations").default(0),
+    deletedConversations: integer("deleted_conversations").default(0),
+    currentPhase: text("current_phase"), // messages, conversations, leads, etc.
+    error: text("error"),
+    createdAt,
+    updatedAt,
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    index("platform_purge_jobs_tenant_idx").on(table.tenantId),
+    index("platform_purge_jobs_status_idx").on(table.status),
+  ],
+);
+
 /** Tenant-owned role profiles. System roles remain immutable in tenant_memberships.role. */
 export const customRoles = pgTable(
   "custom_roles",

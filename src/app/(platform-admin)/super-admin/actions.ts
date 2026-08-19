@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -9,10 +10,10 @@ import {
   setPlatformTenantStatus,
   terminateSession,
   purgeUserLGPD,
-  purgeTenantOperationalData,
   getPlatformAuditLogs,
   getTenantAuditLogs,
 } from "@/features/platform-admin/service";
+import { startPurgeJob, processPurgeJob } from "@/features/platform-admin/purge-job";
 
 export type TenantCreateActionState = { error?: string };
 import { getDatabase, schema } from "@/shared/db";
@@ -30,6 +31,7 @@ import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
 import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
+import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -263,6 +265,33 @@ export async function updateMetaLeadAdsSettingsAction(formData: FormData) {
   });
   revalidatePath("/super-admin/settings");
   revalidatePath("/integrations/meta");
+}
+
+export async function updateSystemReportSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("enabled") === "true" ? "true" : "false";
+  const destination = String(formData.get("destination") ?? "").trim();
+  const now = new Date();
+  if (enabled === "true" && !destination) {
+    throw new Error("Informe o WhatsApp de destino antes de ativar a central de report.");
+  }
+  await Promise.all([
+    setSystemSetting(SYSTEM_REPORT_ENABLED_KEY, enabled, now),
+    setSystemSetting(SYSTEM_REPORT_DESTINATION_KEY, destination, now),
+  ]);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "system_report.settings_updated",
+    targetType: "system_settings",
+    targetId: "system_report",
+    metadata: {
+      enabled,
+      destinationHash: destination ? createHash("sha256").update(destination.replace(/\D/g, "")).digest("hex") : null,
+    },
+    createdAt: now,
+  });
+  revalidatePath("/super-admin/settings");
 }
 
 export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData) {
@@ -786,7 +815,6 @@ export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formDat
 }
 
 export async function resetTenantOperationalDataAction(formData: FormData) {
-  const admin = await getRequiredPlatformAdmin();
   const rawTenantId = String(formData.get("tenantId") ?? "").trim();
   const confirmation = String(formData.get("confirmation") ?? "").trim();
 
@@ -799,14 +827,39 @@ export async function resetTenantOperationalDataAction(formData: FormData) {
     throw new Error('Confirmação inválida. Digite "RESET" para confirmar a operação.');
   }
 
-  const result = await purgeTenantOperationalData(parsed.data);
+  // Start async purge job — returns immediately
+  const { jobId } = await startPurgeJob(parsed.data);
+
+  // Fire-and-forget: process the job in background
+  // The UI will poll for progress via getPurgeJobStatusAction
+  processPurgeJob(jobId).catch((err) => {
+    console.error("[purge-job] Background processing failed:", err);
+  });
 
   revalidatePath(`/super-admin/tenants/${parsed.data}`);
   revalidatePath("/super-admin/tenants");
-  revalidatePath("/leads");
-  revalidatePath("/conversas");
-  revalidatePath("/dashboard");
 
-  return result;
+  return { jobId, started: true };
+}
+
+export async function getPurgeJobStatusAction(jobId: string) {
+  const admin = await getRequiredPlatformAdmin();
+  const db = getDatabase();
+  const [job] = await db
+    .select()
+    .from(schema.platformPurgeJobs)
+    .where(eq(schema.platformPurgeJobs.id, jobId))
+    .limit(1);
+  if (!job) throw new Error("Job não encontrado.");
+  return {
+    status: job.status,
+    totalLeads: job.totalLeads,
+    deletedLeads: job.deletedLeads,
+    totalConversations: job.totalConversations,
+    deletedConversations: job.deletedConversations,
+    currentPhase: job.currentPhase,
+    error: job.error,
+    completedAt: job.completedAt,
+  };
 }
 
