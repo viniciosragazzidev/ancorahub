@@ -1,587 +1,594 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1784721600000,
-      "tag": "0036_reset_baseline",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1784721700000,
-      "tag": "0037_add_tenant_setup_timestamp",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1784721800000,
-      "tag": "0038_enable_lead_realtime",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1784721900000,
-      "tag": "0039_mandatory_lead_feedback",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1784722000000,
-      "tag": "0040_duty_roster_assignments",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1784722100000,
-      "tag": "0041_post_sale_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1784722200000,
-      "tag": "0042_feedback_timeout_routing",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1784722300000,
-      "tag": "0043_route_onboarding_progress",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1784722400000,
-      "tag": "0044_feedback_reminder_config",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1784811600000,
-      "tag": "0045_global_catalog_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1784812600000,
-      "tag": "0046_feedback_checklists",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1784813600000,
-      "tag": "0047_meta_whatsapp_cloud_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1784814600000,
-      "tag": "0048_drop_lead_plan_id_fk",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1784814700000,
-      "tag": "0049_allow_multi_source_quote_plans",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1784814800000,
-      "tag": "0050_duty_schedule_source_filter",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
-      "when": 1784814900000,
-      "tag": "0051_message_templates",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1784815000000,
-      "tag": "0052_quote_builder",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1784815100000,
-      "tag": "0053_reconcile_quote_builder_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1784815200000,
-      "tag": "0066_add_broker_onboarding_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1784815300000,
-      "tag": "0067_add_broker_profiles_invited_deactivated",
-      "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "7",
-      "when": 1784815400000,
-      "tag": "0068_secure_customer_documents",
-      "breakpoints": true
-    },
-    {
-      "idx": 21,
-      "version": "7",
-      "when": 1784815500000,
-      "tag": "0069_persist_lead_document_checklist",
-      "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "7",
-      "when": 1784815600000,
-      "tag": "0070_whatsapp_official_channel_outbox",
-      "breakpoints": true
-    },
-    {
-      "idx": 23,
-      "version": "7",
-      "when": 1784815700000,
-      "tag": "0071_team_whatsapp_invitations",
-      "breakpoints": true
-    },
-    {
-      "idx": 24,
-      "version": "7",
-      "when": 1784815800000,
-      "tag": "0072_add_passkey_table",
-      "breakpoints": true
-    },
-    {
-      "idx": 25,
-      "version": "7",
-      "when": 1784815900000,
-      "tag": "0073_whatsapp_invite_text_fallback",
-      "breakpoints": true
-    },
-    {
-      "idx": 26,
-      "version": "7",
-      "when": 1784900000000,
-      "tag": "0074_password_reset_requests",
-      "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1784900100000,
-      "tag": "0075_add_invitation_revoked_at",
-      "breakpoints": true
-    },
-    {
-      "idx": 28,
-      "version": "7",
-      "when": 1784900200000,
-      "tag": "0076_optional_broker_cpf",
-      "breakpoints": true
-    },
-    {
-      "idx": 29,
-      "version": "7",
-      "when": 1784900300000,
-      "tag": "0077_sync_user_onboarding_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 30,
-      "version": "7",
-      "when": 1784900400000,
-      "tag": "0078_sync_terms_acceptance_metadata",
-      "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "7",
-      "when": 1784900500000,
-      "tag": "0079_lead_offers_and_assignment_templates",
-      "breakpoints": true
-    },
-    {
-      "idx": 32,
-      "version": "7",
-      "when": 1784900600000,
-      "tag": "0080_supabase_documents_storage",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
-      "when": 1784900700000,
-      "tag": "0081_ai_whatsapp_qualification",
-      "breakpoints": true
-    },
-    {
-      "idx": 34,
-      "version": "7",
-      "when": 1784900800000,
-      "tag": "0082_ai_configuration_center",
-      "breakpoints": true
-    },
-    {
-      "idx": 35,
-      "version": "7",
-      "when": 1784900900000,
-      "tag": "0083_sale_renewal_enhancements",
-      "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1784913500000,
-      "tag": "0084_ai_agent_tenant_config_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1785099600000,
-      "tag": "0085_ai_attendance_persistence",
-      "breakpoints": true
-    },
-    {
-      "idx": 38,
-      "version": "7",
-      "when": 1785162000000,
-      "tag": "0086_lead_qualification_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1785165600000,
-      "tag": "0087_ai_qualification_six_question_default",
-      "breakpoints": true
-    },
-    {
-      "idx": 40,
-      "version": "7",
-      "when": 1785169200000,
-      "tag": "0088_quick_reply_automation",
-      "breakpoints": true
-    },
-    {
-      "idx": 41,
-      "version": "7",
-      "when": 1785172800000,
-      "tag": "0089_browser_extension_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 42,
-      "version": "7",
-      "when": 1785259200000,
-      "tag": "0090_agent_training_center",
-      "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1785262800000,
-      "tag": "0091_intelligent_qualification_distribution",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1785337200000,
-      "tag": "0092_lead_intake_outbox",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1785441600000,
-      "tag": "0093_lead_form_data",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1785531600000,
-      "tag": "0094_duty_schedule_coverage",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1785535200000,
-      "tag": "0095_meta_manual_integration",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1785621600000,
-      "tag": "0096_custom_roles_rbac",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1785621700000,
-      "tag": "0097_custom_role_member_scope",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1785621800000,
-      "tag": "0098_performance_seasons",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1785700800000,
-      "tag": "0099_meta_manual_lead_ads",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1785700900000,
-      "tag": "0100_meta_ads_embedded_signup",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1785701000000,
-      "tag": "0101_waha_cadence_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 54,
-      "version": "7",
-      "when": 1785701100000,
-      "tag": "0102_internal_report_documents",
-      "breakpoints": true
-    },
-    {
-      "idx": 55,
-      "version": "7",
-      "when": 1785701200000,
-      "tag": "0103_waha_connection_scopes",
-      "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1785701300000,
-      "tag": "0104_waha_number_capabilities",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1785701400000,
-      "tag": "0105_proposals_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 58,
-      "version": "7",
-      "when": 1786033800000,
-      "tag": "0106_commercial_companies",
-      "breakpoints": true
-    },
-    {
-      "idx": 59,
-      "version": "7",
-      "when": 1786033900000,
-      "tag": "0108_automations_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 60,
-      "version": "7",
-      "when": 1786034000000,
-      "tag": "0109_ai_qualification_hub",
-      "breakpoints": true
-    },
-    {
-      "idx": 61,
-      "version": "7",
-      "when": 1786035000000,
-      "tag": "0110_add_lead_loss_category",
-      "breakpoints": true
-    },
-    {
-      "idx": 62,
-      "version": "7",
-      "when": 1786122000000,
-      "tag": "0111_add_lead_sla_metrics",
-      "breakpoints": true
-    },
-    {
-      "idx": 63,
-      "version": "7",
-      "when": 1786372660000,
-      "tag": "0112_add_tenant_membership_supervisor",
-      "breakpoints": true
-    },
-    {
-      "idx": 64,
-      "version": "7",
-      "when": 1786464000000,
-      "tag": "0113_workflow_automation_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 65,
-      "version": "7",
-      "when": 1786466356253,
-      "tag": "0114_tenant_intelligence_foundation",
-      "breakpoints": true
-    },
-    {
-      "idx": 66,
-      "version": "7",
-      "when": 1786541030471,
-      "tag": "0115_meta_campaign_queue_routes",
-      "breakpoints": true
-    },
-    {
-      "idx": 67,
-      "version": "7",
-      "when": 1786550400000,
-      "tag": "0117_meta_connection_attempts",
-      "breakpoints": true
-    },
-    {
-      "idx": 68,
-      "version": "7",
-      "when": 1786620600000,
-      "tag": "0118_qualification_hub_persistence",
-      "breakpoints": true
-    },
-    {
-      "idx": 69,
-      "version": "7",
-      "when": 1786626000000,
-      "tag": "0119_whatsapp_cloud_registration_state",
-      "breakpoints": true
-    },
-    {
-      "idx": 70,
-      "version": "7",
-      "when": 1786632000000,
-      "tag": "0120_director_lead_soft_delete",
-      "breakpoints": true
-    },
-    {
-      "idx": 71,
-      "version": "7",
-      "when": 1786714800000,
-      "tag": "0121_meta_lead_ads_source_release",
-      "breakpoints": true
-    },
-    {
-      "idx": 72,
-      "version": "7",
-      "when": 1786718400000,
-      "tag": "0122_meta_ad_queue_routes",
-      "breakpoints": true
-    },
-    {
-      "idx": 73,
-      "version": "7",
-      "when": 1786722000000,
-      "tag": "0123_enable_full_realtime",
-      "breakpoints": true
-    },
-    {
-      "idx": 74,
-      "version": "7",
-      "when": 1786724962422,
-      "tag": "0124_lead_queue_exclusive_duty_schedule",
-      "breakpoints": true
-    },
-    {
-      "idx": 75,
-      "version": "7",
-      "when": 1786729000000,
-      "tag": "0125_add_lead_queue_ai_qualification",
-      "breakpoints": true
-    },
-    {
-      "idx": 76,
-      "version": "7",
-      "when": 1786730000000,
-      "tag": "0126_meta_whatsapp_templates_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 77,
-      "version": "7",
-      "when": 1786820400000,
-      "tag": "0127_ai_qualification_followup_prepared_only",
-      "breakpoints": true
-    },
-    {
-      "idx": 78,
-      "version": "7",
-      "when": 1786824000000,
-      "tag": "0128_supabase_vector_knowledge_chunks",
-      "breakpoints": true
-    },
-    {
-      "idx": 79,
-      "version": "7",
-      "when": 1786899600000,
-      "tag": "0129_meta_lead_ads_routing_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 80,
-      "version": "7",
-      "when": 1786903200000,
-      "tag": "0130_allow_tenant_wide_lead_queues",
-      "breakpoints": true
-    },
-{
-      "idx": 81,
-      "version": "7",
-      "when": 1786910000000,
-      "tag": "0131_add_preferred_experience_mode",
-      "breakpoints": true
-    },
-    {
-      "idx": 82,
-      "version": "7",
-      "when": 1787000000000,
-      "tag": "0132_add_lead_documents_expected_contract_period",
-      "breakpoints": true
-    }
-  ]
+    "version":  "7",
+    "dialect":  "postgresql",
+    "entries":  [
+                    {
+                        "idx":  0,
+                        "version":  "7",
+                        "when":  1784721600000,
+                        "tag":  "0036_reset_baseline",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  1,
+                        "version":  "7",
+                        "when":  1784721700000,
+                        "tag":  "0037_add_tenant_setup_timestamp",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  2,
+                        "version":  "7",
+                        "when":  1784721800000,
+                        "tag":  "0038_enable_lead_realtime",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  3,
+                        "version":  "7",
+                        "when":  1784721900000,
+                        "tag":  "0039_mandatory_lead_feedback",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  4,
+                        "version":  "7",
+                        "when":  1784722000000,
+                        "tag":  "0040_duty_roster_assignments",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  5,
+                        "version":  "7",
+                        "when":  1784722100000,
+                        "tag":  "0041_post_sale_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  6,
+                        "version":  "7",
+                        "when":  1784722200000,
+                        "tag":  "0042_feedback_timeout_routing",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  7,
+                        "version":  "7",
+                        "when":  1784722300000,
+                        "tag":  "0043_route_onboarding_progress",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  8,
+                        "version":  "7",
+                        "when":  1784722400000,
+                        "tag":  "0044_feedback_reminder_config",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  9,
+                        "version":  "7",
+                        "when":  1784811600000,
+                        "tag":  "0045_global_catalog_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  10,
+                        "version":  "7",
+                        "when":  1784812600000,
+                        "tag":  "0046_feedback_checklists",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  11,
+                        "version":  "7",
+                        "when":  1784813600000,
+                        "tag":  "0047_meta_whatsapp_cloud_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  12,
+                        "version":  "7",
+                        "when":  1784814600000,
+                        "tag":  "0048_drop_lead_plan_id_fk",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  13,
+                        "version":  "7",
+                        "when":  1784814700000,
+                        "tag":  "0049_allow_multi_source_quote_plans",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  14,
+                        "version":  "7",
+                        "when":  1784814800000,
+                        "tag":  "0050_duty_schedule_source_filter",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  15,
+                        "version":  "7",
+                        "when":  1784814900000,
+                        "tag":  "0051_message_templates",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  16,
+                        "version":  "7",
+                        "when":  1784815000000,
+                        "tag":  "0052_quote_builder",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  17,
+                        "version":  "7",
+                        "when":  1784815100000,
+                        "tag":  "0053_reconcile_quote_builder_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  18,
+                        "version":  "7",
+                        "when":  1784815200000,
+                        "tag":  "0066_add_broker_onboarding_tables",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  19,
+                        "version":  "7",
+                        "when":  1784815300000,
+                        "tag":  "0067_add_broker_profiles_invited_deactivated",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  20,
+                        "version":  "7",
+                        "when":  1784815400000,
+                        "tag":  "0068_secure_customer_documents",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  21,
+                        "version":  "7",
+                        "when":  1784815500000,
+                        "tag":  "0069_persist_lead_document_checklist",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  22,
+                        "version":  "7",
+                        "when":  1784815600000,
+                        "tag":  "0070_whatsapp_official_channel_outbox",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  23,
+                        "version":  "7",
+                        "when":  1784815700000,
+                        "tag":  "0071_team_whatsapp_invitations",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  24,
+                        "version":  "7",
+                        "when":  1784815800000,
+                        "tag":  "0072_add_passkey_table",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  25,
+                        "version":  "7",
+                        "when":  1784815900000,
+                        "tag":  "0073_whatsapp_invite_text_fallback",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  26,
+                        "version":  "7",
+                        "when":  1784900000000,
+                        "tag":  "0074_password_reset_requests",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  27,
+                        "version":  "7",
+                        "when":  1784900100000,
+                        "tag":  "0075_add_invitation_revoked_at",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  28,
+                        "version":  "7",
+                        "when":  1784900200000,
+                        "tag":  "0076_optional_broker_cpf",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  29,
+                        "version":  "7",
+                        "when":  1784900300000,
+                        "tag":  "0077_sync_user_onboarding_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  30,
+                        "version":  "7",
+                        "when":  1784900400000,
+                        "tag":  "0078_sync_terms_acceptance_metadata",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  31,
+                        "version":  "7",
+                        "when":  1784900500000,
+                        "tag":  "0079_lead_offers_and_assignment_templates",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  32,
+                        "version":  "7",
+                        "when":  1784900600000,
+                        "tag":  "0080_supabase_documents_storage",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  33,
+                        "version":  "7",
+                        "when":  1784900700000,
+                        "tag":  "0081_ai_whatsapp_qualification",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  34,
+                        "version":  "7",
+                        "when":  1784900800000,
+                        "tag":  "0082_ai_configuration_center",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  35,
+                        "version":  "7",
+                        "when":  1784900900000,
+                        "tag":  "0083_sale_renewal_enhancements",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  36,
+                        "version":  "7",
+                        "when":  1784913500000,
+                        "tag":  "0084_ai_agent_tenant_config_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  37,
+                        "version":  "7",
+                        "when":  1785099600000,
+                        "tag":  "0085_ai_attendance_persistence",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  38,
+                        "version":  "7",
+                        "when":  1785162000000,
+                        "tag":  "0086_lead_qualification_status",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  39,
+                        "version":  "7",
+                        "when":  1785165600000,
+                        "tag":  "0087_ai_qualification_six_question_default",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  40,
+                        "version":  "7",
+                        "when":  1785169200000,
+                        "tag":  "0088_quick_reply_automation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  41,
+                        "version":  "7",
+                        "when":  1785172800000,
+                        "tag":  "0089_browser_extension_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  42,
+                        "version":  "7",
+                        "when":  1785259200000,
+                        "tag":  "0090_agent_training_center",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  43,
+                        "version":  "7",
+                        "when":  1785262800000,
+                        "tag":  "0091_intelligent_qualification_distribution",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  44,
+                        "version":  "7",
+                        "when":  1785337200000,
+                        "tag":  "0092_lead_intake_outbox",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  45,
+                        "version":  "7",
+                        "when":  1785441600000,
+                        "tag":  "0093_lead_form_data",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  46,
+                        "version":  "7",
+                        "when":  1785531600000,
+                        "tag":  "0094_duty_schedule_coverage",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  47,
+                        "version":  "7",
+                        "when":  1785535200000,
+                        "tag":  "0095_meta_manual_integration",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  48,
+                        "version":  "7",
+                        "when":  1785621600000,
+                        "tag":  "0096_custom_roles_rbac",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  49,
+                        "version":  "7",
+                        "when":  1785621700000,
+                        "tag":  "0097_custom_role_member_scope",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  50,
+                        "version":  "7",
+                        "when":  1785621800000,
+                        "tag":  "0098_performance_seasons",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  51,
+                        "version":  "7",
+                        "when":  1785700800000,
+                        "tag":  "0099_meta_manual_lead_ads",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  52,
+                        "version":  "7",
+                        "when":  1785700900000,
+                        "tag":  "0100_meta_ads_embedded_signup",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  53,
+                        "version":  "7",
+                        "when":  1785701000000,
+                        "tag":  "0101_waha_cadence_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  54,
+                        "version":  "7",
+                        "when":  1785701100000,
+                        "tag":  "0102_internal_report_documents",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  55,
+                        "version":  "7",
+                        "when":  1785701200000,
+                        "tag":  "0103_waha_connection_scopes",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  56,
+                        "version":  "7",
+                        "when":  1785701300000,
+                        "tag":  "0104_waha_number_capabilities",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  57,
+                        "version":  "7",
+                        "when":  1785701400000,
+                        "tag":  "0105_proposals_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  58,
+                        "version":  "7",
+                        "when":  1786033800000,
+                        "tag":  "0106_commercial_companies",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  59,
+                        "version":  "7",
+                        "when":  1786033900000,
+                        "tag":  "0108_automations_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  60,
+                        "version":  "7",
+                        "when":  1786034000000,
+                        "tag":  "0109_ai_qualification_hub",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  61,
+                        "version":  "7",
+                        "when":  1786035000000,
+                        "tag":  "0110_add_lead_loss_category",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  62,
+                        "version":  "7",
+                        "when":  1786122000000,
+                        "tag":  "0111_add_lead_sla_metrics",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  63,
+                        "version":  "7",
+                        "when":  1786372660000,
+                        "tag":  "0112_add_tenant_membership_supervisor",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  64,
+                        "version":  "7",
+                        "when":  1786464000000,
+                        "tag":  "0113_workflow_automation_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  65,
+                        "version":  "7",
+                        "when":  1786466356253,
+                        "tag":  "0114_tenant_intelligence_foundation",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  66,
+                        "version":  "7",
+                        "when":  1786541030471,
+                        "tag":  "0115_meta_campaign_queue_routes",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  67,
+                        "version":  "7",
+                        "when":  1786550400000,
+                        "tag":  "0117_meta_connection_attempts",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  68,
+                        "version":  "7",
+                        "when":  1786620600000,
+                        "tag":  "0118_qualification_hub_persistence",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  69,
+                        "version":  "7",
+                        "when":  1786626000000,
+                        "tag":  "0119_whatsapp_cloud_registration_state",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  70,
+                        "version":  "7",
+                        "when":  1786632000000,
+                        "tag":  "0120_director_lead_soft_delete",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  71,
+                        "version":  "7",
+                        "when":  1786714800000,
+                        "tag":  "0121_meta_lead_ads_source_release",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  72,
+                        "version":  "7",
+                        "when":  1786718400000,
+                        "tag":  "0122_meta_ad_queue_routes",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  73,
+                        "version":  "7",
+                        "when":  1786722000000,
+                        "tag":  "0123_enable_full_realtime",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  74,
+                        "version":  "7",
+                        "when":  1786724962422,
+                        "tag":  "0124_lead_queue_exclusive_duty_schedule",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  75,
+                        "version":  "7",
+                        "when":  1786729000000,
+                        "tag":  "0125_add_lead_queue_ai_qualification",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  76,
+                        "version":  "7",
+                        "when":  1786730000000,
+                        "tag":  "0126_meta_whatsapp_templates_tables",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  77,
+                        "version":  "7",
+                        "when":  1786820400000,
+                        "tag":  "0127_ai_qualification_followup_prepared_only",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  78,
+                        "version":  "7",
+                        "when":  1786824000000,
+                        "tag":  "0128_supabase_vector_knowledge_chunks",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  79,
+                        "version":  "7",
+                        "when":  1786899600000,
+                        "tag":  "0129_meta_lead_ads_routing_schema",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  80,
+                        "version":  "7",
+                        "when":  1786903200000,
+                        "tag":  "0130_allow_tenant_wide_lead_queues",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  81,
+                        "version":  "7",
+                        "when":  1786910000000,
+                        "tag":  "0131_add_preferred_experience_mode",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  82,
+                        "version":  "7",
+                        "when":  1787000000000,
+                        "tag":  "0132_add_lead_documents_expected_contract_period",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  83,
+                        "breakpoints":  true,
+                        "when":  1787086000000,
+                        "version":  "7",
+                        "tag":  "0133_add_account_issuer"
+                    }
+                ]
 }
