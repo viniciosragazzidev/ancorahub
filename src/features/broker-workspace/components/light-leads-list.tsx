@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle, Clock, MagnifyingGlass, Lightning, SlidersHorizontal } from "@/components/huge-icons";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { ArrowRight, MagnifyingGlass, SlidersHorizontal } from "@/components/huge-icons";
+import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
@@ -26,6 +26,13 @@ export type LightLeadItem = {
 };
 
 type FilterTab = "all" | "awaiting" | "active" | "finished";
+
+function formatDate(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
+}
 
 export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightLeadItem[]; initialFilter?: FilterTab }) {
   const [filter, setFilter] = useState<FilterTab>(initialFilter);
@@ -157,37 +164,82 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
             const isConverted = lead.status === "converted";
             const isLost = lead.status === "lost";
 
+            const statusBadge = isDistributed
+              ? { variant: "warning" as const, label: "Novo lead" }
+              : isConverted
+                ? { variant: "success" as const, label: "Venda concluída" }
+                : isLost
+                  ? { variant: "secondary" as const, label: "Finalizado" }
+                  : lead.isOverdue
+                    ? { variant: "destructive" as const, label: "Atualização pendente" }
+                    : { variant: "outline" as const, label: "Em atendimento" };
+
             return (
-              <Card key={lead.id} variant="subtle" className="p-4 bg-card/95 hover:border-primary/30 transition-colors">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-foreground truncate">{lead.name}</h3>
-                      <Badge
-                        variant={isDistributed ? "warning" : isConverted ? "success" : isLost ? "secondary" : lead.isOverdue ? "destructive" : "outline"}
-                        className="text-[10px] font-semibold"
-                      >
-                        {isDistributed ? "Novo lead" : isConverted ? "Venda concluída ✓" : isLost ? "Finalizado" : lead.isOverdue ? "Atualização pendente" : "Em atendimento"}
+              <Card
+                key={lead.id}
+                variant="subtle"
+                className={cn(
+                  "bg-card/95 transition-colors hover:border-primary/30",
+                  isDistributed && "border-l-[3px] border-l-warning",
+                  isConverted && "border-l-[3px] border-l-success",
+                  lead.isOverdue && !isDistributed && "border-l-[3px] border-l-destructive"
+                )}
+              >
+                <div className="space-y-3 p-4 sm:p-5">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-semibold tracking-tight text-foreground">
+                      {lead.name}
+                    </h3>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <Badge variant={statusBadge.variant} className="text-[10px] font-semibold">
+                        {statusBadge.label}
                       </Badge>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      {lead.productName ? <span>{lead.productName}</span> : null}
-                      {lead.livesCount ? <span>· {lead.livesCount} vidas</span> : null}
-                      {lead.city ? <span>· {lead.city}</span> : null}
-                    </div>
-
-                    {lead.summary ? (
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-1">{lead.summary}</p>
-                    ) : null}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <div className="min-w-0 rounded-lg border border-border/60 bg-muted/25 px-3 py-2">
+                      <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Produto
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs font-semibold text-foreground">
+                        {lead.productName || "—"}
+                      </span>
+                    </div>
+                    <div className="min-w-0 rounded-lg border border-border/60 bg-muted/25 px-3 py-2">
+                      <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Vidas
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs font-semibold text-foreground">
+                        {lead.livesCount ?? "—"}
+                      </span>
+                    </div>
+                    <div className="col-span-2 min-w-0 rounded-lg border border-border/60 bg-muted/25 px-3 py-2 sm:col-span-1">
+                      <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Cidade
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs font-semibold text-foreground">
+                        {lead.city || "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {lead.summary ? (
+                    <p className="line-clamp-2 rounded-lg border border-border/40 bg-card px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                      {lead.summary}
+                    </p>
+                  ) : null}
+
+                  <div className="flex flex-col gap-3 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-[11px] text-muted-foreground">
+                      Entrada {formatDate(lead.createdAt)}
+                      {lead.dueAt ? ` · Retorno ${formatDate(lead.dueAt)}` : ""}
+                    </span>
                     <Link
                       href={`/leads/${lead.id}`}
                       className={cn(
                         buttonVariants({ variant: isDistributed ? "default" : "outline", size: "sm" }),
-                        "w-full sm:w-auto h-9 px-4 text-xs font-semibold gap-1.5"
+                        "h-9 w-full gap-1.5 px-4 text-xs font-semibold sm:w-auto"
                       )}
                     >
                       {isDistributed ? "ACEITAR LEAD" : isConverted ? "VER" : "ABRIR"}

@@ -105,11 +105,7 @@ export async function saveDistributionPolicyAction(
   }
 }
 
-function refreshDistribution() {
-  revalidatePath("/leads");
-  revalidatePath("/leads/distribuicao");
-  revalidatePath("/dashboard");
-}
+function refreshDistribution() {}
 
 export async function saveDistributionQueueAction(input: unknown) {
   try {

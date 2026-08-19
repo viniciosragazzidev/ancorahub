@@ -19,6 +19,8 @@ import { ContextNote } from "@/components/ui/context-note";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
@@ -57,6 +59,109 @@ export default async function LeadsPage({
     }))
   )
     redirect("/access-denied");
+
+  // ─── Modo Lite (corretor) ──────────────────────────────────────────────
+  // Mantém a experiência simples do dashboard lite: lista leve com busca,
+  // filtros de situação e acesso direto ao atendimento. As ações de aceitar,
+  // abrir e atualizar continuam funcionando no detalhe do lead.
+  if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+    const [slaRow] = await getDatabase()
+      .select({ minutes: schema.tenants.slaFirstContactMinutes })
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, context.tenantId))
+      .limit(1);
+    const lightSlaMinutes = Math.max(1, Number(slaRow?.minutes ?? 15));
+
+    const lightLeads = await getDatabase()
+      .select({
+        id: schema.leads.id,
+        nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
+        status: schema.leads.status,
+        qualificationStatus: schema.leads.qualificationStatus,
+        qualificationDetails: schema.leads.qualificationDetails,
+        planName: schema.carrierPlans.name,
+        createdAt: schema.leads.createdAt,
+        stageEnteredAt: schema.leads.stageEnteredAt,
+        assignedAt: schema.leads.assignedAt,
+      })
+      .from(schema.leads)
+      .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.corretorId, context.userId),
+          isNull(schema.leads.deletedAt),
+          or(
+            ne(schema.leads.status, "distributed"),
+            isNotNull(schema.leads.firstContactAt),
+            isNull(schema.leads.assignedAt),
+            gte(
+              schema.leads.assignedAt,
+              sql`now() - (${lightSlaMinutes} * interval '1 minute')`
+            )
+          )
+        )
+      )
+      .orderBy(desc(schema.leads.createdAt))
+      .limit(500);
+
+    const lightPendingTasks = lightLeads.length
+      ? await getDatabase()
+          .select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt })
+          .from(schema.leadTasks)
+          .where(
+            and(
+              eq(schema.leadTasks.tenantId, context.tenantId),
+              inArray(schema.leadTasks.leadId, lightLeads.map((l) => l.id)),
+              isNull(schema.leadTasks.completedAt),
+              isNotNull(schema.leadTasks.dueAt)
+            )
+          )
+      : [];
+
+    const earliestTaskDue = new Map<string, Date>();
+    for (const task of lightPendingTasks) {
+      if (task.leadId && task.dueAt) {
+        const existing = earliestTaskDue.get(task.leadId);
+        if (!existing || task.dueAt.getTime() < existing.getTime()) {
+          earliestTaskDue.set(task.leadId, task.dueAt);
+        }
+      }
+    }
+
+    const lightItems: LightLeadItem[] = lightLeads.map((lead) => {
+      const details =
+        lead.qualificationDetails && typeof lead.qualificationDetails === "object" && !Array.isArray(lead.qualificationDetails)
+          ? (lead.qualificationDetails as Record<string, unknown>)
+          : {};
+      const readStr = (key: string) => (typeof details[key] === "string" ? details[key] : null);
+      const rawLives = readStr("qtdVidas");
+      const livesCount = rawLives && rawLives.trim() ? Number(rawLives) : null;
+      const slaDeadline =
+        (lead.status === "new" || lead.status === "distributed") && lead.assignedAt
+          ? new Date(lead.assignedAt.getTime() + lightSlaMinutes * 60 * 1000)
+          : null;
+      const dueAt = slaDeadline ?? earliestTaskDue.get(lead.id) ?? null;
+      return {
+        id: lead.id,
+        name: lead.nome,
+        phone: lead.telefone,
+        status: lead.status,
+        qualificationStatus: lead.qualificationStatus,
+        productName: lead.planName ?? null,
+        livesCount: livesCount && Number.isFinite(livesCount) ? livesCount : null,
+        city: readStr("cidade"),
+        summary: readStr("resumoAtendimento") ?? readStr("resumoNecessidade"),
+        createdAt: lead.createdAt,
+        updatedAt: lead.stageEnteredAt,
+        dueAt,
+        isOverdue: dueAt ? dueAt.getTime() < Date.now() : false,
+      };
+    });
+
+    return <LightLeadsList leads={lightItems} />;
+  }
 
   const filters = await searchParams;
   const db = getDatabase();

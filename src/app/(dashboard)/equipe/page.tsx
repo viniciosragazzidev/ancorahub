@@ -158,7 +158,13 @@ export default async function TeamPage() {
   const leadsTrend = fillMonthSeries(leadsByMonth);
   const salesTrend = fillMonthSeries(salesByMonth);
 
-  const members = [...brokers, ...nonBrokers].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  // Dedup por id: gestores/supervisores/diretores com broker_profiles + tenant_memberships
+  // aparecem nas duas queries; a versão de tenant_memberships (nome/e-mail atuais) vence.
+  const members = [
+    ...new Map<string, (typeof brokers)[number]>(
+      [...brokers, ...nonBrokers].map((member) => [member.id, member])
+    ).values(),
+  ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   const activeMembers = members.filter((member) => member.status === "active").length;
   const unassignedCount = unassignedLeads[0]?.count ?? 0;
   const totalVolume = salesTotal[0]?.sum ?? 0;

@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db";
 import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
+import { startMiddlewareTiming, endMiddlewareTiming } from "@/shared/observability/middleware-timing";
 
 const protectedPathPrefixes = [
   "/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos",
@@ -103,6 +104,7 @@ export async function proxy(request: NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? randomUUID();
   request.headers.set("x-request-id", requestId);
   request.headers.set("x-pathname", pathname);
+  const timing = startMiddlewareTiming(pathname, requestId);
 
   if (isNavigationPrefetch(request.headers)) {
     const response = NextResponse.next({ request: { headers: request.headers } });
@@ -149,40 +151,46 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  let response: NextResponse;
+
   if (authPaths.some((p) => pathname.startsWith(p))) {
     if (session) {
-      const response = NextResponse.redirect(new URL(pathname.startsWith("/admin") ? "/super-admin" : "/dashboard", request.url));
+      response = NextResponse.redirect(new URL(pathname.startsWith("/admin") ? "/super-admin" : "/dashboard", request.url));
       copyCookies(supabaseResponse, response);
-      response.headers.set("x-request-id", requestId);
-      return response;
+    } else {
+      response = supabaseResponse;
     }
-    const response = supabaseResponse;
     response.headers.set("x-request-id", requestId);
+    endMiddlewareTiming(timing, response.status);
     return response;
   }
 
   // Public paths bypass auth entirely
   if (publicPaths.some((p) => pathname.startsWith(p))) {
-    const response = supabaseResponse;
+    response = supabaseResponse;
     response.headers.set("x-request-id", requestId);
+    endMiddlewareTiming(timing, response.status);
     return response;
   }
 
   if (!protectedPathPrefixes.some((prefix) => pathname.startsWith(prefix))) {
-    const response = supabaseResponse;
+    response = supabaseResponse;
     response.headers.set("x-request-id", requestId);
+    endMiddlewareTiming(timing, response.status);
     return response;
   }
 
   if (!session) {
-    const response = NextResponse.redirect(new URL(pathname.startsWith("/super-admin") ? "/admin/login" : "/login", request.url));
+    response = NextResponse.redirect(new URL(pathname.startsWith("/super-admin") ? "/admin/login" : "/login", request.url));
     copyCookies(supabaseResponse, response);
     response.headers.set("x-request-id", requestId);
+    endMiddlewareTiming(timing, response.status);
     return response;
   }
 
-  const response = supabaseResponse;
+  response = supabaseResponse;
   response.headers.set("x-request-id", requestId);
+  endMiddlewareTiming(timing, response.status);
   return response;
 }
 

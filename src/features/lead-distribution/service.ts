@@ -79,7 +79,7 @@ async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: s
   const db = getDatabase();
   await db.insert(schema.leadQueues).values({ id: randomUUID(), tenantId, branchId, name: "Fila geral", slug: "geral", isDefault: true, createdAt: new Date(), updatedAt: new Date() }).onConflictDoNothing();
   const [queue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.branchId, branchId), eq(schema.leadQueues.isDefault, true), eq(schema.leadQueues.status, "active"))).orderBy(asc(schema.leadQueues.createdAt)).limit(1);
-  if (!queue) throw new Error("A unidade não possui uma fila ativa.");
+  if (!queue) throw new Error("A unidade não possui uma fila ativa. Crie uma fila para a unidade antes de enviar leads.");
   void actorId;
   return queue.id;
 }
@@ -161,17 +161,37 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   const db = getDatabase();
   const [branch] = await db.select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status }).from(schema.branches).where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
   if (!branch || branch.status !== "active" || !branch.acceptingLeads) return { status: "failed", code: "BRANCH_NOT_ACCEPTING_LEADS" };
-  const queueId = await ensureDefaultQueue(context.tenantId, branchId, context.userId);
+  // Atribuição manual não requer fila — usa null quando não há fila na unidade
+  let queueId: string | null = null;
+  try {
+    queueId = await ensureDefaultQueue(context.tenantId, branchId, context.userId);
+  } catch {
+    // Unidade sem fila: roteamento continua sem fila vinculada
+  }
   const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "failed", code: "LEAD_NOT_FOUND" };
 
-  const campaignCheck = await validateCampaignQueueRoute(db, context.tenantId, leadId, queueId);
-  if (!campaignCheck.allowed) {
-    throw new AuthorizationError(campaignCheck.reason ?? "Campanha não permitida para esta fila.");
+  if (queueId) {
+    const campaignCheck = await validateCampaignQueueRoute(db, context.tenantId, leadId, queueId);
+    if (!campaignCheck.allowed) {
+      throw new AuthorizationError(campaignCheck.reason ?? "Campanha não permitida para esta fila.");
+    }
   }
 
   const updated = await db.transaction(async (tx) => {
-    const result = await tx.update(schema.leads).set({ branchId, queueId, corretorId: null, distributionStatus: "queued", distributionOrigin: context.role === "director" ? "parent" : "unit", unitAssignedAt: new Date(), assignmentSource: context.role === "director" ? "manual_director" : "manual_manager", assignmentStrategy: "manual", distributionUpdatedAt: new Date() }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
+    const updateData: Record<string, unknown> = {
+      branchId,
+      corretorId: null,
+      distributionStatus: queueId ? "queued" : "unassigned",
+      distributionOrigin: context.role === "director" ? "parent" : "unit",
+      unitAssignedAt: new Date(),
+      assignmentSource: context.role === "director" ? "manual_director" : "manual_manager",
+      assignmentStrategy: "manual",
+      distributionUpdatedAt: new Date(),
+    };
+    // Só vincula fila quando existe; sem fila, o lead fica aguardando fila/unidade
+    if (queueId) updateData.queueId = queueId;
+    const result = await tx.update(schema.leads).set(updateData).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
     if (!result.length) return false;
     await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: branchId, previousOwnerId: lead.corretorId, toQueueId: queueId, action: "routed_to_unit", source: context.role === "director" ? "manual_director" : "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: new Date() });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.routed_to_unit" });

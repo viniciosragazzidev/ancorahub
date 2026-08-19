@@ -3,7 +3,7 @@ export type AssignmentSource = "manual_director" | "manual_manager" | "automatic
 export type AssignmentStrategy = "round_robin" | "capacity" | "manual" | "duty_schedule";
 
 export type LeadRoutingResult =
-  | { status: "routed"; branchId: string; queueId: string; strategy: AssignmentStrategy; ruleId?: string }
+  | { status: "routed"; branchId: string; queueId: string | null; strategy: AssignmentStrategy; ruleId?: string }
   | { status: "inbox"; reason: string }
   | { status: "failed"; code: string }
   | { status: "conflict"; code: string };

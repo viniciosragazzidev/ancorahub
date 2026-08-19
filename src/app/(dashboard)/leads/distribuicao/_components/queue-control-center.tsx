@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import { deleteDistributionQueueAction, saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction } from "@/features/lead-distribution/actions";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
+import { Loader2Icon } from "@/components/huge-icons";
+import { cn } from "@/utils/core/cn";
 
 type Queue = {
   id: string;
@@ -126,8 +128,8 @@ export function QueueControlCenter({
     setDeletingId(queue.id);
     const result = await deleteDistributionQueueAction(queue.id);
     setDeletingId(null);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.");
-    toast.success(result.message);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.", { description: "Verifique se a fila não está em uso por campanhas ativas." });
+    toast.success(result.message, { description: `A fila "${queue.name}" foi removida.` });
   }
 
   const branchQueues = useMemo(
@@ -152,7 +154,7 @@ export function QueueControlCenter({
       ...emptyQueue,
       branchId: "",
       exclusiveDutyScheduleId: "",
-      allowedBranchIds: [],
+      allowedBranchIds: branches.map((b) => b.id), // Todas marcadas por padrão
       brokerScopeMode: "all",
       allowedBrokerIds: [],
     });
@@ -189,6 +191,18 @@ export function QueueControlCenter({
     });
   }
 
+  /** Ao mudar a unidade principal, atualiza allowedBranchIds automaticamente. */
+  function handleBranchChange(newBranchId: string) {
+    setForm((prev) => {
+      if (!newBranchId) {
+        // "Todas as unidades" selecionada → marcar todas as checkboxes
+        return { ...prev, branchId: newBranchId, allowedBranchIds: branches.map((b) => b.id) };
+      }
+      // Unidade específica → remover ela de allowedBranchIds
+      return { ...prev, branchId: newBranchId, allowedBranchIds: prev.allowedBranchIds.filter((id) => id !== newBranchId) };
+    });
+  }
+
   function toggleAllowedBroker(brokerId: string) {
     setForm((prev) => {
       const exists = prev.allowedBrokerIds.includes(brokerId);
@@ -217,8 +231,8 @@ export function QueueControlCenter({
       status: form.status,
     });
     setSaving(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível salvar a fila.");
-    toast.success(result.message);
+    if (!result.success) return toast.error(result.error ?? "Não foi possível salvar a fila.", { description: "Verifique os dados e tente novamente." });
+    toast.success(result.message, { description: editingId ? `A fila "${form.name}" foi atualizada.` : `A fila "${form.name}" está pronta para receber leads.` });
     setEditorOpen(false);
   }
 
@@ -226,8 +240,8 @@ export function QueueControlCenter({
     setSavingCampaignRoute(true);
     const result = await saveMetaCampaignQueueRouteAction({ campaignId, queueId: enabled ? queueId : null, enabled });
     setSavingCampaignRoute(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.");
-    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."));
+    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.", { description: "Verifique se a fila está ativa." });
+    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."), { description: enabled ? "Leads dessa campanha serão direcionados automaticamente." : "A campanha voltará a usar a fila geral." });
   }
 
   async function runSimulation() {
@@ -242,16 +256,16 @@ export function QueueControlCenter({
     setSavingCampaignRoute(true);
     const result = await saveMetaCampaignQueueRouteAction({ campaignId: campaignRoute.campaignId, queueId: enabled ? campaignRoute.queueId : null, enabled });
     setSavingCampaignRoute(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.");
-    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Campanha ignorada pelo CRM."));
+    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.", { description: "Verifique se a fila está ativa." });
+    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Campanha ignorada pelo CRM."), { description: enabled ? "Leads serão direcionados automaticamente." : "A campanha não será registrada no CRM." });
   }
 
   async function saveAdRoute(enabled: boolean) {
     setSavingAdRoute(true);
     const result = await saveMetaAdQueueRouteAction({ adId: adRoute.adId, queueId: enabled ? adRoute.queueId : null, enabled });
     setSavingAdRoute(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar o anúncio.");
-    toast.success(result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."));
+    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar o anúncio.", { description: "Verifique se a fila está ativa." });
+    toast.success(result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."), { description: enabled ? "Leads deste anúncio serão direcionados automaticamente." : "O anúncio não será registrado no CRM." });
   }
 
   return (
@@ -263,10 +277,10 @@ export function QueueControlCenter({
             <p className="mt-1 text-sm text-muted-foreground">Cada fila decide como a corretora ou unidade recebe, prioriza e distribui novos leads.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setSimulation(null); setSimulatorOpen(true); }}>
+            <Button variant="outline" size="sm" onClick={() => { setSimulation(null); setSimulatorOpen(true); }} className="active:scale-[0.97] transition-transform">
               <MagicWand />Simular distribuição
             </Button>
-            {canEdit ? <Button size="sm" onClick={openCreate}><Plus />Criar fila</Button> : null}
+            {canEdit ? <Button size="sm" onClick={openCreate} className="active:scale-[0.97] transition-transform"><Plus />Criar fila</Button> : null}
           </div>
         </div>
 
@@ -388,12 +402,24 @@ export function QueueControlCenter({
                           variant="ghost"
                           onClick={() => handleDeleteQueue(queue)}
                           disabled={deletingId === queue.id}
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-1"
+                          className={cn(
+                            "text-destructive hover:bg-destructive/10 hover:text-destructive gap-1 active:scale-[0.97] transition-all duration-150",
+                            deletingId === queue.id && "pointer-events-none",
+                          )}
                         >
-                          <Trash className="size-3.5" />
+                          {deletingId === queue.id ? (
+                            <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />
+                          ) : (
+                            <Trash className="size-3.5" />
+                          )}
                           {deletingId === queue.id ? "Excluindo…" : "Excluir"}
                         </Button>
-                        <Button size="xs" variant="outline" onClick={() => openEdit(queue)}>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          onClick={() => openEdit(queue)}
+                          className="active:scale-[0.97] transition-transform"
+                        >
                           <SlidersHorizontal />Editar
                         </Button>
                       </div>
@@ -472,18 +498,18 @@ export function QueueControlCenter({
                 size="sm"
                 onClick={() => void saveCampaignRoute(true)}
                 disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId || !campaignRoute.queueId}
-                className="gap-1"
+                className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", savingCampaignRoute && "pointer-events-none")}
               >
-                {savingCampaignRoute ? "Salvando…" : "Receber na fila"}
+                {savingCampaignRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Receber na fila"}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => void saveCampaignRoute(false)}
                 disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId}
-                className="text-destructive hover:bg-destructive/10"
+                className={cn("text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150", savingCampaignRoute && "pointer-events-none")}
               >
-                {savingCampaignRoute ? "Salvando…" : "Não registrar"}
+                {savingCampaignRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Não registrar"}
               </Button>
             </div>
           ) : (
@@ -597,17 +623,18 @@ export function QueueControlCenter({
                 size="sm"
                 onClick={() => void saveAdRoute(true)}
                 disabled={!canEdit || savingAdRoute || !adRoute.adId || !adRoute.queueId}
+                className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", savingAdRoute && "pointer-events-none")}
               >
-                {savingAdRoute ? "Salvando…" : "Receber na fila"}
+                {savingAdRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Receber na fila"}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => void saveAdRoute(false)}
                 disabled={!canEdit || savingAdRoute || !adRoute.adId}
-                className="text-destructive hover:bg-destructive/10"
+                className={cn("text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150", savingAdRoute && "pointer-events-none")}
               >
-                {savingAdRoute ? "Salvando…" : "Não registrar"}
+                {savingAdRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Não registrar"}
               </Button>
             </div>
           ) : (
@@ -676,7 +703,7 @@ export function QueueControlCenter({
                 <AppSelect
                   aria-label="Unidade principal da fila"
                   value={form.branchId}
-                  onValueChange={(branchId) => setForm({ ...form, branchId })}
+                  onValueChange={handleBranchChange}
                   options={[
                     { value: "", label: "Todas as Unidades (Geral / Sem Unidade Específica)" },
                     ...branches.map((branch) => ({ value: branch.id, label: branch.name })),
@@ -907,9 +934,22 @@ export function QueueControlCenter({
             </div>
 
             <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 shrink-0 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditorOpen(false)} disabled={saving}>Cancelar</Button>
-              <Button onClick={saveQueue} disabled={saving || !form.name.trim()}>
-                {saving ? "Salvando…" : "Salvar fila"}
+              <Button variant="outline" onClick={() => setEditorOpen(false)} disabled={saving} className="active:scale-[0.97] transition-transform">
+                Cancelar
+              </Button>
+              <Button
+                onClick={saveQueue}
+                disabled={saving || !form.name.trim()}
+                className={cn(
+                  "gap-1.5 active:scale-[0.97] transition-all duration-150",
+                  saving && "pointer-events-none",
+                )}
+              >
+                {saving ? (
+                  <><Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> Salvando…</>
+                ) : (
+                  "Salvar fila"
+                )}
               </Button>
             </DialogFooter>
           </DialogPanel>
@@ -946,8 +986,16 @@ export function QueueControlCenter({
                 </label>
               </div>
 
-              <Button className="w-fit" onClick={runSimulation} disabled={simulating || !simulationForm.branchId}>
-                {simulating ? "Calculando…" : "Executar simulação"}
+              <Button
+                className={cn("w-fit gap-1.5 active:scale-[0.97] transition-all duration-150", simulating && "pointer-events-none")}
+                onClick={runSimulation}
+                disabled={simulating || !simulationForm.branchId}
+              >
+                {simulating ? (
+                  <><Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> Calculando…</>
+                ) : (
+                  "Executar simulação"
+                )}
               </Button>
 
               {simulation?.success ? (

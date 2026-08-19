@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useMemo, useState, useId } from "react";
-import { toast } from "sonner";
-import { ArrowRight, CheckCircle, MagicWand, UserList } from "@/components/huge-icons";
+import { useActionState, useEffect, useMemo, useState, useId, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "@/components/ui/sonner";
+import { ArrowRight, CheckCircle, Loader2Icon, MagicWand, UserList } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   routeLeadToBranchAction,
   type DistributionActionState,
 } from "@/features/lead-distribution/actions";
+import { cn } from "@/utils/core/cn";
 
 type Lead = {
   id: string;
@@ -49,16 +51,78 @@ type Broker = {
 const PAGE_SIZE = 10;
 const MAX_BATCH = 10;
 
-function Feedback({ state }: { state: DistributionActionState }) {
-  if (state.error) toast.error(state.error);
-  else if (state.message) toast[state.success ? "success" : "warning"](state.message);
-  return null;
+/** Toast imediato baseado no estado da action */
+function useActionFeedback(state: DistributionActionState, label: string) {
+  const shownRef = useState({ s: state.success, e: state.error });
+  if (state.success !== shownRef[0].s || state.error !== shownRef[0].e) {
+    shownRef[0] = { s: state.success, e: state.error };
+    if (state.error) {
+      toast.error(state.error, { description: `Falha ao ${label}.` });
+    } else if (state.message) {
+      if (state.success) {
+        toast.success(state.message, {
+          description: processedCount(state) ? `${processedCount(state)} lead(s) processado(s).` : undefined,
+        });
+      } else {
+        toast.warning(state.message);
+      }
+    }
+  }
 }
 
+function processedCount(state: DistributionActionState): number | undefined {
+  return state.processed ?? undefined;
+}
+
+/** Botão de ação com spinner + ícone de sucesso animado */
+function ActionButton({
+  pending,
+  success,
+  variant = "outline",
+  size = "sm",
+  className,
+  children,
+}: {
+  pending: boolean;
+  success?: boolean;
+  variant?: "default" | "outline" | "ghost";
+  size?: "xs" | "sm" | "default";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      disabled={pending}
+      size={size}
+      type="submit"
+      variant={variant}
+      className={cn(
+        "gap-1.5 transition-all duration-150",
+        "active:scale-[0.97]",
+        pending && "pointer-events-none",
+        success && "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+        className,
+      )}
+    >
+      <span className="t-icon-swap relative inline-grid" data-state={pending ? "b" : "a"}>
+        <span className="t-icon grid place-items-center" data-icon="a">{children}</span>
+        <span className="t-icon absolute inset-0 grid place-items-center" data-icon="b">
+          <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" />
+        </span>
+      </span>
+      <span className="relative">
+        {pending ? "Processando…" : (children as React.ReactNode)}
+      </span>
+    </Button>
+  );
+}
+
+/** Wrapper de formulário de ação com feedback visual completo */
 function ActionForm({
   action,
   children,
   fields,
+  label,
 }: {
   action: (
     previous: DistributionActionState,
@@ -66,21 +130,34 @@ function ActionForm({
   ) => Promise<DistributionActionState>;
   children: React.ReactNode;
   fields: Record<string, string>;
+  label: string;
 }) {
+  const router = useRouter();
   const formKey = useId();
   const [state, formAction, pending] = useActionState(action, {});
   const [formVersion, setFormVersion] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // Reset form by changing key when action completes
+  // Feedback imediato via toast
+  useActionFeedback(state, label);
+
+  // Reset form + flash de sucesso
   const prevSuccessRef = useState(state.success);
   if (state.success !== prevSuccessRef[0]) {
     prevSuccessRef[0] = state.success;
-    if (state.success) setFormVersion((v) => v + 1);
+    if (state.success) {
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 1800);
+      setFormVersion((v) => v + 1);
+      router.refresh();
+    }
   }
   const prevErrorRef = useState(state.error);
   if (state.error !== prevErrorRef[0]) {
     prevErrorRef[0] = state.error;
-    if (state.error) setFormVersion((v) => v + 1);
+    if (state.error) {
+      setFormVersion((v) => v + 1);
+    }
   }
 
   return (
@@ -88,10 +165,9 @@ function ActionForm({
       {Object.entries(fields).map(([name, value]) => (
         <input key={name} name={name} type="hidden" value={value} />
       ))}
-      <Button disabled={pending} size="sm" type="submit" variant="outline">
-        {children}
-      </Button>
-      <Feedback state={state} />
+      <ActionButton pending={pending} success={showSuccess}>
+        {showSuccess ? <CheckCircle className="size-4" /> : children}
+      </ActionButton>
     </form>
   );
 }
@@ -109,6 +185,7 @@ export function DistributionInbox({
   brokers: Broker[];
   initialStatusFilter?: "all" | "unassigned" | "queued" | "returned_to_queue";
 }) {
+  const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const managerBranchId = role === "manager" ? (branches[0]?.id ?? "") : "";
@@ -117,6 +194,7 @@ export function DistributionInbox({
   const [unitFilter, setUnitFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [page, setPage] = useState(1);
+
   const selectable = useMemo(
     () =>
       leads.filter(
@@ -149,7 +227,7 @@ export function DistributionInbox({
       return;
     }
     if (selected.length >= MAX_BATCH) {
-      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`);
+      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`, { description: "Remova leads selecionados para adicionar outros." });
       return;
     }
     setSelected([...selected, id]);
@@ -163,7 +241,7 @@ export function DistributionInbox({
     }
     const missing = visibleIds.filter((id) => !selected.includes(id));
     if (selected.length + missing.length > MAX_BATCH) {
-      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`);
+      toast.error(`Máximo de ${MAX_BATCH} leads por envio.`, { description: "Selecione menos leads para continuar." });
       return;
     }
     setSelected([...selected, ...missing]);
@@ -188,7 +266,6 @@ export function DistributionInbox({
     setBatchBrokerId("");
   }
 
-
   const stateAction = useActionState(distributeLeadBatchAction, {});
   const [batchState, batchAction, batchPending] = stateAction;
   const [assignState, assignAction, assignPending] = useActionState(
@@ -196,11 +273,42 @@ export function DistributionInbox({
     {},
   );
 
+  // Toasts para ações em lote
+  useActionFeedback(batchState, "enviar leads em lote");
+  useActionFeedback(assignState, "atribuir leads em lote");
+
+  const [batchSuccess, setBatchSuccess] = useState(false);
+  const [assignSuccess, setAssignSuccess] = useState(false);
+
+  const prevBatchSuccess = useState(batchState.success);
+  if (batchState.success !== prevBatchSuccess[0]) {
+    prevBatchSuccess[0] = batchState.success;
+    if (batchState.success) {
+      setBatchSuccess(true);
+      setTimeout(() => setBatchSuccess(false), 1800);
+    }
+  }
+  const prevAssignSuccess = useState(assignState.success);
+  if (assignState.success !== prevAssignSuccess[0]) {
+    prevAssignSuccess[0] = assignState.success;
+    if (assignState.success) {
+      setAssignSuccess(true);
+      setTimeout(() => setAssignSuccess(false), 1800);
+    }
+  }
+
   function clearBatchUi() {
     setSelected([]);
     setBrokerByLead({});
     setBatchBrokerId("");
   }
+
+  useEffect(() => {
+    if (batchState.success) router.refresh();
+  }, [batchState.success, router]);
+  useEffect(() => {
+    if (assignState.success) router.refresh();
+  }, [assignState.success, router]);
 
   return (
     <Card variant="overview" data-onboarding="manager-team-performance">
@@ -235,10 +343,9 @@ export function DistributionInbox({
                 ) : (
                   <input name="branchId" type="hidden" value={managerBranchId} />
                 )}
-                <Button disabled={batchPending} size="sm" type="submit">
-                  <ArrowRight /> Enviar selecionados ({selected.length}/{MAX_BATCH})
-                </Button>
-                <Feedback state={batchState} />
+                <ActionButton pending={batchPending} success={batchSuccess} variant="default">
+                  <ArrowRight /> Enviar ({selected.length}/{MAX_BATCH})
+                </ActionButton>
               </form>
               <form
                 action={assignAction}
@@ -262,15 +369,14 @@ export function DistributionInbox({
                     ...unitBrokers.map((b) => ({ value: b.id, label: b.name })),
                   ]}
                 />
-                <Button
-                  disabled={assignPending || !batchBrokerId}
-                  size="sm"
-                  type="submit"
+                <ActionButton
+                  pending={assignPending}
+                  success={assignSuccess}
                   variant="outline"
+                  className={cn(!batchBrokerId && "opacity-50")}
                 >
-                  <UserList /> Atribuir selecionados
-                </Button>
-                <Feedback state={assignState} />
+                  <UserList /> Atribuir ({selected.length})
+                </ActionButton>
               </form>
             </div>
           ) : null}
@@ -431,6 +537,7 @@ export function DistributionInbox({
                                   <ActionForm
                                     action={assignLeadToBrokerAction}
                                     fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id] }}
+                                    label={`atribuir lead ${lead.name}`}
                                   >
                                     <UserList /> Atribuir
                                   </ActionForm>
@@ -438,6 +545,7 @@ export function DistributionInbox({
                                 <ActionForm
                                   action={distributeLeadAutomaticallyAction}
                                   fields={{ leadId: lead.id }}
+                                  label={`distribuir lead ${lead.name}`}
                                 >
                                   <MagicWand /> Auto
                                 </ActionForm>
@@ -459,6 +567,7 @@ export function DistributionInbox({
                                 <ActionForm
                                   action={routeLeadToBranchAction}
                                   fields={{ leadId: lead.id, branchId }}
+                                  label={`enviar lead ${lead.name} para a unidade`}
                                 >
                                   <ArrowRight /> Enviar para unidade
                                 </ActionForm>
