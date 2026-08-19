@@ -48,3 +48,6 @@ public/downloads/
 /tmp/
 /graphify-out/
 
+
+.dbprobe.cjs
+.devlog.txt
