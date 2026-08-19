@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, MagnifyingGlass, SlidersHorizontal } from "@/components/huge-icons";
+import { ArrowRight, HelpCircle, MagnifyingGlass, SlidersHorizontal } from "@/components/huge-icons";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +82,15 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Reportar problema"
+            title="Reportar problema"
+            onClick={() => window.dispatchEvent(new CustomEvent("open-system-feedback"))}
+            className="grid size-9 place-items-center rounded-full border border-border/70 bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <HelpCircle className="size-4" />
+          </button>
           <ExperienceModeToggle variant="badge" />
         </div>
       </div>

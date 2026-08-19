@@ -2,9 +2,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
-import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateWorkflowAutomationSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateNotificationCapabilityAction, updateRealtimeSyncSettingsAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
+import { updateCentralAtencaoSettingsAction, updateGlobalSearchSettingsAction, updateBrokerWorkspaceSettingsAction, updateWorkflowAutomationSettingsAction, updateCleanUiOperationalSettingsAction, updateInterfaceMotionSettingsAction, updateR2StorageSettingsAction, updateMetaCloudWhatsAppSettingsAction, updateMetaLeadAdsSettingsAction, updateMetaLeadAdsPlatformIdentityAction, updateSystemReportSettingsAction, updateNotificationCapabilityAction, updateRealtimeSyncSettingsAction, updateAiSettingsAction, updateAiWhatsAppQualificationSettingsAction, updateQuickReplySettingsAction, updateAiMemoryResetSettingsAction, updateAgentTrainingCenterSettingsAction, updateExtensionGlobalSettingsAction, updateLeadDistributionJobsSettingsAction, runLeadDistributionJobsAction, updateLeadEffectOutboxSettingsAction, runLeadEffectOutboxAction, updateWahaCadenceSettingsAction, updateWahaConnectionSettingsAction, updateLeadManagementActionsSettingsAction, updateCustomRolesGlobalSettingsAction, updatePerformanceRankingSettingsAction, updateTeamMemberProfileSettingsAction, updateUserProfileSettingsAction } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
+import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ export default async function SuperAdminSettingsPage() {
     "feature_r2_storage_enabled",
     "feature_route_onboarding_enabled",
     "feature_whatsapp_meta_cloud_enabled",
+    SYSTEM_REPORT_ENABLED_KEY,
+    SYSTEM_REPORT_DESTINATION_KEY,
     "feature_meta_lead_ads_enabled",
     "feature_realtime_sync_enabled",
     META_LEAD_ADS_PLATFORM_SETTINGS.partnerName,
@@ -84,6 +87,8 @@ export default async function SuperAdminSettingsPage() {
   const r2StorageEnabled = settingMap.get("feature_r2_storage_enabled") !== "false";
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
+  const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
+  const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const realtimeSyncEnabled = settingMap.get("feature_realtime_sync_enabled") !== "false";
   const metaLeadAdsPartnerName = settingMap.get(META_LEAD_ADS_PLATFORM_SETTINGS.partnerName) ?? "Ancora Hub";
@@ -326,6 +331,11 @@ export default async function SuperAdminSettingsPage() {
             <Card className="border-border bg-card shadow-none">
               <CardHeader><CardTitle>WhatsApp oficial da Meta</CardTitle><CardDescription>Ativa o Embedded Signup, o webhook oficial e o envio pela Cloud API. A capacidade pode ser interrompida sem apagar canais ou histórico.</CardDescription></CardHeader>
               <CardContent><form action={updateMetaCloudWhatsAppSettingsAction} className="flex flex-wrap items-center justify-between gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="metaCloudWhatsAppEnabled" value="true" defaultChecked={metaCloudWhatsAppEnabled} className="size-4 warning-[var(--primary)]" /><span><span className="font-medium">Integração oficial habilitada</span><span className="block text-xs text-muted-foreground">Exige as credenciais privadas da Meta configuradas no ambiente da Vercel.</span></span></label><Button type="submit" variant="outline">Salvar integração</Button></form></CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader><CardTitle>Report de problema no WhatsApp</CardTitle><CardDescription>Ativa a central de feedback do &quot;?&quot; no cabeçalho. O envio usa o número oficial da Meta Cloud da própria corretora para um WhatsApp de destino global definido pelo Super-admin. Toda alteração é auditada na plataforma.</CardDescription></CardHeader>
+              <CardContent><form action={updateSystemReportSettingsAction} className="grid gap-4 md:grid-cols-2"><label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" name="enabled" value="true" defaultChecked={systemReportEnabled} className="size-4" /><span><span className="font-medium">Central de report habilitada</span><span className="block text-xs text-muted-foreground">Desativar oculta a ação e bloqueia o envio em todos os tenants, preservando auditoria.</span></span></label><label className="grid gap-1 text-xs font-medium md:col-span-2">WhatsApp de destino (com código do país)<Input name="destination" defaultValue={systemReportDestination} inputMode="tel" placeholder="5521999999999" /></label><div className="md:col-span-2"><Button type="submit" variant={systemReportEnabled ? "outline" : "default"}>{systemReportEnabled ? "Salvar controle" : "Ativar central de report"}</Button></div></form></CardContent>
             </Card>
 
             <Card className="border-border bg-card shadow-none">

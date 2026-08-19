@@ -1,8 +1,8 @@
-import { changedFiles, readProjectFile, requestedFiles, writeReport } from "./lib";
+import { changedFiles, fileExists, readProjectFile, requestedFiles, writeReport } from "./lib";
 
 const files = requestedFiles();
 const candidates = files.length ? files : changedFiles();
-const sourceFiles = candidates.filter((file) => /\.(ts|tsx)$/.test(file) && (file.startsWith("src/") || file.startsWith("apps/") || file.startsWith("services/")));
+const sourceFiles = candidates.filter((file) => /\.(ts|tsx)$/.test(file) && (file.startsWith("src/") || file.startsWith("apps/") || file.startsWith("services/")) && fileExists(file));
 const findings: string[] = [];
 
 for (const file of sourceFiles) {

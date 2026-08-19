@@ -48,9 +48,9 @@ export function DashboardHeader({
         <div className="max-[559px]:hidden"><GlobalSearch /></div>
         <div className="max-[559px]:hidden"><ThemeToggle /></div>
         <Button
-          aria-label="Ajuda desta página"
-          title="Ajuda desta página"
-          onClick={() => window.dispatchEvent(new CustomEvent("open-contextual-help"))}
+          aria-label="Reportar problema"
+          title="Reportar problema"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-system-feedback"))}
           size="icon"
           variant="ghost"
           className="size-8 rounded-lg transition-colors hover:bg-muted/60"

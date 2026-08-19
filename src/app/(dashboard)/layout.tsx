@@ -13,7 +13,7 @@ import { FeedbackToastHandler } from "@/features/leads/components/feedback-toast
 import { PasskeyToastHandler } from "@/components/passkey-toast-handler";
 import { RouteOnboardingLoader } from "@/features/onboarding/components/route-onboarding-loader";
 import { CommandPalette } from "@/components/command-palette";
-import { ContextualHelpDrawer } from "@/components/contextual-help-drawer";
+import { SystemFeedbackDrawer } from "@/components/system-feedback-drawer";
 import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
@@ -93,7 +93,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             <FeedbackToastHandler userId={context.userId} />
             <PasskeyToastHandler userId={context.userId} />
             <CommandPalette />
-            <ContextualHelpDrawer />
+            <SystemFeedbackDrawer />
             <AgentDrawer />
             {children}
           </NotificationCountProvider>

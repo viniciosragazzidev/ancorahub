@@ -37,8 +37,10 @@ export function SecurityTab({ enabled: initialEnabled, email }: Props) {
       const result = await authClient.twoFactor.enable({ password: password || undefined, issuer: "Âncora Corretora" });
       if (result.error || !result.data) throw new Error(result.error?.message ?? "Não foi possível ativar o 2FA.");
       setEnabled(true);
-      setTotpUri(result.data.totpURI);
-      setBackupCodes(result.data.backupCodes);
+      if (result.data.method === "totp") {
+        setTotpUri(result.data.totpURI);
+        setBackupCodes(result.data.backupCodes);
+      }
       setPassword("");
       await recordSecurityAuditAction("ativou_2fa");
       toast.success("2FA ativado. Guarde seus códigos de recuperação.");

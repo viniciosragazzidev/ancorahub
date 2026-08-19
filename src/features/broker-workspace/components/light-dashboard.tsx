@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CheckCircle, Clock, Lightning, Users } from "@/components/huge-icons";
+import { useState } from "react";
+import { ArrowRight, CheckCircle, Clock, HelpCircle, Lightning, SignOut, Users } from "@/components/huge-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogPopup, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AncoraLogo } from "@/components/ancora-logo";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
+import { signOut } from "@/shared/auth/client";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -24,8 +29,27 @@ export function LightDashboard({
   data: BrokerWorkspaceData;
   logoUrl?: string | null;
 }) {
+  const router = useRouter();
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const firstName = data.viewer.name.split(" ")[0] || "Corretor";
   const greeting = getGreeting();
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    toast.info("Encerrando sua sessão...");
+    try {
+      await signOut();
+      toast.success("Sessão encerrada.");
+      window.setTimeout(() => {
+        router.replace("/login");
+        router.refresh();
+      }, 250);
+    } catch (error) {
+      setLoggingOut(false);
+      toast.error(error instanceof Error ? error.message : "Não foi possível sair agora.");
+    }
+  }
 
   const awaitingResponse = data.today.awaitingResponse;
   const inService = data.queue.filter((q) => q.status === "in_contact").length;
@@ -39,9 +63,56 @@ export function LightDashboard({
       <header className="flex items-center justify-between gap-3">
         <AncoraLogo src={logoUrl} className="h-9 w-auto max-w-[180px] object-contain" />
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Reportar problema"
+            title="Reportar problema"
+            onClick={() => window.dispatchEvent(new CustomEvent("open-system-feedback"))}
+            className="grid size-9 place-items-center rounded-full border border-border/70 bg-card text-muted-foreground shadow-xs transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <HelpCircle className="size-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Sair da conta"
+            title="Sair da conta"
+            onClick={() => setLogoutConfirmOpen(true)}
+            disabled={loggingOut}
+            className="grid size-9 place-items-center rounded-full border border-border/70 bg-card text-muted-foreground shadow-xs transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {loggingOut ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <SignOut className="size-4" />}
+          </button>
           <ExperienceModeToggle variant="badge" />
         </div>
       </header>
+
+      {/* Dialog de confirmação de logout */}
+      <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+        <DialogPopup className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sair da conta?</DialogTitle>
+            <DialogDescription>
+              Você será desconectado e redirecionado para a tela de login.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" disabled={loggingOut}>Cancelar</Button>} />
+            <Button type="button" variant="destructive" onClick={handleLogout} disabled={loggingOut}>
+              {loggingOut ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Saindo…
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <SignOut className="size-4" />
+                  Sair
+                </span>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
 
       {/* Primary Question: Tenho algo para fazer agora? */}
       <section aria-label="Resumo do dia" className="space-y-4">
