@@ -56,7 +56,7 @@ export async function startPurgeJob(tenantId: string): Promise<{ jobId: string }
     .limit(1);
 
   if (existing) {
-    throw new Error("Já existe um purge em andamento para esta empresa.");
+    throw new Error("JÃ¡ existe um purge em andamento para esta empresa.");
   }
 
   // Count leads and conversations for progress tracking
@@ -139,7 +139,7 @@ function isTransientQueryError(error: unknown) {
  * Process a purge job in batches within a time budget.
  * Every phase is idempotent (delete-based), so an interrupted slice can be
  * safely resumed: the next invocation re-scans phases and continues.
- * Returns { completed: false } when the budget ran out — the job stays
+ * Returns { completed: false } when the budget ran out â€” the job stays
  * "running" and the cron resumes it on the next tick.
  */
 export async function processPurgeJob(
@@ -227,7 +227,7 @@ export async function processPurgeJob(
     if (!(await batchDelete(db, schema.clients, "tenantId", tenantId, hasBudget))) return notFinished(db, jobId);
     if (!(await batchDelete(db, schema.webhookDeliveries, "tenantId", tenantId, hasBudget))) return notFinished(db, jobId);
 
-    // Phase 11: Leads (the big one — cascades need FK indexes, added in 0135)
+    // Phase 11: Leads (the big one â€” cascades need FK indexes, added in 0135)
     await updatePhase(db, jobId, "leads");
     const deletedLeads = await batchDeleteLeads(db, jobId, tenantId, hasBudget);
     if (deletedLeads === null) return notFinished(db, jobId);
@@ -295,7 +295,7 @@ async function notFinished(
   return { completed: false };
 }
 
-// ─── Batch Helpers ────────────────────────────────────────────────────
+// â”€â”€â”€ Batch Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function updatePhase(
   db: ReturnType<typeof getDatabase>,
@@ -310,6 +310,24 @@ async function updatePhase(
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, BATCH_YIELD_MS));
+}
+
+/**
+ * postgres.js returns a RowList whose affected-row count is `.count`;
+ * node-postgres/neon returns `{ rowCount }`. Normalize both.
+ */
+export function affectedRows(result: unknown): number {
+  const r = result as { count?: number; rowCount?: number };
+  return r?.count ?? r?.rowCount ?? 0;
+}
+
+/**
+ * postgres.js returns rows as the array itself; node-postgres/neon wraps
+ * them in `{ rows }`. Normalize both.
+ */
+export function resultRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  return ((result as { rows?: T[] } | null | undefined)?.rows ?? []);
 }
 
 /**
@@ -334,7 +352,7 @@ async function batchDelete(
         LIMIT ${BATCH_SIZE}
       )
     `);
-    const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+    const deleted = affectedRows(result);
     if (deleted < BATCH_SIZE) return true;
     await yieldToEventLoop();
   }
@@ -358,7 +376,7 @@ async function batchDeleteConversations(
         LIMIT ${BATCH_SIZE}
       )
     `);
-    const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+    const deleted = affectedRows(result);
     totalDeleted += deleted;
     // Update progress
     await db
@@ -384,7 +402,7 @@ async function batchDeleteInteractions(
       WHERE ${schema.leads.tenantId} = ${tenantId}
       LIMIT ${BATCH_SIZE}
     `);
-    const ids = ((leadIds as { rows?: { id: string }[] }).rows ?? []).map((r) => r.id);
+    const ids = resultRows<{ id: string }>(leadIds).map((r) => r.id);
     if (ids.length === 0) return true;
 
     await db
@@ -410,7 +428,7 @@ async function batchDeleteMarketing(
       WHERE ${schema.marketingImports.tenantId} = ${tenantId}
       LIMIT ${BATCH_SIZE}
     `);
-    const ids = ((importIds as { rows?: { id: string }[] }).rows ?? []).map((r) => r.id);
+    const ids = resultRows<{ id: string }>(importIds).map((r) => r.id);
     if (ids.length === 0) break;
 
     await db
@@ -437,7 +455,7 @@ async function batchDeleteTasks(
       WHERE ${schema.leadTasks.tenantId} = ${tenantId}
       LIMIT ${BATCH_SIZE}
     `);
-    const ids = ((taskIds as { rows?: { id: string }[] }).rows ?? []).map((r) => r.id);
+    const ids = resultRows<{ id: string }>(taskIds).map((r) => r.id);
     if (ids.length === 0) break;
 
     await db
@@ -464,7 +482,7 @@ async function batchDeleteQuotes(
       WHERE ${schema.quotes.tenantId} = ${tenantId}
       LIMIT ${BATCH_SIZE}
     `);
-    const ids = ((quoteIds as { rows?: { id: string }[] }).rows ?? []).map((r) => r.id);
+    const ids = resultRows<{ id: string }>(quoteIds).map((r) => r.id);
     if (ids.length === 0) break;
 
     await db
@@ -503,7 +521,7 @@ async function batchDeleteLeads(
         LIMIT ${LEADS_BATCH_SIZE}
       )
     `);
-    const deleted = (result as { rowCount?: number }).rowCount ?? 0;
+    const deleted = affectedRows(result);
     sliceDeleted += deleted;
     if (deleted > 0) {
       await db
