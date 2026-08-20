@@ -4,7 +4,9 @@ import { desc, eq, and, isNull } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LightConversationsView } from "@/features/broker-workspace/components/light-conversations-view";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { buildOfficialTenantConversations } from "@/features/broker-workspace/official-tenant-conversations";
 import { samePhone } from "@/features/communication-channels/service";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasPermission } from "@/shared/auth/permissions";
@@ -70,7 +72,7 @@ export default async function BrokerConversationsPage({
           "Olá, {nome}! Sou seu corretor e vou seguir com seu atendimento por aqui."
         ).replaceAll("{nome}", selectedLead.nome.split(" ")[0] || selectedLead.nome)
       : undefined;
-  const [lightClients, tenantNumbers] = await Promise.all([
+  const [lightClients, tenantNumbers, tenantChannels] = await Promise.all([
     db
       .select({
         id: schema.clients.id,
@@ -94,6 +96,20 @@ export default async function BrokerConversationsPage({
       })
       .from(schema.wahaNumbers)
       .where(eq(schema.wahaNumbers.tenantId, context.tenantId)),
+    db
+      .select({
+        id: schema.communicationChannels.id,
+        name: schema.communicationChannels.verifiedName,
+        phone: schema.communicationChannels.displayPhoneNumber,
+      })
+      .from(schema.communicationChannels)
+      .where(
+        and(
+          eq(schema.communicationChannels.tenantId, context.tenantId),
+          eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+          eq(schema.communicationChannels.status, "active"),
+        ),
+      ),
   ]);
 
   // ── Buscar mensagens ──────────────────────────────────────────────────
@@ -193,34 +209,35 @@ export default async function BrokerConversationsPage({
     };
   });
 
-  const officialConversations = tenantNumbers.map((number) => {
-    const msgs = messageRows
-      .filter(
-        (message) => !message.leadId && !message.clientId && samePhone(message.phone, number.phone),
-      )
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
-      .slice(-100);
-    const latest = msgs.at(-1) ?? null;
-    return {
-      id: `tenant-number:${number.id}`,
-      kind: "tenant_number" as const,
-      sendTarget: { kind: "tenant_number" as const, numberId: number.id },
-      nome: number.label || "Número oficial do tenant",
-      telefone: number.phone,
-      status: "Número oficial",
-      latestMessage: latest
-        ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() }
-        : null,
-      messages: msgs.map((message) => ({
+  const officialConversations = buildOfficialTenantConversations(
+    [
+      ...tenantNumbers.map((number) => ({
+        id: number.id,
+        source: "number" as const,
+        name: number.label || "Número oficial do tenant",
+        phone: number.phone,
+      })),
+      ...tenantChannels
+        .filter((channel) => Boolean(channel.phone))
+        .map((channel) => ({
+          id: channel.id,
+          source: "channel" as const,
+          name: channel.name || "Número oficial do tenant",
+          phone: channel.phone!,
+        })),
+    ],
+    messageRows
+      .filter((message) => !message.leadId && !message.clientId)
+      .map((message) => ({
         id: message.id,
         body: message.body,
         direction: message.direction,
         sentAt: message.sentAt.toISOString(),
+        phone: message.phone,
         senderRole: message.senderRole,
         providerStatus: message.providerStatus,
       })),
-    };
-  });
+  );
 
   // Sort: conversas com mensagens recentes primeiro
   const scopedConversations = [...conversations, ...clientConversations, ...officialConversations];

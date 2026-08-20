@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, PaperPlaneTilt, WhatsappLogo } from "@/components/huge-icons";
@@ -12,9 +12,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
 import {
   sendLeadMessageAction,
+  sendTenantOfficialChannelMessageAction,
   sendTenantOfficialNumberMessageAction,
 } from "@/features/leads/actions/send-lead-message";
 import { cn } from "@/lib/utils";
+import {
+  REALTIME_SYNC_BROWSER_EVENT,
+  type RealtimeSyncBrowserDetail,
+} from "@/components/providers/realtime-events";
 
 export type LightConversationMessage = {
   id: string;
@@ -27,7 +32,10 @@ export type LightConversationMessage = {
 export type LightConversationItem = {
   id: string;
   kind: "lead" | "client" | "tenant_number";
-  sendTarget: { kind: "lead"; leadId: string } | { kind: "tenant_number"; numberId: string };
+  sendTarget:
+    | { kind: "lead"; leadId: string }
+    | { kind: "tenant_number"; numberId: string }
+    | { kind: "tenant_channel"; channelId: string };
   nome: string;
   telefone: string;
   status: string;
@@ -71,6 +79,7 @@ export function LightConversationsView({
   const [connection, setConnection] = useState<Awaited<
     ReturnType<typeof getWhatsAppConnection>
   > | null>(null);
+  const refreshConversations = useCallback(() => router.refresh(), [router]);
   useEffect(() => setConversations(serverConversations), [serverConversations]);
   useEffect(
     () =>
@@ -86,6 +95,22 @@ export function LightConversationsView({
       .then(setConnection)
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    const onConversationInvalidated = (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
+      if (detail?.kind === "domain.invalidated" && detail.domain === "conversations") {
+        refreshConversations();
+      }
+    };
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+  }, [refreshConversations]);
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") refreshConversations();
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refreshConversations]);
   const selected = conversations.find((item) => item.id === selectedId) ?? null;
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
@@ -416,7 +441,9 @@ function ChatInput({
       const result =
         target.kind === "lead"
           ? await sendLeadMessageAction(target.leadId, body)
-          : await sendTenantOfficialNumberMessageAction(target.numberId, body);
+          : target.kind === "tenant_channel"
+            ? await sendTenantOfficialChannelMessageAction(target.channelId, body)
+            : await sendTenantOfficialNumberMessageAction(target.numberId, body);
       if (!result.success || !result.message) {
         setError(result.error ?? "Não foi possível enviar a mensagem.");
         return;

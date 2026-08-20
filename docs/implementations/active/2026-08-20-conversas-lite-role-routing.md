@@ -53,12 +53,20 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - O provedor não aparece em rótulos, botões ou erros voltados ao usuário: a
   superfície usa somente “WhatsApp”. Identificadores técnicos, logs e contratos
   internos foram preservados para não alterar a integração.
+- O contato oficial ativo do tenant, inclusive quando gerido pelo canal Meta, é
+  incluído na carteira Lite sem criar um lead sintético. Suas mensagens são lidas e
+  respondidas exclusivamente pela sessão autenticada do corretor; a ação valida
+  tenant, canal ativo e conexão pronta no servidor e registra auditoria sem corpo.
+- A tela Lite reage ao sinal de invalidação `conversations` e reconcilia a cada 30
+  segundos enquanto estiver visível. Assim, uma mensagem persistida aparece sem
+  recarregamento manual mesmo se o sinal em tempo real for perdido.
 
 ## Validações
 
 - `npx eslint src/app/(dashboard)/conversas/page.tsx src/app/(dashboard)/conversas/broker/page.tsx` — executado no recorte.
 - `npm run type-check` — aprovado.
 - `npx vitest run src/features/broker-workspace/experience-mode.test.ts --reporter=verbose` — 1 teste aprovado.
+- `npx vitest run src/features/broker-workspace/official-tenant-conversations.test.ts --reporter=verbose` — mensagem do canal oficial Meta aparece como conversa autorizada.
 - `npm run agent:verify -- --level full` — documentação, arquivos alterados,
   arquitetura, segurança, performance e type-check aprovados; evidência em
   `reports/agent/verification/2026-08-20T17-47-26.694Z.md`.
