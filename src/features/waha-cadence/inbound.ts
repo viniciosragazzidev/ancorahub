@@ -4,6 +4,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
+import { WAHA_CONNECTIONS_FEATURE } from "@/features/waha-cadence/connection-service";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { phoneHash, normalizePhone, type WahaWebhookEvent, WAHA_AI_FEATURE, WAHA_CADENCE_FEATURE } from "./contract";
@@ -37,8 +39,6 @@ interface WebhookMetrics {
 export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: string) {
   const metrics: WebhookMetrics = { startTime: Date.now() };
 
-  if ((await getSystemSetting(WAHA_CADENCE_FEATURE)) !== "true") return { processed: 0, ignored: "feature_disabled" as const };
-
   const db = getDatabase();
 
   // ── 1. Idempotent event dedup ──────────────────────────────────────────
@@ -59,6 +59,18 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   if (!source) {
     await markIgnored(db, registered.id, "unknown_session");
     return { processed: 0, ignored: "unknown_session" as const };
+  }
+
+  // Cadência é uma automação opt-in. Conversas Lite do corretor são
+  // atendimento humano e continuam recebendo eventos enquanto a conexão WAHA
+  // estiver habilitada pela plataforma.
+  if (source.kind === "number" && (await getSystemSetting(WAHA_CADENCE_FEATURE)) !== "true") {
+    await markIgnored(db, registered.id, "feature_disabled");
+    return { processed: 0, ignored: "feature_disabled" as const };
+  }
+  if (source.kind === "connection" && (await getSystemSetting(WAHA_CONNECTIONS_FEATURE)) === "false") {
+    await markIgnored(db, registered.id, "feature_disabled");
+    return { processed: 0, ignored: "feature_disabled" as const };
   }
 
   // ── 3. Handle session.status ───────────────────────────────────────────
@@ -92,8 +104,15 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     if (source.kind === "connection") {
       try {
         revalidatePath("/conversas");
+        revalidatePath("/conversas/broker");
       } catch {
         // revalidatePath pode falhar fora de Server Components — não crítico
+      }
+      if (source.connection.tenantId && source.connection.userId) {
+        void publishDomainInvalidation(
+          [{ tenantId: source.connection.tenantId, userId: source.connection.userId }],
+          "conversations",
+        );
       }
     }
 
@@ -190,6 +209,23 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     }
   });
   metrics.persistMs = Date.now() - persistStart;
+
+  // Only the broker who owns this WAHA session receives an invalidation. The
+  // event carries no conversation content; the browser re-fetches authorized
+  // data through the server-rendered Lite page.
+  if (source.kind === "connection") {
+    try {
+      revalidatePath("/conversas/broker");
+    } catch {
+      // Cache invalidation is best-effort outside a render request.
+    }
+    if (source.connection.tenantId && source.connection.userId) {
+      void publishDomainInvalidation(
+        [{ tenantId: source.connection.tenantId, userId: source.connection.userId }],
+        "conversations",
+      );
+    }
+  }
 
   // ── 8. AI processing (optional, background, only for inbound) ──────────
   if (!isOutgoing && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {

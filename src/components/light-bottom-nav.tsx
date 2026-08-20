@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gear, House, ListChecks, Users } from "@/components/huge-icons";
+import { ChatCircleText, Gear, House, ListChecks, Users } from "@/components/huge-icons";
 import { Dock, DockIcon } from "@/components/ui/dock";
 import { cn } from "@/lib/utils";
 
 const LIGHT_NAV_ITEMS = [
   { label: "Resumo", href: "/dashboard", icon: House },
   { label: "Leads", href: "/minha-fila", icon: ListChecks },
+  { label: "Conversas", href: "/conversas/broker", icon: ChatCircleText },
   { label: "Clientes", href: "/clientes", icon: Users },
   { label: "Config", href: "/settings", icon: Gear },
 ] as const;

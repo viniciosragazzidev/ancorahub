@@ -13,6 +13,7 @@ import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
@@ -24,6 +25,12 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
+  }
+
+  // A experiência Lite é exclusiva do corretor e tem sua própria superfície WAHA.
+  // Diretores e gestores permanecem sempre na central operacional completa.
+  if (context.role === "broker" && await getExperienceMode(context) === "LIGHT") {
+    redirect(leadId ? `/conversas/broker?leadId=${encodeURIComponent(leadId)}` : "/conversas/broker");
   }
 
   const db = getDatabase();

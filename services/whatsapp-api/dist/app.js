@@ -4,6 +4,32 @@ import { getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
 import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/client.js";
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
 import { WahaClient } from "./integrations/waha/client.js";
+import { WahaClientError } from "./integrations/waha/types.js";
+const failedSessionRecoveries = new Map();
+function recoverFailedSessionOnce(client, sessionName) {
+    const existing = failedSessionRecoveries.get(sessionName);
+    if (existing)
+        return existing;
+    const recovery = client.recoverFailedSession(sessionName).finally(() => {
+        if (failedSessionRecoveries.get(sessionName) === recovery)
+            failedSessionRecoveries.delete(sessionName);
+    });
+    failedSessionRecoveries.set(sessionName, recovery);
+    return recovery;
+}
+function logRecoveryCleanup(request, session, sessionStatus, cleanup) {
+    for (const item of cleanup) {
+        request.log.info({
+            operation: "waha.connection.recover.cleanup",
+            cleanupOperation: item.operation,
+            session,
+            sessionStatus,
+            providerStatusCode: item.providerStatusCode,
+            normalizedError: item.normalizedError,
+            outcome: item.outcome,
+        });
+    }
+}
 /**
  * Comparação timing-safe de strings.
  * Usada para validar tokens internos sem viver a timing side-channel.
@@ -221,10 +247,19 @@ export function buildApp() {
         try {
             const session = await client.getSession(sessionName);
             const status = session?.status ?? "DISCONNECTED";
-            // Só buscar QR se estiver aguardando
             let qr = null;
             if (status === "WAITING_QR") {
-                qr = await client.getQr(sessionName);
+                try {
+                    qr = await client.getQr(sessionName);
+                }
+                catch (qrError) {
+                    // QR pode não estar pronto ainda — retornar null, não falhar
+                    request.log.info({
+                        operation: "waha.test_session.qr",
+                        session: sessionName,
+                        qrError: qrError instanceof Error ? qrError.message : "unknown",
+                    });
+                }
             }
             request.log.info({ operation: "waha.test_session.qr", session: sessionName, status, hasQr: qr !== null });
             // Nunca logar o QR em si
@@ -306,15 +341,80 @@ export function buildApp() {
         const client = new WahaClient(wahaConfig);
         const startedAt = Date.now();
         try {
-            // 1. Procurar sessão existente
+            // 1. Procurar sessão existente (idempotente)
             const existing = await client.getSession(sessionName);
             if (existing) {
-                // 2. Se existe e não está conectada, iniciar
-                if (existing.status !== "CONNECTED" && existing.status !== "WAITING_QR") {
-                    await client.startSession(sessionName);
+                // Sessão já existe — reutilizar conforme lifecycle:
+                // CONNECTED / WAITING_QR → não criar outra, retornar status atual
+                // STARTING → aguardar, retornar status
+                // STOPPED / DISCONNECTED → reiniciar
+                if (existing.status === "CONNECTED") {
+                    request.log.info({
+                        operation: "waha.connection.create",
+                        session: sessionName,
+                        reused: true,
+                        status: existing.status,
+                        durationMs: Date.now() - startedAt,
+                    });
+                    return reply.code(200).send({
+                        ok: true,
+                        sessionName,
+                        status: existing.status,
+                        reused: true,
+                        phoneNumber: existing.displayPhoneNumber,
+                        timestamp: new Date().toISOString(),
+                    });
                 }
-                const session = await client.getSession(sessionName);
-                const status = session?.status ?? existing.status;
+                if (existing.status === "WAITING_QR") {
+                    // Sessão aguardando QR — não criar outra, retornar status
+                    request.log.info({
+                        operation: "waha.connection.create",
+                        session: sessionName,
+                        reused: true,
+                        status: existing.status,
+                        durationMs: Date.now() - startedAt,
+                    });
+                    return reply.code(200).send({
+                        ok: true,
+                        sessionName,
+                        status: existing.status,
+                        reused: true,
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+                if (existing.status === "ERROR") {
+                    const recovered = await recoverFailedSessionOnce(client, sessionName);
+                    logRecoveryCleanup(request, sessionName, existing.status, recovered.cleanup);
+                    request.log.info({
+                        operation: "waha.connection.recover",
+                        session: sessionName,
+                        sessionStatus: existing.status,
+                        cleanup: recovered.cleanup,
+                    });
+                    return reply.code(200).send({
+                        ok: true,
+                        sessionName,
+                        status: recovered.session.status,
+                        reused: true,
+                        timestamp: new Date().toISOString(),
+                    });
+                }
+                // Para outros estados (STOPPED, STARTING), reiniciar
+                if (existing.status !== "STARTING") {
+                    try {
+                        await client.startSession(sessionName);
+                    }
+                    catch (startErr) {
+                        // Se start falhar, logar mas continuar — o status refletirá o estado real
+                        request.log.warn({
+                            operation: "waha.connection.create",
+                            session: sessionName,
+                            startError: startErr instanceof Error ? startErr.message : "unknown",
+                        });
+                    }
+                }
+                const refreshed = await client.getSession(sessionName);
+                const status = refreshed?.status ?? existing.status;
                 request.log.info({
                     operation: "waha.connection.create",
                     session: sessionName,
@@ -330,11 +430,19 @@ export function buildApp() {
                     timestamp: new Date().toISOString(),
                 });
             }
-            // 3. Criar nova sessão
-            await client.createSession(sessionName);
-            await client.startSession(sessionName);
-            const session = await client.getSession(sessionName);
-            const status = session?.status ?? "STARTING";
+            // 2. Criar nova sessão (idempotente — createSession trata 409)
+            const created = await client.createSession(sessionName);
+            // Se não estava em estado inicial, iniciar
+            if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") {
+                try {
+                    await client.startSession(sessionName);
+                }
+                catch {
+                    // Ignorar — createSession já pode ter iniciado
+                }
+            }
+            const finalSession = await client.getSession(sessionName);
+            const status = finalSession?.status ?? created.status ?? "STARTING";
             request.log.info({
                 operation: "waha.connection.create",
                 session: sessionName,
@@ -351,13 +459,75 @@ export function buildApp() {
             });
         }
         catch (error) {
+            const providerStatus = error instanceof WahaClientError ? error.providerStatusCode : undefined;
             request.log.warn({
                 operation: "waha.connection.create",
                 session: sessionName,
                 errorCode: error instanceof Error ? error.message : "unknown",
+                providerStatus,
                 durationMs: Date.now() - startedAt,
             });
             return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+        }
+    });
+    // ── WAHA Connection: Recover failed session ──────────────────────────
+    app.post("/internal/waha/connections/:id/recover", {
+        schema: {
+            params: {
+                type: "object",
+                required: ["id"],
+                properties: { id: { type: "string" } },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { id: sessionName } = request.params;
+        const client = new WahaClient(wahaConfig);
+        const current = await client.getSession(sessionName).catch((error) => {
+            request.log.warn({
+                operation: "waha.connection.recover.status",
+                session: sessionName,
+                providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
+                sessionStatus: "unknown",
+                normalizedError: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
+            return undefined;
+        });
+        if (current === undefined)
+            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+        try {
+            const recovered = await recoverFailedSessionOnce(client, sessionName);
+            logRecoveryCleanup(request, sessionName, current?.status ?? "DISCONNECTED", recovered.cleanup);
+            request.log.info({
+                operation: "waha.connection.recover",
+                session: sessionName,
+                sessionStatus: current?.status ?? "DISCONNECTED",
+                cleanup: recovered.cleanup,
+            });
+            return reply.code(200).send({
+                ok: true,
+                sessionName,
+                status: recovered.session.status,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            request.log.warn({
+                operation: "waha.connection.recover",
+                session: sessionName,
+                providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
+                sessionStatus: current?.status ?? "unknown",
+                normalizedError: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR",
+            });
+            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR" });
         }
     });
     // ── WAHA Connection: Status ──────────────────────────────────────────
@@ -428,7 +598,16 @@ export function buildApp() {
             const status = session?.status ?? "DISCONNECTED";
             let qr = null;
             if (status === "WAITING_QR") {
-                qr = await client.getQr(sessionName);
+                try {
+                    qr = await client.getQr(sessionName);
+                }
+                catch (qrError) {
+                    request.log.info({
+                        operation: "waha.connection.qr",
+                        session: sessionName,
+                        qrError: qrError instanceof Error ? qrError.message : "unknown",
+                    });
+                }
             }
             request.log.info({ operation: "waha.connection.qr", session: sessionName, status, hasQr: qr !== null });
             return reply.code(200).send({

@@ -4,10 +4,43 @@ import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import { getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
 import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/client.js";
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
-import { WahaClient } from "./integrations/waha/client.js";
+import { WahaClient, type WahaRecoveryCleanup } from "./integrations/waha/client.js";
 import { WahaClientError } from "./integrations/waha/types.js";
 
 type SendBody = { to: string; message: string };
+
+type FailedSessionRecovery = Awaited<ReturnType<WahaClient["recoverFailedSession"]>>;
+const failedSessionRecoveries = new Map<string, Promise<FailedSessionRecovery>>();
+
+function recoverFailedSessionOnce(client: WahaClient, sessionName: string) {
+  const existing = failedSessionRecoveries.get(sessionName);
+  if (existing) return existing;
+
+  const recovery = client.recoverFailedSession(sessionName).finally(() => {
+    if (failedSessionRecoveries.get(sessionName) === recovery) failedSessionRecoveries.delete(sessionName);
+  });
+  failedSessionRecoveries.set(sessionName, recovery);
+  return recovery;
+}
+
+function logRecoveryCleanup(
+  request: FastifyRequest,
+  session: string,
+  sessionStatus: string,
+  cleanup: WahaRecoveryCleanup[],
+) {
+  for (const item of cleanup) {
+    request.log.info({
+      operation: "waha.connection.recover.cleanup",
+      cleanupOperation: item.operation,
+      session,
+      sessionStatus,
+      providerStatusCode: item.providerStatusCode,
+      normalizedError: item.normalizedError,
+      outcome: item.outcome,
+    });
+  }
+}
 
 /**
  * Comparação timing-safe de strings.
@@ -389,7 +422,25 @@ export function buildApp() {
             });
           }
 
-          // Para outros estados (STOPPED, ERROR, STARTING), reiniciar
+          if (existing.status === "ERROR") {
+            const recovered = await recoverFailedSessionOnce(client, sessionName);
+            logRecoveryCleanup(request, sessionName, existing.status, recovered.cleanup);
+            request.log.info({
+              operation: "waha.connection.recover",
+              session: sessionName,
+              sessionStatus: existing.status,
+              cleanup: recovered.cleanup,
+            });
+            return reply.code(200).send({
+              ok: true,
+              sessionName,
+              status: recovered.session.status,
+              reused: true,
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Para outros estados (STOPPED, STARTING), reiniciar
           if (existing.status !== "STARTING") {
             try {
               await client.startSession(sessionName);
@@ -463,6 +514,70 @@ export function buildApp() {
           durationMs: Date.now() - startedAt,
         });
         return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+      }
+    },
+  );
+
+  // ── WAHA Connection: Recover failed session ──────────────────────────
+  app.post<{ Params: { id: string } }>(
+    "/internal/waha/connections/:id/recover",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? "")) return;
+
+      let wahaConfig;
+      try {
+        wahaConfig = getWahaConfig();
+      } catch {
+        return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+      }
+
+      const { id: sessionName } = request.params;
+      const client = new WahaClient(wahaConfig);
+      const current = await client.getSession(sessionName).catch((error) => {
+        request.log.warn({
+          operation: "waha.connection.recover.status",
+          session: sessionName,
+          providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
+          sessionStatus: "unknown",
+          normalizedError: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+        });
+        return undefined;
+      });
+      if (current === undefined) return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+
+      try {
+        const recovered = await recoverFailedSessionOnce(client, sessionName);
+        logRecoveryCleanup(request, sessionName, current?.status ?? "DISCONNECTED", recovered.cleanup);
+        request.log.info({
+          operation: "waha.connection.recover",
+          session: sessionName,
+          sessionStatus: current?.status ?? "DISCONNECTED",
+          cleanup: recovered.cleanup,
+        });
+        return reply.code(200).send({
+          ok: true,
+          sessionName,
+          status: recovered.session.status,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        request.log.warn({
+          operation: "waha.connection.recover",
+          session: sessionName,
+          providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
+          sessionStatus: current?.status ?? "unknown",
+          normalizedError: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR",
+        });
+        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR" });
       }
     },
   );

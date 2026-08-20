@@ -18,9 +18,9 @@ function vpsBaseUrl() {
   }
 }
 
-function vpsHeaders() {
+function vpsHeaders(hasJsonBody: boolean) {
   return {
-    "Content-Type": "application/json",
+    ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
     "X-CorreTop-Internal-Token": process.env.WHATSAPP_API_INTERNAL_TOKEN ?? "",
     "Authorization": `Bearer ${process.env.VPS_INTERNAL_API_TOKEN ?? ""}`,
   };
@@ -52,8 +52,8 @@ async function vpsRequest<T extends WahaConnectionResponse>(
   try {
     const response = await fetch(url, {
       method: options.method ?? "GET",
-      headers: vpsHeaders(),
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      headers: vpsHeaders(options.body !== undefined),
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
@@ -169,7 +169,7 @@ export async function startWhatsAppConnection() {
     }
 
     // Upsert no banco local
-    let [connection] = await db
+    const [connection] = await db
       .select()
       .from(schema.whatsappConnections)
       .where(
@@ -331,11 +331,13 @@ export async function resetWhatsAppSessionAction() {
       });
     }
   } catch (error) {
-    // Log mas não falhar — sessão pode já estar parada no WAHA
     const message = error instanceof Error ? error.message : "unknown";
-    if (!/timeout|indisponível/i.test(message)) {
-      console.warn("[waha] reset: disconnect failed:", message);
-    }
+    console.warn("[waha] reset: disconnect failed:", message);
+    return {
+      success: false,
+      error: "Não foi possível confirmar a desconexão da sessão WhatsApp.",
+      code: /timeout/i.test(message) ? "WAHA_TIMEOUT" : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE" : "WAHA_ERROR",
+    };
   }
 
   if (connection) {
@@ -353,4 +355,33 @@ export async function resetWhatsAppSessionAction() {
   }
 
   return { success: true };
+}
+
+/** Recupera uma sessão WAHA falhada mantendo a identidade determinística do corretor. */
+export async function recoverWhatsAppFailedSessionAction() {
+  const { db, connection } = await getOwnConnection();
+  if (!connection?.sessionName) return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
+
+  try {
+    const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/recover`, {
+      method: "POST",
+    });
+    const status = normalizeWahaStatus(result.status ?? "STARTING");
+    const qrResult = status === "ready"
+      ? null
+      : await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`).catch(() => null);
+    const qrCode = status === "ready" ? null : qrResult?.qr ?? null;
+
+    await db.update(schema.whatsappConnections).set({
+      status,
+      qrCode,
+      connectedAt: status === "ready" ? connection.connectedAt ?? new Date() : null,
+      updatedAt: new Date(),
+    }).where(eq(schema.whatsappConnections.id, connection.id));
+
+    return { success: true, sessionId: connection.sessionName, status, qrCode };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Não foi possível recuperar a sessão WhatsApp.";
+    return { success: false, error: message, code: /timeout/i.test(message) ? "WAHA_TIMEOUT" : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE" : "WAHA_ERROR" };
+  }
 }

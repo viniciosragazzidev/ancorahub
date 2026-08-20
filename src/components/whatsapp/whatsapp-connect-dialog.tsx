@@ -11,6 +11,7 @@ import {
   diagnoseWahaConnection,
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
+  recoverWhatsAppFailedSessionAction,
   refreshWhatsAppQr,
   resetWhatsAppSessionAction,
   startWhatsAppConnection,
@@ -25,6 +26,7 @@ function statusLabel(status: string): string {
   switch (status) {
     case "ready": return "Conectado";
     case "initializing": return "Conectando…";
+    case "recovering": return "Recuperando…";
     case "error": return "Erro";
     default: return "Desconectado";
   }
@@ -49,7 +51,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   const previousStatus = useRef(initial.status);
   const polling = useRef(false);
   const ready = connection.status === "ready";
-  const initializing = connection.status === "initializing";
+  const initializing = connection.status === "initializing" || connection.status === "recovering";
   const hasError = connection.status === "error";
   const label = statusLabel(connection.status);
 
@@ -243,7 +245,11 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   function disconnect() {
     startTransition(async () => {
       try {
-        await resetWhatsAppSessionAction();
+        const result = await resetWhatsAppSessionAction();
+        if (!result.success) {
+          toast.error(errorMessage(result.code));
+          return;
+        }
         setConnection((current) => ({
           ...current,
           sessionId: null,
@@ -263,18 +269,22 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   function resetAndRetry() {
     startTransition(async () => {
       try {
-        await resetWhatsAppSessionAction();
+        updateStatus("recovering");
+        const result = await recoverWhatsAppFailedSessionAction();
+        if (!result.success) {
+          updateStatus("error");
+          toast.error(errorMessage(result.code));
+          return;
+        }
         setConnection((current) => ({
           ...current,
-          sessionId: null,
-          sessionName: null,
-          qrCode: null,
-          status: "disconnected",
-          connectedAt: null,
+          sessionId: result.sessionId ?? current.sessionId,
+          qrCode: result.qrCode ?? null,
+          status: result.status ?? "initializing",
+          connectedAt: result.status === "ready" ? current.connectedAt : null,
         }));
-        // Pequena pausa para garantir que o WAHA processou a exclusão
-        await new Promise((r) => setTimeout(r, 500));
-        await start();
+        if (result.qrCode) toast.success("Escaneie o novo QR Code no WhatsApp.");
+        await pollStatus();
       } catch (error) {
         showUnexpectedActionError(error);
       }

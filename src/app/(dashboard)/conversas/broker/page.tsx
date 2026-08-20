@@ -29,9 +29,9 @@ export default async function BrokerConversationsPage({
     redirect("/minha-fila");
   }
 
-  // Se não for corretor, redirecionar para /conversas (modo normal)
-  const isBroker = context.role === "broker" || context.jobTitle === "broker";
-  if (!isBroker) {
+  // A superfície WAHA Lite é exclusiva do papel Corretor com o modo Lite ativo.
+  // Diretores, gestores e corretores no modo normal usam a central geral.
+  if (context.role !== "broker" || await getExperienceMode(context) !== "LIGHT") {
     redirect("/conversas");
   }
 
