@@ -331,11 +331,13 @@ export async function resetWhatsAppSessionAction() {
       });
     }
   } catch (error) {
-    // Log mas não falhar — sessão pode já estar parada no WAHA
     const message = error instanceof Error ? error.message : "unknown";
-    if (!/timeout|indisponível/i.test(message)) {
-      console.warn("[waha] reset: disconnect failed:", message);
-    }
+    console.warn("[waha] reset: disconnect failed:", message);
+    return {
+      success: false,
+      error: "Não foi possível confirmar a desconexão da sessão WhatsApp.",
+      code: /timeout/i.test(message) ? "WAHA_TIMEOUT" : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE" : "WAHA_ERROR",
+    };
   }
 
   if (connection) {
@@ -353,4 +355,33 @@ export async function resetWhatsAppSessionAction() {
   }
 
   return { success: true };
+}
+
+/** Recupera uma sessão WAHA falhada mantendo a identidade determinística do corretor. */
+export async function recoverWhatsAppFailedSessionAction() {
+  const { db, connection } = await getOwnConnection();
+  if (!connection?.sessionName) return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
+
+  try {
+    const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/recover`, {
+      method: "POST",
+    });
+    const status = normalizeWahaStatus(result.status ?? "STARTING");
+    const qrResult = status === "ready"
+      ? null
+      : await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`).catch(() => null);
+    const qrCode = status === "ready" ? null : qrResult?.qr ?? null;
+
+    await db.update(schema.whatsappConnections).set({
+      status,
+      qrCode,
+      connectedAt: status === "ready" ? connection.connectedAt ?? new Date() : null,
+      updatedAt: new Date(),
+    }).where(eq(schema.whatsappConnections.id, connection.id));
+
+    return { success: true, sessionId: connection.sessionName, status, qrCode };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Não foi possível recuperar a sessão WhatsApp.";
+    return { success: false, error: message, code: /timeout/i.test(message) ? "WAHA_TIMEOUT" : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE" : "WAHA_ERROR" };
+  }
 }

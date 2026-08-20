@@ -143,6 +143,60 @@ test("POST /disconnect com WAHA configurado retorna resposta controlada", async 
   await app.close();
 });
 
+test("POST /recover concorrente para sessão FAILED recria somente uma sessão", async () => {
+  configure();
+  const originalFetch = globalThis.fetch;
+  let exists = true;
+  let status = "FAILED";
+  let createCalls = 0;
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    if (target.endsWith("/api/sessions/waha_recover123") && method === "GET") {
+      return exists
+        ? new Response(JSON.stringify({ name: "waha_recover123", status }), { status: 200 })
+        : new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+    }
+    if (target.endsWith("/api/sessions/waha_recover123/stop")) {
+      return new Response(JSON.stringify({ error: "invalid state" }), { status: 400 });
+    }
+    if (target.endsWith("/api/sessions/waha_recover123/logout")) {
+      return new Response(JSON.stringify({ error: "invalid state" }), { status: 400 });
+    }
+    if (target.endsWith("/api/sessions/waha_recover123") && method === "DELETE") {
+      exists = false;
+      return new Response(null, { status: 204 });
+    }
+    if (target.endsWith("/api/sessions/") && method === "POST") {
+      createCalls++;
+      exists = true;
+      status = "STOPPED";
+      return new Response(JSON.stringify({}), { status: 201 });
+    }
+    if (target.endsWith("/api/sessions/waha_recover123/start")) {
+      status = "SCAN_QR_CODE";
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }) as typeof globalThis.fetch;
+
+  const app = buildApp();
+  try {
+    const [first, second] = await Promise.all([
+      app.inject({ method: "POST", url: "/internal/waha/connections/waha_recover123/recover", headers: AUTH_HEADERS }),
+      app.inject({ method: "POST", url: "/internal/waha/connections/waha_recover123/recover", headers: AUTH_HEADERS }),
+    ]);
+    assert.equal(first.statusCode, 200);
+    assert.equal(second.statusCode, 200);
+    assert.equal(first.json().status, "WAITING_QR");
+    assert.equal(second.json().status, "WAITING_QR");
+    assert.equal(createCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
 // ── /health continua independente ──────────────────────────────────────
 
 test("GET /health continua retornando 200 mesmo com rotas de conexão", async () => {

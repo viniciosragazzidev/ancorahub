@@ -9,6 +9,13 @@ import {
 
 type FetchFn = typeof globalThis.fetch;
 
+export type WahaRecoveryCleanup = {
+  operation: "stop" | "logout" | "delete";
+  outcome: "completed" | "ignored";
+  providerStatusCode?: number;
+  normalizedError?: string;
+};
+
 /**
  * Cliente central para comunicação com o WAHA.
  *
@@ -80,6 +87,10 @@ export class WahaClient {
         response.status,
       );
     }
+
+    // DELETE bem-sucedido pode responder 204 sem corpo. Não é uma falha de
+    // contrato nem deve abortar a recuperação da sessão.
+    if (response.status === 204) return {} as T;
 
     let data: unknown;
     try {
@@ -226,10 +237,6 @@ export class WahaClient {
         // Sessão realmente não existe
         return null;
       }
-      if (error instanceof WahaClientError && error.code === "WAHA_UNAVAILABLE") {
-        // WAHA indisponível — tratar como sessão não encontrada para não bloquear fluxo
-        return null;
-      }
       throw error;
     }
   }
@@ -327,22 +334,27 @@ export class WahaClient {
   /**
    * Para uma sessão (pause/stop).
    */
-  async stopSession(name: string): Promise<void> {
+  async stopSession(name: string): Promise<WahaRecoveryCleanup> {
     try {
       await this.request(`/api/sessions/${encodeURIComponent(name)}/stop`, {
         method: "POST",
         timeoutMs: 5_000,
         headers: { "content-type": "application/json" },
       });
-    } catch {
-      // Ignorar erro — sessão pode já estar parada
+      return { operation: "stop", outcome: "completed" };
+    } catch (error) {
+      if (isExpectedCleanupError(error)) {
+        return cleanupIgnored("stop", error);
+      }
+      throw error;
     }
   }
 
   /**
    * Deleta uma sessão.
    */
-  async deleteSession(name: string): Promise<void> {
+  async deleteSession(name: string): Promise<WahaRecoveryCleanup[]> {
+    const cleanup: WahaRecoveryCleanup[] = [];
     try {
       // Primeiro fazer logout (como o relay faz)
       await this.request(`/api/sessions/${encodeURIComponent(name)}/logout`, {
@@ -350,8 +362,10 @@ export class WahaClient {
         timeoutMs: 5_000,
         headers: { "content-type": "application/json" },
       });
-    } catch {
-      // Ignorar — sessão pode não existir mais
+      cleanup.push({ operation: "logout", outcome: "completed" });
+    } catch (error) {
+      if (!isExpectedCleanupError(error)) throw error;
+      cleanup.push(cleanupIgnored("logout", error));
     }
 
     try {
@@ -359,9 +373,37 @@ export class WahaClient {
         method: "DELETE",
         timeoutMs: 5_000,
       });
-    } catch {
-      // Ignorar — sessão pode não existir mais
+      cleanup.push({ operation: "delete", outcome: "completed" });
+    } catch (error) {
+      if (!isExpectedCleanupError(error)) throw error;
+      cleanup.push(cleanupIgnored("delete", error));
     }
+    return cleanup;
+  }
+
+  /**
+   * Recupera uma sessão WAHA falhada sem assumir que stop/logout aceitam FAILED.
+   * Somente erros de estado/ausência (400 e 404) são tolerados no cleanup; falhas
+   * de autenticação, rede ou provider permanecem observáveis para o chamador.
+   */
+  async recoverFailedSession(name: string): Promise<{ session: WahaSession; cleanup: WahaRecoveryCleanup[] }> {
+    const current = await this.getSession(name);
+    if (current?.status !== "ERROR") {
+      if (current) return { session: current, cleanup: [] };
+      const created = await this.createSession(name);
+      if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") await this.startSession(name);
+      return { session: (await this.getSession(name)) ?? created, cleanup: [] };
+    }
+
+    const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name))];
+    const remaining = await this.getSession(name);
+    if (remaining) {
+      throw new WahaClientError("SESSION_EXISTS", 502, "A sessão falhada não foi removida com segurança.");
+    }
+
+    const created = await this.createSession(name);
+    if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") await this.startSession(name);
+    return { session: (await this.getSession(name)) ?? created, cleanup };
   }
 
   /**
@@ -412,4 +454,12 @@ export class WahaClient {
  */
 function isTimeoutError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "TimeoutError";
+}
+
+function isExpectedCleanupError(error: unknown): error is WahaClientError {
+  return error instanceof WahaClientError && (error.providerStatusCode === 400 || error.providerStatusCode === 404);
+}
+
+function cleanupIgnored(operation: WahaRecoveryCleanup["operation"], error: WahaClientError): WahaRecoveryCleanup {
+  return { operation, outcome: "ignored", providerStatusCode: error.providerStatusCode, normalizedError: error.code };
 }

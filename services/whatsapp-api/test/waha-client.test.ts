@@ -137,6 +137,16 @@ test("getSession: 500 → lança erro (não retorna null)", async () => {
   );
 });
 
+test("getSession: indisponibilidade de rede → lança WAHA_UNAVAILABLE (não simula sessão ausente)", async () => {
+  const client = new WahaClient(config, mockFetch(async () => {
+    throw new TypeError("fetch failed");
+  }));
+  await assert.rejects(
+    () => client.getSession("test123"),
+    (err: unknown) => err instanceof WahaClientError && err.code === "WAHA_UNAVAILABLE",
+  );
+});
+
 // ── WahaClient.createSession ──────────────────────────────────────────
 
 test("createSession: nova sessão → retorna status inicial", async () => {
@@ -166,6 +176,55 @@ test("createSession: 409 (sessão existe) → retorna sessão existente", async 
   const session = await client.createSession("exist409");
   assert.ok(session);
   assert.equal(session.status, "CONNECTED");
+});
+
+function failedSessionRecoveryClient(deleteStatus = 200) {
+  let exists = true;
+  let status = "FAILED";
+  let createCalls = 0;
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const method = init?.method ?? "GET";
+    if (url.includes("/api/sessions/recover-me") && method === "GET") {
+      return exists
+        ? new Response(JSON.stringify({ name: "recover-me", status }), { status: 200 })
+        : new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+    }
+    if (url.includes("/api/sessions/recover-me/stop")) return new Response(JSON.stringify({ error: "invalid state" }), { status: 400 });
+    if (url.includes("/api/sessions/recover-me/logout")) return new Response(JSON.stringify({ error: "invalid state" }), { status: 400 });
+    if (url.endsWith("/api/sessions/recover-me") && method === "DELETE") {
+      exists = false;
+      return new Response(JSON.stringify({}), { status: deleteStatus });
+    }
+    if (url.endsWith("/api/sessions/") && method === "POST") {
+      createCalls++;
+      exists = true;
+      status = "STOPPED";
+      return new Response(JSON.stringify({}), { status: 201 });
+    }
+    if (url.includes("/api/sessions/recover-me/start")) {
+      status = "SCAN_QR_CODE";
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+  return { client, getCreateCalls: () => createCalls };
+}
+
+test("recoverFailedSession: stop 400 continua com delete e recriação", async () => {
+  const { client, getCreateCalls } = failedSessionRecoveryClient();
+  const result = await client.recoverFailedSession("recover-me");
+  assert.equal(result.session.status, "WAITING_QR");
+  assert.equal(getCreateCalls(), 1);
+  assert.deepEqual(result.cleanup.map((item) => item.outcome), ["ignored", "ignored", "completed"]);
+});
+
+test("recoverFailedSession: delete 404 considera sessão ausente e recria", async () => {
+  const { client, getCreateCalls } = failedSessionRecoveryClient(404);
+  const result = await client.recoverFailedSession("recover-me");
+  assert.equal(result.session.status, "WAITING_QR");
+  assert.equal(getCreateCalls(), 1);
+  assert.equal(result.cleanup.at(-1)?.outcome, "ignored");
+  assert.equal(result.cleanup.at(-1)?.providerStatusCode, 404);
 });
 
 // ── WahaClient.getQr ──────────────────────────────────────────────────

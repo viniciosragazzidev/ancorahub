@@ -25,6 +25,7 @@ export class WahaClient {
     /**
      * Executa uma chamada HTTP autenticada ao WAHA.
      * Timeout aplicado em toda operação.
+     * Preserva providerStatusCode para diagnóstico.
      */
     async request(path, options = {}) {
         const { method = "GET", timeoutMs = 15_000, body, headers = {} } = options;
@@ -50,8 +51,12 @@ export class WahaClient {
             throw new WahaClientError("WAHA_UNAUTHORIZED", 502, "Autenticação com WAHA falhou.");
         }
         if (!response.ok) {
-            throw new WahaClientError("WAHA_INTERNAL_ERROR", 502, `WAHA retornou status ${response.status}.`);
+            throw new WahaClientError("WAHA_INTERNAL_ERROR", 502, `WAHA retornou status ${response.status}.`, response.status);
         }
+        // DELETE bem-sucedido pode responder 204 sem corpo. Não é uma falha de
+        // contrato nem deve abortar a recuperação da sessão.
+        if (response.status === 204)
+            return {};
         let data;
         try {
             data = await response.json();
@@ -60,6 +65,59 @@ export class WahaClient {
             throw new WahaClientError("WAHA_BAD_RESPONSE", 502, "WAHA retornou JSON inválido.");
         }
         return data;
+    }
+    /**
+     * Executa uma chamada que pode retornar binário (ex: image/png para QR).
+     * Tenta JSON primeiro; se Content-Type indicar imagem, retorna base64.
+     */
+    async requestQr(path, timeoutMs = 5_000) {
+        let response;
+        try {
+            response = await this.fetchFn(`${this.baseUrl}${path}`, {
+                method: "GET",
+                headers: {
+                    "x-api-key": this.apiKey,
+                    accept: "application/json, image/*",
+                },
+                signal: AbortSignal.timeout(timeoutMs),
+            });
+        }
+        catch (error) {
+            if (isTimeoutError(error)) {
+                throw new WahaClientError("WAHA_TIMEOUT", 504, "WAHA não respondeu dentro do timeout.");
+            }
+            throw new WahaClientError("WAHA_UNAVAILABLE", 502, "WAHA indisponível.");
+        }
+        if (response.status === 401) {
+            throw new WahaClientError("WAHA_UNAUTHORIZED", 502, "Autenticação com WAHA falhou.");
+        }
+        if (!response.ok) {
+            throw new WahaClientError("WAHA_INTERNAL_ERROR", 502, `WAHA retornou status ${response.status} ao buscar QR.`, response.status);
+        }
+        const contentType = response.headers.get("content-type") ?? "";
+        // Se retornar imagem binária, converter para base64
+        if (contentType.includes("image/")) {
+            const buffer = await response.arrayBuffer();
+            if (buffer.byteLength === 0)
+                return { base64: null, status: null };
+            const base64 = Buffer.from(buffer).toString("base64");
+            return { base64, status: null };
+        }
+        // Senão, tentar parsear como JSON
+        let data;
+        try {
+            data = await response.json();
+        }
+        catch {
+            throw new WahaClientError("WAHA_BAD_RESPONSE", 502, "WAHA retornou JSON inválido no endpoint de QR.");
+        }
+        const obj = data;
+        if (obj && typeof obj === "object") {
+            const qrData = typeof obj.data === "string" ? obj.data : null;
+            const sessionStatus = typeof obj.status === "string" ? obj.status : null;
+            return { base64: qrData, status: sessionStatus };
+        }
+        return { base64: null, status: null };
     }
     /**
      * Health check do WAHA.
@@ -95,7 +153,8 @@ export class WahaClient {
     }
     /**
      * Consulta o status de uma sessão.
-     * Retorna null se a sessão não existe.
+     * Retorna null SOMENTE quando a sessão realmente não existe (404).
+     * Outros erros são propagados para diagnóstico correto.
      */
     async getSession(name) {
         try {
@@ -115,8 +174,8 @@ export class WahaClient {
             };
         }
         catch (error) {
-            if (error instanceof WahaClientError && error.statusCode === 502) {
-                // WAHA retornou erro — provavelmente sessão não existe ou WAHA indisponível
+            if (error instanceof WahaClientError && error.providerStatusCode === 404) {
+                // Sessão realmente não existe
                 return null;
             }
             throw error;
@@ -124,7 +183,8 @@ export class WahaClient {
     }
     /**
      * Cria uma nova sessão no WAHA.
-     * Se a sessão já existe (409), retorna o status atual.
+     * Se a sessão já existe (409), retorna o status atual (idempotente).
+     * Detecta 409 via providerStatusCode, não via parsing de string.
      */
     async createSession(name) {
         try {
@@ -136,13 +196,12 @@ export class WahaClient {
             });
         }
         catch (error) {
-            // 409 = sessão já existe — não é erro
-            if (isWahaConflict(error)) {
+            // 409 = sessão já existe — resolver existente e retornar
+            if (error instanceof WahaClientError && error.providerStatusCode === 409) {
                 const existing = await this.getSession(name);
                 if (existing)
                     return existing;
-                // Se não conseguiu ler, criar erro genérico
-                throw new WahaClientError("WAHA_INTERNAL_ERROR", 502, "Sessão já existe mas não foi possível ler status.");
+                throw new WahaClientError("SESSION_EXISTS", 502, "Sessão já existe mas não foi possível ler status.", 409);
             }
             throw error;
         }
@@ -167,19 +226,34 @@ export class WahaClient {
     }
     /**
      * Obtém o QR Code de uma sessão.
-     * Retorna null se QR não disponível ou expirado.
+     *
+     * Trata tanto resposta binária (image/png) quanto JSON (data field).
+     * Lança erros específicos em vez de retornar null silenciosamente.
+     *
+     * Erros:
+     * - QR_NOT_READY: sessão não está em WAITING_QR
+     * - QR_EXPIRED: QR expirou ou não está mais disponível
+     * - WAHA_TIMEOUT / WAHA_UNAVAILABLE: problemas de conexão
+     * - SESSION_NOT_FOUND: sessão não existe
      */
     async getQr(name) {
-        try {
-            const raw = await this.request(`/api/${encodeURIComponent(name)}/auth/qr?format=image`, {
-                timeoutMs: 5_000,
-                headers: { accept: "application/json" },
-            });
-            return typeof raw?.data === "string" ? raw.data : null;
+        // Verificar status da sessão antes de buscar QR
+        const session = await this.getSession(name);
+        if (!session) {
+            throw new WahaClientError("SESSION_NOT_FOUND", 502, `Sessão '${name}' não encontrada.`);
         }
-        catch {
-            return null;
+        if (session.status === "CONNECTED") {
+            throw new WahaClientError("QR_NOT_READY", 200, "Sessão já conectada. QR não necessário.");
         }
+        if (session.status !== "WAITING_QR") {
+            throw new WahaClientError("QR_NOT_READY", 200, `Sessão em estado '${session.status}'. Aguarde WAITING_QR.`);
+        }
+        // Buscar QR — suporta tanto JSON quanto imagem binária
+        const { base64 } = await this.requestQr(`/api/${encodeURIComponent(name)}/auth/qr?format=image`);
+        if (!base64) {
+            throw new WahaClientError("QR_EXPIRED", 200, "QR Code não disponível ou expirado.");
+        }
+        return base64;
     }
     /**
      * Para uma sessão (pause/stop).
@@ -191,15 +265,20 @@ export class WahaClient {
                 timeoutMs: 5_000,
                 headers: { "content-type": "application/json" },
             });
+            return { operation: "stop", outcome: "completed" };
         }
-        catch {
-            // Ignorar erro — sessão pode já estar parada
+        catch (error) {
+            if (isExpectedCleanupError(error)) {
+                return cleanupIgnored("stop", error);
+            }
+            throw error;
         }
     }
     /**
      * Deleta uma sessão.
      */
     async deleteSession(name) {
+        const cleanup = [];
         try {
             // Primeiro fazer logout (como o relay faz)
             await this.request(`/api/sessions/${encodeURIComponent(name)}/logout`, {
@@ -207,19 +286,51 @@ export class WahaClient {
                 timeoutMs: 5_000,
                 headers: { "content-type": "application/json" },
             });
+            cleanup.push({ operation: "logout", outcome: "completed" });
         }
-        catch {
-            // Ignorar — sessão pode não existir mais
+        catch (error) {
+            if (!isExpectedCleanupError(error))
+                throw error;
+            cleanup.push(cleanupIgnored("logout", error));
         }
         try {
             await this.request(`/api/sessions/${encodeURIComponent(name)}`, {
                 method: "DELETE",
                 timeoutMs: 5_000,
             });
+            cleanup.push({ operation: "delete", outcome: "completed" });
         }
-        catch {
-            // Ignorar — sessão pode não existir mais
+        catch (error) {
+            if (!isExpectedCleanupError(error))
+                throw error;
+            cleanup.push(cleanupIgnored("delete", error));
         }
+        return cleanup;
+    }
+    /**
+     * Recupera uma sessão WAHA falhada sem assumir que stop/logout aceitam FAILED.
+     * Somente erros de estado/ausência (400 e 404) são tolerados no cleanup; falhas
+     * de autenticação, rede ou provider permanecem observáveis para o chamador.
+     */
+    async recoverFailedSession(name) {
+        const current = await this.getSession(name);
+        if (current?.status !== "ERROR") {
+            if (current)
+                return { session: current, cleanup: [] };
+            const created = await this.createSession(name);
+            if (created.status !== "CONNECTED" && created.status !== "WAITING_QR")
+                await this.startSession(name);
+            return { session: (await this.getSession(name)) ?? created, cleanup: [] };
+        }
+        const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name))];
+        const remaining = await this.getSession(name);
+        if (remaining) {
+            throw new WahaClientError("SESSION_EXISTS", 502, "A sessão falhada não foi removida com segurança.");
+        }
+        const created = await this.createSession(name);
+        if (created.status !== "CONNECTED" && created.status !== "WAITING_QR")
+            await this.startSession(name);
+        return { session: (await this.getSession(name)) ?? created, cleanup };
     }
     /**
      * Garante que uma sessão de teste existe e está pronta.
@@ -262,11 +373,9 @@ export class WahaClient {
 function isTimeoutError(error) {
     return error instanceof DOMException && error.name === "TimeoutError";
 }
-/**
- * Verifica se um erro é de conflito (409) do WAHA.
- */
-function isWahaConflict(error) {
-    return (error instanceof WahaClientError &&
-        error.code === "WAHA_INTERNAL_ERROR" &&
-        error.message.includes("409"));
+function isExpectedCleanupError(error) {
+    return error instanceof WahaClientError && (error.providerStatusCode === 400 || error.providerStatusCode === 404);
+}
+function cleanupIgnored(operation, error) {
+    return { operation, outcome: "ignored", providerStatusCode: error.providerStatusCode, normalizedError: error.code };
 }

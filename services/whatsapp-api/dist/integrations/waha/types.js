@@ -5,10 +5,12 @@
 export class WahaClientError extends Error {
     code;
     statusCode;
-    constructor(code, statusCode = 502, message) {
+    providerStatusCode;
+    constructor(code, statusCode = 502, message, providerStatusCode) {
         super(message ?? code);
         this.code = code;
         this.statusCode = statusCode;
+        this.providerStatusCode = providerStatusCode;
         this.name = "WahaClientError";
     }
 }
