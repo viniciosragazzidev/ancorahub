@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -85,6 +86,15 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         })
         .where(eq(schema.whatsappConnections.id, source.connection.id));
     }
+
+    // Revalidar a página de conversas para que a UI reflita o novo status
+    // sem depender apenas do polling do client
+    try {
+      revalidatePath("/conversas");
+    } catch {
+      // revalidatePath pode falhar fora de Server Components — não crítico
+    }
+
     await markProcessed(db, registered.id);
     metrics.totalMs = Date.now() - metrics.startTime;
     return { processed: 1 };

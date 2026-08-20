@@ -115,12 +115,28 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     }
   }
 
-  // Polling durante WAITING_QR / STARTING — intervalo fixo
+  // Polling adaptativo: 500ms durante tentativa de conexão, 1.5s em background
   useEffect(() => {
     if (!open || !connection.sessionId || connection.status === "ready") return;
     void pollStatus();
-    const timer = window.setInterval(() => startTransition(async () => pollStatus()), 1500);
+    const interval = connection.status === "initializing" ? 500 : 1_500;
+    const timer = window.setInterval(() => startTransition(async () => pollStatus()), interval);
     return () => window.clearInterval(timer);
+  }, [open, connection.sessionId, connection.status]);
+
+  // Quando a aba voltar ao foco, refetch imediatamente (webhook pode ter atualizado o status)
+  useEffect(() => {
+    if (!open || !connection.sessionId || connection.status === "ready") return;
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        startTransition(async () => {
+          await pollStatus();
+          router.refresh();
+        });
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [open, connection.sessionId, connection.status]);
 
   function handleOpenChange(nextOpen: boolean) {
