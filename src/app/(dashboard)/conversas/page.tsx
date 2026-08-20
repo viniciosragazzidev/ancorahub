@@ -26,12 +26,6 @@ export default async function ConversationsPage({ searchParams }: { searchParams
     redirect("/minha-fila");
   }
 
-  // ── Corredores vão para /conversas/broker (modo lite com WAHA) ────────
-  const isBroker = context.role === "broker" || context.jobTitle === "broker";
-  if (isBroker) {
-    redirect("/conversas/broker");
-  }
-
   const db = getDatabase();
 
   const isDirector = context.role === "director";
