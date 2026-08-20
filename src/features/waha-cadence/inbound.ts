@@ -3,11 +3,13 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
 import { WAHA_CONNECTIONS_FEATURE } from "@/features/waha-cadence/connection-service";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { samePhone } from "@/features/communication-channels/service";
 import { phoneHash, normalizePhone, type WahaWebhookEvent, WAHA_AI_FEATURE, WAHA_CADENCE_FEATURE } from "./contract";
 
 type SessionSource =
@@ -155,9 +157,6 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   const isOutgoing = event.message.fromMe === true;
   const normalizedPhone = normalizePhone(event.message.from);
 
-  // For broker connections, the userId is the broker
-  const brokerUserId = source.kind === "connection" ? source.connection.userId : null;
-
   // ── 6. Resolve lead/client (race-safe) ─────────────────────────────────
   const leadResolveStart = Date.now();
   const { leadId, clientId, runId } = await resolveContact(db, source, tenantId, normalizedPhone, isOutgoing);
@@ -240,10 +239,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       transport: "waha",
       wahaRunId: runId ?? undefined,
     }).catch((err) => console.error("[waha-ai] inbound.failed", err));
-    try {
-      const { waitUntil } = require("next/server");
-      if (typeof waitUntil === "function") waitUntil(aiPromise);
-    } catch {}
+    after(() => aiPromise);
   }
 
   await markProcessed(db, registered.id);
@@ -357,8 +353,16 @@ async function resolveContact(
     if (client) clientId = client.id;
   }
 
-  // For incoming messages with no match: create a new lead (same as OpenWA pattern)
-  if (!isOutgoing && !leadId && !clientId) {
+  // The tenant's own official WAHA number is an internal Lite contact, never a
+  // synthetic lead. It is rendered separately and may be answered by the broker.
+  const isTenantOfficialNumber = source.kind === "connection" && (await db
+    .select({ phone: schema.wahaNumbers.displayPhoneNumber })
+    .from(schema.wahaNumbers)
+    .where(eq(schema.wahaNumbers.tenantId, tenantId)))
+    .some((number) => samePhone(number.phone, normalizedPhone));
+
+  // For incoming external messages with no match: create a new lead.
+  if (!isOutgoing && !leadId && !clientId && !isTenantOfficialNumber) {
     const newLeadId = randomUUID();
     await db.insert(schema.leads).values({
       id: newLeadId,

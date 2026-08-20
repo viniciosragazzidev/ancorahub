@@ -59,6 +59,15 @@ export default async function BrokerConversationsPage({
     .limit(100);
 
   const leadIds = lightLeads.map((l) => l.id);
+  const [lightClients, tenantNumbers] = await Promise.all([
+    db.select({ id: schema.clients.id, leadId: schema.clients.leadId, nome: schema.clients.nome, telefone: schema.clients.telefone })
+      .from(schema.clients)
+      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId)))
+      .limit(100),
+    db.select({ id: schema.wahaNumbers.id, label: schema.wahaNumbers.label, phone: schema.wahaNumbers.displayPhoneNumber })
+      .from(schema.wahaNumbers)
+      .where(eq(schema.wahaNumbers.tenantId, context.tenantId)),
+  ]);
 
   // ── Buscar mensagens ──────────────────────────────────────────────────
   const messageRows = leadIds.length
@@ -66,6 +75,7 @@ export default async function BrokerConversationsPage({
         .select({
           id: schema.whatsappMessages.id,
           leadId: schema.whatsappMessages.leadId,
+          clientId: schema.whatsappMessages.clientId,
           phone: schema.whatsappMessages.phone,
           body: schema.whatsappMessages.body,
           direction: schema.whatsappMessages.direction,
@@ -101,6 +111,8 @@ export default async function BrokerConversationsPage({
     const latest = msgs.at(-1) ?? null;
     return {
       id: lead.id,
+      kind: "lead" as const,
+      sendTarget: { kind: "lead" as const, leadId: lead.id },
       nome: lead.nome,
       telefone: lead.telefone,
       status: lead.status,
@@ -122,8 +134,23 @@ export default async function BrokerConversationsPage({
     };
   });
 
+  const clientConversations = lightClients.map((client) => {
+    const msgs = messageRows.filter((message) => message.clientId === client.id || message.leadId === client.leadId || samePhone(message.phone, client.telefone))
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-100);
+    const latest = msgs.at(-1) ?? null;
+    return { id: `client:${client.id}`, kind: "client" as const, sendTarget: { kind: "lead" as const, leadId: client.leadId }, nome: client.nome, telefone: client.telefone, status: "Cliente", latestMessage: latest ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() } : null, messages: msgs.map((message) => ({ id: message.id, body: message.body, direction: message.direction, sentAt: message.sentAt.toISOString(), senderRole: message.senderRole, providerStatus: message.providerStatus })) };
+  });
+
+  const officialConversations = tenantNumbers.map((number) => {
+    const msgs = messageRows.filter((message) => !message.leadId && !message.clientId && samePhone(message.phone, number.phone))
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-100);
+    const latest = msgs.at(-1) ?? null;
+    return { id: `tenant-number:${number.id}`, kind: "tenant_number" as const, sendTarget: { kind: "tenant_number" as const, numberId: number.id }, nome: number.label || "Número oficial do tenant", telefone: number.phone, status: "Número oficial", latestMessage: latest ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() } : null, messages: msgs.map((message) => ({ id: message.id, body: message.body, direction: message.direction, sentAt: message.sentAt.toISOString(), senderRole: message.senderRole, providerStatus: message.providerStatus })) };
+  });
+
   // Sort: conversas com mensagens recentes primeiro
-  conversations.sort((a, b) => {
+  const scopedConversations = [...conversations, ...clientConversations, ...officialConversations];
+  scopedConversations.sort((a, b) => {
     const timeA = a.latestMessage
       ? new Date(a.latestMessage.sentAt).getTime()
       : 0;
@@ -158,7 +185,7 @@ export default async function BrokerConversationsPage({
       <main className="min-h-0 w-full flex-1 bg-background p-0">
         <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:min-h-0 w-full overflow-hidden bg-card">
           <LightConversationsView
-            conversations={conversations}
+            conversations={scopedConversations}
             initialLeadId={leadId}
             whatsappConnected={whatsappConnected}
           />

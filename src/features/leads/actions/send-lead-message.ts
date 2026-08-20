@@ -1,6 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
@@ -8,6 +8,40 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
 export type SendLeadMessageResult = { success: boolean; error?: string; message?: { id: string; body: string; direction: string; sentAt: Date } };
+
+/** Send from the authenticated broker's WAHA session to a tenant-owned WAHA number. */
+export async function sendTenantOfficialNumberMessageAction(numberId: string, body: string): Promise<SendLeadMessageResult> {
+  const text = body.trim();
+  if (!text || text.length > 4_000) return { success: false, error: "A mensagem deve ter entre 1 e 4.000 caracteres." };
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "broker") return { success: false, error: "Apenas o corretor pode usar esta conversa." };
+    const db = getDatabase();
+    const [number] = await db.select({ id: schema.wahaNumbers.id, phone: schema.wahaNumbers.displayPhoneNumber })
+      .from(schema.wahaNumbers)
+      .where(and(eq(schema.wahaNumbers.id, numberId), eq(schema.wahaNumbers.tenantId, context.tenantId)))
+      .limit(1);
+    if (!number) return { success: false, error: "Número oficial não encontrado neste tenant." };
+    const [connection] = await db.select({ sessionName: schema.whatsappConnections.sessionName, status: schema.whatsappConnections.status, active: schema.whatsappConnections.chatInternoAtivo })
+      .from(schema.whatsappConnections)
+      .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId)))
+      .limit(1);
+    if (!connection?.sessionName || connection.status !== "ready" || !connection.active) return { success: false, error: "Conecte e ative seu WhatsApp antes de responder." };
+    const base = process.env.VPS_API_URL?.trim().replace(/\/$/, "");
+    const token = process.env.WHATSAPP_API_INTERNAL_TOKEN?.trim();
+    const phone = number.phone.replace(/\D/g, "");
+    if (!base || !token || !/^\d{10,15}$/.test(phone)) return { success: false, error: "Serviço de envio não configurado." };
+    const response = await fetch(`${base}/internal/waha/messages/text`, { method: "POST", headers: { "Content-Type": "application/json", "x-corretop-internal-token": token }, body: JSON.stringify({ sessionName: connection.sessionName, chatId: phone, text, idempotencyKey: `tenant-number:${context.tenantId}:${numberId}:${randomUUID()}` }), signal: AbortSignal.timeout(15_000) });
+    const result = await response.json().catch(() => null) as { ok?: boolean; messageId?: string } | null;
+    if (!response.ok || !result?.ok || !result.messageId) return { success: false, error: "Não foi possível enviar a mensagem." };
+    const sentAt = new Date(); const id = randomUUID();
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.whatsappMessages).values({ id, tenantId: context.tenantId, provider: "waha", providerStatus: "sent", messageId: result.messageId!, phone, direction: "outgoing", body: text, sentAt }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: number.id, acao: "waha_tenant_number.message_sent", createdAt: sentAt });
+    });
+    return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
+  } catch { return { success: false, error: "Não foi possível enviar a mensagem." }; }
+}
 
 /**
  * Send a text message from the broker to a lead via the best available provider.
@@ -148,7 +182,6 @@ export async function getLeadMessagesAction(leadId: string) {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function createPhoneHash(phone: string): string {
-  const { createHash } = require("node:crypto") as typeof import("node:crypto");
   const normalized = phone.replace(/\D/g, "");
   return createHash("sha256").update(normalized).digest("hex");
 }
