@@ -1,7 +1,7 @@
 # Recuperação de sessão WAHA em FAILED
 
 **Data:** 2026-08-20
-**Estado:** implementado localmente; aguardando publicação da VPS
+**Estado:** CRM publicado na Vercel; aguardando publicação do Fastify na VPS
 
 ## Objetivo
 
@@ -45,3 +45,12 @@ Os diagnósticos de arquitetura e desempenho apontam o tamanho preexistente de
 `services/whatsapp-api/src/app.ts` e do diálogo de conexão. A extração é trabalho
 separado: esta correção foi mantida focalizada para não alterar o contrato de
 mensagens nem o tratamento binário do QR.
+
+## Publicação
+
+- Commit: `362ea9b fix(waha): recuperar sessoes falhadas`.
+- Vercel produção: `dpl_2mLq3heiD2h9jiJKgfshmZzqqxaa`, disponível em
+  `https://crm.ancorasaude.cloud` (build Ready).
+- A nova action do CRM depende do endpoint Fastify `/internal/waha/connections/:id/recover`;
+  ele será utilizável somente depois de reconstruir e reiniciar o container
+  `corretop-api` na VPS com este commit.
