@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 
 import { approvePasswordReset, rejectPasswordReset } from "@/features/team/password-recovery";
 
@@ -15,7 +14,6 @@ export async function approveResetAction(
     if (!requestId) throw new Error("ID da solicitação não informado.");
 
     await approvePasswordReset(requestId);
-    revalidatePath("/equipe/recuperacoes");
     return { success: true, message: "Solicitação aprovada! O link de recuperação será enviado por WhatsApp." };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao aprovar solicitação." };
@@ -33,7 +31,6 @@ export async function rejectResetAction(
     if (!requestId) throw new Error("ID da solicitação não informado.");
 
     await rejectPasswordReset(requestId, reason);
-    revalidatePath("/equipe/recuperacoes");
     return { success: true, message: reason ? "Solicitação rejeitada com justificativa." : "Solicitação rejeitada." };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao rejeitar solicitação." };

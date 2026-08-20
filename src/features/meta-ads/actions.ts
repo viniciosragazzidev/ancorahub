@@ -1,7 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { and, desc, eq, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -334,9 +333,6 @@ export async function confirmMetaConnection(payload: {
   await runMetaTenantSync(context.tenantId, "full");
   await consumeMetaConnectionAttempt(attempt.id);
 
-  revalidatePath("/integrations/meta");
-  revalidatePath("/settings/integracoes/meta");
-  revalidatePath("/marketing/campanhas");
 
   return { success: true };
 }
@@ -402,11 +398,6 @@ export async function disconnectMetaConnection(): Promise<{ success: boolean }> 
     });
   });
 
-  revalidatePath("/integrations/meta");
-  revalidatePath("/settings/integracoes/meta");
-  revalidatePath("/marketing/campanhas");
-  revalidatePath("/marketing/importacoes");
-  revalidatePath("/settings");
   return { success: true };
 }
 
@@ -427,9 +418,6 @@ export async function recordMetaMarketingOnboardingStep(step: string) {
 export async function triggerManualMetaSync(): Promise<{ success: boolean; itemsSynced: number; error?: string; warnings?: MetaSyncWarning[] }> {
   const context = await getRequiredTenantContext();
   const res = await runMetaTenantSync(context.tenantId, "full");
-  revalidatePath("/integrations/meta");
-  revalidatePath("/settings/integracoes/meta");
-  revalidatePath("/marketing/campanhas");
   return res;
 }
 
@@ -525,9 +513,6 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
       });
     });
 
-    revalidatePath("/integrations/meta");
-    revalidatePath("/marketing/campanhas");
-    revalidatePath("/leads/distribuicao");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a elegibilidade da campanha." };
@@ -542,9 +527,6 @@ export async function setMetaGlobalCaptureModeAction(input: {
     const context = await getRequiredTenantContext();
     const { setSystemSetting } = await import("@/features/system-settings/queries");
     await setSystemSetting(`meta_lead_capture_mode_${context.tenantId}`, input.mode);
-    revalidatePath("/integrations/meta");
-    revalidatePath("/marketing/campanhas");
-    revalidatePath("/leads/distribuicao");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao alterar modo de captura mestre." };
@@ -576,7 +558,6 @@ export async function toggleMetaAdCaptureEligibilityAction(input: {
         target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
         set: { enabled: input.enabled, updatedAt: now },
       });
-    revalidatePath("/integrations/meta");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar anúncio." };
@@ -608,7 +589,6 @@ export async function toggleMetaFormCaptureEligibilityAction(input: {
         target: [schema.metaFormQueueRoutes.tenantId, schema.metaFormQueueRoutes.formId],
         set: { enabled: input.enabled, updatedAt: now },
       });
-    revalidatePath("/integrations/meta");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar formulário." };
@@ -683,8 +663,6 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
         });
     }
 
-    revalidatePath("/integrations/meta");
-    revalidatePath("/marketing/campanhas");
     return { success: true, count: input.assetIds.length };
   } catch (error) {
     console.error("[batchSetMetaCaptureEligibilityAction] Error:", error);

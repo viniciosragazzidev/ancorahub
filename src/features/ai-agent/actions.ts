@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -67,7 +66,6 @@ export async function takeoverConversationAction(conversationId: string): Promis
       pausedByUserId: context.userId,
     });
     await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.automation_paused" });
-    revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível assumir a conversa." };
@@ -87,7 +85,6 @@ export async function returnConversationToAiAction(conversationId: string): Prom
       pausedByUserId: null,
     });
     await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.automation_resumed" });
-    revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível devolver a conversa à IA." };
@@ -99,7 +96,6 @@ export async function closeConversationAction(conversationId: string): Promise<C
     const { context, conversation } = await authorizeConversation(parseConversationId(conversationId));
     await transitionConversationState({ tenantId: context.tenantId, conversationId: conversation.id, newStatus: "CLOSED", reason: "Atendimento finalizado manualmente" });
     await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.closed" });
-    revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível encerrar a conversa." };
@@ -133,7 +129,6 @@ export async function resetAiConversationAction(conversationId: string): Promise
       }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, context.tenantId)));
     });
     await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.reset" });
-    revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível reiniciar a conversa." };
@@ -247,8 +242,6 @@ export async function resumeAiQualificationAction(leadId: string): Promise<Conve
 
     await auditConversationAction({ userId: context.userId, conversationId: conversation.id, action: "ai_conversation.resumed_by_user" });
 
-    revalidatePath("/conversas");
-    revalidatePath(`/leads/${leadId}`);
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível retomar o atendimento da IA." };
@@ -302,8 +295,6 @@ export async function syncSingleLeadConversationAction(leadId: string): Promise<
       acao: "lead_conversation.synced",
     });
 
-    revalidatePath("/conversas");
-    revalidatePath(`/leads/${leadId}`);
     return { success: true, messagesCount: messages.length };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao sincronizar histórico do chat." };

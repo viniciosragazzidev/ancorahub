@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -80,7 +79,6 @@ export async function createAutomationAction(input: unknown) {
     });
 
     await audit(context.userId, "crm_automation", id, "automation.created");
-    revalidatePath("/automacoes");
     return { success: true, id };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao criar automação." };
@@ -117,7 +115,6 @@ export async function updateAutomationAction(id: string, input: {
       .where(and(eq(schema.crmAutomations.id, id), eq(schema.crmAutomations.tenantId, context.tenantId)));
 
     await audit(context.userId, "crm_automation", id, `automation.updated:${input.status ?? "values"}`);
-    revalidatePath("/automacoes");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar automação." };
@@ -134,7 +131,6 @@ export async function deleteAutomationAction(id: string) {
       .where(and(eq(schema.crmAutomations.id, id), eq(schema.crmAutomations.tenantId, context.tenantId)));
 
     await audit(context.userId, "crm_automation", id, "automation.deleted");
-    revalidatePath("/automacoes");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao excluir automação." };
@@ -160,7 +156,6 @@ export async function createWhatsappFlowAction(input: unknown) {
     });
 
     await audit(context.userId, "whatsapp_flow", id, "flow.created");
-    revalidatePath("/fluxos-whatsapp");
     return { success: true, id };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao criar fluxo." };
@@ -195,7 +190,6 @@ export async function updateWhatsappFlowAction(id: string, input: {
       .where(and(eq(schema.whatsappFlows.id, id), eq(schema.whatsappFlows.tenantId, context.tenantId)));
 
     await audit(context.userId, "whatsapp_flow", id, `flow.updated:${input.status ?? "values"}`);
-    revalidatePath("/fluxos-whatsapp");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar fluxo." };
@@ -212,7 +206,6 @@ export async function deleteWhatsappFlowAction(id: string) {
       .where(and(eq(schema.whatsappFlows.id, id), eq(schema.whatsappFlows.tenantId, context.tenantId)));
 
     await audit(context.userId, "whatsapp_flow", id, "flow.deleted");
-    revalidatePath("/fluxos-whatsapp");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao excluir fluxo." };
@@ -246,7 +239,6 @@ export async function retryAutomationLogAction(logId: string) {
       .where(and(eq(schema.crmAutomationLogs.id, logId), eq(schema.crmAutomationLogs.tenantId, context.tenantId)));
 
     await audit(context.userId, "crm_automation_log", logId, "automation_log.retried");
-    revalidatePath("/automacoes");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao reprocessar log." };
@@ -292,7 +284,6 @@ export async function saveAiAgentConfigAction(input: unknown) {
     }
 
     await audit(context.userId, "ai_qualification_config", context.tenantId, "ai_settings.updated");
-    revalidatePath("/agentes-ia");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao salvar configuração do agente." };

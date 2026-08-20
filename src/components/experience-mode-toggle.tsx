@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Sparkle } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ export function ExperienceModeToggle({
 }: ExperienceModeToggleProps) {
   const [mode, setMode] = useState<ExperienceMode>(initialMode);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -55,7 +57,7 @@ export function ExperienceModeToggle({
             description: "Você agora tem acesso à navegação completa disponível para seu perfil.",
           });
         }
-        window.location.reload();
+        router.refresh();
       } else {
         toast.error(res.error ?? "Não foi possível alterar o modo de uso.");
       }

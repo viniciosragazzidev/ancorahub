@@ -1,7 +1,6 @@
 "use server";
 
 import { createHash } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createPlatformTenant,
@@ -76,8 +75,6 @@ export async function updateLeadDistributionJobsSettingsAction(formData: FormDat
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_distribution_jobs.settings_updated",
     targetType: "system_settings", targetId: "lead_distribution_jobs", metadata: values, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/leads/distribuicao");
 }
 
 export async function runLeadDistributionJobsAction() {
@@ -87,8 +84,6 @@ export async function runLeadDistributionJobsAction() {
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_distribution_jobs.run_requested",
     targetType: "lead_distribution_jobs", targetId: "global", metadata: result, createdAt: new Date(),
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/leads/distribuicao");
 }
 
 export async function resetUserRouteOnboardingAction(formData: FormData) {
@@ -96,7 +91,6 @@ export async function resetUserRouteOnboardingAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "").trim();
   if (!userId || !tenantId) throw new Error("Usuário e corretora são obrigatórios.");
   await resetPlatformUserRouteOnboarding(userId, tenantId);
-  revalidatePath("/super-admin/onboarding");
 }
 
 export async function updateCentralAtencaoSettingsAction(formData: FormData) {
@@ -124,8 +118,6 @@ export async function updateCentralAtencaoSettingsAction(formData: FormData) {
     createdAt: now,
   });
 
-  revalidatePath("/roadmap");
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateGlobalSearchSettingsAction(formData: FormData) {
@@ -135,7 +127,6 @@ export async function updateGlobalSearchSettingsAction(formData: FormData) {
   const now = new Date();
   await setSystemSetting("feature_global_search_enabled", enabled, now);
   await db.insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_global_search_settings", targetType: "system_settings", targetId: "global_search", metadata: { enabled }, createdAt: now });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
@@ -152,8 +143,6 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/dashboard");
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateWorkflowAutomationSettingsAction(formData: FormData) {
@@ -170,8 +159,6 @@ export async function updateWorkflowAutomationSettingsAction(formData: FormData)
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/automacoes");
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateCleanUiOperationalSettingsAction(formData: FormData) {
@@ -183,8 +170,6 @@ export async function updateCleanUiOperationalSettingsAction(formData: FormData)
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "clean_ui_operational.global_feature_updated",
     targetType: "system_settings", targetId: "clean_ui_operational", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/dashboard");
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateCleanUiOperationalLegacyTenantAction(tenantId: string, formData: FormData) {
@@ -204,9 +189,6 @@ export async function updateCleanUiOperationalLegacyTenantAction(tenantId: strin
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "clean_ui_operational.tenant_fallback_updated",
     targetType: "tenant", targetId: targetTenantId, metadata: { usingLegacyLayout: input.enabled === "true" }, createdAt: now,
   });
-  revalidatePath("/dashboard");
-  revalidatePath("/super-admin/settings");
-  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateInterfaceMotionSettingsAction(formData: FormData) {
@@ -225,8 +207,6 @@ export async function updateInterfaceMotionSettingsAction(formData: FormData) {
     createdAt: now,
   });
 
-  revalidatePath("/");
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateR2StorageSettingsAction(formData: FormData) {
@@ -238,7 +218,6 @@ export async function updateR2StorageSettingsAction(formData: FormData) {
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "r2_storage_feature.updated",
     targetType: "system_settings", targetId: "r2_storage", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateMetaCloudWhatsAppSettingsAction(formData: FormData) {
@@ -250,8 +229,6 @@ export async function updateMetaCloudWhatsAppSettingsAction(formData: FormData) 
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_cloud_whatsapp_feature.updated",
     targetType: "system_settings", targetId: "whatsapp_meta_cloud", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/integrations/whatsapp");
 }
 
 export async function updateMetaLeadAdsSettingsAction(formData: FormData) {
@@ -263,8 +240,6 @@ export async function updateMetaLeadAdsSettingsAction(formData: FormData) {
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads_feature.updated",
     targetType: "system_settings", targetId: "meta_lead_ads", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/integrations/meta");
 }
 
 export async function updateSystemReportSettingsAction(formData: FormData) {
@@ -291,7 +266,6 @@ export async function updateSystemReportSettingsAction(formData: FormData) {
     },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData) {
@@ -304,7 +278,6 @@ export async function updateMetaLeadAdsPlatformIdentityAction(formData: FormData
     setSystemSetting(META_LEAD_ADS_PLATFORM_SETTINGS.supportWhatsApp, input.supportWhatsApp, now),
   ]);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.platform_identity_updated", targetType: "system_settings", targetId: "meta_lead_ads_identity", metadata: input, createdAt: now });
-  revalidatePath("/super-admin/settings"); revalidatePath("/integrations/meta");
 }
 
 export async function updateMetaLeadAdsPilotAction(tenantId: string, formData: FormData) {
@@ -319,8 +292,6 @@ export async function updateMetaLeadAdsPilotAction(tenantId: string, formData: F
   const now = new Date();
   await setSystemSetting(key, JSON.stringify(next), now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.tenant_pilot_updated", targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now });
-  revalidatePath("/super-admin/settings"); revalidatePath("/integrations/meta");
-  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateNotificationCapabilityAction(formData: FormData) {
@@ -335,14 +306,11 @@ export async function updateNotificationCapabilityAction(formData: FormData) {
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "notification_capability.updated",
     targetType: "notification_capability", targetId: capability.id, metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function createTenantAction(_: TenantCreateActionState, formData: FormData): Promise<TenantCreateActionState> {
   try {
     const tenantId = await createPlatformTenant(Object.fromEntries(formData));
-    revalidatePath("/super-admin");
-    revalidatePath("/super-admin/tenants");
     redirect(`/super-admin/tenants/${tenantId}`);
   } catch (error) {
     if (error instanceof TenantCnpjAlreadyExistsError) return { error: error.message };
@@ -366,15 +334,12 @@ export async function updateLeadEffectOutboxSettingsAction(formData: FormData) {
     setSystemSetting("lead_intake_outbox_lease_seconds", values.leaseSeconds, now),
   ]);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.settings_updated", targetType: "system_settings", targetId: "lead_effect_outbox", metadata: values, createdAt: now });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function runLeadEffectOutboxAction() {
   const admin = await getRequiredPlatformAdmin();
   const result = await runLeadEffectOutboxProcessor();
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.run_requested", targetType: "lead_effect_outbox", targetId: "global", metadata: result, createdAt: new Date() });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/leads/distribuicao");
 }
 
 export async function updateWahaCadenceSettingsAction(formData: FormData) {
@@ -395,7 +360,6 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
     setSystemSetting("waha_cadence_lease_seconds", values.leaseSeconds, now),
   ]);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_cadence.settings_updated", targetType: "system_settings", targetId: "waha_cadence", metadata: values, createdAt: now });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateWahaConnectionSettingsAction(formData: FormData) {
@@ -404,8 +368,6 @@ export async function updateWahaConnectionSettingsAction(formData: FormData) {
   const now = new Date();
   await setSystemSetting("feature_waha_connections_enabled", enabled, now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "waha_connections.settings_updated", targetType: "system_settings", targetId: "waha_connections", metadata: { enabled }, createdAt: now });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/integrations/whatsapp");
 }
 
 export async function setTenantStatusAction(formData: FormData) {
@@ -413,27 +375,21 @@ export async function setTenantStatusAction(formData: FormData) {
   const status = String(formData.get("status") ?? "");
   if (status !== "active" && status !== "inactive") throw new Error("Status inválido.");
   await setPlatformTenantStatus(tenantId, status);
-  revalidatePath("/super-admin");
-  revalidatePath("/super-admin/tenants");
-  revalidatePath(`/super-admin/tenants/${tenantId}`);
 }
 
 export async function createTenantAccessAction(formData: FormData) {
   await createTenantAccess(Object.fromEntries(formData));
   const tenantId = String(formData.get("tenantId") ?? "");
-  revalidatePath(`/super-admin/tenants/${tenantId}`);
 }
 
 export async function terminateSessionAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   await terminateSession(sessionId);
-  revalidatePath("/super-admin/sessions");
 }
 
 export async function purgeUserLGPDAction(formData: FormData) {
   const userId = String(formData.get("userId") ?? "");
   await purgeUserLGPD(userId);
-  revalidatePath("/super-admin/audit");
 }
 
 export async function getLeadEvidenceReportAction(leadId: string) {
@@ -602,7 +558,6 @@ export async function updateAiSettingsAction(formData: FormData) {
     createdAt: now,
   });
 
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateAiWhatsAppQualificationSettingsAction(formData: FormData) {
@@ -614,7 +569,6 @@ export async function updateAiWhatsAppQualificationSettingsAction(formData: Form
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_ai_whatsapp_qualification_settings",
     targetType: "system_settings", targetId: "ai_whatsapp_qualification", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateQuickReplySettingsAction(formData: FormData) {
@@ -626,7 +580,6 @@ export async function updateQuickReplySettingsAction(formData: FormData) {
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_ai_quick_reply_settings",
     targetType: "system_settings", targetId: "ai_quick_reply", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 const AI_MEMORY_RESET_MODES = ["never", "before_each_message", "before_each_session", "manual"] as const;
@@ -648,7 +601,6 @@ export async function updateAiMemoryResetSettingsAction(formData: FormData) {
     metadata: { mode },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateAgentTrainingCenterSettingsAction(formData: FormData) {
@@ -667,8 +619,6 @@ export async function updateAgentTrainingCenterSettingsAction(formData: FormData
     createdAt: now,
   });
 
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/settings");
 }
 
 export async function updatePerformanceRankingSettingsAction(formData: FormData) {
@@ -685,8 +635,6 @@ export async function updatePerformanceRankingSettingsAction(formData: FormData)
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/metas/desempenho");
 }
 
 export async function updateTeamMemberProfileSettingsAction(formData: FormData) {
@@ -703,8 +651,6 @@ export async function updateTeamMemberProfileSettingsAction(formData: FormData) 
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/equipe");
 }
 
 export async function updateUserProfileSettingsAction(formData: FormData) {
@@ -721,8 +667,6 @@ export async function updateUserProfileSettingsAction(formData: FormData) {
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/settings");
 }
 
 export async function updateCustomRolesGlobalSettingsAction(formData: FormData) {
@@ -731,8 +675,6 @@ export async function updateCustomRolesGlobalSettingsAction(formData: FormData) 
   const now = new Date();
   await setSystemSetting("feature_custom_roles_enabled", enabled, now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.global_feature_updated", targetType: "system_settings", targetId: "custom_roles", metadata: { enabled }, createdAt: now });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/equipe/cargos");
 }
 
 export async function updateTenantCustomRolesPilotAction(tenantId: string, formData: FormData) {
@@ -743,9 +685,6 @@ export async function updateTenantCustomRolesPilotAction(tenantId: string, formD
   if (input.enabled === "true") await provisionDefaultMarketingRole({ tenantId: targetTenantId, actorUserId: admin.userId });
   await getDatabase().insert(schema.tenantCustomRoleSettings).values({ tenantId: targetTenantId, enabled: input.enabled === "true", updatedBy: admin.userId, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: schema.tenantCustomRoleSettings.tenantId, set: { enabled: input.enabled === "true", updatedBy: admin.userId, updatedAt: now } });
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "custom_roles.tenant_pilot_updated", targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled }, createdAt: now });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/equipe/cargos");
-  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateRealtimeSyncSettingsAction(formData: FormData) {
@@ -762,7 +701,6 @@ export async function updateRealtimeSyncSettingsAction(formData: FormData) {
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateExtensionGlobalSettingsAction(formData: FormData) {
@@ -771,7 +709,6 @@ export async function updateExtensionGlobalSettingsAction(formData: FormData) {
   const now = new Date();
   await setSystemSetting("feature_browser_extension_enabled", enabled, now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "update_browser_extension_global_settings", targetType: "system_settings", targetId: "browser_extension", metadata: { enabled }, createdAt: now });
-  revalidatePath("/super-admin/settings");
 }
 
 export async function updateLeadManagementActionsSettingsAction(formData: FormData) {
@@ -792,8 +729,6 @@ export async function updateLeadManagementActionsSettingsAction(formData: FormDa
     createdAt: now,
   });
 
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/leads");
 }
 
 export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formData: FormData) {
@@ -810,8 +745,6 @@ export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formDat
     metadata: { enabled },
     createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
-  revalidatePath("/marketing/campanhas");
 }
 
 export async function resetTenantOperationalDataAction(formData: FormData) {
@@ -836,8 +769,6 @@ export async function resetTenantOperationalDataAction(formData: FormData) {
     console.error("[purge-job] Background processing failed:", err);
   });
 
-  revalidatePath(`/super-admin/tenants/${parsed.data}`);
-  revalidatePath("/super-admin/tenants");
 
   return { jobId, started: true };
 }

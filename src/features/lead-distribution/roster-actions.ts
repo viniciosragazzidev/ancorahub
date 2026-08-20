@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, lt, ne } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -71,7 +70,6 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     const now = new Date();
     await db.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: schedule.branchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
-    revalidatePath("/leads/distribuicao/plantao");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível adicionar o corretor à escala." };
@@ -92,7 +90,6 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
     await assertNoOverlap(db, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, assignment.id);
     await db.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, branchId: schedule.branchId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
-    revalidatePath("/leads/distribuicao/plantao");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível mover a escala." };
@@ -110,7 +107,6 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
     if (!assignment || (context.role === "manager" && context.branchId !== assignment.branchId)) throw new Error("Escala fora do seu escopo.");
     await db.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.removed" });
-    revalidatePath("/leads/distribuicao/plantao");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível remover a escala." };

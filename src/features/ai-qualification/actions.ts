@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
@@ -61,7 +60,6 @@ export async function updateQualificationSettingsAction(input: UpdateTenantSetti
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await updateQualificationTenantSettings(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -75,7 +73,6 @@ export async function addTestNumberAction(input: AddTestNumberInput) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await addTestNumber(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -83,7 +80,6 @@ export async function removeTestNumberAction(id: string) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await removeTestNumber(context.tenantId, context.userId, id);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -91,7 +87,6 @@ export async function resetMemoryAction(input: ResetMemoryInput) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await resetQualificationSessionMemory(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -99,7 +94,6 @@ export async function sendWhatsAppTestMessageAction(input: SendWhatsAppTestMessa
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await sendWhatsAppTestMessage(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -113,7 +107,6 @@ export async function saveFollowUpRuleAction(input: FollowUpRuleInput) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await saveFollowUpRule(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -121,7 +114,6 @@ export async function deleteFollowUpRuleAction(ruleId: string) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await deleteFollowUpRule(context.tenantId, context.userId, ruleId);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -135,7 +127,6 @@ export async function updateToolPermissionAction(input: UpdateToolPermissionInpu
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await updateToolPermission(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -149,7 +140,6 @@ export async function saveDestinationRuleAction(input: DestinationRuleInput) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await saveDestinationRule(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -163,7 +153,6 @@ export async function saveBrokerEligibilityProfileAction(input: BrokerEligibilit
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await saveBrokerEligibilityProfile(context.tenantId, context.userId, input);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -177,7 +166,6 @@ export async function acknowledgeAlertAction(alertId: string) {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const result = await acknowledgeAlert(context.tenantId, context.userId, alertId);
-  revalidatePath("/qualificacao");
   return result;
 }
 
@@ -278,7 +266,6 @@ export async function setDefaultMetaTemplateAction(templateId: string) {
     });
   }
 
-  revalidatePath("/qualificacao");
   return { success: true };
 }
 
@@ -299,7 +286,6 @@ export async function deleteMetaTemplateAction(templateId: string) {
       )
     );
 
-  revalidatePath("/qualificacao");
   return { success: true };
 }
 
@@ -308,6 +294,5 @@ export async function syncMetaTemplatesAction() {
   assertAdminRole(context.role);
   const { syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
   await syncTenantTemplates(context.tenantId).catch(() => undefined);
-  revalidatePath("/qualificacao");
   return { success: true };
 }

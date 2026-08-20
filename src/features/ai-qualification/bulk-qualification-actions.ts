@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -121,8 +120,6 @@ export async function triggerBulkQualificationAction(input: BulkQualificationFil
       acao: "ai_qualification.bulk_triggered",
     });
 
-    revalidatePath("/conversas");
-    revalidatePath("/qualificacao");
 
     return {
       success: true,

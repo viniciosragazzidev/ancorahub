@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
@@ -70,7 +69,6 @@ export async function createCommissionRuleAction(
       createdBy: context.userId,
     });
 
-    revalidatePath("/configuracoes/comissoes");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -123,7 +121,6 @@ export async function updateCommissionRuleAction(
       .returning({ id: schema.commissionRules.id });
 
     if (result.length === 0) return { error: "Regra não encontrada." };
-    revalidatePath("/configuracoes/comissoes");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -161,7 +158,6 @@ export async function toggleCommissionRuleAction(
       .set({ active: !rule.active })
       .where(eq(schema.commissionRules.id, rule.id));
 
-    revalidatePath("/configuracoes/comissoes");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -192,7 +188,6 @@ export async function deleteCommissionRuleAction(
       .returning({ id: schema.commissionRules.id });
 
     if (result.length === 0) return { error: "Regra não encontrada." };
-    revalidatePath("/configuracoes/comissoes");
     return { success: true };
   } catch (error) {
     return actionError(error);

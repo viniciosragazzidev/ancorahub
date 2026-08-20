@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Power, Users } from "@/components/huge-icons";
 import { toast } from "sonner";
 
@@ -28,10 +29,14 @@ type UnitMembersTableProps = {
 };
 
 function AvailabilityFeedback({ state }: { state: BranchActionState }) {
+  const router = useRouter();
   useEffect(() => {
-    if (state.success) toast.success("Disponibilidade atualizada.");
+    if (state.success) {
+      toast.success("Disponibilidade atualizada.");
+      router.refresh();
+    }
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+  }, [state, router]);
   return null;
 }
 

@@ -1,7 +1,7 @@
 import type { TenantRole } from "@/shared/db/schema";
 
 export const PERMISSIONS = {
-  acessar_conversas: ["supervisor", "manager", "director"],
+  acessar_conversas: ["broker", "supervisor", "manager", "director"],
   acessar_leads: ["broker", "supervisor", "manager", "director"],
   acessar_tarefas: ["broker", "supervisor", "manager", "director"],
   acessar_cotacoes: ["broker", "supervisor", "manager", "director"],

@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
@@ -87,9 +86,6 @@ export async function createPromotionalMaterial(
       createdBy: context.userId,
     });
 
-    revalidatePath("/super-admin/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao/gerenciar");
 
     return { success: true };
   } catch (error) {
@@ -145,9 +141,6 @@ export async function updatePromotionalMaterial(
         ),
       );
 
-    revalidatePath("/super-admin/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao/gerenciar");
 
     return { success: true };
   } catch (error) {
@@ -175,9 +168,6 @@ export async function togglePromotionalMaterialActive(
         ),
       );
 
-    revalidatePath("/super-admin/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao/gerenciar");
 
     return { success: true };
   } catch (error) {
@@ -203,8 +193,6 @@ export async function deletePromotionalMaterial(
         ),
       );
 
-    revalidatePath("/super-admin/materiais-divulgacao");
-    revalidatePath("/materiais-divulgacao");
 
     return { success: true };
   } catch (error) {

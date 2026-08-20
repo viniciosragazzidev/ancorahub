@@ -1,7 +1,6 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireRole } from "@/shared/auth/authorization";
@@ -41,7 +40,6 @@ export async function completeInitialSetup(
       .set(updateData)
       .where(eq(schema.tenants.id, context.tenantId));
 
-    revalidatePath("/", "layout");
 
     return { success: true };
   } catch (error) {

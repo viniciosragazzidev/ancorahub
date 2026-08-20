@@ -21,6 +21,24 @@ export function getWhatsAppReviewConfig() {
         requestTimeoutMs,
     };
 }
+export function getWahaConfig() {
+    const baseUrl = process.env.WAHA_BASE_URL?.trim();
+    if (!baseUrl)
+        throw new Error("Configuração obrigatória ausente: WAHA_BASE_URL.");
+    try {
+        const url = new URL(baseUrl);
+        if (url.protocol !== "http:" && url.protocol !== "https:")
+            throw new Error("Protocolo inválido.");
+    }
+    catch {
+        throw new Error("WAHA_BASE_URL deve ser uma URL válida (ex: http://waha:3000).");
+    }
+    return {
+        baseUrl,
+        apiKey: required("WAHA_API_KEY"),
+        healthTimeoutMs: 5_000,
+    };
+}
 export function getServerAddress() {
     return { host: process.env.HOST?.trim() || "0.0.0.0", port: Number(process.env.PORT || 3333) };
 }

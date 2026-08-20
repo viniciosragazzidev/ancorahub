@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
@@ -109,8 +108,6 @@ export async function setGlobalCatalogCapabilityAction(formData: FormData): Prom
       targetId: "catalog_capabilities",
       metadata: { globalEnabled, privateEnabled },
     });
-    revalidatePath("/super-admin/catalogo");
-    revalidatePath("/catalogo/interno");
     return { success: "Capacidades do catálogo atualizadas." };
   } catch (error) {
     return formError(error);
@@ -135,7 +132,6 @@ export async function createGlobalCarrierAction(formData: FormData): Promise<Cat
       writeCatalogAudit({ actorUserId: admin.userId, source: "global", action: "carrier.created", entityType: "global_carrier", entityId: id }),
       writePlatformCatalogAudit({ actorUserId: admin.userId, action: "catalog_carrier_created", targetType: "global_carrier", targetId: id }),
     ]);
-    revalidatePath("/super-admin/catalogo");
     return { success: "Operadora oficial criada como rascunho." };
   } catch (error) {
     return formError(error);
@@ -174,7 +170,6 @@ export async function createGlobalPlanAction(formData: FormData): Promise<Catalo
       writeCatalogAudit({ actorUserId: admin.userId, source: "global", action: "plan.created", entityType: "global_plan", entityId: id, metadata: { carrierId: input.carrierId } }),
       writePlatformCatalogAudit({ actorUserId: admin.userId, action: "catalog_plan_created", targetType: "global_plan", targetId: id }),
     ]);
-    revalidatePath("/super-admin/catalogo");
     return { success: "Plano oficial criado como rascunho." };
   } catch (error) {
     return formError(error);
@@ -200,7 +195,6 @@ export async function publishGlobalPlanAction(formData: FormData): Promise<Catal
       writeCatalogAudit({ actorUserId: admin.userId, source: "global", action: "plan.published", entityType: "global_plan", entityId: plan.id }),
       writePlatformCatalogAudit({ actorUserId: admin.userId, action: "catalog_plan_published", targetType: "global_plan", targetId: plan.id }),
     ]);
-    revalidatePath("/super-admin/catalogo");
     return { success: "Plano e sua operadora estão publicados." };
   } catch (error) {
     return formError(error);
@@ -239,7 +233,6 @@ export async function setTenantPlanAvailabilityAction(formData: FormData): Promi
       writeCatalogAudit({ actorUserId: admin.userId, source: "global", action: "availability.changed", entityType: "tenant_catalog_plan_setting", entityId: `${input.tenantId}:${input.globalPlanId}`, tenantId: input.tenantId, metadata: { enabled: input.enabled === "true" } }),
       writePlatformCatalogAudit({ actorUserId: admin.userId, action: "catalog_tenant_availability_changed", targetType: "tenant_catalog_plan_setting", targetId: `${input.tenantId}:${input.globalPlanId}`, metadata: { enabled: input.enabled === "true" } }),
     ]);
-    revalidatePath("/super-admin/catalogo");
     return { success: "Disponibilidade atualizada para a corretora." };
   } catch (error) {
     return formError(error);
@@ -287,7 +280,6 @@ export async function createGlobalPriceTableAction(formData: FormData): Promise<
       writeCatalogAudit({ actorUserId: admin.userId, source: "global", action: "table.published", entityType: "catalog_table_version", entityId: versionId, metadata: { planId: plan.id } }),
       writePlatformCatalogAudit({ actorUserId: admin.userId, action: "catalog_table_published", targetType: "catalog_table_version", targetId: versionId }),
     ]);
-    revalidatePath("/super-admin/catalogo");
     return { success: "Tabela oficial publicada." };
   } catch (error) {
     return formError(error);
@@ -308,7 +300,6 @@ export async function createPrivateCarrierAction(formData: FormData): Promise<Ca
       createdBy: context.userId,
     });
     await writeCatalogAudit({ actorUserId: context.userId, tenantId: context.tenantId, source: "tenant_private", action: "carrier.created", entityType: "tenant_private_carrier", entityId: id });
-    revalidatePath("/catalogo/interno");
     return { success: "Operadora interna criada." };
   } catch (error) {
     return formError(error);
@@ -344,7 +335,6 @@ export async function createPrivatePlanAction(formData: FormData): Promise<Catal
       createdBy: context.userId,
     });
     await writeCatalogAudit({ actorUserId: context.userId, tenantId: context.tenantId, source: "tenant_private", action: "plan.created", entityType: "tenant_private_plan", entityId: id, metadata: { carrierId: input.carrierId } });
-    revalidatePath("/catalogo/interno");
     return { success: "Plano interno criado." };
   } catch (error) {
     return formError(error);
@@ -395,7 +385,6 @@ export async function createPrivatePriceTableAction(formData: FormData): Promise
       });
     });
     await writeCatalogAudit({ actorUserId: context.userId, tenantId: context.tenantId, source: "tenant_private", action: "table.published", entityType: "tenant_private_table_version", entityId: versionId, metadata: { planId: plan.id } });
-    revalidatePath("/catalogo/interno");
     return { success: "Tabela interna publicada." };
   } catch (error) {
     return formError(error);

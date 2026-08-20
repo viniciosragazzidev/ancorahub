@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
@@ -53,8 +52,6 @@ export async function createBranchAction(
       name: parsed.data.name,
       status: "active",
     });
-    revalidatePath("/filiais");
-    revalidatePath("/equipe");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -83,8 +80,6 @@ export async function updateBranchAction(
       )
       .returning({ id: schema.branches.id });
     if (result.length === 0) return { error: "Filial não encontrada." };
-    revalidatePath("/filiais");
-    revalidatePath("/equipe");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -112,8 +107,6 @@ export async function toggleBranchAction(
       .update(schema.branches)
       .set({ status: branch.status === "active" ? "inactive" : "active" })
       .where(eq(schema.branches.id, branch.id));
-    revalidatePath("/filiais");
-    revalidatePath("/equipe");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -141,9 +134,6 @@ export async function toggleAcceptingLeadsAction(
       .update(schema.branches)
       .set({ acceptingLeads: !branch.acceptingLeads })
       .where(eq(schema.branches.id, branch.id));
-    revalidatePath("/filiais");
-    revalidatePath("/equipe");
-    revalidatePath(`/unidades/${branchId.data}`);
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -179,9 +169,6 @@ export async function toggleAutoDistributeAction(
       .update(schema.branches)
       .set({ autoDistribute: !branch.autoDistribute })
       .where(eq(schema.branches.id, branch.id));
-    revalidatePath("/filiais");
-    revalidatePath("/dashboard");
-    revalidatePath(`/unidades/${branchId.data}`);
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -239,8 +226,6 @@ export async function toggleBrokerAvailabilityAction(
           nextStatus === "paused" ? "pausou_recebimento_de_leads" : "reativou_recebimento_de_leads",
       });
     });
-    revalidatePath("/leads/distribuicao");
-    revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -313,8 +298,6 @@ export async function setBrokersAvailabilityAction(
         });
       }
     });
-    revalidatePath("/leads/distribuicao");
-    revalidatePath("/dashboard");
     return {
       success: true,
       message:

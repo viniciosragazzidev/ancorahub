@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -22,7 +21,6 @@ async function auditWorkflow(userId: string, workflowId: string, action: string)
   await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId, entidade: "workflow_automation", entidadeId: workflowId, acao: action });
 }
 
-function revalidateWorkflowRoutes() { revalidatePath("/automacoes"); }
 
 export async function createWorkflowDraftAction(input: unknown) {
   try {
@@ -34,7 +32,6 @@ export async function createWorkflowDraftAction(input: unknown) {
       status: "rascunho", draftDefinition: parsed.definition, createdBy: context.userId,
     });
     await auditWorkflow(context.userId, id, "workflow_automation.draft_created");
-    revalidateWorkflowRoutes();
     return { success: true as const, id };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível criar o rascunho." };
@@ -53,7 +50,6 @@ export async function saveWorkflowDraftAction(workflowId: string, input: unknown
     await db.update(schema.workflowAutomations).set({ name: parsed.name, description: parsed.description ?? null, draftDefinition: parsed.definition, updatedAt: new Date() })
       .where(and(eq(schema.workflowAutomations.id, id), eq(schema.workflowAutomations.tenantId, context.tenantId)));
     await auditWorkflow(context.userId, id, "workflow_automation.draft_updated");
-    revalidateWorkflowRoutes();
     return { success: true as const };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível salvar o rascunho." };
@@ -81,7 +77,6 @@ export async function publishWorkflowAction(workflowId: string) {
         .where(and(eq(schema.workflowAutomations.id, id), eq(schema.workflowAutomations.tenantId, context.tenantId)));
     });
     await auditWorkflow(context.userId, id, "workflow_automation.published");
-    revalidateWorkflowRoutes();
     return { success: true as const, versionId };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível publicar o fluxo." };

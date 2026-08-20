@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, ArrowRight, ArrowLeft, MagicWand } from "@/components/huge-icons";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const reactions = [
 ] as const;
 
 export function LeadFeedbackDialog({ leadId, open, onOpenChange }: { leadId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [eventType, setEventType] = useState<(typeof events)[number][0]>("contacted");
   const [reaction, setReaction] = useState<(typeof reactions)[number][0]>("interested");
@@ -39,7 +41,8 @@ export function LeadFeedbackDialog({ leadId, open, onOpenChange }: { leadId: str
     toast.success("Memória do atendimento registrada.");
     setStep(1); setNote(""); setNextAction(""); setFollowUpAt("");
     onOpenChange(false);
-  }, [state.success, onOpenChange]);
+    router.refresh();
+  }, [state, onOpenChange, router]);
   useEffect(() => { if (state.error) toast.error(state.error); }, [state.error]);
 
   function submit(formData: FormData) {

@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
 import { getRequiredSession } from "@/shared/auth/session";
 import {
@@ -52,7 +51,6 @@ export async function setSuperAdminRoleOverrideAction(targetRole: RoleOverrideOp
     createdAt: new Date(),
   });
 
-  revalidatePath("/", "layout");
   return { success: true };
 }
 

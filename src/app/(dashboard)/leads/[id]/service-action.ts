@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, or } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -158,10 +157,6 @@ export async function startLeadServiceAction(_prev: StartLeadServiceState, formD
       }
     })();
 
-    revalidatePath(`/leads/${lead.id}`);
-    revalidatePath("/leads");
-    revalidatePath("/minha-fila");
-    revalidatePath("/dashboard");
 
     return { success: true, whatsappUrl: `https://wa.me/${lead.telefone.replace(/\D/g, "")}` };
   } catch (error) {

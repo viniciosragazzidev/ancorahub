@@ -1,5 +1,32 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-081 — Feedback instantâneo server-first
+
+**Estado:** Aceita
+**Data:** 2026-08-20
+
+O CorreTop adota o modelo server-first puro para reatividade de interface: Server
+Components continuam sendo a única fonte de verdade das listas e Server Actions o
+único caminho de mutação (DEC-007). Feedback instantâneo vem de `useOptimistic`
+aplicado dentro de `startTransition` junto ao dispatch da action, e a
+reconciliação pós-ação vem de `router.refresh()` disparado sempre que o **objeto
+de estado** da action muda — nunca por efeito com dependência booleana
+(`state.success`), que deixa de disparar na segunda operação bem-sucedida
+idêntica. Chamadas diretas `await action()` também devem chamar
+`router.refresh()` no sucesso; `window.location.reload()` fica restrito à
+recuperação de erro (error boundary, version skew).
+
+A infraestrutura morta de TanStack Query (`QueryClientProvider`,
+`useLocalFirstMutation`, `localFirstQueryKey`) é removida do runtime: sem nenhum
+`useQuery` na aplicação, ela só adicionava peso ao bundle inicial sem
+propagar dados. A dependência permanece no `package.json` até remoção
+explicitamente aprovada.
+
+Atualizações entre usuários seguem DEC-077: sinal opaco por usuário, sem
+conteúdo pessoal, agora estendido a `domain.invalidated` além de notificações —
+o navegador responde invalidando o estado local e executando um refresh
+consolidado. Detalhes e alternativas rejeitadas em ADR-0039.
+
 ## DEC-080 — Timeout da qualificação respeita a fila configurada no intake
 
 **Estado:** Aceita

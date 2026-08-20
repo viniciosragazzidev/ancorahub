@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { ArrowSquareOut, PencilSimple, Plus, Power, WifiHigh, XCircle } from "@/components/huge-icons";
@@ -19,10 +20,14 @@ import { createBranchAction, toggleBranchAction, toggleAcceptingLeadsAction, upd
 type Branch = { id: string; name: string; externalId: string | null; status: "active" | "inactive"; memberCount: number; acceptingLeads: boolean };
 
 function ActionFeedback({ state }: { state: BranchActionState }) {
+  const router = useRouter();
   useEffect(() => {
-    if (state.success) toast.success("Filial atualizada com sucesso.");
+    if (state.success) {
+      toast.success("Filial atualizada com sucesso.");
+      router.refresh();
+    }
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+  }, [state, router]);
   return null;
 }
 
@@ -34,7 +39,7 @@ function CreateBranchForm({ onSuccess }: { onSuccess: () => void }) {
       formRef.current?.reset();
       onSuccess();
     }
-  }, [state.success, onSuccess]);
+  }, [state, onSuccess]);
 
   return (
     <form ref={formRef} action={action} className="space-y-4">

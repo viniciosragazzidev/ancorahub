@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -52,5 +51,4 @@ export async function updateSystemSettingsAction(formData: FormData) {
     createdAt: new Date(),
   });
 
-  revalidatePath("/roadmap");
 }

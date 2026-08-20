@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
@@ -41,8 +40,6 @@ export async function updateTenantBrandingAction(
       });
     });
 
-    revalidatePath("/settings");
-    revalidatePath("/dashboard");
     return { success: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao salvar identidade visual.";

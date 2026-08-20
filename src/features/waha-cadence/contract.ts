@@ -61,7 +61,22 @@ export const wahaWebhookSchema = z.object({
   message: z.object({
     id: z.string().min(1).max(200),
     from: z.string().regex(/^\d{10,15}$/),
+    to: z.string().regex(/^\d{10,15}$/).optional(),
     body: z.string().trim().min(1).max(4_000),
+    /** Message type (text, image, audio, video, document, sticker, location, contact) */
+    type: z.enum(["text", "image", "audio", "video", "document", "sticker", "location", "contact"]).default("text"),
+    /** Whether this message was sent by the session owner (broker's own messages) */
+    fromMe: z.boolean().default(false),
+    /** Caption for media messages */
+    caption: z.string().max(1_000).optional(),
+    /** Reply context: the ID of the message being replied to */
+    replyToId: z.string().max(200).optional(),
+    /** Media metadata */
+    media: z.object({
+      mimeType: z.string().max(100).optional(),
+      fileName: z.string().max(255).optional(),
+      sizeBytes: z.number().int().optional(),
+    }).strict().optional(),
   }).strict().optional(),
   delivery: z.object({
     idempotencyKey: z.string().min(16).max(160),

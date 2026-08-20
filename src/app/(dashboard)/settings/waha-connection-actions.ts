@@ -1,12 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 
 import { changeOwnWahaConnection, createOwnWahaConnection, refreshOwnWahaConnection, updateOwnWahaCapabilities } from "@/features/waha-cadence/connection-service";
 
 function done() {
-  revalidatePath("/integrations/whatsapp");
-  revalidatePath("/settings");
 }
 
 export async function createWahaConnectionAction(formData: FormData) {

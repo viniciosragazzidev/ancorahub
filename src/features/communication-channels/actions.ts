@@ -2,7 +2,6 @@
 
 import { randomInt, randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -113,10 +112,8 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
   try {
     await registerChannelPhone({ channelId, tenantId: context.tenantId, actorUserId: context.userId, phoneNumberId, accessToken, registrationPin });
   } catch (error) {
-    revalidatePath("/integrations/whatsapp");
     throw error;
   }
-  revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
   return { success: true, channelId, displayPhoneNumber: phone.display_phone_number ?? null, registrationStatus: "registered" };
 }
 
@@ -137,10 +134,8 @@ export async function completeMetaCloudChannelRegistrationAction(channelId: stri
   try {
     await registerChannelPhone({ channelId: channel.id, tenantId: context.tenantId, actorUserId: context.userId, phoneNumberId: channel.phoneNumberId, accessToken, registrationPin });
   } catch (error) {
-    revalidatePath("/integrations/whatsapp");
     throw error;
   }
-  revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
   return { success: true };
 }
 
@@ -152,7 +147,6 @@ export async function setMetaCloudChannelStatusAction(channelId: string, active:
   if (!channel) throw new Error("Canal oficial não encontrado.");
   await db.update(schema.communicationChannels).set({ status: active ? "active" : "inactive", updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channelId));
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: active ? "meta_cloud_channel_activated" : "meta_cloud_channel_deactivated" });
-  revalidatePath("/integrations/whatsapp"); revalidatePath("/conversas");
 }
 
 /** Disconnects the CRM while retaining auditable conversation history. */
@@ -178,6 +172,5 @@ export async function disconnectMetaCloudChannelAction(channelId: string) {
       entidadeId: channel.id, acao: "meta_cloud_channel_disconnected", createdAt: now,
     });
   });
-  revalidatePath("/integrations/whatsapp"); revalidatePath("/integrations/meta"); revalidatePath("/conversas");
   return { success: true };
 }

@@ -2,21 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { ArrowRight, CheckCircle } from "@/components/huge-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ContextNote } from "@/components/ui/context-note";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
-import { toggleLeadTaskAction, type LeadTaskState } from "@/features/leads/task-actions";
-import { useLocalFirstMutation } from "@/utils/local-first/use-local-first-mutation";
+import { toggleLeadTaskAction } from "@/features/leads/task-actions";
 
 type Viewer = BrokerWorkspaceData["viewer"];
 type NextAction = NonNullable<BrokerWorkspaceData["nextAction"]>;
-
-function queryKeys(viewer: Viewer) {
-  return [["broker-workspace", viewer.tenantId, viewer.userId]] as const;
-}
 
 function actionLabel(action: NextAction) {
   if (action.kind === "awaiting_response") return "Responder agora";
@@ -24,44 +20,56 @@ function actionLabel(action: NextAction) {
   return "Abrir atendimento";
 }
 
-export function BrokerWorkspaceActionButtons({ nextAction, viewer }: { nextAction: NextAction; viewer: Viewer }) {
+export function BrokerWorkspaceActionButtons({ nextAction, viewer: _viewer }: { nextAction: NextAction; viewer: Viewer }) {
+  const router = useRouter();
   const [completed, setCompleted] = useState(false);
-  const completeTask = useLocalFirstMutation<LeadTaskState, string, boolean>({
-    mutationFn: async (taskId) => {
-      const result = await toggleLeadTaskAction(taskId);
-      if (result.error || !result.success) throw new Error(result.error ?? "Não foi possível concluir a tarefa.");
-      return result;
-    },
-    queryKeys: queryKeys(viewer),
-    onOptimistic: () => {
-      const snapshot = completed;
-      setCompleted(true);
-      return snapshot;
-    },
-    onRollback: (snapshot) => setCompleted(snapshot ?? false),
-    onConfirmed: () => toast.success("Tarefa concluída. A fila será atualizada."),
-  });
+  const [syncError, setSyncError] = useState(false);
+  const [pending, setPending] = useState(false);
 
-  return <div className="grid gap-2"><div className="flex flex-wrap gap-2"><Link href={nextAction.href} className={buttonVariants({ size: "sm" })}>{actionLabel(nextAction)} <ArrowRight aria-hidden="true" /></Link>{nextAction.taskId ? <Button disabled={completeTask.isPending || completed} onClick={() => completeTask.mutate(nextAction.taskId!)} size="sm" variant="outline"><CheckCircle aria-hidden="true" /> {completed ? "Concluída" : "Concluir"}</Button> : null}</div>{completeTask.syncError ? <ContextNote title="Não foi possível sincronizar" variant="error">A alteração local foi desfeita. Tente novamente.</ContextNote> : null}</div>;
+  async function completeTask() {
+    if (!nextAction.taskId || pending) return;
+    const snapshot = completed;
+    setPending(true);
+    setSyncError(false);
+    setCompleted(true);
+    try {
+      const result = await toggleLeadTaskAction(nextAction.taskId);
+      if (result.error || !result.success) throw new Error(result.error ?? "Não foi possível concluir a tarefa.");
+      toast.success("Tarefa concluída. A fila será atualizada.");
+      router.refresh();
+    } catch {
+      setCompleted(snapshot);
+      setSyncError(true);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return <div className="grid gap-2"><div className="flex flex-wrap gap-2"><Link href={nextAction.href} className={buttonVariants({ size: "sm" })}>{actionLabel(nextAction)} <ArrowRight aria-hidden="true" /></Link>{nextAction.taskId ? <Button disabled={pending || completed} onClick={completeTask} size="sm" variant="outline"><CheckCircle aria-hidden="true" /> {completed ? "Concluída" : "Concluir"}</Button> : null}</div>{syncError ? <ContextNote title="Não foi possível sincronizar" variant="error">A alteração local foi desfeita. Tente novamente.</ContextNote> : null}</div>;
 }
 
-export function BrokerWorkspaceTaskCompleteButton({ taskId, taskTitle, viewer }: { taskId: string; taskTitle: string; viewer: Viewer }) {
+export function BrokerWorkspaceTaskCompleteButton({ taskId, taskTitle }: { taskId: string; taskTitle: string; viewer: Viewer }) {
+  const router = useRouter();
   const [completed, setCompleted] = useState(false);
-  const mutation = useLocalFirstMutation<LeadTaskState, string, boolean>({
-    mutationFn: async (id) => {
-      const result = await toggleLeadTaskAction(id);
-      if (result.error || !result.success) throw new Error(result.error ?? "Não foi possível concluir a tarefa.");
-      return result;
-    },
-    queryKeys: queryKeys(viewer),
-    onOptimistic: () => {
-      const snapshot = completed;
-      setCompleted(true);
-      return snapshot;
-    },
-    onRollback: (snapshot) => setCompleted(snapshot ?? false),
-    onConfirmed: () => toast.success("Tarefa concluída. A agenda será atualizada."),
-  });
+  const [pending, setPending] = useState(false);
 
-  return <Button aria-label={completed ? `${taskTitle} concluída` : `Concluir ${taskTitle}`} disabled={mutation.isPending || completed} onClick={() => mutation.mutate(taskId)} size="icon" variant="ghost"><CheckCircle aria-hidden="true" className="size-4" /></Button>;
+  async function completeTask() {
+    if (pending) return;
+    const snapshot = completed;
+    setPending(true);
+    setCompleted(true);
+    try {
+      const result = await toggleLeadTaskAction(taskId);
+      if (result.error || !result.success) throw new Error(result.error ?? "Não foi possível concluir a tarefa.");
+      toast.success("Tarefa concluída. A agenda será atualizada.");
+      router.refresh();
+    } catch {
+      setCompleted(snapshot);
+      toast.error("Não foi possível concluir a tarefa. Tente novamente.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return <Button aria-label={completed ? `${taskTitle} concluída` : `Concluir ${taskTitle}`} disabled={pending || completed} onClick={completeTask} size="icon" variant="ghost"><CheckCircle aria-hidden="true" className="size-4" /></Button>;
 }

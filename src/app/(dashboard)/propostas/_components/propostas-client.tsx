@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Plus,
@@ -81,6 +82,7 @@ export function PropostasClient({
   expiringProposals,
   leads,
 }: PropostasClientProps) {
+  const router = useRouter();
   const [proposals, setProposals] = useState<ProposalRecord[]>(initialProposals);
   const [createOpen, setCreateOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
@@ -149,7 +151,7 @@ export function PropostasClient({
         toast.error(res.error);
       } else if (res.success && res.proposalId) {
         toast.success("Proposta criada com sucesso.");
-        window.location.reload();
+        router.refresh();
       }
     });
   }
@@ -203,7 +205,7 @@ export function PropostasClient({
     if (res.success) {
       toast.success("Proposta convertida em venda com sucesso!");
       setConvertOpen(false);
-      window.location.reload();
+      router.refresh();
     } else {
       toast.error(res.error || "Erro ao converter para venda.");
     }

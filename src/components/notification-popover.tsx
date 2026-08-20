@@ -91,8 +91,10 @@ export function NotificationPopover() {
     if (!open || !userId) return;
     const onRealtimeSync = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (!detail?.notificationId) return;
-      if (detail.kind === "notification.created") setNewIds((current) => new Set(current).add(detail.notificationId));
+      if (!detail) return;
+      const notificationId = detail.notificationId;
+      if (detail.kind === "notification.created" && notificationId) setNewIds((current) => new Set(current).add(notificationId));
+      if (!notificationId) return;
       void fetchRecent(true);
     };
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtimeSync);

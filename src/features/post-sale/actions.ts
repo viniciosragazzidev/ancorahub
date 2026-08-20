@@ -80,7 +80,6 @@ export async function addLeadBeneficiaryAction(rawInput: z.input<typeof benefici
     birthDate: input.birthDate, relationship: input.isHolder ? "titular" : input.relationship, isHolder: input.isHolder,
   }).returning({ id: schema.leadBeneficiaries.id });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: created.id, acao: "criou" });
-  revalidatePath(`/leads/${input.leadId}`);
   return { success: true, id: created.id };
 }
 
@@ -101,7 +100,6 @@ export async function removeLeadBeneficiaryAction(beneficiaryId: string) {
     return { error: "Não foi possível excluir este beneficiário porque ele passou a ter vínculos operacionais. Atualize a página e tente novamente." };
   }
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_beneficiary", entidadeId: beneficiary.id, acao: "removeu" });
-  revalidatePath(`/leads/${beneficiary.leadId}`);
   return { success: true };
 }
 
@@ -274,7 +272,6 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
       tag: `sale-${saleId}`,
     }).catch(() => { /* non-blocking */ });
   }
-  revalidatePath(`/leads/${lead.id}`); revalidatePath("/clientes"); revalidatePath("/vendas"); revalidatePath("/financeiro");
   return { success: true, saleId, activeCustomerId };
 }
 
@@ -296,7 +293,6 @@ export async function cancelActiveCustomerAction(rawInput: { activeCustomerId: s
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "active_customer", entidadeId: customer.id, acao: "cancelou" });
     await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: customer.leadId, userId: context.userId, tipo: "system_alert", conteudo: `Cliente ativo cancelado. Motivo: ${input.reason}` });
   });
-  revalidatePath("/clientes"); revalidatePath("/vendas"); revalidatePath("/financeiro");
   return { success: true, chargebackWindowDays: windowDays };
 }
 
@@ -309,7 +305,6 @@ export async function updatePostSaleSettingsAction(rawInput: { chargebackWindowD
   if (existing) await db.update(schema.postSaleSettings).set({ chargebackWindowDays: input.chargebackWindowDays, active: input.active, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.postSaleSettings.id, existing.id));
   else await db.insert(schema.postSaleSettings).values({ id: randomUUID(), tenantId: context.tenantId, chargebackWindowDays: input.chargebackWindowDays, active: input.active, updatedBy: context.userId });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "post_sale_settings", entidadeId: existing?.id ?? context.tenantId, acao: "alterou" });
-  revalidatePath("/configuracoes/comissoes");
   return { success: true };
 }
 
@@ -376,8 +371,5 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
     acao: "alterou_status_renovacao",
   });
 
-  revalidatePath("/clientes");
-  if (customer.clientId) revalidatePath(`/clientes/${customer.clientId}`);
-  revalidatePath("/vendas");
   return { success: true };
 }

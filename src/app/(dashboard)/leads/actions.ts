@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { createManualLead } from "@/features/leads/manual-create";
@@ -51,7 +50,6 @@ export async function deleteLeadAction(_previous: LeadDeleteState, formData: For
     return { error: error instanceof Error ? error.message : "Não foi possível excluir o lead." };
   }
 
-  revalidatePath("/leads");
   // The active route is the lead that has just been soft-deleted. Revalidating
   // it would render its `notFound()` boundary in the Server Action response,
   // preventing the dialog from receiving a completed response. A Server Action

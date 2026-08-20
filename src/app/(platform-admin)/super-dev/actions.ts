@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createPlatformTenant,
@@ -21,8 +20,6 @@ import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 export async function createTenantAction(_: TenantCreateActionState, formData: FormData): Promise<TenantCreateActionState> {
   try {
     const tenantId = await createPlatformTenant(Object.fromEntries(formData));
-    revalidatePath("/super-dev");
-    revalidatePath("/super-dev/tenants");
     redirect(`/super-dev/tenants/${tenantId}`);
   } catch (error) {
     if (error instanceof TenantCnpjAlreadyExistsError) return { error: error.message };
@@ -35,27 +32,21 @@ export async function setTenantStatusAction(formData: FormData) {
   const status = String(formData.get("status") ?? "");
   if (status !== "active" && status !== "inactive") throw new Error("Status inválido.");
   await setPlatformTenantStatus(tenantId, status);
-  revalidatePath("/super-dev");
-  revalidatePath("/super-dev/tenants");
-  revalidatePath(`/super-dev/tenants/${tenantId}`);
 }
 
 export async function createTenantAccessAction(formData: FormData) {
   await createTenantAccess(Object.fromEntries(formData));
   const tenantId = String(formData.get("tenantId") ?? "");
-  revalidatePath(`/super-dev/tenants/${tenantId}`);
 }
 
 export async function terminateSessionAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   await terminateSession(sessionId);
-  revalidatePath("/super-dev/sessions");
 }
 
 export async function purgeUserLGPDAction(formData: FormData) {
   const userId = String(formData.get("userId") ?? "");
   await purgeUserLGPD(userId);
-  revalidatePath("/super-dev/audit");
 }
 
 export async function getLeadEvidenceReportAction(leadId: string) {

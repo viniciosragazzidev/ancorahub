@@ -1,8 +1,8 @@
-# Plano mestre — redesign e experiência de conversão do AncoraHub
+﻿# Plano mestre — redesign e experiência de conversão do AncoraHub
 
 **Status:** proposto para aprovação  
 **Escopo:** todas as superfícies do produto — operação, gestão, administração, plataforma, fluxos públicos e extensão de navegador.  
-**Referência visual:** imagens em `NewDesignRefs/` e linguagem de workspace da Firecrawl.  
+**Referência visual:** imagens em `docs/design-system/refs/` e linguagem de workspace da Firecrawl.  
 **Regra de marca:** a referência define composição, densidade, superfícies e hierarquia. A cor de ação continua sendo a marca configurada pelo tenant; não será copiada a cor laranja da referência.
 
 ---

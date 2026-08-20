@@ -1,7 +1,6 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireAnyRole } from "@/shared/auth/authorization";
@@ -29,7 +28,6 @@ export async function dismissTenantOnboarding(): Promise<{ success: boolean; err
         ),
       );
 
-    revalidatePath("/", "layout");
 
     return { success: true };
   } catch (error) {

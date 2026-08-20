@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -25,6 +24,5 @@ export async function updateQuickReplyTemplateAction(rawInput: unknown) {
     await db.insert(schema.aiQuickReplyTemplates).values({ id: randomUUID(), tenantId: context.tenantId, ruleKey: input.ruleKey, templateKey: input.templateKey, body: input.body, active: input.active, updatedBy: context.userId });
   }
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "ai_quick_reply_template", entidadeId: existing?.id ?? input.ruleKey, acao: "updated" });
-  revalidatePath("/settings");
   return { success: true as const };
 }

@@ -3,7 +3,6 @@
 import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -155,8 +154,6 @@ export async function markCommissionPaidAction(
       .where(eq(schema.commissionSchedule.id, scheduleId));
 
     // Revalidar paths relevantes
-    revalidatePath("/vendas");
-    revalidatePath(`/vendas/${item.id}`);
 
     return { success: true };
   } catch (error) {
@@ -210,8 +207,6 @@ export async function markCommissionUnpaidAction(
       })
       .where(eq(schema.commissionSchedule.id, scheduleId));
 
-    revalidatePath("/vendas");
-    revalidatePath(`/vendas/${item.id}`);
 
     return { success: true };
   } catch (error) {

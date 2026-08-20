@@ -244,16 +244,27 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
                       Entrada {formatDate(lead.createdAt)}
                       {lead.dueAt ? ` · Retorno ${formatDate(lead.dueAt)}` : ""}
                     </span>
-                    <Link
-                      href={`/leads/${lead.id}`}
-                      className={cn(
-                        buttonVariants({ variant: isDistributed ? "default" : "outline", size: "sm" }),
-                        "h-9 w-full gap-1.5 px-4 text-xs font-semibold sm:w-auto"
-                      )}
-                    >
-                      {isDistributed ? "ACEITAR LEAD" : isConverted ? "VER" : "ABRIR"}
-                      <ArrowRight className="size-3.5" />
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/conversas?leadId=${lead.id}`}
+                        className={cn(
+                          buttonVariants({ variant: "ghost", size: "sm" }),
+                          "h-9 flex-1 gap-1.5 px-3 text-xs font-semibold sm:flex-none"
+                        )}
+                      >
+                        Chat
+                      </Link>
+                      <Link
+                        href={`/leads/${lead.id}`}
+                        className={cn(
+                          buttonVariants({ variant: isDistributed ? "default" : "outline", size: "sm" }),
+                          "h-9 flex-1 gap-1.5 px-4 text-xs font-semibold sm:w-auto"
+                        )}
+                      >
+                        {isDistributed ? "ACEITAR LEAD" : isConverted ? "VER" : "ABRIR"}
+                        <ArrowRight className="size-3.5" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </Card>

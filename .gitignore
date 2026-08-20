@@ -51,3 +51,20 @@ public/downloads/
 
 .dbprobe.cjs
 .devlog.txt
+
+# build/test artifacts
+/playwright-report/
+/test-results/
+.next-dev.*.log
+
+# agent/tool local state (não são artefatos do produto)
+/.ua/
+/.tokensave/
+/.firecrawl/
+
+# dependências de serviços satélite
+/services/whatsapp-api/node_modules/
+
+# credenciais locais (segredo: nunca versionar; ver docs/agent/SECURITY_RULES.md)
+plans/credenciais-*.json
+plans/production-neon-backup-*.json

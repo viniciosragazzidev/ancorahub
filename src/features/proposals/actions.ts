@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -133,8 +132,6 @@ export async function createProposalAction(
       },
     });
 
-    revalidatePath("/propostas");
-    revalidatePath(`/leads/${leadId}`);
     return { success: true, proposalId };
   } catch (error) {
     return {
@@ -204,8 +201,6 @@ export async function updateProposalStatusAction(
       }
     });
 
-    revalidatePath("/propostas");
-    revalidatePath(`/leads/${proposal.leadId}`);
     return { success: true };
   } catch (error) {
     return {
@@ -466,9 +461,6 @@ export async function convertProposalToSaleAction(
       });
     });
 
-    revalidatePath("/propostas");
-    revalidatePath("/vendas");
-    revalidatePath(`/leads/${lead.id}`);
 
     return { success: true, saleId };
   } catch (error) {

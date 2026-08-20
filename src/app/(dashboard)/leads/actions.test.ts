@@ -38,7 +38,6 @@ vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schem
 vi.mock("@/shared/auth/tenant-context", () => ({
   getRequiredTenantContext: () => Promise.resolve(state.mockTenantContext),
 }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
@@ -50,7 +49,6 @@ vi.mock("drizzle-orm", () => ({
   isNull: vi.fn((field: unknown) => ({ field, null: true })),
 }));
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { deleteLeadAction } from "./actions";
 
@@ -76,7 +74,6 @@ describe("deleteLeadAction", () => {
   it("redirects to the active lead list after deletion instead of revalidating the deleted route", async () => {
     await expect(deleteLeadAction({}, formData())).rejects.toThrow("NEXT_REDIRECT:/leads");
 
-    expect(revalidatePath).toHaveBeenCalledExactlyOnceWith("/leads");
     expect(redirect).toHaveBeenCalledWith("/leads");
     expect(state.updates.map((update) => update.table)).toEqual(
       expect.arrayContaining([state.schema.leads, state.schema.aiConversations]),

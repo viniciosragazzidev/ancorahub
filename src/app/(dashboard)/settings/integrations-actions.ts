@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
@@ -95,7 +94,6 @@ export async function createIntegrationAction(
       status: "active",
       createdBy: context.userId,
     });
-    revalidatePath("/settings");
     return {
       success: true,
       token: token.rawToken,
@@ -115,7 +113,6 @@ export async function toggleIntegrationAction(formData: FormData) {
       .from(schema.leadWebhookCredentials).where(and(eq(schema.leadWebhookCredentials.id, id), eq(schema.leadWebhookCredentials.tenantId, context.tenantId))).limit(1);
     if (!integration) return { success: false, error: "Integração não encontrada." };
     await db.update(schema.leadWebhookCredentials).set({ status: integration.status === "active" ? "revoked" : "active", revokedAt: integration.status === "active" ? new Date() : null, updatedAt: new Date() }).where(eq(schema.leadWebhookCredentials.id, id));
-    revalidatePath("/settings");
     return { success: true, status: integration.status === "active" ? "revoked" : "active" as const };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a integração." };
@@ -128,7 +125,6 @@ export async function revokeIntegrationAction(formData: FormData) {
     const { id } = idSchema.parse(Object.fromEntries(formData));
     await getDatabase().update(schema.leadWebhookCredentials).set({ status: "revoked", revokedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(schema.leadWebhookCredentials.id, id), eq(schema.leadWebhookCredentials.tenantId, context.tenantId)));
-    revalidatePath("/settings");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível revogar a integração." };

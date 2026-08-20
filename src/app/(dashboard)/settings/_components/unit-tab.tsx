@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Buildings, CheckCircle, XCircle, WifiHigh } from "@/components/huge-icons";
@@ -34,16 +35,23 @@ export function UnitTab({
     toggleAutoDistributeAction,
     {},
   );
+  const router = useRouter();
 
   useEffect(() => {
-    if (acceptingState.success) toast.success("Recebimento de leads atualizado.");
+    if (acceptingState.success) {
+      toast.success("Recebimento de leads atualizado.");
+      router.refresh();
+    }
     if (acceptingState.error) toast.error(acceptingState.error);
-  }, [acceptingState.success, acceptingState.error]);
+  }, [acceptingState, router]);
 
   useEffect(() => {
-    if (autoDistState.success) toast.success("Distribuição automática atualizada.");
+    if (autoDistState.success) {
+      toast.success("Distribuição automática atualizada.");
+      router.refresh();
+    }
     if (autoDistState.error) toast.error(autoDistState.error);
-  }, [autoDistState.success, autoDistState.error]);
+  }, [autoDistState, router]);
 
   const isDirector = currentRole === "director";
   const canToggleAccepting = isDirector;

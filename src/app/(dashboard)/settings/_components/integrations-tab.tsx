@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Copy, HelpCircle, LinkSimple, Plus, ShieldCheck, Trash } from "@/components/huge-icons";
 import { FlaskConical } from "lucide-react";
 import { toast } from "sonner";
@@ -19,23 +19,94 @@ import { createIntegrationAction, revokeIntegrationAction, toggleIntegrationActi
 
 type Branch = { id: string; name: string };
 type Props = { integrations: IntegrationRecord[]; branches: Branch[] };
-type QueryData = { integrations: IntegrationRecord[]; branches: Branch[] };
 
 const sourceLabel: Record<string, string> = { site_pixel: "Pixel / Site", landing_page: "Landing page" };
 
 export function IntegrationsTab({ integrations, branches }: Props) {
-  const queryClient = useQueryClient();
+  const router = useRouter();
+  const [integrationList, setIntegrationList] = useState<IntegrationRecord[]>(integrations);
   const [selectedId, setSelectedId] = useState<string | null>(integrations[0]?.id ?? null);
   const [createOpen, setCreateOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [createPending, setCreatePending] = useState(false);
+  const [togglePendingId, setTogglePendingId] = useState<string | null>(null);
+  const [revokePendingId, setRevokePendingId] = useState<string | null>(null);
   const [testOpen, setTestOpen] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [testResult, setTestResult] = useState<{ leadId?: string; code?: string; message?: string } | null>(null);
   const testNameRef = useRef<HTMLInputElement>(null);
   const testPhoneRef = useRef<HTMLInputElement>(null);
   const testEmailRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setIntegrationList(integrations);
+  }, [integrations]);
+
+  const data = { integrations: integrationList, branches };
+  const selected = integrationList.find((item) => item.id === selectedId) ?? integrationList[0] ?? null;
+
+  async function handleCreate(formData: FormData) {
+    const previous = integrationList;
+    const branchId = String(formData.get("branchId") ?? "") || null;
+    const optimistic: IntegrationRecord = { id: `temp-${crypto.randomUUID()}`, name: String(formData.get("name") ?? "Nova fonte"), source: String(formData.get("source") ?? "site_pixel"), branchId, branchName: branches.find((branch) => branch.id === branchId)?.name ?? null, status: "active", tokenPrefix: "sincronizando⬦", createdAt: new Date() };
+    setCreatePending(true);
+    setIntegrationList((current) => [optimistic, ...current]);
+    setSelectedId(optimistic.id);
+    setCreateOpen(false);
+    try {
+      const result = await createIntegrationAction({}, formData);
+      if (!result.success || !result.integration) throw new Error(result.error ?? "Não foi possível criar a integração.");
+      setIntegrationList((current) => current.map((item) => item.id === optimistic.id ? { ...result.integration!, branchName: branches.find((branch) => branch.id === result.integration!.branchId)?.name ?? null } : item));
+      setSelectedId(result.integration.id);
+      setRevealedToken(result.token ?? null);
+      toast.success("Fonte de captura criada.");
+      router.refresh();
+    } catch (error) {
+      setIntegrationList(previous);
+      setSelectedId(previous[0]?.id ?? null);
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar a integração.");
+    } finally {
+      setCreatePending(false);
+    }
+  }
+
+  async function handleToggle(id: string) {
+    const previous = integrationList;
+    setTogglePendingId(id);
+    setIntegrationList((current) => current.map((item) => item.id === id ? { ...item, status: item.status === "active" ? "revoked" : "active" } : item));
+    try {
+      const form = new FormData();
+      form.set("id", id);
+      const result = await toggleIntegrationAction(form);
+      if (!result.success) throw new Error(result.error ?? "Não foi possível atualizar o status.");
+      toast.success("Status da integração atualizado.");
+      router.refresh();
+    } catch (error) {
+      setIntegrationList(previous);
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status.");
+    } finally {
+      setTogglePendingId(null);
+    }
+  }
+
+  async function handleRevoke(id: string) {
+    setRevokePendingId(id);
+    try {
+      const form = new FormData();
+      form.set("id", id);
+      await revokeIntegrationAction(form);
+      setIntegrationList((current) => current.filter((item) => item.id !== id));
+      setSelectedId(null);
+      toast.success("Integração revogada.");
+      router.refresh();
+    } catch {
+      toast.error("Não foi possível revogar a integração.");
+    } finally {
+      setRevokePendingId(null);
+    }
+  }
 
   async function handleTest(e: React.FormEvent) {
     e.preventDefault();
@@ -69,50 +140,6 @@ export function IntegrationsTab({ integrations, branches }: Props) {
       setTestResult({ code: "NETWORK_ERROR", message: "Sem conexão com o servidor." });
     }
   }
-
-  const query = useQuery<QueryData>({ queryKey: ["settings-integrations"], queryFn: async () => ({ integrations, branches }), initialData: { integrations, branches }, staleTime: 30_000 });
-  const data = query.data;
-  const selected = data.integrations.find((item) => item.id === selectedId) ?? data.integrations[0] ?? null;
-
-  const createMutation = useMutation({
-    mutationFn: async (formData: FormData) => createIntegrationAction({}, formData),
-    onMutate: async (formData) => {
-      await queryClient.cancelQueries({ queryKey: ["settings-integrations"] });
-      const previous = queryClient.getQueryData<QueryData>(["settings-integrations"]);
-      const branchId = String(formData.get("branchId") ?? "") || null;
-      const optimistic: IntegrationRecord = { id: `temp-${crypto.randomUUID()}`, name: String(formData.get("name") ?? "Nova fonte"), source: String(formData.get("source") ?? "site_pixel"), branchId, branchName: data.branches.find((branch) => branch.id === branchId)?.name ?? null, status: "active", tokenPrefix: "sincronizando⬦", createdAt: new Date() };
-      queryClient.setQueryData<QueryData>(["settings-integrations"], { ...data, integrations: [optimistic, ...data.integrations] });
-      setSelectedId(optimistic.id);
-      setCreateOpen(false);
-      return { previous, optimisticId: optimistic.id };
-    },
-    onSuccess: (result, _formData, context) => {
-      if (!result.success || !result.integration || !context) { toast.error(result.error ?? "Não foi possível criar a integração."); return; }
-      queryClient.setQueryData<QueryData>(["settings-integrations"], (current) => current ? { ...current, integrations: current.integrations.map((item) => item.id === context.optimisticId ? { ...result.integration!, branchName: current.branches.find((branch) => branch.id === result.integration!.branchId)?.name ?? null } : item) } : current);
-      setSelectedId(result.integration.id);
-      setRevealedToken(result.token ?? null);
-      toast.success("Fonte de captura criada.");
-    },
-    onError: (_error, _formData, context) => { if (context?.previous) queryClient.setQueryData(["settings-integrations"], context.previous); toast.error("Não foi possível criar a integração."); },
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: async (id: string) => { const form = new FormData(); form.set("id", id); return toggleIntegrationAction(form); },
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["settings-integrations"] });
-      const previous = queryClient.getQueryData<QueryData>(["settings-integrations"]);
-      queryClient.setQueryData<QueryData>(["settings-integrations"], (current) => current ? { ...current, integrations: current.integrations.map((item) => item.id === id ? { ...item, status: item.status === "active" ? "revoked" : "active" } : item) } : current);
-      return { previous };
-    },
-    onSuccess: (result) => { if (!result.success) { queryClient.invalidateQueries({ queryKey: ["settings-integrations"] }); toast.error(result.error); return; } toast.success("Status da integração atualizado."); },
-    onError: (_error, _id, context) => { if (context?.previous) queryClient.setQueryData(["settings-integrations"], context.previous); toast.error("Não foi possível atualizar o status."); },
-  });
-
-  const revokeMutation = useMutation({
-    mutationFn: async (id: string) => { const form = new FormData(); form.set("id", id); return revokeIntegrationAction(form); },
-    onSuccess: (_result, id) => { queryClient.setQueryData<QueryData>(["settings-integrations"], (current) => current ? { ...current, integrations: current.integrations.filter((item) => item.id !== id) } : current); setSelectedId(null); toast.success("Integração revogada."); },
-    onError: () => toast.error("Não foi possível revogar a integração."),
-  });
 
   const snippet = useMemo(() => {
     if (!selected) return "";
@@ -154,7 +181,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
           {!data.integrations.length ? <div className="p-10 text-center"><ShieldCheck className="mx-auto size-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Nenhuma fonte configurada</p><p className="mt-1 text-xs text-muted-foreground">Crie um token para começar a receber leads automaticamente.</p></div> : null}
         </div></CardContent>
       </Card>
-      {selected ? <Card className="h-fit border-transparent bg-transparent shadow-none"><CardHeader><CardTitle className="text-base">Configuração da fonte</CardTitle><CardDescription>{selected.name}</CardDescription></CardHeader><CardContent className="grid gap-4"><div className="grid gap-1"><span className="text-xs text-muted-foreground">Token</span><code className="rounded-md bg-muted px-2.5 py-2 text-xs">{selected.tokenPrefix}⬢⬢⬢⬢⬢⬢⬢⬢</code><span className="text-[11px] text-muted-foreground">O token completo só é exibido uma vez após a criação.</span></div><div className="flex items-center justify-between rounded-lg border border-border p-3"><div><p className="text-sm font-medium">Recebimento</p><p className="text-xs text-muted-foreground">{selected.status === "active" ? "Aceitando novos leads" : "Bloqueado"}</p></div><Button aria-label="Alternar status" onClick={() => toggleMutation.mutate(selected.id)} size="sm" variant="outline">{selected.status === "active" ? "Desativar" : "Ativar"}</Button></div><div className="grid gap-2"><div className="flex items-center justify-between"><span className="flex items-center gap-1 text-xs font-medium">Snippet de integração <button type="button" onClick={() => setHelpOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors" title="Como integrar em um site externo?"><HelpCircle className="size-3.5" /></button></span><Button onClick={copySnippet} size="sm" variant="ghost">{copied ? <Check /> : <Copy />} {copied ? "Copiado" : "Copiar"}</Button></div><pre className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-muted-foreground">{snippet}</pre></div>
+      {selected ? <Card className="h-fit border-transparent bg-transparent shadow-none"><CardHeader><CardTitle className="text-base">Configuração da fonte</CardTitle><CardDescription>{selected.name}</CardDescription></CardHeader><CardContent className="grid gap-4"><div className="grid gap-1"><span className="text-xs text-muted-foreground">Token</span><code className="rounded-md bg-muted px-2.5 py-2 text-xs">{selected.tokenPrefix}⬢⬢⬢⬢⬢⬢⬢⬢</code><span className="text-[11px] text-muted-foreground">O token completo só é exibido uma vez após a criação.</span></div><div className="flex items-center justify-between rounded-lg border border-border p-3"><div><p className="text-sm font-medium">Recebimento</p><p className="text-xs text-muted-foreground">{selected.status === "active" ? "Aceitando novos leads" : "Bloqueado"}</p></div><Button aria-label="Alternar status" disabled={togglePendingId === selected.id} onClick={() => handleToggle(selected.id)} size="sm" variant="outline">{selected.status === "active" ? "Desativar" : "Ativar"}</Button></div><div className="grid gap-2"><div className="flex items-center justify-between"><span className="flex items-center gap-1 text-xs font-medium">Snippet de integração <button type="button" onClick={() => setHelpOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors" title="Como integrar em um site externo?"><HelpCircle className="size-3.5" /></button></span><Button onClick={copySnippet} size="sm" variant="ghost">{copied ? <Check /> : <Copy />} {copied ? "Copiado" : "Copiar"}</Button></div><pre className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-muted-foreground">{snippet}</pre></div>
 
         {/* Painel de Teste */}
         <div className="rounded-lg border border-border">
@@ -215,9 +242,9 @@ export function IntegrationsTab({ integrations, branches }: Props) {
           )}
         </div>
 
-        <Button className="w-full" onClick={() => revokeMutation.mutate(selected.id)} variant="destructive"><Trash /> Revogar integração</Button></CardContent></Card> : null}
+        <Button className="w-full" disabled={revokePendingId === selected.id} onClick={() => handleRevoke(selected.id)} variant="destructive"><Trash /> Revogar integração</Button></CardContent></Card> : null}
     </TabsContent>
-    <CreateIntegrationDialog branches={branches} open={createOpen} onOpenChange={setCreateOpen} onSubmit={(formData) => createMutation.mutate(formData)} pending={createMutation.isPending} />
+    <CreateIntegrationDialog branches={branches} open={createOpen} onOpenChange={setCreateOpen} onSubmit={(formData) => void handleCreate(formData)} pending={createPending} />
     <HelpIntegrationDialog open={helpOpen} onOpenChange={setHelpOpen} />
   </Tabs></div>;
 }

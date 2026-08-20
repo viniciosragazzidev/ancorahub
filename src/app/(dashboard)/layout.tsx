@@ -38,7 +38,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const pathname = headersList.get("x-pathname") || "";
 
   if (isLightBroker) {
-    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/leads", "/clientes", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
+    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/leads", "/clientes", "/conversas", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
     const isAllowed = allowedLightPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix));
     if (!isAllowed && pathname !== "") {
       redirect("/dashboard");

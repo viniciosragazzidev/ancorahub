@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -93,10 +92,6 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
       sameSite: "lax",
     });
 
-    revalidatePath("/");
-    revalidatePath("/dashboard");
-    revalidatePath("/minha-fila");
-    revalidatePath("/leads");
 
     return { success: true, mode };
   } catch (error) {

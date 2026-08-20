@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { and, desc, eq, isNull, lt, count, or } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -23,7 +22,6 @@ export async function markNotificationReadAction(formData: FormData) {
       isNull(schema.notifications.readAt),
     ));
 
-  revalidatePath("/notificacoes");
 }
 
 export async function markAllNotificationsReadAction() {
@@ -37,7 +35,6 @@ export async function markAllNotificationsReadAction() {
       isNull(schema.notifications.readAt),
     ));
 
-  revalidatePath("/notificacoes");
 }
 
 export async function loadMoreNotificationsAction(cursor: string | null) {

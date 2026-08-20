@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -70,7 +69,6 @@ export async function updateTenantAiSettingsAction(_prev: { success: boolean; er
       else await tx.insert(schema.aiQualificationConfigs).values({ id: randomUUID(), tenantId: context.tenantId, enabled: false, timeoutMinutes: parsed.data.maxConversationMinutes, maxRetries: 2, createdAt: now, ...values });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "ai_qualification_config", entidadeId: context.tenantId, acao: "ai_settings.updated" });
     });
-    revalidatePath("/settings");
     console.info("[ai-settings] update.success", { tenantId: context.tenantId });
     return { success: true };
   } catch (error) {

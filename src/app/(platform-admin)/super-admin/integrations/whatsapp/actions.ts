@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getMetaCloudServerConfig } from "@/features/communication-channels/meta-cloud-config";
@@ -97,9 +96,6 @@ export async function connectWhatsAppTenantAction(formData: FormData) {
     if (samePhone) await db.update(schema.communicationChannels).set(values).where(eq(schema.communicationChannels.id, channelId));
     else await db.insert(schema.communicationChannels).values({ id: channelId, ...values, createdBy: admin.userId, createdAt: now });
     await db.insert(schema.platformAuditLogs).values({ id: randomUUID(), actorUserId: admin.userId, action: samePhone ? "whatsapp_channel.reconnected" : "whatsapp_channel.connected", targetType: "communication_channel", targetId: channelId, metadata: { tenantId: input.tenantId, wabaId: input.wabaId, phoneNumberId: input.phoneNumberId }, createdAt: now });
-    revalidatePath("/super-admin/integrations/whatsapp");
-    revalidatePath("/integrations/whatsapp");
-    revalidatePath("/conversas");
     return { success: true as const, displayPhoneNumber: values.displayPhoneNumber };
   } catch (error) {
     return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível conectar a empresa." };
@@ -115,7 +111,4 @@ export async function disconnectWhatsAppTenantAction(formData: FormData) {
   if (!channel) throw new Error("Canal oficial não encontrado.");
   await db.update(schema.communicationChannels).set({ status: "inactive", isDefault: false, updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channelId));
   await db.insert(schema.platformAuditLogs).values({ id: randomUUID(), actorUserId: admin.userId, action: "whatsapp_channel.disconnected", targetType: "communication_channel", targetId: channelId, metadata: { tenantId: channel.tenantId }, createdAt: new Date() });
-  revalidatePath("/super-admin/integrations/whatsapp");
-  revalidatePath("/integrations/whatsapp");
-  revalidatePath("/conversas");
 }

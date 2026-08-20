@@ -103,7 +103,7 @@ export function LeadDrawerManagementActions({
       setReassignKey((k) => k + 1);
     }
   }, [reassignState, onSuccess]);
-  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState.success, router]);
+  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState, router]);
 
   useEffect(() => {
     if (assumeState.success) {
@@ -116,7 +116,7 @@ export function LeadDrawerManagementActions({
       setAssumeKey((k) => k + 1);
     }
   }, [assumeState, onSuccess]);
-  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState.success, router]);
+  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState, router]);
 
   useEffect(() => {
     if (routeState.success) {
@@ -129,7 +129,7 @@ export function LeadDrawerManagementActions({
       setRouteKey((k) => k + 1);
     }
   }, [routeState, onSuccess]);
-  useEffect(() => { if (routeState.success) router.refresh(); }, [routeState.success, router]);
+  useEffect(() => { if (routeState.success) router.refresh(); }, [routeState, router]);
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";

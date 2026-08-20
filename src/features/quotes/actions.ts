@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -121,7 +120,6 @@ export async function createQuoteAction(_previous: QuoteActionState, formData: F
       });
     });
 
-    revalidatePath(`/leads/${lead.id}`);
     return { success: true, token };
   } catch (error) {
     console.error("Error creating quote:", error);
@@ -180,7 +178,6 @@ export async function shareQuoteAction(_previous: QuoteActionState, formData: Fo
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "quote", entidadeId: quoteId, acao: "compartilhou" });
     });
 
-    revalidatePath(`/leads/${quote.leadId}`);
     return { success: true };
   } catch (error) {
     console.error("Error sharing quote:", error);
@@ -213,7 +210,6 @@ export async function deleteQuoteAction(_previous: QuoteActionState, formData: F
       await tx.delete(schema.quotes).where(eq(schema.quotes.id, quoteId));
     });
 
-    revalidatePath(`/leads/${quote.leadId}`);
     return { success: true };
   } catch (error) {
     console.error("Error deleting quote:", error);
@@ -254,7 +250,6 @@ export async function createMessageTemplateAction(_previous: MessageTemplateStat
       createdBy: context.userId,
     });
 
-    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     console.error("Error creating template:", error);
@@ -273,7 +268,6 @@ export async function deleteMessageTemplateAction(_previous: MessageTemplateStat
       .delete(schema.messageTemplates)
       .where(and(eq(schema.messageTemplates.id, templateId), eq(schema.messageTemplates.tenantId, context.tenantId)));
 
-    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     console.error("Error deleting template:", error);

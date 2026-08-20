@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -70,8 +69,6 @@ export async function submitLeadFeedbackAction(_previous: LeadFeedbackState, for
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "note", conteudo: `Feedback registrado: ${parsed.data.type}${parsed.data.content ? ` — ${parsed.data.content}` : ""}` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_feedback", entidadeId: lead.id, acao: "feedback.registrado" });
     });
-    revalidatePath(`/leads/${lead.id}`);
-    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível registrar o feedback." };

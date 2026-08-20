@@ -1,7 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { changeLeadStatus, type ChangeLeadStatusInput } from "@/features/leads/change-lead-status";
 import { assignLeadToBroker } from "@/features/lead-distribution/service";
@@ -69,9 +68,7 @@ export async function bulkReassignLeadsAction(
 
     // Revalidate
     for (const id of leadIds) {
-      revalidatePath(`/leads/${id}`);
     }
-    revalidatePath("/leads");
 
     if (errorCount === 0) {
       const base = `${successCount} lead${successCount === 1 ? "" : "s"} reatribuído${successCount === 1 ? "" : "s"} com sucesso.`;
@@ -106,7 +103,6 @@ export async function changeLeadStatusAction(
 
   try {
     await changeLeadStatus(rawInput);
-    revalidatePath(`/leads/${rawInput.leadId}`);
     return { success: true };
   } catch (error) {
     return {
@@ -192,9 +188,7 @@ export async function bulkChangeLeadStatusAction(
     const updatedIds = await bulkChangeLeadStatusDirect(context, leadIds, newStatus, motivoPerda);
 
     for (const id of updatedIds) {
-      revalidatePath(`/leads/${id}`);
     }
-    revalidatePath("/leads");
 
     return {
       success: true,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ const targetTypeSuffixes: Record<string, string> = {
 };
 
 export function GoalForm({ goal, teamMembers, branches, onDone }: GoalFormProps) {
+  const router = useRouter();
   const action = goal ? updateGoalAction : createGoalAction;
   const [state, formAction, pending] = useActionState<GoalActionState, FormData>(action, {});
   const formRef = useRef<HTMLFormElement>(null);
@@ -54,8 +56,9 @@ export function GoalForm({ goal, teamMembers, branches, onDone }: GoalFormProps)
       formRef.current?.reset();
       toast.success(goal ? "Meta atualizada!" : "Meta criada!");
       onDone();
+      router.refresh();
     }
-  }, [state.success, onDone, goal]);
+  }, [state, onDone, goal, router]);
 
   return (
     <form ref={formRef} action={formAction} className="space-y-5">

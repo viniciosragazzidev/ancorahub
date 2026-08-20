@@ -2,7 +2,6 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -53,6 +52,4 @@ export async function updateBrokerAvailabilityAction(status: "available" | "paus
     });
   });
     
-  revalidatePath("/dashboard");
-  revalidatePath("/corretor/resumo");
 }

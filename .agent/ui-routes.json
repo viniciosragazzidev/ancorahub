@@ -1,0 +1,3038 @@
+{
+  "/2fa": {
+    "route": "/2fa",
+    "file": "src/app/(auth)/2fa/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "application",
+    "components": [
+      "ArrowRight",
+      "Key",
+      "Button",
+      "Input",
+      "Label",
+      "Checkbox"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form"
+    ],
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/access-denied": {
+    "route": "/access-denied",
+    "file": "src/app/(auth)/access-denied/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "application",
+    "components": [
+      "Link"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/admin/login": {
+    "route": "/admin/login",
+    "file": "src/app/(auth)/admin/login/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "application",
+    "components": [
+      "LockKey",
+      "Button",
+      "Input",
+      "Label"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/invite/accept": {
+    "route": "/invite/accept",
+    "file": "src/app/(auth)/invite/accept/page.tsx",
+    "type": "FORM_PAGE",
+    "layout": "application",
+    "components": [
+      "Button",
+      "Input",
+      "Label"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "form"
+    ],
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "FORM_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/login": {
+    "route": "/login",
+    "file": "src/app/(auth)/login/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "application",
+    "components": [
+      "Link",
+      "Eye",
+      "EyeSlash",
+      "LockKey",
+      "Button",
+      "Input",
+      "Label",
+      "Checkbox",
+      "LoginTransition"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/recuperar-senha": {
+    "route": "/recuperar-senha",
+    "file": "src/app/(auth)/recuperar-senha/page.tsx",
+    "type": "FORM_PAGE",
+    "layout": "application",
+    "components": [
+      "CheckCircle",
+      "LockKey",
+      "Warning",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Field",
+      "FieldLabel",
+      "Input"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "FORM_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/verify": {
+    "route": "/verify",
+    "file": "src/app/(auth)/verify/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "application",
+    "components": [],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/agentes-ia": {
+    "route": "/agentes-ia",
+    "file": "src/app/(dashboard)/agentes-ia/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "AiAgentWizardClient"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/assinatura": {
+    "route": "/assinatura",
+    "file": "src/app/(dashboard)/assinatura/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CreditCard",
+      "Users",
+      "Buildings",
+      "Handshake",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/assistente": {
+    "route": "/assistente",
+    "file": "src/app/(dashboard)/assistente/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "AuthenticationError",
+      "AuthorizationError",
+      "AssistenteChatClient"
+    ],
+    "patterns": [],
+    "states": [
+      "error"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/automacoes": {
+    "route": "/automacoes",
+    "file": "src/app/(dashboard)/automacoes/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "AutomationsClient",
+      "DashboardHeader",
+      "WorkflowAutomationStudio"
+    ],
+    "patterns": [],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/catalogo/interno": {
+    "route": "/catalogo/interno",
+    "file": "src/app/(dashboard)/catalogo/interno/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Input",
+      "AppSelect",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "CatalogActionForm",
+      "CatalogStatusBadge"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/catalogo": {
+    "route": "/catalogo",
+    "file": "src/app/(dashboard)/catalogo/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/checklist": {
+    "route": "/checklist",
+    "file": "src/app/(dashboard)/checklist/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "ChecklistClient",
+      "CheckCircle"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/clientes": {
+    "route": "/clientes",
+    "file": "src/app/(dashboard)/clientes/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "PeriodSelect",
+      "BranchSelect",
+      "ClientesList",
+      "LightClientsList"
+    ],
+    "patterns": [
+      "filter-toolbar"
+    ],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/clientes/[clientId]": {
+    "route": "/clientes/[clientId]",
+    "file": "src/app/(dashboard)/clientes/[clientId]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "Badge",
+      "Button",
+      "UserAvatar",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Tabs",
+      "TabsContent",
+      "TabsList",
+      "TabsTrigger",
+      "LeadTimeline",
+      "Phone",
+      "Clock",
+      "Buildings",
+      "CalendarCheck",
+      "ShieldCheck",
+      "FileText",
+      "CurrencyCircleDollar",
+      "ArrowRight",
+      "LeadDocumentsSection",
+      "CustomerRenewalStatus",
+      "PersonRecordDetails"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "success",
+      "permission",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/configuracoes/comissoes": {
+    "route": "/configuracoes/comissoes",
+    "file": "src/app/(dashboard)/configuracoes/comissoes/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CommissionRulesManager",
+      "PostSaleSettings"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/conversas": {
+    "route": "/conversas",
+    "file": "src/app/(dashboard)/conversas/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "Badge",
+      "Button",
+      "ConversationsWorkspace",
+      "OfficialBrokerConversations",
+      "META_CLOUD_PROVIDER",
+      "BulkQualificationDialog"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ],
+    "states": [
+      "error",
+      "permission",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/corretor/resumo": {
+    "route": "/corretor/resumo",
+    "file": "src/app/(dashboard)/corretor/resumo/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/cotacao": {
+    "route": "/cotacao",
+    "file": "src/app/(dashboard)/cotacao/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CotadorViewerClient"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/cotacao/[token]": {
+    "route": "/cotacao/[token]",
+    "file": "src/app/(dashboard)/cotacao/[token]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Metadata",
+      "Badge"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/dashboard": {
+    "route": "/dashboard",
+    "file": "src/app/(dashboard)/dashboard/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "NocDashboardContent",
+      "MarketingDashboardContent",
+      "BrokerWorkspace",
+      "LightDashboard"
+    ],
+    "patterns": [],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/diretor/resume": {
+    "route": "/diretor/resume",
+    "file": "src/app/(dashboard)/diretor/resume/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/documentos": {
+    "route": "/documentos",
+    "file": "src/app/(dashboard)/documentos/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "DocumentsWorkspace"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/empresas": {
+    "route": "/empresas",
+    "file": "src/app/(dashboard)/empresas/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "Buildings",
+      "Plus",
+      "Users",
+      "DashboardHeader",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "patterns": [
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "permission"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/equipe/cargos": {
+    "route": "/equipe/cargos",
+    "file": "src/app/(dashboard)/equipe/cargos/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CustomRolesWorkspace"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/equipe/convidar": {
+    "route": "/equipe/convidar",
+    "file": "src/app/(dashboard)/equipe/convidar/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "TeamInviteSection",
+      "DashboardHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "patterns": [
+      "page-header",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/equipe": {
+    "route": "/equipe",
+    "file": "src/app/(dashboard)/equipe/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "ShieldCheck",
+      "StatCard",
+      "Link",
+      "Button",
+      "TeamInviteSection",
+      "TeamMembersTable"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "disabled",
+      "error",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/equipe/recuperacoes": {
+    "route": "/equipe/recuperacoes",
+    "file": "src/app/(dashboard)/equipe/recuperacoes/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "StatCard",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "RecoveryRequestsTable"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/equipe/[id]": {
+    "route": "/equipe/[id]",
+    "file": "src/app/(dashboard)/equipe/[id]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "ArrowLeft",
+      "ChartBar",
+      "CheckCircle",
+      "Clock",
+      "FileText",
+      "Target",
+      "UserList",
+      "UserSwitch",
+      "XCircle",
+      "LeadStatusBadge",
+      "MemberStatusBadge",
+      "RoleBadge",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "UserAvatar"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/ferramentas-vendas/tabelas-personalizadas": {
+    "route": "/ferramentas-vendas/tabelas-personalizadas",
+    "file": "src/app/(dashboard)/ferramentas-vendas/tabelas-personalizadas/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CustomTableBuilder"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/filiais": {
+    "route": "/filiais",
+    "file": "src/app/(dashboard)/filiais/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "BranchesManager"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/financeiro/comissoes": {
+    "route": "/financeiro/comissoes",
+    "file": "src/app/(dashboard)/financeiro/comissoes/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CommissionDetails"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/financeiro": {
+    "route": "/financeiro",
+    "file": "src/app/(dashboard)/financeiro/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "ViewScopeContext",
+      "PeriodSelect",
+      "FinancialDashboard"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/fluxos-whatsapp": {
+    "route": "/fluxos-whatsapp",
+    "file": "src/app/(dashboard)/fluxos-whatsapp/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "WhatsappFlowsClient"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/gestor": {
+    "route": "/gestor",
+    "file": "src/app/(dashboard)/gestor/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "NocDashboardContent"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/guia": {
+    "route": "/guia",
+    "file": "src/app/(dashboard)/guia/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "SystemGuide",
+      "RelatedActions"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/guia/webhook": {
+    "route": "/guia/webhook",
+    "file": "src/app/(dashboard)/guia/webhook/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "WebhookTutorial"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/integrations/meta": {
+    "route": "/integrations/meta",
+    "file": "src/app/(dashboard)/integrations/meta/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "MetaIntegrationHub"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ],
+    "states": [
+      "error"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/integrations": {
+    "route": "/integrations",
+    "file": "src/app/(dashboard)/integrations/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "IntegrationsCatalog"
+    ],
+    "patterns": [],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/integrations/whatsapp": {
+    "route": "/integrations/whatsapp",
+    "file": "src/app/(dashboard)/integrations/whatsapp/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "WahaConnectionsCard",
+      "WhatsAppPage"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "error"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/integridade": {
+    "route": "/integridade",
+    "file": "src/app/(dashboard)/integridade/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "ArrowUpRight",
+      "FileText",
+      "SealCheck",
+      "ShieldWarning",
+      "Warning",
+      "XCircle",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "ScrollArea",
+      "Sparkline"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/inteligencia/agentes": {
+    "route": "/inteligencia/agentes",
+    "file": "src/app/(dashboard)/inteligencia/agentes/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "Link",
+      "ArrowLeft",
+      "Bot",
+      "Plus",
+      "Sparkles",
+      "CheckCircle2",
+      "Card",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "CardContent",
+      "Button",
+      "Badge",
+      "Input",
+      "Textarea"
+    ],
+    "patterns": [
+      "page-header",
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/inteligencia/corretora": {
+    "route": "/inteligencia/corretora",
+    "file": "src/app/(dashboard)/inteligencia/corretora/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "Link",
+      "ArrowLeft",
+      "Building",
+      "Save",
+      "Sparkles",
+      "CheckCircle2",
+      "Card",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "CardContent",
+      "CardFooter",
+      "Input",
+      "Textarea",
+      "Button",
+      "Badge"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/inteligencia/materiais": {
+    "route": "/inteligencia/materiais",
+    "file": "src/app/(dashboard)/inteligencia/materiais/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "Link",
+      "ArrowLeft",
+      "FileText",
+      "Upload",
+      "Sparkles",
+      "CheckCircle2",
+      "Card",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "CardContent",
+      "Button",
+      "Badge",
+      "Textarea",
+      "Input"
+    ],
+    "patterns": [
+      "page-header",
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/inteligencia": {
+    "route": "/inteligencia",
+    "file": "src/app/(dashboard)/inteligencia/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "Link",
+      "Sparkles",
+      "Building",
+      "MapPin",
+      "BookOpen",
+      "FileText",
+      "Bot",
+      "Brain",
+      "ShieldAlert",
+      "History",
+      "Play",
+      "CheckCircle2",
+      "AlertTriangle",
+      "ArrowRight",
+      "Badge",
+      "Card",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "CardContent",
+      "Button"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/inteligencia/playground": {
+    "route": "/inteligencia/playground",
+    "file": "src/app/(dashboard)/inteligencia/playground/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "Link",
+      "ArrowLeft",
+      "Play",
+      "Sparkles",
+      "BookOpen",
+      "Wrench",
+      "Shield",
+      "Clock",
+      "Card",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "CardContent",
+      "Button",
+      "Badge",
+      "Textarea"
+    ],
+    "patterns": [
+      "page-header",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/inteligencia/sugestoes": {
+    "route": "/inteligencia/sugestoes",
+    "file": "src/app/(dashboard)/inteligencia/sugestoes/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "Link",
+      "ArrowLeft",
+      "Sparkles",
+      "Check",
+      "X",
+      "Building",
+      "AlertTriangle",
+      "Card",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "CardContent",
+      "CardFooter",
+      "Button",
+      "Badge"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "loading",
+      "empty"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/internal/design-system/motion": {
+    "route": "/internal/design-system/motion",
+    "file": "src/app/(dashboard)/internal/design-system/motion/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "React",
+      "AnimatePresence",
+      "Sparkles",
+      "CheckCircle2",
+      "RefreshCw",
+      "Layers",
+      "Sliders",
+      "Play",
+      "Info",
+      "Check",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardHeader",
+      "CardTitle",
+      "CardDescription",
+      "Badge"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "loading",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/internal/design-system": {
+    "route": "/internal/design-system",
+    "file": "src/app/(dashboard)/internal/design-system/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Button",
+      "AppSelect",
+      "AppCombobox",
+      "Input",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Badge",
+      "Tabs",
+      "TabsContent",
+      "TabsList",
+      "TabsTrigger",
+      "Sparkle",
+      "CheckCircle",
+      "Warning",
+      "XCircle",
+      "UserList",
+      "Buildings"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/leads/distribuicao": {
+    "route": "/leads/distribuicao",
+    "file": "src/app/(dashboard)/leads/distribuicao/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "DistributionMetrics",
+      "DistributionPanel",
+      "DistributionInbox",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Badge",
+      "Tabs",
+      "TabsContent",
+      "TabsList",
+      "TabsTrigger",
+      "QueueControlCenter",
+      "DistributionTabsContainer",
+      "DistributionPolicyPanel"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/leads/distribuicao/plantao": {
+    "route": "/leads/distribuicao/plantao",
+    "file": "src/app/(dashboard)/leads/distribuicao/plantao/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "DutyOperationsWorkspace"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/leads": {
+    "route": "/leads",
+    "file": "src/app/(dashboard)/leads/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "ManualLeadSheet",
+      "BulkLeadImportDialog",
+      "LeadsLiveSync",
+      "LeadsFilters",
+      "LeadsPagination",
+      "LeadsWorkspace",
+      "LeadsHeaderActions",
+      "WifiHigh",
+      "Plus",
+      "Target",
+      "Button",
+      "DashboardHeader",
+      "NextUrgentLeadButton",
+      "ContextNote",
+      "LightLeadsList"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "permission",
+      "disabled",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/leads/[id]/feedback": {
+    "route": "/leads/[id]/feedback",
+    "file": "src/app/(dashboard)/leads/[id]/feedback/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "LightFeedbackView"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/leads/[id]": {
+    "route": "/leads/[id]",
+    "file": "src/app/(dashboard)/leads/[id]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Badge",
+      "Button",
+      "UserAvatar",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Tabs",
+      "TabsContent",
+      "TabsList",
+      "TabsTrigger",
+      "LeadStatusSelector",
+      "LeadTimeline",
+      "LeadTasks",
+      "LeadChat",
+      "LEAD_STATUS_LABELS",
+      "LEAD_STATUS_ORDER",
+      "StartServiceButton",
+      "SupervisionPanel",
+      "DeleteLeadControl",
+      "LightLeadDetail",
+      "StartQualificationButton",
+      "LeadDocumentsSection",
+      "LeadActionHub",
+      "BeneficiariesSection",
+      "Link",
+      "Phone",
+      "Clock"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "permission",
+      "disabled",
+      "error",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/marketing/campanhas": {
+    "route": "/marketing/campanhas",
+    "file": "src/app/(dashboard)/marketing/campanhas/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CampaignsDashboardView",
+      "RelatedActions"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/marketing/campanhas/[id]": {
+    "route": "/marketing/campanhas/[id]",
+    "file": "src/app/(dashboard)/marketing/campanhas/[id]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "CampaignDetailView"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/marketing/importacoes": {
+    "route": "/marketing/importacoes",
+    "file": "src/app/(dashboard)/marketing/importacoes/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "MarketingImportClient"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "permission"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/marketing/meta": {
+    "route": "/marketing/meta",
+    "file": "src/app/(dashboard)/marketing/meta/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/marketing": {
+    "route": "/marketing",
+    "file": "src/app/(dashboard)/marketing/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/materiais-divulgacao/gerenciar": {
+    "route": "/materiais-divulgacao/gerenciar",
+    "file": "src/app/(dashboard)/materiais-divulgacao/gerenciar/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "MaterialsManager"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "permission"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/materiais-divulgacao": {
+    "route": "/materiais-divulgacao",
+    "file": "src/app/(dashboard)/materiais-divulgacao/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "Button",
+      "MaterialsPublicPage"
+    ],
+    "patterns": [],
+    "states": [
+      "permission"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/metas/desempenho": {
+    "route": "/metas/desempenho",
+    "file": "src/app/(dashboard)/metas/desempenho/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "DirectorPerformanceManager"
+    ],
+    "patterns": [
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/metas": {
+    "route": "/metas",
+    "file": "src/app/(dashboard)/metas/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Target",
+      "ViewScopeContext",
+      "PeriodSelect",
+      "Button",
+      "GoalsManager",
+      "Link"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "permission",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/minha-fila": {
+    "route": "/minha-fila",
+    "file": "src/app/(dashboard)/minha-fila/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "BrokerQueueClient",
+      "BrokerAvailabilityButton",
+      "Sparkline",
+      "ChatCircleText",
+      "ClipboardText",
+      "ListChecks",
+      "Target",
+      "Users",
+      "Warning",
+      "XCircle",
+      "ChartLineUp",
+      "ArrowRight",
+      "Button",
+      "Link",
+      "LightLeadsList"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/minha-meta": {
+    "route": "/minha-meta",
+    "file": "src/app/(dashboard)/minha-meta/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "BrokerGoalView"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/noc": {
+    "route": "/noc",
+    "file": "src/app/(dashboard)/noc/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "NextUrgentLeadButton",
+      "PeriodSelect",
+      "NocClient",
+      "NocHeaderSlot"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/notificacoes": {
+    "route": "/notificacoes",
+    "file": "src/app/(dashboard)/notificacoes/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "NotificationsClient"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/propostas": {
+    "route": "/propostas",
+    "file": "src/app/(dashboard)/propostas/page.tsx",
+    "type": "LIST_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Metadata",
+      "PropostasClient"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "LIST_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/qualificacao": {
+    "route": "/qualificacao",
+    "file": "src/app/(dashboard)/qualificacao/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "AuthorizationError",
+      "QualificationHubClient"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ],
+    "states": [
+      "error",
+      "permission",
+      "loading"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/relatorios": {
+    "route": "/relatorios",
+    "file": "src/app/(dashboard)/relatorios/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "PeriodSelect",
+      "ViewScopeContext",
+      "ArrowUpRight",
+      "ChartBar",
+      "CurrencyCircleDollar",
+      "Target",
+      "TrendUp",
+      "Users",
+      "Card",
+      "StatCard",
+      "ReportCenter",
+      "SpreadsheetSection",
+      "InternalReportDocuments",
+      "ReportTrendCharts"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "success",
+      "permission",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/roadmap": {
+    "route": "/roadmap",
+    "file": "src/app/(dashboard)/roadmap/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "CalendarBlank",
+      "CheckCircle",
+      "Circle",
+      "Clock",
+      "Flag",
+      "WarningCircle",
+      "DashboardHeader",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "AppSelect",
+      "Tabs",
+      "TabsContent",
+      "TabsList",
+      "TabsTrigger"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/settings/extension": {
+    "route": "/settings/extension",
+    "file": "src/app/(dashboard)/settings/extension/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Button",
+      "ExtensionConnectCard"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/settings/feedback-templates": {
+    "route": "/settings/feedback-templates",
+    "file": "src/app/(dashboard)/settings/feedback-templates/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "FeedbackTemplatesClient"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "error"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/settings/integrations": {
+    "route": "/settings/integrations",
+    "file": "src/app/(dashboard)/settings/integrations/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/settings/meta": {
+    "route": "/settings/meta",
+    "file": "src/app/(dashboard)/settings/meta/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/settings": {
+    "route": "/settings",
+    "file": "src/app/(dashboard)/settings/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "WhatsappLogo",
+      "MinhaContaTab",
+      "EmpresaTab",
+      "IntegrationsTab",
+      "SecurityTab",
+      "SettingsTabs",
+      "UnitTab",
+      "FeedbackTab",
+      "ExtensionTab",
+      "RelatedActions"
+    ],
+    "patterns": [
+      "card-grid"
+    ],
+    "states": [
+      "permission",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/settings/whatsapp": {
+    "route": "/settings/whatsapp",
+    "file": "src/app/(dashboard)/settings/whatsapp/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/tarefas": {
+    "route": "/tarefas",
+    "file": "src/app/(dashboard)/tarefas/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "Button",
+      "ContextNote",
+      "Card",
+      "CardContent",
+      "TasksWorkspace"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/unidades/[branchId]": {
+    "route": "/unidades/[branchId]",
+    "file": "src/app/(dashboard)/unidades/[branchId]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "Card",
+      "CardContent",
+      "CardHeader",
+      "CardTitle",
+      "PeriodSelect",
+      "UnitProfileHeader",
+      "UnitMetricsCards",
+      "UnitMembersTable",
+      "UnitTopBrokers"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "error",
+      "loading"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/vendas": {
+    "route": "/vendas",
+    "file": "src/app/(dashboard)/vendas/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "DashboardHeader",
+      "PeriodSelect",
+      "BranchSelect",
+      "SalesWorkspace",
+      "RelatedActions"
+    ],
+    "patterns": [
+      "filter-toolbar"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/vendas/[id]": {
+    "route": "/vendas/[id]",
+    "file": "src/app/(dashboard)/vendas/[id]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "Link",
+      "DashboardHeader",
+      "Badge",
+      "Button",
+      "Avatar",
+      "AvatarFallback",
+      "UserAvatar",
+      "ArrowLeft",
+      "Clock",
+      "FileText",
+      "UserList",
+      "SaleDetailsTabs",
+      "SaleStatsCards"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/welcome": {
+    "route": "/welcome",
+    "file": "src/app/(dashboard)/welcome/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "main-dashboard",
+    "components": [
+      "WelcomeScreen"
+    ],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/audit": {
+    "route": "/super-admin/audit",
+    "file": "src/app/(platform-admin)/super-admin/audit/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "ColumnDef",
+      "PlatformAdminHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Button",
+      "Input",
+      "Label",
+      "MagnifyingGlass",
+      "Trash",
+      "DataTable",
+      "DataTableColumnHeader"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/catalogo": {
+    "route": "/super-admin/catalogo",
+    "file": "src/app/(platform-admin)/super-admin/catalogo/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Image",
+      "PlatformAdminHeader",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Input",
+      "CatalogActionForm",
+      "CatalogStatusBadge"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/integrations/whatsapp": {
+    "route": "/super-admin/integrations/whatsapp",
+    "file": "src/app/(platform-admin)/super-admin/integrations/whatsapp/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "WhatsAppAdminPanel"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/materiais-divulgacao": {
+    "route": "/super-admin/materiais-divulgacao",
+    "file": "src/app/(platform-admin)/super-admin/materiais-divulgacao/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/onboarding": {
+    "route": "/super-admin/onboarding",
+    "file": "src/app/(platform-admin)/super-admin/onboarding/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Input",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow"
+    ],
+    "patterns": [
+      "data-table",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/overview": {
+    "route": "/super-admin/overview",
+    "file": "src/app/(platform-admin)/super-admin/overview/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Buildings",
+      "SealCheck",
+      "Users",
+      "Warning",
+      "XCircle",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin": {
+    "route": "/super-admin",
+    "file": "src/app/(platform-admin)/super-admin/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Link",
+      "PlatformAdminHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Button",
+      "Input",
+      "AppSelect",
+      "Badge",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "Clock",
+      "ShieldWarning",
+      "FileText",
+      "MagnifyingGlass",
+      "Gear",
+      "Buildings",
+      "ArrowRight",
+      "ShieldStar"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/sessions": {
+    "route": "/super-admin/sessions",
+    "file": "src/app/(platform-admin)/super-admin/sessions/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "PlatformAdminHeader"
+    ],
+    "patterns": [
+      "data-table",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/settings": {
+    "route": "/super-admin/settings",
+    "file": "src/app/(platform-admin)/super-admin/settings/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Suspense",
+      "Link",
+      "CLEAN_UI_FEATURE",
+      "META_LEAD_ADS_PLATFORM_SETTINGS",
+      "SYSTEM_REPORT_DESTINATION_KEY",
+      "SYSTEM_REPORT_ENABLED_KEY",
+      "PlatformAdminHeader",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Badge",
+      "Input",
+      "AppSelect",
+      "SuperAdminSettingsTabs"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/tenants": {
+    "route": "/super-admin/tenants",
+    "file": "src/app/(platform-admin)/super-admin/tenants/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Link",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Input",
+      "Label",
+      "AppSelect",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "PlatformAdminHeader",
+      "CreateTenantForm"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/tenants/[tenantId]": {
+    "route": "/super-admin/tenants/[tenantId]",
+    "file": "src/app/(platform-admin)/super-admin/tenants/[tenantId]/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Link",
+      "CreateTenantAccessForm",
+      "ResetTenantDataCard",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "PlatformAdminHeader",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "ArrowRight",
+      "CLEAN_UI_FEATURE"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-admin/whatsapp-review": {
+    "route": "/super-admin/whatsapp-review",
+    "file": "src/app/(platform-admin)/super-admin/whatsapp-review/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "ReviewMessageForm"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev/audit": {
+    "route": "/super-dev/audit",
+    "file": "src/app/(platform-admin)/super-dev/audit/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "Button",
+      "Input",
+      "Label",
+      "Badge",
+      "Clock",
+      "ShieldWarning",
+      "FileText",
+      "MagnifyingGlass",
+      "Trash",
+      "Plus"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev/integridade": {
+    "route": "/super-dev/integridade",
+    "file": "src/app/(platform-admin)/super-dev/integridade/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "ScrollArea"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "offline"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev": {
+    "route": "/super-dev",
+    "file": "src/app/(platform-admin)/super-dev/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Badge",
+      "PlatformAdminHeader",
+      "Buildings",
+      "ShieldStar",
+      "WarningCircle",
+      "Clock",
+      "ChartLineUp",
+      "Link"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev/sessions": {
+    "route": "/super-dev/sessions",
+    "file": "src/app/(platform-admin)/super-dev/sessions/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "PlatformAdminHeader",
+      "ShieldWarning"
+    ],
+    "patterns": [
+      "data-table",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "empty"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev/settings": {
+    "route": "/super-dev/settings",
+    "file": "src/app/(platform-admin)/super-dev/settings/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "PlatformAdminHeader",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Badge"
+    ],
+    "patterns": [
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev/tenants": {
+    "route": "/super-dev/tenants",
+    "file": "src/app/(platform-admin)/super-dev/tenants/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Link",
+      "Badge",
+      "Button",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "Input",
+      "Label",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "PlatformAdminHeader",
+      "CreateTenantForm",
+      "ArrowRight"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/super-dev/tenants/[tenantId]": {
+    "route": "/super-dev/tenants/[tenantId]",
+    "file": "src/app/(platform-admin)/super-dev/tenants/[tenantId]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "platform-admin",
+    "components": [
+      "Link",
+      "CreateTenantAccessForm",
+      "Badge",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle",
+      "PlatformAdminHeader",
+      "Table",
+      "TableBody",
+      "TableCell",
+      "TableHead",
+      "TableHeader",
+      "TableRow",
+      "ArrowRight"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "success"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/compartilhado/[token]": {
+    "route": "/compartilhado/[token]",
+    "file": "src/app/compartilhado/[token]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "application",
+    "components": [
+      "ArrowsDownUp",
+      "ChevronDownIcon",
+      "ChevronUpIcon",
+      "Eye",
+      "EyeSlash",
+      "MagnifyingGlass",
+      "ShieldCheck",
+      "Button",
+      "Input",
+      "Label",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ],
+    "states": [
+      "loading",
+      "error",
+      "disabled"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/l/[id]/feedback": {
+    "route": "/l/[id]/feedback",
+    "file": "src/app/l/[id]/feedback/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "application",
+    "components": [
+      "LightFeedbackView"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/l/[id]": {
+    "route": "/l/[id]",
+    "file": "src/app/l/[id]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "application",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/onboarding": {
+    "route": "/onboarding",
+    "file": "src/app/onboarding/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "application",
+    "components": [
+      "OnboardingWizard"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [
+      "error"
+    ],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/onboarding/[token]": {
+    "route": "/onboarding/[token]",
+    "file": "src/app/onboarding/[token]/page.tsx",
+    "type": "DETAIL_PAGE",
+    "layout": "application",
+    "components": [],
+    "patterns": [],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": false,
+    "status": "AUDITED",
+    "expectedPattern": "DETAIL_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/": {
+    "route": "/",
+    "file": "src/app/page.tsx",
+    "type": "SETTINGS_PAGE",
+    "layout": "application",
+    "components": [
+      "AncoraLogo",
+      "Link",
+      "ArrowRight",
+      "Buildings",
+      "ChartLineUp",
+      "Handshake",
+      "Phone",
+      "RocketLaunch",
+      "ShieldCheck",
+      "Target",
+      "Users",
+      "UsersThree",
+      "WhatsappLogo",
+      "Button",
+      "Badge"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "card-grid"
+    ],
+    "states": [
+      "success",
+      "loading",
+      "error",
+      "not-found"
+    ],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "SETTINGS_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/primeiro-acesso": {
+    "route": "/primeiro-acesso",
+    "file": "src/app/primeiro-acesso/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "application",
+    "components": [
+      "OnboardingWizard"
+    ],
+    "patterns": [
+      "page-header"
+    ],
+    "states": [],
+    "responsiveBehavior": "NOT_EVIDENT_IN_PAGE_FILE",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  },
+  "/termos": {
+    "route": "/termos",
+    "file": "src/app/termos/page.tsx",
+    "type": "DASHBOARD_PAGE",
+    "layout": "application",
+    "components": [
+      "Metadata",
+      "Link",
+      "AncoraLogo",
+      "Card",
+      "CardContent",
+      "CardDescription",
+      "CardHeader",
+      "CardTitle"
+    ],
+    "patterns": [
+      "page-header",
+      "card-grid"
+    ],
+    "states": [],
+    "responsiveBehavior": "STATIC_EVIDENCE_PRESENT",
+    "legacyUsage": true,
+    "status": "AUDITED",
+    "expectedPattern": "DASHBOARD_PAGE",
+    "compliance": "PARTIAL_MATCH"
+  }
+}

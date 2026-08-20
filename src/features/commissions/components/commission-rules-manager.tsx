@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   Calculator,
@@ -33,10 +34,14 @@ type CommissionRuleFormProps = {
 };
 
 function ActionFeedback({ state }: { state: CommissionActionState }) {
+  const router = useRouter();
   useEffect(() => {
-    if (state.success) toast.success("Regra de comissão salva.");
+    if (state.success) {
+      toast.success("Regra de comissão salva.");
+      router.refresh();
+    }
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+  }, [state, router]);
   return null;
 }
 
@@ -73,7 +78,7 @@ function CommissionRuleForm({ rule, carriers, onDone }: CommissionRuleFormProps)
       formRef.current?.reset();
       onDone();
     }
-  }, [state.success, onDone]);
+  }, [state, onDone]);
 
   // When switching to "unica", collapse to a single month
   function handleTypeChange(newType: "unica" | "escalonada") {

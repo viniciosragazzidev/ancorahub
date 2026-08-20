@@ -35,7 +35,7 @@ export function WhatsAppAdminPanel({ tenants, connections }: { tenants: Tenant[]
       const result = await connectWhatsAppTenantAction(formData);
       if (!result.success) { toast.error(result.error); return; }
       toast.success("Empresa conectada ao WhatsApp oficial", { description: result.displayPhoneNumber ?? undefined });
-      window.location.reload();
+      router.refresh();
     });
   }
 

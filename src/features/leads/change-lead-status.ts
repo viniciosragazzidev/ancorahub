@@ -10,6 +10,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
 import type { TenantContext } from "@/shared/auth/types";
 import {
   LEAD_STATUS_LABELS,
@@ -225,6 +226,29 @@ export async function changeLeadStatus(
   });
 
   // ─── Notificações fora da transação (push pode falhar sem efeito colateral) ───
+
+  // Sinal opaco de invalidação de domínio (DEC-081/DEC-077): diretores e gestores
+  // elegíveis, o corretor responsável e o autor veem listas e detalhes atualizados
+  // sem F5. Best-effort; a mutação já está persistida.
+  {
+    const watcherScope = lead.branchId
+      ? or(eq(schema.tenantMemberships.role, "director"), and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, lead.branchId)))
+      : eq(schema.tenantMemberships.role, "director");
+    const watchers = await db
+      .select({ userId: schema.tenantMemberships.userId })
+      .from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, lead.tenantId), eq(schema.tenantMemberships.status, "active"), watcherScope))
+      .groupBy(schema.tenantMemberships.userId)
+      .limit(20);
+    const targets = watchers
+      .map((watcher) => watcher.userId)
+      .filter((userId) => userId !== context.userId);
+    if (lead.corretorId && lead.corretorId !== context.userId) targets.push(lead.corretorId);
+    void publishDomainInvalidation(
+      targets.map((userId) => ({ tenantId: lead.tenantId, userId })),
+      "leads",
+    ).catch(() => { /* non-blocking */ });
+  }
 
   if (newStatus === "lost") {
     const scope = lead.branchId

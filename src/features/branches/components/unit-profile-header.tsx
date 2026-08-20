@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Buildings, SlidersHorizontal, WifiHigh } from "@/components/huge-icons";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -24,10 +25,14 @@ type UnitProfileHeaderProps = {
 };
 
 function ActionFeedback({ state }: { state: BranchActionState }) {
+  const router = useRouter();
   useEffect(() => {
-    if (state.success) toast.success("Configuração atualizada.");
+    if (state.success) {
+      toast.success("Configuração atualizada.");
+      router.refresh();
+    }
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+  }, [state, router]);
   return null;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -90,6 +91,7 @@ export function DocumentsWorkspace({
   const [activeTab, setActiveTab] = useState<"queue" | "config">(
     role === "director" ? "queue" : "queue"
   );
+  const router = useRouter();
   const [requirements, setRequirements] = useState(initialRequirements);
   const [pendingDocs, setPendingDocs] = useState(initialPendingDocs);
 
@@ -105,11 +107,12 @@ export function DocumentsWorkspace({
       toast.success("Requisito criado com sucesso!");
       reqFormRef.current?.reset();
       setReqKey((k) => k + 1);
+      router.refresh();
     }
     if (reqState.error) {
       toast.error(reqState.error);
     }
-  }, [reqState]);
+  }, [reqState, router]);
 
   useEffect(() => {
     setRequirements(initialRequirements);

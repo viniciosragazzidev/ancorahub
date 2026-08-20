@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
@@ -112,7 +111,6 @@ export async function forceCompleteQualificationAction(input: {
       void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id }).catch(console.error);
     }
 
-    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     return {
@@ -158,7 +156,6 @@ export async function updateLeadTargetQueueAction(input: {
       acao: "qualification.target_queue_updated",
     });
 
-    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     return {
@@ -222,9 +219,6 @@ export async function startManualQualificationAction(input: { leadId: string }) 
       acao: "qualification.manually_started",
     }).catch(() => undefined);
 
-    revalidatePath("/leads");
-    revalidatePath(`/leads/${lead.id}`);
-    revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
     return {
@@ -379,9 +373,6 @@ export async function manuallyChangeQualificationStageAction(input: {
       }
     }
 
-    revalidatePath("/leads");
-    revalidatePath(`/leads/${lead.id}`);
-    revalidatePath("/conversas");
     return { success: true };
   } catch (error) {
     return {

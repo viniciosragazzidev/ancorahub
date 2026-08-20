@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "enforcement": "REQUIRED_FOR_NEW_OR_REFACTORED_PAGES",
+  "baseline": "Existing routes are classified for documentation only; no page migration is implied.",
+  "patterns": {
+    "LIST_PAGE": { "uses": ["/leads", "/clientes", "/equipe", "/vendas", "/tarefas"] },
+    "DETAIL_PAGE": { "uses": ["/leads/[id]", "/clientes/[clientId]", "/equipe/[id]"] },
+    "SETTINGS_PAGE": { "uses": ["/qualificacao", "/settings", "/leads/distribuicao"] },
+    "DASHBOARD_PAGE": { "uses": ["/dashboard", "/diretor/resume", "/gestor"] },
+    "CHAT_PAGE": { "uses": ["/conversas"] }
+  }
+}

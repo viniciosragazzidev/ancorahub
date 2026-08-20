@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -104,9 +103,6 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
     // Attempt automatic redistribution in background
     void processQueuedLead(context, lead.id).catch(() => { /* Non-blocking */ });
 
-    revalidatePath(`/leads/${lead.id}`);
-    revalidatePath("/leads");
-    revalidatePath("/minha-fila");
 
     return { success: true };
   } catch (error) {

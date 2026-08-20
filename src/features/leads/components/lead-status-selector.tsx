@@ -97,7 +97,7 @@ export function LeadStatusSelector({
       setFeedbackAfterStatus(false);
       toast.error(state.error);
     }
-  }, [state.success, state.error, router]);
+  }, [state, router]);
 
   const submitChange = (status: string, motivo?: string) => {
     const formData = new FormData();
@@ -105,8 +105,10 @@ export function LeadStatusSelector({
     formData.set("newStatus", status);
     if (motivo) formData.set("motivoPerda", motivo);
     setFeedbackAfterStatus(role === "broker" && status !== "lost");
-    addOptimisticStatus(status);
-    startTransition(() => dispatch(formData));
+    startTransition(() => {
+      addOptimisticStatus(status);
+      dispatch(formData);
+    });
   };
 
   const handleStatusSelect: (value: string | null | undefined) => void = (value) => {

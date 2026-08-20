@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   MagnifyingGlass,
@@ -61,10 +62,14 @@ const scopeLabels: Record<string, string> = {
 };
 
 function ActionFeedback({ state }: { state: GoalActionState }) {
+  const router = useRouter();
   useEffect(() => {
-    if (state.success) toast.success(state.success);
+    if (state.success) {
+      toast.success(state.success);
+      router.refresh();
+    }
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+  }, [state, router]);
   return null;
 }
 

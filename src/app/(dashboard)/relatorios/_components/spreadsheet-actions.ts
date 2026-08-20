@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID, createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 
@@ -159,7 +158,6 @@ export async function importSpreadsheetAction(
       updatedAt: now,
     });
 
-    revalidatePath("/relatorios");
 
     return {
       success: true,
@@ -288,7 +286,6 @@ export async function deleteSpreadsheetAction(
         ),
       );
 
-    revalidatePath("/relatorios");
     return { success: true };
   } catch (error) {
     return {
@@ -320,7 +317,6 @@ export async function renameSpreadsheetAction(
         ),
       );
 
-    revalidatePath("/relatorios");
     return { success: true };
   } catch (error) {
     return {
@@ -359,7 +355,6 @@ export async function generatePublicLinkAction(
         ),
       );
 
-    revalidatePath("/relatorios");
     return { success: true, publicToken };
   } catch (error) {
     return {
@@ -391,7 +386,6 @@ export async function revokePublicLinkAction(
         ),
       );
 
-    revalidatePath("/relatorios");
     return { success: true };
   } catch (error) {
     return {

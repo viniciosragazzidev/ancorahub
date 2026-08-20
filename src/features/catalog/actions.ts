@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
@@ -56,7 +55,6 @@ export async function seedCarriersAction(): Promise<CatalogActionState> {
       await db.insert(schema.carriers).values(toInsert);
     }
 
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -144,7 +142,6 @@ export async function updateCarrierAction(
       .returning({ id: schema.carriers.id });
 
     if (result.length === 0) return { error: "Operadora não encontrada." };
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -174,7 +171,6 @@ export async function toggleCarrierAction(
       .set({ status: carrier.status === "active" ? "inactive" : "active" })
       .where(eq(schema.carriers.id, carrier.id));
 
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -253,7 +249,6 @@ export async function createPlanAction(
       active: parsed.data.active ?? true,
     });
 
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -308,7 +303,6 @@ export async function updatePlanAction(
       .returning({ id: schema.carrierPlans.id });
 
     if (result.length === 0) return { error: "Plano não encontrado." };
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -338,7 +332,6 @@ export async function togglePlanAction(
       .set({ active: !plan.active })
       .where(eq(schema.carrierPlans.id, plan.id));
 
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -367,7 +360,6 @@ export async function deletePlanAction(
       .returning({ id: schema.carrierPlans.id });
 
     if (result.length === 0) return { error: "Plano não encontrado." };
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -446,7 +438,6 @@ export async function upsertPlanPricesAction(
       }
     });
 
-    revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     return actionError(error);

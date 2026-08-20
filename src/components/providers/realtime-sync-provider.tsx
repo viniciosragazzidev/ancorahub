@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import {
   createIncomingLeadQueueState,
@@ -52,7 +51,6 @@ const RECONCILIATION_MS = 60_000;
 
 export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
   const refreshPendingRef = useRef(false);
@@ -97,11 +95,10 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [isFormElementFocused, router]);
 
   /**
-   * Client-only state sync: invalidates React Query cache, dispatches browser
+   * Client-only state sync: updates the local revision, dispatches browser
    * events, and schedules a coalesced server refresh.
    */
   const syncClientState = useCallback((detail: RealtimeSyncBrowserDetail, broadcast = true) => {
-    void queryClient.invalidateQueries({ queryKey: ["local-first", tenantId, userId] });
     setLastSyncedAt(Date.now());
     try {
       window.sessionStorage.setItem(LEADS_REVISION_KEY, String(Date.now()));
@@ -111,7 +108,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     dispatchRealtimeSyncEvent(detail);
     scheduleServerRefresh();
     if (broadcast) localBroadcastRef.current?.postMessage({ type: "local-first.invalidate", detail });
-  }, [queryClient, scheduleServerRefresh, tenantId, userId]);
+  }, [scheduleServerRefresh]);
 
   const reconcileRecentNotifications = useCallback(async (notificationId?: string) => {
     if (!isEligibleForLeadNotifications) return;
@@ -203,6 +200,11 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       .channel(syncTopic, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "refresh" }, (payload) => {
         const signal = payload.payload as Partial<RealtimeSyncBrowserDetail>;
+        if (signal.kind === "domain.invalidated") {
+          setIsOnline(true);
+          handleRemoteSignal({ kind: "domain.invalidated", domain: signal.domain });
+          return;
+        }
         if (!signal.notificationId || (signal.kind !== "notification.created" && signal.kind !== "notification.read")) return;
         setIsOnline(true);
         handleRemoteSignal({ kind: signal.kind, notificationId: signal.notificationId });

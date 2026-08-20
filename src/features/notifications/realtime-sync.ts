@@ -14,6 +14,13 @@ export type RealtimeSyncSignal = {
   occurredAt: string;
 };
 
+export type DomainInvalidationSignal = {
+  version: 1;
+  kind: "domain.invalidated";
+  domain: string;
+  occurredAt: string;
+};
+
 type RealtimeSyncTarget = {
   tenantId: string;
   userId: string;
@@ -74,7 +81,28 @@ export async function publishRealtimeSyncSignals(notifications: RealtimeSyncNoti
   ));
 }
 
-async function sendRealtimeSignal(target: RealtimeSyncTarget, signal: RealtimeSyncSignal) {
+/**
+ * Best-effort domain invalidation. The signal carries only the coarse domain
+ * name (e.g. "leads") — never entity ids or personal data — and the browser
+ * re-reads through authenticated routes after receiving it. Call only after the
+ * write transaction commits.
+ */
+export async function publishDomainInvalidation(
+  targets: RealtimeSyncTarget[],
+  domain: string,
+): Promise<void> {
+  if (!targets.length || !(await isRealtimeSyncEnabled())) return;
+
+  const occurredAt = new Date().toISOString();
+  await Promise.allSettled(targets.map(({ tenantId, userId }) =>
+    sendRealtimeSignal(
+      { tenantId, userId },
+      { version: 1, kind: "domain.invalidated", domain, occurredAt },
+    ),
+  ));
+}
+
+async function sendRealtimeSignal(target: RealtimeSyncTarget, signal: RealtimeSyncSignal | DomainInvalidationSignal) {
 
   const url = requiredEnv("NEXT_PUBLIC_SUPABASE_URL");
   const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");

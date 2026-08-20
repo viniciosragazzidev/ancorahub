@@ -1,7 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -52,7 +51,6 @@ export async function updateDisplayNameAction(_prev: ProfileActionState, formDat
     .where(eq(schema.user.id, context.userId));
 
   await recordProfileAuditAction("atualizou_nome");
-  revalidatePath("/settings");
   return { success: true };
 }
 
@@ -80,6 +78,5 @@ export async function updateAvatarAction(_prev: ProfileActionState, formData: Fo
     .where(eq(schema.user.id, context.userId));
 
   await recordProfileAuditAction("atualizou_avatar");
-  revalidatePath("/settings");
   return { success: true };
 }

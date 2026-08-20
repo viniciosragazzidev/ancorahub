@@ -1,7 +1,6 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -53,7 +52,6 @@ export async function createTeamUserAction(
 ): Promise<TeamActionState> {
   try {
     const res = await createTeamUser(Object.fromEntries(formData));
-    revalidatePath("/equipe");
     return { success: true, token: res.token, invitationId: res.invitationId, whatsappStatus: res.whatsappStatus };
   } catch (e) {
     const message =
@@ -162,7 +160,6 @@ export async function updateTeamMemberAction(
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.membershipId, acao: "atualizou_membro" });
     });
 
-    revalidatePath("/equipe");
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o membro.";
@@ -252,7 +249,6 @@ export async function bulkToggleTeamMemberStatusAction(
       }
     }
 
-    revalidatePath("/equipe");
 
     if (errorMessages.length === 0) {
       return {
@@ -334,7 +330,6 @@ export async function toggleTeamMemberStatusAction(
       }
     });
 
-    revalidatePath("/equipe");
     return { success: true, status: nextActive ? "active" : "disabled" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o status.";
@@ -463,8 +458,6 @@ export async function deleteTeamMemberAction(
       });
     }
 
-    revalidatePath("/equipe");
-    revalidatePath("/leads");
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao excluir o membro.";
@@ -525,8 +518,6 @@ export async function transferLeadsAction(
         )
       );
 
-    revalidatePath("/equipe");
-    revalidatePath("/leads");
     return { success: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao transferir leads.";
@@ -641,7 +632,6 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
     }
 
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_invitation", entidadeId: newInvite.id, acao: "reenviou_convite" });
-    revalidatePath("/equipe");
     return { success: true, token: newInvite.token, invitationId: newInvite.id, whatsappStatus };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao reenviar convite." };
@@ -668,7 +658,6 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
       .where(eq(schema.brokerInvitations.id, invitation.id));
 
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_invitation", entidadeId: invitation.id, acao: "revogou_convite" });
-    revalidatePath("/equipe");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao revogar convite." };
@@ -816,7 +805,6 @@ export async function importBrokersAction(
       }
     });
 
-    revalidatePath("/equipe");
 
     let reportMessage = `Importação concluída. ${imported} corretores importados com sucesso como Rascunho (DRAFT).`;
     if (errors.length > 0) {

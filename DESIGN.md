@@ -1,250 +1,487 @@
-# AncoraHub - Sistema de Design Operacional
+# Acctual — Style Reference
+> Paper invoice on frosted glass
 
-> Versão 4.0. Tema base: light. Dark mode continua suportado pelos mesmos tokens.
+**Theme:** light
 
-Este documento é a fonte de verdade visual do CorreTop. Se algo estiver diferente daqui, o arquivo precisa ser atualizado antes de criar nova variação de UI.
+Acctual runs a white-canvas invoicing product on a near-monochrome foundation: paper-white surfaces, dense near-black text, and a single electric blue (#0098f2) used as functional punctuation for checkmarks, rates, and inline highlights. The brand voice is geometric and confident — pill-shaped controls, generous 16px card radii, and rounded invoice mockups floating against pure white. Color is deployed sparingly: most screens stay achromatic so the blue, violet, and pink decorative chips read as deliberate accents rather than noise. Typography is built on Open Runde at weight 600, with tight -0.03em tracking on display sizes that gives headlines a compressed, almost monolinear feel, paired with handwritten Caveat signatures for testimonial contrast.
 
-## Direção visual
+## Tokens — Colors
 
-- CRM operacional premium para corretoras, desenhado para decisão e atendimento contínuo.
-- Hierarquia por camadas: ação atual, contexto essencial e detalhes sob demanda.
-- Densidade confortável: menos blocos concorrentes, mais listas legíveis e áreas de trabalho claras.
-- A marca oceânica aparece apenas em profundidade, ícones de contexto e estados de acolhimento; nunca como ruído decorativo.
-- A sidebar preserva sua cor-base. Ações primárias, seleção, foco e links usam o token de marca; sucesso, atenção e erro permanecem semânticos.
-- Evitar eyebrow/kicker, cards genéricos de ícone + título + texto, bordas laterais coloridas e painéis que pareçam clicáveis sem uma ação real.
+| Name | Value | Token | Role |
+|------|-------|-------|------|
+| Ink | `#1e1e1e` | `--color-ink` | Headings and primary body text — near-black with a slight cool cast reads as authoritative without the harshness of pure #000 |
+| Carbon | `#0f0f0f` | `--color-carbon` | Body text and secondary headings — deeper than Ink, used where maximum contrast against white surfaces is needed |
+| Midnight | `#0d111b` | `--color-midnight` | Primary action buttons (filled) — dark navy-black instead of pure black, giving CTAs a subtle blue undertone that harmonizes with the electric blue accent |
+| Smoke | `#666666` | `--color-smoke` | Secondary body text, helper copy, muted descriptions under headlines |
+| Fog | `#8d8d8d` | `--color-fog` | Tertiary text, nav links, subdued metadata — the lightest readable neutral before borders take over |
+| Ash | `#999999` | `--color-ash` | Disabled state text, placeholder text, low-priority labels |
+| Mist | `#ccd1da` | `--color-mist` | Hairline borders, input outlines, divider lines — cool blue-gray instead of pure gray so dividers feel on-brand |
+| Paper | `#ffffff` | `--color-paper` | Page canvas, card surfaces, hero background — the dominant surface, occupying the majority of every viewport |
+| Snow | `#f7fafc` | `--color-snow` | Subtle section backgrounds, alternating bands — barely warmer than Paper, creates gentle visual rhythm without darkening the page |
+| Concrete | `#afb0b1` | `--color-concrete` | Muted surface fills, inactive chip backgrounds — sits between border and surface in the neutral stack |
+| Electric Blue | `#0098f2` | `--color-electric-blue` | Brand accent — checkmark icons, payment rate callouts, inline highlights, the single most prominent chromatic color across the page |
+| Iris | `#6c56fc` | `--color-iris` | Decorative accent and illustration fill — violet chip on invoice cards, secondary brand signal |
+| Magenta | `#f200ca` | `--color-magenta` | Decorative accent and illustration fill — pink chip on invoice cards, tertiary brand signal |
+| Leaf | `#5d9c06` | `--color-leaf` | Green text accent for links, tags, and emphasized short phrases. Use as a supporting accent, not as a status color |
+| Coral | `#ff6363` | `--color-coral` | Red decorative accent for icons, marks, and small graphic details. Use as a supporting accent, not as a status color |
+| Ice | `#cfeafa` | `--color-ice` | Tinted surface wash — light blue card backgrounds for highlight sections, soft accent backgrounds |
+| Lavender | `#e1e0fc` | `--color-lavender` | Tinted surface wash — light violet card backgrounds for feature blocks |
+| Blush | `#f6d2f4` | `--color-blush` | Tinted surface wash — light pink card backgrounds, decorative highlight blocks |
 
-## Regras obrigatórias
+## Tokens — Typography
 
-1. Sempre usar componentes reutilizáveis de `src/components/ui/`.
-2. Evitar estilos locais repetidos em componentes que fazem a mesma coisa.
-3. Não criar botões, inputs, badges ou cards com tamanhos próprios sem justificativa.
-4. Padronizar tipografia, espaçamento, raio e bordas usando tokens.
-5. Não hardcodar cores de superfície em telas específicas.
-6. Toda variação nova deve nascer no componente compartilhado, não na página.
-7. Usar `transitions-dev` para motion curto e útil.
-8. Respeitar `prefers-reduced-motion`.
+### sans-serif — sans-serif — detected in extracted data but not described by AI · `--font-sans-serif`
+- **Weights:** 400
+- **Sizes:** 12px
+- **Line height:** 1.2
+- **Role:** sans-serif — detected in extracted data but not described by AI
 
-## Estrutura de tema
+### Open Runde — Primary typeface for all headings and body text — geometric sans-serif with weight 600 at display sizes (64/48/40/32/24/20px) carrying -0.03em letter-spacing for compressed confident headlines; weight 500 for body (22/16/14px) with -0.02em tracking; 11px uppercase eyebrow labels at weight 600 with +0.02em tracking · `--font-open-runde`
+- **Substitute:** Inter, DM Sans, or Outfit
+- **Weights:** 500, 600
+- **Sizes:** 11, 12, 14, 16, 20, 22, 24, 32, 40, 48, 64
+- **Line height:** 1.13-1.78
+- **Letter spacing:** -0.03em at 20px+ display, -0.02em at 14-16px body, +0.02em at 11px uppercase
+- **OpenType features:** `"ss01" on`
+- **Role:** Primary typeface for all headings and body text — geometric sans-serif with weight 600 at display sizes (64/48/40/32/24/20px) carrying -0.03em letter-spacing for compressed confident headlines; weight 500 for body (22/16/14px) with -0.02em tracking; 11px uppercase eyebrow labels at weight 600 with +0.02em tracking
 
-O tema trabalha com as mesmas variáveis nos dois modos.
+### Caveat — Handwritten signature font for testimonial attributions — creates human warmth against the geometric system at small sizes only · `--font-caveat`
+- **Substitute:** Dancing Script or Kalam
+- **Weights:** 600
+- **Sizes:** 16, 24
+- **Line height:** 1.33, 1.50
+- **Role:** Handwritten signature font for testimonial attributions — creates human warmth against the geometric system at small sizes only
 
-### Light mode
+### SF Pro Text — Secondary system font for small uppercase labels — only used sparingly where system rendering is preferred over Open Runde · `--font-sf-pro-text`
+- **Substitute:** System UI sans-serif
+- **Weights:** 600
+- **Sizes:** 11
+- **Line height:** 1.62
+- **Letter spacing:** +0.02em
+- **Role:** Secondary system font for small uppercase labels — only used sparingly where system rendering is preferred over Open Runde
 
-- Canvas claro.
-- Cards e popovers levemente mais elevados que o fundo.
-- Texto principal escuro, nunca preto puro.
-- Borda visível, mas discreta.
-- Azul de marca para ação principal, foco, seleção e links.
+### Inter — Inter — detected in extracted data but not described by AI · `--font-inter`
+- **Weights:** 400, 500
+- **Sizes:** 16px, 32px
+- **Line height:** 1, 1.25
+- **Role:** Inter — detected in extracted data but not described by AI
 
-### Dark mode
+### Type Scale
 
-- Mesmas relações de hierarquia.
-- Mesmos nomes de token.
-- Só os valores mudam.
+| Role | Size | Line Height | Letter Spacing | Token |
+|------|------|-------------|----------------|-------|
+| eyebrow | 11px | 1.62 | 0.22px | `--text-eyebrow` |
+| body-sm | 14px | 1.43 | -0.28px | `--text-body-sm` |
+| body | 16px | 1.5 | -0.32px | `--text-body` |
+| body-lg | 22px | 1.29 | — | `--text-body-lg` |
+| subheading | 24px | 1.33 | -0.72px | `--text-subheading` |
+| heading-sm | 32px | 1.25 | -0.96px | `--text-heading-sm` |
+| heading | 40px | 1.2 | -1.2px | `--text-heading` |
+| heading-lg | 48px | 1.17 | -1.44px | `--text-heading-lg` |
+| display | 64px | 1.13 | -1.92px | `--text-display` |
 
-## Tokens semânticos
+## Tokens — Spacing & Shapes
 
-### Superfícies
+**Base unit:** 4px
 
-| Papel | Token | Uso |
-|---|---|---|
-| Base da página | `--background` | fundo principal |
-| Card | `--card` | painéis e blocos |
-| Elevado | `--popover` | menus, sheets, dialogs |
-| Sidebar | `--sidebar` | shell lateral |
-| Borda | `--border` | separação estrutural |
-| Input | `--input` | campos e controles |
+**Density:** comfortable
 
-### Texto
+### Spacing Scale
 
-| Papel | Token | Uso |
-|---|---|---|
-| Primário | `--foreground` | títulos e corpo principal |
-| Secundário | `--muted-foreground` | metadados e suporte |
-| Inverso | `--primary-foreground` | texto sobre warning |
+| Name | Value | Token |
+|------|-------|-------|
+| 4 | 4px | `--spacing-4` |
+| 8 | 8px | `--spacing-8` |
+| 12 | 12px | `--spacing-12` |
+| 16 | 16px | `--spacing-16` |
+| 20 | 20px | `--spacing-20` |
+| 24 | 24px | `--spacing-24` |
+| 28 | 28px | `--spacing-28` |
+| 32 | 32px | `--spacing-32` |
+| 36 | 36px | `--spacing-36` |
+| 40 | 40px | `--spacing-40` |
+| 48 | 48px | `--spacing-48` |
+| 64 | 64px | `--spacing-64` |
+| 80 | 80px | `--spacing-80` |
+| 96 | 96px | `--spacing-96` |
 
-### Marca e semântica
+### Border Radius
 
-| Papel | Token | Uso |
-|---|---|---|
-| Marca principal | `--primary` | CTA, link ativo e foco |
-| Marca suave | `--primary` com transparência | hover e seleção leve |
-| Sucesso | `--success` | confirmação, concluído |
-| Atenção | `--warning` | pendência, alerta moderado |
-| Erro | `--destructive` | falha, remoção, bloqueio |
+| Element | Value |
+|---------|-------|
+| tags | 100px |
+| cards | 16px |
+| icons | 888px |
+| images | 20px |
+| buttons | 100px |
+| largeCards | 32px |
 
-### Sidebar
+### Shadows
 
-| Papel | Token | Uso |
-|---|---|---|
-| Texto | `--sidebar-foreground` | navegação e metadados |
-| Destaque | `--sidebar-warning` | item ativo e hover |
-| Texto de destaque | `--sidebar-warning-foreground` | conteúdo sobre destaque |
-| Borda | `--sidebar-border` | divisões e shell |
-| Foco | `--sidebar-ring` | foco e seleção |
+| Name | Value | Token |
+|------|-------|-------|
+| subtle | `rgba(10, 13, 20, 0.03) 0px 1px 2px 0px` | `--shadow-subtle` |
+| subtle-2 | `rgb(36, 38, 40) 0px 0px 0px 1px, rgba(27, 28, 29, 0.48) 0...` | `--shadow-subtle-2` |
+| subtle-3 | `rgba(0, 0, 0, 0.06) 0px 2px 3px -1px` | `--shadow-subtle-3` |
 
-## Hierarquia visual
+### Layout
 
-1. O mais importante precisa ser lido em menos de 2 segundos.
-2. Título, subtítulo e ação principal devem ter contraste claro entre si.
-3. Não usar o mesmo peso tipográfico para tudo.
-4. Texto secundário nunca pode parecer desabilitado se ainda for informativo.
-5. Um painel não deve competir com outro painel sem motivo.
+- **Page max-width:** 1200px
+- **Section gap:** 96px
+- **Card padding:** 24px
+- **Element gap:** 12px
 
-## Tipografia
+## Components
 
-- Família principal: Geist.
-- Títulos: 24 a 30 px para páginas, 16 px para cards.
-- Texto de apoio: 12 a 14 px.
-- Números importantes: usar `tabular-nums`.
-- Evitar fontes extras fora do sistema.
+### Filled Action Button
+**Role:** Primary CTA — 'Send my first invoice', 'Create an invoice', 'Sign up for free'
 
-## Espaçamento e forma
+Background #0d111b (Midnight), text #ffffff, border-radius 100px (pill), padding 8px 12px (small) or 6px 14px (nav), shadow rgb(36,38,40) 0px 0px 0px 1px + rgba(27,28,29,0.48) 0px 1px 2px 0px. Open Runde 14px/500, text #ffffff, letter-spacing -0.02em.
 
-- Raio operacional: 12 px para superfícies, 10 px para controles e 999 px apenas para tags curtas.
-- Pads e gaps sempre repetidos por escala de 4, 8, 12, 16, 24 e 32 px.
-- Cards, inputs e botões seguem um único vocabulário de tamanho; superfície tem borda discreta ou elevação, nunca ambos como efeito padrão.
-- Nenhuma tela inventa um raio, sombra ou cor de superfície própria.
+### Secondary Dark Button
+**Role:** Compact dark action — nav-level CTAs and dense button rows
 
-## Motion
+Background #0f0f0f (Carbon), text #ffffff, border-radius 100px, padding 6px 10px or 6px 14px. Same shadow stack as primary button. Used where a slightly smaller, denser button is needed in nav or toolbar contexts.
 
-- Movimento deve reforçar estado, não decorar a UI.
-- Use motion para transições de tabs, abertura de painel, loading e feedback.
-- Evite animação em tabela, métricas e listas densas.
-- Se houver animação, ela precisa respeitar redução de movimento.
-- Transições entre rotas devem usar View Transitions curtas sobre snapshots, nunca duas rotas renderizadas simultaneamente.
-- A camada global de motion precisa poder ser desligada pelo Super-admin; o desligamento e `prefers-reduced-motion` removem movimento sem bloquear navegação ou feedback textual.
+### Outline Link Button
+**Role:** Navigation links — 'Freelancer', 'Agency', 'Pricing', 'Blog', 'Guides'
 
-## Componentes padrão
+Background #ffffff, text #1e1e1, border-radius 100px, padding 8px 12px. No shadow. Functions as a ghost nav item inside the pill-shaped header container.
 
-- Botões: `Button`
-- Cartões: `Card`
-- Status e etiquetas: `Badge`
-- Campos: `Input`, `Select`, `Textarea`, `Checkbox`
-- Estrutura lateral: `Sidebar`
-- Overlays: `Sheet`, `Dialog`, `Tooltip`
-- Tabelas: `Table`
-- Feedback: `Toaster`
+### Feature Card
+**Role:** Standard content card for feature blocks and comparison panels
 
-## Estados obrigatórios
+Background #fafafa (or #ffffff), border-radius 16px, padding 24px, no shadow. Open Runde 24px/600 heading with -0.03em tracking, body text 16px/500 in #666666. Sits flush on white canvas.
 
-Toda tela importante precisa prever:
+### Elevated Card
+**Role:** Card with subtle elevation for invoice previews and testimonial blocks
 
-- loading
-- empty
-- error
-- hover
-- focus
-- disabled
+Background #ffffff, border-radius 20px, shadow rgba(0,0,0,0.05) 0px 1.78px 8px 0px + rgba(0,0,0,0.04) 0px 0.89px 2.67px 0px. No padding (content fills card). Used for the invoice mockup stack and the testimonial quote card.
 
-## Regras de consistência
+### Large Feature Panel
+**Role:** Full-width feature section with generous internal padding
 
-- Não misturar estilos locais com tokens para o mesmo tipo de componente.
-- Não variar altura de botões iguais em telas diferentes.
-- Não variar padding de cards sem uma razão de hierarquia.
-- Não usar uma cor de marca diferente por módulo.
-- Não introduzir sombra pesada sem necessidade.
+Background #fafafa, border-radius 32px, padding 96px 48px. No shadow. Used for the 'We designed an invoice...' section and similar spacious feature panels that need to feel like standalone editorial blocks.
 
-## Checklist de aceite
+### Tinted Accent Card
+**Role:** Highlight block with brand-tinted background
 
-- [ ] O tema light usa tokens semânticos e não hex solto na página.
-- [ ] Dark mode continua funcional com os mesmos nomes de token.
-- [ ] O sistema tem pelo menos 3 camadas de superfície.
-- [ ] warning, status e navegação não se confundem visualmente.
-- [ ] Componentes reutilizáveis cobrem o que é repetido.
-- [ ] Motion é curto, útil e respeita redução de movimento.
-- [ ] A tela continua legível em teclado e em contraste baixo.
+Background rgba(0,152,242,0.16) (Ice at 16% opacity), border-radius 16px, no padding or shadow. Used for payment rate callout strips and highlighted info blocks.
 
-## Observação para IA
+### Invoice Mockup Card
+**Role:** Overlapping invoice preview document
 
-Antes de criar qualquer tela nova:
+Background #ffffff, border-radius 16px, shadow rgba(10,13,20,0.03) 0px 1px 2px 0px. Contains a structured invoice layout: 'INVOICE NO' label at 11px uppercase in #666666, 'FROM/TO' blocks with brand-color circular icons (Iris #6c56fc, Leaf #5d9c06), line items in a table with #666666 labels and #1e1e1 values. Stacked with slight rotation and offset for depth.
 
-1. Ler este arquivo.
-2. Reusar os componentes existentes.
-3. Conferir se a variação nova precisa entrar no componente compartilhado.
-4. Manter o tema consistente com os tokens aqui definidos.
+### Star Rating Block
+**Role:** 5-star rating indicator for testimonial credibility
 
-## Referência de dashboard
+Five solid orange/amber stars (default #f5a623 implied) centered above a quote. No border or background. Open Runde 24px/600 quote text below in #1e1e1, Caveat 16px/600 attribution in #666666.
 
-As referências Nexus orientam a composição do CorreTop, sem copiar marca ou nomes fictícios. O padrão é um shell lateral persistente, cabeçalho compacto com busca global, cards curtos na primeira linha, gráfico principal com leitura comparativa na segunda e tabela/alertas na terceira.
+### Payment Rate Badge
+**Role:** Inline rate indicator — 'Cards 2.7%', 'Bank transfer 1%', 'Stablecoin 1%'
 
-Use `--chart-1` a `--chart-5` para visualizações. No light mode, o canvas é cinza muito claro com cards brancos e bordas suaves; no dark mode, a hierarquia usa carvão, grafite e texto claro. Violeta, azul e teal são reservados para dados de gráfico, não para substituir os estados semânticos de sucesso, atenção e erro.
+No background, inline horizontal arrangement: Electric Blue #0098f2 circular checkmark icon (radius 888px = fully round), followed by label text in #1e1e1 at 16px/500, rate value in bold. No padding, no border.
 
----
+### FAQ Accordion Item
+**Role:** Expandable question row in the FAQ section
 
-## Catálogo de Componentes e Variáveis CSS
+Full-width row with no background, no border-radius, horizontal divider line (1px #ccd1da or similar hairline). Question text in #1e1e1 at 16px/500, plus icon (+) on the right in #1e1e1e. Vertical padding ~16px, spacing between items ~12px.
 
-Abaixo encontra-se a especificação de cada componente do design system, descrevendo suas variáveis, variantes de estilos de tamanho/cores e comportamentos de estado (`hover`, `focus`, `disabled` e `loading`).
+### Pill-Shaped Header Container
+**Role:** Floating navigation bar wrapping logo, links, and CTAs
 
-### 1. `Button` (Botão)
-Componente de ação primário e secundário.
-- **Variáveis Relacionadas**:
-  - Fundo principal: `var(--primary)` / Texto: `var(--primary-foreground)`
-  - Hover: `opacity: 0.9` ou `var(--warning)`
-  - Raio de Borda: `var(--radius)` (base: 8px)
-- **Tamanhos e Variantes**:
-  - `default`: Altura de 36px (`h-9`), padding horizontal de 16px (`px-4`).
-  - `sm`: Altura de 32px (`h-8`), padding horizontal de 12px (`px-3`).
-  - `lg`: Altura de 40px (`h-10`), padding horizontal de 32px (`px-8`).
-  - `icon`: Quadrado de 36px (`h-9 w-9`).
-- **Estados**:
-  - `hover`: Transição suave (`transition-colors duration-150`).
-  - `focus-visible`: Outline de 2px em `var(--ring)`.
-  - `disabled`: `opacity: 0.5`, sem cursor ou ações.
+Background #ffffff, border-radius 100px, wrapping the entire nav row. Contains logo + nav links (outline buttons) + login text + filled CTA, all arranged inline with 8-12px gaps. Floats above the hero with subtle shadow.
 
-### 2. `Card` (Cartão / Bloco Bento)
-Usado para grids de dashboards e bento boxes.
-- **Variáveis Relacionadas**:
-  - Fundo: `var(--card)`
-  - Texto: `var(--card-foreground)`
-  - Borda: `var(--border)`
-- **Estrutura interna**:
-  - `CardHeader`: Padding de 24px (`p-6`), gap de 6px.
-  - `CardTitle`: Fonte Geist, peso semi-bold (`font-semibold`), tracking reduzido (`tracking-tight`).
-  - `CardContent`: Área de conteúdo principal com espaçamento de base flexível.
+### Logo Mark
+**Role:** Acctual brand logo — stylized arrow/chevron monogram
 
-### 3. `Badge` (Etiqueta de Status)
-Etiquetas para classificar status de leads, operadoras ou planos.
-- **Variantes de Cores**:
-  - `default`: Fundo `var(--primary)`, texto `var(--primary-foreground)`.
-  - `secondary`: Fundo `var(--secondary)`, texto `var(--secondary-foreground)`.
-  - `success`: Fundo verde translúcido, texto `--success`.
-  - `warning`: Fundo amarelo translúcido, texto `--warning`.
-  - `destructive`: Fundo vermelho translúcido, texto `--destructive` (`destructive-foreground`).
-  - `outline`: Borda fina, fundo transparente.
+Two stacked chevron/arrow shapes forming 'A' or '→' glyph, rendered in #1e1e1 (dark). Paired with 'Acctual' wordmark in Open Runde 16px/500, #1e1e1e.
 
-### 4. `Input` / `Textarea` (Campos de Texto)
-Campos de entrada estruturados para formulários.
-- **Variáveis Relacionadas**:
-  - Fundo: `var(--input)` ou transparente
-  - Borda: `var(--border)`
-  - Foco: `var(--ring)`
-- **Estados**:
-  - `hover`: Borda levemente realçada.
-  - `focus`: Outline/sombra suave com cor de destaque `var(--primary)`.
-  - `disabled`: Fundo opaco/cinza suave (`opacity: 0.5`), bloqueado para digitação.
+### Eyebrow Label
+**Role:** Small uppercase category tag above section headings — 'Used by 5,000+ businesses worldwide'
 
-### 5. `Table` (Tabela)
-Usado para dados tabulares densos de leads, corretores ou sessões.
-- **Estrutura de Bordas e Alinhamento**:
-  - Borda inferior fina (`border-b`) separando linhas.
-  - `TableHead`: Fonte Geist, peso `font-medium`, cor `var(--muted-foreground)` para menor distração.
-  - `TableRow`: Animação hover suave de mudança de fundo (`hover:bg-muted/50`).
+Open Runde 11px/600, letter-spacing +0.02em, text-transform uppercase, color #0098f2 (Electric Blue). No background, no border. Sits centered above the headline as a tiny blue capsule of context.
 
-### 6. `Sidebar` (Menu de Navegação Lateral)
-O elemento de navegação do AppShell e do SuperAdmin.
-- **Variáveis de Estilo**:
-  - Fundo: `var(--sidebar)`
-  - Texto ativo: `var(--sidebar-warning-foreground)`
-  - Item ativo: `var(--sidebar-warning)`
-  - Borda: `var(--sidebar-border)`
-- **Offset e Trilho (Rail)**:
-  - Adota `rail` para se deslocar `4rem` em layouts dual-rail de múltiplos workspaces.
+## Do's and Don'ts
 
-### 7. `Sheet` / `Dialog` (Painéis e Overlays)
-Painéis laterais (slide-over) e modais para ações críticas.
-- **Variáveis Relacionadas**:
-  - Fundo elevado: `var(--popover)` ou `var(--background)`
-  - Overlay de fundo: `var(--black-overlay)` ou opacidade preta.
-- **Movimento**:
-  - Suporte total a transições curtas (`duration-200`) e animações de entrada/saída suaves.
+### Do
+- Use Open Runde weight 600 for all headings 20px and above with -0.03em letter-spacing — the tight tracking is the signature compressed headline feel
+- Set primary action buttons to #0d111b with white text and 100px pill radius — never use colored fills for primary CTAs
+- Use #0098f2 Electric Blue exclusively for inline icons (checkmarks), rate callouts, and eyebrow labels — never for button backgrounds or large surface fills
+- Apply 16px border-radius to all content cards and 32px to large feature panels — radius hierarchy is a core part of the visual rhythm
+- Set page canvas to pure #ffffff and use #fafafa or #f7fafc only for alternating section bands — keep the page as bright as possible
+- Use Caveat 16px/600 for testimonial attributions only — it is a signature element, not a body font
+- Stack invoice mockup cards with slight rotation and overlapping offset to create the layered paper effect visible in the hero
+
+### Don't
+- Don't use #0098f2, #6c56fc, or #f200ca as button backgrounds — the brand accent colors are decorative, not interactive
+- Don't use pure #000000 for text or buttons — use #1e1e1 for text and #0d111b for button fills; the near-black tones are deliberate
+- Don't apply box-shadow to feature cards — elevation is reserved for the invoice mockups and testimonial cards; flat surfaces are the norm
+- Don't use border-radius below 10px on any interactive element — pills (100px), 16px, and 32px are the only valid radius values
+- Don't use gradient backgrounds anywhere — the design is strictly flat with solid fills only
+- Don't set body text below #666666 — the neutral floor for readable text is Smoke, not lighter grays
+- Don't use more than two chromatic accent colors on a single screen — the system relies on color appearing as rare punctuation
+
+## Surfaces
+
+| Level | Name | Value | Purpose |
+|-------|------|-------|---------|
+| 0 | Paper | `#ffffff` | Page canvas — dominant background for the entire site, hero, and most content sections |
+| 1 | Snow | `#fafafa` | Alternating section bands, feature card backgrounds, subtle contrast surfaces |
+| 2 | Ice | `#cfeafa` | Tinted highlight blocks for payment info and feature callouts |
+| 3 | Lavender | `#e1e0fc` | Violet-tinted card backgrounds for secondary feature blocks |
+
+## Elevation
+
+- **Primary Button:** `rgb(36, 38, 40) 0px 0px 0px 1px, rgba(27, 28, 29, 0.48) 0px 1px 2px 0px`
+- **Elevated Card:** `rgba(0, 0, 0, 0.05) 0px 1.78px 8px 0px, rgba(0, 0, 0, 0.04) 0px 0.89px 2.67px 0px`
+- **Invoice Mockup:** `rgba(10, 13, 20, 0.03) 0px 1px 2px 0px`
+
+## Imagery
+
+Imagery is minimal and product-focused: flat-lay photography of office objects (keyboard, binder clip, red binder, Apple display) cropped at the edges and scattered around the page as atmospheric decoration. The dominant visual asset is the layered invoice mockup stack — rendered as actual UI, not illustration, showing real invoice data with brand-color icons. Icons are simple flat geometric shapes (circles for checkmarks, rounded squares) in Electric Blue. No illustrations, no 3D renders, no lifestyle photography. The aesthetic is 'desktop overhead shot meets UI artifact'.
+
+## Agent Prompt Guide
+
+## Quick Color Reference
+- Text (primary): #1e1e1e
+- Text (secondary): #666666
+- Text (muted): #8d8d8d
+- Background (page): #ffffff
+- Background (card): #fafafa
+- Border: #ccd1da
+- Accent: #0098f2
+- primary action: #0d111b (filled action)
+
+## 5 Example Component Prompts
+
+1. Create a Primary Action Button: #0d111b background, #ffffff text, 9999px radius, compact pill padding. Use this filled treatment for the main CTA.
+
+2. **Feature Card**: Background #fafafa, border-radius 16px, padding 24px, no shadow. Heading at 24px Open Runde weight 600, #1e1e1e, letter-spacing -0.72px. Body at 16px Open Runde weight 500, #666666.
+
+3. **Payment Rate Badge**: Inline row — Electric Blue #0098f2 circular checkmark icon (12px diameter, 888px radius = perfect circle), followed by label text 'Cards' in #1e1e1e at 16px/500, then rate '2.7%' in bold #1e1e1e. No background, no border, no padding.
+
+4. **Invoice Mockup Card**: Background #ffffff, border-radius 16px, shadow rgba(10,13,20,0.03) 0px 1px 2px. Header label 'INVOICE NO 001' at 11px Open Runde weight 600 uppercase, #666666. Two-column body: 'FROM' block with Iris #6c56fc circular icon + 'Marble Studio' at 20px/600 #1e1e1e; 'TO' block with Leaf #5d9c06 circular icon + 'Charm AI' at 20px/600. Address lines at 14px/500 in #666666.
+
+5. **FAQ Accordion Row**: Full-width row, no background, 1px bottom border in #ccd1da. Question text at 16px Open Runde weight 500, #1e1e1e, padding 16px 0. Plus icon on right at 16px, #1e1e1e. Spacing between rows: 12px.
+
+## Similar Brands
+
+- **Stripe** — Same flat white-canvas approach with pill-shaped buttons, minimal shadows, and restrained use of color for functional accents rather than decoration
+- **Linear** — Same compressed geometric sans-serif headlines with tight negative letter-spacing, dark filled CTA buttons, and a near-monochrome palette with rare chromatic punctuation
+- **FreshBooks** — Same invoicing product category with overlapping paper/invoice mockup photography and a clean white-surface aesthetic for financial UI
+- **Plausible Analytics** — Same approach of using a single vivid accent color (blue) sparingly against a white canvas, with pill-radius buttons and generous card padding
+- **Vercel** — Same near-black (#0d111b range) primary buttons instead of pure black, minimal shadows, and geometric typography with tight tracking on display sizes
+
+## Quick Start
+
+### CSS Custom Properties
+
+```css
+:root {
+  /* Colors */
+  --color-ink: #1e1e1e;
+  --color-carbon: #0f0f0f;
+  --color-midnight: #0d111b;
+  --color-smoke: #666666;
+  --color-fog: #8d8d8d;
+  --color-ash: #999999;
+  --color-mist: #ccd1da;
+  --color-paper: #ffffff;
+  --color-snow: #f7fafc;
+  --color-concrete: #afb0b1;
+  --color-electric-blue: #0098f2;
+  --color-iris: #6c56fc;
+  --color-magenta: #f200ca;
+  --color-leaf: #5d9c06;
+  --color-coral: #ff6363;
+  --color-ice: #cfeafa;
+  --color-lavender: #e1e0fc;
+  --color-blush: #f6d2f4;
+
+  /* Typography — Font Families */
+  --font-sans-serif: 'sans-serif', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-open-runde: 'Open Runde', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-caveat: 'Caveat', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sf-pro-text: 'SF Pro Text', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-inter: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Typography — Scale */
+  --text-eyebrow: 11px;
+  --leading-eyebrow: 1.62;
+  --tracking-eyebrow: 0.22px;
+  --text-body-sm: 14px;
+  --leading-body-sm: 1.43;
+  --tracking-body-sm: -0.28px;
+  --text-body: 16px;
+  --leading-body: 1.5;
+  --tracking-body: -0.32px;
+  --text-body-lg: 22px;
+  --leading-body-lg: 1.29;
+  --text-subheading: 24px;
+  --leading-subheading: 1.33;
+  --tracking-subheading: -0.72px;
+  --text-heading-sm: 32px;
+  --leading-heading-sm: 1.25;
+  --tracking-heading-sm: -0.96px;
+  --text-heading: 40px;
+  --leading-heading: 1.2;
+  --tracking-heading: -1.2px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1.17;
+  --tracking-heading-lg: -1.44px;
+  --text-display: 64px;
+  --leading-display: 1.13;
+  --tracking-display: -1.92px;
+
+  /* Typography — Weights */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* Spacing */
+  --spacing-unit: 4px;
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-36: 36px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-96: 96px;
+
+  /* Layout */
+  --page-max-width: 1200px;
+  --section-gap: 96px;
+  --card-padding: 24px;
+  --element-gap: 12px;
+
+  /* Border Radius */
+  --radius-lg: 10px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-3xl: 32px;
+  --radius-full: 50px;
+  --radius-full-2: 100px;
+  --radius-full-3: 888px;
+  --radius-full-4: 999px;
+
+  /* Named Radii */
+  --radius-tags: 100px;
+  --radius-cards: 16px;
+  --radius-icons: 888px;
+  --radius-images: 20px;
+  --radius-buttons: 100px;
+  --radius-largecards: 32px;
+
+  /* Shadows */
+  --shadow-subtle: rgba(10, 13, 20, 0.03) 0px 1px 2px 0px;
+  --shadow-subtle-2: rgb(36, 38, 40) 0px 0px 0px 1px, rgba(27, 28, 29, 0.48) 0px 1px 2px 0px;
+  --shadow-subtle-3: rgba(0, 0, 0, 0.06) 0px 2px 3px -1px;
+
+  /* Surfaces */
+  --surface-paper: #ffffff;
+  --surface-snow: #fafafa;
+  --surface-ice: #cfeafa;
+  --surface-lavender: #e1e0fc;
+}
+```
+
+### Tailwind v4
+
+```css
+@theme {
+  /* Colors */
+  --color-ink: #1e1e1e;
+  --color-carbon: #0f0f0f;
+  --color-midnight: #0d111b;
+  --color-smoke: #666666;
+  --color-fog: #8d8d8d;
+  --color-ash: #999999;
+  --color-mist: #ccd1da;
+  --color-paper: #ffffff;
+  --color-snow: #f7fafc;
+  --color-concrete: #afb0b1;
+  --color-electric-blue: #0098f2;
+  --color-iris: #6c56fc;
+  --color-magenta: #f200ca;
+  --color-leaf: #5d9c06;
+  --color-coral: #ff6363;
+  --color-ice: #cfeafa;
+  --color-lavender: #e1e0fc;
+  --color-blush: #f6d2f4;
+
+  /* Typography */
+  --font-sans-serif: 'sans-serif', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-open-runde: 'Open Runde', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-caveat: 'Caveat', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sf-pro-text: 'SF Pro Text', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-inter: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Typography — Scale */
+  --text-eyebrow: 11px;
+  --leading-eyebrow: 1.62;
+  --tracking-eyebrow: 0.22px;
+  --text-body-sm: 14px;
+  --leading-body-sm: 1.43;
+  --tracking-body-sm: -0.28px;
+  --text-body: 16px;
+  --leading-body: 1.5;
+  --tracking-body: -0.32px;
+  --text-body-lg: 22px;
+  --leading-body-lg: 1.29;
+  --text-subheading: 24px;
+  --leading-subheading: 1.33;
+  --tracking-subheading: -0.72px;
+  --text-heading-sm: 32px;
+  --leading-heading-sm: 1.25;
+  --tracking-heading-sm: -0.96px;
+  --text-heading: 40px;
+  --leading-heading: 1.2;
+  --tracking-heading: -1.2px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1.17;
+  --tracking-heading-lg: -1.44px;
+  --text-display: 64px;
+  --leading-display: 1.13;
+  --tracking-display: -1.92px;
+
+  /* Spacing */
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-36: 36px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-96: 96px;
+
+  /* Border Radius */
+  --radius-lg: 10px;
+  --radius-2xl: 16px;
+  --radius-2xl-2: 20px;
+  --radius-3xl: 32px;
+  --radius-full: 50px;
+  --radius-full-2: 100px;
+  --radius-full-3: 888px;
+  --radius-full-4: 999px;
+
+  /* Shadows */
+  --shadow-subtle: rgba(10, 13, 20, 0.03) 0px 1px 2px 0px;
+  --shadow-subtle-2: rgb(36, 38, 40) 0px 0px 0px 1px, rgba(27, 28, 29, 0.48) 0px 1px 2px 0px;
+  --shadow-subtle-3: rgba(0, 0, 0, 0.06) 0px 2px 3px -1px;
+}
+```

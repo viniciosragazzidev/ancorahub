@@ -1,7 +1,6 @@
 "use server";
 
 import { createHash, randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
@@ -34,7 +33,6 @@ export async function sendWhatsAppReviewMessageAction(_: WhatsAppReviewActionSta
       metadata: { recipientHash: createHash("sha256").update(parsed.data.to.replace(/\D/g, "")).digest("hex"), provider: "meta_cloud" },
       createdAt: new Date(),
     });
-    revalidatePath("/super-admin/whatsapp-review");
     return { success: "Mensagem enviada. Confirme o recebimento no WhatsApp.", messageId: result.messageId };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível enviar a mensagem de revisão." };

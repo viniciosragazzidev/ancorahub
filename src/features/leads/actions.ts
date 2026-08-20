@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { assertTenantAccess } from "@/shared/auth/authorization";
@@ -93,7 +92,6 @@ export async function addLeadNoteAction(
       }).catch(() => { /* non-blocking */ });
     }
 
-    revalidatePath(`/leads/${lead.id}`);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível registrar a nota." };
@@ -142,9 +140,6 @@ export async function updateLeadLivesCountAction(
       .set({ qualificationDetails: updatedDetails })
       .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
 
-    revalidatePath(`/leads/${lead.id}`);
-    revalidatePath("/minha-fila");
-    revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível atualizar a quantidade de vidas." };

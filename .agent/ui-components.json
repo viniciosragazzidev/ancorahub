@@ -1,0 +1,6501 @@
+[
+  {
+    "name": "AssistenteChatClient",
+    "path": "src/app/(dashboard)/assistente/_components/assistente-chat-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from assistente-chat-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ChecklistClient",
+    "path": "src/app/(dashboard)/checklist/checklist-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from checklist-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ClientesList",
+    "path": "src/app/(dashboard)/clientes/clientes-list.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from clientes-list.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ConversationsWorkspace",
+    "path": "src/app/(dashboard)/conversas/conversations-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from conversations-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "OfficialBrokerConversations",
+    "path": "src/app/(dashboard)/conversas/official-broker-conversations.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from official-broker-conversations.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AvailabilityToggle",
+    "path": "src/app/(dashboard)/corretor/resumo/_components/availability-toggle.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from availability-toggle.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "BrokerResumeDashboard",
+    "path": "src/app/(dashboard)/corretor/resumo/_components/broker-resume-dashboard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from broker-resume-dashboard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CotadorViewerClient",
+    "path": "src/app/(dashboard)/cotacao/cotador-viewer-client.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from cotador-viewer-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "page-header",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LogoutButton",
+    "path": "src/app/(dashboard)/dashboard/logout-button.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from logout-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "AutoDistributeToggle",
+    "path": "src/app/(dashboard)/dashboard/_components/auto-distribute-toggle.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from auto-distribute-toggle.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "BrokerWorkspaceActions",
+    "path": "src/app/(dashboard)/dashboard/_components/broker-workspace-actions.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from broker-workspace-actions.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "BrokerWorkspace",
+    "path": "src/app/(dashboard)/dashboard/_components/broker-workspace.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from broker-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MarketingDashboardContent",
+    "path": "src/app/(dashboard)/dashboard/_components/marketing-dashboard-content.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from marketing-dashboard-content.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "NocDashboardContent",
+    "path": "src/app/(dashboard)/dashboard/_components/noc-dashboard-content.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from noc-dashboard-content.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ScrollContain",
+    "path": "src/app/(dashboard)/dashboard/_components/scroll-contain.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from scroll-contain.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "DirectorResumeDashboard",
+    "path": "src/app/(dashboard)/diretor/resume/_components/director-resume-dashboard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from director-resume-dashboard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "Workspace",
+    "path": "src/app/(dashboard)/equipe/cargos/workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 12,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "permission",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MemberActions",
+    "path": "src/app/(dashboard)/equipe/member-actions.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from member-actions.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "RecoveryRequestsTable",
+    "path": "src/app/(dashboard)/equipe/recuperacoes/recovery-requests-table.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from recovery-requests-table.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "TeamInviteForm",
+    "path": "src/app/(dashboard)/equipe/team-invite-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from team-invite-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "TeamInviteSection",
+    "path": "src/app/(dashboard)/equipe/team-invite-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from team-invite-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "TeamMembersTable",
+    "path": "src/app/(dashboard)/equipe/team-members-table.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from team-members-table.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "EquipeShell",
+    "path": "src/app/(dashboard)/equipe/_components/equipe-shell.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from equipe-shell.tsx.",
+    "designSystemEquivalent": "PageHeader",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "CustomTableBuilder",
+    "path": "src/app/(dashboard)/ferramentas-vendas/tabelas-personalizadas/custom-table-builder.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from custom-table-builder.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WebhookTutorial",
+    "path": "src/app/(dashboard)/guia/webhook/webhook-tutorial.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from webhook-tutorial.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "TemplateBuilderWizard",
+    "path": "src/app/(dashboard)/integrations/whatsapp/_components/template-builder-wizard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from template-builder-wizard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "TemplateListView",
+    "path": "src/app/(dashboard)/integrations/whatsapp/_components/template-list-view.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from template-list-view.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "TemplateUsagesCard",
+    "path": "src/app/(dashboard)/integrations/whatsapp/_components/template-usages-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from template-usages-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DutyOperationsWorkspace",
+    "path": "src/app/(dashboard)/leads/distribuicao/plantao/_components/duty-operations-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from duty-operations-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DistributionDashboard",
+    "path": "src/app/(dashboard)/leads/distribuicao/_components/distribution-dashboard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from distribution-dashboard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DistributionInbox",
+    "path": "src/app/(dashboard)/leads/distribuicao/_components/distribution-inbox.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from distribution-inbox.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DistributionTabsContainer",
+    "path": "src/app/(dashboard)/leads/distribuicao/_components/distribution-tabs-container.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from distribution-tabs-container.tsx.",
+    "designSystemEquivalent": "Tabs",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "QueueControlCenter",
+    "path": "src/app/(dashboard)/leads/distribuicao/_components/queue-control-center.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from queue-control-center.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadsDataTable",
+    "path": "src/app/(dashboard)/leads/leads-data-table.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from leads-data-table.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "LeadsTable",
+    "path": "src/app/(dashboard)/leads/leads-table.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from leads-table.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "LeadsWorkspace",
+    "path": "src/app/(dashboard)/leads/leads-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from leads-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success",
+      "permission"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "BeneficiariesSection",
+    "path": "src/app/(dashboard)/leads/[id]/beneficiaries-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from beneficiaries-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DeleteLeadControl",
+    "path": "src/app/(dashboard)/leads/[id]/delete-lead-control.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from delete-lead-control.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "InlineFeedbackForm",
+    "path": "src/app/(dashboard)/leads/[id]/inline-feedback-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from inline-feedback-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadFeedbackForm",
+    "path": "src/app/(dashboard)/leads/[id]/lead-feedback-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-feedback-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "RegisterSalePanel",
+    "path": "src/app/(dashboard)/leads/[id]/register-sale-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from register-sale-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "StartServiceButton",
+    "path": "src/app/(dashboard)/leads/[id]/start-service-button.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from start-service-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "SupervisionPanel",
+    "path": "src/app/(dashboard)/leads/[id]/supervision-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from supervision-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "BulkLeadImportDialog",
+    "path": "src/app/(dashboard)/leads/_components/bulk-lead-import-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from bulk-lead-import-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "LeadDrawerManagementActions",
+    "path": "src/app/(dashboard)/leads/_components/lead-drawer-management-actions.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-drawer-management-actions.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadsFilters",
+    "path": "src/app/(dashboard)/leads/_components/leads-filters.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from leads-filters.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadsHeaderActions",
+    "path": "src/app/(dashboard)/leads/_components/leads-header-actions.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from leads-header-actions.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadsPagination",
+    "path": "src/app/(dashboard)/leads/_components/leads-pagination.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from leads-pagination.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar"
+    ]
+  },
+  {
+    "name": "ManualLeadForm",
+    "path": "src/app/(dashboard)/leads/_components/manual-lead-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from manual-lead-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ManualLeadSheet",
+    "path": "src/app/(dashboard)/leads/_components/manual-lead-sheet.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from manual-lead-sheet.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "ManualQualificationDialog",
+    "path": "src/app/(dashboard)/leads/_components/manual-qualification-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from manual-qualification-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "QualifyingLeadActions",
+    "path": "src/app/(dashboard)/leads/_components/qualifying-lead-actions.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from qualifying-lead-actions.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "MarketingImportClient",
+    "path": "src/app/(dashboard)/marketing/importacoes/_components/marketing-import-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from marketing-import-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "BrokerAvailability",
+    "path": "src/app/(dashboard)/minha-fila/_components/broker-availability.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from broker-availability.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "QueueClient",
+    "path": "src/app/(dashboard)/minha-fila/_components/queue-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from queue-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "Sparkline",
+    "path": "src/app/(dashboard)/minha-fila/_components/sparkline.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from sparkline.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "NocClient",
+    "path": "src/app/(dashboard)/noc/noc-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from noc-client.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "NotFound",
+    "path": "src/app/(dashboard)/not-found.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from not-found.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "NotificationsClient",
+    "path": "src/app/(dashboard)/notificacoes/notifications-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from notifications-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PropostasClient",
+    "path": "src/app/(dashboard)/propostas/_components/propostas-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from propostas-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AgentTriggersPanel",
+    "path": "src/app/(dashboard)/qualificacao/_components/agent-triggers-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from agent-triggers-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "permission"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaTemplatesPanel",
+    "path": "src/app/(dashboard)/qualificacao/_components/meta-templates-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-templates-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "QualificationHubClient",
+    "path": "src/app/(dashboard)/qualificacao/_components/qualification-hub-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from qualification-hub-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "permission",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ExportButtons",
+    "path": "src/app/(dashboard)/relatorios/_components/export-buttons.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from export-buttons.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "InternalReportDocuments",
+    "path": "src/app/(dashboard)/relatorios/_components/internal-report-documents.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from internal-report-documents.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ReportCenter",
+    "path": "src/app/(dashboard)/relatorios/_components/report-center.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from report-center.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ReportTrendCharts",
+    "path": "src/app/(dashboard)/relatorios/_components/report-trend-charts.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from report-trend-charts.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ShareDialog",
+    "path": "src/app/(dashboard)/relatorios/_components/share-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from share-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "SpreadsheetList",
+    "path": "src/app/(dashboard)/relatorios/_components/spreadsheet-list.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from spreadsheet-list.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SpreadsheetSection",
+    "path": "src/app/(dashboard)/relatorios/_components/spreadsheet-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from spreadsheet-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "permission"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "SpreadsheetTableViewer",
+    "path": "src/app/(dashboard)/relatorios/_components/spreadsheet-table-viewer.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from spreadsheet-table-viewer.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "SpreadsheetUploader",
+    "path": "src/app/(dashboard)/relatorios/_components/spreadsheet-uploader.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from spreadsheet-uploader.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ExtensionConnectCard",
+    "path": "src/app/(dashboard)/settings/extension/extension-connect-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from extension-connect-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ExtensionHelpDialog",
+    "path": "src/app/(dashboard)/settings/extension/extension-help-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from extension-help-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "ExtensionTab",
+    "path": "src/app/(dashboard)/settings/extension/extension-tab.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from extension-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "LOW",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "Client",
+    "path": "src/app/(dashboard)/settings/feedback-templates/client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WhatsappPage",
+    "path": "src/app/(dashboard)/settings/whatsapp-page.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from whatsapp-page.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AccountTab",
+    "path": "src/app/(dashboard)/settings/_components/account-tab.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from account-tab.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AgentTrainingTab",
+    "path": "src/app/(dashboard)/settings/_components/agent-training-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from agent-training-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AiSettingsTab",
+    "path": "src/app/(dashboard)/settings/_components/ai-settings-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from ai-settings-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ColorPicker",
+    "path": "src/app/(dashboard)/settings/_components/color-picker.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from color-picker.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "DistributionPolicyPanel",
+    "path": "src/app/(dashboard)/settings/_components/distribution-policy-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from distribution-policy-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "EmpresaTab",
+    "path": "src/app/(dashboard)/settings/_components/empresa-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from empresa-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "FeedbackTab",
+    "path": "src/app/(dashboard)/settings/_components/feedback-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from feedback-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "IntegrationsTab",
+    "path": "src/app/(dashboard)/settings/_components/integrations-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from integrations-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LogoUpload",
+    "path": "src/app/(dashboard)/settings/_components/logo-upload.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from logo-upload.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "MinhaContaTab",
+    "path": "src/app/(dashboard)/settings/_components/minha-conta-tab.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from minha-conta-tab.tsx.",
+    "designSystemEquivalent": "Tabs",
+    "confidence": "LOW",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "PasskeySection",
+    "path": "src/app/(dashboard)/settings/_components/passkey-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from passkey-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SecurityTab",
+    "path": "src/app/(dashboard)/settings/_components/security-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from security-tab.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SettingsTabs",
+    "path": "src/app/(dashboard)/settings/_components/settings-tabs.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from settings-tabs.tsx.",
+    "designSystemEquivalent": "Tabs",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "UnitTab",
+    "path": "src/app/(dashboard)/settings/_components/unit-tab.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from unit-tab.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WahaConnectionsCard",
+    "path": "src/app/(dashboard)/settings/_components/waha-connections-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from waha-connections-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "TasksWorkspace",
+    "path": "src/app/(dashboard)/tarefas/tasks-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from tasks-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "SalesWorkspace",
+    "path": "src/app/(dashboard)/vendas/sales-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from sales-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CommissionScheduleTable",
+    "path": "src/app/(dashboard)/vendas/[id]/commission-schedule-table.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from commission-schedule-table.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "SaleDetailsTabs",
+    "path": "src/app/(dashboard)/vendas/[id]/sale-details-tabs.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from sale-details-tabs.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SaleStatsCards",
+    "path": "src/app/(dashboard)/vendas/[id]/sale-stats-cards.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from sale-stats-cards.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WhatsappAdminPanel",
+    "path": "src/app/(platform-admin)/super-admin/integrations/whatsapp/whatsapp-admin-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from whatsapp-admin-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SuperAdminSettingsTabs",
+    "path": "src/app/(platform-admin)/super-admin/settings/super-admin-settings-tabs.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from super-admin-settings-tabs.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CreateTenantAccessForm",
+    "path": "src/app/(platform-admin)/super-admin/tenants/[tenantId]/_components/create-tenant-access-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from create-tenant-access-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "ResetTenantDataCard",
+    "path": "src/app/(platform-admin)/super-admin/tenants/[tenantId]/_components/reset-tenant-data-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from reset-tenant-data-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ReviewMessageForm",
+    "path": "src/app/(platform-admin)/super-admin/whatsapp-review/review-message-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from review-message-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "GlobalError",
+    "path": "src/app/global-error.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from global-error.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "page-header"
+    ]
+  },
+  {
+    "name": "NotFound",
+    "path": "src/app/not-found.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from not-found.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "OnboardingWizard",
+    "path": "src/app/primeiro-acesso/onboarding-wizard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-wizard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AgentDrawerProvider",
+    "path": "src/components/agent-drawer/agent-drawer-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from agent-drawer-provider.tsx.",
+    "designSystemEquivalent": "Drawer",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "AgentDrawer",
+    "path": "src/components/agent-drawer/agent-drawer.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from agent-drawer.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "AgentShortcutChips",
+    "path": "src/components/agent-drawer/agent-shortcut-chips.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from agent-shortcut-chips.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "AncoraLogo",
+    "path": "src/components/ancora-logo.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from ancora-logo.tsx.",
+    "designSystemEquivalent": "FilterToolbar",
+    "confidence": "MEDIUM",
+    "usageCount": 20,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "AppProviders",
+    "path": "src/components/app-providers.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from app-providers.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 8,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "AppShell",
+    "path": "src/components/app-shell.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from app-shell.tsx.",
+    "designSystemEquivalent": "Dialog",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "BranchSelect",
+    "path": "src/components/branch-select.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from branch-select.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar"
+    ]
+  },
+  {
+    "name": "AnimatedLogo",
+    "path": "src/components/branding/animated-logo.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from animated-logo.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "CommandPalette",
+    "path": "src/components/command-palette.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from command-palette.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "permission"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "CorretopFinanceiroSidebar",
+    "path": "src/components/corretop-financeiro-sidebar.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from corretop-financeiro-sidebar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "permission"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "CorretopLogo",
+    "path": "src/components/corretop-logo.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from corretop-logo.tsx.",
+    "designSystemEquivalent": "FilterToolbar",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "CorretopSidebar",
+    "path": "src/components/corretop-sidebar.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from corretop-sidebar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "permission"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "CorretorSidebar",
+    "path": "src/components/corretor-sidebar.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from corretor-sidebar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "permission"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "BacklogOverlay",
+    "path": "src/components/dashboard/backlog-overlay.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from backlog-overlay.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "FunnelChart",
+    "path": "src/components/dashboard/funnel-chart.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from funnel-chart.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "LeadTrendChart",
+    "path": "src/components/dashboard/lead-trend-chart.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-trend-chart.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "form"
+    ]
+  },
+  {
+    "name": "MetricCard",
+    "path": "src/components/dashboard/metric-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from metric-card.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 10,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MiniDonut",
+    "path": "src/components/dashboard/mini-donut.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from mini-donut.tsx.",
+    "designSystemEquivalent": "FilterToolbar",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "filter-toolbar"
+    ]
+  },
+  {
+    "name": "Sparkline",
+    "path": "src/components/dashboard/sparkline.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from sparkline.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "DashboardHeader",
+    "path": "src/components/dashboard-header.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from dashboard-header.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 124,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar",
+      "overlay"
+    ]
+  },
+  {
+    "name": "DegradedState",
+    "path": "src/components/degraded-state.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from degraded-state.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "EmptyState",
+    "path": "src/components/empty-state.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from empty-state.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 35,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "ExperienceModeToggle",
+    "path": "src/components/experience-mode-toggle.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from experience-mode-toggle.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 15,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "GlobalSearch",
+    "path": "src/components/global-search.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from global-search.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "HugeIcons",
+    "path": "src/components/huge-icons.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from huge-icons.tsx.",
+    "designSystemEquivalent": "FilterToolbar",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "VoxelIllustration",
+    "path": "src/components/illustrations/voxel-illustration.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from voxel-illustration.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 11,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "KeyboardShortcutsProvider",
+    "path": "src/components/keyboard-shortcuts-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from keyboard-shortcuts-provider.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "KeyboardShortcuts",
+    "path": "src/components/keyboard-shortcuts.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from keyboard-shortcuts.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "LightBottomNav",
+    "path": "src/components/light-bottom-nav.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from light-bottom-nav.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "AppBootLoader",
+    "path": "src/components/loading/app-boot-loader.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from app-boot-loader.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [
+      "loading"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "LoadingWatchdog",
+    "path": "src/components/loading-watchdog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from loading-watchdog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "LoginTransition",
+    "path": "src/components/login-transition.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from login-transition.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "MobileBottomNav",
+    "path": "src/components/mobile-bottom-nav.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from mobile-bottom-nav.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AnimatedBadge",
+    "path": "src/components/motion/animated-badge.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from animated-badge.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 103,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "AnimatedPageTitle",
+    "path": "src/components/motion/animated-page-title.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from animated-page-title.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "AnimatedToast",
+    "path": "src/components/motion/animated-toast.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from animated-toast.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 8,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "AttachmentUpload",
+    "path": "src/components/motion/attachment-upload.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from attachment-upload.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "FileUpload",
+    "path": "src/components/motion/file-upload.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from file-upload.tsx.",
+    "designSystemEquivalent": "Sheet",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "InterfaceMotionProvider",
+    "path": "src/components/motion/interface-motion-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from interface-motion-provider.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "SelectMorph",
+    "path": "src/components/motion/select-morph.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from select-morph.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Select",
+    "path": "src/components/motion/select.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from select.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 151,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Tooltip",
+    "path": "src/components/motion/tooltip.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from tooltip.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "MEDIUM",
+    "usageCount": 80,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "NextUrgentLeadButton",
+    "path": "src/components/next-urgent-lead-button.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from next-urgent-lead-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "LOW",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "NotificationPopover",
+    "path": "src/components/notification-popover.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from notification-popover.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "IncomingLeadCard",
+    "path": "src/components/notifications/incoming-lead-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from incoming-lead-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "OnboardingCard",
+    "path": "src/components/onboarding/onboarding-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "OnboardingChecklist",
+    "path": "src/components/onboarding/onboarding-checklist.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-checklist.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "OnboardingHelpButton",
+    "path": "src/components/onboarding/onboarding-help-button.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-help-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "OnboardingProvider",
+    "path": "src/components/onboarding/onboarding-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-provider.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "OperationalPlaceholder",
+    "path": "src/components/operational-placeholder.tsx",
+    "category": "LEGACY",
+    "purpose": "UI component inferred from operational-placeholder.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "page-header",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PasskeyToastHandler",
+    "path": "src/components/passkey-toast-handler.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from passkey-toast-handler.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PeriodSelect",
+    "path": "src/components/period-select.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from period-select.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 21,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar"
+    ]
+  },
+  {
+    "name": "PlatformAdminHeader",
+    "path": "src/components/platform-admin-header.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from platform-admin-header.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 42,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "PlatformAdminPlaceholder",
+    "path": "src/components/platform-admin-placeholder.tsx",
+    "category": "LEGACY",
+    "purpose": "UI component inferred from platform-admin-placeholder.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "page-header",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PlatformAdminShell",
+    "path": "src/components/platform-admin-shell.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from platform-admin-shell.tsx.",
+    "designSystemEquivalent": "DataTable",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "PlatformAdminSidebar",
+    "path": "src/components/platform-admin-sidebar.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from platform-admin-sidebar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "LeadAssignedNotificationButton",
+    "path": "src/components/plugins/lead-assigned-notification-button.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-assigned-notification-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "NotificationCountProvider",
+    "path": "src/components/providers/notification-count-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from notification-count-provider.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "PerformanceMonitor",
+    "path": "src/components/providers/performance-monitor.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from performance-monitor.tsx.",
+    "designSystemEquivalent": "FormField",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "RealtimeSyncProvider",
+    "path": "src/components/providers/realtime-sync-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from realtime-sync-provider.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PwaInstallPrompt",
+    "path": "src/components/pwa-install-prompt.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from pwa-install-prompt.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success",
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "QuickActionsMenu",
+    "path": "src/components/quick-actions-menu.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from quick-actions-menu.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "RelatedActions",
+    "path": "src/components/related-actions.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from related-actions.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 9,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "RouteError",
+    "path": "src/components/route-error.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from route-error.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 19,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "page-header"
+    ]
+  },
+  {
+    "name": "RouteLoading",
+    "path": "src/components/route-loading.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from route-loading.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 33,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading"
+    ],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "RouteNotFound",
+    "path": "src/components/route-not-found.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from route-not-found.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "page-header"
+    ]
+  },
+  {
+    "name": "SetupTutorialDrawer",
+    "path": "src/components/setup/setup-tutorial-drawer.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from setup-tutorial-drawer.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "SidebarCollapsibleGroup",
+    "path": "src/components/sidebar-collapsible-group.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from sidebar-collapsible-group.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 14,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "SkipToContent",
+    "path": "src/components/skip-to-content.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from skip-to-content.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "SplashScreen",
+    "path": "src/components/splash-screen.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from splash-screen.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "StatusBadges",
+    "path": "src/components/status-badges.tsx",
+    "category": "UNKNOWN",
+    "purpose": "UI component inferred from status-badges.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [
+      "loading",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "SuperAdminRoleSwitcher",
+    "path": "src/components/super-admin-role-switcher.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from super-admin-role-switcher.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "SuperDevShell",
+    "path": "src/components/super-dev-shell.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from super-dev-shell.tsx.",
+    "designSystemEquivalent": "PageHeader",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "SuperDevSidebar",
+    "path": "src/components/super-dev-sidebar.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from super-dev-sidebar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "SystemFeedbackDrawer",
+    "path": "src/components/system-feedback-drawer.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from system-feedback-drawer.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "ThemeProvider",
+    "path": "src/components/theme-provider.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from theme-provider.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "ThemeToggle",
+    "path": "src/components/theme-toggle.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from theme-toggle.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ArrowDown",
+    "path": "src/components/ui/animated-icons/hugeicons/arrow-down.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from arrow-down.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ArrowLeft",
+    "path": "src/components/ui/animated-icons/hugeicons/arrow-left.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from arrow-left.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 44,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ArrowRight",
+    "path": "src/components/ui/animated-icons/hugeicons/arrow-right.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from arrow-right.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 157,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ArrowUpRight",
+    "path": "src/components/ui/animated-icons/hugeicons/arrow-up-right.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from arrow-up-right.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 26,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ArrowUp",
+    "path": "src/components/ui/animated-icons/hugeicons/arrow-up.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from arrow-up.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Bell",
+    "path": "src/components/ui/animated-icons/hugeicons/bell.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from bell.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 33,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Calendar",
+    "path": "src/components/ui/animated-icons/hugeicons/calendar.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from calendar.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Check",
+    "path": "src/components/ui/animated-icons/hugeicons/check.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from check.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 72,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ChevronDown",
+    "path": "src/components/ui/animated-icons/hugeicons/chevron-down.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from chevron-down.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 12,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ChevronLeft",
+    "path": "src/components/ui/animated-icons/hugeicons/chevron-left.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from chevron-left.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 4,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ChevronRight",
+    "path": "src/components/ui/animated-icons/hugeicons/chevron-right.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from chevron-right.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ChevronUp",
+    "path": "src/components/ui/animated-icons/hugeicons/chevron-up.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from chevron-up.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 2,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Download",
+    "path": "src/components/ui/animated-icons/hugeicons/download.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from download.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Eye",
+    "path": "src/components/ui/animated-icons/hugeicons/eye.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from eye.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 22,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Filter",
+    "path": "src/components/ui/animated-icons/hugeicons/filter.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from filter.tsx.",
+    "designSystemEquivalent": "FilterToolbar",
+    "confidence": "HIGH",
+    "usageCount": 14,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar"
+    ]
+  },
+  {
+    "name": "Heart",
+    "path": "src/components/ui/animated-icons/hugeicons/heart.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from heart.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Home",
+    "path": "src/components/ui/animated-icons/hugeicons/home.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from home.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 2,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Lock",
+    "path": "src/components/ui/animated-icons/hugeicons/lock.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from lock.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 6,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Mail",
+    "path": "src/components/ui/animated-icons/hugeicons/mail.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from mail.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Menu",
+    "path": "src/components/ui/animated-icons/hugeicons/menu.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from menu.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 6,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Notification03",
+    "path": "src/components/ui/animated-icons/hugeicons/notification-03.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from notification-03.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Pencil",
+    "path": "src/components/ui/animated-icons/hugeicons/pencil.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from pencil.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Plus",
+    "path": "src/components/ui/animated-icons/hugeicons/plus.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from plus.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 81,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Refresh",
+    "path": "src/components/ui/animated-icons/hugeicons/refresh.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from refresh.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 1,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Save",
+    "path": "src/components/ui/animated-icons/hugeicons/save.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from save.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 7,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Search",
+    "path": "src/components/ui/animated-icons/hugeicons/search.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from search.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 21,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar"
+    ]
+  },
+  {
+    "name": "Settings",
+    "path": "src/components/ui/animated-icons/hugeicons/settings.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from settings.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Share",
+    "path": "src/components/ui/animated-icons/hugeicons/share.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from share.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 10,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ShieldCheck",
+    "path": "src/components/ui/animated-icons/hugeicons/shield-check.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from shield-check.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 51,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Star",
+    "path": "src/components/ui/animated-icons/hugeicons/star.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from star.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 1,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Trash",
+    "path": "src/components/ui/animated-icons/hugeicons/trash.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from trash.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 63,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Upload",
+    "path": "src/components/ui/animated-icons/hugeicons/upload.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from upload.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 14,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "User",
+    "path": "src/components/ui/animated-icons/hugeicons/user.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from user.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 14,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "XCircle",
+    "path": "src/components/ui/animated-icons/hugeicons/x-circle.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from x-circle.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 55,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "X",
+    "path": "src/components/ui/animated-icons/hugeicons/x.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from x.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "AnimatedThemeToggler",
+    "path": "src/components/ui/animated-theme-toggler.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from animated-theme-toggler.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Avatar",
+    "path": "src/components/ui/avatar.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from avatar.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "HIGH",
+    "usageCount": 14,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Badge",
+    "path": "src/components/ui/badge.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from badge.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 873,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Breadcrumb",
+    "path": "src/components/ui/breadcrumb.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from breadcrumb.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 2,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Bubble",
+    "path": "src/components/ui/bubble.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from bubble.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 8,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "BulkReassignDialog",
+    "path": "src/components/ui/bulk-reassign-dialog.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from bulk-reassign-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "BulkStatusDialog",
+    "path": "src/components/ui/bulk-status-dialog.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from bulk-status-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "Button",
+    "path": "src/components/ui/button.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 1767,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Card",
+    "path": "src/components/ui/card.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from card.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "HIGH",
+    "usageCount": 1056,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "Chart",
+    "path": "src/components/ui/chart.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from chart.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "HIGH",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "form"
+    ]
+  },
+  {
+    "name": "Checkbox",
+    "path": "src/components/ui/checkbox.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from checkbox.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "HIGH",
+    "usageCount": 40,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Combobox",
+    "path": "src/components/ui/combobox.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from combobox.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "empty",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "ContextNote",
+    "path": "src/components/ui/context-note.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from context-note.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 18,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "CurrencyInput",
+    "path": "src/components/ui/currency-input.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from currency-input.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "HIGH",
+    "usageCount": 9,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "DataTableColumnHeader",
+    "path": "src/components/ui/data-table/data-table-column-header.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from data-table-column-header.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 58,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "data-table"
+    ]
+  },
+  {
+    "name": "DataTablePagination",
+    "path": "src/components/ui/data-table/data-table-pagination.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from data-table-pagination.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "DataTableViewOptions",
+    "path": "src/components/ui/data-table/data-table-view-options.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from data-table-view-options.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "data-table"
+    ]
+  },
+  {
+    "name": "DataTable",
+    "path": "src/components/ui/data-table/data-table.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from data-table.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "HIGH",
+    "usageCount": 25,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Dialog",
+    "path": "src/components/ui/dialog.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from dialog.tsx.",
+    "designSystemEquivalent": "Dialog",
+    "confidence": "HIGH",
+    "usageCount": 173,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "Dock",
+    "path": "src/components/ui/dock.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from dock.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "HIGH",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Drawer",
+    "path": "src/components/ui/drawer.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from drawer.tsx.",
+    "designSystemEquivalent": "Drawer",
+    "confidence": "HIGH",
+    "usageCount": 18,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "DropdownMenu",
+    "path": "src/components/ui/dropdown-menu.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from dropdown-menu.tsx.",
+    "designSystemEquivalent": "Popover",
+    "confidence": "HIGH",
+    "usageCount": 44,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "EmptyState",
+    "path": "src/components/ui/empty-state.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from empty-state.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 35,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Field",
+    "path": "src/components/ui/field.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from field.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 121,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Form",
+    "path": "src/components/ui/form.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from form.tsx.",
+    "designSystemEquivalent": "FormField",
+    "confidence": "HIGH",
+    "usageCount": 11,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "form"
+    ]
+  },
+  {
+    "name": "InfoTooltip",
+    "path": "src/components/ui/info-tooltip.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from info-tooltip.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "HIGH",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "InlineGroup",
+    "path": "src/components/ui/inline-group.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from inline-group.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Input",
+    "path": "src/components/ui/input.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from input.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "HIGH",
+    "usageCount": 432,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "Label",
+    "path": "src/components/ui/label.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from label.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "HIGH",
+    "usageCount": 496,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "MagneticButton",
+    "path": "src/components/ui/magnetic-button.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from magnetic-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Marker",
+    "path": "src/components/ui/marker.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from marker.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Message",
+    "path": "src/components/ui/message.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from message.tsx.",
+    "designSystemEquivalent": "PageHeader",
+    "confidence": "HIGH",
+    "usageCount": 12,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Popover",
+    "path": "src/components/ui/popover.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from popover.tsx.",
+    "designSystemEquivalent": "Popover",
+    "confidence": "HIGH",
+    "usageCount": 12,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "Progress",
+    "path": "src/components/ui/progress.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from progress.tsx.",
+    "designSystemEquivalent": "FormField",
+    "confidence": "HIGH",
+    "usageCount": 23,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "ScrollArea",
+    "path": "src/components/ui/scroll-area.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from scroll-area.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "HIGH",
+    "usageCount": 69,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Select",
+    "path": "src/components/ui/select.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from select.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 151,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "SelectionToolbar",
+    "path": "src/components/ui/selection-toolbar.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from selection-toolbar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 16,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Separator",
+    "path": "src/components/ui/separator.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from separator.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 29,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Sheet",
+    "path": "src/components/ui/sheet.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from sheet.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 43,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "Sidebar",
+    "path": "src/components/ui/sidebar.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from sidebar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 22,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "loading",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "Skeleton",
+    "path": "src/components/ui/skeleton.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from skeleton.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 30,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "loading"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Sonner",
+    "path": "src/components/ui/sonner.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from sonner.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "loading",
+      "error",
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "StatefulButton",
+    "path": "src/components/ui/stateful-button.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from stateful-button.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "HIGH",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "Switch",
+    "path": "src/components/ui/switch.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from switch.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "HIGH",
+    "usageCount": 9,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Table",
+    "path": "src/components/ui/table.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from table.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "HIGH",
+    "usageCount": 111,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": [
+      "data-table"
+    ]
+  },
+  {
+    "name": "Tabs",
+    "path": "src/components/ui/tabs.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from tabs.tsx.",
+    "designSystemEquivalent": "Tabs",
+    "confidence": "HIGH",
+    "usageCount": 60,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "ToggleGroup",
+    "path": "src/components/ui/toggle-group.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from toggle-group.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "Toggle",
+    "path": "src/components/ui/toggle.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from toggle.tsx.",
+    "designSystemEquivalent": "Input",
+    "confidence": "HIGH",
+    "usageCount": 17,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "Tooltip",
+    "path": "src/components/ui/tooltip.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from tooltip.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "HIGH",
+    "usageCount": 80,
+    "status": "AUDITED",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "UserAvatar",
+    "path": "src/components/ui/user-avatar.tsx",
+    "category": "PRIMITIVE",
+    "purpose": "UI component inferred from user-avatar.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "HIGH",
+    "usageCount": 31,
+    "status": "UNKNOWN",
+    "recommendation": "KEEP_AND_REFINE",
+    "states": [
+      "loading"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "ShimmerSkeleton",
+    "path": "src/components/unlumen-ui/shimmer-skeleton.tsx",
+    "category": "COMPOSITE",
+    "purpose": "UI component inferred from shimmer-skeleton.tsx.",
+    "designSystemEquivalent": "FormField",
+    "confidence": "LOW",
+    "usageCount": 16,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "WhatsappConnectDialog",
+    "path": "src/components/whatsapp/whatsapp-connect-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from whatsapp-connect-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WorkspaceRail",
+    "path": "src/components/workspace-rail.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from workspace-rail.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "BulkQualificationDialog",
+    "path": "src/features/ai-qualification/components/bulk-qualification-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from bulk-qualification-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 6,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "FollowupRulesPanel",
+    "path": "src/features/ai-qualification/components/followup-rules-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from followup-rules-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AiAgentWizardClient",
+    "path": "src/features/automations/components/ai-agent-wizard-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from ai-agent-wizard-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "AutomationsClient",
+    "path": "src/features/automations/components/automations-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from automations-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WhatsappFlowsClient",
+    "path": "src/features/automations/components/whatsapp-flows-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from whatsapp-flows-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "BranchesManager",
+    "path": "src/features/branches/components/branches-manager.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from branches-manager.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "UnitMembersTable",
+    "path": "src/features/branches/components/unit-members-table.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from unit-members-table.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "UnitMetricsCards",
+    "path": "src/features/branches/components/unit-metrics-cards.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from unit-metrics-cards.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "UnitProfileHeader",
+    "path": "src/features/branches/components/unit-profile-header.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from unit-profile-header.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "UnitReportsExporter",
+    "path": "src/features/branches/components/unit-reports-exporter.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from unit-reports-exporter.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "UnitTopBrokers",
+    "path": "src/features/branches/components/unit-top-brokers.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from unit-top-brokers.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "LightClientsList",
+    "path": "src/features/broker-workspace/components/light-clients-list.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from light-clients-list.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LightDashboard",
+    "path": "src/features/broker-workspace/components/light-dashboard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from light-dashboard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LightFeedbackView",
+    "path": "src/features/broker-workspace/components/light-feedback-view.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from light-feedback-view.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LightLeadDetail",
+    "path": "src/features/broker-workspace/components/light-lead-detail.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from light-lead-detail.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LightLeadsList",
+    "path": "src/features/broker-workspace/components/light-leads-list.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from light-leads-list.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CatalogClient",
+    "path": "src/features/catalog/components/catalog-client.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from catalog-client.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CatalogStats",
+    "path": "src/features/catalog/components/catalog-stats.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from catalog-stats.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CommissionRulesManager",
+    "path": "src/features/commissions/components/commission-rules-manager.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from commission-rules-manager.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "IntegrationsCatalog",
+    "path": "src/features/communication-channels/components/integrations-catalog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from integrations-catalog.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaCloudSetupCard",
+    "path": "src/features/communication-channels/components/meta-cloud-setup-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-cloud-setup-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaEmbeddedSignupCard",
+    "path": "src/features/communication-channels/components/meta-embedded-signup-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-embedded-signup-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaIntegrationHub",
+    "path": "src/features/communication-channels/components/meta-integration-hub.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-integration-hub.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaManualIntegrationWorkspace",
+    "path": "src/features/communication-channels/components/meta-manual-integration-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-manual-integration-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "TenantDebugBar",
+    "path": "src/features/communication-channels/components/tenant-debug-bar.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from tenant-debug-bar.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "WhatsappTestMessageCard",
+    "path": "src/features/communication-channels/components/whatsapp-test-message-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from whatsapp-test-message-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 0,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PersonRecordDetails",
+    "path": "src/features/customer-record/components/person-record-details.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from person-record-details.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 9,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DocumentsWorkspace",
+    "path": "src/features/documents/components/documents-workspace.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from documents-workspace.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadDocumentsSection",
+    "path": "src/features/documents/components/lead-documents-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-documents-section.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "CommissionDetails",
+    "path": "src/features/financeiro/components/commission-details.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from commission-details.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "FinancialDashboard",
+    "path": "src/features/financeiro/components/financial-dashboard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from financial-dashboard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CatalogActionForm",
+    "path": "src/features/global-catalog/components/catalog-action-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from catalog-action-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 13,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "CatalogStatusBadge",
+    "path": "src/features/global-catalog/components/catalog-status-badge.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from catalog-status-badge.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "BrokerGoalView",
+    "path": "src/features/goals/components/broker-goal-view.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from broker-goal-view.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "GoalForm",
+    "path": "src/features/goals/components/goal-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from goal-form.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "GoalProgressCard",
+    "path": "src/features/goals/components/goal-progress-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from goal-progress-card.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "GoalsManager",
+    "path": "src/features/goals/components/goals-manager.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from goals-manager.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SystemGuide",
+    "path": "src/features/guide/components/system-guide.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from system-guide.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "BrokerDocumentsPanel",
+    "path": "src/features/leads/components/broker-documents-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from broker-documents-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "DailyActionPanel",
+    "path": "src/features/leads/components/daily-action-panel.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from daily-action-panel.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "form"
+    ]
+  },
+  {
+    "name": "FeedbackToastHandler",
+    "path": "src/features/leads/components/feedback-toast-handler.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from feedback-toast-handler.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "LeadActionHub",
+    "path": "src/features/leads/components/lead-action-hub.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-action-hub.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "LeadChat",
+    "path": "src/features/leads/components/lead-chat.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-chat.tsx.",
+    "designSystemEquivalent": "FormField",
+    "confidence": "MEDIUM",
+    "usageCount": 4,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "LeadFeedbackDialog",
+    "path": "src/features/leads/components/lead-feedback-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-feedback-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadHealthBadge",
+    "path": "src/features/leads/components/lead-health-badge.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-health-badge.tsx.",
+    "designSystemEquivalent": "Tooltip",
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "LeadProgressStepper",
+    "path": "src/features/leads/components/lead-progress-stepper.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-progress-stepper.tsx.",
+    "designSystemEquivalent": "Switch",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": []
+  },
+  {
+    "name": "LeadQuickNote",
+    "path": "src/features/leads/components/lead-quick-note.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-quick-note.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "LeadReminder",
+    "path": "src/features/leads/components/lead-reminder.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-reminder.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadStatusSelector",
+    "path": "src/features/leads/components/lead-status-selector.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-status-selector.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "LeadTasks",
+    "path": "src/features/leads/components/lead-tasks.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-tasks.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "LeadTimeline",
+    "path": "src/features/leads/components/lead-timeline.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from lead-timeline.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MessageTemplatePicker",
+    "path": "src/features/leads/components/message-template-picker.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from message-template-picker.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "success"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "NextStatusSuggestion",
+    "path": "src/features/leads/components/next-status-suggestion.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from next-status-suggestion.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "QuoteBuilder",
+    "path": "src/features/leads/components/quote-builder.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from quote-builder.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay"
+    ]
+  },
+  {
+    "name": "QuoteCard",
+    "path": "src/features/leads/components/quote-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from quote-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 2,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CampaignDetailView",
+    "path": "src/features/meta-ads/components/campaign-detail-view.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from campaign-detail-view.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CampaignsDashboardView",
+    "path": "src/features/meta-ads/components/campaigns-dashboard-view.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from campaigns-dashboard-view.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "data-table",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaAssetsModal",
+    "path": "src/features/meta-ads/components/meta-assets-modal.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-assets-modal.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaIntegrationView",
+    "path": "src/features/meta-ads/components/meta-integration-view.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-integration-view.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "permission",
+      "disabled"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MetaMarketingWizard",
+    "path": "src/features/meta-ads/components/meta-marketing-wizard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from meta-marketing-wizard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "permission",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "NextBestActionBanner",
+    "path": "src/features/next-best-action/components/next-best-action-banner.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from next-best-action-banner.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "NextBestActionCard",
+    "path": "src/features/next-best-action/components/next-best-action-card.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from next-best-action-card.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "NextBestActionInline",
+    "path": "src/features/next-best-action/components/next-best-action-inline.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from next-best-action-inline.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "RelatedActionsMenu",
+    "path": "src/features/next-best-action/components/related-actions-menu.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from related-actions-menu.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "NocAnomalyAlerts",
+    "path": "src/features/noc/components/noc-anomaly-alerts.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from noc-anomaly-alerts.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "NocHeatmap",
+    "path": "src/features/noc/components/noc-heatmap.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from noc-heatmap.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PushNotificationManager",
+    "path": "src/features/notifications/components/push-notification-manager.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from push-notification-manager.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 5,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "permission",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DirectorWizardLoader",
+    "path": "src/features/onboarding/components/director-wizard-loader.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from director-wizard-loader.tsx.",
+    "designSystemEquivalent": "Select",
+    "confidence": "LOW",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "DirectorWizard",
+    "path": "src/features/onboarding/components/director-wizard.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from director-wizard.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "page-header",
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "OnboardingBenefits",
+    "path": "src/features/onboarding/components/onboarding-benefits.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-benefits.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "OnboardingHero",
+    "path": "src/features/onboarding/components/onboarding-hero.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-hero.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "page-header"
+    ]
+  },
+  {
+    "name": "OnboardingPreview",
+    "path": "src/features/onboarding/components/onboarding-preview.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-preview.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "OnboardingProgress",
+    "path": "src/features/onboarding/components/onboarding-progress.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-progress.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": []
+  },
+  {
+    "name": "OnboardingStepItem",
+    "path": "src/features/onboarding/components/onboarding-step-item.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-step-item.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "success"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "OnboardingStepList",
+    "path": "src/features/onboarding/components/onboarding-step-list.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from onboarding-step-list.tsx.",
+    "designSystemEquivalent": null,
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "UNKNOWN",
+    "recommendation": "UNKNOWN",
+    "states": [],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "RouteOnboardingDialog",
+    "path": "src/features/onboarding/components/route-onboarding-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from route-onboarding-dialog.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "RouteOnboardingLoader",
+    "path": "src/features/onboarding/components/route-onboarding-loader.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from route-onboarding-loader.tsx.",
+    "designSystemEquivalent": "Dialog",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid",
+      "overlay"
+    ]
+  },
+  {
+    "name": "TenantOnboardingDialogLoader",
+    "path": "src/features/onboarding/components/tenant-onboarding-dialog-loader.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from tenant-onboarding-dialog-loader.tsx.",
+    "designSystemEquivalent": "Dialog",
+    "confidence": "LOW",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "overlay"
+    ]
+  },
+  {
+    "name": "TenantOnboardingDialog",
+    "path": "src/features/onboarding/components/tenant-onboarding-dialog.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from tenant-onboarding-dialog.tsx.",
+    "designSystemEquivalent": "Dialog",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": [
+      "filter-toolbar",
+      "kpi-grid",
+      "overlay",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WelcomeScreen",
+    "path": "src/features/onboarding/components/welcome-screen.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from welcome-screen.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success"
+    ],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "DirectorPerformanceManager",
+    "path": "src/features/performance/components/director-performance-manager.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from director-performance-manager.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CreateTenantForm",
+    "path": "src/features/platform-admin/components/create-tenant-form.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from create-tenant-form.tsx.",
+    "designSystemEquivalent": "FormField",
+    "confidence": "MEDIUM",
+    "usageCount": 7,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form"
+    ]
+  },
+  {
+    "name": "CustomerRenewalStatus",
+    "path": "src/features/post-sale/components/customer-renewal-status.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from customer-renewal-status.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "PostSaleSettings",
+    "path": "src/features/post-sale/components/post-sale-settings.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from post-sale-settings.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MaterialsManager",
+    "path": "src/features/promotional-materials/components/materials-manager.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from materials-manager.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "data-table",
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "MaterialsPublicPage",
+    "path": "src/features/promotional-materials/components/materials-public-page.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from materials-public-page.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "page-header",
+      "filter-toolbar",
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "CentralAtencaoWidget",
+    "path": "src/features/roadmap/components/central-atencao-widget.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from central-atencao-widget.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 1,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ActivityLogSection",
+    "path": "src/features/user-profile/components/activity-log-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from activity-log-section.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "PerfilTabs",
+    "path": "src/features/user-profile/components/perfil-tabs.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from perfil-tabs.tsx.",
+    "designSystemEquivalent": "Tabs",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [],
+    "patterns": [
+      "kpi-grid"
+    ]
+  },
+  {
+    "name": "PersonalDataSection",
+    "path": "src/features/user-profile/components/personal-data-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from personal-data-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "loading",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "ProfileHeader",
+    "path": "src/features/user-profile/components/profile-header.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from profile-header.tsx.",
+    "designSystemEquivalent": "Card",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "offline"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SecuritySummarySection",
+    "path": "src/features/user-profile/components/security-summary-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from security-summary-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "form",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "SessionsSection",
+    "path": "src/features/user-profile/components/sessions-section.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from sessions-section.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "empty",
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  },
+  {
+    "name": "WorkflowAutomationStudio",
+    "path": "src/features/workflow-automation/components/workflow-automation-studio.tsx",
+    "category": "FEATURE",
+    "purpose": "UI component inferred from workflow-automation-studio.tsx.",
+    "designSystemEquivalent": "Button",
+    "confidence": "MEDIUM",
+    "usageCount": 3,
+    "status": "AUDITED",
+    "recommendation": "MERGE",
+    "states": [
+      "error",
+      "success",
+      "disabled"
+    ],
+    "patterns": [
+      "kpi-grid",
+      "card-grid"
+    ]
+  }
+]

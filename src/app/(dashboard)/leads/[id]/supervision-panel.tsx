@@ -68,7 +68,7 @@ export function SupervisionPanel({
       setReassignVersion((v) => v + 1);
     }
   }, [reassignState]);
-  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState.success, router]);
+  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState, router]);
 
   useEffect(() => {
     if (assumeState.success) {
@@ -80,7 +80,7 @@ export function SupervisionPanel({
       setAssumeVersion((v) => v + 1);
     }
   }, [assumeState]);
-  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState.success, router]);
+  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState, router]);
 
   // SLA calculations
   const elapsedMinutes = Math.max(0, Math.round((Date.now() - stageEnteredAt.getTime()) / 60000));

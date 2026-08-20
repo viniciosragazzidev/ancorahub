@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   FileText,
@@ -76,6 +77,7 @@ export function LeadDocumentsSection({
   checklist?: ChecklistItem[];
   beneficiaries?: Beneficiary[];
 }) {
+  const router = useRouter();
   const [documents] = useState<UserDoc[]>(initialDocs);
   const [selectedBeneficiaryByRequirement, setSelectedBeneficiaryByRequirement] = useState<Record<string, string>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -130,7 +132,7 @@ export function LeadDocumentsSection({
         } else {
           toast.success(`Documento "${file.name}" enviado com sucesso!`);
           setDescription("");
-          window.location.reload();
+          router.refresh();
         }
       });
     } catch (err) {
@@ -166,7 +168,7 @@ export function LeadDocumentsSection({
     if (result.error) toast.error(result.error);
     else {
       toast.success("Documento removido.");
-      window.location.reload();
+      router.refresh();
     }
   };
 

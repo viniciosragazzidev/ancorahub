@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { completeRouteOnboarding, getRouteOnboardingState } from "../route-onboarding-service";
@@ -27,5 +26,4 @@ export async function setRouteOnboardingGlobalAction(formData: FormData) {
     id: crypto.randomUUID(), actorUserId: admin.userId, action: "route_onboarding.global_updated",
     targetType: "system_settings", targetId: "route_onboarding", metadata: { enabled }, createdAt: now,
   });
-  revalidatePath("/super-admin/settings");
 }

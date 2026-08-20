@@ -319,10 +319,10 @@ export function DistributionInbox({
 
   useEffect(() => {
     if (batchState.success) router.refresh();
-  }, [batchState.success, router]);
+  }, [batchState, router]);
   useEffect(() => {
     if (assignState.success) router.refresh();
-  }, [assignState.success, router]);
+  }, [assignState, router]);
 
   return (
     <>

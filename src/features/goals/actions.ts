@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAnyRole } from "@/shared/auth/authorization";
@@ -83,8 +82,6 @@ export async function createGoalAction(
       // Non-critical — progress can be recalculated later
     }
 
-    revalidatePath("/metas");
-    revalidatePath("/minha-meta");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -151,8 +148,6 @@ export async function updateGoalAction(
       // Non-critical
     }
 
-    revalidatePath("/metas");
-    revalidatePath("/minha-meta");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -190,8 +185,6 @@ export async function toggleGoalAction(
       .set({ active: !goal.active })
       .where(eq(schema.goals.id, goal.id));
 
-    revalidatePath("/metas");
-    revalidatePath("/minha-meta");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -222,8 +215,6 @@ export async function deleteGoalAction(
       .returning({ id: schema.goals.id });
 
     if (result.length === 0) return { error: "Meta não encontrada." };
-    revalidatePath("/metas");
-    revalidatePath("/minha-meta");
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -246,8 +237,6 @@ export async function recalculateGoalProgressAction(
 
     await calculateGoalProgress(goalId.data);
 
-    revalidatePath("/metas");
-    revalidatePath("/minha-meta");
     return { success: true };
   } catch (error) {
     return actionError(error);

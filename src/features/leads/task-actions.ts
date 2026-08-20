@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -69,7 +68,6 @@ export async function createLeadTaskAction(_previous: LeadTaskState, formData: F
       await tx.insert(schema.leadTaskAssignees).values(assigneeIds.map((userId) => ({ id: randomUUID(), tenantId: context.tenantId, taskId, userId })));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_task", entidadeId: taskId, acao: "criou" });
     });
-    revalidatePath(`/leads/${lead.id}`);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível criar a tarefa." };
@@ -91,7 +89,6 @@ export async function toggleLeadTaskAction(taskId: string): Promise<LeadTaskStat
       await tx.update(schema.leadTasks).set({ completedAt: task.completedAt ? null : new Date() }).where(and(eq(schema.leadTasks.id, task.id), eq(schema.leadTasks.tenantId, context.tenantId)));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_task", entidadeId: task.id, acao: task.completedAt ? "reabriu" : "concluiu" });
     });
-    revalidatePath(`/leads/${task.leadId}`);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível atualizar a tarefa." };

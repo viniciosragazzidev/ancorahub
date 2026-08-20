@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, lt, ne } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -113,7 +112,6 @@ async function findScheduleForMutation(scheduleId: string) {
 }
 
 function revalidateDutyWorkspace() {
-  revalidatePath("/leads/distribuicao/plantao");
 }
 
 export async function createDutyScheduleAction(_previous: DutyActionState, formData: FormData): Promise<DutyActionState> {

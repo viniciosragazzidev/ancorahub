@@ -2,7 +2,6 @@
 
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -138,7 +137,6 @@ export async function createChecklistTemplateAction(
       }
     });
 
-    revalidatePath("/settings/feedback-templates");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao criar template." };
@@ -175,7 +173,6 @@ export async function toggleChecklistTemplateAction(
       .set({ active: !template.active, updatedAt: new Date() })
       .where(eq(schema.feedbackChecklistTemplates.id, templateId));
 
-    revalidatePath("/settings/feedback-templates");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao atualizar template." };
@@ -203,7 +200,6 @@ export async function deleteChecklistTemplateAction(
         ),
       );
 
-    revalidatePath("/settings/feedback-templates");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao excluir template." };

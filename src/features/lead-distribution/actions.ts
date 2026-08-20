@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -96,7 +95,6 @@ export async function saveDistributionPolicyAction(
       entidadeId: existing?.id ?? context.tenantId,
       acao: "distribution_policy.updated",
     });
-    refreshDistribution();
     return { success: true };
   } catch (error) {
     return {
@@ -106,15 +104,10 @@ export async function saveDistributionPolicyAction(
   }
 }
 
-function refreshDistribution() {
-  revalidatePath("/leads/distribuicao");
-  revalidatePath("/leads/distribuicao/plantao");
-}
 
 export async function saveDistributionQueueAction(input: unknown) {
   try {
     const result = await saveDistributionQueue(await getRequiredTenantContext(), input);
-    refreshDistribution();
     return { success: true, id: result.id, message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
@@ -124,7 +117,6 @@ export async function saveDistributionQueueAction(input: unknown) {
 export async function deleteDistributionQueueAction(queueId: string) {
   try {
     await deleteDistributionQueue(await getRequiredTenantContext(), queueId);
-    refreshDistribution();
     return { success: true, message: "Fila removida com sucesso." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível excluir a fila." };
@@ -148,7 +140,6 @@ export async function getQueueDependenciesAction(queueId: string): Promise<{ suc
 export async function forceDeleteQueueAction(queueId: string) {
   try {
     await forceDeleteQueue(await getRequiredTenantContext(), queueId);
-    refreshDistribution();
     return { success: true, message: "Fila excluída e dependências desvinculadas." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível forçar a exclusão da fila." };
@@ -158,9 +149,6 @@ export async function forceDeleteQueueAction(queueId: string) {
 export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
   try {
     const route = await deleteMetaCampaignQueueRoute(await getRequiredTenantContext(), campaignId);
-    refreshDistribution();
-    revalidatePath("/integrations/meta");
-    revalidatePath("/marketing/campanhas");
     return { success: true, route, message: "Regra de campanha removida. A campanha voltará a usar a fila geral." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra da campanha." };
@@ -170,8 +158,6 @@ export async function deleteMetaCampaignQueueRouteAction(campaignId: string) {
 export async function deleteMetaAdQueueRouteAction(adId: string) {
   try {
     const route = await deleteMetaAdQueueRoute(await getRequiredTenantContext(), adId);
-    refreshDistribution();
-    revalidatePath("/integrations/meta");
     return { success: true, route, message: "Regra de anúncio removida. O anúncio voltará a usar a fila geral." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível remover a regra do anúncio." };
@@ -189,9 +175,6 @@ export async function simulateDistributionAction(input: unknown) {
 export async function saveMetaCampaignQueueRouteAction(input: unknown) {
   try {
     const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), input);
-    refreshDistribution();
-    revalidatePath("/integrations/meta");
-    revalidatePath("/marketing/campanhas");
     return { success: true, route, message: "Fila de distribuição da campanha atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra da campanha." };
@@ -201,8 +184,6 @@ export async function saveMetaCampaignQueueRouteAction(input: unknown) {
 export async function saveMetaAdQueueRouteAction(input: unknown) {
   try {
     const route = await saveMetaAdQueueRoute(await getRequiredTenantContext(), input);
-    refreshDistribution();
-    revalidatePath("/integrations/meta");
     return { success: true, route, message: "Regra de anúncio atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra do anúncio." };
@@ -241,7 +222,6 @@ export async function retryLeadEffectAction(formData: FormData) {
     entidadeId: effect.id,
     acao: "lead_effect.retry_requested",
   });
-  refreshDistribution();
 }
 
 export async function routeLeadToBranchAction(
@@ -280,7 +260,6 @@ export async function routeLeadToBranchAction(
             : "A unidade não pode receber leads agora.",
       };
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
-    refreshDistribution();
     return { success: true, message: "Lead enviado para a fila da unidade." };
   } catch (error) {
     return {
@@ -312,7 +291,6 @@ export async function assignLeadToBrokerAction(
       parsed.data.reason,
     );
     if (result.status !== "assigned") return { error: result.reason };
-    refreshDistribution();
     const message = result.notificationWarnings?.length
       ? `Lead atribuído ao corretor. Aviso: ${result.notificationWarnings.join("; ")}`
       : "Lead atribuído ao corretor.";
@@ -348,7 +326,6 @@ export async function routeAndAssignLeadAction(
     );
     if (result.status !== "assigned") return { error: result.reason };
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
-    refreshDistribution();
     const message = result.notificationWarnings?.length
       ? `Lead roteado e atribuído. Aviso: ${result.notificationWarnings.join("; ")}`
       : "Lead roteado para unidade e atribuído ao corretor.";
@@ -368,7 +345,6 @@ export async function distributeLeadAutomaticallyAction(
   if (!parsed.success) return { error: "Lead inválido." };
   try {
     const result = await processQueuedLead(await getRequiredTenantContext(), parsed.data);
-    refreshDistribution();
     if (result.status !== "assigned") return { error: result.reason };
     const message = result.notificationWarnings?.length
       ? `Lead distribuído automaticamente. Aviso: ${result.notificationWarnings.join("; ")}`
@@ -411,7 +387,6 @@ export async function distributeLeadBatchAction(
       }
     }
     await Promise.allSettled(enqueuePromises);
-    refreshDistribution();
     return {
       success: conflicts === 0,
       processed,
@@ -463,7 +438,6 @@ export async function assignLeadBatchToBrokerAction(
       if (result.status === "assigned") processed += 1;
       else conflicts += 1;
     }
-    refreshDistribution();
     return {
       success: conflicts === 0,
       processed,

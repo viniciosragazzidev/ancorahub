@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { CheckCircle, XCircle } from "@/components/huge-icons";
 import { toast } from "sonner";
@@ -19,11 +20,15 @@ export function AutoDistributeToggle({
     toggleAutoDistributeAction,
     {},
   );
+  const router = useRouter();
 
   useEffect(() => {
-    if (state.success) toast.success("Distribuição automática atualizada.");
+    if (state.success) {
+      toast.success("Distribuição automática atualizada.");
+      router.refresh();
+    }
     if (state.error) toast.error(state.error);
-  }, [state.success, state.error]);
+  }, [state, router]);
 
   return (
     <Card className="border-border bg-card shadow-none">

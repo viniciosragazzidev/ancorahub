@@ -1,11 +1,11 @@
-# Documentação do CorreTop
+﻿# Documentação do CorreTop
 
 ## Como usar este diretório
 
 | Documento | Finalidade | Fonte/estado |
 |---|---|---|
-| `../CorreTop_Documento_Requisitos.md` | Requisitos, escopo e pesquisa de produto | Fonte de referência v1.0 |
-| `../CorreTop_Arquitetura_Desenvolvimento.md` | Arquitetura e processo de engenharia | Fonte de referência |
+| `product/CorreTop_Documento_Requisitos.md` | Requisitos, escopo e pesquisa de produto | Fonte de referência v1.0 |
+| `architecture/CorreTop_Arquitetura_Desenvolvimento.md` | Arquitetura e processo de engenharia | Fonte de referência |
 | `../DESIGN.md` | Sistema de design e UX | Norma visual vigente |
 | `ui-foundation.md` | Uso obrigatório de shadcn, Unlumen e motion | Norma de UI vigente |
 | `../AI_RULES.md` | Instruções operacionais para IA | Norma de execução vigente |
@@ -43,5 +43,5 @@ substitui: ele torna o que é implementável, testável e auditável mais fácil
 Consulte `ux-audit-2026-07-13.md` para a auditoria heuristica, hipoteses de pesquisa
 e backlog prioritario de clareza e reducao de carga cognitiva. As regras obrigatorias
 correspondentes estao em `../AI_RULES.md` e no pre-flight de `engineering-checklist.md`.
-Referencia adicional: `../features/system_design.md` documenta a implementacao,
+Referencia adicional: `architecture/system_design.md` documenta a implementacao,
 beneficios e operacao da infraestrutura de escala.

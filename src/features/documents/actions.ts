@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -57,7 +56,6 @@ export async function createRequirementAction(
       appliesPerBeneficiary: parsed.data.appliesPerBeneficiary ?? false,
     });
 
-    revalidatePath("/documentos");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao criar requisito." };
@@ -83,7 +81,6 @@ export async function deleteRequirementAction(
       .returning({ id: schema.documentRequirements.id });
 
     if (result.length === 0) return { error: "Requisito não encontrado." };
-    revalidatePath("/documentos");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao excluir requisito." };
@@ -283,7 +280,6 @@ export async function confirmDocumentUploadAction({
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_document", entidadeId: docId, acao: "document.uploaded" });
     });
 
-    revalidatePath(`/leads/${leadId}`);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao salvar documento." };
@@ -381,8 +377,6 @@ export async function reviewDocumentAction({
       }).catch(() => { /* non-blocking */ });
     }
 
-    revalidatePath(`/leads/${leadId}`);
-    revalidatePath("/documentos");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao avaliar documento." };
@@ -416,8 +410,6 @@ export async function deleteDocumentAction(documentId: string): Promise<Document
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: document.leadId, userId: context.userId, tipo: "document_upload", conteudo: `Documento "${document.filename}" removido.`, metadata: { documentId } });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_document", entidadeId: document.id, acao: "document.deleted" });
     });
-    revalidatePath(`/leads/${document.leadId}`);
-    revalidatePath("/documentos");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao remover documento." };
@@ -536,7 +528,6 @@ export async function bulkReviewDocumentsAction(
       }
     });
 
-    revalidatePath("/documentos");
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erro ao processar lote." };

@@ -3,7 +3,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAnyRole } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -29,9 +28,6 @@ async function audit(userId: string, entityId: string, action: string) {
 }
 
 function revalidatePerformance() {
-  revalidatePath("/metas");
-  revalidatePath("/metas/desempenho");
-  revalidatePath("/dashboard");
 }
 
 export async function createSeasonAction(_: PerformanceActionState, formData: FormData): Promise<PerformanceActionState> {

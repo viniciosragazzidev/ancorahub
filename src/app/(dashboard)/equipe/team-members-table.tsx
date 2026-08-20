@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
@@ -47,6 +48,7 @@ type Props = {
 };
 
 export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId, canViewProfile }: Props) {
+  const router = useRouter();
   const [branchFilter, setBranchFilter] = useState("all");
   const [mobileQuery, setMobileQuery] = useState("");
   const [mobilePage, setMobilePage] = useState(0);
@@ -112,11 +114,12 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     if (bulkState.success) {
       toast.success(bulkState.message ?? "Operação concluída.");
       clearSelection();
+      router.refresh();
     }
     if (bulkState.error) {
       toast.error(bulkState.error);
     }
-  }, [bulkState.success, bulkState.error, bulkState.message, clearSelection]);
+  }, [bulkState, clearSelection, router]);
 
   const activeCount = displayedMembers.filter((member) => member.status === "active").length;
 

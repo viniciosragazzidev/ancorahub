@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -105,7 +104,6 @@ export async function quickReminderAction(
       });
     });
 
-    revalidatePath(`/leads/${lead.id}`);
     return { success: true };
   } catch (error) {
     return {
