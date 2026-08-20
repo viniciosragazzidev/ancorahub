@@ -113,24 +113,22 @@ export default async function BrokerConversationsPage({
   ]);
 
   // ── Buscar mensagens ──────────────────────────────────────────────────
-  const messageRows = leadIds.length
-    ? await db
-        .select({
-          id: schema.whatsappMessages.id,
-          leadId: schema.whatsappMessages.leadId,
-          clientId: schema.whatsappMessages.clientId,
-          phone: schema.whatsappMessages.phone,
-          body: schema.whatsappMessages.body,
-          direction: schema.whatsappMessages.direction,
-          senderRole: schema.whatsappMessages.senderRole,
-          providerStatus: schema.whatsappMessages.providerStatus,
-          sentAt: schema.whatsappMessages.sentAt,
-        })
-        .from(schema.whatsappMessages)
-        .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
-        .orderBy(desc(schema.whatsappMessages.sentAt))
-        .limit(500)
-    : [];
+  const messageRows = await db
+    .select({
+      id: schema.whatsappMessages.id,
+      leadId: schema.whatsappMessages.leadId,
+      clientId: schema.whatsappMessages.clientId,
+      phone: schema.whatsappMessages.phone,
+      body: schema.whatsappMessages.body,
+      direction: schema.whatsappMessages.direction,
+      senderRole: schema.whatsappMessages.senderRole,
+      providerStatus: schema.whatsappMessages.providerStatus,
+      sentAt: schema.whatsappMessages.sentAt,
+    })
+    .from(schema.whatsappMessages)
+    .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(500);
 
   const messagesByLead = new Map<string, typeof messageRows>();
   for (const msg of messageRows) {

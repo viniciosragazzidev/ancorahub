@@ -60,6 +60,9 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - A tela Lite reage ao sinal de invalidação `conversations` e reconcilia a cada 30
   segundos enquanto estiver visível. Assim, uma mensagem persistida aparece sem
   recarregamento manual mesmo se o sinal em tempo real for perdido.
+- A consulta de mensagens não depende de existir lead na carteira: conversas do
+  número oficial continuam sendo carregadas para um corretor que ainda não recebeu
+  nenhum lead.
 
 ## Validações
 
