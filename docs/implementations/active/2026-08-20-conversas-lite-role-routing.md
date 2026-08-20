@@ -1,6 +1,6 @@
 # Isolamento da central de conversas e modo Lite
 
-**Data:** 2026-08-20  
+**Data:** 2026-08-20
 **Estado:** implementado; build local inconclusivo
 
 ## Objetivo
