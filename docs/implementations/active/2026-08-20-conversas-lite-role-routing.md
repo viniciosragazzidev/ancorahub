@@ -1,7 +1,7 @@
 # Isolamento da central de conversas e modo Lite
 
 **Data:** 2026-08-20
-**Estado:** implementado; build local inconclusivo
+**Estado:** implementado; validação final pendente
 
 ## Objetivo
 
@@ -23,6 +23,21 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - A decisão usa `getExperienceMode(context)`, que deriva papel e preferência de um
   contexto autenticado no servidor; nenhum modo ou papel do navegador é autoridade.
 - Não há mudança de dados, schema, integração externa ou regra de negócio nova.
+
+## Evolução do atendimento Lite
+
+- `/conversas/broker` segue o blueprint `CHAT_PAGE`: lista pesquisável de conversas,
+  conversa ativa, ação para abrir o lead e retorno responsivo para a lista em telas
+  estreitas.
+- A seleção fica em `?leadId=`, de forma que o corretor pode retornar à conversa
+  correta sem usar estado implícito do navegador.
+- O diálogo `Conexão WAHA` disponibiliza a ação explícita de **Desconectar** para a
+  própria sessão autenticada do corretor; não há ação para sessões de terceiros.
+- Eventos de conexões de corretor não dependem de `feature_waha_cadence_enabled`.
+  A cadência continua sob seu kill switch; a conversa humana respeita apenas o
+  kill switch de conexões WAHA. Após persistir mensagem ou estado da sessão, o CRM
+  publica uma invalidação `conversations` dirigida somente ao corretor dono da sessão.
+  O sinal não contém telefone, nome ou mensagem.
 
 ## Validações
 

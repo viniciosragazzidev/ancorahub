@@ -7,6 +7,6 @@
     "DETAIL_PAGE": { "uses": ["/leads/[id]", "/clientes/[clientId]", "/equipe/[id]"] },
     "SETTINGS_PAGE": { "uses": ["/qualificacao", "/settings", "/leads/distribuicao"] },
     "DASHBOARD_PAGE": { "uses": ["/dashboard", "/diretor/resume", "/gestor"] },
-    "CHAT_PAGE": { "uses": ["/conversas"] }
+    "CHAT_PAGE": { "uses": ["/conversas", "/conversas/broker"] }
   }
 }
