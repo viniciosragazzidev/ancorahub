@@ -229,7 +229,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
               Conecte seu WhatsApp para iniciar seus atendimentos.
             </DialogDescription>
           </div>
-          <Badge variant={ready ? "success" : "outline"}>{label}</Badge>
+          <Badge variant={ready ? "success" : "outline"} className="ct-status-badge">{label}</Badge>
         </div>
 
         <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_15rem]">
@@ -238,7 +238,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
             {ready && (
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-500" />
+                  <span className="ct-connected-pulse size-2 rounded-full bg-emerald-500" />
                   <p className="text-sm font-semibold">Online</p>
                 </div>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -260,7 +260,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <p className="text-sm font-semibold">Preparando sua conexão…</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Aguardando o QR Code do WhatsApp.
+                  {connection.qrCode ? "Escaneie o QR Code no WhatsApp." : "Gerando QR Code..."}
                 </p>
               </div>
             )}
@@ -315,22 +315,24 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
             {connection.qrCode && !ready ? (
               <img
                 alt="QR Code para conectar o WhatsApp"
-                className="size-48"
+                className="ct-qr-enter size-48"
                 src={connection.qrCode.startsWith("data:") ? connection.qrCode : `data:image/png;base64,${connection.qrCode}`}
               />
             ) : (
               <div className="text-center text-slate-600">
                 {ready ? (
-                  <CheckCircle className="mx-auto size-9 text-emerald-600" />
+                  <CheckCircle className="ct-qr-enter mx-auto size-9 text-emerald-600" />
                 ) : (
-                  <LockKey className="mx-auto size-7" />
+                  <LockKey className={"mx-auto size-7" + (initializing ? " ct-waiting-breathe" : "")} />
                 )}
                 <p className="mt-2 text-xs font-medium">
-                  {ready
-                    ? "Dispositivo conectado"
-                    : initializing
-                      ? "Gerando QR Code…"
-                      : "Clique em Conectar"}
+                  {ready ? (
+                    <span className="ct-qr-enter">Dispositivo conectado</span>
+                  ) : initializing ? (
+                    <span className="ct-shimmer-text" data-text="Gerando QR Code…">Gerando QR Code…</span>
+                  ) : (
+                    "Clique em Conectar"
+                  )}
                 </p>
               </div>
             )}
