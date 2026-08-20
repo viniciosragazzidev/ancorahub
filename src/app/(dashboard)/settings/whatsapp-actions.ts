@@ -131,29 +131,19 @@ export async function getWhatsAppConnection() {
       };
 }
 
+/**
+ * Inicia ou retoma conexão WhatsApp.
+ * 
+ * Idempotente: se a sessão já existe no WAHA, reutiliza em vez de destruir.
+ * NÃO remove sessão existente — isso invalidava QR em pareamento.
+ */
 export async function startWhatsAppConnection() {
   const { context, db } = await getOwnConnection();
   const sessionName = generateWahaSessionName(context.tenantId, context.userId);
 
   try {
-    // Verificar se já existe conexão local com esta sessão
-    const [existingLocal] = await db
-      .select()
-      .from(schema.whatsappConnections)
-      .where(
-        and(
-          eq(schema.whatsappConnections.tenantId, context.tenantId),
-          eq(schema.whatsappConnections.userId, context.userId),
-        ),
-      )
-      .limit(1);
-
-    // Se já existe sessão local ativa, não criar outra — retornar status atual
-    if (existingLocal?.sessionName && existingLocal.status === "ready") {
-      return { success: true, sessionId: existingLocal.sessionName, qrCode: null };
-    }
-
     // Chamar Fastify para criar/iniciar sessão WAHA (idempotente)
+    // O endpoint /connections já trata: CONNECTED→retorna, WAITING_QR→retorna, STOPPED→reinicia
     const result = await vpsRequest("/internal/waha/connections", {
       method: "POST",
       body: {
@@ -164,15 +154,18 @@ export async function startWhatsAppConnection() {
     });
 
     const status = normalizeWahaStatus(result.status ?? "STARTING");
+    const isReady = status === "ready";
 
-    // Tentar obter QR imediatamente após criar a sessão
+    // Se a sessão já estava CONNECTED, não buscar QR
     let qrCode: string | null = null;
-    try {
-      const qrResult = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`);
-      const qrStatus = normalizeWahaStatus(qrResult.status ?? status);
-      qrCode = qrStatus === "ready" ? null : (qrResult.qr ?? null);
-    } catch {
-      // QR pode não estar disponível ainda — o polling vai buscar depois
+    if (!isReady) {
+      try {
+        const qrResult = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`);
+        const qrStatus = normalizeWahaStatus(qrResult.status ?? status);
+        qrCode = qrStatus === "ready" ? null : (qrResult.qr ?? null);
+      } catch {
+        // QR pode não estar disponível ainda — o polling vai buscar depois
+      }
     }
 
     // Upsert no banco local
@@ -196,7 +189,8 @@ export async function startWhatsAppConnection() {
       status,
       qrCode,
       webhookSecret: connection?.webhookSecret ?? randomUUID(),
-      chatInternoAtivo: true,
+      chatInternoAtivo: status === "ready" ? true : connection?.chatInternoAtivo ?? true,
+      connectedAt: isReady ? (connection?.connectedAt ?? new Date()) : connection?.connectedAt ?? null,
       updatedAt: new Date(),
     };
 
@@ -206,18 +200,21 @@ export async function startWhatsAppConnection() {
       await db.insert(schema.whatsappConnections).values(values);
     }
 
-    return { success: true, sessionId: sessionName, qrCode };
+    return { success: true, sessionId: sessionName, qrCode, status };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Não foi possível iniciar o WhatsApp.",
-    };
+    const message = error instanceof Error ? error.message : "Não foi possível iniciar o WhatsApp.";
+    // Normalizar código de erro para o frontend decidir UI
+    const code = /timeout|não respondeu/i.test(message) ? "WAHA_TIMEOUT"
+      : /indisponível|não foi possível conectar/i.test(message) ? "WAHA_UNAVAILABLE"
+      : /já existe|409/i.test(message) ? "SESSION_EXISTS"
+      : "WAHA_ERROR";
+    return { success: false, error: message, code };
   }
 }
 
 export async function refreshWhatsAppQr() {
   const { db, connection } = await getOwnConnection();
-  if (!connection?.sessionName) return { success: false, error: "Inicie uma sessão primeiro." };
+  if (!connection?.sessionName) return { success: false, error: "Inicie uma sessão primeiro.", code: "NO_SESSION" };
 
   try {
     const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`);
@@ -237,10 +234,12 @@ export async function refreshWhatsAppQr() {
 
     return { success: true, qrCode, status };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Não foi possível atualizar o QR Code.",
-    };
+    const message = error instanceof Error ? error.message : "Não foi possível atualizar o QR Code.";
+    const code = /timeout/i.test(message) ? "WAHA_TIMEOUT"
+      : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE"
+      : /QR|qr/i.test(message) ? "QR_ERROR"
+      : "WAHA_ERROR";
+    return { success: false, error: message, code };
   }
 }
 
@@ -268,7 +267,7 @@ export async function toggleWhatsAppChatAction(): Promise<{ success: boolean; ac
 
 export async function getWhatsAppSessionStatus() {
   const { db, connection } = await getOwnConnection();
-  if (!connection?.sessionName) return { success: false, error: "Sessão não configurada." };
+  if (!connection?.sessionName) return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
 
   try {
     const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/status`);
@@ -287,10 +286,11 @@ export async function getWhatsAppSessionStatus() {
 
     return { success: true, status, phone: result.phoneNumber ?? null };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Não foi possível consultar o status.",
-    };
+    const message = error instanceof Error ? error.message : "Não foi possível consultar o status.";
+    const code = /timeout/i.test(message) ? "WAHA_TIMEOUT"
+      : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE"
+      : "WAHA_ERROR";
+    return { success: false, error: message, code };
   }
 }
 
@@ -330,20 +330,26 @@ export async function resetWhatsAppSessionAction() {
         method: "POST",
       });
     }
-  } finally {
-    if (connection) {
-      await db
-        .update(schema.whatsappConnections)
-        .set({
-          sessionId: null,
-          sessionName: null,
-          status: "disconnected",
-          qrCode: null,
-          connectedAt: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.whatsappConnections.id, connection.id));
+  } catch (error) {
+    // Log mas não falhar — sessão pode já estar parada no WAHA
+    const message = error instanceof Error ? error.message : "unknown";
+    if (!/timeout|indisponível/i.test(message)) {
+      console.warn("[waha] reset: disconnect failed:", message);
     }
+  }
+
+  if (connection) {
+    await db
+      .update(schema.whatsappConnections)
+      .set({
+        sessionId: null,
+        sessionName: null,
+        status: "disconnected",
+        qrCode: null,
+        connectedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.whatsappConnections.id, connection.id));
   }
 
   return { success: true };

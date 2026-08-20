@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, LockKey, Monitor, WhatsappLogo } from "@/components/huge-icons";
+import { CheckCircle, LockKey, Monitor, WarningCircle, WhatsappLogo } from "@/components/huge-icons";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,25 @@ import {
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
 
+type ErrorCode = "WAHA_TIMEOUT" | "WAHA_UNAVAILABLE" | "WAHA_ERROR" | "SESSION_EXISTS" | "QR_ERROR" | "NO_SESSION";
+
 function statusLabel(status: string): string {
   switch (status) {
     case "ready": return "Conectado";
     case "initializing": return "Conectando…";
     case "error": return "Erro";
     default: return "Desconectado";
+  }
+}
+
+function errorMessage(code?: string | null): string {
+  switch (code) {
+    case "WAHA_TIMEOUT": return "O servidor WhatsApp demorou para responder. Tente novamente.";
+    case "WAHA_UNAVAILABLE": return "Serviço de WhatsApp temporariamente indisponível.";
+    case "SESSION_EXISTS": return "Sessão já existe. Reconectando…";
+    case "QR_ERROR": return "QR Code expirou ou indisponível. Gere um novo.";
+    case "NO_SESSION": return "Nenhuma sessão ativa. Inicie uma nova conexão.";
+    default: return "Não foi possível completar a operação. Tente novamente.";
   }
 }
 
@@ -37,6 +50,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   const polling = useRef(false);
   const ready = connection.status === "ready";
   const initializing = connection.status === "initializing";
+  const hasError = connection.status === "error";
   const label = statusLabel(connection.status);
 
   function recoverFromOutdatedAction(error: unknown): boolean {
@@ -69,7 +83,10 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     polling.current = true;
     try {
       const result = await getWhatsAppSessionStatus();
-      if (!result.success || !result.status) return;
+      if (!result.success || !result.status) {
+        // Se falhou ao consultar status, não atualizar UI — manter estado atual
+        return;
+      }
       if (result.status === "ready") {
         const wasReady = previousStatus.current === "ready";
         updateStatus("ready");
@@ -98,7 +115,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     }
   }
 
-  // Polling durante WAITING_QR / STARTING — intervalo progressivo
+  // Polling durante WAITING_QR / STARTING — intervalo fixo
   useEffect(() => {
     if (!open || !connection.sessionId || connection.status === "ready") return;
     void pollStatus();
@@ -122,6 +139,15 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     return true;
   }
 
+  /**
+   * Iniciar conexão WhatsApp.
+   * 
+   * CRÍTICO: NÃO destruir sessão existente antes de criar nova.
+   * O endpoint Fastify /connections é idempotente — se a sessão já existe,
+   * ele retorna o status atual sem recriar. Destruir antes causava:
+   * 1. QR em pareamento era invalidado instantaneamente
+   * 2. Erros de Server Component quando WAHA retornava erro durante destruição
+   */
   function start() {
     if (shouldBlockQrOnMobile()) return;
     startTransition(async () => {
@@ -129,17 +155,15 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         // Diagnóstico rápido: verificar se o VPS está acessível
         const diag = await diagnoseWahaConnection();
         if (!diag.ok) {
-          toast.error(`Falha na conexão com o servidor: ${diag.error}`, { duration: 10000 });
+          toast.error(`Serviço indisponível: ${diag.error}`, { duration: 10000 });
           return;
         }
-        // Se já existe sessão, resetar primeiro
-        if (connection.sessionId) {
-          await resetWhatsAppSessionAction();
-          setConnection((current) => ({ ...current, sessionId: null, qrCode: null, status: "disconnected" }));
-        }
+        // IDEMPOTENTE: chamar start direto — Fastify decide reutilizar ou criar
+        // NÃO chamar resetWhatsAppSessionAction() antes!
         const result = await startWhatsAppConnection();
         if (!result.success) {
-          toast.error(result.error, { duration: 8000 });
+          const code = (result as { code?: string }).code;
+          toast.error(errorMessage(code), { duration: 8000 });
           return;
         }
         // Usar QR retornado pelo start e/ou buscar atualizado
@@ -152,9 +176,9 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           status: (qr.success ? qr.status : null) ?? "initializing",
         }));
         if (newQrCode) {
-          toast.success("Sessão criada. Escaneie o QR Code.");
+          toast.success("Escaneie o QR Code no WhatsApp.");
         } else {
-          toast.info("Sessão criada. Aguardando QR Code...");
+          toast.info("Preparando conexão...");
         }
         await pollStatus();
       } catch (error) {
@@ -168,8 +192,10 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     startTransition(async () => {
       try {
         const result = await refreshWhatsAppQr();
-        if (!result.success) toast.error(result.error);
-        else {
+        if (!result.success) {
+          const code = (result as { code?: string }).code;
+          toast.error(errorMessage(code));
+        } else {
           setConnection((current) => ({
             ...current,
             qrCode: result.qrCode ?? current.qrCode,
@@ -218,6 +244,27 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     });
   }
 
+  function resetAndRetry() {
+    startTransition(async () => {
+      try {
+        await resetWhatsAppSessionAction();
+        setConnection((current) => ({
+          ...current,
+          sessionId: null,
+          sessionName: null,
+          qrCode: null,
+          status: "disconnected",
+          connectedAt: null,
+        }));
+        // Pequena pausa para garantir que o WAHA processou a exclusão
+        await new Promise((r) => setTimeout(r, 500));
+        await start();
+      } catch (error) {
+        showUnexpectedActionError(error);
+      }
+    });
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
@@ -255,22 +302,44 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
               </div>
             )}
 
+            {/* Estado: Erro (FAILED / ERROR no WAHA) */}
+            {!ready && hasError && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div className="flex items-start gap-2">
+                  <WarningCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                  <div>
+                    <p className="text-sm font-semibold text-destructive">Falha na conexão</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Não foi possível concluir o pareamento. Verifique se o WhatsApp está instalado e tente novamente.
+                    </p>
+                    <Button disabled={pending} onClick={resetAndRetry} variant="outline" size="sm" className="mt-3">
+                      Tentar novamente
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Estado: Inicializando / Aguardando QR */}
-            {!ready && initializing && (
+            {!ready && !hasError && initializing && (
               <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Preparando sua conexão…</p>
+                <p className="text-sm font-semibold">
+                  {connection.qrCode ? "Escaneie o QR Code" : "Preparando sua conexão…"}
+                </p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {connection.qrCode ? "Escaneie o QR Code no WhatsApp." : "Gerando QR Code..."}
+                  {connection.qrCode
+                    ? "Abra o WhatsApp no celular, vá em Dispositivos conectados e escaneie o código."
+                    : "Gerando QR Code..."}
                 </p>
               </div>
             )}
 
-            {/* Estado: Desconectado */}
-            {!ready && !initializing && (
+            {/* Estado: Desconectado (sem sessão) */}
+            {!ready && !hasError && !initializing && (
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <p className="text-sm font-semibold">Chat interno {connection.chatInternoAtivo ? "ativo" : "desativado"}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Se o pareamento for interrompido, use "Conectar" para gerar um QR Code limpo.
+                  Clique em Conectar para gerar um QR Code e vincular seu WhatsApp.
                 </p>
               </div>
             )}
@@ -289,25 +358,16 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
             {/* Botões de ação */}
             <div className="flex flex-wrap gap-2">
               <div className="hidden flex-wrap gap-2 md:flex">
-                <Button disabled={pending} onClick={start}>
+                <Button disabled={pending} onClick={hasError ? resetAndRetry : start}>
                   {connection.sessionId ? "Conectar novamente" : "Conectar WhatsApp"}
                 </Button>
-                {initializing && (
+                {initializing && connection.qrCode && (
                   <Button disabled={pending} onClick={refresh} variant="outline">
                     Gerar novo QR
                   </Button>
                 )}
               </div>
             </div>
-
-            {/* Diagnóstico: mostrar quando houver erro de conexão */}
-            {!ready && connection.status === "error" && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                <p className="text-xs font-medium text-destructive">
-                  Erro de conexão — verifique se o servidor WAHA está rodando no VPS.
-                </p>
-              </div>
-            )}
           </div>
 
           {/* QR Code panel */}
@@ -322,12 +382,16 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
               <div className="text-center text-slate-600">
                 {ready ? (
                   <CheckCircle className="ct-qr-enter mx-auto size-9 text-emerald-600" />
+                ) : hasError ? (
+                  <WarningCircle className="mx-auto size-7 text-destructive" />
                 ) : (
                   <LockKey className={"mx-auto size-7" + (initializing ? " ct-waiting-breathe" : "")} />
                 )}
                 <p className="mt-2 text-xs font-medium">
                   {ready ? (
                     <span className="ct-qr-enter">Dispositivo conectado</span>
+                  ) : hasError ? (
+                    "Pareamento falhou"
                   ) : initializing ? (
                     <span className="ct-shimmer-text" data-text="Gerando QR Code…">Gerando QR Code…</span>
                   ) : (
