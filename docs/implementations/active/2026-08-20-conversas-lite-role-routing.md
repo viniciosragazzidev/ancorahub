@@ -30,6 +30,8 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
   `?leadId=<id>&draft=broker_intro`. A rota valida no servidor que o lead pertence
   ao corretor autenticado e preenche uma mensagem editável; ela nunca é enviada
   automaticamente.
+- Os atalhos da fila e do detalhe Lite apontam diretamente para
+  `/conversas/broker`, mantendo `leadId` e `draft=broker_intro`.
 - O texto inicial vem de `broker_lite_opening_draft` quando configurado, aceita
   somente `{nome}` e usa uma saudação segura como fallback. O texto não é colocado
   na URL nem confiado ao navegador.

@@ -270,7 +270,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Quick Header Actions */}
               <div id="lead-actions" className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {hasPermission(context.role, "acessar_conversas") ? (
-                  <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}`} />} variant="outline">
+                  <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}&draft=broker_intro`} />} variant="outline">
                     <ChatCircleText className="size-3.5 text-primary" />
                     Conversas
                   </Button>

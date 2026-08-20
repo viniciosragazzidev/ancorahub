@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, HelpCircle, MagnifyingGlass, SlidersHorizontal } from "@/components/huge-icons";
+import {
+  ArrowRight,
+  HelpCircle,
+  MagnifyingGlass,
+  SlidersHorizontal,
+} from "@/components/huge-icons";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +39,13 @@ function formatDate(value: Date | string | null | undefined): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
 }
 
-export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightLeadItem[]; initialFilter?: FilterTab }) {
+export function LightLeadsList({
+  leads,
+  initialFilter = "all",
+}: {
+  leads: LightLeadItem[];
+  initialFilter?: FilterTab;
+}) {
   const [filter, setFilter] = useState<FilterTab>(initialFilter);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -44,14 +55,25 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
     // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      list = list.filter((l) => l.name.toLowerCase().includes(q) || (l.phone && l.phone.includes(q)) || (l.productName && l.productName.toLowerCase().includes(q)));
+      list = list.filter(
+        (l) =>
+          l.name.toLowerCase().includes(q) ||
+          (l.phone && l.phone.includes(q)) ||
+          (l.productName && l.productName.toLowerCase().includes(q)),
+      );
     }
 
     // Status filter
     if (filter === "awaiting") {
       list = list.filter((l) => l.status === "distributed" || l.status === "new");
     } else if (filter === "active") {
-      list = list.filter((l) => l.status === "in_contact" || l.status === "quote_sent" || l.status === "negotiation" || l.status === "documentation_pending");
+      list = list.filter(
+        (l) =>
+          l.status === "in_contact" ||
+          l.status === "quote_sent" ||
+          l.status === "negotiation" ||
+          l.status === "documentation_pending",
+      );
     } else if (filter === "finished") {
       list = list.filter((l) => l.status === "converted" || l.status === "lost");
     }
@@ -62,7 +84,12 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
         if (item.status === "distributed" || item.status === "new") return 1;
         if (item.isOverdue) return 2;
         if (item.dueAt) return 3;
-        if (item.status === "in_contact" || item.status === "quote_sent" || item.status === "negotiation") return 4;
+        if (
+          item.status === "in_contact" ||
+          item.status === "quote_sent" ||
+          item.status === "negotiation"
+        )
+          return 4;
         return 5;
       };
       return rank(a) - rank(b);
@@ -76,7 +103,9 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
       {/* Top Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Meus Leads</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+            Meus Leads
+          </span>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Atendimentos ({leads.length})
           </h1>
@@ -104,7 +133,7 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
             "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
             filter === "all"
               ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-              : "bg-muted text-muted-foreground hover:bg-muted/80"
+              : "bg-muted text-muted-foreground hover:bg-muted/80",
           )}
         >
           Todos ({leads.length})
@@ -117,7 +146,7 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
             "rounded-full px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1",
             filter === "awaiting"
               ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-              : "bg-muted text-muted-foreground hover:bg-muted/80"
+              : "bg-muted text-muted-foreground hover:bg-muted/80",
           )}
         >
           Aguardando aceite
@@ -133,10 +162,18 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
             "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
             filter === "active"
               ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-              : "bg-muted text-muted-foreground hover:bg-muted/80"
+              : "bg-muted text-muted-foreground hover:bg-muted/80",
           )}
         >
-          Em atendimento ({leads.filter((l) => ["in_contact", "quote_sent", "negotiation", "documentation_pending"].includes(l.status)).length})
+          Em atendimento (
+          {
+            leads.filter((l) =>
+              ["in_contact", "quote_sent", "negotiation", "documentation_pending"].includes(
+                l.status,
+              ),
+            ).length
+          }
+          )
         </button>
 
         <button
@@ -146,10 +183,11 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
             "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
             filter === "finished"
               ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-              : "bg-muted text-muted-foreground hover:bg-muted/80"
+              : "bg-muted text-muted-foreground hover:bg-muted/80",
           )}
         >
-          Finalizados ({leads.filter((l) => l.status === "converted" || l.status === "lost").length})
+          Finalizados ({leads.filter((l) => l.status === "converted" || l.status === "lost").length}
+          )
         </button>
       </div>
 
@@ -191,7 +229,7 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
                   "bg-card/95 transition-colors hover:border-primary/30",
                   isDistributed && "border-l-[3px] border-l-warning",
                   isConverted && "border-l-[3px] border-l-success",
-                  lead.isOverdue && !isDistributed && "border-l-[3px] border-l-destructive"
+                  lead.isOverdue && !isDistributed && "border-l-[3px] border-l-destructive",
                 )}
               >
                 <div className="space-y-3 p-4 sm:p-5">
@@ -246,10 +284,10 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
                     </span>
                     <div className="flex gap-2">
                       <Link
-                        href={`/conversas?leadId=${lead.id}`}
+                        href={`/conversas/broker?leadId=${lead.id}&draft=broker_intro`}
                         className={cn(
                           buttonVariants({ variant: "ghost", size: "sm" }),
-                          "h-9 flex-1 gap-1.5 px-3 text-xs font-semibold sm:flex-none"
+                          "h-9 flex-1 gap-1.5 px-3 text-xs font-semibold sm:flex-none",
                         )}
                       >
                         Chat
@@ -257,8 +295,11 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
                       <Link
                         href={`/leads/${lead.id}`}
                         className={cn(
-                          buttonVariants({ variant: isDistributed ? "default" : "outline", size: "sm" }),
-                          "h-9 flex-1 gap-1.5 px-4 text-xs font-semibold sm:w-auto"
+                          buttonVariants({
+                            variant: isDistributed ? "default" : "outline",
+                            size: "sm",
+                          }),
+                          "h-9 flex-1 gap-1.5 px-4 text-xs font-semibold sm:w-auto",
                         )}
                       >
                         {isDistributed ? "ACEITAR LEAD" : isConverted ? "VER" : "ABRIR"}
@@ -271,7 +312,10 @@ export function LightLeadsList({ leads, initialFilter = "all" }: { leads: LightL
             );
           })
         ) : (
-          <Card variant="subtle" className="flex flex-col items-center justify-center p-8 text-center bg-card/95 border-dashed">
+          <Card
+            variant="subtle"
+            className="flex flex-col items-center justify-center p-8 text-center bg-card/95 border-dashed"
+          >
             <SlidersHorizontal className="size-8 text-muted-foreground/60" />
             <h3 className="mt-2 text-sm font-semibold text-foreground">Nenhum lead encontrado</h3>
             <p className="mt-1 text-xs text-muted-foreground">
