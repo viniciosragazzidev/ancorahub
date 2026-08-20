@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConversationsWorkspace, type ConversationItem, type ConversationMessage } from "./conversations-workspace";
 import { OfficialBrokerConversations, type OfficialBrokerConversation, type OfficialBrokerMessage } from "./official-broker-conversations";
-import { LightConversationsView } from "@/features/broker-workspace/components/light-conversations-view";
-import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -27,6 +25,13 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
   }
+
+  // ── Corredores vão para /conversas/broker (modo lite com WAHA) ────────
+  const isBroker = context.role === "broker" || context.jobTitle === "broker";
+  if (isBroker) {
+    redirect("/conversas/broker");
+  }
+
   const db = getDatabase();
 
   const isDirector = context.role === "director";
@@ -34,121 +39,6 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const scope = context.role === "manager" && context.branchId
     ? eq(schema.leads.branchId, context.branchId)
     : undefined;
-
-  // ── Modo Lite (corretor) ──────────────────────────────────────────────
-  // Renderiza uma versão simplificada: lista de conversas + chat direto.
-  if ((await getExperienceMode(context)) === "LIGHT") {
-    const lightLeads = await db
-      .select({
-        id: schema.leads.id,
-        nome: schema.leads.nome,
-        telefone: schema.leads.telefone,
-        status: schema.leads.status,
-        createdAt: schema.leads.createdAt,
-        stageEnteredAt: schema.leads.stageEnteredAt,
-      })
-      .from(schema.leads)
-      .where(and(
-        eq(schema.leads.tenantId, context.tenantId),
-        isNull(schema.leads.deletedAt),
-        eq(schema.leads.corretorId, context.userId),
-      ))
-      .orderBy(desc(schema.leads.stageEnteredAt))
-      .limit(100);
-
-    const leadIds = lightLeads.map((l) => l.id);
-    const messageRows = leadIds.length
-      ? await db
-          .select({
-            id: schema.whatsappMessages.id,
-            leadId: schema.whatsappMessages.leadId,
-            phone: schema.whatsappMessages.phone,
-            body: schema.whatsappMessages.body,
-            direction: schema.whatsappMessages.direction,
-            senderRole: schema.whatsappMessages.senderRole,
-            providerStatus: schema.whatsappMessages.providerStatus,
-            sentAt: schema.whatsappMessages.sentAt,
-          })
-          .from(schema.whatsappMessages)
-          .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
-          .orderBy(desc(schema.whatsappMessages.sentAt))
-          .limit(500)
-      : [];
-
-    const messagesByLead = new Map<string, typeof messageRows>();
-    for (const msg of messageRows) {
-      const matched = lightLeads.find(
-        (l) => l.id === msg.leadId || (Boolean(msg.phone && l.telefone) && samePhone(msg.phone, l.telefone)),
-      );
-      if (matched) {
-        const list = messagesByLead.get(matched.id) ?? [];
-        list.push(msg);
-        messagesByLead.set(matched.id, list);
-      }
-    }
-
-    const conversations = lightLeads.map((lead) => {
-      const msgs = (messagesByLead.get(lead.id) ?? [])
-        .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
-        .slice(-100);
-      const latest = msgs.at(-1) ?? null;
-      return {
-        id: lead.id,
-        nome: lead.nome,
-        telefone: lead.telefone,
-        status: lead.status,
-        latestMessage: latest
-          ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() }
-          : null,
-        messages: msgs.map((m) => ({
-          id: m.id,
-          body: m.body,
-          direction: m.direction,
-          sentAt: m.sentAt.toISOString(),
-          senderRole: m.senderRole,
-          providerStatus: m.providerStatus,
-        })),
-      };
-    });
-
-    // Sort: conversations with recent messages first
-    conversations.sort((a, b) => {
-      const timeA = a.latestMessage ? new Date(a.latestMessage.sentAt).getTime() : 0;
-      const timeB = b.latestMessage ? new Date(b.latestMessage.sentAt).getTime() : 0;
-      return timeB - timeA;
-    });
-
-    // Check WhatsApp connection status for the broker
-    const [conn] = await db
-      .select({
-        sessionName: schema.whatsappConnections.sessionName,
-        status: schema.whatsappConnections.status,
-        chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
-      })
-      .from(schema.whatsappConnections)
-      .where(and(
-        eq(schema.whatsappConnections.tenantId, context.tenantId),
-        eq(schema.whatsappConnections.userId, context.userId),
-      ))
-      .limit(1);
-
-    const whatsappConnected = conn?.status === "ready" && conn?.chatInternoAtivo === true;
-
-    return (
-      <>
-        <DashboardHeader breadcrumb="Atendimento" title="Conversas" />
-        <main className="min-h-0 w-full flex-1 bg-background p-0">
-          <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:min-h-0 w-full overflow-hidden bg-card">
-            <LightConversationsView
-              conversations={conversations}
-              initialLeadId={leadId}
-              whatsappConnected={whatsappConnected}
-            />
-          </div>
-        </main>
-      </>
-    );
-  }
 
   const [leads, branches] = await Promise.all([
     db
@@ -340,7 +230,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
       uniqueConversationsByPhone.set(phoneKey, conv);
     } else {
       const allMsgs = [...existing.messages, ...conv.messages].sort(
-        (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
+        (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
       );
       const seenMsgIds = new Set<string>();
       const dedupedMsgs = allMsgs.filter((m) => {
