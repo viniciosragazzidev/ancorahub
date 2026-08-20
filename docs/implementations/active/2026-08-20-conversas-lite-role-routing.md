@@ -38,6 +38,8 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
   kill switch de conexões WAHA. Após persistir mensagem ou estado da sessão, o CRM
   publica uma invalidação `conversations` dirigida somente ao corretor dono da sessão.
   O sinal não contém telefone, nome ou mensagem.
+- A barra inferior exclusiva do corretor Lite inclui **Conversas**, com destino direto
+  a `/conversas/broker`; a barra não é montada para Diretor, Gestor ou modo normal.
 
 ## Validações
 
