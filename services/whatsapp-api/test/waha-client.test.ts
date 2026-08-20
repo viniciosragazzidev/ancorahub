@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { WahaClient } from "../src/integrations/waha/client.js";
-import { normalizeWahaStatus } from "../src/integrations/waha/types.js";
+import { WahaClientError, normalizeWahaStatus } from "../src/integrations/waha/types.js";
 
 const config = {
   baseUrl: "http://waha:3000",
@@ -36,6 +36,20 @@ test("normalizeWahaStatus: status desconhecido → DISCONNECTED", () => {
   assert.equal(normalizeWahaStatus("UNKNOWN"), "DISCONNECTED");
 });
 
+// ── WahaClientError ──────────────────────────────────────────────────
+
+test("WahaClientError preserva providerStatusCode", () => {
+  const err = new WahaClientError("WAHA_INTERNAL_ERROR", 502, "test", 409);
+  assert.equal(err.providerStatusCode, 409);
+  assert.equal(err.code, "WAHA_INTERNAL_ERROR");
+  assert.equal(err.statusCode, 502);
+});
+
+test("WahaClientError providerStatusCode é opcional", () => {
+  const err = new WahaClientError("WAHA_TIMEOUT", 504, "timeout");
+  assert.equal(err.providerStatusCode, undefined);
+});
+
 // ── WahaClient.health ──────────────────────────────────────────────────
 
 function mockFetch(handler: (url: string, init?: RequestInit) => Promise<Response>) {
@@ -58,7 +72,6 @@ test("health: WAHA retorna 401 → status unavailable (auth details hidden)", as
   }));
   const result = await client.health();
   assert.equal(result.ok, false);
-  // Auth details hidden from external consumers — maps to "unavailable"
   assert.equal(result.status, "unavailable");
   assert.equal(result.error, "WAHA_UNAUTHORIZED");
 });
@@ -87,8 +100,149 @@ test("health: JSON inválido no health não derruba o client", async () => {
   const client = new WahaClient(config, mockFetch(async () => {
     return new Response("not json", { status: 200, headers: { "content-type": "text/plain" } });
   }));
-  // JSON.parse vai falhar, mas o health() deve tratar como healthy
-  // (o WAHA pode não retornar JSON no health)
   const result = await client.health();
   assert.ok(typeof result.ok === "boolean");
+});
+
+// ── WahaClient.getSession ──────────────────────────────────────────────
+
+test("getSession: sessão existente → retorna WahaSession", async () => {
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/api/sessions/test123")) {
+      return new Response(JSON.stringify({ name: "test123", status: "WORKING", me: { id: "5511999999999@c.us" } }), { status: 200 });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  const session = await client.getSession("test123");
+  assert.ok(session);
+  assert.equal(session.status, "CONNECTED");
+  assert.equal(session.displayPhoneNumber, "5511999999999");
+});
+
+test("getSession: 404 → null (sessão não existe)", async () => {
+  const client = new WahaClient(config, mockFetch(async () => {
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+  const session = await client.getSession("nonexistent");
+  assert.equal(session, null);
+});
+
+test("getSession: 500 → lança erro (não retorna null)", async () => {
+  const client = new WahaClient(config, mockFetch(async () => {
+    return new Response(JSON.stringify({ error: "internal" }), { status: 500 });
+  }));
+  await assert.rejects(
+    () => client.getSession("test123"),
+    (err: unknown) => err instanceof WahaClientError && err.providerStatusCode === 500,
+  );
+});
+
+// ── WahaClient.createSession ──────────────────────────────────────────
+
+test("createSession: nova sessão → retorna status inicial", async () => {
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    if (url.includes("/api/sessions/") && init?.method === "POST" && !url.includes("/start")) {
+      return new Response(JSON.stringify({ name: "new123", status: "STARTING" }), { status: 201 });
+    }
+    if (url.includes("/api/sessions/new123") && (!init?.method || init.method === "GET")) {
+      return new Response(JSON.stringify({ name: "new123", status: "SCAN_QR_CODE" }), { status: 200 });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  const session = await client.createSession("new123");
+  assert.equal(session.status, "WAITING_QR");
+});
+
+test("createSession: 409 (sessão existe) → retorna sessão existente", async () => {
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    if (url.includes("/api/sessions/") && init?.method === "POST" && !url.includes("/start")) {
+      return new Response(JSON.stringify({ error: "already exists" }), { status: 409 });
+    }
+    if (url.includes("/api/sessions/exist409") && (!init?.method || init.method === "GET")) {
+      return new Response(JSON.stringify({ name: "exist409", status: "WORKING", me: { id: "5511888888888@c.us" } }), { status: 200 });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  const session = await client.createSession("exist409");
+  assert.ok(session);
+  assert.equal(session.status, "CONNECTED");
+});
+
+// ── WahaClient.getQr ──────────────────────────────────────────────────
+
+test("getQr: sessão em WAITING_QR com JSON data → retorna base64", async () => {
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/api/sessions/qrtest") && !url.includes("/auth")) {
+      return new Response(JSON.stringify({ name: "qrtest", status: "SCAN_QR_CODE" }), { status: 200 });
+    }
+    if (url.includes("/auth/qr")) {
+      return new Response(JSON.stringify({ data: "iVBORw0KGgo=" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  const qr = await client.getQr("qrtest");
+  assert.equal(qr, "iVBORw0KGgo=");
+});
+
+test("getQr: sessão em WAITING_QR com imagem binária → retorna base64", async () => {
+  const fakePng = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG header bytes
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/api/sessions/qrbin") && !url.includes("/auth")) {
+      return new Response(JSON.stringify({ name: "qrbin", status: "SCAN_QR_CODE" }), { status: 200 });
+    }
+    if (url.includes("/auth/qr")) {
+      return new Response(fakePng, {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  const qr = await client.getQr("qrbin");
+  assert.equal(typeof qr, "string");
+  assert.ok(qr.length > 0);
+  // Verify it's valid base64
+  assert.ok(Buffer.from(qr, "base64").length > 0);
+});
+
+test("getQr: sessão CONNECTED → lança QR_NOT_READY", async () => {
+  const client = new WahaClient(config, mockFetch(async () => {
+    return new Response(JSON.stringify({ name: "connected", status: "WORKING", me: { id: "5511999999999@c.us" } }), { status: 200 });
+  }));
+  await assert.rejects(
+    () => client.getQr("connected"),
+    (err: unknown) => err instanceof WahaClientError && err.code === "QR_NOT_READY",
+  );
+});
+
+test("getQr: sessão não existe → lança SESSION_NOT_FOUND", async () => {
+  const client = new WahaClient(config, mockFetch(async () => {
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+  await assert.rejects(
+    () => client.getQr("ghost"),
+    (err: unknown) => err instanceof WahaClientError && err.code === "SESSION_NOT_FOUND",
+  );
+});
+
+test("getQr: QR data vazio → lança QR_EXPIRED", async () => {
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/api/sessions/emptyqr") && !url.includes("/auth")) {
+      return new Response(JSON.stringify({ name: "emptyqr", status: "SCAN_QR_CODE" }), { status: 200 });
+    }
+    if (url.includes("/auth/qr")) {
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  await assert.rejects(
+    () => client.getQr("emptyqr"),
+    (err: unknown) => err instanceof WahaClientError && err.code === "QR_EXPIRED",
+  );
 });

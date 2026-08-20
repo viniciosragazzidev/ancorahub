@@ -7,7 +7,11 @@ export type WahaErrorCode =
   | "WAHA_TIMEOUT"
   | "WAHA_UNAUTHORIZED"
   | "WAHA_BAD_RESPONSE"
-  | "WAHA_INTERNAL_ERROR";
+  | "WAHA_INTERNAL_ERROR"
+  | "SESSION_NOT_FOUND"
+  | "SESSION_EXISTS"
+  | "QR_NOT_READY"
+  | "QR_EXPIRED";
 
 /**
  * Status normalizados internamente.
@@ -50,6 +54,7 @@ export class WahaClientError extends Error {
     public readonly code: WahaErrorCode,
     public readonly statusCode: number = 502,
     message?: string,
+    public readonly providerStatusCode?: number,
   ) {
     super(message ?? code);
     this.name = "WahaClientError";

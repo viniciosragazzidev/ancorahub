@@ -96,9 +96,11 @@ async function getOwnConnection() {
 function normalizeWahaStatus(raw: string): string {
   const s = raw.toUpperCase();
   if (s === "WORKING") return "ready";
+  if (s === "CONNECTED") return "ready";
   if (s === "STOPPED") return "disconnected";
   if (s === "FAILED") return "error";
-  if (s === "SCAN_QR_CODE" || s === "STARTING") return "initializing";
+  if (s === "ERROR") return "error";
+  if (s === "SCAN_QR_CODE" || s === "STARTING" || s === "WAITING_QR") return "initializing";
   return "disconnected";
 }
 
@@ -134,7 +136,24 @@ export async function startWhatsAppConnection() {
   const sessionName = generateWahaSessionName(context.tenantId, context.userId);
 
   try {
-    // Chamar Fastify para criar/iniciar sessão WAHA
+    // Verificar se já existe conexão local com esta sessão
+    const [existingLocal] = await db
+      .select()
+      .from(schema.whatsappConnections)
+      .where(
+        and(
+          eq(schema.whatsappConnections.tenantId, context.tenantId),
+          eq(schema.whatsappConnections.userId, context.userId),
+        ),
+      )
+      .limit(1);
+
+    // Se já existe sessão local ativa, não criar outra — retornar status atual
+    if (existingLocal?.sessionName && existingLocal.status === "ready") {
+      return { success: true, sessionId: existingLocal.sessionName, qrCode: null };
+    }
+
+    // Chamar Fastify para criar/iniciar sessão WAHA (idempotente)
     const result = await vpsRequest("/internal/waha/connections", {
       method: "POST",
       body: {
@@ -145,6 +164,16 @@ export async function startWhatsAppConnection() {
     });
 
     const status = normalizeWahaStatus(result.status ?? "STARTING");
+
+    // Tentar obter QR imediatamente após criar a sessão
+    let qrCode: string | null = null;
+    try {
+      const qrResult = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`);
+      const qrStatus = normalizeWahaStatus(qrResult.status ?? status);
+      qrCode = qrStatus === "ready" ? null : (qrResult.qr ?? null);
+    } catch {
+      // QR pode não estar disponível ainda — o polling vai buscar depois
+    }
 
     // Upsert no banco local
     let [connection] = await db
@@ -165,7 +194,7 @@ export async function startWhatsAppConnection() {
       sessionId: sessionName,
       sessionName,
       status,
-      qrCode: null,
+      qrCode,
       webhookSecret: connection?.webhookSecret ?? randomUUID(),
       chatInternoAtivo: true,
       updatedAt: new Date(),
@@ -177,7 +206,7 @@ export async function startWhatsAppConnection() {
       await db.insert(schema.whatsappConnections).values(values);
     }
 
-    return { success: true, sessionId: sessionName };
+    return { success: true, sessionId: sessionName, qrCode };
   } catch (error) {
     return {
       success: false,

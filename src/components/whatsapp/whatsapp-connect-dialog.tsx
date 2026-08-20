@@ -79,6 +79,17 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         if (returnTo) router.replace(returnTo);
       } else {
         updateStatus(result.status);
+        // Buscar QR code quando estiver aguardando pareamento
+        if (result.status === "initializing") {
+          const qr = await refreshWhatsAppQr();
+          if (qr.success && qr.qrCode) {
+            setConnection((current) => ({
+              ...current,
+              qrCode: qr.qrCode ?? current.qrCode,
+              status: qr.status ?? current.status,
+            }));
+          }
+        }
       }
     } catch (error) {
       showUnexpectedActionError(error);
@@ -131,16 +142,19 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           toast.error(result.error, { duration: 8000 });
           return;
         }
-        toast.success("Sessão iniciada. Escaneie o QR Code.");
-        // Buscar QR imediatamente
+        // Usar QR retornado pelo start e/ou buscar atualizado
         const qr = await refreshWhatsAppQr();
-        if (qr.success) {
-          setConnection((current) => ({
-            ...current,
-            sessionId: result.sessionId ?? current.sessionId,
-            qrCode: qr.qrCode ?? current.qrCode,
-            status: qr.status ?? "initializing",
-          }));
+        const newQrCode = (qr.success ? qr.qrCode : null) ?? (result as { qrCode?: string | null }).qrCode ?? null;
+        setConnection((current) => ({
+          ...current,
+          sessionId: result.sessionId ?? current.sessionId,
+          qrCode: newQrCode ?? current.qrCode,
+          status: (qr.success ? qr.status : null) ?? "initializing",
+        }));
+        if (newQrCode) {
+          toast.success("Sessão criada. Escaneie o QR Code.");
+        } else {
+          toast.info("Sessão criada. Aguardando QR Code...");
         }
         await pollStatus();
       } catch (error) {
@@ -299,7 +313,11 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           {/* QR Code panel */}
           <div className="hidden min-h-56 items-center justify-center rounded-lg bg-white p-3 md:flex">
             {connection.qrCode && !ready ? (
-              <img alt="QR Code para conectar o WhatsApp" className="size-48" src={connection.qrCode} />
+              <img
+                alt="QR Code para conectar o WhatsApp"
+                className="size-48"
+                src={connection.qrCode.startsWith("data:") ? connection.qrCode : `data:image/png;base64,${connection.qrCode}`}
+              />
             ) : (
               <div className="text-center text-slate-600">
                 {ready ? (
@@ -311,7 +329,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
                   {ready
                     ? "Dispositivo conectado"
                     : initializing
-                      ? "Aguardando QR Code…"
+                      ? "Gerando QR Code…"
                       : "Clique em Conectar"}
                 </p>
               </div>
