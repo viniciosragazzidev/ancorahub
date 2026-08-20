@@ -8,6 +8,7 @@ import { samePhone } from "@/features/communication-channels/service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasPermission } from "@/shared/auth/permissions";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 // Não gerar estaticamente — a página depende de sessão
 export const dynamic = "force-dynamic";
@@ -20,9 +21,9 @@ export const maxDuration = 300;
 export default async function BrokerConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string }>;
+  searchParams: Promise<{ leadId?: string; draft?: string }>;
 }) {
-  const { leadId } = await searchParams;
+  const { leadId, draft } = await searchParams;
   const context = await getRequiredTenantContext();
 
   if (!hasPermission(context.role, "acessar_conversas")) {
@@ -31,7 +32,7 @@ export default async function BrokerConversationsPage({
 
   // A superfície WAHA Lite é exclusiva do papel Corretor com o modo Lite ativo.
   // Diretores, gestores e corretores no modo normal usam a central geral.
-  if (context.role !== "broker" || await getExperienceMode(context) !== "LIGHT") {
+  if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") {
     redirect("/conversas");
   }
 
@@ -59,12 +60,38 @@ export default async function BrokerConversationsPage({
     .limit(100);
 
   const leadIds = lightLeads.map((l) => l.id);
+  const selectedLead = leadId ? lightLeads.find((lead) => lead.id === leadId) : null;
+  const draftTemplate =
+    draft === "broker_intro" ? await getSystemSetting("broker_lite_opening_draft") : null;
+  const initialDraft =
+    draft === "broker_intro" && selectedLead
+      ? (
+          draftTemplate?.trim() ||
+          "Olá, {nome}! Sou seu corretor e vou seguir com seu atendimento por aqui."
+        ).replaceAll("{nome}", selectedLead.nome.split(" ")[0] || selectedLead.nome)
+      : undefined;
   const [lightClients, tenantNumbers] = await Promise.all([
-    db.select({ id: schema.clients.id, leadId: schema.clients.leadId, nome: schema.clients.nome, telefone: schema.clients.telefone })
+    db
+      .select({
+        id: schema.clients.id,
+        leadId: schema.clients.leadId,
+        nome: schema.clients.nome,
+        telefone: schema.clients.telefone,
+      })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId)))
+      .where(
+        and(
+          eq(schema.clients.tenantId, context.tenantId),
+          eq(schema.clients.corretorId, context.userId),
+        ),
+      )
       .limit(100),
-    db.select({ id: schema.wahaNumbers.id, label: schema.wahaNumbers.label, phone: schema.wahaNumbers.displayPhoneNumber })
+    db
+      .select({
+        id: schema.wahaNumbers.id,
+        label: schema.wahaNumbers.label,
+        phone: schema.wahaNumbers.displayPhoneNumber,
+      })
       .from(schema.wahaNumbers)
       .where(eq(schema.wahaNumbers.tenantId, context.tenantId)),
   ]);
@@ -135,28 +162,71 @@ export default async function BrokerConversationsPage({
   });
 
   const clientConversations = lightClients.map((client) => {
-    const msgs = messageRows.filter((message) => message.clientId === client.id || message.leadId === client.leadId || samePhone(message.phone, client.telefone))
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-100);
+    const msgs = messageRows
+      .filter(
+        (message) =>
+          message.clientId === client.id ||
+          message.leadId === client.leadId ||
+          samePhone(message.phone, client.telefone),
+      )
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+      .slice(-100);
     const latest = msgs.at(-1) ?? null;
-    return { id: `client:${client.id}`, kind: "client" as const, sendTarget: { kind: "lead" as const, leadId: client.leadId }, nome: client.nome, telefone: client.telefone, status: "Cliente", latestMessage: latest ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() } : null, messages: msgs.map((message) => ({ id: message.id, body: message.body, direction: message.direction, sentAt: message.sentAt.toISOString(), senderRole: message.senderRole, providerStatus: message.providerStatus })) };
+    return {
+      id: `client:${client.id}`,
+      kind: "client" as const,
+      sendTarget: { kind: "lead" as const, leadId: client.leadId },
+      nome: client.nome,
+      telefone: client.telefone,
+      status: "Cliente",
+      latestMessage: latest
+        ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() }
+        : null,
+      messages: msgs.map((message) => ({
+        id: message.id,
+        body: message.body,
+        direction: message.direction,
+        sentAt: message.sentAt.toISOString(),
+        senderRole: message.senderRole,
+        providerStatus: message.providerStatus,
+      })),
+    };
   });
 
   const officialConversations = tenantNumbers.map((number) => {
-    const msgs = messageRows.filter((message) => !message.leadId && !message.clientId && samePhone(message.phone, number.phone))
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-100);
+    const msgs = messageRows
+      .filter(
+        (message) => !message.leadId && !message.clientId && samePhone(message.phone, number.phone),
+      )
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+      .slice(-100);
     const latest = msgs.at(-1) ?? null;
-    return { id: `tenant-number:${number.id}`, kind: "tenant_number" as const, sendTarget: { kind: "tenant_number" as const, numberId: number.id }, nome: number.label || "Número oficial do tenant", telefone: number.phone, status: "Número oficial", latestMessage: latest ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() } : null, messages: msgs.map((message) => ({ id: message.id, body: message.body, direction: message.direction, sentAt: message.sentAt.toISOString(), senderRole: message.senderRole, providerStatus: message.providerStatus })) };
+    return {
+      id: `tenant-number:${number.id}`,
+      kind: "tenant_number" as const,
+      sendTarget: { kind: "tenant_number" as const, numberId: number.id },
+      nome: number.label || "Número oficial do tenant",
+      telefone: number.phone,
+      status: "Número oficial",
+      latestMessage: latest
+        ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() }
+        : null,
+      messages: msgs.map((message) => ({
+        id: message.id,
+        body: message.body,
+        direction: message.direction,
+        sentAt: message.sentAt.toISOString(),
+        senderRole: message.senderRole,
+        providerStatus: message.providerStatus,
+      })),
+    };
   });
 
   // Sort: conversas com mensagens recentes primeiro
   const scopedConversations = [...conversations, ...clientConversations, ...officialConversations];
   scopedConversations.sort((a, b) => {
-    const timeA = a.latestMessage
-      ? new Date(a.latestMessage.sentAt).getTime()
-      : 0;
-    const timeB = b.latestMessage
-      ? new Date(b.latestMessage.sentAt).getTime()
-      : 0;
+    const timeA = a.latestMessage ? new Date(a.latestMessage.sentAt).getTime() : 0;
+    const timeB = b.latestMessage ? new Date(b.latestMessage.sentAt).getTime() : 0;
     return timeB - timeA;
   });
 
@@ -176,8 +246,7 @@ export default async function BrokerConversationsPage({
     )
     .limit(1);
 
-  const whatsappConnected =
-    conn?.status === "ready" && conn?.chatInternoAtivo === true;
+  const whatsappConnected = conn?.status === "ready" && conn?.chatInternoAtivo === true;
 
   return (
     <>
@@ -187,6 +256,7 @@ export default async function BrokerConversationsPage({
           <LightConversationsView
             conversations={scopedConversations}
             initialLeadId={leadId}
+            initialDraft={initialDraft}
             whatsappConnected={whatsappConnected}
           />
         </div>

@@ -10,40 +10,462 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
-import { sendLeadMessageAction, sendTenantOfficialNumberMessageAction } from "@/features/leads/actions/send-lead-message";
+import {
+  sendLeadMessageAction,
+  sendTenantOfficialNumberMessageAction,
+} from "@/features/leads/actions/send-lead-message";
 import { cn } from "@/lib/utils";
 
-export type LightConversationMessage = { id: string; body: string; direction: string; sentAt: string; senderRole?: string | null; providerStatus?: string | null };
-export type LightConversationItem = { id: string; kind: "lead" | "client" | "tenant_number"; sendTarget: { kind: "lead"; leadId: string } | { kind: "tenant_number"; numberId: string }; nome: string; telefone: string; status: string; latestMessage: { body: string; direction: string; sentAt: string } | null; messages: LightConversationMessage[] };
+export type LightConversationMessage = {
+  id: string;
+  body: string;
+  direction: string;
+  sentAt: string;
+  senderRole?: string | null;
+  providerStatus?: string | null;
+};
+export type LightConversationItem = {
+  id: string;
+  kind: "lead" | "client" | "tenant_number";
+  sendTarget: { kind: "lead"; leadId: string } | { kind: "tenant_number"; numberId: string };
+  nome: string;
+  telefone: string;
+  status: string;
+  latestMessage: { body: string; direction: string; sentAt: string } | null;
+  messages: LightConversationMessage[];
+};
 
-function formatTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date); }
-function formatDay(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date); }
-function isOutbound(direction: string) { return direction === "outgoing" || direction === "outbound"; }
+function formatTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
+}
+function formatDay(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
+}
+function isOutbound(direction: string) {
+  return direction === "outgoing" || direction === "outbound";
+}
 
-export function LightConversationsView({ conversations: serverConversations, initialLeadId, whatsappConnected }: { conversations: LightConversationItem[]; initialLeadId?: string; whatsappConnected: boolean }) {
-  const router = useRouter(); const pathname = usePathname(); const searchParams = useSearchParams();
+export function LightConversationsView({
+  conversations: serverConversations,
+  initialLeadId,
+  initialDraft,
+  whatsappConnected,
+}: {
+  conversations: LightConversationItem[];
+  initialLeadId?: string;
+  initialDraft?: string;
+  whatsappConnected: boolean;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState(serverConversations);
   const [selectedId, setSelectedId] = useState<string | null>(initialLeadId ?? null);
   const [query, setQuery] = useState("");
-  const [connection, setConnection] = useState<Awaited<ReturnType<typeof getWhatsAppConnection>> | null>(null);
+  const [connection, setConnection] = useState<Awaited<
+    ReturnType<typeof getWhatsAppConnection>
+  > | null>(null);
   useEffect(() => setConversations(serverConversations), [serverConversations]);
-  useEffect(() => setSelectedId(initialLeadId && serverConversations.some((item) => item.id === initialLeadId) ? initialLeadId : null), [initialLeadId, serverConversations]);
-  useEffect(() => { void getWhatsAppConnection().then(setConnection).catch(() => undefined); }, []);
+  useEffect(
+    () =>
+      setSelectedId(
+        initialLeadId && serverConversations.some((item) => item.id === initialLeadId)
+          ? initialLeadId
+          : null,
+      ),
+    [initialLeadId, serverConversations],
+  );
+  useEffect(() => {
+    void getWhatsAppConnection()
+      .then(setConnection)
+      .catch(() => undefined);
+  }, []);
   const selected = conversations.find((item) => item.id === selectedId) ?? null;
-  const filtered = useMemo(() => { const term = query.trim().toLocaleLowerCase("pt-BR"); return conversations.filter((item) => !term || item.nome.toLocaleLowerCase("pt-BR").includes(term) || item.telefone.includes(term)); }, [conversations, query]);
-  function selectConversation(leadId: string | null) { setSelectedId(leadId); const params = new URLSearchParams(searchParams.toString()); if (leadId) params.set("leadId", leadId); else params.delete("leadId"); router.replace(params.size ? `${pathname}?${params}` : pathname, { scroll: false }); }
-  function appendMessage(leadId: string, message: LightConversationMessage) { setConversations((current) => current.map((conversation) => conversation.id !== leadId || conversation.messages.some((item) => item.id === message.id) ? conversation : { ...conversation, messages: [...conversation.messages, message], latestMessage: { body: message.body, direction: message.direction, sentAt: message.sentAt } }).sort((a, b) => Date.parse(b.latestMessage?.sentAt ?? "") - Date.parse(a.latestMessage?.sentAt ?? ""))); }
+  const filtered = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("pt-BR");
+    return conversations.filter(
+      (item) =>
+        !term ||
+        item.nome.toLocaleLowerCase("pt-BR").includes(term) ||
+        item.telefone.includes(term),
+    );
+  }, [conversations, query]);
+  function selectConversation(leadId: string | null) {
+    setSelectedId(leadId);
+    const params = new URLSearchParams(searchParams.toString());
+    if (leadId) params.set("leadId", leadId);
+    else params.delete("leadId");
+    router.replace(params.size ? `${pathname}?${params}` : pathname, { scroll: false });
+  }
+  function appendMessage(leadId: string, message: LightConversationMessage) {
+    setConversations((current) =>
+      current
+        .map((conversation) =>
+          conversation.id !== leadId || conversation.messages.some((item) => item.id === message.id)
+            ? conversation
+            : {
+                ...conversation,
+                messages: [...conversation.messages, message],
+                latestMessage: {
+                  body: message.body,
+                  direction: message.direction,
+                  sentAt: message.sentAt,
+                },
+              },
+        )
+        .sort(
+          (a, b) =>
+            Date.parse(b.latestMessage?.sentAt ?? "") - Date.parse(a.latestMessage?.sentAt ?? ""),
+        ),
+    );
+  }
   if (!whatsappConnected) return <ConnectionEmptyState connection={connection} />;
-  return <section className="flex h-[calc(100dvh-var(--header-height,3.5rem))] min-h-[38rem] overflow-hidden border-y border-border/70 bg-background lg:border">
-    <aside className={cn("flex min-w-0 flex-1 flex-col border-r border-border/70 bg-card lg:max-w-[23rem] lg:flex-none", selected && "max-lg:hidden")} aria-label="Lista de conversas">
-      <div className="space-y-4 border-b border-border/70 px-4 py-4 sm:px-5"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Atendimento Lite</p><h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Suas conversas</h1><p className="mt-1 text-xs text-muted-foreground">{conversations.length} lead{conversations.length === 1 ? "" : "s"} na sua carteira</p></div>{connection ? <WhatsAppConnectDialog initial={connection} triggerLabel="Conexão WAHA" connectedLabel="Conexão WAHA" /> : <Button size="sm" variant="outline" disabled>WAHA</Button>}</div><Input aria-label="Buscar conversas" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nome ou telefone" /></div>
-      <ScrollArea className="min-h-0 flex-1"><div className="space-y-1 p-2">{filtered.map((conversation) => { const active = conversation.id === selectedId; return <button key={conversation.id} type="button" onClick={() => selectConversation(conversation.id)} className={cn("flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring", active && "bg-primary/10")} aria-current={active ? "page" : undefined}><span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary" aria-hidden="true">{conversation.nome.trim().slice(0, 1).toLocaleUpperCase("pt-BR")}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><span className="truncate text-sm font-semibold text-foreground">{conversation.nome}</span>{conversation.latestMessage ? <time className="shrink-0 text-[11px] text-muted-foreground" dateTime={conversation.latestMessage.sentAt}>{formatTime(conversation.latestMessage.sentAt)}</time> : null}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{conversation.latestMessage ? `${isOutbound(conversation.latestMessage.direction) ? "Você: " : ""}${conversation.latestMessage.body}` : "Sem mensagens ainda"}</span></span></button>; })}{!filtered.length ? <Card variant="subtle" className="m-2 border-dashed p-5 text-center"><p className="text-sm font-medium">Nenhuma conversa encontrada</p><p className="mt-1 text-xs text-muted-foreground">Altere a busca ou aguarde uma nova mensagem.</p></Card> : null}</div></ScrollArea>
-    </aside>
-    {selected ? <ConversationPanel conversation={selected} onBack={() => selectConversation(null)} onMessageSent={(message) => appendMessage(selected.id, message)} /> : <div className="hidden flex-1 flex-col items-center justify-center bg-muted/20 px-6 text-center lg:flex"><span className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary"><WhatsappLogo className="size-6" /></span><h2 className="mt-4 text-base font-semibold">Escolha uma conversa</h2><p className="mt-1 max-w-sm text-sm text-muted-foreground">Selecione um lead ao lado para ver o histórico e continuar o atendimento.</p></div>}
-  </section>;
+  return (
+    <section className="flex h-[calc(100dvh-var(--header-height,3.5rem))] min-h-[38rem] overflow-hidden border-y border-border/70 bg-background lg:border">
+      <aside
+        className={cn(
+          "flex min-w-0 flex-1 flex-col border-r border-border/70 bg-card lg:max-w-[23rem] lg:flex-none",
+          selected && "max-lg:hidden",
+        )}
+        aria-label="Lista de conversas"
+      >
+        <div className="space-y-4 border-b border-border/70 bg-primary/[0.04] px-4 py-5 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                Atendimento Lite
+              </p>
+              <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                Sua carteira
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {conversations.length} conversa{conversations.length === 1 ? "" : "s"} autorizada
+                {conversations.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            {connection ? (
+              <WhatsAppConnectDialog
+                initial={connection}
+                triggerLabel="WhatsApp"
+                connectedLabel="WhatsApp"
+              />
+            ) : (
+              <Button size="sm" variant="outline" disabled>
+                WhatsApp
+              </Button>
+            )}
+          </div>
+          <Input
+            aria-label="Buscar conversas"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar nome ou telefone"
+          />
+        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="space-y-1 p-2">
+            {filtered.map((conversation) => {
+              const active = conversation.id === selectedId;
+              return (
+                <button
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => selectConversation(conversation.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                    active && "bg-primary/10",
+                  )}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <span
+                    className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+                    aria-hidden="true"
+                  >
+                    {conversation.nome.trim().slice(0, 1).toLocaleUpperCase("pt-BR")}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold text-foreground">
+                        {conversation.nome}
+                      </span>
+                      {conversation.latestMessage ? (
+                        <time
+                          className="shrink-0 text-[11px] text-muted-foreground"
+                          dateTime={conversation.latestMessage.sentAt}
+                        >
+                          {formatTime(conversation.latestMessage.sentAt)}
+                        </time>
+                      ) : null}
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-muted-foreground">
+                      {conversation.latestMessage
+                        ? `${isOutbound(conversation.latestMessage.direction) ? "Você: " : ""}${conversation.latestMessage.body}`
+                        : "Sem mensagens ainda"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+            {!filtered.length ? (
+              <Card variant="subtle" className="m-2 border-dashed p-5 text-center">
+                <p className="text-sm font-medium">Nenhuma conversa encontrada</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Altere a busca ou aguarde uma nova mensagem.
+                </p>
+              </Card>
+            ) : null}
+          </div>
+        </ScrollArea>
+      </aside>
+      {selected ? (
+        <ConversationPanel
+          conversation={selected}
+          initialDraft={selected.id === initialLeadId ? initialDraft : undefined}
+          onBack={() => selectConversation(null)}
+          onMessageSent={(message) => appendMessage(selected.id, message)}
+        />
+      ) : (
+        <div className="hidden flex-1 flex-col items-center justify-center bg-muted/20 px-6 text-center lg:flex">
+          <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+            <WhatsappLogo className="size-6" />
+          </span>
+          <h2 className="mt-4 text-lg font-semibold">Escolha uma conversa</h2>
+          <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+            Selecione um contato da sua carteira para ver o histórico e responder.
+          </p>
+        </div>
+      )}
+    </section>
+  );
 }
 
-function ConnectionEmptyState({ connection }: { connection: Awaited<ReturnType<typeof getWhatsAppConnection>> | null }) { return <div className="mx-auto flex min-h-[32rem] w-full max-w-md flex-col items-center justify-center px-5 text-center"><span className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary"><WhatsappLogo className="size-8" /></span><h1 className="mt-5 text-xl font-semibold tracking-tight">Conecte seu WhatsApp</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">O WhatsApp é necessário para enviar e receber mensagens no atendimento Lite.</p>{connection ? <div className="mt-6"><WhatsAppConnectDialog initial={connection} triggerLabel="Conectar WhatsApp" connectedLabel="Gerenciar conexão" /></div> : <Button className="mt-6" disabled>Carregando conexão…</Button>}</div>; }
-function ConversationPanel({ conversation, onBack, onMessageSent }: { conversation: LightConversationItem; onBack: () => void; onMessageSent: (message: LightConversationMessage) => void }) { return <article className="flex min-w-0 flex-1 flex-col bg-card" aria-label={`Conversa com ${conversation.nome}`}><header className="flex items-center gap-3 border-b border-border/70 px-4 py-3 sm:px-5"><Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onBack} aria-label="Voltar para conversas"><ArrowLeft className="size-4" /></Button><span className="grid size-9 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary" aria-hidden="true">{conversation.nome.trim().slice(0, 1).toLocaleUpperCase("pt-BR")}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-semibold">{conversation.nome}</h2><p className="truncate text-xs text-muted-foreground">{conversation.telefone}</p></div>{conversation.sendTarget.kind === "lead" ? <Link href={`/leads/${conversation.sendTarget.leadId}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}>Ver lead</Link> : <span className="text-xs text-muted-foreground">Número oficial</span>}</header><ChatHistory messages={conversation.messages} clientName={conversation.nome} /><ChatInput target={conversation.sendTarget} onMessageSent={onMessageSent} /></article>; }
-function ChatHistory({ messages, clientName }: { messages: LightConversationMessage[]; clientName: string }) { const bottomRef = useRef<HTMLDivElement>(null); const sortedMessages = useMemo(() => [...messages].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)), [messages]); useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [sortedMessages.length]); if (!sortedMessages.length) return <div className="flex flex-1 flex-col items-center justify-center px-6 text-center"><p className="text-sm font-medium">Sem mensagens com {clientName}</p><p className="mt-1 text-xs text-muted-foreground">Envie a primeira mensagem para iniciar o atendimento.</p></div>; return <ScrollArea className="min-h-0 flex-1 bg-muted/20"><div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-5 sm:px-6">{sortedMessages.map((message) => <div key={message.id} className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}><div className={cn("max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-5 shadow-xs", isOutbound(message.direction) ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md bg-card text-foreground")}><p className="whitespace-pre-wrap break-words">{message.body}</p><p className={cn("mt-1 text-right text-[10px]", isOutbound(message.direction) ? "text-primary-foreground/70" : "text-muted-foreground")}>{formatDay(message.sentAt)} · {formatTime(message.sentAt)}</p></div></div>)}<div ref={bottomRef} /></div></ScrollArea>; }
-function ChatInput({ target, onMessageSent }: { target: LightConversationItem["sendTarget"]; onMessageSent: (message: LightConversationMessage) => void }) { const [text, setText] = useState(""); const [isPending, setIsPending] = useState(false); const [error, setError] = useState<string | null>(null); async function handleSend(event: React.FormEvent) { event.preventDefault(); const body = text.trim(); if (!body || isPending) return; setIsPending(true); setError(null); try { const result = target.kind === "lead" ? await sendLeadMessageAction(target.leadId, body) : await sendTenantOfficialNumberMessageAction(target.numberId, body); if (!result.success || !result.message) { setError(result.error ?? "Não foi possível enviar a mensagem."); return; } setText(""); onMessageSent({ id: result.message.id, body: result.message.body, direction: result.message.direction, sentAt: result.message.sentAt.toISOString() }); } catch { setError("Não foi possível enviar a mensagem. Tente novamente."); } finally { setIsPending(false); } } return <div className="border-t border-border/70 bg-card px-4 py-3 sm:px-5"><form onSubmit={handleSend} className="flex items-end gap-2"><div className="min-w-0 flex-1"><Input value={text} onChange={(event) => setText(event.target.value)} placeholder="Digite uma mensagem" disabled={isPending} aria-describedby={error ? "message-error" : undefined} />{error ? <p id="message-error" role="alert" className="mt-1 text-xs text-destructive">{error}</p> : null}</div><Button type="submit" size="icon-sm" disabled={isPending || !text.trim()} aria-label="Enviar mensagem"><PaperPlaneTilt className={cn("size-4", isPending && "animate-pulse")} /></Button></form></div>; }
+function ConnectionEmptyState({
+  connection,
+}: {
+  connection: Awaited<ReturnType<typeof getWhatsAppConnection>> | null;
+}) {
+  return (
+    <div className="mx-auto flex min-h-[32rem] w-full max-w-md flex-col items-center justify-center px-5 text-center">
+      <span className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+        <WhatsappLogo className="size-8" />
+      </span>
+      <h1 className="mt-5 text-xl font-semibold tracking-tight">Conecte seu WhatsApp</h1>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        O WhatsApp é necessário para enviar e receber mensagens no atendimento Lite.
+      </p>
+      {connection ? (
+        <div className="mt-6">
+          <WhatsAppConnectDialog
+            initial={connection}
+            triggerLabel="Conectar WhatsApp"
+            connectedLabel="Gerenciar conexão"
+          />
+        </div>
+      ) : (
+        <Button className="mt-6" disabled>
+          Carregando conexão…
+        </Button>
+      )}
+    </div>
+  );
+}
+function ConversationPanel({
+  conversation,
+  initialDraft,
+  onBack,
+  onMessageSent,
+}: {
+  conversation: LightConversationItem;
+  initialDraft?: string;
+  onBack: () => void;
+  onMessageSent: (message: LightConversationMessage) => void;
+}) {
+  return (
+    <article
+      className="flex min-w-0 flex-1 flex-col bg-card"
+      aria-label={`Conversa com ${conversation.nome}`}
+    >
+      <header className="flex items-center gap-3 border-b border-border/70 px-4 py-3 sm:px-5">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="lg:hidden"
+          onClick={onBack}
+          aria-label="Voltar para conversas"
+        >
+          <ArrowLeft className="size-4" />
+        </Button>
+        <span
+          className="grid size-10 place-items-center rounded-xl bg-primary/10 text-sm font-semibold text-primary"
+          aria-hidden="true"
+        >
+          {conversation.nome.trim().slice(0, 1).toLocaleUpperCase("pt-BR")}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold">{conversation.nome}</h2>
+          <p className="truncate text-xs text-muted-foreground">
+            {conversation.status} · {conversation.telefone}
+          </p>
+        </div>
+        {conversation.sendTarget.kind === "lead" ? (
+          <Link
+            href={`/leads/${conversation.sendTarget.leadId}`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
+          >
+            Ver lead
+          </Link>
+        ) : (
+          <span className="text-xs text-muted-foreground">Número oficial</span>
+        )}
+      </header>
+      <ChatHistory messages={conversation.messages} clientName={conversation.nome} />
+      <ChatInput
+        key={conversation.id}
+        initialText={initialDraft}
+        target={conversation.sendTarget}
+        onMessageSent={onMessageSent}
+      />
+    </article>
+  );
+}
+function ChatHistory({
+  messages,
+  clientName,
+}: {
+  messages: LightConversationMessage[];
+  clientName: string;
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const sortedMessages = useMemo(
+    () => [...messages].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)),
+    [messages],
+  );
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [sortedMessages.length]);
+  if (!sortedMessages.length)
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+        <p className="text-sm font-medium">Sem mensagens com {clientName}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Envie a primeira mensagem para iniciar o atendimento.
+        </p>
+      </div>
+    );
+  return (
+    <ScrollArea className="min-h-0 flex-1 bg-muted/20">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-5 sm:px-6">
+        {sortedMessages.map((message) => (
+          <div
+            key={message.id}
+            className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}
+          >
+            <div
+              className={cn(
+                "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-5 shadow-xs",
+                isOutbound(message.direction)
+                  ? "rounded-br-md bg-primary text-primary-foreground"
+                  : "rounded-bl-md bg-card text-foreground",
+              )}
+            >
+              <p className="whitespace-pre-wrap break-words">{message.body}</p>
+              <p
+                className={cn(
+                  "mt-1 text-right text-[10px]",
+                  isOutbound(message.direction)
+                    ? "text-primary-foreground/70"
+                    : "text-muted-foreground",
+                )}
+              >
+                {formatDay(message.sentAt)} · {formatTime(message.sentAt)}
+              </p>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+    </ScrollArea>
+  );
+}
+function ChatInput({
+  target,
+  initialText = "",
+  onMessageSent,
+}: {
+  target: LightConversationItem["sendTarget"];
+  initialText?: string;
+  onMessageSent: (message: LightConversationMessage) => void;
+}) {
+  const [text, setText] = useState(initialText);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSend(event: React.FormEvent) {
+    event.preventDefault();
+    const body = text.trim();
+    if (!body || isPending) return;
+    setIsPending(true);
+    setError(null);
+    try {
+      const result =
+        target.kind === "lead"
+          ? await sendLeadMessageAction(target.leadId, body)
+          : await sendTenantOfficialNumberMessageAction(target.numberId, body);
+      if (!result.success || !result.message) {
+        setError(result.error ?? "Não foi possível enviar a mensagem.");
+        return;
+      }
+      setText("");
+      onMessageSent({
+        id: result.message.id,
+        body: result.message.body,
+        direction: result.message.direction,
+        sentAt: result.message.sentAt.toISOString(),
+      });
+    } catch {
+      setError("Não foi possível enviar a mensagem. Tente novamente.");
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-border/70 bg-card px-4 py-3 sm:px-5">
+      {initialText ? (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Mensagem inicial pronta para você revisar antes do envio.
+        </p>
+      ) : null}
+      <form onSubmit={handleSend} className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Input
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Digite uma mensagem"
+            disabled={isPending}
+            aria-describedby={error ? "message-error" : undefined}
+          />
+          {error ? (
+            <p id="message-error" role="alert" className="mt-1 text-xs text-destructive">
+              {error}
+            </p>
+          ) : null}
+        </div>
+        <Button
+          type="submit"
+          size="icon-sm"
+          disabled={isPending || !text.trim()}
+          aria-label="Enviar mensagem"
+        >
+          <PaperPlaneTilt className={cn("size-4", isPending && "animate-pulse")} />
+        </Button>
+      </form>
+    </div>
+  );
+}

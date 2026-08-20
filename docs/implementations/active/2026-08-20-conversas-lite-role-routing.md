@@ -26,12 +26,19 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 
 ## Evolução do atendimento Lite
 
+- Ao abrir a conversa de um lead pelo atalho de WhatsApp, a aplicação usa
+  `?leadId=<id>&draft=broker_intro`. A rota valida no servidor que o lead pertence
+  ao corretor autenticado e preenche uma mensagem editável; ela nunca é enviada
+  automaticamente.
+- O texto inicial vem de `broker_lite_opening_draft` quando configurado, aceita
+  somente `{nome}` e usa uma saudação segura como fallback. O texto não é colocado
+  na URL nem confiado ao navegador.
 - `/conversas/broker` segue o blueprint `CHAT_PAGE`: lista pesquisável de conversas,
   conversa ativa, ação para abrir o lead e retorno responsivo para a lista em telas
   estreitas.
 - A seleção fica em `?leadId=`, de forma que o corretor pode retornar à conversa
   correta sem usar estado implícito do navegador.
-- O diálogo `Conexão WAHA` disponibiliza a ação explícita de **Desconectar** para a
+- O diálogo de conexão do WhatsApp disponibiliza a ação explícita de **Desconectar** para a
   própria sessão autenticada do corretor; não há ação para sessões de terceiros.
 - Eventos de conexões de corretor não dependem de `feature_waha_cadence_enabled`.
   A cadência continua sob seu kill switch; a conversa humana respeita apenas o
@@ -43,6 +50,9 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - A desconexão de uma sessão WAHA faz `POST` sem corpo; o cliente VPS omite
   `Content-Type: application/json` nesse caso para o Fastify não rejeitar a requisição
   com `FST_ERR_CTP_EMPTY_JSON_BODY` antes de alcançar o WAHA.
+- O provedor não aparece em rótulos, botões ou erros voltados ao usuário: a
+  superfície usa somente “WhatsApp”. Identificadores técnicos, logs e contratos
+  internos foram preservados para não alterar a integração.
 
 ## Validações
 
