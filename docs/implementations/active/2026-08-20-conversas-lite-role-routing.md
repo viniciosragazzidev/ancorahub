@@ -40,6 +40,9 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
   O sinal não contém telefone, nome ou mensagem.
 - A barra inferior exclusiva do corretor Lite inclui **Conversas**, com destino direto
   a `/conversas/broker`; a barra não é montada para Diretor, Gestor ou modo normal.
+- A desconexão de uma sessão WAHA faz `POST` sem corpo; o cliente VPS omite
+  `Content-Type: application/json` nesse caso para o Fastify não rejeitar a requisição
+  com `FST_ERR_CTP_EMPTY_JSON_BODY` antes de alcançar o WAHA.
 
 ## Validações
 

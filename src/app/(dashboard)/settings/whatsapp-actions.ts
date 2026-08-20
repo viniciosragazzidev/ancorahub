@@ -18,9 +18,9 @@ function vpsBaseUrl() {
   }
 }
 
-function vpsHeaders() {
+function vpsHeaders(hasJsonBody: boolean) {
   return {
-    "Content-Type": "application/json",
+    ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
     "X-CorreTop-Internal-Token": process.env.WHATSAPP_API_INTERNAL_TOKEN ?? "",
     "Authorization": `Bearer ${process.env.VPS_INTERNAL_API_TOKEN ?? ""}`,
   };
@@ -52,8 +52,8 @@ async function vpsRequest<T extends WahaConnectionResponse>(
   try {
     const response = await fetch(url, {
       method: options.method ?? "GET",
-      headers: vpsHeaders(),
-      body: options.body ? JSON.stringify(options.body) : undefined,
+      headers: vpsHeaders(options.body !== undefined),
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
@@ -169,7 +169,7 @@ export async function startWhatsAppConnection() {
     }
 
     // Upsert no banco local
-    let [connection] = await db
+    const [connection] = await db
       .select()
       .from(schema.whatsappConnections)
       .where(
