@@ -46,22 +46,33 @@ async function vpsRequest<T extends WahaConnectionResponse>(
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const base = vpsBaseUrl();
-  if (!base) throw new Error("VPS_API_URL não configurada.");
+  if (!base) throw new Error("VPS_API_URL não configurada no Vercel. Verifique as variáveis de ambiente.");
 
-  const response = await fetch(`${base}${path}`, {
-    method: options.method ?? "GET",
-    headers: vpsHeaders(),
-    body: options.body ? JSON.stringify(options.body) : undefined,
-    cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
-  });
+  const url = `${base}${path}`;
+  try {
+    const response = await fetch(url, {
+      method: options.method ?? "GET",
+      headers: vpsHeaders(),
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
 
-  const data = (await response.json().catch(() => null)) as T | null;
-  if (!response.ok || !data?.ok) {
-    const message = data && "error" in data ? String(data.error) : `WAHA retornou status ${response.status}`;
-    throw new Error(message);
+    const data = (await response.json().catch(() => null)) as T | null;
+    if (!response.ok || !data?.ok) {
+      const detail = data && "error" in data ? String(data.error) : `status ${response.status}`;
+      const routeHint = response.status === 404
+        ? ` A rota ${options.method ?? "GET"} ${path} não foi encontrada no servidor. Verifique se o Fastify service no VPS foi reiniciado com as rotas mais recentes.`
+        : "";
+      throw new Error(`WAHA (${detail})${routeHint}`);
+    }
+    return data;
+  } catch (error) {
+    if (error instanceof Error && /VPS_API_URL não configurada/.test(error.message)) throw error;
+    if (error instanceof Error && /WAHA \(/.test(error.message)) throw error;
+    // Erro de rede / timeout / DNS
+    throw new Error(`Não foi possível conectar ao servidor WAHA em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${error instanceof Error ? error.message : String(error)}`);
   }
-  return data;
 }
 
 // ── Connection helpers ────────────────────────────────────────────────
@@ -251,6 +262,33 @@ export async function getWhatsAppSessionStatus() {
       success: false,
       error: error instanceof Error ? error.message : "Não foi possível consultar o status.",
     };
+  }
+}
+
+/**
+ * Diagnóstico: testa conectividade com o VPS Fastify.
+ * Pode ser chamada do client para entender o que está falhando.
+ */
+export async function diagnoseWahaConnection() {
+  const base = vpsBaseUrl();
+  if (!base) return { ok: false, step: "config", error: "VPS_API_URL não configurada no Vercel." };
+
+  try {
+    const healthRes = await fetch(`${base}/health`, {
+      method: "GET",
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!healthRes.ok) return { ok: false, step: "health", error: `Health check retornou ${healthRes.status}` };
+  } catch (error) {
+    return { ok: false, step: "connectivity", error: `Não foi possível acessar ${base}. ${error instanceof Error ? error.message : String(error)}` };
+  }
+
+  try {
+    const wahaHealth = await vpsRequest("/internal/waha/health");
+    return { ok: true, step: "waha", status: wahaHealth.status, timestamp: wahaHealth.timestamp };
+  } catch (error) {
+    return { ok: false, step: "waha", error: error instanceof Error ? error.message : String(error) };
   }
 }
 

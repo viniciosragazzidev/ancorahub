@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
+  diagnoseWahaConnection,
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
   refreshWhatsAppQr,
@@ -47,7 +48,10 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   }
 
   function showUnexpectedActionError(error: unknown) {
-    if (!recoverFromOutdatedAction(error)) toast.error("Não foi possível atualizar a conexão por QR. Tente novamente.");
+    if (!recoverFromOutdatedAction(error)) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(msg || "Não foi possível conectar ao WhatsApp. Tente novamente.", { duration: 8000 });
+    }
   }
 
   function updateStatus(status: string) {
@@ -111,6 +115,12 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     if (shouldBlockQrOnMobile()) return;
     startTransition(async () => {
       try {
+        // Diagnóstico rápido: verificar se o VPS está acessível
+        const diag = await diagnoseWahaConnection();
+        if (!diag.ok) {
+          toast.error(`Falha na conexão com o servidor: ${diag.error}`, { duration: 10000 });
+          return;
+        }
         // Se já existe sessão, resetar primeiro
         if (connection.sessionId) {
           await resetWhatsAppSessionAction();
@@ -118,7 +128,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         }
         const result = await startWhatsAppConnection();
         if (!result.success) {
-          toast.error(result.error);
+          toast.error(result.error, { duration: 8000 });
           return;
         }
         toast.success("Sessão iniciada. Escaneie o QR Code.");
@@ -275,6 +285,15 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
                 )}
               </div>
             </div>
+
+            {/* Diagnóstico: mostrar quando houver erro de conexão */}
+            {!ready && connection.status === "error" && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-xs font-medium text-destructive">
+                  Erro de conexão — verifique se o servidor WAHA está rodando no VPS.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* QR Code panel */}
