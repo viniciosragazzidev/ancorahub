@@ -87,12 +87,14 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         .where(eq(schema.whatsappConnections.id, source.connection.id));
     }
 
-    // Revalidar a página de conversas para que a UI reflita o novo status
-    // sem depender apenas do polling do client
-    try {
-      revalidatePath("/conversas");
-    } catch {
-      // revalidatePath pode falhar fora de Server Components — não crítico
+    // Revalidar a página de conversas APENAS para conexões de corretor (modo lite)
+    // Números da plataforma (relay) não afetam a UI de conversas do corretor
+    if (source.kind === "connection") {
+      try {
+        revalidatePath("/conversas");
+      } catch {
+        // revalidatePath pode falhar fora de Server Components — não crítico
+      }
     }
 
     await markProcessed(db, registered.id);
