@@ -10,6 +10,7 @@ import { WAHA_CONNECTIONS_FEATURE } from "@/features/waha-cadence/connection-ser
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { samePhone } from "@/features/communication-channels/service";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { phoneHash, normalizePhone, type WahaWebhookEvent, WAHA_AI_FEATURE, WAHA_CADENCE_FEATURE } from "./contract";
 
 type SessionSource =
@@ -355,11 +356,18 @@ async function resolveContact(
 
   // The tenant's own official WAHA number is an internal Lite contact, never a
   // synthetic lead. It is rendered separately and may be answered by the broker.
-  const isTenantOfficialNumber = source.kind === "connection" && (await db
-    .select({ phone: schema.wahaNumbers.displayPhoneNumber })
-    .from(schema.wahaNumbers)
-    .where(eq(schema.wahaNumbers.tenantId, tenantId)))
-    .some((number) => samePhone(number.phone, normalizedPhone));
+  const isTenantOfficialNumber = source.kind === "connection" && (await Promise.all([
+    db.select({ phone: schema.wahaNumbers.displayPhoneNumber })
+      .from(schema.wahaNumbers)
+      .where(eq(schema.wahaNumbers.tenantId, tenantId)),
+    db.select({ phone: schema.communicationChannels.displayPhoneNumber })
+      .from(schema.communicationChannels)
+      .where(and(
+        eq(schema.communicationChannels.tenantId, tenantId),
+        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+        eq(schema.communicationChannels.status, "active"),
+      )),
+  ])).flat().some((number) => Boolean(number.phone) && samePhone(number.phone!, normalizedPhone));
 
   // For incoming external messages with no match: create a new lead.
   if (!isOutgoing && !leadId && !clientId && !isTenantOfficialNumber) {
