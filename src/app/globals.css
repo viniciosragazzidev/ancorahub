@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "../styles/theme.css";
+@import "../styles/typography.css";
 
 
 @custom-variant dark (&:is(.dark *));
@@ -1650,4 +1652,33 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 
 @media (prefers-reduced-motion: reduce) {
   .t-icon-swap .t-icon { transition: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+ * BoardUI Table primitive (components/base/table)
+ * --------------------------------------------------------------------------- */
+.bui-table {
+  @apply w-full border-collapse text-left;
+}
+.bui-table th {
+  @apply px-3 py-2.5 text-left align-middle text-body-medium text-text-tertiary whitespace-nowrap outline-none;
+  background-color: var(--color-background-secondary-default);
+  border-top: 1px solid var(--color-separator-border);
+  border-bottom: 1px solid var(--color-separator-border);
+  transition: padding 200ms ease, font-size 200ms ease;
+}
+.bui-table td {
+  @apply px-3 py-2.5 align-middle text-body-medium text-text-primary outline-none;
+  transition: padding 200ms ease, font-size 200ms ease;
+}
+.bui-table tbody tr {
+  @apply transition-colors duration-150;
+  border-bottom: 1px solid var(--color-separator-border);
+}
+.bui-table tbody tr[data-focus-visible] {
+  @apply ring-2 ring-inset ring-border-focus-ring;
+}
+.bui-table.bui-table-sm th,
+.bui-table.bui-table-sm td {
+  @apply px-2.5 py-1.5 text-body-2-medium;
 }
