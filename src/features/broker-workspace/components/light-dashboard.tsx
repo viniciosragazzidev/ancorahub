@@ -12,7 +12,6 @@ import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 function getGreeting() {
@@ -29,7 +28,6 @@ export function LightDashboard({
   data: BrokerWorkspaceData;
   logoUrl?: string | null;
 }) {
-  const router = useRouter();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const firstName = data.viewer.name.split(" ")[0] || "Corretor";
@@ -40,15 +38,12 @@ export function LightDashboard({
     toast.info("Encerrando sua sessão...");
     try {
       await signOut();
-      toast.success("Sessão encerrada.");
-      window.setTimeout(() => {
-        router.replace("/login");
-        router.refresh();
-      }, 250);
-    } catch (error) {
-      setLoggingOut(false);
-      toast.error(error instanceof Error ? error.message : "Não foi possível sair agora.");
+    } catch {
+      // signOut may fail if the server is unreachable, but we still redirect
+      // so the user can re-authenticate cleanly.
     }
+    // Hard navigation guarantees the proxy middleware runs with a cleared cookie.
+    window.location.href = "/login";
   }
 
   const awaitingResponse = data.today.awaitingResponse;

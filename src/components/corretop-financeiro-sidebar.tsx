@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 
@@ -45,7 +45,6 @@ function NavigationGroup({ label, items, roleKey, jobTitle, groupIndex }: { labe
 }
 
 export function CorreTopFinanceiroSidebar() {
-  const router = useRouter();
   const [user, setUser] = useState<UserDisplayInfo | null>(null);
   useEffect(() => { getUserDisplayInfo().then(setUser); }, []);
   const userName = user?.name ?? "Usuário";
@@ -55,8 +54,14 @@ export function CorreTopFinanceiroSidebar() {
 
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
-    try { await signOut(); toast.success("Sessão encerrada."); window.setTimeout(() => { router.replace("/login"); router.refresh(); }, 250); }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível sair agora."); }
+    try {
+      await signOut();
+    } catch {
+      // signOut may fail if the server is unreachable, but we still redirect
+      // so the user can re-authenticate cleanly.
+    }
+    // Hard navigation guarantees the proxy middleware runs with a cleared cookie.
+    window.location.href = "/login";
   }
 
   return <Sidebar variant="sidebar"><SidebarHeader><SidebarMenu><SidebarMenuItem><SidebarMenuButton className="h-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/financeiro" prefetch={false} />}><div className="grid size-7 place-items-center rounded-md bg-emerald-600 text-xs font-bold text-white">$</div><span className="truncate font-semibold tracking-tight">Financeiro</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu><div className="mx-2 rounded-md border border-sidebar-border bg-sidebar-warning/45 px-3 py-2.5 group-data-[collapsible=icon]:hidden"><p className="text-[11px] text-sidebar-foreground/55">Área financeira</p><p className="mt-0.5 truncate text-sm font-medium">{userRole || "Gestão Financeira"}</p></div></SidebarHeader><SidebarContent><NavigationGroup items={overviewItems} label="Visão geral" roleKey={roleKey} jobTitle={user?.jobTitle ?? null} groupIndex={0} /><NavigationGroup items={commissionItems} label="Comissões" roleKey={roleKey} jobTitle={user?.jobTitle ?? null} groupIndex={1} /><NavigationGroup items={goalsItems} label="Metas" roleKey={roleKey} jobTitle={user?.jobTitle ?? null} groupIndex={2} /><NavigationGroup items={reportsItems} label="Relatórios" roleKey={roleKey} jobTitle={user?.jobTitle ?? null} groupIndex={3} /><NavigationGroup items={settingsItems} label="Configurações" roleKey={roleKey} jobTitle={user?.jobTitle ?? null} groupIndex={4} /></SidebarContent><SidebarFooter><SidebarMenu><SidebarMenuItem><SidebarMenuButton size="lg" render={<button type="button" onClick={handleLogout} />} tooltip={userName}><span className="grid size-7 place-items-center rounded-full bg-secondary text-foreground border border-border/80 text-xs font-semibold">{initials}</span><span className="grid flex-1 text-left text-sm leading-tight"><span className="truncate font-medium">{userName}</span><span className="truncate text-xs text-sidebar-foreground/55">{userRole}</span></span><SignOut className="ml-auto size-4 shrink-0 text-sidebar-foreground/55 group-data-[collapsible=icon]:hidden" /></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarFooter></Sidebar>;
