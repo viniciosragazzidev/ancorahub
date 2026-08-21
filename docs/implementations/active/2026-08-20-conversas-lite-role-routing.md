@@ -65,6 +65,9 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - A consulta de mensagens não depende de existir lead na carteira: conversas do
   número oficial continuam sendo carregadas para um corretor que ainda não recebeu
   nenhum lead.
+- Mensagem desconhecida recebida na conexão pessoal do corretor não cria lead,
+  não entra no intake do tenant e não aciona qualificação por IA. A criação
+  sintética permanece exclusiva do relay oficial do tenant.
 
 ## Validações
 

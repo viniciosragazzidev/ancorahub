@@ -11,11 +11,33 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { samePhone } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { phoneHash, normalizePhone, type WahaWebhookEvent, WAHA_AI_FEATURE, WAHA_CADENCE_FEATURE } from "./contract";
+import {
+  phoneHash,
+  normalizePhone,
+  type WahaWebhookEvent,
+  WAHA_AI_FEATURE,
+  WAHA_CADENCE_FEATURE,
+} from "./contract";
 
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
   | { kind: "connection"; connection: typeof schema.whatsappConnections.$inferSelect };
+
+export function shouldCreateSyntheticLead(input: {
+  sourceKind: SessionSource["kind"];
+  isOutgoing: boolean;
+  hasLead: boolean;
+  hasClient: boolean;
+  isTenantOfficialNumber: boolean;
+}) {
+  return (
+    input.sourceKind === "number" &&
+    !input.isOutgoing &&
+    !input.hasLead &&
+    !input.hasClient &&
+    !input.isTenantOfficialNumber
+  );
+}
 
 /** Observability counters for webhook processing */
 interface WebhookMetrics {
@@ -49,7 +71,12 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   const payloadHash = createHash("sha256").update(rawPayload).digest("hex");
   const [registered] = await db
     .insert(schema.wahaWebhookEvents)
-    .values({ id: randomUUID(), externalEventId: event.eventId, eventType: event.type, payloadHash })
+    .values({
+      id: randomUUID(),
+      externalEventId: event.eventId,
+      eventType: event.type,
+      payloadHash,
+    })
     .onConflictDoNothing()
     .returning({ id: schema.wahaWebhookEvents.id });
   metrics.eventDedupMs = Date.now() - dedupStart;
@@ -71,7 +98,10 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     await markIgnored(db, registered.id, "feature_disabled");
     return { processed: 0, ignored: "feature_disabled" as const };
   }
-  if (source.kind === "connection" && (await getSystemSetting(WAHA_CONNECTIONS_FEATURE)) === "false") {
+  if (
+    source.kind === "connection" &&
+    (await getSystemSetting(WAHA_CONNECTIONS_FEATURE)) === "false"
+  ) {
     await markIgnored(db, registered.id, "feature_disabled");
     return { processed: 0, ignored: "feature_disabled" as const };
   }
@@ -84,7 +114,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       offline: "disconnected",
       error: "error",
     };
-    const normalizedStatus = event.sessionStatus ? (statusMap[event.sessionStatus] ?? event.sessionStatus) : "disconnected";
+    const normalizedStatus = event.sessionStatus
+      ? (statusMap[event.sessionStatus] ?? event.sessionStatus)
+      : "disconnected";
 
     if (source.kind === "number") {
       await db
@@ -160,7 +192,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // ── 6. Resolve lead/client (race-safe) ─────────────────────────────────
   const leadResolveStart = Date.now();
-  const { leadId, clientId, runId } = await resolveContact(db, source, tenantId, normalizedPhone, isOutgoing);
+  const { leadId, clientId, runId } = await resolveContact(
+    db,
+    source,
+    tenantId,
+    normalizedPhone,
+    isOutgoing,
+  );
   metrics.leadResolveMs = Date.now() - leadResolveStart;
 
   // For outgoing messages from broker: if no lead found, skip (don't create leads from broker's own messages)
@@ -190,7 +228,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         body: event.message!.body,
         sentAt: new Date(event.occurredAt),
       })
-      .onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+      .onConflictDoNothing({
+        target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId],
+      });
 
     // Update cadence run if applicable
     if (runId) {
@@ -229,7 +269,8 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // ── 8. AI processing (optional, background, only for inbound) ──────────
   if (!isOutgoing && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
-    const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
+    const { processInboundAiResponse } =
+      await import("@/features/ai-agent/conversation-state-machine");
     const aiPromise = processInboundAiResponse({
       tenantId,
       leadId,
@@ -329,12 +370,7 @@ async function resolveContact(
     const [lead] = await db
       .select({ id: schema.leads.id })
       .from(schema.leads)
-      .where(
-        and(
-          eq(schema.leads.tenantId, tenantId),
-          eq(schema.leads.telefone, normalizedPhone),
-        ),
-      )
+      .where(and(eq(schema.leads.tenantId, tenantId), eq(schema.leads.telefone, normalizedPhone)))
       .limit(1);
     if (lead) leadId = lead.id;
   }
@@ -345,10 +381,7 @@ async function resolveContact(
       .select({ id: schema.clients.id })
       .from(schema.clients)
       .where(
-        and(
-          eq(schema.clients.tenantId, tenantId),
-          eq(schema.clients.telefone, normalizedPhone),
-        ),
+        and(eq(schema.clients.tenantId, tenantId), eq(schema.clients.telefone, normalizedPhone)),
       )
       .limit(1);
     if (client) clientId = client.id;
@@ -356,21 +389,41 @@ async function resolveContact(
 
   // The tenant's own official WAHA number is an internal Lite contact, never a
   // synthetic lead. It is rendered separately and may be answered by the broker.
-  const isTenantOfficialNumber = source.kind === "connection" && (await Promise.all([
-    db.select({ phone: schema.wahaNumbers.displayPhoneNumber })
-      .from(schema.wahaNumbers)
-      .where(eq(schema.wahaNumbers.tenantId, tenantId)),
-    db.select({ phone: schema.communicationChannels.displayPhoneNumber })
-      .from(schema.communicationChannels)
-      .where(and(
-        eq(schema.communicationChannels.tenantId, tenantId),
-        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
-        eq(schema.communicationChannels.status, "active"),
-      )),
-  ])).flat().some((number) => Boolean(number.phone) && samePhone(number.phone!, normalizedPhone));
+  const isTenantOfficialNumber =
+    source.kind === "connection" &&
+    (
+      await Promise.all([
+        db
+          .select({ phone: schema.wahaNumbers.displayPhoneNumber })
+          .from(schema.wahaNumbers)
+          .where(eq(schema.wahaNumbers.tenantId, tenantId)),
+        db
+          .select({ phone: schema.communicationChannels.displayPhoneNumber })
+          .from(schema.communicationChannels)
+          .where(
+            and(
+              eq(schema.communicationChannels.tenantId, tenantId),
+              eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+              eq(schema.communicationChannels.status, "active"),
+            ),
+          ),
+      ])
+    )
+      .flat()
+      .some((number) => Boolean(number.phone) && samePhone(number.phone!, normalizedPhone));
 
-  // For incoming external messages with no match: create a new lead.
-  if (!isOutgoing && !leadId && !clientId && !isTenantOfficialNumber) {
+  // Only the tenant-owned relay flow may create a new lead from an unknown
+  // contact. A broker's personal WhatsApp is a restricted Lite workspace: an
+  // unrelated inbound message must never enter tenant intake or AI qualification.
+  if (
+    shouldCreateSyntheticLead({
+      sourceKind: source.kind,
+      isOutgoing,
+      hasLead: Boolean(leadId),
+      hasClient: Boolean(clientId),
+      isTenantOfficialNumber,
+    })
+  ) {
     const newLeadId = randomUUID();
     await db.insert(schema.leads).values({
       id: newLeadId,
