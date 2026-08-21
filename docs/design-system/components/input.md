@@ -10,4 +10,4 @@ Default, placeholder, hover, focus-visible, disabled, read-only e `aria-invalid`
 
 ## Migration
 
-Use `Field`, `FieldLabel`, `FieldDescription` e `FieldError` para anatomia de formulário. A definição final de FormField e de tokens de radius depende de DG-010/DG-003.
+Use `Field`, `FieldLabel`, `FieldDescription` e `FieldError` para anatomia de formulário. A definição de FormField foi resolvida em DG-010; controls usam `radius.control` conforme DG-003.

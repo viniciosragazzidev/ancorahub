@@ -8,7 +8,7 @@ function Field({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="field"
-      className={cn("grid gap-2", className)}
+      className={cn("grid gap-[var(--size-spacing-02)]", className)}
       {...props}
     />
   )
@@ -18,7 +18,7 @@ function FieldLabel({ className, ...props }: React.ComponentProps<"label">) {
   return (
     <label
       data-slot="field-label"
-      className={cn("text-sm font-medium leading-none", className)}
+      className={cn("text-sm font-medium leading-none tracking-tight", className)}
       {...props}
     />
   )

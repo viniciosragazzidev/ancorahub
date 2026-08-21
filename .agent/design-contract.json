@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "status": "ACTIVE",
   "sourceOfTruth": "docs/design-system/DESIGN_CONTRACT.md",
   "evidenceSource": "design.md",
@@ -14,5 +14,5 @@
   },
   "requiredBeforeUiChange": ["contract", "foundations", "component-rules", "declared-pattern-blueprint", "accessibility", "responsive", "motion"],
   "changeProtocol": "semver-and-implementation-record",
-  "gaps": ["DG-001", "DG-002", "DG-003", "DG-004", "DG-005", "DG-006", "DG-007", "DG-008", "DG-009", "DG-010", "DG-011"]
+  "gaps": ["DG-002", "DG-004", "DG-005", "DG-006", "DG-007", "DG-008"]
 }

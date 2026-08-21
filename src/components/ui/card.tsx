@@ -8,11 +8,11 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-4 rounded-xl border border-border/75 bg-card p-5 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-card motion-reduce:transition-none",
-        subtle: "gap-4 rounded-xl border border-border/65 bg-card/85 p-5",
-        overview: "gap-0 overflow-hidden rounded-xl border border-border/80 bg-card p-0",
-        compact: "gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
-        kanban: "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] hover:border-border-strong hover:bg-muted/20 motion-reduce:transition-none",
+        default: "gap-[var(--size-spacing-04)] rounded-[var(--radius-card)] border border-border bg-card p-[var(--size-spacing-05)] shadow-none",
+        subtle: "gap-[var(--size-spacing-04)] rounded-[var(--radius-card)] border border-border bg-[var(--surface-secondary)] p-[var(--size-spacing-05)] shadow-none",
+        overview: "gap-0 overflow-hidden rounded-[var(--radius-card)] border border-border bg-card p-0 shadow-none",
+        compact: "gap-[var(--size-spacing-03)] rounded-[var(--radius-card)] border border-border bg-card p-[var(--size-spacing-04)] shadow-none",
+        kanban: "gap-0 overflow-hidden rounded-[var(--radius-card)] border border-border bg-card p-0 shadow-none",
       },
     },
     defaultVariants: {
@@ -34,7 +34,7 @@ function Card({
       data-size={size}
       className={cn(
         cardVariants({ variant }),
-        size === "sm" && variant === "default" && "gap-3 rounded-lg p-4",
+        size === "sm" && variant === "default" && "gap-[var(--size-spacing-03)] p-[var(--size-spacing-04)]",
         className
       )}
       {...props}
@@ -60,7 +60,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-title"
       className={cn(
-        "font-sans text-[15px] font-semibold tracking-[-0.015em] text-foreground",
+        "font-sans text-base font-semibold tracking-tight text-foreground",
         className
       )}
       {...props}
@@ -105,7 +105,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-footer"
-      className={cn("flex items-center rounded-b-lg px-5 pb-5", className)}
+      className={cn("flex items-center rounded-b-[var(--radius-card)] px-[var(--size-spacing-05)] pb-[var(--size-spacing-05)]", className)}
       {...props}
     />
   )

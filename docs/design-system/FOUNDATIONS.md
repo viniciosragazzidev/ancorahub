@@ -7,7 +7,7 @@ As foundations abaixo são evidência de referência, não migração automátic
 | Cor | CONFIRMED | consultar `tokens/colors.md`; Electric Blue não é preenchimento de CTA ou superfície grande. |
 | Tipografia | CONFIRMED | consultar `tokens/typography.md`; Open Runde é primária na referência. |
 | Espaço | CONFIRMED | base 4 px, escala em `tokens/spacing.md`. |
-| Raio | CONFLICT | consultar `tokens/radius.md`; não arbitrar. |
+| Raio | CONFIRMED | controls 10 px, cards 16 px, imagens elevadas 20 px, panels 32 px e pills 999 px; usar aliases runtime. |
 | Bordas | CONFIRMED/MISSING | Mist é borda delicada; demais regras são gap. |
 | Sombra | CONFIRMED/CONFLICT | sombras são discretas; `subtle-2` precisa de confirmação. |
 | Motion | MISSING | seguir política do projeto até a escala ser decidida. |

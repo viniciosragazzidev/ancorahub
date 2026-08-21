@@ -14,6 +14,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
+import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -229,19 +230,12 @@ export function ConversationsWorkspace({
       aria-label="Central de conversas"
       className="flex h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:h-full w-full flex-col overflow-hidden bg-card"
     >
-      <header className="shrink-0 border-b border-border bg-card px-4 py-2.5 sm:px-5">
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight">Atendimentos</h2>
-              <Badge className="tabular-nums" variant="secondary">
-                {conversations.length}
-              </Badge>
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">Histórico e contexto de cada lead no seu escopo.</p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 overflow-x-auto max-w-full no-scrollbar py-0.5">
+      <FilterToolbar
+        aria-label="Filtros dos atendimentos"
+        className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
+        filters={
+          <>
+            <h2 className="sr-only">Filtros dos atendimentos</h2>
             {role === "director" && branches.length > 0 ? (
               <Select
                 labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
@@ -262,15 +256,16 @@ export function ConversationsWorkspace({
               </Select>
             ) : null}
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
               <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
               <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
               <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
               <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
             </div>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+        results={`${filtered.length} de ${conversations.length} atendimentos`}
+      />
 
       <div
           className={cn(

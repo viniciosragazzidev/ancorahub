@@ -26,19 +26,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
-          "--border-radius": "12px",
+          "--border-radius": "var(--radius-card)",
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: "ct-toast border border-border/80 shadow-md backdrop-blur-md rounded-xl p-3 text-xs font-medium",
+          toast: "ct-toast rounded-[var(--radius-card)] border border-border/80 p-3 text-xs font-medium shadow-[var(--shadow-dialog)] backdrop-blur-md",
           title: "ct-toast__title font-semibold text-xs",
           description: "ct-toast__description text-[11px] text-muted-foreground",
           icon: "ct-toast__icon",
           content: "ct-toast__content",
-          closeButton: "ct-toast__close rounded-md p-1 opacity-70 hover:opacity-100",
-          actionButton: "ct-toast__action bg-primary text-primary-foreground text-xs rounded-lg px-2.5 py-1",
-          cancelButton: "ct-toast__cancel bg-muted text-muted-foreground text-xs rounded-lg px-2.5 py-1",
+          closeButton: "ct-toast__close rounded-[var(--radius-control)] p-1 opacity-70 hover:opacity-100",
+          actionButton: "ct-toast__action rounded-full bg-primary px-2.5 py-1 text-xs text-primary-foreground",
+          cancelButton: "ct-toast__cancel rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground",
           success: "ct-toast--success border-emerald-500/25 bg-emerald-500/5 text-emerald-950 dark:text-emerald-100",
           error: "ct-toast--error border-destructive/25 bg-destructive/5 text-destructive-foreground",
           info: "ct-toast--info border-primary/25 bg-primary/5 text-foreground",

@@ -42,48 +42,47 @@
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
   --font-heading: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
   --radius: var(--radius-md);
-  --radius-sm: 0.5rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 1rem;
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-card);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-panel);
 }
 
 :root {
   color-scheme: light;
   /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
-  --surface-base: oklch(0.978 0.004 235);
+  --surface-base: #ffffff;
   /* Lvl 0: Base Canvas (#f5f5f3) */
   --surface-card: oklch(1 0 0);
   /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: oklch(0.970 0.002 260);
+  --surface-secondary: #f7fafc;
   /* Lvl 2: Recessed / Input (#eeeee9) */
   --surface-elevated: oklch(1.000 0 0);
   /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
-  --background: oklch(100% 0.00011 271.152);
-  --foreground: oklch(0.170 0.012 260);
+  --background: #ffffff;
+  --foreground: #1e1e1e;
 
-  --card: oklch(0.998 0.001 235);
-  --card-foreground: oklch(0.170 0.012 260);
+  --card: #ffffff;
+  --card-foreground: #1e1e1e;
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.170 0.012 260);
+  --popover-foreground: #1e1e1e;
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca ─────────────────────── */
-  --primary: oklch(0.560 0.190 255);
-  --primary-foreground: oklch(0.990 0 0);
+  --primary: #0d111b;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.965 0.003 260);
-  --secondary-foreground: oklch(0.220 0.012 260);
+  --secondary: #f7fafc;
+  --secondary-foreground: #1e1e1e;
 
-  --accent: oklch(0.955 0.024 255);
-  /* Ramp Esmeralda da Marca (#15A46B) */
-  --accent-foreground: oklch(0.420 0.150 255);
+  --accent: #eef6fb;
+  --accent-foreground: #1e1e1e;
 
-  --muted: oklch(0.948 0.007 235);
-  --muted-foreground: oklch(0.455 0.018 245);
-  --muted-text: oklch(0.580 0.012 260);
+  --muted: #f7fafc;
+  --muted-foreground: #666666;
+  --muted-text: #8d8d8d;
 
   /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
   --warning: oklch(0.660 0.165 75);
@@ -95,25 +94,25 @@
   --destructive: oklch(0.580 0.200 25);
   /* Erro e Ação Destrutiva */
 
-  --border: oklch(0.875 0.008 235);
+  --border: #ccd1da;
   /* Bordas suaves 1px */
-  --border-strong: oklch(0.820 0.006 260);
-  --input: oklch(0.965 0.004 235);
-  --ring: oklch(0.560 0.190 255);
+  --border-strong: #afb0b1;
+  --input: #ffffff;
+  --ring: #0098f2;
 
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.220 0.012 260);
-  --sidebar-primary: oklch(0.560 0.190 255);
-  --sidebar-primary-foreground: oklch(0.990 0 0);
-  --sidebar-accent: oklch(0.955 0.024 255);
-  --sidebar-accent-foreground: oklch(0.420 0.150 255);
+  --sidebar-primary: #0d111b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef6fb;
+  --sidebar-accent-foreground: #1e1e1e;
   --sidebar-warning: oklch(0.965 0.003 260);
   --sidebar-warning-foreground: oklch(0.220 0.012 260);
   --sidebar-border: oklch(0.890 0.004 260);
-  --sidebar-ring: oklch(0.560 0.190 255);
+  --sidebar-ring: #0098f2;
 
-  --ct-blue: oklch(0.560 0.190 255);
-  --ct-blue-strong: oklch(0.460 0.180 255);
+  --ct-blue: #0098f2;
+  --ct-blue-strong: #007fc9;
 
   /* ── Camada 4: Paleta de Gráficos em OKLCH (L = 0.64, C = 0.16) ─────────── */
   --chart-1: oklch(0.640 0.160 260);
@@ -159,7 +158,10 @@
   --motion-timing-function-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
   --motion-timing-function-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
 
-  --border-radius-rounded: 2px;
+  --radius-control: 0.625rem;
+  --radius-card: 1rem;
+  --radius-panel: 2rem;
+  --border-radius-rounded: var(--radius-control);
   --border-radius-circle: 50%;
   --border-radius-pill: 999px;
 
@@ -168,8 +170,9 @@
   --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.10), 0 8px 16px -4px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 8px 16px -4px rgb(0 0 0 / 0.12), 0 16px 32px -8px rgb(0 0 0 / 0.10);
   --shadow-xl: 0 16px 32px -8px rgb(0 0 0 / 0.18), 0 32px 64px -16px rgb(0 0 0 / 0.14);
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.025), 0 2px 8px rgb(15 23 42 / 0.025);
-  --shadow-dialog: 0 24px 64px rgb(15 23 42 / 0.16), 0 8px 24px rgb(15 23 42 / 0.08);
+  --shadow-action: 0 1px 2px rgb(13 17 27 / 0.18);
+  --shadow-card: 0 1px 2px rgb(10 13 20 / 0.03);
+  --shadow-dialog: 0 12px 30px rgb(15 23 42 / 0.12);
   --dialog-overlay-duration: 180ms;
   --dialog-content-duration: 220ms;
   --dialog-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -261,7 +264,7 @@
   --sync-error: var(--destructive);
   --sync-surface: var(--muted);
   --dashboard-canvas: oklch(0.968 0.006 235);
-  --radius: 0.875rem;
+  --radius: var(--radius-card);
 }
 
 .dark {
@@ -287,8 +290,8 @@
   --popover-foreground: oklch(0.940 0.006 260);
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca Dark ───────────────── */
-  --primary: oklch(0.690 0.170 255);
-  --primary-foreground: oklch(0.140 0.010 260);
+  --primary: #f2f5f7;
+  --primary-foreground: #0d111b;
 
   --secondary: oklch(0.240 0.008 260);
   --secondary-foreground: oklch(0.960 0.003 260);
@@ -312,18 +315,18 @@
   /* Bordas nítidas sem empastamento */
   --border-strong: oklch(0.380 0.010 260);
   --input: oklch(0.290 0.008 260);
-  --ring: oklch(0.960 0.003 260);
+  --ring: #0098f2;
 
   --sidebar: oklch(0.170 0.009 260);
   --sidebar-foreground: oklch(0.910 0.006 260);
-  --sidebar-primary: oklch(0.690 0.170 255);
-  --sidebar-primary-foreground: oklch(0.140 0.010 260);
-  --sidebar-accent: oklch(0.280 0.055 255);
-  --sidebar-accent-foreground: oklch(0.760 0.130 255);
+  --sidebar-primary: #f2f5f7;
+  --sidebar-primary-foreground: #0d111b;
+  --sidebar-accent: oklch(0.280 0.018 260);
+  --sidebar-accent-foreground: oklch(0.940 0.006 260);
   --sidebar-warning: oklch(0.230 0.011 260);
   --sidebar-warning-foreground: oklch(0.910 0.006 260);
   --sidebar-border: oklch(0.290 0.010 260);
-  --sidebar-ring: oklch(0.690 0.170 255);
+  --sidebar-ring: #0098f2;
 
   --ct-blue: oklch(0.960 0.003 260);
   --ct-blue-strong: oklch(0.960 0.003 260);
@@ -334,7 +337,7 @@
   --chart-3: oklch(0.740 0.150 230);
   --chart-4: oklch(0.740 0.150 300);
   --chart-5: oklch(0.740 0.150 65);
-  --radius: 0.875rem;
+  --radius: var(--radius-card);
 }
 
 /* Contrast guardrails for legacy status utilities. The light theme must keep

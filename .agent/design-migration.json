@@ -198,10 +198,10 @@
       "id": "UI-006",
       "type": "PATTERN",
       "name": "Page header and filters",
-      "status": "PLANNED",
+      "status": "MIGRATING",
       "priority": "P2",
-      "currentImplementations": 2,
-      "target": "PageHeader and FilterToolbar",
+      "currentImplementations": 3,
+      "target": "PageHeader, FilterToolbar and FormSection",
       "affectedRoutes": [
         "/2fa",
         "/access-denied",
@@ -229,7 +229,21 @@
         "/documentos",
         "/empresas"
       ],
-      "dependencies": []
+      "dependencies": [],
+      "pattern": ["CHAT_PAGE", "CRM_PAGE"],
+      "filesChanged": [
+        "src/components/ui/page-header.tsx",
+        "src/components/ui/filter-toolbar.tsx",
+        "src/components/ui/form-section.tsx",
+        "src/app/(dashboard)/conversas/conversations-workspace.tsx",
+        "src/app/(dashboard)/conversas/loading.tsx"
+      ],
+      "legacyRemoved": ["workspace header duplicado de atendimentos", "loading genérico de rota"],
+      "violationsBefore": ["contexto duplicado", "loading sem relação estrutural com o chat"],
+      "violationsAfter": [],
+      "tests": ["src/components/ui/pattern-primitives.test.tsx", "npm run type-check"],
+      "visualVerification": "PENDING_LOCAL_BROWSER_QA",
+      "remainingGaps": ["QA desktop/tablet/mobile da central com sessão autenticada"]
     }
   ]
 }
