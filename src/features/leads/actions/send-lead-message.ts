@@ -13,6 +13,7 @@ import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-me
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -21,6 +22,41 @@ export type SendLeadMessageResult = {
   error?: string;
   message?: { id: string; body: string; direction: string; sentAt: Date };
 };
+
+function getVpsApiConfig() {
+  const rawUrl = (
+    process.env.VPS_API_URL ||
+    process.env.WAHA_API_URL ||
+    process.env.WAHA_RELAY_URL ||
+    process.env.NEXT_PUBLIC_VPS_API_URL
+  )?.trim();
+
+  const token = (
+    process.env.WHATSAPP_API_INTERNAL_TOKEN ||
+    process.env.VPS_INTERNAL_API_TOKEN ||
+    process.env.VPS_API_TOKEN ||
+    process.env.WAHA_RELAY_SHARED_SECRET
+  )?.trim();
+
+  if (!rawUrl || !token) return null;
+
+  try {
+    const raw = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+    const url = new URL(raw);
+    return {
+      baseUrl: url.origin,
+      token,
+      headers: {
+        "Content-Type": "application/json",
+        "x-corretop-internal-token": token,
+        "X-CorreTop-Internal-Token": token,
+        Authorization: `Bearer ${token}`,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Send from the authenticated broker's WAHA session to a tenant-owned WAHA number. */
 export async function sendTenantOfficialNumberMessageAction(
@@ -34,6 +70,9 @@ export async function sendTenantOfficialNumberMessageAction(
     const context = await getRequiredTenantContext();
     if (context.role !== "broker")
       return { success: false, error: "Apenas o corretor pode usar esta conversa." };
+    if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
+      return { success: false, error: "O atendimento interno por WhatsApp está temporariamente pausado." };
+    }
     const db = getDatabase();
     const [number] = await db
       .select({ id: schema.wahaNumbers.id, phone: schema.wahaNumbers.displayPhoneNumber })
@@ -59,14 +98,13 @@ export async function sendTenantOfficialNumberMessageAction(
       .limit(1);
     if (!connection?.sessionName || connection.status !== "ready" || !connection.active)
       return { success: false, error: "Conecte e ative seu WhatsApp antes de responder." };
-    const base = process.env.VPS_API_URL?.trim().replace(/\/$/, "");
-    const token = process.env.WHATSAPP_API_INTERNAL_TOKEN?.trim();
+    const vpsConfig = getVpsApiConfig();
     const phone = number.phone.replace(/\D/g, "");
-    if (!base || !token || !/^\d{10,15}$/.test(phone))
+    if (!vpsConfig || !/^\d{10,15}$/.test(phone))
       return { success: false, error: "Serviço de envio não configurado." };
-    const response = await fetch(`${base}/internal/waha/messages/text`, {
+    const response = await fetch(`${vpsConfig.baseUrl}/internal/waha/messages/text`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-corretop-internal-token": token },
+      headers: vpsConfig.headers,
       body: JSON.stringify({
         sessionName: connection.sessionName,
         chatId: phone,
@@ -129,6 +167,9 @@ export async function sendTenantOfficialChannelMessageAction(
     const context = await getRequiredTenantContext();
     if (context.role !== "broker")
       return { success: false, error: "Apenas o corretor pode usar esta conversa." };
+    if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
+      return { success: false, error: "O atendimento interno por WhatsApp está temporariamente pausado." };
+    }
     const db = getDatabase();
     const [channel] = await db
       .select({
@@ -163,14 +204,13 @@ export async function sendTenantOfficialChannelMessageAction(
       .limit(1);
     if (!connection?.sessionName || connection.status !== "ready" || !connection.active)
       return { success: false, error: "Conecte e ative seu WhatsApp antes de responder." };
-    const base = process.env.VPS_API_URL?.trim().replace(/\/$/, "");
-    const token = process.env.WHATSAPP_API_INTERNAL_TOKEN?.trim();
+    const vpsConfig = getVpsApiConfig();
     const phone = channel.phone.replace(/\D/g, "");
-    if (!base || !token || !/^\d{10,15}$/.test(phone))
+    if (!vpsConfig || !/^\d{10,15}$/.test(phone))
       return { success: false, error: "Serviço de envio não configurado." };
-    const response = await fetch(`${base}/internal/waha/messages/text`, {
+    const response = await fetch(`${vpsConfig.baseUrl}/internal/waha/messages/text`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-corretop-internal-token": token },
+      headers: vpsConfig.headers,
       body: JSON.stringify({
         sessionName: connection.sessionName,
         chatId: phone,
@@ -244,6 +284,18 @@ export async function sendLeadMessageAction(
 
   try {
     const context = await getRequiredTenantContext();
+    const brokerUsesLite =
+      context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
+    if (
+      brokerUsesLite &&
+      (await getSystemSetting("feature_waha_connections_enabled")) === "false"
+    ) {
+      return {
+        success: false,
+        error: "O atendimento interno por WhatsApp está temporariamente pausado. Use Abrir no WhatsApp.",
+      };
+    }
+
     const db = getDatabase();
     const [lead] = await db
       .select({
@@ -293,9 +345,6 @@ export async function sendLeadMessageAction(
 
     // Corretores no modo Lite atendem pelo próprio WhatsApp conectado. O canal
     // oficial continua sendo exclusivo das conversas do tenant e da gestão.
-    const brokerUsesLite =
-      context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
-
     // ── 1. Try Meta Cloud channel for the tenant workspace ────────────────
     const officialChannel = brokerUsesLite
       ? null
@@ -355,10 +404,9 @@ export async function sendLeadMessageAction(
       return { success: false, error: "O chat interno está desativado nas integrações." };
     }
 
-    // Resolve the VPS API URL
-    const vpsApiUrl = process.env.VPS_API_URL?.trim().replace(/\/$/, "");
-    const vpsInternalToken = process.env.WHATSAPP_API_INTERNAL_TOKEN?.trim();
-    if (!vpsApiUrl || !vpsInternalToken) {
+    // Resolve the VPS / WAHA API configuration
+    const vpsConfig = getVpsApiConfig();
+    if (!vpsConfig) {
       return { success: false, error: "Serviço de envio não configurado." };
     }
 
@@ -368,12 +416,9 @@ export async function sendLeadMessageAction(
       `outbound:${context.tenantId}:${leadId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
     const phoneDigits = lead.telefone.replace(/\D/g, "");
 
-    const response = await fetch(`${vpsApiUrl}/internal/waha/messages/text`, {
+    const response = await fetch(`${vpsConfig.baseUrl}/internal/waha/messages/text`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-corretop-internal-token": vpsInternalToken,
-      },
+      headers: vpsConfig.headers,
       body: JSON.stringify({
         sessionName: connection.sessionName,
         chatId: phoneDigits,

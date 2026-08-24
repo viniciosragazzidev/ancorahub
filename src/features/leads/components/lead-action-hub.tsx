@@ -188,15 +188,11 @@ export function LeadActionHub({
           <Button
             className="h-8 px-2.5 text-xs"
             render={
-              canAccessConversas ? (
-                <Link href={`/conversas?leadId=${leadId}&draft=broker_intro`} />
-              ) : (
-                <a
-                  href={`https://wa.me/${phone.replace(/\D/g, "")}`}
-                  rel="noreferrer"
-                  target="_blank"
-                />
-              )
+              <a
+                href={`https://wa.me/${phone.replace(/\D/g, "")}`}
+                rel="noreferrer"
+                target="_blank"
+              />
             }
             size="sm"
             variant="outline"

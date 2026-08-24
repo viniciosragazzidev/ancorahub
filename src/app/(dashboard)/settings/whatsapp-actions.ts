@@ -8,10 +8,16 @@ import { getDatabase, schema } from "@/shared/db";
 // ── WAHA via Fastify ──────────────────────────────────────────────────
 
 function vpsBaseUrl() {
-  const value = process.env.VPS_API_URL?.trim();
+  const value = (
+    process.env.VPS_API_URL ||
+    process.env.WAHA_API_URL ||
+    process.env.WAHA_RELAY_URL ||
+    process.env.NEXT_PUBLIC_VPS_API_URL
+  )?.trim();
   if (!value) return null;
   try {
-    const url = new URL(value);
+    const raw = value.startsWith("http") ? value : `https://${value}`;
+    const url = new URL(raw);
     return url.origin;
   } catch {
     return null;
@@ -19,10 +25,17 @@ function vpsBaseUrl() {
 }
 
 function vpsHeaders(hasJsonBody: boolean) {
+  const token = (
+    process.env.WHATSAPP_API_INTERNAL_TOKEN ||
+    process.env.VPS_INTERNAL_API_TOKEN ||
+    process.env.VPS_API_TOKEN ||
+    process.env.WAHA_RELAY_SHARED_SECRET
+  )?.trim() ?? "";
   return {
     ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
-    "X-CorreTop-Internal-Token": process.env.WHATSAPP_API_INTERNAL_TOKEN ?? "",
-    Authorization: `Bearer ${process.env.VPS_INTERNAL_API_TOKEN ?? ""}`,
+    "X-CorreTop-Internal-Token": token,
+    "x-corretop-internal-token": token,
+    Authorization: `Bearer ${token}`,
   };
 }
 

@@ -28,6 +28,7 @@ import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qu
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 import { BeneficiariesSection } from "./beneficiaries-section";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
@@ -50,6 +51,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   const { id } = await params;
   const context = await getRequiredTenantContext();
+  const brokerInternalChatEnabled =
+    context.role !== "broker" ||
+    (await getSystemSetting("feature_waha_connections_enabled")) !== "false";
   const db = getDatabase();
 
   let isMatrix = false;
@@ -456,7 +460,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     isOwner={context.userId === lead.corretorId}
                     phone={canSeePersonalData ? lead.telefone : null}
                     canSeePersonalData={canSeePersonalData}
-                    canAccessConversas={hasPermission(context.role, "acessar_conversas")}
+                    canAccessConversas={
+                      hasPermission(context.role, "acessar_conversas") && brokerInternalChatEnabled
+                    }
                     showFeedback={context.role === "broker" && context.userId === lead.corretorId && lead.status !== "lost" && lead.status !== "converted"}
                   />
                 )}

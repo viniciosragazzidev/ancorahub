@@ -38,6 +38,12 @@ export default async function BrokerConversationsPage({
     redirect("/conversas");
   }
 
+  // Pausa global reversível: não desconecta nem exclui a sessão do corretor,
+  // apenas bloqueia a superfície interna até a reativação pelo Super-admin.
+  if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
+    redirect("/minha-fila");
+  }
+
   const db = getDatabase();
 
   // ── Buscar leads do corretor ──────────────────────────────────────────

@@ -19,6 +19,7 @@ import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -33,6 +34,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   const experienceMode = await getExperienceMode(context);
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
+  const showLightConversations =
+    !isLightBroker ||
+    (await getSystemSetting("feature_waha_connections_enabled")) !== "false";
 
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") || "";
@@ -74,6 +78,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     <AgentDrawerProvider>
       <AppShell
         isLightBroker={isLightBroker}
+        showLightConversations={showLightConversations}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

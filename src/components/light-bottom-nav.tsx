@@ -14,8 +14,11 @@ const LIGHT_NAV_ITEMS = [
   { label: "Config", href: "/settings", icon: Gear },
 ] as const;
 
-export function LightBottomNav() {
+export function LightBottomNav({ showConversations = true }: { showConversations?: boolean }) {
   const pathname = usePathname();
+  const items = showConversations
+    ? LIGHT_NAV_ITEMS
+    : LIGHT_NAV_ITEMS.filter((item) => item.href !== "/conversas/broker");
 
   return (
     <nav
@@ -23,7 +26,7 @@ export function LightBottomNav() {
       className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
     >
       <Dock className="pointer-events-auto">
-        {LIGHT_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+        {items.map(({ label, href, icon: Icon }) => {
           const active =
             pathname === href ||
             (href === "/minha-fila" && pathname.startsWith("/leads")) ||

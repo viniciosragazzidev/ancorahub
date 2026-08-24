@@ -22,6 +22,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
@@ -39,9 +40,13 @@ export default async function ConversationsPage({
     redirect("/minha-fila");
   }
 
-  // A experiência Lite é exclusiva do corretor e tem sua própria superfície WAHA.
-  // Diretores e gestores permanecem sempre na central operacional completa.
+  // A experiência Lite conectada é exclusiva do corretor. Enquanto o controle
+  // global estiver desligado, o corretor não pode cair na central geral, pois ela
+  // não é a superfície de atendimento dele.
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+    if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
+      redirect("/minha-fila");
+    }
     const params = new URLSearchParams();
     if (leadId) params.set("leadId", leadId);
     if (draft === "broker_intro") params.set("draft", draft);

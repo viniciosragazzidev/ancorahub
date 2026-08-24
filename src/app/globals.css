@@ -364,6 +364,7 @@
 html {
   /* font-size: 110% escala textos e componentes rem sem quebrar
      elementos position:fixed/sticky, ao contrário do zoom.       */
+  font-size: 97%;
   min-height: 100%;
 }
 
@@ -725,12 +726,14 @@ body {
 .ct-qr-enter {
   animation: ct-qr-in 400ms var(--ease-smooth-out) both;
 }
+
 @keyframes ct-qr-in {
   from {
     opacity: 0;
     transform: scale(0.92);
     filter: blur(4px);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -744,19 +747,18 @@ body {
   display: inline-block;
   color: var(--muted-foreground);
 }
+
 .ct-shimmer-text::before {
   content: attr(data-text);
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 40%,
-    currentColor 50%,
-    transparent 60%,
-    transparent 100%
-  );
+  background-image: linear-gradient(90deg,
+      transparent 0%,
+      transparent 40%,
+      currentColor 50%,
+      transparent 60%,
+      transparent 100%);
   background-size: 400% 100%;
   background-repeat: no-repeat;
   -webkit-background-clip: text;
@@ -766,22 +768,31 @@ body {
   opacity: 0.4;
   animation: ct-shimmer-sweep 2s linear infinite;
 }
+
 @keyframes ct-shimmer-sweep {
-  0% { background-position: 100% 0; }
-  100% { background-position: 0% 0; }
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: 0% 0;
+  }
 }
 
 /* Connected pulse: green dot glow on successful connection */
 .ct-connected-pulse {
   animation: ct-pulse-glow 1.2s var(--ease-smooth-out) both;
 }
+
 @keyframes ct-pulse-glow {
   0% {
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
   }
+
   50% {
     box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
   }
+
   100% {
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
   }
@@ -796,20 +807,39 @@ body {
 .ct-waiting-breathe {
   animation: ct-breathe 2.5s ease-in-out infinite;
 }
+
 @keyframes ct-breathe {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.05); }
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .ct-qr-enter,
   .ct-shimmer-text::before,
   .ct-connected-pulse,
   .ct-waiting-breathe {
     animation: none !important;
   }
-  .ct-qr-enter { opacity: 1; filter: none; transform: none; }
-  .ct-waiting-breathe { opacity: 0.5; }
+
+  .ct-qr-enter {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+
+  .ct-waiting-breathe {
+    opacity: 0.5;
+  }
 }
 
 /* Sonner: feedback compacto, adaptado para light e dark theme de acordo com DESIGN.md */
@@ -1629,20 +1659,23 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   position: relative;
   display: inline-grid;
 }
+
 .t-icon-swap .t-icon {
   grid-area: 1 / 1;
   transition:
-    opacity   250ms ease-in-out,
-    filter    250ms ease-in-out,
+    opacity 250ms ease-in-out,
+    filter 250ms ease-in-out,
     transform 250ms ease-in-out;
   will-change: opacity, filter, transform;
 }
+
 .t-icon-swap[data-state="a"] .t-icon[data-icon="a"],
 .t-icon-swap[data-state="b"] .t-icon[data-icon="b"] {
   opacity: 1;
   filter: blur(0);
   transform: scale(1);
 }
+
 .t-icon-swap[data-state="a"] .t-icon[data-icon="b"],
 .t-icon-swap[data-state="b"] .t-icon[data-icon="a"] {
   opacity: 0;
@@ -1651,7 +1684,9 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .t-icon-swap .t-icon { transition: none !important; }
+  .t-icon-swap .t-icon {
+    transition: none !important;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1660,6 +1695,7 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 .bui-table {
   @apply w-full border-collapse text-left;
 }
+
 .bui-table th {
   @apply px-3 py-2.5 text-left align-middle text-body-medium text-text-tertiary whitespace-nowrap outline-none;
   background-color: var(--color-background-secondary-default);
@@ -1667,17 +1703,21 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   border-bottom: 1px solid var(--color-separator-border);
   transition: padding 200ms ease, font-size 200ms ease;
 }
+
 .bui-table td {
   @apply px-3 py-2.5 align-middle text-body-medium text-text-primary outline-none;
   transition: padding 200ms ease, font-size 200ms ease;
 }
+
 .bui-table tbody tr {
   @apply transition-colors duration-150;
   border-bottom: 1px solid var(--color-separator-border);
 }
+
 .bui-table tbody tr[data-focus-visible] {
   @apply ring-2 ring-inset ring-border-focus-ring;
 }
+
 .bui-table.bui-table-sm th,
 .bui-table.bui-table-sm td {
   @apply px-2.5 py-1.5 text-body-2-medium;

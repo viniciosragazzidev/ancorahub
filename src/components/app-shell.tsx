@@ -32,10 +32,12 @@ export function AppShell({
   children,
   branding,
   isLightBroker = false,
+  showLightConversations = true,
 }: {
   children: ReactNode;
   branding?: Branding;
   isLightBroker?: boolean;
+  showLightConversations?: boolean;
 }) {
   const pathname = usePathname();
   const isFinanceiro = pathname === "/financeiro" || pathname.startsWith("/financeiro/");
@@ -108,7 +110,7 @@ export function AppShell({
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SidebarInset>
-        {isLightBroker ? <LightBottomNav /> : <MobileBottomNav />}
+        {isLightBroker ? <LightBottomNav showConversations={showLightConversations} /> : <MobileBottomNav />}
         {!isLightBroker ? <OnboardingWelcomeDialog /> : null}
       </SidebarProvider>
     </OnboardingProvider>
