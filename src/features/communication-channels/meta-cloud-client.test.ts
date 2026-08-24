@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("./meta-cloud-config", () => ({
@@ -7,6 +7,12 @@ vi.mock("./meta-cloud-config", () => ({
 }));
 
 import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, formatE164Phone, registerMetaPhoneNumber, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  delete process.env.META_GRAPH_TIMEOUT_MS;
+});
 
 describe("formatE164Phone", () => {
   it("formats Brazilian numbers for DDD >= 31 removing 9th digit (e.g., DDD 41)", () => {
@@ -160,6 +166,31 @@ describe("Meta Cloud template payload", () => {
       type: "template",
       template: { name: "broker_first_access", language: { code: "pt_BR" } },
     });
+  });
+
+  it("fails a stalled official template request in a controlled time instead of waiting for the function timeout", async () => {
+    vi.useFakeTimers();
+    process.env.META_GRAPH_TIMEOUT_MS = "1000";
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        const error = new Error("The operation was aborted.");
+        error.name = "AbortError";
+        reject(error);
+      });
+    })));
+
+    const request = sendMetaCloudTemplate({
+      phoneNumberId: "phone-number-id",
+      accessToken: "channel-token",
+      to: "+55 21 99999-9999",
+      templateName: "new_lead_broker",
+      languageCode: "pt_BR",
+      variables: ["Corretor(a)", "Ana", "Lead", "Plano"],
+    });
+
+    const rejection = expect(request).rejects.toMatchObject({ status: 504, code: 408 });
+    await vi.advanceTimersByTimeAsync(1000);
+    await rejection;
   });
 
   it("derives a Page token from the connecting user's assets and returns only the selected Page token", async () => {

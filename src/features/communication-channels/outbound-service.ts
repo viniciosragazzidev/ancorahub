@@ -210,6 +210,14 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
       const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
       const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
       await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      console.warn("[meta-outbox] delivery_deferred", {
+        outboundMessageId: row.id,
+        tenantId: row.tenantId,
+        purpose: row.purpose,
+        attempt: row.attempts + 1,
+        providerErrorCode: code,
+        retryScheduled: Boolean(nextAttemptAt),
+      });
       if (row.purpose === "brokerInvitation" && row.recipientId) {
         const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
         await db.update(schema.brokerInvitations).set(failureUpdate).where(eq(schema.brokerInvitations.id, row.recipientId));
