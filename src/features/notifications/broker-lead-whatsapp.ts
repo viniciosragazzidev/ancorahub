@@ -73,16 +73,16 @@ export async function enqueueBrokerLeadNotification(input: {
     })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-    .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.tenantMemberships.userId), eq(schema.brokerProfiles.tenantId, input.tenantId)))
+    .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.tenantMemberships.userId), eq(schema.brokerProfiles.tenantId, input.tenantId)))
     .where(and(
       eq(schema.tenantMemberships.tenantId, input.tenantId),
       eq(schema.tenantMemberships.userId, input.brokerId),
-      eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
     ))
     .limit(1);
 
-  if (!broker?.phone) return { queued: false as const, reason: "broker_phone_missing" as const };
+  const destinationPhone = broker?.phone;
+  if (!destinationPhone) return { queued: false as const, reason: "broker_phone_missing" as const };
 
   const produtoInteresse = lead.legacyPlanName
     ?? lead.globalPlanName
@@ -98,7 +98,7 @@ export async function enqueueBrokerLeadNotification(input: {
     tenantId: input.tenantId,
     recipientType: "user",
     recipientId: input.brokerId,
-    destinationPhone: broker.phone,
+    destinationPhone,
     purpose: "brokerLeadNotification",
     variables: buildBrokerLeadNotificationVariables({
       cargo: formatBrokerRole(broker.jobTitle),

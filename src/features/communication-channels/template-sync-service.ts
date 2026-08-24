@@ -437,7 +437,7 @@ export class WhatsAppTemplateResolver {
     // Map purpose string to eventKey
     let eventKey: EventKey | null = null;
     if (purpose === "brokerInvitation") eventKey = "BROKER_WELCOME";
-    else if (purpose === "brokerLeadNotification") eventKey = "LEAD_ASSIGNMENT";
+    else if (purpose === "brokerLeadNotification" || purpose === "leadQualification" || purpose === "lead_qualification") eventKey = "LEAD_ASSIGNMENT";
     else if (purpose === "newLeadAssignment") eventKey = "LEAD_OFFER";
     else if (purpose === "leadAssignmentConfirmed") eventKey = "LEAD_ASSIGNMENT_CONFIRMED";
     else if (purpose === "leadAssignmentUnavailable") eventKey = "LEAD_ASSIGNMENT_UNAVAILABLE";
