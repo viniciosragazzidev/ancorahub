@@ -154,6 +154,8 @@ export function LightLeadDetail({
 
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
   const [requestingSale, startRequestSaleTransition] = useTransition();
+  const brokerIntro = `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`;
+  const externalWhatsAppUrl = buildWhatsAppUrl(lead.telefone, brokerIntro);
 
   const [saleDocOpen, setSaleDocOpen] = useState(false);
   const [showSaleConfirm, setShowSaleConfirm] = useState(false);
@@ -608,18 +610,14 @@ export function LightLeadDetail({
 
                 if (isMobile && !hasWahaConnected) {
                   e.preventDefault();
-                  const firstName = lead.nome.split(" ")[0] || lead.nome;
-                  const initialMsg = `Olá, ${firstName}! Sou seu corretor e vou seguir com seu atendimento por aqui.`;
-                  const waUrl = buildWhatsAppUrl(lead.telefone, initialMsg);
-
                   toast.info("Acesse pelo computador para conectar seu WhatsApp ao sistema e habilitar automações.", {
                     description: "Redirecionando para o aplicativo do WhatsApp...",
                     duration: 4000,
                   });
 
-                  if (waUrl) {
+                  if (externalWhatsAppUrl) {
                     setTimeout(() => {
-                      window.location.href = waUrl;
+                      window.location.href = externalWhatsAppUrl;
                     }, 700);
                   }
                 }
@@ -630,8 +628,19 @@ export function LightLeadDetail({
               )}
             >
               <WhatsappLogo className="size-5" />
-              ABRIR NO WHATSAPP
+              ABRIR CHAT INTERNO
             </Link>
+
+            {externalWhatsAppUrl ? (
+              <Button
+                className="w-full"
+                render={<a href={externalWhatsAppUrl} rel="noreferrer" target="_blank" />}
+                size="sm"
+                variant="outline"
+              >
+                <WhatsappLogo className="size-4" /> Abrir no WhatsApp Web ou app
+              </Button>
+            ) : null}
 
             {whatsappOpenedAt ? (
               <p className="text-center text-[11px] text-emerald-600 font-medium">

@@ -16,6 +16,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { normalizeWhatsAppDestination } from "@/lib/whatsapp-url";
 
 export type SendLeadMessageResult = {
   success: boolean;
@@ -416,7 +417,10 @@ export async function sendLeadMessageAction(
       ? clientMessageId
       : `outbound:${context.tenantId}:${leadId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
     const idempotencyKey = rawKey.slice(0, 160);
-    const phoneDigits = lead.telefone.replace(/\D/g, "");
+    const phoneDigits = normalizeWhatsAppDestination(lead.telefone);
+    if (!phoneDigits || !/^\d{10,15}$/.test(phoneDigits)) {
+      return { success: false, error: "O número de telefone do lead é inválido para envio via WhatsApp." };
+    }
 
     const response = await fetch(`${vpsConfig.baseUrl}/internal/waha/messages/text`, {
       method: "POST",
