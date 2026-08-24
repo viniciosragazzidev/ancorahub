@@ -35,6 +35,7 @@ import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { cn } from "@/lib/utils";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
@@ -121,12 +122,14 @@ const STEP_OPTIONS = [
 export function LightLeadDetail({
   lead,
   brokerName,
+  hasWahaConnected = false,
   requirements = [],
   documents = [],
   carriers = [],
 }: {
   lead: LightLeadDetailData;
   brokerName: string;
+  hasWahaConnected?: boolean;
   requirements?: LiteRequirement[];
   documents?: ConfirmationDocument[];
   carriers?: CarrierOption[];
@@ -589,12 +592,37 @@ export function LightLeadDetail({
           <div className="pt-2 space-y-3">
             <Link
               href={`/conversas/broker?leadId=${lead.id}&draft=broker_intro`}
-              onClick={() => {
+              onClick={(e) => {
                 const nowStr = new Date().toLocaleTimeString("pt-BR", {
                   hour: "2-digit",
                   minute: "2-digit",
                 });
                 setWhatsappOpenedAt(nowStr);
+
+                const isMobile =
+                  typeof window !== "undefined" &&
+                  (window.matchMedia("(max-width: 768px)").matches ||
+                    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                      navigator.userAgent,
+                    ));
+
+                if (isMobile && !hasWahaConnected) {
+                  e.preventDefault();
+                  const firstName = lead.nome.split(" ")[0] || lead.nome;
+                  const initialMsg = `Olá, ${firstName}! Sou seu corretor e vou seguir com seu atendimento por aqui.`;
+                  const waUrl = buildWhatsAppUrl(lead.telefone, initialMsg);
+
+                  toast.info("Acesse pelo computador para conectar seu WhatsApp ao sistema e habilitar automações.", {
+                    description: "Redirecionando para o aplicativo do WhatsApp...",
+                    duration: 4000,
+                  });
+
+                  if (waUrl) {
+                    setTimeout(() => {
+                      window.location.href = waUrl;
+                    }, 700);
+                  }
+                }
               }}
               className={cn(
                 buttonVariants({ size: "lg" }),
