@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 
-import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
@@ -111,6 +111,5 @@ export async function enqueueBrokerLeadNotification(input: {
     idempotencyKey,
   });
 
-  await processMetaOutboundBatch(10, input.tenantId);
   return { queued: true as const, outboundId: outbound.id, duplicate: outbound.duplicate };
 }
