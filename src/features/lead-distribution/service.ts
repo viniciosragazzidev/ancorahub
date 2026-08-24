@@ -388,7 +388,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     qualificationProfileKey: schema.leads.qualificationProfileKey,
     qualificationState: schema.leads.qualificationState,
     qualificationStatus: schema.leads.qualificationStatus,
-  }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.distributionStatus, "queued"))).limit(1);
+  }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.distributionStatus, ["queued", "unassigned"]), isNull(schema.leads.corretorId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
   if (lead.branchId) {
     const [leadBranch] = await db.select({ isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches).where(and(eq(schema.branches.id, lead.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
@@ -407,7 +407,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const intelligentPolicy = await loadDistributionPolicy(context.tenantId, lead.queueId, lead.qualificationProfileKey);
   if (!intelligentPolicy.enabled) return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta fila." };
   if (queue?.branchId && intelligentPolicy.value.excludedBranchIds.includes(queue.branchId)) return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta unidade." };
-  const configuredBranchIds = resolveQueueCandidateBranchIds({ queueBranchId: queue?.branchId ?? null, allowedBranchIds: (intelligentPolicy.value.allowedBranchIds ?? []).filter((branchId) => !intelligentPolicy.value.excludedBranchIds.includes(branchId)) });
+  const configuredBranchIds = resolveQueueCandidateBranchIds({ queueBranchId: queue?.branchId ?? null, allowedBranchIds: (intelligentPolicy.value.allowedBranchIds ?? []).filter((branchId) => !intelligentPolicy.value.excludedBranchIds.includes(branchId)), leadBranchId: lead.branchId });
   const requestedBranchIds = context.role === "manager" && context.branchId
     ? configuredBranchIds.filter((branchId) => branchId === context.branchId)
     : configuredBranchIds;

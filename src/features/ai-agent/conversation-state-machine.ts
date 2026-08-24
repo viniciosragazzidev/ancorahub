@@ -193,9 +193,14 @@ export async function sendAiOutbound(input: {
     .limit(1);
 
   if (lastOutbound?.sentAt) {
-    const elapsedMs = Date.now() - new Date(lastOutbound.sentAt).getTime();
-    if (elapsedMs < 1_000) {
-      await new Promise((resolve) => setTimeout(resolve, 1_000 - elapsedMs));
+    const { getSystemSetting } = await import("@/features/system-settings/queries");
+    const debounceSetting = await getSystemSetting("ai_debounce_delay_seconds").catch(() => null);
+    const debounceSeconds = debounceSetting !== null && debounceSetting !== undefined ? parseInt(debounceSetting, 10) : 0;
+    if (debounceSeconds > 0) {
+      const elapsedMs = Date.now() - new Date(lastOutbound.sentAt).getTime();
+      if (elapsedMs < 1_000) {
+        await new Promise((resolve) => setTimeout(resolve, 1_000 - elapsedMs));
+      }
     }
   }
 
@@ -1088,39 +1093,41 @@ export async function processInboundAiResponse({
   if (!skipDebounce && process.env.NODE_ENV !== "test") {
     const { getSystemSetting } = await import("@/features/system-settings/queries");
     const debounceSetting = await getSystemSetting("ai_debounce_delay_seconds");
-    const debounceSeconds = debounceSetting ? parseInt(debounceSetting, 10) : 1;
-    const debounceMs = Math.max(500, Math.min(2000, (isNaN(debounceSeconds) ? 1 : Math.min(2, debounceSeconds)) * 1000));
+    const debounceSeconds = debounceSetting !== null && debounceSetting !== undefined ? parseInt(debounceSetting, 10) : 0;
+    const debounceMs = isNaN(debounceSeconds) || debounceSeconds <= 0 ? 0 : Math.min(2000, debounceSeconds * 1000);
 
-    await new Promise((resolve) => setTimeout(resolve, debounceMs));
+    if (debounceMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, debounceMs));
 
-    const last8DigitsPhone = phone.replace(/\D/g, "").slice(-8);
-    const [newerIncoming] = await db
-      .select({ id: schema.whatsappMessages.id })
-      .from(schema.whatsappMessages)
-      .where(
-        and(
-          eq(schema.whatsappMessages.tenantId, tenantId),
-          or(
-            eq(schema.whatsappMessages.leadId, leadId),
-            eq(schema.whatsappMessages.conversationId, conversation.id),
-            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8DigitsPhone}`
-          ),
-          or(
-            eq(schema.whatsappMessages.direction, "incoming"),
-            eq(schema.whatsappMessages.direction, "inbound")
-          ),
-          gt(schema.whatsappMessages.sentAt, nowReceived)
+      const last8DigitsPhone = phone.replace(/\D/g, "").slice(-8);
+      const [newerIncoming] = await db
+        .select({ id: schema.whatsappMessages.id })
+        .from(schema.whatsappMessages)
+        .where(
+          and(
+            eq(schema.whatsappMessages.tenantId, tenantId),
+            or(
+              eq(schema.whatsappMessages.leadId, leadId),
+              eq(schema.whatsappMessages.conversationId, conversation.id),
+              sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8DigitsPhone}`
+            ),
+            or(
+              eq(schema.whatsappMessages.direction, "incoming"),
+              eq(schema.whatsappMessages.direction, "inbound")
+            ),
+            gt(schema.whatsappMessages.sentAt, nowReceived)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (newerIncoming) {
-      console.info("[ai-wpp] inbound.debounced_superceded", {
-        tenantId,
-        leadId,
-        receivedAt: nowReceived.toISOString(),
-      });
-      return { status: "debounced_superceded" as const };
+      if (newerIncoming) {
+        console.info("[ai-wpp] inbound.debounced_superceded", {
+          tenantId,
+          leadId,
+          receivedAt: nowReceived.toISOString(),
+        });
+        return { status: "debounced_superceded" as const };
+      }
     }
   }
 

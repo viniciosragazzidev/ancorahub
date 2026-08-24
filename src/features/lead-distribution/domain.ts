@@ -101,9 +101,14 @@ export function isDeferredDistributionReason(reason: string) {
 export function resolveQueueCandidateBranchIds(input: {
   queueBranchId: string | null;
   allowedBranchIds: string[];
+  leadBranchId?: string | null;
 }) {
   if (input.queueBranchId) return [input.queueBranchId];
-  return Array.from(new Set(input.allowedBranchIds));
+  const list = [...input.allowedBranchIds];
+  if (input.leadBranchId && !list.includes(input.leadBranchId)) {
+    list.push(input.leadBranchId);
+  }
+  return Array.from(new Set(list));
 }
 
 /** A distribution hub (Matriz) receives leads for human redistribution only. */

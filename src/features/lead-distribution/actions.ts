@@ -259,8 +259,13 @@ export async function routeLeadToBranchAction(
             ? "Este lead já foi atribuído."
             : "A unidade não pode receber leads agora.",
       };
+    const assignedResult = await processQueuedLead(context, parsed.data.leadId);
+    if (assignedResult.status === "assigned") {
+      return { success: true, message: "Lead enviado para a unidade e atribuído ao corretor com sucesso!" };
+    }
+
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
-    return { success: true, message: "Lead enviado para a fila da unidade." };
+    return { success: true, message: "Lead enviado para a unidade. Aguardando corretor disponível no plantão." };
   } catch (error) {
     return {
       error:
