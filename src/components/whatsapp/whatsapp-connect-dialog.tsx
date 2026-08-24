@@ -157,6 +157,12 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     return true;
   }
 
+  function openWhatsAppExternal() {
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    const destination = isMobile ? "whatsapp://send" : "https://web.whatsapp.com/";
+    window.open(destination, "_blank", "noopener,noreferrer");
+  }
+
   /**
    * Iniciar conexão WhatsApp.
    * 
@@ -394,6 +400,9 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
                 )}
               </div>
             </div>
+            <Button className="w-full md:w-auto" onClick={openWhatsAppExternal} size="sm" variant="outline">
+              <WhatsappLogo className="size-4" /> Abrir WhatsApp Web ou app
+            </Button>
           </div>
 
           {/* QR Code panel */}
