@@ -5,21 +5,22 @@ import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
 import { chooseAvailableBroker } from "./assignment";
-import { notifyLeadReassigned, notifyNewLead } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned, notifyNewLead, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
-type SlaKind = "lead_unworked" | "lead_stalled";
+type SlaKind = "lead_unworked" | "lead_warning_10m" | "lead_stalled";
 
-export type SlaSweepResult = { tenants: number; unworked: number; stalled: number; notifications: number };
+export type SlaSweepResult = { tenants: number; unworked: number; warnings: number; stalled: number; notifications: number };
 
 export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
-  if (!(await isNotificationCapabilityEnabled("lead_sla"))) return { tenants: 0, unworked: 0, stalled: 0, notifications: 0 };
+  if (!(await isNotificationCapabilityEnabled("lead_sla"))) return { tenants: 0, unworked: 0, warnings: 0, stalled: 0, notifications: 0 };
   const db = getDatabase();
   const tenants = await db.select({ id: schema.tenants.id, firstContactMinutes: schema.tenants.slaFirstContactMinutes, stagnantDays: schema.tenants.slaStagnantDays })
     .from(schema.tenants).where(tenantId ? eq(schema.tenants.id, tenantId) : eq(schema.tenants.status, "active"));
   let unworked = 0;
+  let warnings = 0;
   let stalled = 0;
   let notifications = 0;
   const now = Date.now();
@@ -27,6 +28,8 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     const firstContactMinutes = Math.max(1, Number.parseInt(tenant.firstContactMinutes, 10) || 15);
     const stagnantDays = Math.max(1, Number.parseInt(tenant.stagnantDays, 10) || 3);
     const unworkedCutoff = new Date(now - firstContactMinutes * 60 * 1000);
+    const warningMinutes = Math.min(10, Math.max(1, Math.floor(firstContactMinutes * 0.66)));
+    const warningCutoff = new Date(now - warningMinutes * 60 * 1000);
     const stagnantCutoff = new Date(now - stagnantDays * 24 * 60 * 60 * 1000);
     
     const leads = await db.select({
@@ -39,7 +42,15 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       stageEnteredAt: schema.leads.stageEnteredAt,
       webhookCredentialId: schema.leads.webhookCredentialId,
     })
-      .from(schema.leads).where(and(eq(schema.leads.tenantId, tenant.id), or(and(eq(schema.leads.status, "distributed"), lt(schema.leads.assignedAt, unworkedCutoff)), and(inArray(schema.leads.status, activeStatuses), lt(schema.leads.stageEnteredAt, stagnantCutoff)))));
+      .from(schema.leads).where(
+        and(
+          eq(schema.leads.tenantId, tenant.id),
+          or(
+            and(eq(schema.leads.status, "distributed"), lt(schema.leads.assignedAt, warningCutoff)),
+            and(inArray(schema.leads.status, activeStatuses), lt(schema.leads.stageEnteredAt, stagnantCutoff))
+          )
+        )
+      );
     
     if (!leads.length) continue;
     
@@ -60,7 +71,14 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     const pending: Array<typeof schema.notifications.$inferInsert> = [];
     
     for (const lead of leads) {
-      const kind: SlaKind = lead.status === "distributed" && lead.assignedAt && lead.assignedAt < unworkedCutoff ? "lead_unworked" : "lead_stalled";
+      let kind: SlaKind = "lead_stalled";
+      if (lead.status === "distributed" && lead.assignedAt) {
+        if (lead.assignedAt < unworkedCutoff) {
+          kind = "lead_unworked";
+        } else if (lead.assignedAt <= warningCutoff) {
+          kind = "lead_warning_10m";
+        }
+      }
       
       if (kind === "lead_unworked") {
         unworked += 1;
@@ -116,17 +134,44 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
           void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
         }
 
+      } else if (kind === "lead_warning_10m") {
+        warnings += 1;
+        if (lead.corretorId) {
+          const brokerKey = `${lead.corretorId}:${lead.id}:lead_warning_10m`;
+          if (!existingKeys.has(brokerKey)) {
+            existingKeys.add(brokerKey);
+            pending.push({
+              id: randomUUID(),
+              tenantId: tenant.id,
+              recipientUserId: lead.corretorId,
+              leadId: lead.id,
+              type: "lead_warning_10m",
+              title: "Atenção: Atendimento Pendente ⚠️",
+              message: `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente para evitar a redistribuição automática do lead!`,
+              createdAt: new Date(),
+            });
+
+            void sendNotificationToUser(lead.corretorId, {
+              title: "Atenção: Atendimento Pendente ⚠️",
+              body: `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora para evitar que ele seja redistribuído!`,
+              url: `/leads/${lead.id}`,
+              tag: `corretop-warning-${lead.id}`,
+            }).catch(console.error);
+          }
+        }
       } else {
         stalled += 1;
       }
       
-      // Notify managers and directors
-      for (const recipient of recipients) {
-        if (recipient.role === "manager" && recipient.branchId !== lead.branchId) continue;
-        const key = `${recipient.userId}:${lead.id}:${kind}`;
-        if (existingKeys.has(key)) continue;
-        existingKeys.add(key);
-        pending.push({ id: randomUUID(), tenantId: tenant.id, recipientUserId: recipient.userId, leadId: lead.id, type: kind, title: kind === "lead_unworked" ? "Lead não trabalhado" : "Lead estagnado", message: kind === "lead_unworked" ? `O lead ${lead.nome} está sem primeiro contato há mais de ${firstContactMinutes} minutos.` : `O lead ${lead.nome} está sem avanço há mais de ${stagnantDays} dias.`, createdAt: new Date() });
+      // Notify managers and directors only for lead_unworked and lead_stalled
+      if (kind === "lead_unworked" || kind === "lead_stalled") {
+        for (const recipient of recipients) {
+          if (recipient.role === "manager" && recipient.branchId !== lead.branchId) continue;
+          const key = `${recipient.userId}:${lead.id}:${kind}`;
+          if (existingKeys.has(key)) continue;
+          existingKeys.add(key);
+          pending.push({ id: randomUUID(), tenantId: tenant.id, recipientUserId: recipient.userId, leadId: lead.id, type: kind, title: kind === "lead_unworked" ? "Lead não trabalhado" : "Lead estagnado", message: kind === "lead_unworked" ? `O lead ${lead.nome} está sem primeiro contato há mais de ${firstContactMinutes} minutos.` : `O lead ${lead.nome} está sem avanço há mais de ${stagnantDays} dias.`, createdAt: new Date() });
+        }
       }
 
       // For stalled leads, also notify the broker who owns the lead
@@ -161,5 +206,5 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       notifications += pending.length;
     }
   }
-  return { tenants: tenants.length, unworked, stalled, notifications };
+  return { tenants: tenants.length, unworked, warnings, stalled, notifications };
 }
