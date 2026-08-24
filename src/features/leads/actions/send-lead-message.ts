@@ -397,7 +397,8 @@ export async function sendLeadMessageAction(
       )
       .limit(1);
 
-    if (!connection?.sessionName || connection.status !== "ready") {
+    const statusLower = (connection?.status ?? "").toLowerCase();
+    if (!connection?.sessionName || !["ready", "connected", "working"].includes(statusLower)) {
       return { success: false, error: "Conecte o WhatsApp e aguarde o status Conectado." };
     }
     if (!connection.active) {
@@ -411,9 +412,10 @@ export async function sendLeadMessageAction(
     }
 
     // Call Fastify to send via WAHA
-    const idempotencyKey =
-      clientMessageId ??
-      `outbound:${context.tenantId}:${leadId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+    const rawKey = clientMessageId && clientMessageId.length >= 16 && clientMessageId.length <= 160
+      ? clientMessageId
+      : `outbound:${context.tenantId}:${leadId}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+    const idempotencyKey = rawKey.slice(0, 160);
     const phoneDigits = lead.telefone.replace(/\D/g, "");
 
     const response = await fetch(`${vpsConfig.baseUrl}/internal/waha/messages/text`, {
@@ -436,14 +438,40 @@ export async function sendLeadMessageAction(
 
     if (!response.ok || !result?.ok || !result?.messageId) {
       const errorCode = result?.error ?? `HTTP_${response.status}`;
-      // Map error codes to user-friendly messages
-      if (errorCode.includes("SESSION_")) {
+      console.error("[sendLeadMessageAction] WAHA delivery failed:", {
+        status: response.status,
+        result,
+        sessionName: connection.sessionName,
+        leadId,
+        tenantId: context.tenantId,
+      });
+
+      if (
+        errorCode.includes("SESSION_") ||
+        errorCode === "SESSION_NOT_FOUND" ||
+        errorCode === "SESSION_STOPPED"
+      ) {
         return {
           success: false,
-          error: "Sessão WhatsApp não está conectada. Reconecte para enviar.",
+          error: "Sessão WhatsApp não está conectada ou o seu WhatsApp foi desconectado. Reconecte em Configurações > WhatsApp para enviar.",
         };
       }
-      return { success: false, error: "Não foi possível enviar a mensagem. Tente novamente." };
+      if (errorCode === "INVALID_CHAT_ID") {
+        return {
+          success: false,
+          error: "O número de telefone do lead é inválido para envio via WhatsApp.",
+        };
+      }
+      if (errorCode === "WAHA_SEND_FAILED" || response.status === 502) {
+        return {
+          success: false,
+          error: "O servidor de WhatsApp (WAHA) não conseguiu entregar a mensagem. Verifique se o seu número está ativo no aparelho.",
+        };
+      }
+      return {
+        success: false,
+        error: `Falha no envio via WhatsApp (${errorCode}). Tente novamente ou verifique sua conexão.`,
+      };
     }
 
     // ── 3. Persist message ─────────────────────────────────────────────────
