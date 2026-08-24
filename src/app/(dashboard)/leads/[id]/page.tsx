@@ -128,9 +128,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       .where(eq(schema.user.id, context.userId))
       .limit(1);
 
-    const lightBeneficiaries = await getLeadBeneficiaries(id);
+    const [lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers] = await Promise.all([
+      getLeadBeneficiaries(id),
+      getRequirementsForLead(id),
+      getLeadDocuments(id),
+      db.select({ id: schema.carriers.id, name: schema.carriers.name })
+        .from(schema.carriers)
+        .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active")))
+        .orderBy(schema.carriers.name),
+    ]);
+
     const lightFormData = readFormData(lead.formData);
-    const lightRequirements = await getRequirementsForLead(id);
 
     const lightLead: LightLeadDetailData = {
       id: lead.id,
@@ -174,6 +182,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           required: Boolean(req.required),
           appliesPerBeneficiary: Boolean(req.appliesPerBeneficiary),
         }))}
+        documents={lightLeadDocs.map((doc) => ({
+          id: doc.id,
+          filename: doc.filename,
+          status: doc.status,
+        }))}
+        carriers={lightCarriers}
       />
     );
   }

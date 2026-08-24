@@ -117,7 +117,7 @@ describe("MetaIntegrationView", () => {
     expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 
-  it("updates campaign eligibility locally without refreshing the route tree", async () => {
+  it("updates campaign eligibility locally and refreshes the route tree", async () => {
     toggleCampaignMock.mockResolvedValue({ success: true });
     render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
 
@@ -125,10 +125,10 @@ describe("MetaIntegrationView", () => {
 
     await waitFor(() => expect(toggleCampaignMock).toHaveBeenCalledWith({ campaignId: "campaign-1", enabled: true }));
     expect(screen.getByText("✓ Elegível p/ Captura")).toBeInTheDocument();
-    expect(refreshMock).not.toHaveBeenCalled();
+    expect(refreshMock).toHaveBeenCalled();
   });
 
-  it("updates the master capture mode locally without refreshing the route tree", async () => {
+  it("updates the master capture mode locally and refreshes the route tree", async () => {
     setGlobalModeMock.mockResolvedValue({ success: true });
     render(<MetaIntegrationView canConfigure connection={{ ...connectedConnection, globalCaptureMode: "all" }} assets={connectedAssets} logs={[]} />);
 
@@ -137,6 +137,6 @@ describe("MetaIntegrationView", () => {
 
     await waitFor(() => expect(setGlobalModeMock).toHaveBeenCalledWith({ mode: "selective" }));
     expect(screen.getByText(/MODO SELETIVO/)).toBeInTheDocument();
-    expect(refreshMock).not.toHaveBeenCalled();
+    expect(refreshMock).toHaveBeenCalled();
   });
 });

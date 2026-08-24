@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -37,6 +37,10 @@ import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { cn } from "@/lib/utils";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
+import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
+
+type ConfirmationDocument = { id: string; filename: string; status: string };
+type CarrierOption = { id: string; name: string };
 
 export type LiteRequirement = {
   id: string;
@@ -118,10 +122,14 @@ export function LightLeadDetail({
   lead,
   brokerName,
   requirements = [],
+  documents = [],
+  carriers = [],
 }: {
   lead: LightLeadDetailData;
   brokerName: string;
   requirements?: LiteRequirement[];
+  documents?: ConfirmationDocument[];
+  carriers?: CarrierOption[];
 }) {
   const router = useRouter();
   const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
@@ -145,12 +153,16 @@ export function LightLeadDetail({
   const [requestingSale, startRequestSaleTransition] = useTransition();
 
   const [saleDocOpen, setSaleDocOpen] = useState(false);
+  const [showSaleConfirm, setShowSaleConfirm] = useState(false);
   const [docRequirementId, setDocRequirementId] = useState("");
   const [docBeneficiaryId, setDocBeneficiaryId] = useState("");
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docObservation, setDocObservation] = useState("");
   const [isSaleClosing, setIsSaleClosing] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const approvedDocument = useMemo(() => documents.find((d) => d.status === "approved"), [documents]);
+  const rejectedDocument = useMemo(() => documents.find((d) => d.status === "rejected"), [documents]);
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
 
@@ -627,8 +639,61 @@ export function LightLeadDetail({
               </Button>
             </div>
 
-            {/* Sale Registration Button - only when not yet converted and not pending */}
-            {leadStatus !== "converted" &&
+            {/* Approved document - Release sale confirmation! */}
+            {approvedDocument && leadStatus !== "converted" && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 space-y-2 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle className="size-4" />
+                  Documentação Aprovada pelo Supervisor!
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O documento &quot;{approvedDocument.filename}&quot; foi aprovado. Confirme os dados da apólice para concluir a venda.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setShowSaleConfirm(true)}
+                  className="w-full text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <FileText className="size-4" />
+                  CONFIRMAR VENDA & CONVERTER
+                </Button>
+              </div>
+            )}
+
+            {/* Rejected document alert */}
+            {!approvedDocument && rejectedDocument && leadStatus !== "converted" && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 space-y-2 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-destructive">
+                  <XCircle className="size-4" />
+                  Documentação Rejeitada pelo Supervisor
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O documento &quot;{rejectedDocument.filename}&quot; foi rejeitado. Reenvie a documentação corrigida.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleRequestSale}
+                  disabled={requestingSale}
+                  className="w-full text-xs font-bold gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  <FileText className="size-4" />
+                  REENVIAR DOCUMENTAÇÃO
+                </Button>
+              </div>
+            )}
+
+            {/* Pending sale status */}
+            {!approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" && (
+              <div className="rounded-xl border border-amber-300/30 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-center">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">Documentação de venda em análise</p>
+                <p className="mt-1 text-amber-600 dark:text-amber-300">Aguardando aprovação do supervisor.</p>
+              </div>
+            )}
+
+            {/* Regular Register Sale Button when no docs attached yet */}
+            {!approvedDocument &&
+              !rejectedDocument &&
+              leadStatus !== "converted" &&
               leadStatus !== "lost" &&
               leadStatus !== "documentation_pending" && (
                 <Button
@@ -641,14 +706,6 @@ export function LightLeadDetail({
                   {requestingSale ? "Enviando..." : "REGISTRAR VENDA"}
                 </Button>
               )}
-
-            {/* Pending sale status */}
-            {leadStatus === "documentation_pending" && (
-              <div className="rounded-xl border border-amber-300/30 bg-amber-50 p-3 text-xs text-center">
-                <p className="font-semibold text-amber-700">Documentação de venda pendente</p>
-                <p className="mt-1 text-amber-600">Aguardando aprovação do supervisor.</p>
-              </div>
-            )}
           </div>
         )}
       </Card>
@@ -1012,6 +1069,14 @@ export function LightLeadDetail({
           </div>
         </DialogPopup>
       </Dialog>
+
+      <RegisterSalePanel
+        leadId={lead.id}
+        documents={documents}
+        carriers={carriers}
+        open={showSaleConfirm}
+        onOpenChange={setShowSaleConfirm}
+      />
     </div>
   );
 }

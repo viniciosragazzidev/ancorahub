@@ -14,6 +14,7 @@ import {
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -91,11 +92,17 @@ export function DocumentsWorkspace({
   const [activeTab, setActiveTab] = useState<"queue" | "config">(
     role === "director" ? "queue" : "queue"
   );
+  const [statusFilter, setStatusFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const router = useRouter();
   const [requirements, setRequirements] = useState(initialRequirements);
   const [pendingDocs, setPendingDocs] = useState(initialPendingDocs);
 
-  const pendingIds = useMemo(() => pendingDocs.map((d) => d.id), [pendingDocs]);
+  const filteredDocs = useMemo(() => {
+    if (statusFilter === "all") return pendingDocs;
+    return pendingDocs.filter((d) => d.status === statusFilter);
+  }, [pendingDocs, statusFilter]);
+
+  const pendingIds = useMemo(() => filteredDocs.map((d) => d.id), [filteredDocs]);
   const multiSelect = useMultiSelect(pendingIds);
   const [reqState, reqFormAction, reqPending] = useActionState(createRequirementAction, {});
   const [, startTransition] = useTransition();
@@ -141,7 +148,9 @@ export function DocumentsWorkspace({
         if (res.error) toast.error(res.error);
         else {
           toast.success(status === "approved" ? "Documento aprovado." : "Documento rejeitado.");
-          setPendingDocs((current) => current.filter((d) => d.id !== docId));
+          setPendingDocs((current) =>
+            current.map((d) => (d.id === docId ? { ...d, status } : d))
+          );
         }
       } catch (error) {
         if (isVersionSkewError(error)) reloadAfterDeploymentUpdate();
@@ -159,7 +168,9 @@ export function DocumentsWorkspace({
         if (res.error) toast.error(res.error);
         else {
           toast.success(`Processamento em lote concluído (${ids.length} itens).`);
-          setPendingDocs((current) => current.filter((d) => !ids.includes(d.id)));
+          setPendingDocs((current) =>
+            current.map((d) => (ids.includes(d.id) ? { ...d, status } : d))
+          );
           multiSelect.clear();
         }
       } catch (error) {
@@ -229,6 +240,32 @@ export function DocumentsWorkspace({
       ),
     },
     {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const s = row.original.status;
+        if (s === "approved") {
+          return (
+            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+              Aprovado ✓
+            </Badge>
+          );
+        }
+        if (s === "rejected") {
+          return (
+            <Badge variant="destructive" className="font-semibold text-[11px]">
+              Rejeitado ✕
+            </Badge>
+          );
+        }
+        return (
+          <Badge variant="secondary" className="font-medium text-[11px]">
+            Pendente
+          </Badge>
+        );
+      },
+    },
+    {
       id: "ownership",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Responsável / unidade" />,
       cell: ({ row }) => (
@@ -260,7 +297,7 @@ export function DocumentsWorkspace({
         <div className="text-right">
           {role === "broker" ? (
             <span className="text-xs capitalize text-muted-foreground">{row.original.status}</span>
-          ) : (
+          ) : row.original.status === "pending" ? (
             <div className="flex justify-end gap-1.5">
               <Button
                 size="icon-xs"
@@ -278,6 +315,23 @@ export function DocumentsWorkspace({
                 title="Rejeitar"
               >
                 <XCircle className="size-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-1">
+              <Button
+                size="xs"
+                variant="ghost"
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={() =>
+                  handleReviewDoc(
+                    row.original.id,
+                    row.original.leadId,
+                    row.original.status === "approved" ? "rejected" : "approved"
+                  )
+                }
+              >
+                Alterar status
               </Button>
             </div>
           )}
@@ -315,10 +369,51 @@ export function DocumentsWorkspace({
 
       {activeTab === "queue" && (
         <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/20 p-1">
+              <Button
+                type="button"
+                size="xs"
+                variant={statusFilter === "pending" ? "default" : "ghost"}
+                className="text-xs h-7 font-medium"
+                onClick={() => setStatusFilter("pending")}
+              >
+                Pendentes ({pendingDocs.filter((d) => d.status === "pending").length})
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={statusFilter === "approved" ? "default" : "ghost"}
+                className="text-xs h-7 font-medium"
+                onClick={() => setStatusFilter("approved")}
+              >
+                Aprovados ({pendingDocs.filter((d) => d.status === "approved").length})
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={statusFilter === "rejected" ? "default" : "ghost"}
+                className="text-xs h-7 font-medium"
+                onClick={() => setStatusFilter("rejected")}
+              >
+                Rejeitados ({pendingDocs.filter((d) => d.status === "rejected").length})
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={statusFilter === "all" ? "default" : "ghost"}
+                className="text-xs h-7 font-medium"
+                onClick={() => setStatusFilter("all")}
+              >
+                Todos ({pendingDocs.length})
+              </Button>
+            </div>
+          </div>
+
           {role !== "broker" && (
             <SelectionToolbar
               selectedCount={multiSelect.count}
-              totalCount={pendingDocs.length}
+              totalCount={filteredDocs.length}
               onClear={multiSelect.clear}
             >
               <Button
@@ -345,19 +440,25 @@ export function DocumentsWorkspace({
 
           <DataTable
             columns={columns}
-            data={pendingDocs}
+            data={filteredDocs}
             searchPlaceholder="Buscar por lead, documento ou tipo..."
             showColumnToggle={true}
             showPagination={true}
             pageSize={10}
             emptyState={
-              pendingDocs.length === 0 ? (
+              filteredDocs.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
                   <VoxelIllustration className="size-20" name="document-review" />
                   <div className="max-w-sm space-y-1.5">
                     <p className="text-sm font-semibold text-foreground">Tudo em dia!</p>
                     <p className="text-xs leading-relaxed text-muted-foreground">
-                      Nenhum documento aguardando aprovação.
+                      {statusFilter === "pending"
+                        ? "Nenhum documento aguardando aprovação."
+                        : statusFilter === "approved"
+                        ? "Nenhum documento aprovado encontrado."
+                        : statusFilter === "rejected"
+                        ? "Nenhum documento rejeitado encontrado."
+                        : "Nenhum documento encontrado."}
                     </p>
                   </div>
                 </div>

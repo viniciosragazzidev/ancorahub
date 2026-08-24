@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -199,7 +199,7 @@ export async function confirmDocumentUploadAction({
     }
 
     const [lead] = await db
-      .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId })
+      .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId, nome: schema.leads.nome })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
       .limit(1);
@@ -279,6 +279,40 @@ export async function confirmDocumentUploadAction({
       });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_document", entidadeId: docId, acao: "document.uploaded" });
     });
+
+    // Notify managers and directors about new pending document
+    const managersAndDirectors = await db
+      .select({ userId: schema.tenantMemberships.userId })
+      .from(schema.tenantMemberships)
+      .where(
+        and(
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.status, "active"),
+          or(
+            eq(schema.tenantMemberships.role, "director"),
+            lead.branchId
+              ? and(eq(schema.tenantMemberships.role, "manager"), eq(schema.tenantMemberships.branchId, lead.branchId))
+              : eq(schema.tenantMemberships.role, "manager")
+          )
+        )
+      );
+
+    for (const recipient of managersAndDirectors) {
+      if (recipient.userId === context.userId) continue;
+      void publishNotification({
+        capability: "document_reviewed",
+        tenantId: context.tenantId,
+        recipientUserId: recipient.userId,
+        leadId,
+        type: "document_pending_approval",
+        title: "Novo documento para aprovação 📄",
+        message: `O documento "${filename}" do lead ${lead.nome ?? "Lead"} aguarda aprovação.`,
+        pushTitle: "Novo Documento para Aprovação 📄",
+        pushBody: `${lead.nome ?? "Lead"} — "${filename}" enviado para revisão.`,
+        url: "/documentos",
+        tag: `doc-pending-${docId}`,
+      }).catch(() => { /* non-blocking */ });
+    }
 
     return { success: true };
   } catch (error) {
@@ -446,12 +480,12 @@ export async function getPendingDocuments() {
       and(
         context.role === "broker"
           ? eq(schema.leads.corretorId, context.userId)
-          : eq(schema.leadDocuments.status, "pending"),
+          : undefined,
         isNull(schema.leadDocuments.deletedAt),
         eq(schema.leadDocuments.tenantId, context.tenantId)
       )
     )
-    .orderBy(schema.leadDocuments.createdAt);
+    .orderBy(desc(schema.leadDocuments.createdAt));
 
   const rows = await query;
 
@@ -474,6 +508,8 @@ export async function bulkReviewDocumentsAction(
 
   const db = getDatabase();
   try {
+    let allowedDocsToNotify: Array<{ id: string; leadId: string; filename: string }> = [];
+
     await db.transaction(async (tx) => {
       // Find all target documents to verify context
       const docs = await tx
@@ -494,6 +530,7 @@ export async function bulkReviewDocumentsAction(
 
       if (allowedDocs.length === 0) return;
 
+      allowedDocsToNotify = allowedDocs;
       const allowedIds = allowedDocs.map((d) => d.id);
 
       await tx
@@ -527,6 +564,31 @@ export async function bulkReviewDocumentsAction(
         });
       }
     });
+
+    // Notify brokers of reviewed documents
+    for (const doc of allowedDocsToNotify) {
+      const [leadData] = await db
+        .select({ corretorId: schema.leads.corretorId, nome: schema.leads.nome })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.id, doc.leadId), eq(schema.leads.tenantId, context.tenantId)))
+        .limit(1);
+
+      if (leadData?.corretorId) {
+        void publishNotification({
+          capability: "document_reviewed",
+          tenantId: context.tenantId,
+          recipientUserId: leadData.corretorId,
+          leadId: doc.leadId,
+          type: status === "approved" ? "document_approved" : "document_rejected",
+          title: status === "approved" ? "Documento aprovado ✅" : "Documento rejeitado ❌",
+          message: `O documento "${doc.filename}" do lead ${leadData.nome} foi ${status === "approved" ? "aprovado" : "rejeitado"}.`,
+          pushTitle: status === "approved" ? "Documento Aprovado! ✅" : "Documento Rejeitado! ❌",
+          pushBody: `${leadData.nome} — documento ${status === "approved" ? "aprovado" : "rejeitado"}.`,
+          url: `/leads/${doc.leadId}`,
+          tag: `doc-${doc.id}`,
+        }).catch(() => { /* non-blocking */ });
+      }
+    }
 
     return { success: true };
   } catch (error) {
