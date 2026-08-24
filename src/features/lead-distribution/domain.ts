@@ -106,6 +106,16 @@ export function resolveQueueCandidateBranchIds(input: {
   return Array.from(new Set(input.allowedBranchIds));
 }
 
+/** A distribution hub (Matriz) receives leads for human redistribution only. */
+export function isAutomaticDistributionBranch(branch: {
+  status: "active" | "inactive";
+  acceptingLeads: boolean;
+  autoDistribute: boolean;
+  isDistributionHub: boolean;
+}) {
+  return branch.status === "active" && branch.acceptingLeads && branch.autoDistribute && !branch.isDistributionHub;
+}
+
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {
   return Math.min(baseSeconds * 1000 * (2 ** Math.max(attempt - 1, 0)), 30 * 60_000);
 }

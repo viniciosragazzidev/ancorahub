@@ -5,6 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import {
+  REALTIME_SYNC_BROWSER_EVENT,
+  type RealtimeSyncBrowserDetail,
+} from "@/components/providers/realtime-events";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "@/components/ui/message";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
@@ -153,6 +157,19 @@ export function ConversationsWorkspace({
     const sync = window.setTimeout(() => setConversations(initialConversations), 0);
     return () => window.clearTimeout(sync);
   }, [initialConversations]);
+
+  // The Director workspace consumes the same opaque conversation signal as
+  // Lite. The resulting refresh re-runs server-side tenant and lead scoping.
+  useEffect(() => {
+    const onConversationInvalidated = (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
+      if (detail?.kind === "domain.invalidated" && detail.domain === "conversations") {
+        router.refresh();
+      }
+    };
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+  }, [router]);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ViewFilter>("all");

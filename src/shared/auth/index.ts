@@ -51,7 +51,14 @@ function createAuth() {
         issuer: "Âncora Corretora",
         backupCodeOptions: { amount: 10, storeBackupCodes: "encrypted" },
       }),
-      passkey(),
+      // rpID fixado no domínio canônico: passkeys ficam válidas em qualquer
+      // subdomínio/host confiado do mesmo registrante (DEC-082). Sem rpID, a
+      // credencial seria emitida para o host da requisição (ex.: preview da
+      // Vercel) e não funcionaria na origem de produção.
+      passkey({
+        rpName: "Âncora Corretora",
+        rpID: process.env.PASSKEY_RP_ID ?? "ancorasaude.cloud",
+      }),
       nextCookies(),
     ],
     session: {

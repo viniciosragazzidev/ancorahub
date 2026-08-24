@@ -174,7 +174,7 @@ export function InputBase({
   return (
     <AriaGroup
       ref={groupRef}
-      className={({ isFocusWithin, isHovered, isDisabled, isInvalid }) =>
+      className={({ isFocusWithin, isHovered, isDisabled, isInvalid }: { isFocusWithin?: boolean; isHovered?: boolean; isDisabled?: boolean; isInvalid?: boolean }) =>
         cx(
           inputStyles.field,
           hasAddon

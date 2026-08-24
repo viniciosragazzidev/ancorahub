@@ -1,5 +1,27 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-082 — Auto-login e passkey no primeiro acesso
+
+**Estado:** Aceita
+**Data:** 2026-08-21
+
+Ao concluir o onboarding de primeiro acesso, o membro é autenticado
+automaticamente pelo fluxo público de credenciais do better-auth
+(`signIn.email` com a senha recém-definida, ainda em memória) e levado ao
+dashboard sem passar pela tela de login. Se o sign-in falhar, a ativação
+permanece válida e o fluxo caí no login manual — a ativação da conta nunca
+depende do auto-login.
+
+O wizard ganha uma etapa opcional de biometria **posterior** à autenticação:
+o registro de passkey (`addPasskey`) exige sessão ativa, portanto a etapa só
+aparece depois do auto-login, com detecção de suporte a autenticador de
+plataforma, opção explícita "Fazer depois" e fallback ao lembrete existente
+(`PasskeyToastHandler`). O registro audita `cadastrou_passkey` pela ação de
+segurança existente. O plugin passkey passa a fixar `rpName` e `rpID` do
+domínio canônico para que as credenciais não fiquem presas a um host de
+preview; o login por passkey continua disponível em ambos os domínios de
+produção confiados.
+
 ## DEC-081 — Feedback instantâneo server-first
 
 **Estado:** Aceita
@@ -40,6 +62,18 @@ fila geral seleciona somente unidades explicitamente permitidas em sua política
 nunca usa a Matriz como destino. A Matriz é ponto administrativo de entrada. Sem
 corretor ou unidade elegível, o lead permanece em fila e o trabalho é repetido com
 motivo auditável, sem descartar a atribuição de fila.
+
+## DEC-082 — Matriz como Central de redistribuição, fora da distribuição automática
+
+**Estado:** Aceita
+**Data:** 2026-08-21
+
+Cada tenant pode marcar uma única unidade como Central de redistribuição (Matriz). A
+Central não participa da seleção automática, mesmo quando estiver ativa, aceitando
+leads ou configurada para distribuição. Leads nela permanecem aguardando a decisão do
+Diretor, que pode encaminhá-los a uma unidade ativa e, quando necessário, atribuí-los
+diretamente a um corretor elegível. A marca é reversível, auditada e não é inferida
+pelo nome da unidade.
 
 ## DEC-079 — Notificação oficial ao corretor em toda atribuição de lead
 

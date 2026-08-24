@@ -15,9 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { createBranchAction, toggleBranchAction, toggleAcceptingLeadsAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
+import { createBranchAction, toggleBranchAction, toggleAcceptingLeadsAction, toggleDistributionHubAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
 
-type Branch = { id: string; name: string; externalId: string | null; status: "active" | "inactive"; memberCount: number; acceptingLeads: boolean };
+type Branch = { id: string; name: string; externalId: string | null; status: "active" | "inactive"; memberCount: number; acceptingLeads: boolean; isDistributionHub: boolean };
 
 function ActionFeedback({ state }: { state: BranchActionState }) {
   const router = useRouter();
@@ -83,13 +83,14 @@ function AcceptingLeadsToggle({ branch }: { branch: Branch }) {
 function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
   const [updateState, updateAction, updatePending] = useActionState<BranchActionState, FormData>(updateBranchAction, {});
   const [toggleState, toggleAction, togglePending] = useActionState<BranchActionState, FormData>(toggleBranchAction, {});
+  const [hubState, hubAction, hubPending] = useActionState<BranchActionState, FormData>(toggleDistributionHubAction, {});
   const updateFormId = `branch-update-${branch.id}`;
   const cells = (
     <>
       <TableCell className="min-w-56 pl-5"><form id={updateFormId} action={updateAction} className="flex items-center gap-2"><input type="hidden" name="branchId" value={branch.id} /><Input aria-label={`Nome da filial ${branch.name}`} name="name" defaultValue={branch.name} required /><Button aria-label={`Salvar ${branch.name}`} type="submit" variant="ghost" size="icon-sm" disabled={updatePending}><PencilSimple size={15} /></Button></form><ActionFeedback state={updateState} /></TableCell>
       <TableCell className="min-w-40"><Input form={updateFormId} aria-label={`Identificador de ${branch.name}`} name="externalId" defaultValue={branch.externalId ?? ""} placeholder="Sem ID" /></TableCell>
       <TableCell><span className="text-sm">{branch.memberCount}</span><span className="ml-1 text-xs text-muted-foreground">membro(s)</span></TableCell>
-      <TableCell><Badge variant="outline" className={branch.status === "active" ? "border-emerald-500/40 text-emerald-500" : "text-muted-foreground"}>{branch.status === "active" ? "Ativa" : "Inativa"}</Badge></TableCell>
+      <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline" className={branch.status === "active" ? "border-emerald-500/40 text-emerald-500" : "text-muted-foreground"}>{branch.status === "active" ? "Ativa" : "Inativa"}</Badge>{branch.isDistributionHub ? <Badge variant="secondary">Central</Badge> : null}</div></TableCell>
       <TableCell><AcceptingLeadsToggle branch={branch} /></TableCell>
       <TableCell className="pr-5 text-right">
         <div className="flex items-center justify-end gap-1">
@@ -98,7 +99,9 @@ function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
             Ver perfil
           </Button>
           <form action={toggleAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" disabled={togglePending}><Power size={15} />{branch.status === "active" ? "Desativar" : "Ativar"}</Button></form>
+          <form action={hubAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" disabled={hubPending}>{branch.isDistributionHub ? "Remover central" : "Definir central"}</Button></form>
           <ActionFeedback state={toggleState} />
+          <ActionFeedback state={hubState} />
         </div>
       </TableCell>
     </>

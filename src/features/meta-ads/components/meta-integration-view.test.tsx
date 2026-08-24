@@ -92,11 +92,11 @@ describe("MetaIntegrationView", () => {
   it("asks for confirmation before disconnecting and refreshes the page state", async () => {
     disconnectMock.mockResolvedValue({ success: true });
     render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Desconectar" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Desconectar" })[0]);
     expect(screen.getByText("Desconectar Marketing da Meta?")).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancelar" }));
     expect(disconnectMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Desconectar" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Desconectar" })[0]);
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Desconectar" }));
     await waitFor(() => expect(disconnectMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(refreshMock).toHaveBeenCalled());

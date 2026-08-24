@@ -28,6 +28,7 @@ export interface LabelProps extends AriaLabelProps {
   isInvalid?: boolean;
   /** Show the info icon next to the label. */
   tooltip?: boolean | string;
+  className?: string;
   ref?: Ref<HTMLLabelElement>;
 }
 

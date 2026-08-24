@@ -321,7 +321,7 @@ export function DataTableExample({
                 slot={null}
                 aria-label={`Select ${c.name}`}
                 isSelected={row.getIsSelected()}
-                onChange={(v) => row.toggleSelected(!!v)}
+                onChange={(v: any) => row.toggleSelected(!!v)}
               />
               {c.avatar ? (
                 <Avatar size={avatarSize} src={c.avatar} alt="" />
@@ -432,7 +432,7 @@ export function DataTableExample({
             className="shrink-0"
             popoverClassName="min-w-40"
             selectedKey={priceFilter}
-            onSelectionChange={(k) => {
+            onSelectionChange={(k: any) => {
               setPriceFilter(String(k));
               resetPage();
             }}
@@ -448,7 +448,7 @@ export function DataTableExample({
             className="shrink-0"
             popoverClassName="min-w-40"
             selectedKey={productFilter}
-            onSelectionChange={(k) => {
+            onSelectionChange={(k: any) => {
               setProductFilter(String(k));
               resetPage();
             }}
@@ -467,7 +467,7 @@ export function DataTableExample({
             className="shrink-0"
             popoverClassName="min-w-40"
             selectedKey={regionFilter}
-            onSelectionChange={(k) => {
+            onSelectionChange={(k: any) => {
               setRegionFilter(String(k));
               resetPage();
             }}
@@ -486,7 +486,7 @@ export function DataTableExample({
             placeholder="Search"
             leadingIcon={RiSearchLine}
             value={query}
-            onChange={(e) => {
+            onChange={(e: any) => {
               setQuery(e.target.value);
               resetPage();
             }}
@@ -513,7 +513,7 @@ export function DataTableExample({
                         aria-label="Select all customers on this page"
                         isSelected={table.getIsAllPageRowsSelected()}
                         isIndeterminate={table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()}
-                        onChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+                        onChange={(v: any) => table.toggleAllPageRowsSelected(!!v)}
                       />
                       <button
                         type="button"
@@ -587,7 +587,7 @@ export function DataTableExample({
         <SegmentedControl
           aria-label="Table density"
           selectedKeys={new Set([size])}
-          onSelectionChange={(keys) => {
+          onSelectionChange={(keys: any) => {
             const next = [...keys][0];
             if (next) setSize(next as TableSize);
           }}

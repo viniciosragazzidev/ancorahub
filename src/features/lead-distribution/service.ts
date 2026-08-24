@@ -5,7 +5,7 @@ import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds, type IntelligentDistributionPolicy } from "./domain";
+import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { notifyNewLead } from "@/features/notifications/send-push-helper";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -72,7 +72,9 @@ async function getRosterBrokerIds(tenantId: string, branchId: string, date = new
       inArray(schema.dutyRosterAssignments.scheduleId, matchingScheduleIds),
     ));
 
-  return assignments.length ? new Set(assignments.map((a) => a.brokerId)) : null;
+  // A matching plantão without escalated brokers has no eligible broker. It must
+  // remain queued instead of silently falling back to the whole unit roster.
+  return new Set(assignments.map((a) => a.brokerId));
 }
 
 async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: string) {
@@ -159,8 +161,9 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem distribuir leads.");
   assertBranchScope(context, branchId);
   const db = getDatabase();
-  const [branch] = await db.select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status }).from(schema.branches).where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
-  if (!branch || branch.status !== "active" || !branch.acceptingLeads) return { status: "failed", code: "BRANCH_NOT_ACCEPTING_LEADS" };
+  const [branch] = await db.select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status, isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches).where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+  if (!branch || branch.status !== "active" || (!branch.isDistributionHub && !branch.acceptingLeads)) return { status: "failed", code: "BRANCH_NOT_ACCEPTING_LEADS" };
+  if (branch.isDistributionHub && context.role !== "director") throw new AuthorizationError("Somente Diretores podem encaminhar leads para a Central de redistribuição.");
   // Atribuição manual não requer fila — usa null quando não há fila na unidade
   let queueId: string | null = null;
   try {
@@ -214,12 +217,12 @@ export async function routeLeadToBranchAndAssignBroker(
 
   // 1. Verify branch
   const [branch] = await db
-    .select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status })
+    .select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status, isDistributionHub: schema.branches.isDistributionHub })
     .from(schema.branches)
 
     .where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId)))
     .limit(1);
-  if (!branch || branch.status !== "active" || !branch.acceptingLeads)
+  if (!branch || branch.status !== "active" || !branch.acceptingLeads || branch.isDistributionHub)
     return { status: "conflict", leadId, reason: "A unidade não pode receber leads agora." };
 
   // 2. Get lead
@@ -387,6 +390,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     qualificationStatus: schema.leads.qualificationStatus,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.distributionStatus, "queued"))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  if (lead.branchId) {
+    const [leadBranch] = await db.select({ isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches).where(and(eq(schema.branches.id, lead.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+    if (leadBranch?.isDistributionHub) return { status: "queued", leadId, reason: "Lead aguardando redistribuição manual pela Central." };
+  }
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
   }
@@ -405,8 +412,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     ? configuredBranchIds.filter((branchId) => branchId === context.branchId)
     : configuredBranchIds;
   if (!requestedBranchIds.length) return { status: "queued", leadId, reason: "A fila geral não possui unidades elegíveis configuradas." };
-  const activeBranches = await db.select({ id: schema.branches.id }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), inArray(schema.branches.id, requestedBranchIds), eq(schema.branches.status, "active"), eq(schema.branches.acceptingLeads, true), eq(schema.branches.autoDistribute, true)));
-  const targetBranchIds = activeBranches.map((branch) => branch.id);
+  const activeBranches = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, autoDistribute: schema.branches.autoDistribute, isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), inArray(schema.branches.id, requestedBranchIds)));
+  const targetBranchIds = activeBranches.filter(isAutomaticDistributionBranch).map((branch) => branch.id);
   if (!targetBranchIds.length) return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
   const allBrokers = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId, createdAt: schema.user.createdAt }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), inArray(schema.tenantMemberships.branchId, targetBranchIds), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(asc(schema.user.createdAt));
   const rosterResults = await Promise.all(targetBranchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId)] as const));

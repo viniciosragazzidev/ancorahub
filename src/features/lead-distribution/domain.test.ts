@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -80,5 +80,10 @@ describe("lead distribution domain", () => {
       queueBranchId: null,
       allowedBranchIds: [],
     })).toEqual([]);
+  });
+
+  it("keeps the Matriz available for human redistribution but out of automatic distribution", () => {
+    expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: true })).toBe(false);
+    expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: false })).toBe(true);
   });
 });

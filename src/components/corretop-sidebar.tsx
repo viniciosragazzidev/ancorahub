@@ -223,13 +223,18 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
     try {
-      await signOut();
+      await signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            window.location.href = "/login";
+          },
+        },
+      });
     } catch {
-      // signOut may fail if the server is unreachable, but we still redirect
-      // so the user can re-authenticate cleanly.
+      // signOut may fail if server is unreachable
+    } finally {
+      window.location.href = "/login";
     }
-    // Hard navigation guarantees the proxy middleware runs with a cleared cookie.
-    window.location.href = "/login";
   }
 
   return (

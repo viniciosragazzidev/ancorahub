@@ -80,7 +80,7 @@ export function Tooltip({ children, className, size = "sm", showArrow = true, of
     <AriaTooltip
       offset={offset}
       {...props}
-      className={(state) =>
+      className={(state: any) =>
         cx(
           "pointer-events-none z-50 max-w-[240px] select-none rounded-lg border border-border-button-default bg-background-primary-default text-text-primary shadow-dropdown",
           sizes[size],
@@ -91,13 +91,13 @@ export function Tooltip({ children, className, size = "sm", showArrow = true, of
           "transition duration-200 ease-out",
           "data-[entering]:scale-90 data-[entering]:opacity-0 data-[entering]:blur-[4px]",
           "data-[exiting]:scale-90 data-[exiting]:opacity-0 data-[exiting]:blur-[4px]",
-          typeof className === "function" ? className(state) : className,
+          typeof className === "function" ? (className as any)(state) : className,
         )
       }
     >
       {showArrow && (
         <AriaOverlayArrow>
-          {({ placement }) => {
+          {({ placement }: { placement: string }) => {
             // `placement` includes react-aria's `"center"` (for other overlay
             // types); this tooltip only ever resolves to one of our 4 sides.
             const caret = TOOLTIP_CARETS[placement as keyof typeof TOOLTIP_CARETS] ?? TOOLTIP_CARETS.top;

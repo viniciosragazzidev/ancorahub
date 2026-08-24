@@ -1,8 +1,10 @@
 import "server-only";
 
 import { createHmac } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { getDatabase, schema } from "@/shared/db";
 
 export const REALTIME_SYNC_FEATURE = "feature_realtime_sync_enabled";
 export const REALTIME_SYNC_EVENT = "refresh";
@@ -100,6 +102,38 @@ export async function publishDomainInvalidation(
       { version: 1, kind: "domain.invalidated", domain, occurredAt },
     ),
   ));
+}
+
+/**
+ * Conversations are visible to tenant directors and, when applicable, the
+ * broker participating in the workspace. The signal contains no message data;
+ * every recipient refreshes its own server-authorized view.
+ */
+export async function publishConversationInvalidation(input: {
+  tenantId: string;
+  participantUserIds?: Array<string | null | undefined>;
+}): Promise<void> {
+  if (!(await isRealtimeSyncEnabled())) return;
+
+  const directors = await getDatabase()
+    .select({ userId: schema.tenantMemberships.userId })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, input.tenantId),
+        eq(schema.tenantMemberships.status, "active"),
+        eq(schema.tenantMemberships.role, "director"),
+      ),
+    )
+    .limit(20);
+
+  const userIds = new Set(directors.map((director) => director.userId));
+  for (const userId of input.participantUserIds ?? []) if (userId) userIds.add(userId);
+
+  await publishDomainInvalidation(
+    [...userIds].map((userId) => ({ tenantId: input.tenantId, userId })),
+    "conversations",
+  );
 }
 
 async function sendRealtimeSignal(target: RealtimeSyncTarget, signal: RealtimeSyncSignal | DomainInvalidationSignal) {

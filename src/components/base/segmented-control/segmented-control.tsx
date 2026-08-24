@@ -87,11 +87,11 @@ export function SegmentedControl({ className, children, variant = "solid", ref, 
       selectionMode="single"
       disallowEmptySelection
       {...props}
-      className={(state) =>
+      className={(state: any) =>
         cx(
           "relative inline-flex items-start gap-0.5 rounded-2lg",
           variant === "solid" && "bg-segmented-control-background p-1",
-          typeof className === "function" ? className(state) : className,
+          typeof className === "function" ? (className as any)(state) : className,
         )
       }
     >
@@ -126,7 +126,7 @@ export function SegmentedControlItem({
     <AriaToggleButton
       ref={ref}
       {...props}
-      className={(state) =>
+      className={(state: any) =>
         cx(
           "relative z-10 inline-flex cursor-pointer items-center justify-center rounded-md px-2.5 py-1 text-center whitespace-nowrap",
           "transition-colors duration-200 ease",

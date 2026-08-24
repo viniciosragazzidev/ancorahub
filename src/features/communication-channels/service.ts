@@ -5,6 +5,7 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
+import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { decryptChannelSecret } from "./secret-crypto";
 import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
@@ -171,6 +172,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
           }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
           console.info("[whatsapp/broker-channel] inbound.received", { tenantId: channel.tenantId, brokerProfileId: brokerProfile.id, messageKind });
+          void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
           await setWebhookEventResult(eventId, "processed");
           processed += 1;
           continue;
@@ -186,7 +188,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           .filter((s) => s.length >= 8)
           .map((s) => sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') LIKE ${'%' + s}`);
         const leads = phoneConditions.length
-          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus })
+          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, corretorId: schema.leads.corretorId })
               .from(schema.leads)
               .where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt), or(...phoneConditions)))
           : [];
@@ -230,6 +232,10 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           body: text || `[${messageKind}]`,
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+        void publishConversationInvalidation({
+          tenantId: channel.tenantId,
+          participantUserIds: [lead?.corretorId],
+        }).catch(() => undefined);
 
         if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
@@ -270,6 +276,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           });
         }
         await setWebhookEventResult(eventId, "processed");
+        void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
         processed += 1;
       }
 

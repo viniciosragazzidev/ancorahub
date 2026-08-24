@@ -2,12 +2,17 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 import {
   getPreferredMetaCloudChannel,
   sendMetaCloudChannelText,
 } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
+import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -243,6 +248,7 @@ export async function sendLeadMessageAction(
     const [lead] = await db
       .select({
         id: schema.leads.id,
+        nome: schema.leads.nome,
         telefone: schema.leads.telefone,
         status: schema.leads.status,
         corretorId: schema.leads.corretorId,
@@ -253,8 +259,21 @@ export async function sendLeadMessageAction(
       .limit(1);
     if (!lead) return { success: false, error: "Lead não encontrado." };
     const isManagement = context.role === "director" || context.role === "manager";
-    if (lead.status === "distributed" && context.role === "broker")
-      return { success: false, error: "Inicie o atendimento antes de enviar mensagens." };
+    if (lead.status === "distributed" && context.role === "broker" && lead.corretorId === context.userId) {
+      // DEC-027: a primeira mensagem do corretor dono também é forma válida de
+      // iniciar o atendimento. A transição é condicional (status/corretorId) e
+      // idempotente; falhas aqui não impedem o envio da mensagem.
+      const started = await startServiceOnFirstMessage({
+        tenantId: context.tenantId,
+        leadId: lead.id,
+        brokerId: context.userId,
+        branchId: lead.branchId,
+      });
+      if (started) {
+        lead.status = "in_contact";
+        void notifyServiceStarted(context, lead).catch(() => { /* non-blocking */ });
+      }
+    }
     if (lead.corretorId && lead.corretorId !== context.userId && !isManagement)
       return {
         success: false,
@@ -272,12 +291,19 @@ export async function sendLeadMessageAction(
     if (suppression)
       return { success: false, error: "Este contato não pode receber novas mensagens." };
 
-    // ── 1. Try Meta Cloud channel ──────────────────────────────────────────
-    const officialChannel = await getPreferredMetaCloudChannel({
-      tenantId: context.tenantId,
-      branchId: lead.branchId,
-      userId: context.userId,
-    });
+    // Corretores no modo Lite atendem pelo próprio WhatsApp conectado. O canal
+    // oficial continua sendo exclusivo das conversas do tenant e da gestão.
+    const brokerUsesLite =
+      context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
+
+    // ── 1. Try Meta Cloud channel for the tenant workspace ────────────────
+    const officialChannel = brokerUsesLite
+      ? null
+      : await getPreferredMetaCloudChannel({
+          tenantId: context.tenantId,
+          branchId: lead.branchId,
+          userId: context.userId,
+        });
     if (officialChannel) {
       const sent = await sendMetaCloudChannelText({
         channel: officialChannel,
@@ -301,6 +327,7 @@ export async function sendLeadMessageAction(
           body: text,
           sentAt,
         });
+      synchronizeConversationWorkspace(context.tenantId, [context.userId]);
       return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
     }
 
@@ -395,6 +422,7 @@ export async function sendLeadMessageAction(
         target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId],
       });
 
+    synchronizeConversationWorkspace(context.tenantId, [context.userId]);
     return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
   } catch (error) {
     return {
@@ -402,6 +430,12 @@ export async function sendLeadMessageAction(
       error: error instanceof Error ? error.message : "Não foi possível enviar a mensagem.",
     };
   }
+}
+
+function synchronizeConversationWorkspace(tenantId: string, participantUserIds: string[]) {
+  revalidatePath("/conversas");
+  revalidatePath("/conversas/broker");
+  void publishConversationInvalidation({ tenantId, participantUserIds }).catch(() => undefined);
 }
 
 export async function getLeadMessagesAction(leadId: string) {
@@ -445,6 +479,25 @@ export async function getLeadMessagesAction(leadId: string) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+async function notifyServiceStarted(
+  context: { tenantId: string; userId: string },
+  lead: { id: string; nome: string },
+) {
+  await publishNotification({
+    capability: "lead_service_started",
+    tenantId: context.tenantId,
+    recipientUserId: context.userId,
+    leadId: lead.id,
+    type: "lead_service_started",
+    title: "Atendimento ativo",
+    message: `Você iniciou o atendimento de ${lead.nome} ao enviar a primeira mensagem.`,
+    pushTitle: "Atendimento Ativo! ✅",
+    pushBody: `Você iniciou o atendimento de ${lead.nome}.`,
+    url: `/leads/${lead.id}`,
+    tag: `lead-${lead.id}`,
+  }).catch(() => { /* non-blocking */ });
+}
 
 function createPhoneHash(phone: string): string {
   const normalized = phone.replace(/\D/g, "");

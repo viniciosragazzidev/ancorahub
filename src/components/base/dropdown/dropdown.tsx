@@ -93,7 +93,7 @@ export function Dropdown({ isOpen: controlledOpen, onOpenChange, children }: Dro
 
   return (
     <DropdownContext.Provider value={{ triggerRef, popoverRef }}>
-      <AriaDialogTrigger isOpen={isOpen} onOpenChange={(o) => allowOpenChange(o) && setOpen(o)}>
+      <AriaDialogTrigger isOpen={isOpen} onOpenChange={(o: boolean) => allowOpenChange(o) && setOpen(o)}>
         {children}
       </AriaDialogTrigger>
     </DropdownContext.Provider>
@@ -117,9 +117,11 @@ export function DropdownTrigger({ className, ...props }: ComponentProps<typeof A
 
 /* ------------------------------------------------------------------- panel */
 
-export interface DropdownPopoverProps
-  extends Pick<ComponentProps<typeof AriaPopover>, "placement" | "offset" | "crossOffset"> {
+export interface DropdownPopoverProps {
   "aria-label": string;
+  placement?: any;
+  offset?: number;
+  crossOffset?: number;
   /** Extra classes on the panel — e.g. a width override (default w-[266px]). */
   className?: string;
   /** Classes on the inner dialog (the flex column), e.g. gap between groups. */

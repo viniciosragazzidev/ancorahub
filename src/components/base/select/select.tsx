@@ -95,10 +95,10 @@ export function Select<T extends object>({
       ref={ref}
       {...props}
       isOpen={isOpen}
-      onOpenChange={(o) => allowOpenChange(o) && setIsOpen(o)}
+      onOpenChange={(o: boolean) => allowOpenChange(o) && setIsOpen(o)}
       className={cx("group flex flex-col", className)}
     >
-      {({ isOpen }) => (
+      {({ isOpen }: { isOpen: boolean }) => (
         <>
           <AriaButton
             ref={triggerRef}
@@ -167,7 +167,7 @@ export function SelectItem({ className, children, ...props }: SelectItemProps) {
   return (
     <AriaListBoxItem
       {...props}
-      className={(state) =>
+      className={(state: any) =>
         cx(
           MENU_ITEM,
           size === "sm" ? "px-2 py-1.5 text-body-2-medium" : "text-body-medium",

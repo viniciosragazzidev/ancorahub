@@ -47,6 +47,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-029 | Notificação operacional é um evento coordenado. | Capacidade ativa → cria notificação in-app para Realtime/toast e tenta push; capacidade desativada pelo Super-admin → nenhum canal é emitido, com auditoria da alteração. | DEC-028 |
 | BR-029J | Atribuição de corretor também gera aviso oficial por WhatsApp. | Corretor passa a ser responsável → template `new_lead_broker` é enfileirado de forma idempotente pela atribuição; falha de entrega não desfaz a distribuição. | DEC-079 |
 | BR-029K | Estouro de prazo da qualificação preserva a fila do tipo/campanha configurado no intake. | Após o timeout → o lead entra ou permanece na fila ativa configurada; fila de unidade tenta apenas sua unidade e fila geral tenta apenas as unidades permitidas. Matriz nunca é destino. Sem elegível, o lead continua em fila com retry auditável. | DEC-080 |
+| BR-029L | A Central de redistribuição (Matriz) não é candidata à distribuição automática. | Lead na Central → permanece aguardando decisão do Diretor; Diretor pode encaminhá-lo para unidade ativa e corretor elegível. | DEC-082 |
 | BR-029C | Lead sem unidade resolvida entra na fila geral central do tenant, sem atribuição automática. | Diretor encaminha para uma unidade; Gestor direciona somente após o lead entrar em sua unidade; cada ação é auditada. | DEC-059 |
 | BR-029D | Exceções de intake/outbox possuem dono operacional e SLA inicial. | Diretor trata exceções centrais; Gestor trata apenas a própria unidade; P0 em até 30 min e P1 até o fim do dia útil. | DEC-060 |
 | BR-029E | Plantão tem cobertura mínima configurável e não bloqueia a distribuição quando incompleto. | Escalados abaixo do mínimo → alerta operacional; corretores elegíveis já escalados continuam concorrendo à distribuição. | DEC-061 |
@@ -117,6 +118,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 - Canal, aprovação e opt-out do reengajamento (DEC-006).
 
 | BR-062 | O Diretor pode consultar, em modo somente leitura, o histórico do número oficial com corretores do próprio tenant. | Mensagem oficial para/desde número de corretor → persiste no ledger autorizado; Diretor abre `/conversas?tab=corretores` → consulta convites, entregas e respostas sem enviar mensagens. | DEC-065 |
+| BR-062A | A conexão pessoal do Corretor só sincroniza conversas operacionais atribuídas a ele; conversas pessoais não entram no CRM nem na central do Diretor. | Webhook WAHA de sessão do corretor → resolve lead/cliente pelo tenant e pelo `corretorId` da sessão; contato sem vínculo é ignorado, número oficial do tenant fica em thread própria do Lite e lead/cliente vinculado é persistido pelo mesmo `leadId` da qualificação. | DEC-081 / DEC-070 |
 
 ## Feedback e lembretes
 

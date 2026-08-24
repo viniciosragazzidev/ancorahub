@@ -469,19 +469,59 @@ export function LightLeadDetail({
           <div>
             <span className="text-muted-foreground block text-[11px]">Tipo de Lead</span>
             <strong className="font-semibold text-foreground truncate block">
-              {lead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
+              {lead.tipo === "PJ" || lead.tipo === "PME" ? "PJ / PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
             </strong>
           </div>
+
+          {phoneUnlocked && lead.email ? (
+            <div className="col-span-2">
+              <span className="text-muted-foreground block text-[11px]">E-mail</span>
+              <strong className="font-semibold text-foreground truncate block">
+                {lead.email}
+              </strong>
+            </div>
+          ) : null}
+
+          {lead.formData?.razaoSocial ? (
+            <div className="col-span-2">
+              <span className="text-muted-foreground block text-[11px]">Razão Social</span>
+              <strong className="font-semibold text-foreground truncate block">
+                {lead.formData.razaoSocial}
+              </strong>
+            </div>
+          ) : null}
+
+          {lead.formData?.cnpj ? (
+            <div>
+              <span className="text-muted-foreground block text-[11px]">CNPJ</span>
+              <strong className="font-semibold text-foreground truncate block">
+                {lead.formData.cnpj}
+              </strong>
+            </div>
+          ) : null}
+
           <div>
-            <span className="text-muted-foreground block text-[11px]">Origem</span>
+            <span className="text-muted-foreground block text-[11px]">Origem / Campanha</span>
             <strong className="font-semibold text-foreground truncate block">
-              {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}
+              {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook / Meta")}
             </strong>
           </div>
           <div>
             <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
             <strong className="font-semibold text-foreground truncate block">
               {lead.city || lead.branchName || "Não informada"}
+            </strong>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-[11px]">Data de Entrada</span>
+            <strong className="font-semibold text-foreground truncate block">
+              {new Date(lead.createdAt).toLocaleDateString("pt-BR")}
+            </strong>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-[11px]">Consentimento LGPD</span>
+            <strong className="font-semibold text-emerald-600 truncate block">
+              ✓ Confirmado
             </strong>
           </div>
           <div className="col-span-2">

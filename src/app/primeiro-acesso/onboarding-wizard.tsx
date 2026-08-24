@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Fingerprint } from "@/components/huge-icons";
+import { authClient } from "@/shared/auth/client";
+import { recordSecurityAuditAction } from "@/app/(dashboard)/settings/security-actions";
 import { completeOnboardingAction } from "./onboarding-actions";
 
 type Props = {
@@ -25,6 +28,15 @@ type Props = {
   };
 };
 
+async function platformAuthenticatorAvailable(): Promise<boolean> {
+  try {
+    if (typeof window === "undefined" || !("PublicKeyCredential" in window)) return false;
+    return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch {
+    return false;
+  }
+}
+
 export function OnboardingWizard({ invitation, profile }: Props) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(profile.professionalName);
@@ -35,7 +47,13 @@ export function OnboardingWizard({ invitation, profile }: Props) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    void platformAuthenticatorAvailable().then(setPasskeySupported);
+  }, []);
 
   function nextStep() {
     if (step === 1) {
@@ -73,6 +91,29 @@ export function OnboardingWizard({ invitation, profile }: Props) {
     setStep((prev) => prev - 1);
   }
 
+  function goToDashboard() {
+    router.push("/dashboard");
+    router.refresh();
+  }
+
+  async function registerPasskey() {
+    setPasskeyBusy(true);
+    try {
+      const result = await authClient.passkey.addPasskey({
+        name: "Biometria do primeiro acesso",
+        authenticatorAttachment: "platform",
+      });
+      if (result.error) throw new Error(result.error.message ?? "Não foi possível cadastrar a biometria.");
+      await recordSecurityAuditAction("cadastrou_passkey");
+      toast.success("Biometria cadastrada! Você já pode entrar com a digital.");
+      goToDashboard();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível cadastrar a biometria.");
+    } finally {
+      setPasskeyBusy(false);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!termsAccepted) {
@@ -91,34 +132,52 @@ export function OnboardingWizard({ invitation, profile }: Props) {
       formData.append("termsAccepted", "on");
 
       const result = await completeOnboardingAction({ success: false }, formData);
-      if (result.success) {
-        toast.success("Conta ativada com sucesso! Redirecionando para o login...");
-        setTimeout(() => {
-          router.push("/login?message=onboarding_completed");
-        }, 1500);
-      } else {
+      if (!result.success) {
         toast.error("Erro na ativação", { description: result.error });
+        return;
+      }
+
+      // DEC-082: auto-login com a senha recém-definida (ainda em memória).
+      // Se falhar, a conta já está ativa e o login manual continua válido.
+      try {
+        const signIn = await authClient.signIn.email({
+          email: invitation.email,
+          password,
+        });
+        if (!signIn.error) {
+          toast.success("Conta ativada com sucesso! Bem-vindo(a).");
+          setStep(5);
+          return;
+        }
+        throw new Error(signIn.error.message);
+      } catch {
+        toast.success("Conta ativada com sucesso! Faça login para continuar.");
+        router.push("/login?message=onboarding_completed");
       }
     });
   }
+
+  const totalSteps = 5;
 
   return (
     <Card className="w-full max-w-lg border border-border shadow-md bg-card">
       <CardHeader className="border-b border-border pb-4">
         <span className="text-[10px] font-semibold text-primary uppercase tracking-widest">
-          Passo {step} de 4 · Primeiro Acesso
+          Passo {step} de {totalSteps} · Primeiro Acesso
         </span>
         <CardTitle className="mt-1 text-xl font-bold tracking-tight text-foreground">
           {step === 1 && "Confirme seu Perfil Profissional"}
           {step === 2 && "Validação de Identidade (CPF)"}
           {step === 3 && "Defina sua Senha de Acesso"}
           {step === 4 && "Termos e Consentimentos"}
+          {step === 5 && "Acesso com Biometria"}
         </CardTitle>
         <CardDescription>
           {step === 1 && `Vínculo com ${invitation.tenantName} · Unidade ${invitation.branchName}`}
           {step === 2 && "Confirme o CPF associado a este convite para validar sua segurança."}
           {step === 3 && "Crie uma senha forte e segura para seus acessos futuros."}
           {step === 4 && "Leia e dê o aceite nas políticas operacionais da plataforma."}
+          {step === 5 && "Cadastre sua digital para entrar sem digitar senha — ou pule esta etapa."}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-6">
@@ -172,11 +231,11 @@ export function OnboardingWizard({ invitation, profile }: Props) {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="user-pass">Senha de Acesso</Label>
-                <Input id="user-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 10 caracteres" required />
+                <Input id="user-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 10 caracteres" required autoComplete="new-password" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="user-pass-confirm">Confirme sua Senha</Label>
-                <Input id="user-pass-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" required />
+                <Input id="user-pass-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" required autoComplete="new-password" />
               </div>
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" type="button" className="flex-1" onClick={prevStep}>
@@ -221,6 +280,34 @@ export function OnboardingWizard({ invitation, profile }: Props) {
                 <Button type="submit" className="flex-1" disabled={pending}>
                   {pending ? "Ativando conta..." : "Concluir e Ativar"}
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
+                <Fingerprint className="size-6 shrink-0 text-primary" />
+                <div className="text-sm leading-relaxed text-muted-foreground">
+                  {passkeySupported
+                    ? "Use a biometria do seu dispositivo (digital ou Face ID) para entrar no CorreTop sem digitar senha. Você pode cadastrar ou gerenciar biometrias depois, em Configurações → Segurança."
+                    : "Este dispositivo não parece oferecer autenticador biométrico. Você pode cadastrar uma biometria depois, em Configurações → Segurança, a partir de um dispositivo compatível."}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" type="button" className="flex-1" onClick={goToDashboard} disabled={passkeyBusy}>
+                  Fazer depois
+                </Button>
+                {passkeySupported && (
+                  <Button type="button" className="flex-1" onClick={() => void registerPasskey()} disabled={passkeyBusy}>
+                    {passkeyBusy ? "Aguardando biometria..." : "Ativar digital agora"}
+                  </Button>
+                )}
+                {!passkeySupported && (
+                  <Button type="button" className="flex-1" onClick={goToDashboard}>
+                    Ir para o painel
+                  </Button>
+                )}
               </div>
             </div>
           )}

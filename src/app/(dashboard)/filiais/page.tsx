@@ -21,6 +21,7 @@ export default async function BranchesPage() {
       name: schema.branches.name,
       status: schema.branches.status,
       acceptingLeads: schema.branches.acceptingLeads,
+      isDistributionHub: schema.branches.isDistributionHub,
     })
     .from(schema.branches)
     .where(eq(schema.branches.tenantId, context.tenantId));

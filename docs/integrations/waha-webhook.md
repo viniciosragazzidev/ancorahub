@@ -364,6 +364,8 @@ Cada processamento registra:
 - ✅ Deduplicação em 3 camadas
 - ✅ Resolução de sessão por 2 tabelas (não aceita sessionName arbitrário)
 - ✅ Busca de contato **sempre** escopada por tenant
+- ✅ JID do WAHA (`numero@c.us`) é normalizado para dígitos antes da validação
+  estrita do telefone; identificadores que não representam telefone continuam recusados
 - ✅ Sem PII nos logs (apenas IDs e métricas)
 - ✅ Webhook rápido (sem chamadas a IA, RAG ou download de mídia)
 - ✅ Mensagens do corretor (`fromMe`) não criam leads
@@ -506,7 +508,7 @@ Container WAHA reinicia
 | `WAHA_CADENCE_FEATURE` | CRM (system_settings) | Kill switch: `feature_waha_cadence_enabled` |
 | `WAHA_AI_FEATURE` | CRM (system_settings) | Kill switch: `feature_waha_ai_enabled` |
 | `CRM_WEBHOOK_URL` | Fastify (VPS) | URL do webhook CRM para forward |
-| `CRM_INTERNAL_TOKEN` | Fastify (VPS) | Token de autenticação interna |
+| `WAHA_RELAY_SHARED_SECRET` | Fastify (VPS) + CRM | Mesmo segredo HMAC usado pelo encaminhador para assinar cada evento recebido do WAHA. |
 
 ---
 

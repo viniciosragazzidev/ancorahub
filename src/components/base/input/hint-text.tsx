@@ -19,6 +19,7 @@ import { cx } from "@/utils/cx";
 export interface HintTextProps extends AriaTextProps {
   children: ReactNode;
   isInvalid?: boolean;
+  className?: string;
   ref?: Ref<HTMLElement>;
 }
 

@@ -41,16 +41,16 @@ export function Checkbox({ className, children, size = "md", ref, ...props }: Ch
     <AriaCheckbox
       ref={ref}
       {...props}
-      className={(state) =>
+      className={(state: any) =>
         cx(
           "group inline-flex items-center select-none",
           s.gap,
           state.isDisabled ? "cursor-not-allowed" : "cursor-pointer",
-          typeof className === "function" ? className(state) : className,
+          typeof className === "function" ? (className as any)(state) : className,
         )
       }
     >
-      {(state) => (
+      {(state: any) => (
         <>
           <CheckboxGlyph state={state} size={size} />
           {children !== undefined && children !== null && (

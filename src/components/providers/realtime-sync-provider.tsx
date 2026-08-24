@@ -62,22 +62,13 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
 
   const isEligibleForLeadNotifications = role === "director" || role === "manager" || role === "broker";
 
-  const isFormElementFocused = useCallback(() => {
-    const element = document.activeElement;
-    if (!element) return false;
-    const tag = element.tagName.toLowerCase();
-    return tag === "input" || tag === "textarea" || tag === "select" ||
-      (element as HTMLElement).isContentEditable || element.getAttribute("role") === "textbox" ||
-      element.closest('[role="dialog"]') !== null;
-  }, []);
-
   /**
    * Coalesced server refresh: events arriving within REFRESH_COALESCE_MS are
    * consolidated into a single router.refresh(). This prevents a burst of 5
    * realtime events from triggering 5 separate server re-renders.
    */
   const scheduleServerRefresh = useCallback(() => {
-    if (document.visibilityState !== "visible" || isFormElementFocused()) {
+    if (document.visibilityState !== "visible") {
       refreshPendingRef.current = true;
       return;
     }
@@ -92,7 +83,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       pendingEventsRef.current = 0;
       router.refresh();
     }, REFRESH_COALESCE_MS);
-  }, [isFormElementFocused, router]);
+  }, [router]);
 
   /**
    * Client-only state sync: updates the local revision, dispatches browser
