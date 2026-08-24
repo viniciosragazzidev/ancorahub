@@ -35,7 +35,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
   ];
 
   return (
-    <form action={action} onSubmit={() => toast.info("Salvando lead e distribuindo a oportunidade...")} className="space-y-4">
+    <form action={action} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="lead-name">Nome completo</Label>
         <Input id="lead-name" name="nome" placeholder="Ex.: Mariana Costa" required />
