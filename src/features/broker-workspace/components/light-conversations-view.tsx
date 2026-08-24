@@ -152,7 +152,7 @@ export function LightConversationsView({
   }
   if (!whatsappConnected) return <ConnectionEmptyState connection={connection} />;
   return (
-    <section className="flex h-[calc(100dvh-var(--header-height,3.5rem))] min-h-[38rem] overflow-hidden border-y border-border/70 bg-background lg:border">
+    <section className="flex h-[calc(100dvh-var(--header-height,3.5rem))] min-h-[38rem] max-lg:min-h-0 overflow-hidden border-y border-border/70 bg-background lg:border">
       <aside
         className={cn(
           "flex min-w-0 flex-1 flex-col border-r border-border/70 bg-card lg:max-w-[23rem] lg:flex-none",
@@ -463,7 +463,7 @@ function ChatInput({
   }
 
   return (
-    <div className="border-t border-border/70 bg-card px-4 py-3 sm:px-5">
+    <div className="border-t border-border/70 bg-card px-4 py-3 sm:px-5 max-lg:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-3">
       {initialText ? (
         <p className="mb-2 text-xs text-muted-foreground">
           Mensagem inicial pronta para você revisar antes do envio.
