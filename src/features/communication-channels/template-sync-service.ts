@@ -432,12 +432,19 @@ export class WhatsAppTemplateResolver {
     tenantId: string,
     purpose: MetaWhatsAppTemplatePurpose | string,
   ): Promise<{ name: string; language: string; isCustom: boolean }> {
+    // Broker assignment and offer acceptance have fixed operational contracts.
+    // They cannot inherit tenant bindings because qualification targets the lead,
+    // while these templates target the broker with different payloads.
+    if (purpose === "brokerLeadNotification" || purpose === "leadAssignmentConfirmed") {
+      const template = META_WHATSAPP_TEMPLATE_PURPOSES[purpose];
+      return { ...template, isCustom: false };
+    }
+
     const db = getDatabase();
 
     // Map purpose string to eventKey
     let eventKey: EventKey | null = null;
     if (purpose === "brokerInvitation") eventKey = "BROKER_WELCOME";
-    else if (purpose === "brokerLeadNotification" || purpose === "leadQualification" || purpose === "lead_qualification") eventKey = "LEAD_ASSIGNMENT";
     else if (purpose === "newLeadAssignment") eventKey = "LEAD_OFFER";
     else if (purpose === "leadAssignmentConfirmed") eventKey = "LEAD_ASSIGNMENT_CONFIRMED";
     else if (purpose === "leadAssignmentUnavailable") eventKey = "LEAD_ASSIGNMENT_UNAVAILABLE";

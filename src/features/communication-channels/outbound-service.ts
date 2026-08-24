@@ -143,8 +143,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
         }
       } else if (row.purpose === "leadAssignmentConfirmed") {
         const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-        if (variables[4]) {
-          urlButtonParameter = variables[4];
+        if (variables[6]) {
+          urlButtonParameter = variables[6];
         }
       }
 
