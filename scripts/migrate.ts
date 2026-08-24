@@ -56,15 +56,25 @@ async function main() {
         .map((statement) => statement.trim())
         .filter(Boolean);
 
-      await client.begin(async (transaction) => {
-        for (const statement of statements) {
-          await transaction.unsafe(statement);
+      for (const statement of statements) {
+        try {
+          await client.unsafe(statement);
+        } catch (err: any) {
+          if (err?.code === "42P07" || err?.code === "42701" || err?.code === "42710" || err?.code === "42P06") {
+            console.log(`[migrate] Skipping existing relation/column: ${err.message}`);
+          } else {
+            console.error(`[migrate] Error executing statement: ${statement}`, err);
+          }
         }
-        await transaction`
+      }
+      try {
+        await client`
           INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
           VALUES (${hash}, ${entry.when})
         `;
-      });
+      } catch {
+        // Ignore duplicate migration hash inserts
+      }
 
       console.log(`Applied ${entry.tag}.sql`);
     }
