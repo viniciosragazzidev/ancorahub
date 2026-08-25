@@ -256,31 +256,50 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
             urlButtonParameter,
           });
         } catch (templateError) {
-          const isLanguageError = templateError instanceof MetaCloudApiError && (templateError.code === 100 || templateError.message.toLowerCase().includes("language") || templateError.message.toLowerCase().includes("does not exist"));
-          if (isLanguageError) {
-            const fallbackLangs = row.templateLanguage.startsWith("pt") ? ["en", "en_US"] : ["pt_BR"];
-            let sentWithFallback = false;
-            for (const lang of fallbackLangs) {
-              try {
-                metaResponse = await sendMetaCloudTemplate({
-                  phoneNumberId,
-                  accessToken,
-                  to: row.destinationPhone,
-                  templateName: row.templateName,
-                  languageCode: lang,
-                  variables: templateVariables.bodyVariables,
-                  variableNames,
-                  urlButtonParameter,
-                });
-                sentWithFallback = true;
-                break;
-              } catch {
-                // Tenta próximo idioma de fallback
-              }
+          let sentWithFallback = false;
+          if (variableNames) {
+            try {
+              metaResponse = await sendMetaCloudTemplate({
+                phoneNumberId,
+                accessToken,
+                to: row.destinationPhone,
+                templateName: row.templateName,
+                languageCode: row.templateLanguage,
+                variables: templateVariables.bodyVariables,
+                variableNames: undefined,
+                urlButtonParameter,
+              });
+              sentWithFallback = true;
+            } catch {
+              // Prosegue para fallback de idioma se falhar
             }
-            if (!sentWithFallback) throw templateError;
-          } else {
-            throw templateError;
+          }
+          if (!sentWithFallback) {
+            const isLanguageError = templateError instanceof MetaCloudApiError && (templateError.code === 100 || templateError.message.toLowerCase().includes("language") || templateError.message.toLowerCase().includes("does not exist"));
+            if (isLanguageError) {
+              const fallbackLangs = row.templateLanguage.startsWith("pt") ? ["en", "en_US"] : ["pt_BR"];
+              for (const lang of fallbackLangs) {
+                try {
+                  metaResponse = await sendMetaCloudTemplate({
+                    phoneNumberId,
+                    accessToken,
+                    to: row.destinationPhone,
+                    templateName: row.templateName,
+                    languageCode: lang,
+                    variables: templateVariables.bodyVariables,
+                    variableNames,
+                    urlButtonParameter,
+                  });
+                  sentWithFallback = true;
+                  break;
+                } catch {
+                  // Tenta próximo idioma de fallback
+                }
+              }
+              if (!sentWithFallback) throw templateError;
+            } else {
+              throw templateError;
+            }
           }
         }
       }

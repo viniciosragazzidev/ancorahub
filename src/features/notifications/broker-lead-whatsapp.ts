@@ -82,7 +82,7 @@ export async function enqueueBrokerLeadNotification(input: {
     ))
     .limit(1);
 
-  const destinationPhone = broker?.phone;
+  const destinationPhone = broker?.phone?.trim();
   if (!destinationPhone) return { queued: false as const, reason: "broker_phone_missing" as const };
 
   const produtoInteresse = lead.legacyPlanName

@@ -64,23 +64,29 @@ export function buildLeadAssignmentConfirmedVariables(input: {
 export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: string[]) {
   if (purpose === "brokerLeadNotification") {
     const [cargo, corretorNome, leadNome, produtoInteresse, leadId] = variables;
-    if (!cargo || !corretorNome || !leadNome || !produtoInteresse || !leadId) {
-      throw new Error("O template new_lead_broker exige cargo, corretor, lead, produto e identificador do lead.");
-    }
     return {
-      bodyVariables: [cargo, corretorNome, leadNome, produtoInteresse],
-      urlButtonParameter: leadId,
+      bodyVariables: [
+        cargo?.trim() || "Corretor(a)",
+        corretorNome?.trim() || "Corretor(a)",
+        leadNome?.trim() || "Cliente",
+        produtoInteresse?.trim() || "Plano de saúde",
+      ],
+      urlButtonParameter: leadId || undefined,
     };
   }
 
   if (purpose === "leadAssignmentConfirmed") {
     const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, leadId] = variables;
-    if (!brokerName || !leadNome || !leadTelefone || !interesse || !leadTypeLabel || !dependentes || !leadId) {
-      throw new Error("O template lead_assignment_confirmed exige corretor, cliente, telefone, interesse, tipo, dependentes e identificador do lead.");
-    }
     return {
-      bodyVariables: [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes],
-      urlButtonParameter: leadId,
+      bodyVariables: [
+        brokerName?.trim() || "Corretor(a)",
+        leadNome?.trim() || "Cliente",
+        leadTelefone?.trim() || "Sem telefone",
+        interesse?.trim() || "Plano de saúde",
+        leadTypeLabel?.trim() || "Individual",
+        dependentes?.trim() || "0",
+      ],
+      urlButtonParameter: leadId || undefined,
     };
   }
 

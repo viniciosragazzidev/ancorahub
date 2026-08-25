@@ -60,7 +60,9 @@ export default async function ConversationsPage({
   const scope =
     context.role === "manager" && context.branchId
       ? eq(schema.leads.branchId, context.branchId)
-      : undefined;
+      : context.role === "broker"
+        ? eq(schema.leads.corretorId, context.userId)
+        : undefined;
 
   const [leads, branches] = await Promise.all([
     db
