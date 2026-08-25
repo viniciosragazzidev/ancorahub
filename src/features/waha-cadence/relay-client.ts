@@ -5,9 +5,23 @@ import { randomUUID } from "node:crypto";
 import { relaySendRequestSchema, relaySessionCreateSchema, relaySessionStateSchema, relaySignature } from "./contract";
 
 function relayConfig() {
-  const url = process.env.WAHA_RELAY_URL?.trim().replace(/\/$/, "");
-  const secret = process.env.WAHA_RELAY_SHARED_SECRET?.trim();
-  if (!url || !secret) throw new Error("Relay WAHA não configurado.");
+  const url = (
+    process.env.WAHA_RELAY_URL ||
+    process.env.VPS_API_URL ||
+    process.env.WAHA_API_URL ||
+    process.env.NEXT_PUBLIC_VPS_API_URL
+  )?.trim().replace(/\/$/, "");
+
+  const secret = (
+    process.env.WAHA_RELAY_SHARED_SECRET ||
+    process.env.WHATSAPP_API_INTERNAL_TOKEN ||
+    process.env.VPS_INTERNAL_API_TOKEN ||
+    process.env.VPS_API_TOKEN
+  )?.trim();
+
+  if (!url || !secret) {
+    throw new Error("Relay WAHA não configurado. Defina WAHA_RELAY_URL e WAHA_RELAY_SHARED_SECRET no ambiente.");
+  }
   return { url, secret };
 }
 
