@@ -5,6 +5,7 @@ import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTeamUser } from "@/features/team/create-user";
+import { generatePasswordResetLinkForMember } from "@/features/team/password-recovery";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole, requireCanManageMember } from "@/shared/auth/team-permissions";
@@ -816,3 +817,20 @@ export async function importBrokersAction(
     return { success: false, error: message };
   }
 }
+
+export async function generateResetPasswordLinkAction(
+  _prev: TeamActionState & { resetUrl?: string },
+  formData: FormData,
+): Promise<TeamActionState & { resetUrl?: string }> {
+  try {
+    const userId = String(formData.get("userId") ?? "").trim();
+    if (!userId) throw new Error("ID do usuário é obrigatório.");
+
+    const result = await generatePasswordResetLinkForMember(userId);
+    return { success: true, resetUrl: result.resetUrl };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Erro ao gerar link de redefinição de senha.";
+    return { success: false, error: message };
+  }
+}
+

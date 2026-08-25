@@ -37,11 +37,11 @@ export default function PasswordResetPage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md border-border bg-card shadow-none">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CheckCircle size={20} className="text-emerald-500" /> Senha redefinida!</CardTitle>
-            <CardDescription>Sua senha foi alterada com sucesso. Você já pode fazer login com sua nova senha.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><CheckCircle size={20} className="text-emerald-500" /> Senha alterada com sucesso!</CardTitle>
+            <CardDescription>Sua senha foi redefinida e seu login foi realizado automaticamente no sistema.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" render={<a href="/login" />}>Ir para o login</Button>
+            <Button className="w-full" render={<a href="/dashboard" />}>Acessar o sistema</Button>
           </CardContent>
         </Card>
       </div>

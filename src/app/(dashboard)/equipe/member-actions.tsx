@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { DotsThreeVertical, PencilSimple, Power, Trash, UserSwitch } from "@/components/huge-icons";
+import { CheckCircle, DotsThreeVertical, LockKey, PencilSimple, Power, Trash, UserSwitch } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { deleteTeamMemberAction, toggleTeamMemberStatusAction, updateTeamMemberAction, transferLeadsAction, resendInviteAction, revokeInviteAction, type TeamActionState } from "./actions";
+import { deleteTeamMemberAction, toggleTeamMemberStatusAction, updateTeamMemberAction, transferLeadsAction, resendInviteAction, revokeInviteAction, generateResetPasswordLinkAction, type TeamActionState } from "./actions";
 
 import type { TenantRole } from "@/shared/db/schema";
 
@@ -331,6 +331,7 @@ export function TeamMemberActions({
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [toggleState, toggleAction, togglePending] = useActionState<
     TeamActionState,
     FormData
@@ -392,6 +393,7 @@ export function TeamMemberActions({
   const canToggle = canEdit && member.userId !== null;
   const toggleLabel = displayStatus === "active" ? "Desativar" : "Ativar";
   const canManageInvite = canEdit && (member.role === "broker" || member.role === "manager");
+  const canResetPassword = member.userId !== null && (currentRole === "director" || currentRole === "manager");
 
   return (
     <>
@@ -464,6 +466,12 @@ export function TeamMemberActions({
                 <DropdownMenuSeparator />
               </>
             ) : null}
+            {canResetPassword ? (
+              <DropdownMenuItem onClick={() => setResetPasswordOpen(true)}>
+                <LockKey size={15} />
+                Resetar senha
+              </DropdownMenuItem>
+            ) : null}
             {member.role === "broker" && member.userId ? (
               <DropdownMenuItem
                 onClick={() => setTransferOpen(true)}
@@ -508,7 +516,116 @@ export function TeamMemberActions({
         open={transferOpen}
         onOpenChange={setTransferOpen}
       />
+      <ResetPasswordDialog
+        key={`${member.id}-reset-password`}
+        member={member}
+        open={resetPasswordOpen}
+        onOpenChange={setResetPasswordOpen}
+      />
     </>
+  );
+}
+
+function ResetPasswordDialog({
+  member,
+  open,
+  onOpenChange,
+}: {
+  member: TeamMember;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [state, action, pending] = useActionState<
+    TeamActionState & { resetUrl?: string },
+    FormData
+  >(generateResetPasswordLinkAction, {});
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (state.error) {
+      toast.error(state.error);
+    }
+  }, [state.error]);
+
+  const memberName = member.name ?? member.email;
+  const resetUrl = state.resetUrl ?? "";
+
+  const templateMessage = resetUrl
+    ? `Olá, ${memberName}! Seu link para redefinir sua senha no sistema Âncora CRM foi gerado. Acesse o link abaixo para criar sua nova senha:\n\n${resetUrl}\n\nEste link é seguro e é válido por 24 horas.`
+    : "";
+
+  const handleCopy = async () => {
+    if (!templateMessage) return;
+    try {
+      await navigator.clipboard.writeText(templateMessage);
+      setCopied(true);
+      toast.success("Mensagem e link copiados com sucesso!");
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      toast.error("Erro ao copiar para a área de transferência.");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => {
+      setCopied(false);
+      onOpenChange(val);
+    }}>
+      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
+        <DialogTitle className="flex items-center gap-2">
+          <LockKey size={18} /> Redefinir Senha do Membro
+        </DialogTitle>
+        <DialogDescription>
+          Gere um link seguro de redefinição de senha para <strong>{memberName}</strong>.
+        </DialogDescription>
+
+        {!state.resetUrl ? (
+          <form action={action} className="grid gap-4 mt-2">
+            <input name="userId" type="hidden" value={member.userId ?? ""} />
+            <p className="text-xs text-muted-foreground">
+              Ao gerar o link, todas as sessões ativas deste membro serão encerradas por segurança.
+            </p>
+            <div className="flex gap-2 mt-2">
+              <Button className="flex-1" disabled={pending || !member.userId} type="submit">
+                {pending ? "Gerando Link..." : "Gerar Link de Redefinição"}
+              </Button>
+              <DialogClose
+                render={
+                  <Button disabled={pending} type="button" variant="ghost">
+                    Cancelar
+                  </Button>
+                }
+              />
+            </div>
+          </form>
+        ) : (
+          <div className="grid gap-4 mt-2">
+            <Field>
+              <FieldLabel>Mensagem Pronta com o Link</FieldLabel>
+              <textarea
+                readOnly
+                className="w-full h-36 p-3 text-xs font-mono rounded-md border border-input bg-muted/50 resize-none focus:outline-none"
+                value={templateMessage}
+              />
+            </Field>
+
+            <div className="flex gap-2">
+              <Button className="flex-1 gap-2" onClick={handleCopy} type="button">
+                {copied ? <CheckCircle size={16} className="text-emerald-400" /> : <LockKey size={16} />}
+                {copied ? "Mensagem e Link Copiados!" : "Copiar Mensagem e Link"}
+              </Button>
+              <DialogClose
+                render={
+                  <Button type="button" variant="ghost">
+                    Fechar
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+        )}
+      </DialogPopup>
+    </Dialog>
   );
 }
 

@@ -269,5 +269,77 @@ export async function completePasswordReset(token: string, newPassword: string) 
     });
   });
 
-  return { success: true };
+  return { success: true, userEmail: request.userEmail };
 }
+
+/**
+ * Gera um link de redefinição de senha para um membro da equipe (solicitado por diretor ou gestor).
+ */
+export async function generatePasswordResetLinkForMember(targetUserId: string) {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director" && context.role !== "manager") {
+    throw new Error("Permissão insuficiente para gerar link de redefinição de senha.");
+  }
+
+  const db = getDatabase();
+
+  const [targetMembership] = await db
+    .select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, targetUserId),
+        eq(schema.tenantMemberships.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  if (!targetMembership) {
+    throw new Error("Membro da equipe não encontrado ou inativo.");
+  }
+
+  const [user] = await db
+    .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
+    .from(schema.user)
+    .where(eq(schema.user.id, targetUserId))
+    .limit(1);
+
+  if (!user) {
+    throw new Error("Usuário não encontrado.");
+  }
+
+  const id = randomUUID();
+  const token = randomBytes(32).toString("hex");
+  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+  await db.insert(schema.passwordResetRequests).values({
+    id,
+    tenantId: context.tenantId,
+    userId: targetUserId,
+    userEmail: user.email,
+    status: "approved",
+    token,
+    tokenExpiresAt,
+    reviewedBy: context.userId,
+    reviewedAt: new Date(),
+  });
+
+  // Revogar sessões ativas do membro por segurança
+  await db.delete(schema.session).where(eq(schema.session.userId, targetUserId));
+
+  // Log de auditoria
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "user",
+    entidadeId: targetUserId,
+    acao: "team.generated_password_reset_link",
+  });
+
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "").replace(/\/$/, "");
+  const resetUrl = `${baseUrl}/recuperar-senha?token=${encodeURIComponent(token)}`;
+
+  return { success: true, resetUrl };
+}
+
