@@ -420,6 +420,7 @@ export const leads = pgTable(
     metaAdId: text("meta_ad_id"),
     metaFormId: text("meta_form_id"),
     metaPageId: text("meta_page_id"),
+    redistributionCount: integer("redistribution_count").notNull().default(0),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedBy: text("deleted_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,

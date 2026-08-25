@@ -32,6 +32,14 @@ export function enqueueIncomingLead(
 ): IncomingLeadQueueState {
   if (!item.notificationId || state.seenIds.has(item.notificationId)) return state;
 
+  // Evita duplicatas do mesmo lead na fila caso receba via WS e polling simultâneos
+  const existingLead = state.queue.some((q) => q.leadId === item.leadId);
+  if (existingLead) {
+    const seenIds = new Set(state.seenIds);
+    seenIds.add(item.notificationId);
+    return { queue: state.queue, seenIds };
+  }
+
   const seenIds = new Set(state.seenIds);
   seenIds.add(item.notificationId);
   return {

@@ -14,6 +14,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { IncomingLead } from "./incoming-lead-queue";
 
+let lastSoundPlayedAt = 0;
+const SOUND_THROTTLE_MS = 4000;
+
 export function IncomingLeadCard({
   item,
   queuedCount = 0,
@@ -32,10 +35,14 @@ export function IncomingLeadCard({
 
   useEffect(() => {
     if (item?.notificationId) {
-      try {
-        playSound(notificationSound, { volume: 0.8 });
-      } catch {
-        // Fallback if browser requires user gesture for audio context
+      const now = Date.now();
+      if (now - lastSoundPlayedAt >= SOUND_THROTTLE_MS) {
+        lastSoundPlayedAt = now;
+        try {
+          playSound(notificationSound, { volume: 0.8 });
+        } catch {
+          // Fallback se o navegador exigir gesto do usuário
+        }
       }
     }
   }, [item?.notificationId]);

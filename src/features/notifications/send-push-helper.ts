@@ -189,9 +189,11 @@ export async function notifyNewLead(
   corretorId: string | null,
   leadName: string,
   idempotencyPrefix?: string,
+  options?: { isRedistribution?: boolean },
 ): Promise<{ notificationError?: string } | void> {
   let whatsappError: string | undefined;
   let pushError: string | undefined;
+  const isRedistribution = Boolean(options?.isRedistribution);
 
   try {
     if (!(await isNotificationCapabilityEnabled("lead_assignment"))) return;
@@ -227,8 +229,9 @@ export async function notifyNewLead(
         .limit(1);
 
       const isQualifiedByAi =
-        leadInfo?.qualificationState === "QUALIFIED" ||
-        ["waiting_human", "qualified", "hot", "warm"].includes(leadInfo?.qualificationStatus ?? "");
+        !isRedistribution &&
+        (leadInfo?.qualificationState === "QUALIFIED" ||
+          ["waiting_human", "qualified", "hot", "warm"].includes(leadInfo?.qualificationStatus ?? ""));
 
       const recipients = await db
         .select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role })
@@ -255,32 +258,62 @@ export async function notifyNewLead(
         targets.map((target) => {
           const isDirector = target.role === "director";
           const isBroker = target.role === "broker";
+
+          let title: string;
+          let message: string;
+          let pushTitle: string;
+          let pushBody: string;
+
+          if (isRedistribution) {
+            title = isBroker
+              ? "Lead atribuído (Redistribuição)"
+              : isDirector
+              ? "Lead redistribuído na corretora"
+              : "Lead redistribuído na unidade";
+            message = isBroker
+              ? `Você recebeu o lead ${leadName} (redistribuído por inatividade).`
+              : `"${leadName}" foi redistribuído por inatividade do corretor anterior.`;
+            pushTitle = isBroker
+              ? "Lead Atribuído (Redistribuição)! ⚡"
+              : isDirector
+              ? "Lead Redistribuído na Corretora 🔄"
+              : "Lead Redistribuído na Unidade 🔄";
+            pushBody = isBroker
+              ? `O lead "${leadName}" foi redistribuído para você para novo atendimento.`
+              : `"${leadName}" foi redistribuído por falta de retorno do corretor.`;
+          } else {
+            title = isBroker
+              ? isQualifiedByAi ? "Lead qualificado atribuído" : "Novo lead atribuído"
+              : isDirector
+              ? isQualifiedByAi ? "Lead qualificado na corretora" : "Novo lead na corretora"
+              : isQualifiedByAi ? "Lead qualificado na unidade" : "Novo lead na unidade";
+            message = isBroker
+              ? isQualifiedByAi ? `Você recebeu o lead qualificado ${leadName} para atender.` : `Você recebeu o lead ${leadName} para atender.`
+              : corretorId
+              ? isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e distribuído.` : `"${leadName}" chegou e foi distribuído.`
+              : isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e aguarda atendimento.` : `"${leadName}" chegou e está aguardando distribuição.`;
+            pushTitle = isBroker
+              ? isQualifiedByAi ? "Lead Qualificado Atribuído! ⚡" : "Novo Lead Atribuído! ⚡"
+              : isDirector
+              ? isQualifiedByAi ? "Lead Qualificado na Corretora! ✨" : "Novo Lead na Corretora! 🏢"
+              : isQualifiedByAi ? "Lead Qualificado na Unidade! ✨" : "Novo Lead na Unidade! 📍";
+            pushBody = isBroker
+              ? isQualifiedByAi ? `O lead "${leadName}" foi qualificado pela IA e distribuído para você.` : `O lead "${leadName}" foi distribuído para você.`
+              : corretorId
+              ? isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e distribuído.` : `"${leadName}" chegou e foi distribuído.`
+              : isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e aguarda atendimento.` : `"${leadName}" está aguardando distribuição.`;
+          }
+
           return publishNotification({
             capability: "lead_assignment",
             tenantId,
             recipientUserId: target.userId,
             leadId,
-            type: "agent.lead_assigned",
-            title: isBroker
-              ? isQualifiedByAi ? "Lead qualificado atribuído" : "Novo lead atribuído"
-              : isDirector
-              ? isQualifiedByAi ? "Lead qualificado na corretora" : "Novo lead na corretora"
-              : isQualifiedByAi ? "Lead qualificado na unidade" : "Novo lead na unidade",
-            message: isBroker
-              ? isQualifiedByAi ? `Você recebeu o lead qualificado ${leadName} para atender.` : `Você recebeu o lead ${leadName} para atender.`
-              : corretorId
-              ? isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e distribuído.` : `"${leadName}" chegou e foi distribuído.`
-              : isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e aguarda atendimento.` : `"${leadName}" chegou e está aguardando distribuição.`,
-            pushTitle: isBroker
-              ? isQualifiedByAi ? "Lead Qualificado Atribuído! ⚡" : "Novo Lead Atribuído! ⚡"
-              : isDirector
-              ? isQualifiedByAi ? "Lead Qualificado na Corretora! ✨" : "Novo Lead na Corretora! 🏢"
-              : isQualifiedByAi ? "Lead Qualificado na Unidade! ✨" : "Novo Lead na Unidade! 📍",
-            pushBody: isBroker
-              ? isQualifiedByAi ? `O lead "${leadName}" foi qualificado pela IA e distribuído para você.` : `O lead "${leadName}" foi distribuído para você.`
-              : corretorId
-              ? isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e distribuído.` : `"${leadName}" chegou e foi distribuído.`
-              : isQualifiedByAi ? `"${leadName}" foi qualificado pela IA e aguarda atendimento.` : `"${leadName}" está aguardando distribuição.`,
+            type: isRedistribution ? "lead_reassigned" : "agent.lead_assigned",
+            title,
+            message,
+            pushTitle,
+            pushBody,
             url: `/leads/${leadId}`,
             tag: "corretop-leads",
             idempotencyKey: idempotencyPrefix ? `${idempotencyPrefix}:${target.userId}` : undefined,

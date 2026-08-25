@@ -371,7 +371,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   });
   const notificationWarnings: string[] = [];
   if (assigned && source !== "automatic") {
-    const notifyResult = await notifyNewLead(leadId, context.tenantId, assignmentBranchId, brokerId, lead.nome, `lead-assigned:${assignmentEventId}`).catch(() => undefined);
+    const notifyResult = await notifyNewLead(leadId, context.tenantId, assignmentBranchId, brokerId, lead.nome, `lead-assigned:${assignmentEventId}`, { isRedistribution: Boolean(lead.corretorId) }).catch(() => undefined);
     if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
   }
   return assigned

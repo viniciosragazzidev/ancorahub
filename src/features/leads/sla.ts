@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
 import { chooseAvailableBroker } from "./assignment";
-import { notifyLeadReassigned, notifyNewLead, sendNotificationToUser } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned, notifyNewLead, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 
@@ -41,6 +41,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       assignedAt: schema.leads.assignedAt,
       stageEnteredAt: schema.leads.stageEnteredAt,
       webhookCredentialId: schema.leads.webhookCredentialId,
+      redistributionCount: schema.leads.redistributionCount,
     })
       .from(schema.leads).where(
         and(
@@ -85,53 +86,114 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
 
         // Save previous owner to notify them later
         const previousOwnerId = lead.corretorId;
-        
-        // Active automatic redistribution of the unworked lead
-        const nextBrokerId = await chooseAvailableBroker(tenant.id, lead.branchId, lead.corretorId, lead.webhookCredentialId);
+        const currentRedistributions = lead.redistributionCount ?? 0;
+        const MAX_REDISTRIBUTIONS = 2;
         const updateTime = new Date();
-        
-        await db.transaction(async (tx) => {
-          await tx.update(schema.leads)
-            .set({
-              corretorId: nextBrokerId,
-              status: nextBrokerId ? "distributed" : "new",
-              distributionStatus: nextBrokerId ? "assigned" : "queued",
-              assignedAt: nextBrokerId ? updateTime : null,
-              stageEnteredAt: updateTime,
-              distributionUpdatedAt: updateTime,
-              firstContactAt: null,
-              serviceStartedAt: null,
-              serviceStartedBy: null,
-            })
-            .where(eq(schema.leads.id, lead.id));
 
-          if (systemUserId) {
-            await tx.insert(schema.leadInteractions).values({
-              id: randomUUID(),
+        if (currentRedistributions >= MAX_REDISTRIBUTIONS) {
+          // Bateu o limite máximo de 2 redistribuições: o lead fica sem corretor aguardando atribuição manual
+          await db.transaction(async (tx) => {
+            await tx.update(schema.leads)
+              .set({
+                corretorId: null,
+                status: "new",
+                distributionStatus: "unassigned",
+                assignedAt: null,
+                assignmentSource: "manual_pending",
+                stageEnteredAt: updateTime,
+                distributionUpdatedAt: updateTime,
+                firstContactAt: null,
+                serviceStartedAt: null,
+                serviceStartedBy: null,
+              })
+              .where(eq(schema.leads.id, lead.id));
+
+            if (systemUserId) {
+              await tx.insert(schema.leadInteractions).values({
+                id: randomUUID(),
+                leadId: lead.id,
+                userId: systemUserId,
+                tipo: "system_alert",
+                conteudo: `Limite máximo de ${MAX_REDISTRIBUTIONS} redistribuições automáticas atingido. Lead retornado para atribuição manual.`,
+              });
+
+              await tx.insert(schema.auditLogs).values({
+                id: randomUUID(),
+                userId: systemUserId,
+                entidade: "lead",
+                entidadeId: lead.id,
+                acao: "lead.redistribution_limit_reached",
+              });
+            }
+          });
+
+          // Notificar gestores/diretores sobre a necessidade de atribuição manual
+          for (const recipient of recipients) {
+            await publishNotification({
+              capability: "lead_assignment",
+              tenantId: tenant.id,
+              recipientUserId: recipient.userId,
               leadId: lead.id,
-              userId: systemUserId,
-              tipo: "system_alert",
-              conteudo: nextBrokerId
-                ? `Lead redistribuído automaticamente por estouro de SLA (atendimento não iniciado pelo corretor anterior).`
-                : `Lead retornado para a fila da unidade por estouro de SLA (sem outro corretor disponível).`,
-            });
-
-            await tx.insert(schema.auditLogs).values({
-              id: randomUUID(),
-              userId: systemUserId,
-              entidade: "lead",
-              entidadeId: lead.id,
-              acao: "lead.redistributed_sla",
-            });
+              type: "lead_reassigned",
+              title: "Lead aguardando atribuição manual ⚠️",
+              message: `O lead "${lead.nome}" atingiu o limite de 2 redistribuições por inatividade e aguarda atribuição manual.`,
+              pushTitle: "Lead Aguarda Atribuição Manual ⚠️",
+              pushBody: `"${lead.nome}" atingiu 2 redistribuições automáticas e precisa de intervenção manual.`,
+              url: `/leads/${lead.id}`,
+              tag: "corretop-leads",
+            }).catch(console.error);
           }
-        });
 
-        // Trigger real-time push and WS notifications in background
-        await notifyNewLead(lead.id, tenant.id, lead.branchId, nextBrokerId, lead.nome).catch(console.error);
+          if (previousOwnerId) {
+            void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+          }
+        } else {
+          // Dentro do limite: efetua a redistribuição e incrementa o contador
+          const nextBrokerId = await chooseAvailableBroker(tenant.id, lead.branchId, lead.corretorId, lead.webhookCredentialId);
+          
+          await db.transaction(async (tx) => {
+            await tx.update(schema.leads)
+              .set({
+                corretorId: nextBrokerId,
+                status: nextBrokerId ? "distributed" : "new",
+                distributionStatus: nextBrokerId ? "assigned" : "queued",
+                redistributionCount: currentRedistributions + 1,
+                assignedAt: nextBrokerId ? updateTime : null,
+                stageEnteredAt: updateTime,
+                distributionUpdatedAt: updateTime,
+                firstContactAt: null,
+                serviceStartedAt: null,
+                serviceStartedBy: null,
+              })
+              .where(eq(schema.leads.id, lead.id));
 
-        // Notify the previous broker that they lost the lead
-        if (previousOwnerId && previousOwnerId !== nextBrokerId) {
-          void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            if (systemUserId) {
+              await tx.insert(schema.leadInteractions).values({
+                id: randomUUID(),
+                leadId: lead.id,
+                userId: systemUserId,
+                tipo: "system_alert",
+                conteudo: nextBrokerId
+                  ? `Lead redistribuído automaticamente por estouro de SLA (tentativa ${currentRedistributions + 1} de ${MAX_REDISTRIBUTIONS}).`
+                  : `Lead retornado para a fila da unidade por estouro de SLA (sem outro corretor disponível).`,
+              });
+
+              await tx.insert(schema.auditLogs).values({
+                id: randomUUID(),
+                userId: systemUserId,
+                entidade: "lead",
+                entidadeId: lead.id,
+                acao: "lead.redistributed_sla",
+              });
+            }
+          });
+
+          // Disparar notificações de redistribuição
+          await notifyNewLead(lead.id, tenant.id, lead.branchId, nextBrokerId, lead.nome, undefined, { isRedistribution: true }).catch(console.error);
+
+          if (previousOwnerId && previousOwnerId !== nextBrokerId) {
+            void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+          }
         }
 
       } else if (kind === "lead_warning_10m") {
