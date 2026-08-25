@@ -38,8 +38,10 @@ falhar, a aplicação é parada no Coolify. A Vercel continua atendendo a produ�
 ## Validação executada e pendente no ambiente-alvo
 
 Em 25/08/2026, o `package-lock.json` foi sincronizado com o `package.json` após o
-primeiro build do Coolify identificar entradas ausentes do `esbuild`. A verificação
-`npm ci --dry-run --ignore-scripts` foi concluída com sucesso.
+primeiro build do Coolify identificar entradas ausentes do `esbuild`. A sincronização
+foi refeita com npm 10.9.8, a mesma versão usada pela imagem Node 22 do Docker, para
+preservar as dependências opcionais Linux. A verificação
+`npm ci --dry-run --ignore-scripts` com npm 10.9.8 foi concluída com sucesso.
 
 O Docker Desktop local não está disponível nesta estação. O build, o teste focado de
 autenticação, o healthcheck e a validação de login serão executados no primeiro deploy
