@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 
+import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,8 @@ export default async function ConversationsPage({
   const db = getDatabase();
 
   const isDirector = context.role === "director";
-  const officialBrokerTab = isDirector && tab === "corretores";
+  const canSeeBrokerTab = isDirector || context.role === "manager";
+  const officialBrokerTab = canSeeBrokerTab && tab === "corretores";
   const scope =
     context.role === "manager" && context.branchId
       ? eq(schema.leads.branchId, context.branchId)
@@ -548,23 +550,36 @@ export default async function ConversationsPage({
         breadcrumb="Atendimento"
         title="Conversas"
         rightSlot={
-          isDirector ? (
-            <nav aria-label="Tipo de conversa" className="flex items-center gap-2">
+          canSeeBrokerTab ? (
+            <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
               <BulkQualificationDialog />
-              <Button
-                render={<Link href="/conversas" />}
-                size="sm"
-                variant={officialBrokerTab ? "ghost" : "secondary"}
-              >
-                Leads <Badge variant="outline">{finalConversations.length}</Badge>
-              </Button>
-              <Button
-                render={<Link href="/conversas?tab=corretores" />}
-                size="sm"
-                variant={officialBrokerTab ? "secondary" : "ghost"}
-              >
-                Número oficial <span className="hidden lg:inline">· corretores</span>
-              </Button>
+              <div className="flex items-center rounded-lg border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-xs">
+                <Link
+                  href="/conversas"
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150",
+                    !officialBrokerTab
+                      ? "bg-background text-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+                  )}
+                >
+                  Leads
+                  <Badge variant="outline" className="ml-0.5 text-[10px] px-1.5 py-0">
+                    {finalConversations.length}
+                  </Badge>
+                </Link>
+                <Link
+                  href="/conversas?tab=corretores"
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150",
+                    officialBrokerTab
+                      ? "bg-background text-foreground shadow-xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/40",
+                  )}
+                >
+                  Número oficial <span className="hidden lg:inline">· corretores</span>
+                </Link>
+              </div>
             </nav>
           ) : undefined
         }
