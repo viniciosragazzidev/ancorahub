@@ -174,14 +174,14 @@ Já que a decisão foi usar ambos conforme o caso, aqui está o critério práti
 | Ambiente | Propósito | Branch correspondente | Banco de dados |
 |---|---|---|---|
 | Desenvolvimento (local) | Máquina do desenvolvedor | qualquer `feature/*` local | Banco local ou branch de banco isolado (Neon suporta branching de banco) |
-| Staging/Homologação | Testar antes de produção, validar com o cliente-piloto se necessário | `develop` (deploy automático da Vercel em preview) | Banco de staging separado, com dados de teste |
+| Staging/Homologação | Testar antes de produção, validar com o cliente-piloto se necessário | `codex/coolify-staging` durante a migração controlada | Banco de staging separado, vazio e com dados sintéticos |
 | Produção | Ambiente real dos tenants | `main` | Banco de produção |
 
-**Gestão de variáveis de ambiente:** arquivo `.env.example` no repositório documentando todas as chaves necessárias (sem valores reais). Segredos reais configurados diretamente no painel da Vercel por ambiente (Development/Preview/Production), nunca commitados.
+**Gestão de variáveis de ambiente:** arquivo `.env.example` no repositório documentando todas as chaves necessárias (sem valores reais). Segredos reais ficam somente no provedor do ambiente correspondente (Vercel ou Coolify), nunca commitados. O staging não recebe segredos de canais reais.
 
 ---
 
-## 8. Pipeline de CI/CD (GitHub Actions + Vercel)
+## 8. Pipeline de CI/CD (GitHub Actions + provedores de deploy)
 
 **Estágios do workflow (`.github/workflows/ci.yml`):**
 
@@ -191,12 +191,15 @@ Já que a decisão foi usar ambos conforme o caso, aqui está o critério práti
 4. **Build** — `next build`, garantindo que o projeto compila
 5. **Testes E2E** (apenas em PRs para `main`, ou noturno) — Playwright, cobrindo os fluxos críticos (Seção 9)
 
-**Deploy:**
-- Push em `feature/*` ou PR aberto → Vercel gera um **preview deploy** automático (URL única por PR).
-- Merge em `develop` → deploy automático no ambiente de **staging**.
-- Merge em `main` → deploy automático em **produção**.
+**Deploy durante a migração controlada:**
+- Vercel permanece como produção em `crm.ancorasaude.cloud`.
+- `codex/coolify-staging` é construído no Coolify somente para
+  `staging.crm.ancorasaude.cloud`, com banco vazio e integrações reais desativadas.
+- Nenhum webhook da Meta ou relay WAHA é redirecionado nesta etapa.
+- A futura troca de produção exige decisão, checklist de cutover e rollback próprios.
 
-O CI (GitHub Actions) atua como **gate de qualidade antes do merge**; a Vercel cuida do deploy em si — os dois se complementam, sem sobreposição de responsabilidade.
+O CI (GitHub Actions) atua como gate de qualidade antes do merge. O provedor de cada
+ambiente executa somente o deploy configurado para ele.
 
 ---
 

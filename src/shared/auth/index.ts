@@ -21,9 +21,10 @@ export function getTrustedAuthOrigins() {
   ].filter((origin): origin is string => Boolean(origin))));
 }
 
-function getAuthBaseUrl() {
-  if (process.env.NODE_ENV === "production") return CANONICAL_PRODUCTION_ORIGIN;
-  return process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+export function getAuthBaseUrl() {
+  return process.env.BETTER_AUTH_URL
+    || process.env.NEXT_PUBLIC_APP_URL
+    || CANONICAL_PRODUCTION_ORIGIN;
 }
 
 function createAuth() {

@@ -1,40 +1,65 @@
-# Staging deployment
+# Homologação isolada no Coolify
 
-Vercel owns deployment. GitHub Actions only verifies lint, types, and build; it never runs migrations or deploys.
+## Objetivo
 
-## Environments
+Validar o CRM Next.js em `https://staging.crm.ancorasaude.cloud` sem alterar a
+produção hospedada na Vercel. A aplicação de staging é um ambiente de homologação,
+nunca uma réplica operacional com dados ou canais reais.
 
-| Environment | Vercel target | Database | Data |
-|---|---|---|---|
-| Development | local | local database or isolated managed branch | fictitious |
-| Preview | Preview | isolated preview database, never production | fictitious |
-| Staging | Preview deployment for `develop` once that branch exists | dedicated staging database | fictitious |
-| Production | Production (`main`) | dedicated production database | production |
+## Isolamento obrigatório
 
-`develop` does not yet exist in this repository, so no branch mapping is configured in versioned files. Configure the staging branch in the Vercel dashboard only after it exists and is approved.
+| Ambiente | Hospedagem | Banco | Dados | Integrações externas |
+|---|---|---|---|---|
+| Desenvolvimento | local | local ou isolado | sintéticos | simuladas ou ausentes |
+| Staging | Coolify | projeto Supabase vazio e dedicado | sintéticos | desativadas inicialmente |
+| Produção | Vercel | banco de produção | reais | ativas |
 
-## Required Vercel variables
+Staging não recebe cópia do banco de produção e não recebe segredos de Meta, WAHA,
+relay, VPS ou R2. Webhooks continuam configurados somente para
+`https://crm.ancorasaude.cloud` durante este teste.
 
-Configure these in **Project Settings → Environment Variables** with separate values for Development, Preview/Staging, and Production:
+## Configuração do Coolify
+
+- Repositório: `viniciosragazzidev/ancorahub`.
+- Branch: `codex/coolify-staging`.
+- Estratégia: Dockerfile em `/Dockerfile`.
+- Porta interna: `3000`, sem port mapping público.
+- Domínio: `https://staging.crm.ancorasaude.cloud`, marcado como não indexável.
+- Healthcheck: `GET /api/health`.
+- Pre-deployment e post-deployment: vazios.
+
+## Variáveis do primeiro deploy
+
+Cadastre em Coolify somente os valores do ambiente de staging:
 
 ```env
-DATABASE_URL=
+BETTER_AUTH_URL=https://staging.crm.ancorasaude.cloud
+NEXT_PUBLIC_APP_URL=https://staging.crm.ancorasaude.cloud
 BETTER_AUTH_SECRET=
-BETTER_AUTH_URL=
-NEXT_PUBLIC_APP_URL=
+SUPABASE_DB_URL=
+DATABASE_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+CRON_SECRET=
 ```
 
-`DATABASE_URL` and `BETTER_AUTH_SECRET` are server-only. Preview and staging must use their own database credentials; neither may point to production.
+As variáveis `NEXT_PUBLIC_*` acima devem estar habilitadas para build e runtime,
+porque o Next.js as incorpora no bundle do navegador. As outras ficam somente em
+runtime. Os valores nunca são versionados nem incluídos no Dockerfile.
 
-## Migration policy
+Não cadastrar nesta fase: `META_*`, `WAHA_*`, `VPS_*`, `OPENWA_*`, credenciais R2 ou
+tokens de produção.
 
-Run `npm run db:migrate` exactly once against the intended database from an authorized, controlled release step. Never run migrations from `next build`, pull-request CI, or every preview deployment. Production migration automation needs an approved release owner before it is introduced.
+## Sequência controlada
 
-## First staging deployment checklist
-
-1. Link this repository to a Vercel project with Vercel Git integration.
-2. Create a separate PostgreSQL database for staging and set its `DATABASE_URL` only in the staging environment.
-3. Set the four variables above for the correct Vercel environments.
-4. Apply the reviewed migration with `npm run db:migrate` against staging.
-5. Run the controlled bootstrap with fictitious staging data: `npm run bootstrap:tenant` (with the documented `BOOTSTRAP_*` variables set).
-6. Deploy `develop` after the branch exists, then verify `/login` and `/dashboard`.
+1. Publicar a branch de staging e configurar a aplicação no Coolify, sem deploy
+   automático de produção.
+2. Cadastrar somente as variáveis listadas acima e realizar o primeiro deploy.
+3. Confirmar `GET /api/health`, `/login` e ausência de chamadas a canais externos.
+4. Executar `npm run db:migrate` exatamente uma vez contra o banco de staging, fora
+   do build e com as credenciais desse banco apenas.
+5. Criar dados sintéticos com o bootstrap controlado e validar login, dashboard e
+   isolamento entre dois tenants de teste.
+6. Para rollback, parar a aplicação no Coolify. A Vercel e todos os webhooks de
+   produção permanecem inalterados.
