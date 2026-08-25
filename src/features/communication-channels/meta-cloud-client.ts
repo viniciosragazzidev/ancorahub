@@ -271,12 +271,38 @@ export function formatE164Phone(phone: string) {
   return digits;
 }
 
+export function getAlternateBrazilianPhone(phone: string): string | null {
+  const digits = formatE164Phone(phone);
+  if (!digits.startsWith("55")) return null;
+
+  if (digits.length === 13 && digits[4] === "9") {
+    return `${digits.slice(0, 4)}${digits.slice(5)}`;
+  }
+  if (digits.length === 12) {
+    return `${digits.slice(0, 4)}9${digits.slice(4)}`;
+  }
+  return null;
+}
+
 export async function sendMetaCloudText(input: { phoneNumberId: string; accessToken: string; to: string; body: string }) {
-  return graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: formatE164Phone(input.to), type: "text", text: { preview_url: false, body: input.body } }),
-  }, input.accessToken);
+  const primaryPhone = formatE164Phone(input.to);
+  try {
+    return await graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: primaryPhone, type: "text", text: { preview_url: false, body: input.body } }),
+    }, input.accessToken);
+  } catch (error) {
+    const altPhone = getAlternateBrazilianPhone(input.to);
+    if (altPhone && error instanceof MetaCloudApiError && (error.code === 100 || error.code === 131026 || error.status === 400)) {
+      return await graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: altPhone, type: "text", text: { preview_url: false, body: input.body } }),
+      }, input.accessToken);
+    }
+    throw error;
+  }
 }
 
 type MetaCloudTemplateInput = {
@@ -315,9 +341,22 @@ export function buildMetaCloudTemplatePayload(input: MetaCloudTemplateInput) {
 
 export async function sendMetaCloudTemplate(input: MetaCloudTemplateInput & { phoneNumberId: string; accessToken: string }) {
   const payload = buildMetaCloudTemplatePayload(input);
-  return graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  }, input.accessToken);
+  try {
+    return await graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }, input.accessToken);
+  } catch (error) {
+    const altPhone = getAlternateBrazilianPhone(input.to);
+    if (altPhone && error instanceof MetaCloudApiError && (error.code === 100 || error.code === 131026 || error.status === 400)) {
+      const altPayload = { ...payload, to: altPhone };
+      return await graphRequest<{ messages?: Array<{ id: string }> }>(`${encodeURIComponent(input.phoneNumberId)}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(altPayload),
+      }, input.accessToken);
+    }
+    throw error;
+  }
 }
