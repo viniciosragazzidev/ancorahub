@@ -11,11 +11,13 @@ nunca uma réplica operacional com dados ou canais reais.
 | Ambiente | Hospedagem | Banco | Dados | Integrações externas |
 |---|---|---|---|---|
 | Desenvolvimento | local | local ou isolado | sintéticos | simuladas ou ausentes |
-| Staging | Coolify | projeto Supabase vazio e dedicado | sintéticos | desativadas inicialmente |
+| Staging | Coolify | projeto vazio ou branch integralmente sanitizada | sintéticos | desativadas inicialmente |
 | Produção | Vercel | banco de produção | reais | ativas |
 
 Staging não recebe cópia do banco de produção e não recebe segredos de Meta, WAHA,
-relay, VPS ou R2. Webhooks continuam configurados somente para
+relay, VPS ou R2. Quando uma branch de banco criada a partir da produção for usada
+para conter custo, ela precisa ser sanitizada integralmente antes de qualquer conexão
+do CRM. Webhooks continuam configurados somente para
 `https://crm.ancorasaude.cloud` durante este teste.
 
 ## Configuração do Coolify
@@ -50,6 +52,23 @@ runtime. Os valores nunca são versionados nem incluídos no Dockerfile.
 
 Não cadastrar nesta fase: `META_*`, `WAHA_*`, `VPS_*`, `OPENWA_*`, credenciais R2 ou
 tokens de produção.
+
+## Sanitização de uma branch copiada
+
+Execute este comando apenas na branch de staging, com uma URL de conexão fornecida
+explicitamente para a sessão. O script não carrega `.env.local`, exige a referência
+do projeto e uma confirmação específica da branch antes de apagar dados.
+
+```powershell
+$env:SUPABASE_DB_URL = "CONNECTION_STRING_DA_BRANCH"
+$env:STAGING_DATABASE_REF = "REFERENCIA_DE_20_CARACTERES"
+$env:STAGING_SANITIZATION_CONFIRMATION = "SANITIZE_REFERENCIA_DE_20_CARACTERES"
+npm run sanitize:staging
+```
+
+Ele remove registros de todas as tabelas da aplicação, objetos do Supabase Storage e
+reinicia identidades, preservando somente o schema e o histórico de migrations. Nunca
+execute o comando com uma URL de produção.
 
 ## Sequência controlada
 

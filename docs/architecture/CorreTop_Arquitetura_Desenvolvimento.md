@@ -174,7 +174,7 @@ Já que a decisão foi usar ambos conforme o caso, aqui está o critério práti
 | Ambiente | Propósito | Branch correspondente | Banco de dados |
 |---|---|---|---|
 | Desenvolvimento (local) | Máquina do desenvolvedor | qualquer `feature/*` local | Banco local ou branch de banco isolado (Neon suporta branching de banco) |
-| Staging/Homologação | Testar antes de produção, validar com o cliente-piloto se necessário | `codex/coolify-staging` durante a migração controlada | Banco de staging separado, vazio e com dados sintéticos |
+| Staging/Homologação | Testar antes de produção, validar com o cliente-piloto se necessário | `codex/coolify-staging` durante a migração controlada | Banco de staging separado ou branch integralmente sanitizada, com dados sintéticos |
 | Produção | Ambiente real dos tenants | `main` | Banco de produção |
 
 **Gestão de variáveis de ambiente:** arquivo `.env.example` no repositório documentando todas as chaves necessárias (sem valores reais). Segredos reais ficam somente no provedor do ambiente correspondente (Vercel ou Coolify), nunca commitados. O staging não recebe segredos de canais reais.

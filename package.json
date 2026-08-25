@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:check": "drizzle-kit check --config drizzle.config.ts",
+    "sanitize:staging": "tsx scripts/sanitize-staging.ts",
     "db:check-meta-connection": "tsx scripts/check-meta-connection-attempts.ts",
     "bootstrap:tenant": "tsx scripts/bootstrap-tenant.ts",
     "bootstrap:brokerage-team": "tsx scripts/bootstrap-brokerage-team.ts",

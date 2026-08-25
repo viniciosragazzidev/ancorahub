@@ -10,6 +10,8 @@ execução self-hosted do Next.js antes de qualquer migração de produção.
 - gerar imagem Docker com `output: "standalone"`;
 - iniciar o servidor Next na porta interna `3000`;
 - permitir que Better Auth use a origem configurada do staging;
+- sanitizar de forma bloqueada uma branch de banco copiada, quando não houver banco
+  dedicado para homologação;
 - documentar variáveis, healthcheck, rollback e isolamento de dados.
 
 ## Fora do escopo
@@ -25,7 +27,7 @@ execução self-hosted do Next.js antes de qualquer migração de produção.
 - a origem de autenticação vem somente de configuração server-side;
 - `NEXT_PUBLIC_*` contém apenas valores intencionalmente públicos;
 - segredos e conexões externas reais não são cadastrados no ambiente inicial;
-- o banco de staging é vazio, independente e recebe somente dados sintéticos.
+- o banco de staging recebe somente dados sintéticos após a sanitização confirmada.
 
 ## Rollout e rollback
 

@@ -10,8 +10,8 @@ O primeiro deploy do CRM fora da Vercel ocorre exclusivamente em
 dedicada. A Vercel continua atendendo `crm.ancorasaude.cloud` e continua sendo o
 único destino de webhooks da Meta e do relay WAHA nesta fase.
 
-O staging usa um projeto Supabase vazio e independente, com dados sintéticos. Não
-recebe cópia de dados de produção, chaves da Meta, chaves WAHA, segredo do relay ou
+O staging usa um projeto Supabase vazio ou uma branch integralmente sanitizada, sempre
+com dados sintéticos. Não recebe chaves da Meta, chaves WAHA, segredo do relay ou
 token interno da VPS. Migrações são executadas uma única vez, de forma controlada,
 fora do build e depois do primeiro deploy saudável. O rollback consiste em parar a
 aplicação do Coolify; nenhum domínio, webhook ou dado de produção é alterado.
