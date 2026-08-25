@@ -39,6 +39,8 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       status: schema.leads.status,
       corretorId: schema.leads.corretorId,
       assignedAt: schema.leads.assignedAt,
+      firstContactAt: schema.leads.firstContactAt,
+      serviceStartedAt: schema.leads.serviceStartedAt,
       stageEnteredAt: schema.leads.stageEnteredAt,
       webhookCredentialId: schema.leads.webhookCredentialId,
       redistributionCount: schema.leads.redistributionCount,
@@ -73,7 +75,8 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     
     for (const lead of leads) {
       let kind: SlaKind = "lead_stalled";
-      if (lead.status === "distributed" && lead.assignedAt) {
+      const isAcceptedOrStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt || lead.status !== "distributed");
+      if (lead.status === "distributed" && lead.assignedAt && !isAcceptedOrStarted) {
         if (lead.assignedAt < unworkedCutoff) {
           kind = "lead_unworked";
         } else if (lead.assignedAt <= warningCutoff) {

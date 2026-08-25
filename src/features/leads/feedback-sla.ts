@@ -28,7 +28,7 @@ export async function runFeedbackSlaSweep(tenantId?: string): Promise<FeedbackSl
     const cutoff = new Date(Date.now() - minutes * 60_000);
     const leads = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin, assignmentSource: schema.leads.assignmentSource, assignedAt: schema.leads.assignedAt })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, tenant.id), eq(schema.leads.status, "distributed"), isNull(schema.leads.firstContactAt), lt(schema.leads.assignedAt, cutoff), or(eq(schema.leads.distributionStatus, "assigned"), eq(schema.leads.distributionStatus, "queued"))));
+      .where(and(eq(schema.leads.tenantId, tenant.id), eq(schema.leads.status, "distributed"), isNull(schema.leads.firstContactAt), isNull(schema.leads.serviceStartedAt), lt(schema.leads.assignedAt, cutoff), or(eq(schema.leads.distributionStatus, "assigned"), eq(schema.leads.distributionStatus, "queued"))));
     result.checked += leads.length;
     if (!leads.length) continue;
     const [actor] = await db.select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
