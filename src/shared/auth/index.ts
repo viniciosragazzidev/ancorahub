@@ -16,14 +16,17 @@ export function getTrustedAuthOrigins() {
   return Array.from(new Set([
     CANONICAL_PRODUCTION_ORIGIN,
     LEGACY_PRODUCTION_ORIGIN,
+    "https://staging.crm.ancorasaude.cloud",
     process.env.BETTER_AUTH_URL,
     process.env.NEXT_PUBLIC_APP_URL,
   ].filter((origin): origin is string => Boolean(origin))));
 }
 
 function getAuthBaseUrl() {
+  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
   if (process.env.NODE_ENV === "production") return CANONICAL_PRODUCTION_ORIGIN;
-  return process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return "http://localhost:3000";
 }
 
 function createAuth() {
