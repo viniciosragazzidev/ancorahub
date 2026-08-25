@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ContextNote } from "@/components/ui/context-note";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -548,7 +549,12 @@ function ResetPasswordDialog({
   }, [state.error]);
 
   const memberName = member.name ?? member.email;
-  const resetUrl = state.resetUrl ?? "";
+  const rawResetUrl = state.resetUrl ?? "";
+  const resetUrl = rawResetUrl
+    ? rawResetUrl.startsWith("http")
+      ? rawResetUrl
+      : `${typeof window !== "undefined" ? window.location.origin : ""}${rawResetUrl}`
+    : "";
 
   const templateMessage = resetUrl
     ? `Olá, ${memberName}! Seu link para redefinir sua senha no sistema Âncora CRM foi gerado. Acesse o link abaixo para criar sua nova senha:\n\n${resetUrl}\n\nEste link é seguro e é válido por 24 horas.`
@@ -579,14 +585,20 @@ function ResetPasswordDialog({
           Gere um link seguro de redefinição de senha para <strong>{memberName}</strong>.
         </DialogDescription>
 
-        {!state.resetUrl ? (
+        {state.error ? (
+          <ContextNote variant="error" className="mt-2 text-xs">
+            {state.error}
+          </ContextNote>
+        ) : null}
+
+        {!resetUrl ? (
           <form action={action} className="grid gap-4 mt-2">
-            <input name="userId" type="hidden" value={member.userId ?? ""} />
+            <input name="userId" type="hidden" value={member.userId ?? member.id} />
             <p className="text-xs text-muted-foreground">
               Ao gerar o link, todas as sessões ativas deste membro serão encerradas por segurança.
             </p>
             <div className="flex gap-2 mt-2">
-              <Button className="flex-1" disabled={pending || !member.userId} type="submit">
+              <Button className="flex-1" disabled={pending || (!member.userId && !member.id)} type="submit">
                 {pending ? "Gerando Link..." : "Gerar Link de Redefinição"}
               </Button>
               <DialogClose

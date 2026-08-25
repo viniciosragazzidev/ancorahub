@@ -283,22 +283,7 @@ export async function generatePasswordResetLinkForMember(targetUserId: string) {
 
   const db = getDatabase();
 
-  const [targetMembership] = await db
-    .select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role })
-    .from(schema.tenantMemberships)
-    .where(
-      and(
-        eq(schema.tenantMemberships.tenantId, context.tenantId),
-        eq(schema.tenantMemberships.userId, targetUserId),
-        eq(schema.tenantMemberships.status, "active"),
-      ),
-    )
-    .limit(1);
-
-  if (!targetMembership) {
-    throw new Error("Membro da equipe não encontrado ou inativo.");
-  }
-
+  // Verificar se o usuário existe
   const [user] = await db
     .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
     .from(schema.user)
@@ -307,6 +292,38 @@ export async function generatePasswordResetLinkForMember(targetUserId: string) {
 
   if (!user) {
     throw new Error("Usuário não encontrado.");
+  }
+
+  // Verificar se o usuário pertence a este tenant (via tenantMemberships ou brokerProfiles)
+  const [membership] = await db
+    .select({ userId: schema.tenantMemberships.userId })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, targetUserId),
+      ),
+    )
+    .limit(1);
+
+  let isMember = Boolean(membership);
+
+  if (!isMember) {
+    const [broker] = await db
+      .select({ userId: schema.brokerProfiles.userId })
+      .from(schema.brokerProfiles)
+      .where(
+        and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          eq(schema.brokerProfiles.userId, targetUserId),
+        ),
+      )
+      .limit(1);
+    isMember = Boolean(broker);
+  }
+
+  if (!isMember) {
+    throw new Error("Membro da equipe não encontrado neste ambiente.");
   }
 
   const id = randomUUID();
