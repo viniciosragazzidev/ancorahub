@@ -536,25 +536,54 @@ function ResetPasswordDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [state, action, pending] = useActionState<
-    TeamActionState & { resetUrl?: string },
-    FormData
-  >(generateResetPasswordLinkAction, {});
+  const [pending, setPending] = useState(false);
+  const [resetUrl, setResetUrl] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (state.error) {
-      toast.error(state.error);
+    if (!open) {
+      setResetUrl(null);
+      setErrorMessage(null);
+      setCopied(false);
+      setPending(false);
     }
-  }, [state.error]);
+  }, [open]);
 
   const memberName = member.name ?? member.email;
-  const rawResetUrl = state.resetUrl ?? "";
-  const resetUrl = rawResetUrl
-    ? rawResetUrl.startsWith("http")
-      ? rawResetUrl
-      : `${typeof window !== "undefined" ? window.location.origin : ""}${rawResetUrl}`
-    : "";
+
+  const handleGenerate = async () => {
+    const targetId = member.userId ?? member.id;
+    if (!targetId) {
+      setErrorMessage("ID de membro não informado.");
+      return;
+    }
+
+    setPending(true);
+    setErrorMessage(null);
+
+    try {
+      const fd = new FormData();
+      fd.set("userId", targetId);
+      const res = await generateResetPasswordLinkAction({}, fd);
+
+      if (res.success && res.resetUrl) {
+        const raw = res.resetUrl;
+        const fullUrl = raw.startsWith("http")
+          ? raw
+          : `${typeof window !== "undefined" ? window.location.origin : ""}${raw}`;
+        setResetUrl(fullUrl);
+      } else {
+        setErrorMessage(res.error ?? "Erro desconhecido ao gerar o link.");
+      }
+    } catch (e) {
+      setErrorMessage(
+        e instanceof Error ? e.message : "Falha na requisição. Verifique sua conexão.",
+      );
+    } finally {
+      setPending(false);
+    }
+  };
 
   const templateMessage = resetUrl
     ? `Olá, ${memberName}! Seu link para redefinir sua senha no sistema Âncora CRM foi gerado. Acesse o link abaixo para criar sua nova senha:\n\n${resetUrl}\n\nEste link é seguro e é válido por 24 horas.`
@@ -573,10 +602,7 @@ function ResetPasswordDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(val) => {
-      setCopied(false);
-      onOpenChange(val);
-    }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-md">
         <DialogTitle className="flex items-center gap-2">
           <LockKey size={18} /> Redefinir Senha do Membro
@@ -585,20 +611,24 @@ function ResetPasswordDialog({
           Gere um link seguro de redefinição de senha para <strong>{memberName}</strong>.
         </DialogDescription>
 
-        {state.error ? (
+        {errorMessage ? (
           <ContextNote variant="error" className="mt-2 text-xs">
-            {state.error}
+            {errorMessage}
           </ContextNote>
         ) : null}
 
         {!resetUrl ? (
-          <form action={action} className="grid gap-4 mt-2">
-            <input name="userId" type="hidden" value={member.userId ?? member.id} />
+          <div className="grid gap-4 mt-2">
             <p className="text-xs text-muted-foreground">
               Ao gerar o link, todas as sessões ativas deste membro serão encerradas por segurança.
             </p>
             <div className="flex gap-2 mt-2">
-              <Button className="flex-1" disabled={pending || (!member.userId && !member.id)} type="submit">
+              <Button
+                className="flex-1"
+                disabled={pending}
+                onClick={handleGenerate}
+                type="button"
+              >
                 {pending ? "Gerando Link..." : "Gerar Link de Redefinição"}
               </Button>
               <DialogClose
@@ -609,7 +639,7 @@ function ResetPasswordDialog({
                 }
               />
             </div>
-          </form>
+          </div>
         ) : (
           <div className="grid gap-4 mt-2">
             <Field>

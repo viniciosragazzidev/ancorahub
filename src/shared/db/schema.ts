@@ -1919,7 +1919,7 @@ export const wahaNumbers = pgTable(
     branchId: text("branch_id").references(() => branches.id, { onDelete: "restrict" }),
     scope: text("scope").notNull().default("platform"),
     label: text("label"),
-    capabilities: jsonb("capabilities").$type<{ inbound: boolean; cadence: boolean; ai: boolean }>().notNull().default({ inbound: true, cadence: false, ai: false }),
+    capabilities: jsonb("capabilities").$type<{ inbound: boolean; cadence: boolean; ai: boolean; brokerFallback?: boolean; qualificationFallback?: boolean }>().notNull().default({ inbound: true, cadence: false, ai: false }),
     status: text("status").notNull().default("pending"),
     maxMessagesPerHour: integer("max_messages_per_hour").notNull().default(60),
     minIntervalSeconds: integer("min_interval_seconds").notNull().default(45),

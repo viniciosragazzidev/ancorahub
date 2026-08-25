@@ -71,13 +71,19 @@ export async function createOwnWahaConnection(input: { label: string }) {
   return { id, ...initial };
 }
 
-export async function updateOwnWahaCapabilities(id: string, input: { inbound: boolean; cadence: boolean; ai: boolean }) {
+export async function updateOwnWahaCapabilities(id: string, input: { inbound: boolean; cadence: boolean; ai: boolean; brokerFallback?: boolean; qualificationFallback?: boolean }) {
   const context = await getRequiredTenantContext();
   await assertAvailable(context);
   if (input.ai && !input.inbound) throw new Error("A IA exige o recebimento de mensagens ativo.");
   const [number] = await getDatabase().select().from(schema.wahaNumbers).where(whereOwnNumber(context, id)).limit(1);
   if (!number) throw new Error("Número não encontrado.");
-  const capabilities = { inbound: Boolean(input.inbound), cadence: Boolean(input.cadence), ai: Boolean(input.ai) };
+  const capabilities = {
+    inbound: Boolean(input.inbound),
+    cadence: Boolean(input.cadence),
+    ai: Boolean(input.ai),
+    brokerFallback: Boolean(input.brokerFallback),
+    qualificationFallback: Boolean(input.qualificationFallback),
+  };
   await getDatabase().update(schema.wahaNumbers).set({ capabilities, updatedAt: new Date() }).where(eq(schema.wahaNumbers.id, id));
   await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id, acao: `waha_connection.capabilities:${JSON.stringify(capabilities)}`, createdAt: new Date() });
   return capabilities;

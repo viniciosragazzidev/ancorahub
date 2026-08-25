@@ -13,6 +13,7 @@ import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
+import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS } from "@/features/notifications/broker-lead-cadence";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
@@ -153,6 +154,99 @@ export async function enqueueMetaTextMessage(input: {
   return { id, status: "queued" as const, duplicate: false };
 }
 
+export function resolveTemplateTextBody(purpose: string, rawVariables: string[], urlButtonParameter?: string): string {
+  if (purpose === "brokerInvitation") {
+    const nome = rawVariables[0]?.trim() || "Corretor(a)";
+    const empresa = rawVariables[1]?.trim() || "Âncora";
+    const link = urlButtonParameter
+      ? (urlButtonParameter.startsWith("http") ? urlButtonParameter : `https://ancorahub.com.br/convite/${urlButtonParameter}`)
+      : "https://ancorahub.com.br";
+    return `Olá *${nome}*! 👋\n\nVocê recebeu um convite para criar seu acesso no sistema *${empresa}*.\n\nAcesse o link abaixo para definir sua senha e entrar no sistema:\n${link}\n\n_Este link é individual e seguro._`;
+  }
+
+  if (purpose === "brokerLeadNotification") {
+    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
+    const corretorNome = split.bodyVariables[1] || rawVariables[1] || "Corretor(a)";
+    const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
+    const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
+    const leadId = urlButtonParameter || split.urlButtonParameter;
+    const link = leadId ? `\n\n👉 *Acesse no CRM:* https://ancorahub.com.br/conversas?lead=${leadId}` : "";
+    return `⚡ *Novo Lead Atribuído!*\n\nOlá *${corretorNome}*, um novo lead foi atribuído a você:\n\n👤 *Cliente:* ${leadNome}\n🏥 *Interesse:* ${produto}${link}`;
+  }
+
+  if (purpose === "leadAssignmentConfirmed") {
+    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
+    const brokerName = split.bodyVariables[0] || rawVariables[0] || "Corretor(a)";
+    const leadNome = split.bodyVariables[1] || rawVariables[1] || "Cliente";
+    const leadPhone = split.bodyVariables[2] || rawVariables[2] || "";
+    const interesse = split.bodyVariables[3] || rawVariables[3] || "Plano de Saúde";
+    const leadType = split.bodyVariables[4] || rawVariables[4] || "Individual";
+    const dependentes = split.bodyVariables[5] || rawVariables[5] || "0";
+    const leadId = urlButtonParameter || split.urlButtonParameter;
+    const link = leadId ? `\n\n👉 *Abrir conversa:* https://ancorahub.com.br/conversas?lead=${leadId}` : "";
+    return `✅ *Atribuição Confirmada*\n\nOlá *${brokerName}*, você assumiu o atendimento de *${leadNome}*.\n\n📞 *Telefone:* ${leadPhone}\n📋 *Tipo:* ${leadType}\n🏥 *Interesse:* ${interesse}\n👥 *Dependentes:* ${dependentes}${link}`;
+  }
+
+  if (purpose === "newLeadAssignment") {
+    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
+    const brokerName = split.bodyVariables[0] || rawVariables[0] || "Corretor(a)";
+    const leadType = split.bodyVariables[2] || rawVariables[2] || "Lead";
+    const branchName = split.bodyVariables[3] || rawVariables[3] || "Unidade";
+    const timeout = split.bodyVariables[4] || rawVariables[4] || "15";
+    const leadId = urlButtonParameter || split.urlButtonParameter;
+    const link = leadId ? `\n\n👉 *Aceitar Lead:* https://ancorahub.com.br/conversas?lead=${leadId}` : "";
+    return `🚨 *Novo Lead Disponível!*\n\nOlá *${brokerName}*, há um lead de *${leadType}* disponível em *${branchName}*.\n\n⏱️ Você tem *${timeout} minutos* para aceitar o atendimento.${link}`;
+  }
+
+  if (purpose === "taskReminder") {
+    const nome = rawVariables[0] || "Usuário";
+    const tarefa = rawVariables[1] || "Tarefa agendada";
+    const dataHora = rawVariables[2] || "Hoje";
+    return `⏰ *Lembrete de Tarefa*\n\nOlá *${nome}*, você tem uma tarefa pendente:\n📌 *${tarefa}*\n📅 *Horário:* ${dataHora}`;
+  }
+
+  if (purpose === "clientNotice") {
+    const nome = rawVariables[0] || "Cliente";
+    const msg = rawVariables[1] || "";
+    return `📢 *Aviso Âncora CRM*\n\nOlá *${nome}*,\n\n${msg}`;
+  }
+
+  if (purpose === "leadQualification" || purpose === "lead_qualification") {
+    const nome = rawVariables[0] || "Cliente";
+    return `Olá *${nome}*! 👋\n\nSomos da equipe de atendimento. Como podemos te ajudar a encontrar o melhor plano de saúde hoje?`;
+  }
+
+  if (purpose === "leadAssignmentUnavailable") {
+    const brokerName = rawVariables[0] || "Corretor(a)";
+    return `ℹ️ *Aviso de Atribuição*\n\nOlá *${brokerName}*, este lead já foi atribuído a outro corretor ou expirou.`;
+  }
+
+  if (purpose === "leadAssignmentExpired") {
+    const brokerName = rawVariables[0] || "Corretor(a)";
+    return `⏳ *Tempo Expirado*\n\nOlá *${brokerName}*, o tempo para aceitar o lead expirou e a oportunidade foi repassada.`;
+  }
+
+  return rawVariables.filter(Boolean).join("\n") || "Notificação Âncora CRM";
+}
+
+export async function findActiveWahaFallbackNumber(tenantId: string, branchId?: string | null, capability: "brokerFallback" | "qualificationFallback" = "brokerFallback") {
+  const db = getDatabase();
+  const numbers = await db
+    .select({ id: schema.wahaNumbers.id, relaySessionId: schema.wahaNumbers.relaySessionId, capabilities: schema.wahaNumbers.capabilities, status: schema.wahaNumbers.status })
+    .from(schema.wahaNumbers)
+    .where(
+      and(
+        eq(schema.wahaNumbers.tenantId, tenantId),
+        inArray(schema.wahaNumbers.status, ["WORKING", "active"]),
+        ...(branchId ? [or(eq(schema.wahaNumbers.branchId, branchId), isNull(schema.wahaNumbers.branchId))] : []),
+      ),
+    )
+    .orderBy(desc(schema.wahaNumbers.updatedAt))
+    .limit(5);
+
+  return numbers.find((n) => n.capabilities?.[capability] !== false);
+}
+
 export async function processMetaOutboundBatch(limit = 10, tenantId?: string): Promise<{ processed: number; sent: number; failed: number; retried: number }> {
   const db = getDatabase();
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 50);
@@ -162,6 +256,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
   let failed = 0;
   let retried = 0;
   const processRow = async (row: (typeof rows)[number]) => {
+    let urlButtonParameter: string | undefined;
+    let invitation: { tokenCiphertext: string | null; expiresAt: Date; status: string } | undefined;
     const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", attempts: row.attempts + 1, updatedAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")))).returning({ id: schema.whatsappOutboundMessages.id });
     if (!claimed) return;
     try {
@@ -204,17 +300,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
         });
         return;
       }
-      const [channel] = await db.select().from(schema.communicationChannels).where(and(
-        eq(schema.communicationChannels.id, row.channelId),
-        eq(schema.communicationChannels.tenantId, row.tenantId),
-        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-        eq(schema.communicationChannels.status, "active"),
-      )).limit(1);
-      if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
-      const phoneNumberId = channel.phoneNumberId;
-      const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
-      let urlButtonParameter: string | undefined;
-      let invitation: { tokenCiphertext: string | null; expiresAt: Date; status: string } | undefined;
+
       if (row.purpose === "brokerInvitation" && row.recipientId) {
         const [loadedInvitation] = await db.select({ tokenCiphertext: schema.brokerInvitations.tokenCiphertext, expiresAt: schema.brokerInvitations.expiresAt, status: schema.brokerInvitations.status }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, row.recipientId), eq(schema.brokerInvitations.tenantId, row.tenantId))).limit(1);
         invitation = loadedInvitation;
@@ -234,6 +320,16 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
           urlButtonParameter = variables[6];
         }
       }
+
+      const [channel] = await db.select().from(schema.communicationChannels).where(and(
+        eq(schema.communicationChannels.id, row.channelId),
+        eq(schema.communicationChannels.tenantId, row.tenantId),
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+        eq(schema.communicationChannels.status, "active"),
+      )).limit(1);
+      if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
+      const phoneNumberId = channel.phoneNumberId;
+      const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
 
       let metaResponse: { messages?: Array<{ id: string }> } = {};
       if (row.messageType === "text") {
@@ -307,28 +403,61 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
       await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
       if (invitation && row.recipientId) {
-        await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts + 1, deliveryError: null }).where(eq(schema.brokerInvitations.id, row.recipientId));
+        await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts, deliveryError: null }).where(eq(schema.brokerInvitations.id, row.recipientId));
       }
       sent += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha no envio via Meta Cloud API.";
       const code = error instanceof MetaCloudApiError ? String(error.code ?? error.status) : "META_OUTBOUND_FAILED";
-      const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
-      const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
-      await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-      console.warn("[meta-outbox] delivery_deferred", {
-        outboundMessageId: row.id,
-        tenantId: row.tenantId,
-        purpose: row.purpose,
-        attempt: row.attempts + 1,
-        providerErrorCode: code,
-        retryScheduled: Boolean(nextAttemptAt),
-      });
-      if (row.purpose === "brokerInvitation" && row.recipientId) {
-        const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
-        await db.update(schema.brokerInvitations).set(failureUpdate).where(eq(schema.brokerInvitations.id, row.recipientId));
+
+      let sentViaWaha = false;
+      try {
+        const capability = (row.purpose === "aiQualification" || row.purpose === "leadQualification" || row.purpose === "lead_qualification")
+          ? "qualificationFallback"
+          : "brokerFallback";
+        const wahaFallbackNumber = await findActiveWahaFallbackNumber(row.tenantId, null, capability);
+        if (wahaFallbackNumber) {
+          const bodyText = row.messageType === "text"
+            ? (Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "")
+            : resolveTemplateTextBody(row.purpose, Array.isArray(row.variables) ? row.variables.filter((v): v is string => typeof v === "string") : [], urlButtonParameter);
+
+          const wahaRes = await sendWahaRelayMessage({
+            idempotencyKey: `waha-fallback-${row.id}-${row.attempts}`,
+            sessionId: wahaFallbackNumber.relaySessionId,
+            destination: row.destinationPhone,
+            body: bodyText,
+          });
+
+          const providerMessageId = wahaRes.messageId || "waha_fallback_sent";
+          await db.update(schema.whatsappOutboundMessages).set({
+            status: "sent",
+            providerMessageId,
+            providerErrorCode: null,
+            providerErrorMessage: "Enviado via contingência WAHA",
+            sentAt: new Date(),
+            updatedAt: new Date(),
+          }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+
+          if (invitation && row.recipientId) {
+            await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts, deliveryError: null }).where(eq(schema.brokerInvitations.id, row.recipientId));
+          }
+          sent += 1;
+          sentViaWaha = true;
+        }
+      } catch (wahaError) {
+        console.warn("[meta-outbox] WAHA fallback attempt failed:", wahaError);
       }
-      if (nextAttemptAt) retried += 1; else failed += 1;
+
+      if (!sentViaWaha) {
+        const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
+        const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
+        await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        if (row.purpose === "brokerInvitation" && row.recipientId) {
+          const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts });
+          await db.update(schema.brokerInvitations).set(failureUpdate).where(eq(schema.brokerInvitations.id, row.recipientId));
+        }
+        if (nextAttemptAt) retried += 1; else failed += 1;
+      }
     }
   };
 

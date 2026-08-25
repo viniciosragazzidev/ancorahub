@@ -28,7 +28,13 @@ type Connection = {
   scope: string;
   status: string;
   displayPhoneNumber: string;
-  capabilities: { inbound: boolean; cadence: boolean; ai: boolean };
+  capabilities: {
+    inbound: boolean;
+    cadence: boolean;
+    ai: boolean;
+    brokerFallback?: boolean;
+    qualificationFallback?: boolean;
+  };
 };
 
 export function WahaConnectionsCard({
@@ -190,7 +196,7 @@ export function WahaConnectionsCard({
                 </div>
                 <form
                   action={(formData) => saveCapabilities(connection.id, formData)}
-                  className="grid gap-2 rounded-lg bg-muted/30 p-3 text-xs sm:grid-cols-3"
+                  className="grid gap-2 rounded-lg bg-muted/30 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3"
                 >
                   <label className="flex items-center gap-2">
                     <input
@@ -219,11 +225,29 @@ export function WahaConnectionsCard({
                     />{" "}
                     IA após inbound
                   </label>
-                  <p className="sm:col-span-2 text-muted-foreground">
-                    IA só atua depois de uma mensagem recebida. Cadências respeitam descadastro e
-                    limites.
-                  </p>
-                  <div className="sm:text-right">
+                  <label className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
+                    <input
+                      defaultChecked={connection.capabilities.brokerFallback ?? true}
+                      name="brokerFallback"
+                      type="checkbox"
+                      value="true"
+                    />{" "}
+                    Fallback: Notificar corretores
+                  </label>
+                  <label className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                    <input
+                      defaultChecked={connection.capabilities.qualificationFallback ?? true}
+                      name="qualificationFallback"
+                      type="checkbox"
+                      value="true"
+                    />{" "}
+                    Fallback: Qualificação (IA)
+                  </label>
+
+                  <div className="sm:col-span-2 lg:col-span-3 flex items-center justify-between pt-2 border-t border-border/40 mt-1">
+                    <p className="text-muted-foreground text-[11px]">
+                      O fallback envia automaticamente pelo WAHA se o canal oficial Meta estiver indisponível ou falhar.
+                    </p>
                     <Button disabled={pending} size="sm" type="submit" variant="outline">
                       Salvar funções
                     </Button>

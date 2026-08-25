@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -275,7 +275,7 @@ export async function completePasswordReset(token: string, newPassword: string) 
 /**
  * Gera um link de redefinição de senha para um membro da equipe (solicitado por diretor ou gestor).
  */
-export async function generatePasswordResetLinkForMember(targetUserId: string) {
+export async function generatePasswordResetLinkForMember(targetIdentifier: string) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") {
     throw new Error("Permissão insuficiente para gerar link de redefinição de senha.");
@@ -283,52 +283,72 @@ export async function generatePasswordResetLinkForMember(targetUserId: string) {
 
   const db = getDatabase();
 
-  // Verificar se o usuário existe
-  const [user] = await db
+  // 1. Tentar encontrar usuário por ID direto em user
+  let [user] = await db
     .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
     .from(schema.user)
-    .where(eq(schema.user.id, targetUserId))
+    .where(eq(schema.user.id, targetIdentifier))
     .limit(1);
 
-  if (!user) {
-    throw new Error("Usuário não encontrado.");
-  }
+  let targetUserId = user?.id;
 
-  // Verificar se o usuário pertence a este tenant (via tenantMemberships ou brokerProfiles)
-  const [membership] = await db
-    .select({ userId: schema.tenantMemberships.userId })
-    .from(schema.tenantMemberships)
-    .where(
-      and(
-        eq(schema.tenantMemberships.tenantId, context.tenantId),
-        eq(schema.tenantMemberships.userId, targetUserId),
-      ),
-    )
-    .limit(1);
-
-  let isMember = Boolean(membership);
-
-  if (!isMember) {
+  // 2. Se não encontrou por user.id, tentar por brokerProfiles.id ou brokerProfiles.userId
+  if (!targetUserId) {
     const [broker] = await db
-      .select({ userId: schema.brokerProfiles.userId })
+      .select({ userId: schema.brokerProfiles.userId, invitedEmail: schema.brokerProfiles.invitedEmail })
       .from(schema.brokerProfiles)
       .where(
         and(
           eq(schema.brokerProfiles.tenantId, context.tenantId),
-          eq(schema.brokerProfiles.userId, targetUserId),
+          or(
+            eq(schema.brokerProfiles.id, targetIdentifier),
+            eq(schema.brokerProfiles.userId, targetIdentifier),
+          ),
         ),
       )
       .limit(1);
-    isMember = Boolean(broker);
+
+    if (broker?.userId) {
+      targetUserId = broker.userId;
+      [user] = await db
+        .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
+        .from(schema.user)
+        .where(eq(schema.user.id, targetUserId))
+        .limit(1);
+    }
   }
 
-  if (!isMember) {
-    throw new Error("Membro da equipe não encontrado neste ambiente.");
+  // 3. Se ainda não encontrou, tentar por tenantMemberships.id
+  if (!targetUserId) {
+    const [membership] = await db
+      .select({ userId: schema.tenantMemberships.userId })
+      .from(schema.tenantMemberships)
+      .where(
+        and(
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.id, targetIdentifier),
+        ),
+      )
+      .limit(1);
+
+    if (membership?.userId) {
+      targetUserId = membership.userId;
+      [user] = await db
+        .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
+        .from(schema.user)
+        .where(eq(schema.user.id, targetUserId))
+        .limit(1);
+    }
+  }
+
+  if (!user || !targetUserId) {
+    throw new Error("Este membro ainda não possui uma conta de usuário cadastrada no sistema.");
   }
 
   const id = randomUUID();
   const token = randomBytes(32).toString("hex");
   const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+  const now = new Date();
 
   await db.insert(schema.passwordResetRequests).values({
     id,
@@ -339,7 +359,9 @@ export async function generatePasswordResetLinkForMember(targetUserId: string) {
     token,
     tokenExpiresAt,
     reviewedBy: context.userId,
-    reviewedAt: new Date(),
+    reviewedAt: now,
+    createdAt: now,
+    updatedAt: now,
   });
 
   // Revogar sessões ativas do membro por segurança

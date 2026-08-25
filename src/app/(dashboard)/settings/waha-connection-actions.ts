@@ -28,7 +28,13 @@ export async function changeWahaConnectionAction(id: string, operation: "pause" 
 
 export async function updateWahaCapabilitiesAction(id: string, formData: FormData) {
   try {
-    const capabilities = await updateOwnWahaCapabilities(id, { inbound: formData.get("inbound") === "true", cadence: formData.get("cadence") === "true", ai: formData.get("ai") === "true" });
+    const capabilities = await updateOwnWahaCapabilities(id, {
+      inbound: formData.get("inbound") === "true",
+      cadence: formData.get("cadence") === "true",
+      ai: formData.get("ai") === "true",
+      brokerFallback: formData.get("brokerFallback") === "true",
+      qualificationFallback: formData.get("qualificationFallback") === "true",
+    });
     done();
     return { success: true as const, capabilities };
   } catch (error) {
