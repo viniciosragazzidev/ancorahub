@@ -9,6 +9,7 @@ import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAu
 import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { notifyNewLead } from "@/features/notifications/send-push-helper";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { isWithinBusinessHours } from "@/shared/time/business-hours";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -518,6 +519,11 @@ export async function distributeQualifiedLead(input: {
     ? { status: "routed" as const }
     : await routeLeadToBranch(distributionContext, input.leadId, targetBranchId, `Qualification completed (${classification.toUpperCase()})`);
   if (routedQualifiedLead.status !== "routed") return { distributed: false, destination, reason: `routing_${routedQualifiedLead.status}` };
+  const { enqueueLeadDistributionJob } = await import("./jobs");
+  await enqueueLeadDistributionJob({ tenantId: input.tenantId, leadId: input.leadId });
+  if (!isWithinBusinessHours()) {
+    return { distributed: false, destination, reason: "scheduled_for_business_hours" };
+  }
   const routedAssignment = await processQueuedLead(distributionContext, input.leadId);
   if (routedAssignment.status === "queued") {
     // A qualified lead is never discarded because the roster is empty. Keep

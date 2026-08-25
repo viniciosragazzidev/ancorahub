@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -11,7 +11,9 @@ import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables, type MetaWhatsAppTemplatePurpose } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
+import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
+import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS } from "@/features/notifications/broker-lead-cadence";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -28,6 +30,52 @@ export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean
       ? "Tentativa de envio será repetida automaticamente."
       : "A Meta não confirmou o envio do convite. Revise o template aprovado e o número antes de reenviar.",
   };
+}
+
+async function isCurrentBrokerLeadNotification(row: {
+  tenantId: string;
+  purpose: string;
+  recipientId: string | null;
+  variables: unknown;
+}) {
+  if (row.purpose !== "brokerLeadNotification") return true;
+  const leadId = Array.isArray(row.variables) && typeof row.variables[4] === "string"
+    ? row.variables[4]
+    : null;
+  if (!leadId || !row.recipientId) return false;
+  const [lead] = await getDatabase().select({ id: schema.leads.id })
+    .from(schema.leads)
+    .where(and(
+      eq(schema.leads.id, leadId),
+      eq(schema.leads.tenantId, row.tenantId),
+      eq(schema.leads.corretorId, row.recipientId),
+    ))
+    .limit(1);
+  return Boolean(lead);
+}
+
+async function getBrokerLeadNotificationCadenceAt(row: {
+  id: string;
+  tenantId: string;
+  purpose: string;
+  recipientId: string | null;
+}, now: Date) {
+  if (row.purpose !== "brokerLeadNotification" || !row.recipientId) return null;
+  const [previous] = await getDatabase().select({ sentAt: schema.whatsappOutboundMessages.sentAt })
+    .from(schema.whatsappOutboundMessages)
+    .where(and(
+      eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+      eq(schema.whatsappOutboundMessages.recipientId, row.recipientId),
+      eq(schema.whatsappOutboundMessages.purpose, "brokerLeadNotification"),
+      ne(schema.whatsappOutboundMessages.id, row.id),
+      inArray(schema.whatsappOutboundMessages.status, ["sent", "delivered", "read"]),
+      isNotNull(schema.whatsappOutboundMessages.sentAt),
+    ))
+    .orderBy(desc(schema.whatsappOutboundMessages.sentAt))
+    .limit(1);
+  if (!previous?.sentAt) return null;
+  const nextAllowedAt = new Date(previous.sentAt.getTime() + BROKER_LEAD_NOTIFICATION_INTERVAL_MS);
+  return nextAllowedAt > now ? scheduleForBusinessHours(nextAllowedAt) : null;
 }
 
 export async function enqueueMetaTemplateMessage(input: {
@@ -109,7 +157,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
   const db = getDatabase();
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 50);
   const now = new Date();
-  const rows = await db.select().from(schema.whatsappOutboundMessages).where(and(tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined, or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")), or(lte(schema.whatsappOutboundMessages.scheduledAt, now), isNull(schema.whatsappOutboundMessages.scheduledAt)), or(lte(schema.whatsappOutboundMessages.nextAttemptAt, now), isNull(schema.whatsappOutboundMessages.nextAttemptAt)))).limit(safeLimit);
+  const rows = await db.select().from(schema.whatsappOutboundMessages).where(and(tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined, or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")), or(lte(schema.whatsappOutboundMessages.scheduledAt, now), isNull(schema.whatsappOutboundMessages.scheduledAt)), or(lte(schema.whatsappOutboundMessages.nextAttemptAt, now), isNull(schema.whatsappOutboundMessages.nextAttemptAt)))).orderBy(asc(schema.whatsappOutboundMessages.createdAt)).limit(safeLimit);
   let sent = 0;
   let failed = 0;
   let retried = 0;
@@ -117,6 +165,45 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
     const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", attempts: row.attempts + 1, updatedAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")))).returning({ id: schema.whatsappOutboundMessages.id });
     if (!claimed) return;
     try {
+      if (row.purpose === "brokerLeadNotification" && !isWithinBusinessHours()) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "pending",
+          attempts: row.attempts,
+          scheduledAt: scheduleForBusinessHours(),
+          nextAttemptAt: null,
+          providerErrorCode: "OUTSIDE_BUSINESS_HOURS",
+          providerErrorMessage: "Aviso de novo lead aguarda o próximo horário comercial.",
+          updatedAt: new Date(),
+        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        return;
+      }
+      const cadenceAt = await getBrokerLeadNotificationCadenceAt(row, now);
+      if (cadenceAt) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "pending",
+          attempts: row.attempts,
+          scheduledAt: cadenceAt,
+          nextAttemptAt: null,
+          providerErrorCode: "BROKER_NOTIFICATION_CADENCE",
+          providerErrorMessage: "Aviso de novo lead agendado para respeitar o intervalo do corretor.",
+          updatedAt: new Date(),
+        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        return;
+      }
+      if (!await isCurrentBrokerLeadNotification(row)) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "cancelled",
+          providerErrorCode: "ASSIGNMENT_SUPERSEDED",
+          providerErrorMessage: "A atribuição do lead foi alterada antes do envio.",
+          updatedAt: new Date(),
+        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        console.info("[meta-outbox] broker_notification_cancelled", {
+          outboundMessageId: row.id,
+          tenantId: row.tenantId,
+          purpose: row.purpose,
+        });
+        return;
+      }
       const [channel] = await db.select().from(schema.communicationChannels).where(and(
         eq(schema.communicationChannels.id, row.channelId),
         eq(schema.communicationChannels.tenantId, row.tenantId),
@@ -226,6 +313,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
     }
   };
 
-  await runWithConcurrency(rows, 3, processRow);
+  const brokerLeadRows = rows.filter((row) => row.purpose === "brokerLeadNotification");
+  const otherRows = rows.filter((row) => row.purpose !== "brokerLeadNotification");
+  await runWithConcurrency(otherRows, 3, processRow);
+  for (const row of brokerLeadRows) await processRow(row);
   return { processed: rows.length, sent, failed, retried };
 }

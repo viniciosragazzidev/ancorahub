@@ -6,6 +6,7 @@ import { and, asc, eq, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSettings } from "@/features/system-settings/queries";
+import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
 
 import { processQueuedLead } from "./service";
 import { distributionRetryDelayMilliseconds, isDeferredDistributionReason } from "./domain";
@@ -61,6 +62,7 @@ export async function getDistributionJobConfig(): Promise<DistributionJobConfig>
 
 export async function enqueueLeadDistributionJob(input: { tenantId: string; leadId: string; runAfter?: Date; maxAttempts?: number }) {
   const now = new Date();
+  const runAfter = scheduleForBusinessHours(input.runAfter ?? now);
   await getDatabase().insert(schema.leadDistributionJobs).values({
     id: randomUUID(),
     tenantId: input.tenantId,
@@ -68,11 +70,28 @@ export async function enqueueLeadDistributionJob(input: { tenantId: string; lead
     type: JOB_TYPE,
     status: "pending",
     maxAttempts: input.maxAttempts ?? defaults.maxAttempts,
-    runAfter: input.runAfter ?? now,
+    runAfter,
     idempotencyKey: `${JOB_TYPE}:${input.leadId}`,
     createdAt: now,
     updatedAt: now,
   }).onConflictDoNothing();
+}
+
+async function deferJobsUntilBusinessHours(now: Date, tenantId?: string, leadId?: string) {
+  const runAfter = scheduleForBusinessHours(now);
+  const deferred = await getDatabase().update(schema.leadDistributionJobs).set({
+    runAfter,
+    lastErrorCode: "OUTSIDE_BUSINESS_HOURS",
+    lastErrorMessage: "Distribuição automática aguarda o próximo horário comercial.",
+    updatedAt: now,
+  }).where(and(
+    eq(schema.leadDistributionJobs.type, JOB_TYPE),
+    inArray(schema.leadDistributionJobs.status, [...ACTIVE_JOB_STATUSES]),
+    lte(schema.leadDistributionJobs.runAfter, runAfter),
+    tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
+    leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
+  )).returning({ id: schema.leadDistributionJobs.id });
+  return deferred.length;
 }
 
 async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: string, leadId?: string) {
@@ -227,6 +246,10 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
 
   const effectiveConfig = { ...config, batchSize: Math.min(input.limit ?? config.batchSize, config.batchSize) };
   const now = new Date();
+  if (!isWithinBusinessHours(now)) {
+    result.deferred = await deferJobsUntilBusinessHours(now, input.tenantId, input.leadId);
+    return result;
+  }
   result.recoveredLeases = await recoverExpiredJobLeases(now, input.tenantId, input.leadId);
   result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId);
   result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId);

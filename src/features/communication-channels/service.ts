@@ -86,6 +86,13 @@ export function matchesKnownBrokerPhone(phone: string, brokerPhones: readonly st
   return brokerPhones.some((brokerPhone) => samePhone(brokerPhone, phone));
 }
 
+export function getMetaDeliveryFailure(status: { errors?: Array<{ code?: number; title?: string; message?: string }> }) {
+  const error = status.errors?.[0];
+  if (!error) return { code: "META_DELIVERY_FAILED", message: "A Meta não informou o motivo da falha de entrega." };
+  const title = error.title?.trim() || "A Meta recusou a entrega para este destinatário.";
+  return { code: String(error.code ?? "META_DELIVERY_FAILED"), message: title.slice(0, 240) };
+}
+
 async function registerWebhookEvent(input: { channelId: string | null; externalEventId: string; eventType: string; payloadHash: string }) {
   const [event] = await getDatabase().insert(schema.communicationChannelWebhookEvents).values({
     id: randomUUID(), channelId: input.channelId, provider: META_CLOUD_PROVIDER, externalEventId: input.externalEventId, eventType: input.eventType, payloadHash: input.payloadHash,
@@ -286,7 +293,12 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         await db.update(schema.whatsappMessages).set({ providerStatus: status.status }).where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id), eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER)));
         const outboundUpdate: Partial<typeof schema.whatsappOutboundMessages.$inferInsert> = { updatedAt: new Date() };
         if (["sent", "delivered", "read"].includes(status.status)) outboundUpdate.status = status.status;
-        else if (["failed", "deleted"].includes(status.status)) outboundUpdate.status = "failed";
+        else if (["failed", "deleted"].includes(status.status)) {
+          outboundUpdate.status = "failed";
+          const deliveryFailure = getMetaDeliveryFailure(status);
+          outboundUpdate.providerErrorCode = deliveryFailure.code;
+          outboundUpdate.providerErrorMessage = deliveryFailure.message;
+        }
         if (status.status === "sent") outboundUpdate.sentAt = new Date();
         if (status.status === "delivered") outboundUpdate.deliveredAt = new Date();
         if (status.status === "read") outboundUpdate.readAt = new Date();
@@ -324,7 +336,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           await db.update(schema.leadOffers).set({ status: status.status.toUpperCase() as "DELIVERED" | "READ", updatedAt: new Date() }).where(and(eq(schema.leadOffers.outboundMessageId, outbound.id), eq(schema.leadOffers.tenantId, channel.tenantId)));
         }
 
-        await setWebhookEventResult(eventId, "processed");
+        await setWebhookEventResult(eventId, "processed", outboundUpdate.providerErrorCode ?? undefined);
         processed += 1;
       }
     }

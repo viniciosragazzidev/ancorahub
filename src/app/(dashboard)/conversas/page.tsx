@@ -493,7 +493,7 @@ export default async function ConversationsPage({
         attempts: message.attempts,
         error:
           message.status === "failed"
-            ? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe."
+            ? message.providerErrorMessage ?? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe."
             : null,
       });
     }

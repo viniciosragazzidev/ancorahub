@@ -10,6 +10,7 @@ import {
   routeLeadToBranchAndAssignBroker,
 } from "./service";
 import { enqueueLeadDistributionJob } from "./jobs";
+import { isWithinBusinessHours } from "@/shared/time/business-hours";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -349,6 +350,11 @@ export async function distributeLeadAutomaticallyAction(
   const parsed = leadId.safeParse(formData.get("leadId"));
   if (!parsed.success) return { error: "Lead inválido." };
   try {
+    if (!isWithinBusinessHours()) {
+      const context = await getRequiredTenantContext();
+      await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data });
+      return { success: true, message: "Distribuição automática agendada para o próximo horário comercial." };
+    }
     const result = await processQueuedLead(await getRequiredTenantContext(), parsed.data);
     if (result.status !== "assigned") return { error: result.reason };
     const message = result.notificationWarnings?.length

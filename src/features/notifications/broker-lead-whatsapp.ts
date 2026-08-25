@@ -1,10 +1,11 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
+import { scheduleBrokerLeadNotification } from "./broker-lead-cadence";
 
 const FALLBACK_PRODUCT_INTEREST = "Plano de saúde";
 
@@ -94,6 +95,29 @@ export async function enqueueBrokerLeadNotification(input: {
     ? `${input.idempotencyKey}:broker-whatsapp:${input.brokerId}`
     : `lead-assignment:${input.leadId}:${input.brokerId}:${assignmentVersion}:broker-whatsapp`;
   const requestedBy = await resolveSystemUserId(input.tenantId);
+  const now = new Date();
+  const [previousNotification] = await db.select({
+    scheduledAt: schema.whatsappOutboundMessages.scheduledAt,
+    sentAt: schema.whatsappOutboundMessages.sentAt,
+    queuedAt: schema.whatsappOutboundMessages.queuedAt,
+    createdAt: schema.whatsappOutboundMessages.createdAt,
+  }).from(schema.whatsappOutboundMessages).where(and(
+    eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+    eq(schema.whatsappOutboundMessages.recipientId, input.brokerId),
+    eq(schema.whatsappOutboundMessages.purpose, "brokerLeadNotification"),
+    inArray(schema.whatsappOutboundMessages.status, ["pending", "queued", "processing", "sent", "delivered", "read"]),
+    or(isNotNull(schema.whatsappOutboundMessages.scheduledAt), isNotNull(schema.whatsappOutboundMessages.queuedAt)),
+  )).orderBy(
+    desc(schema.whatsappOutboundMessages.scheduledAt),
+    desc(schema.whatsappOutboundMessages.sentAt),
+    desc(schema.whatsappOutboundMessages.queuedAt),
+    desc(schema.whatsappOutboundMessages.createdAt),
+  ).limit(1);
+  const previousAt = previousNotification?.scheduledAt
+    ?? previousNotification?.sentAt
+    ?? previousNotification?.queuedAt
+    ?? previousNotification?.createdAt
+    ?? null;
   const outbound = await enqueueMetaTemplateMessage({
     tenantId: input.tenantId,
     recipientType: "user",
@@ -109,6 +133,7 @@ export async function enqueueBrokerLeadNotification(input: {
     }),
     requestedBy,
     idempotencyKey,
+    scheduledAt: scheduleBrokerLeadNotification({ now, lastScheduledAt: previousAt }),
   });
 
   return { queued: true as const, outboundId: outbound.id, duplicate: outbound.duplicate };

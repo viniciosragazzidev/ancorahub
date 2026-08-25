@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { processQueuedLead } from "@/features/lead-distribution/service";
+import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 
 export type DeclineLeadState = { success?: boolean; error?: string };
 
@@ -100,8 +100,8 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
       return { error: "Não foi possível recusar o lead. Verifique se o estado já foi alterado." };
     }
 
-    // Attempt automatic redistribution in background
-    void processQueuedLead(context, lead.id).catch(() => { /* Non-blocking */ });
+    // The persistent worker retries automatic redistribution in the permitted window.
+    void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id }).catch(() => { /* Non-blocking */ });
 
 
     return { success: true };

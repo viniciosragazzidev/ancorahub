@@ -9,10 +9,12 @@ import { processQueuedLead } from "@/features/lead-distribution/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
+import { isWithinBusinessHours } from "@/shared/time/business-hours";
 
 export type FeedbackSlaResult = { checked: number; released: number; reassigned: number; notifications: number };
 
 export async function runFeedbackSlaSweep(tenantId?: string): Promise<FeedbackSlaResult> {
+  if (!isWithinBusinessHours()) return { checked: 0, released: 0, reassigned: 0, notifications: 0 };
   const db = getDatabase();
   const tenants = await db.select({ id: schema.tenants.id, feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, autoRedistribute: schema.tenants.autoRedistributeOnFeedbackTimeout, firstContactMinutes: schema.tenants.slaFirstContactMinutes, graceMinutes: schema.tenants.feedbackGraceMinutes })
     .from(schema.tenants)
@@ -70,7 +72,6 @@ export async function runFeedbackSlaSweep(tenantId?: string): Promise<FeedbackSl
       if (reassigned.status === "assigned") {
         result.reassigned += 1;
       } else if (origin !== "parent") {
-        // Queue a background job for retry; lead stays in unit queue
         void enqueueLeadDistributionJob({ tenantId: tenant.id, leadId: lead.id }).catch(() => {});
       }
       if (reassigned.status !== "assigned" && origin === "parent") {

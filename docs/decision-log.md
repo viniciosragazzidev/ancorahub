@@ -1,5 +1,38 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-084 — Cadência e diagnóstico seguro dos avisos de novo lead
+
+**Estado:** Aceita
+**Data:** 2026-08-25
+
+O aviso oficial `new_lead_broker` mantém uma cadência mínima de dez minutos por
+corretor. Novas atribuições não são descartadas: entram na outbox na ordem recebida e
+são agendadas para a próxima posição disponível, sempre respeitando a janela da
+DEC-083. O processamento serializa esses avisos no lote para que itens já pendentes
+não sejam enviados juntos.
+
+Falhas de entrega posteriores ao aceite da API são diferentes de erros de envio. O
+webhook da Meta persiste no ledger somente o código e o título seguro do primeiro erro
+do status, sem payload bruto nem telefone. Isso permite distinguir destinatário,
+política ou qualidade de canal sem expor PII e sem reverter a atribuição do lead.
+
+## DEC-083 — Janela comercial para distribuição automática e aviso de novo lead
+
+**Estado:** Aceita
+**Data:** 2026-08-25
+
+A distribuição automática, inclusive as retomadas por recusa, SLA e conclusão de
+qualificação, executa somente de segunda a sexta entre 08:00 (inclusivo) e 18:00
+(exclusivo), no fuso `America/Sao_Paulo`. Fora da janela, o lead continua
+persistido na fila e o job idempotente é reagendado para a próxima abertura; não há
+perda de lead nem consumo de tentativa.
+
+O template oficial `new_lead_broker` segue a mesma janela: a atribuição é durável
+imediatamente, mas a saída fica pendente até a abertura. Antes de enviar, a outbox
+revalida que o destinatário ainda é o corretor responsável e cancela o aviso se a
+atribuição foi substituída. Atribuições manuais continuam permitidas fora do horário;
+somente o efeito automático e o aviso são postergados.
+
 ## DEC-082 — Auto-login e passkey no primeiro acesso
 
 **Estado:** Aceita
