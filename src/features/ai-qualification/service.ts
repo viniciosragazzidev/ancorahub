@@ -148,71 +148,121 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
         const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
         const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
         const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
-
         const leadName = lead.nome || "Cliente";
+
+        const { sendMetaCloudTemplate, MetaCloudApiError } = await import("@/features/communication-channels/meta-cloud-client");
+
+        // Analisar quantidade de marcadores no bodyText do template para ajustar os parâmetros exatamente
+        const bodyText = template.bodyText || "";
+        const matches = bodyText.match(/\{\{([a-zA-Z0-9_]+)\}\}/g) || [];
+        const uniqueParams = Array.from(new Set(matches));
+        const paramCount = Math.max(1, uniqueParams.length);
+
+        const possibleValues = [leadName, botName, "Âncora Saúde"];
+        const bodyVariables = possibleValues.slice(0, paramCount);
+
         const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
         const namedParams = bodyComp?.example?.body_text_named_params;
-        let parameters: any[] = [];
-        if (namedParams && namedParams.length > 0) {
-          parameters = namedParams.map((p: any) => {
-            const pName = p.param_name || p.parameter_name;
-            if (pName === "nome_bot" || pName === "bot_name") {
-              return { type: "text", parameter_name: pName, text: botName };
-            }
-            if (pName === "empresa" || pName === "company") {
-              return { type: "text", parameter_name: pName, text: "Âncora Saúde" };
-            }
-            return { type: "text", parameter_name: pName || "nome", text: leadName };
+        const variableNames = namedParams && namedParams.length === bodyVariables.length
+          ? namedParams.map((p: any) => p.param_name || p.parameter_name || "param")
+          : undefined;
+
+        let res: { messages?: Array<{ id: string }> } = {};
+        let sentSuccessfully = false;
+
+        // Tentativa 1: Envio com nomes de variáveis (se houver) ou posicionais
+        try {
+          res = await sendMetaCloudTemplate({
+            phoneNumberId: credentials.phoneNumberId,
+            accessToken: credentials.accessToken,
+            to: lead.phone,
+            templateName: template.name,
+            languageCode: template.language || "pt_BR",
+            variables: bodyVariables,
+            variableNames,
           });
-        } else {
-          parameters = [
-            { type: "text", text: leadName },
-            { type: "text", text: botName },
-          ];
+          sentSuccessfully = true;
+        } catch (err1) {
+          // Tentativa 2: Se falhar por erro de parâmetro nomeado (código 100), tentar estritamente posicional
+          if (variableNames) {
+            try {
+              res = await sendMetaCloudTemplate({
+                phoneNumberId: credentials.phoneNumberId,
+                accessToken: credentials.accessToken,
+                to: lead.phone,
+                templateName: template.name,
+                languageCode: template.language || "pt_BR",
+                variables: bodyVariables,
+                variableNames: undefined,
+              });
+              sentSuccessfully = true;
+            } catch {
+              // Prosegue para fallback de idioma
+            }
+          }
+
+          // Tentativa 3: Se falhar por código de idioma ("pt_BR" vs "pt" vs "en"), tentar idiomas alternativos
+          if (!sentSuccessfully && err1 instanceof MetaCloudApiError && (err1.code === 100 || err1.message.toLowerCase().includes("language"))) {
+            const fallbackLangs = (template.language || "pt_BR").startsWith("pt") ? ["pt", "pt_BR", "en"] : ["pt_BR", "pt"];
+            for (const langCode of fallbackLangs) {
+              if (langCode === (template.language || "pt_BR")) continue;
+              try {
+                res = await sendMetaCloudTemplate({
+                  phoneNumberId: credentials.phoneNumberId,
+                  accessToken: credentials.accessToken,
+                  to: lead.phone,
+                  templateName: template.name,
+                  languageCode: langCode,
+                  variables: bodyVariables,
+                  variableNames: undefined,
+                });
+                sentSuccessfully = true;
+                break;
+              } catch {
+                // Tenta próximo idioma
+              }
+            }
+          }
+
+          if (!sentSuccessfully) {
+            console.warn("[startAiQualificationForLead] Meta template dispatch failed:", err1);
+          }
         }
 
-        const components = [{ type: "body", parameters }];
+        if (sentSuccessfully) {
+          dispatchedViaTemplate = true;
+          const wamid = res.messages?.[0]?.id ?? null;
+          if (wamid) queuedId = wamid;
 
-        const res = await sendMetaCloudTemplateTest(
-          credentials.phoneNumberId,
-          credentials.accessToken,
-          lead.phone,
-          template.name,
-          template.language,
-          components
-        );
+          let rendered = template.bodyText || "";
+          if (rendered) {
+            rendered = rendered
+              .replace(/\{\{1\}\}/g, leadName)
+              .replace(/\{\{2\}\}/g, botName)
+              .replace(/\{\{3\}\}/g, "Âncora Saúde")
+              .replace(/\{\{nome\}\}/g, leadName)
+              .replace(/\{\{nome_bot\}\}/g, botName)
+              .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
+          } else {
+            rendered = finalBody;
+          }
+          finalBody = rendered;
 
-        dispatchedViaTemplate = true;
-        const wamid = res.messages?.[0]?.id ?? null;
-        if (wamid) queuedId = wamid;
-
-        let rendered = template.bodyText || "";
-        if (rendered) {
-          rendered = rendered
-            .replace(/\{\{1\}\}/g, leadName)
-            .replace(/\{\{2\}\}/g, botName)
-            .replace(/\{\{nome\}\}/g, leadName)
-            .replace(/\{\{nome_bot\}\}/g, botName)
-            .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
-        } else {
-          rendered = finalBody;
+          await db.insert(schema.whatsappMessages).values({
+            id: wamid || `tpl_start_${randomUUID()}`,
+            tenantId: input.tenantId,
+            leadId: input.leadId,
+            communicationChannelId: channel.id,
+            senderRole: "assistant",
+            provider: META_CLOUD_PROVIDER,
+            phone: lead.phone,
+            direction: "outbound",
+            body: finalBody,
+            providerStatus: "sent",
+            messageId: wamid ?? undefined,
+            sentAt: now,
+          }).onConflictDoNothing();
         }
-        finalBody = rendered;
-
-        await db.insert(schema.whatsappMessages).values({
-          id: wamid || `tpl_start_${randomUUID()}`,
-          tenantId: input.tenantId,
-          leadId: input.leadId,
-          communicationChannelId: channel.id,
-          senderRole: "assistant",
-          provider: META_CLOUD_PROVIDER,
-          phone: lead.phone,
-          direction: "outbound",
-          body: finalBody,
-          providerStatus: "sent",
-          messageId: wamid ?? undefined,
-          sentAt: now,
-        }).onConflictDoNothing();
       }
     }
   } catch (templateError) {
