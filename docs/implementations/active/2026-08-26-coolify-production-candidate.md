@@ -14,7 +14,7 @@ producao nesta etapa.
 
 ## Validacao e rollback
 
-- `npm ci --dry-run --ignore-scripts` deve aceitar o lockfile;
+- `npm@10.9.8 ci --dry-run --ignore-scripts` aceitou o lockfile sincronizado;
 - o build e o healthcheck serao validados pelo candidato isolado no Coolify;
 - rollback: manter o staging e a Vercel sem alteracao, removendo apenas o candidato
   se a homologacao falhar.
