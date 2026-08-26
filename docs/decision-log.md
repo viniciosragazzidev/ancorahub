@@ -1,5 +1,17 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-085 — Fonte única de agendamento operacional
+
+**Estado:** Aceita
+**Data:** 2026-08-26
+
+Cada ambiente terá somente uma fonte ativa para os endpoints cron de distribuição,
+efeitos de lead, WhatsApp, SLA, lembretes, Meta, WAHA e manutenção. O scheduler
+da VPS chama os endpoints idempotentes já existentes com `CRON_SECRET`, mas nasce
+desativado. A ativação só ocorre depois de a Vercel Cron ser desabilitada; rollback
+desativa primeiro o scheduler da VPS antes de reativar a Vercel. Essa ordem evita
+duplicação de saídas, notificações e redistribuições durante a migração.
+
 ## DEC-084 — Cadência e diagnóstico seguro dos avisos de novo lead
 
 **Estado:** Aceita

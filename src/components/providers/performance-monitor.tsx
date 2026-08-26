@@ -17,19 +17,23 @@ import { useEffect, useRef } from "react";
  */
 export function PerformanceMonitor() {
   const routeStartRef = useRef<number>(performance.now());
+  const reportedRef = useRef(new Set<string>());
 
   useEffect(() => {
     const routeStart = routeStartRef.current;
     const pathname = window.location.pathname;
+    const route = normalizeRoute(pathname);
+    const reportOnce = (metric: MetricPayload["metric"], value: number) => {
+      const key = `${route}:${metric}`;
+      if (reportedRef.current.has(key)) return;
+      reportedRef.current.add(key);
+      reportMetric({ route, metric, value });
+    };
 
     // Report route load duration after page is fully loaded
     const reportRouteLoad = () => {
       const routeLoadDuration = Math.round(performance.now() - routeStart);
-      reportMetric({
-        route: normalizeRoute(pathname),
-        metric: "route_load",
-        value: routeLoadDuration,
-      });
+      reportOnce("route_load", routeLoadDuration);
     };
 
     // Report when page is fully loaded
@@ -44,26 +48,19 @@ export function PerformanceMonitor() {
     if (navigationEntries.length > 0) {
       const nav = navigationEntries[0] as PerformanceNavigationTiming;
       if (nav.responseStart > 0) {
-        reportMetric({
-          route: normalizeRoute(pathname),
-          metric: "ttfb",
-          value: Math.round(nav.responseStart),
-        });
+        reportOnce("ttfb", Math.round(nav.responseStart));
       }
     }
 
     // ── LCP ───────────────────────────────────────────────────────────
     let lcpObserver: PerformanceObserver | undefined;
+    let lcpValue = 0;
     try {
       lcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
         const last = entries[entries.length - 1];
         if (last) {
-          reportMetric({
-            route: normalizeRoute(pathname),
-            metric: "lcp",
-            value: Math.round(last.startTime),
-          });
+          lcpValue = Math.round(last.startTime);
         }
       });
       lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
@@ -91,12 +88,9 @@ export function PerformanceMonitor() {
     // Report CLS on page hide (final value)
     const handlePageHide = () => {
       if (clsValue > 0) {
-        reportMetric({
-          route: normalizeRoute(pathname),
-          metric: "cls",
-          value: Math.round(clsValue * 1000) / 1000,
-        });
+        reportOnce("cls", Math.round(clsValue * 1000) / 1000);
       }
+      if (lcpValue > 0) reportOnce("lcp", lcpValue);
     };
     window.addEventListener("pagehide", handlePageHide);
 
@@ -123,11 +117,7 @@ export function PerformanceMonitor() {
     // Report INP on page hide
     const handlePageHideInp = () => {
       if (maxInp > 0) {
-        reportMetric({
-          route: normalizeRoute(pathname),
-          metric: "inp",
-          value: Math.round(maxInp),
-        });
+        reportOnce("inp", Math.round(maxInp));
       }
     };
     window.addEventListener("pagehide", handlePageHideInp);
@@ -150,7 +140,7 @@ export function PerformanceMonitor() {
 
 type MetricPayload = {
   route: string;
-  metric: string;
+  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load";
   value: number;
 };
 
