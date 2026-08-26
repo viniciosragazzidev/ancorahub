@@ -73,6 +73,7 @@ import {
 import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-message";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
+import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
 
 export type ConversationMessage = {
   id: string;
@@ -490,13 +491,27 @@ function ConversationHeader({
     }
   }
 
+  async function handleCopyLeadLink() {
+    const url = `${window.location.origin}/conversas?leadId=${client.id}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Link da conversa copiado para a área de transferência!");
+  }
+
   return (
-    <header className="shrink-0 border-b border-border bg-card px-4 py-2.5 sm:px-5">
-      <div className="flex items-center justify-between gap-3 min-w-0">
+    <header className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-5">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <Button aria-label="Voltar para atendimentos" className="lg:hidden shrink-0" onClick={onBack} size="icon-sm" type="button" variant="ghost">
-            <ArrowLeft className="size-3.5" />
+          <Button
+            aria-label="Voltar para lista de atendimentos"
+            className="lg:hidden shrink-0"
+            onClick={onBack}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <ArrowLeft className="size-4" />
           </Button>
+
           <ContactAvatar name={client.nome} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
@@ -606,6 +621,10 @@ function ConversationHeader({
           </DropdownMenu>
 
           <div className="flex items-center gap-1 border-l border-border/60 pl-1.5 sm:pl-2">
+            <Tooltip>
+              <TooltipTrigger render={<Button aria-label="Copiar link direto da conversa" onClick={() => void handleCopyLeadLink()} size="icon-sm" type="button" variant="ghost"><LinkSimple className="size-3.5" /></Button>} />
+              <TooltipContent>Copiar link da conversa</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))} />} />
               <TooltipContent>Ligar</TooltipContent>
@@ -791,16 +810,21 @@ function ChatInput({
     }
   }
 
+  function handleAppendQuickResponse(quickText: string) {
+    setText((prev) => (prev ? `${prev}\n${quickText}` : quickText));
+  }
+
   return (
     <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
       <form onSubmit={handleSend} className="flex gap-2 items-center">
+        <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
         <div className="relative flex-1">
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Digite sua mensagem para o cliente..."
+            placeholder="Digite sua mensagem para o cliente (ou escolha uma resposta rápida)..."
             disabled={isPending}
-            className="pr-10 h-10 text-sm"
+            className="h-10 text-sm"
           />
           {error && (
             <p className="absolute -top-6 left-1 text-[11px] font-medium text-destructive truncate max-w-full">
@@ -1373,6 +1397,8 @@ function ClientProfile({
             leadName={client.nome}
           />
 
+          <LeadNotesSection leadId={client.id} />
+
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">
               <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-2">
@@ -1529,4 +1555,34 @@ function formatRelative(value: string) {
 
 function getWhatsAppUrl(phone: string) {
   return `https://wa.me/${phone.replace(/\D/g, "")}`;
+}
+
+function LeadNotesSection({ leadId }: { leadId: string }) {
+  const storageKey = `ancora_lead_note_${leadId}`;
+  const [note, setNote] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(storageKey) ?? "";
+  });
+  const [saved, setSaved] = useState(false);
+
+  function handleChange(val: string) {
+    setNote(val);
+    localStorage.setItem(storageKey, val);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <ProfileSection
+      action={saved ? <span className="text-[10px] text-emerald-500 font-semibold">Salvo ✓</span> : undefined}
+      title="Anotações Privadas"
+    >
+      <textarea
+        value={note}
+        onChange={(e) => handleChange(e.target.value)}
+        placeholder="Anote preferências do cliente (ex: busca plano sem coparticipação, 2 dependentes)..."
+        className="w-full min-h-[70px] text-xs p-2 rounded-lg border border-border bg-card text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+      />
+    </ProfileSection>
+  );
 }
