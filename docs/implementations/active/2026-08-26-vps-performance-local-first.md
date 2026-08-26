@@ -27,6 +27,12 @@ para os cron jobs da Vercel.
   transição de rota.
 - A infraestrutura recebe o serviço `scheduler`, desativado por padrão, que
   dispara os endpoints cron autenticados do CRM nos intervalos atuais.
+- A lista operacional de Leads deixa de executar uma rotina de reparo com
+  escrita no banco a cada abertura. A integridade continua validada no comando
+  de mudança de etapa; a reconciliação em lote deve ser executada pelo fluxo
+  operacional agendado, não pelo request do usuário. A rota também passa a
+  consultar somente a página solicitada e consolida as configurações usadas
+  nela em uma única leitura.
 
 ## Decisão operacional
 
@@ -48,6 +54,9 @@ job, status HTTP e duração.
 - `src/app/(dashboard)/layout.tsx`
 - `src/app/(dashboard)/conversas/broker/page.tsx`
 - `src/app/(dashboard)/conversas/broker/loading.tsx`
+- `src/app/(dashboard)/leads/page.tsx`
+- `src/app/(dashboard)/leads/leads-workspace.tsx`
+- `src/app/(dashboard)/leads/leads-data-table.tsx`
 - `corretop-infra/scheduler/*`
 - `corretop-infra/infra/docker-compose.coolify.yml`
 

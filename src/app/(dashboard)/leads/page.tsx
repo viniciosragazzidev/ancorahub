@@ -16,7 +16,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { NextUrgentLeadButton } from "@/components/next-urgent-lead-button";
 import { getUrgentLeadForUser } from "@/features/leads/queries";
 import { ContextNote } from "@/components/ui/context-note";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { getSystemSettings } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
@@ -166,13 +166,17 @@ export default async function LeadsPage({
   const filters = await searchParams;
   const db = getDatabase();
 
-  const { enforceLeadQualificationRules } = await import("@/features/leads/qualification-guard");
-  await enforceLeadQualificationRules(context.tenantId).catch((err) =>
-    console.error("[leads-page] Error enforcing qualification rules:", err)
-  );
-
   const period = parsePeriod(filters.period);
   const eligibleCampaignsOnly = filters.eligibleCampaigns === "1";
+  const systemSettings = new Map(
+    (
+      await getSystemSettings([
+        "feature_central_atencao_stagnant_days",
+        "feature_lead_management_actions_enabled",
+        ...(eligibleCampaignsOnly ? [`meta_lead_capture_mode_${context.tenantId}`] : []),
+      ])
+    ).map((setting) => [setting.key, setting.value]),
+  );
 
   // Pagination parameters
   const pageParam = parseInt(filters.page ?? "1", 10);
@@ -180,7 +184,7 @@ export default async function LeadsPage({
   const pageSizeParam = parseInt(filters.pageSize ?? "20", 10);
   const pageSize = Number.isInteger(pageSizeParam) && [10, 20, 50, 100].includes(pageSizeParam) ? pageSizeParam : 20;
 
-  const configuredStagnantDays = Number((await getSystemSetting("feature_central_atencao_stagnant_days")) ?? 3);
+  const configuredStagnantDays = Number(systemSettings.get("feature_central_atencao_stagnant_days") ?? 3);
   const stagnantDays =
     Number.isInteger(configuredStagnantDays) && configuredStagnantDays >= 1 && configuredStagnantDays <= 30
       ? configuredStagnantDays
@@ -273,8 +277,8 @@ export default async function LeadsPage({
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
   const metaCampaignEligibility = eligibleCampaignsOnly
-    ? await Promise.all([
-        getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`).catch(() => null),
+      ? await Promise.all([
+        Promise.resolve(systemSettings.get(`meta_lead_capture_mode_${context.tenantId}`) ?? null),
         db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled })
           .from(schema.metaCampaignQueueRoutes)
           .where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId))
@@ -346,7 +350,7 @@ export default async function LeadsPage({
     activeQueues,
     urgentLead,
   ] = await Promise.all([
-    db.select({ total: count() }).from(schema.leads).innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id)).where(where),
+    db.select({ total: count() }).from(schema.leads).where(where),
     listAvailableCatalogPlans(context),
     db
       .select({
@@ -373,10 +377,10 @@ export default async function LeadsPage({
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
-      .innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id))
       .where(where)
       .orderBy(desc(schema.leads.createdAt))
-      .limit(1000),
+      .limit(pageSize)
+      .offset(offset),
     db
       .select({ id: schema.carrierPlans.id, name: schema.carrierPlans.name, carrierName: schema.carriers.name })
       .from(schema.carrierPlans)
@@ -511,7 +515,7 @@ export default async function LeadsPage({
 
   const slaFirstContactMinutes = Number(slaSettings.slaFirstContactMinutes);
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);
-  const leadManagementActionsEnabled = (await getSystemSetting("feature_lead_management_actions_enabled")) !== "false";
+  const leadManagementActionsEnabled = systemSettings.get("feature_lead_management_actions_enabled") !== "false";
   // RCD: detect if any filter is active to switch empty state copy
   const isFiltered = !!(
     filters.search ||

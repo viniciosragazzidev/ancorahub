@@ -204,6 +204,7 @@ export function LeadsWorkspace({
   brokers = [],
   branches = [],
   pageSize = 20,
+  pagination,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -501,6 +502,7 @@ export function LeadsWorkspace({
                   slaFirstContactMinutes={slaFirstContactMinutes}
                   slaStagnantDays={slaStagnantDays}
                   pageSize={pageSize}
+                  pagination={pagination}
                   selectedIds={multiSelect.selectedIds}
                   isAllSelected={multiSelect.isAllSelected}
                   onToggleRow={multiSelect.toggle}

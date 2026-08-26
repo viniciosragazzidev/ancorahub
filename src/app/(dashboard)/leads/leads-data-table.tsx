@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RiSearchLine } from "@remixicon/react";
 import { Focusable } from "react-aria-components";
 import {
@@ -93,6 +94,12 @@ type LeadsDataTableProps = {
   slaFirstContactMinutes: number;
   slaStagnantDays: number;
   pageSize?: number;
+  pagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
   selectedIds: string[];
   isAllSelected: boolean;
   onToggleRow: (id: string) => void;
@@ -107,14 +114,18 @@ export function LeadsDataTable({
   slaFirstContactMinutes,
   slaStagnantDays,
   pageSize = 10,
+  pagination: serverPagination,
   selectedIds,
   isAllSelected,
   onToggleRow,
   onSelectAll,
   onRowClick,
 }: LeadsDataTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize });
+  const [localPagination, setLocalPagination] = useState<PaginationState>({ pageIndex: 0, pageSize });
   const [query, setQuery] = useState("");
   const [size] = useState<TableSize>("md");
 
@@ -295,18 +306,34 @@ export function LeadsDataTable({
     data,
     columns,
     getRowId: (row) => row.id,
-    state: { sorting, pagination },
+    state: {
+      sorting,
+      pagination: serverPagination
+        ? { pageIndex: serverPagination.currentPage - 1, pageSize: serverPagination.pageSize }
+        : localPagination,
+    },
     onSortingChange: setSorting,
-    onPaginationChange: setPagination,
+    onPaginationChange: serverPagination ? undefined : setLocalPagination,
+    manualPagination: Boolean(serverPagination),
+    pageCount: serverPagination?.totalPages,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
 
-  const resetPage = () => table.setPageIndex(0);
+  const resetPage = () => {
+    if (!serverPagination) table.setPageIndex(0);
+  };
   const headers = table.getHeaderGroups()[0].headers;
   const rows = table.getRowModel().rows;
-  const totalPages = table.getPageCount();
+  const totalPages = serverPagination?.totalPages ?? table.getPageCount();
+
+  function goToServerPage(page: number) {
+    if (!serverPagination || page < 1 || page > serverPagination.totalPages || page === serverPagination.currentPage) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(page));
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
   if (leads.length === 0) {
     return (
@@ -337,7 +364,7 @@ export function LeadsDataTable({
           <div className="flex flex-col justify-center">
             <p className="text-body-medium whitespace-nowrap text-text-tertiary">Total Results</p>
             <p className="text-body-medium whitespace-nowrap text-text-primary">
-              {data.length.toLocaleString()} lead{data.length !== 1 ? "s" : ""}
+              {(serverPagination?.totalItems ?? data.length).toLocaleString()} lead{(serverPagination?.totalItems ?? data.length) !== 1 ? "s" : ""}
             </p>
           </div>
           <div className="-mx-3 flex w-[calc(100%+1.5rem)] items-center gap-2.5 overflow-x-auto px-3 sm:mx-0 sm:w-auto sm:flex-wrap sm:justify-end sm:overflow-visible sm:px-0">
@@ -416,9 +443,12 @@ export function LeadsDataTable({
         {totalPages > 1 && (
           <div className="px-3 pt-3">
             <Pagination
-              page={pagination.pageIndex + 1}
+              page={serverPagination?.currentPage ?? localPagination.pageIndex + 1}
               totalPages={totalPages}
-              onChange={(p) => table.setPageIndex(p - 1)}
+              onChange={(p) => {
+                if (serverPagination) goToServerPage(p);
+                else table.setPageIndex(p - 1);
+              }}
             />
           </div>
         )}
