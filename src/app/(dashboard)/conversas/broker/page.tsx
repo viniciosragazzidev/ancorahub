@@ -46,8 +46,10 @@ export default async function BrokerConversationsPage({
 
   const db = getDatabase();
 
-  // ── Buscar leads do corretor ──────────────────────────────────────────
-  const lightLeads = await db
+  // These queries are isolated by the authenticated tenant/user context and
+  // do not depend on one another. Run them concurrently so the workspace can
+  // start rendering as soon as the slowest authorized read completes.
+  const lightLeadsPromise = db
     .select({
       id: schema.leads.id,
       nome: schema.leads.nome,
@@ -66,60 +68,44 @@ export default async function BrokerConversationsPage({
     )
     .orderBy(desc(schema.leads.stageEnteredAt))
     .limit(100);
-
-  const leadIds = lightLeads.map((l) => l.id);
-  const selectedLead = leadId ? lightLeads.find((lead) => lead.id === leadId) : null;
-  const draftTemplate =
-    draft === "broker_intro" ? await getSystemSetting("broker_lite_opening_draft") : null;
-  const initialDraft =
-    draft === "broker_intro" && selectedLead
-      ? (
-          draftTemplate?.trim() ||
-          "Olá, {nome}! Sou seu corretor e vou seguir com seu atendimento por aqui."
-        ).replaceAll("{nome}", selectedLead.nome.split(" ")[0] || selectedLead.nome)
-      : undefined;
-  const [lightClients, tenantNumbers, tenantChannels] = await Promise.all([
-    db
-      .select({
-        id: schema.clients.id,
-        leadId: schema.clients.leadId,
-        nome: schema.clients.nome,
-        telefone: schema.clients.telefone,
-      })
-      .from(schema.clients)
-      .where(
-        and(
-          eq(schema.clients.tenantId, context.tenantId),
-          eq(schema.clients.corretorId, context.userId),
-        ),
-      )
-      .limit(100),
-    db
-      .select({
-        id: schema.wahaNumbers.id,
-        label: schema.wahaNumbers.label,
-        phone: schema.wahaNumbers.displayPhoneNumber,
-      })
-      .from(schema.wahaNumbers)
-      .where(eq(schema.wahaNumbers.tenantId, context.tenantId)),
-    db
-      .select({
-        id: schema.communicationChannels.id,
-        name: schema.communicationChannels.verifiedName,
-        phone: schema.communicationChannels.displayPhoneNumber,
-      })
-      .from(schema.communicationChannels)
-      .where(
-        and(
-          eq(schema.communicationChannels.tenantId, context.tenantId),
-          eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
-          eq(schema.communicationChannels.status, "active"),
-        ),
+  const lightClientsPromise = db
+    .select({
+      id: schema.clients.id,
+      leadId: schema.clients.leadId,
+      nome: schema.clients.nome,
+      telefone: schema.clients.telefone,
+    })
+    .from(schema.clients)
+    .where(
+      and(
+        eq(schema.clients.tenantId, context.tenantId),
+        eq(schema.clients.corretorId, context.userId),
       ),
-  ]);
-
-  // ── Buscar mensagens ──────────────────────────────────────────────────
-  const messageRows = await db
+    )
+    .limit(100);
+  const tenantNumbersPromise = db
+    .select({
+      id: schema.wahaNumbers.id,
+      label: schema.wahaNumbers.label,
+      phone: schema.wahaNumbers.displayPhoneNumber,
+    })
+    .from(schema.wahaNumbers)
+    .where(eq(schema.wahaNumbers.tenantId, context.tenantId));
+  const tenantChannelsPromise = db
+    .select({
+      id: schema.communicationChannels.id,
+      name: schema.communicationChannels.verifiedName,
+      phone: schema.communicationChannels.displayPhoneNumber,
+    })
+    .from(schema.communicationChannels)
+    .where(
+      and(
+        eq(schema.communicationChannels.tenantId, context.tenantId),
+        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+        eq(schema.communicationChannels.status, "active"),
+      ),
+    );
+  const messageRowsPromise = db
     .select({
       id: schema.whatsappMessages.id,
       leadId: schema.whatsappMessages.leadId,
@@ -135,7 +121,43 @@ export default async function BrokerConversationsPage({
     .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
     .orderBy(desc(schema.whatsappMessages.sentAt))
     .limit(500);
+  const connectionPromise = db
+    .select({
+      sessionName: schema.whatsappConnections.sessionName,
+      status: schema.whatsappConnections.status,
+      chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
+    })
+    .from(schema.whatsappConnections)
+    .where(
+      and(
+        eq(schema.whatsappConnections.tenantId, context.tenantId),
+        eq(schema.whatsappConnections.userId, context.userId),
+      ),
+    )
+    .limit(1);
+  const draftTemplatePromise =
+    draft === "broker_intro"
+      ? getSystemSetting("broker_lite_opening_draft")
+      : Promise.resolve(null);
 
+  const [lightLeads, lightClients, tenantNumbers, tenantChannels, messageRows, connectionRows, draftTemplate] = await Promise.all([
+    lightLeadsPromise,
+    lightClientsPromise,
+    tenantNumbersPromise,
+    tenantChannelsPromise,
+    messageRowsPromise,
+    connectionPromise,
+    draftTemplatePromise,
+  ]);
+
+  const selectedLead = leadId ? lightLeads.find((lead) => lead.id === leadId) : null;
+  const initialDraft =
+    draft === "broker_intro" && selectedLead
+      ? (
+          draftTemplate?.trim() ||
+          "Olá, {nome}! Sou seu corretor e vou seguir com seu atendimento por aqui."
+        ).replaceAll("{nome}", selectedLead.nome.split(" ")[0] || selectedLead.nome)
+      : undefined;
   const messagesByLead = new Map<string, typeof messageRows>();
   for (const msg of messageRows) {
     const matched = lightLeads.find(
@@ -252,20 +274,7 @@ export default async function BrokerConversationsPage({
   });
 
   // ── Status WhatsApp do corretor ───────────────────────────────────────
-  const [conn] = await db
-    .select({
-      sessionName: schema.whatsappConnections.sessionName,
-      status: schema.whatsappConnections.status,
-      chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
-    })
-    .from(schema.whatsappConnections)
-    .where(
-      and(
-        eq(schema.whatsappConnections.tenantId, context.tenantId),
-        eq(schema.whatsappConnections.userId, context.userId),
-      ),
-    )
-    .limit(1);
+  const [conn] = connectionRows;
 
   const whatsappConnected = conn?.status === "ready" && conn?.chatInternoAtivo === true;
 

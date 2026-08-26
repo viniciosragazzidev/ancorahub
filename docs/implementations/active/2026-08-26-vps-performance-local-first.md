@@ -20,6 +20,11 @@ para os cron jobs da Vercel.
 - O liveness do container fica separado da prontidão do banco em
   `/api/health/live`; o endpoint completo `/api/health` continua destinado a
   diagnóstico e alertas.
+- O shell passa a buscar em paralelo a preferência de experiência, o pathname e
+  a marca do tenant após autenticar a sessão. A rota `/conversas/broker` também
+  executa em paralelo somente as leituras já autorizadas pelo tenant e corretor;
+  o novo `loading.tsx` próprio mantém a estrutura da conversa visível durante a
+  transição de rota.
 - A infraestrutura recebe o serviço `scheduler`, desativado por padrão, que
   dispara os endpoints cron autenticados do CRM nos intervalos atuais.
 
@@ -40,6 +45,9 @@ job, status HTTP e duração.
 - `src/app/api/internal/performance/route.ts`
 - `src/shared/observability/metrics.ts`
 - `src/components/providers/realtime-sync-provider.tsx`
+- `src/app/(dashboard)/layout.tsx`
+- `src/app/(dashboard)/conversas/broker/page.tsx`
+- `src/app/(dashboard)/conversas/broker/loading.tsx`
 - `corretop-infra/scheduler/*`
 - `corretop-infra/infra/docker-compose.coolify.yml`
 
