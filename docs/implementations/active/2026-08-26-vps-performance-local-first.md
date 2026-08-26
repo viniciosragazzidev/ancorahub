@@ -17,6 +17,9 @@ para os cron jobs da Vercel.
   conversas já trata o evento opaco de atualização. A sincronização em outras
   abas, o fallback de reconciliação e o isolamento por tenant continuam iguais.
 - O health público passa a expor apenas agregados de métricas de frontend.
+- O liveness do container fica separado da prontidão do banco em
+  `/api/health/live`; o endpoint completo `/api/health` continua destinado a
+  diagnóstico e alertas.
 - A infraestrutura recebe o serviço `scheduler`, desativado por padrão, que
   dispara os endpoints cron autenticados do CRM nos intervalos atuais.
 
@@ -42,7 +45,8 @@ job, status HTTP e duração.
 
 ## Configuração pendente no Coolify
 
-No recurso da infraestrutura, criar `CRM_CRON_URL`, `CRON_SECRET` e
+No recurso da CRM no Coolify, configurar o healthcheck como
+`GET http://localhost:3000/api/health/live`. No recurso da infraestrutura, criar `CRM_CRON_URL`, `CRON_SECRET` e
 `SCHEDULER_ENABLED=false`. O valor de `CRON_SECRET` deve ser o mesmo do CRM.
 Não ativar o scheduler até a remoção explícita dos cron jobs na Vercel.
 

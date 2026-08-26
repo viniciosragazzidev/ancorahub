@@ -1,5 +1,17 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-086 — Liveness independente de prontidão de dependências
+
+**Estado:** Aceita
+**Data:** 2026-08-26
+
+O healthcheck do orquestrador mede somente se o processo do CRM está vivo, em
+`/api/health/live`, sem consultar banco, Meta ou WhatsApp. O endpoint
+`/api/health` permanece como readiness/diagnóstico de dependências e pode ficar
+degradado sem fazer o proxy remover um processo funcional do tráfego. A separação
+evita indisponibilidade total durante picos transitórios de webhook ou fila do
+pool de banco.
+
 ## DEC-085 — Fonte única de agendamento operacional
 
 **Estado:** Aceita
