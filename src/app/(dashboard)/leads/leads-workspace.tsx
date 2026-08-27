@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
+import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -726,6 +727,11 @@ export function LeadsWorkspace({
                         <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
                       </dl>
                     </SheetSection>
+                    <LeadAssignmentHistory
+                      leadId={selectedLead.id}
+                      assignedAt={selectedLead.assignedAt}
+                      corretorNome={selectedLead.corretorNome}
+                    />
                     <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
                       Ver detalhe completo
                       <ArrowUpRight />

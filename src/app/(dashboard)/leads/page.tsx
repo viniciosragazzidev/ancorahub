@@ -469,7 +469,8 @@ export default async function LeadsPage({
           context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
         )
       )
-      .orderBy(desc(schema.leads.createdAt)),
+      .orderBy(desc(schema.leads.createdAt))
+      .limit(50),
     db
       .select({
         id: schema.leadQueues.id,

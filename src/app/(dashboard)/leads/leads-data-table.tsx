@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RiSearchLine } from "@remixicon/react";
@@ -327,13 +327,17 @@ export function LeadsDataTable({
   };
   const headers = table.getHeaderGroups()[0].headers;
   const rows = table.getRowModel().rows;
+  const [isPending, startTransition] = useTransition();
+
   const totalPages = serverPagination?.totalPages ?? table.getPageCount();
 
   function goToServerPage(page: number) {
     if (!serverPagination || page < 1 || page > serverPagination.totalPages || page === serverPagination.currentPage) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", String(page));
-    router.push(`${pathname}?${params.toString()}`);
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`);
+    });
   }
 
   if (leads.length === 0) {
@@ -463,7 +467,9 @@ export function LeadsDataTable({
               const params = new URLSearchParams(searchParams.toString());
               params.set("pageSize", String(newSize));
               params.set("page", "1");
-              router.push(`${pathname}?${params.toString()}`);
+              startTransition(() => {
+                router.push(`${pathname}?${params.toString()}`);
+              });
             } else {
               table.setPageSize(newSize);
               setLocalPagination({ pageIndex: 0, pageSize: newSize });

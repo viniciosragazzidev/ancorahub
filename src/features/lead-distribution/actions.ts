@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import {
@@ -457,5 +457,80 @@ export async function assignLeadBatchToBrokerAction(
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível processar o lote." };
+  }
+}
+
+export type AssignmentHistoryItem = {
+  id: string;
+  createdAt: string;
+  action: string;
+  source: string;
+  strategy: string | null;
+  reason: string | null;
+  previousOwnerName: string | null;
+  newOwnerName: string | null;
+  fromBranchName: string | null;
+  toBranchName: string | null;
+  actorName: string | null;
+};
+
+export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promise<AssignmentHistoryItem[]> {
+  const parsed = leadId.safeParse(inputLeadId);
+  if (!parsed.success) return [];
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+
+    const previousOwner = aliasedTable(schema.user, "previous_owner");
+    const newOwner = aliasedTable(schema.user, "new_owner");
+    const actor = aliasedTable(schema.user, "actor");
+    const fromBranch = aliasedTable(schema.branches, "from_branch");
+    const toBranch = aliasedTable(schema.branches, "to_branch");
+
+    const events = await db
+      .select({
+        id: schema.leadDistributionEvents.id,
+        createdAt: schema.leadDistributionEvents.createdAt,
+        action: schema.leadDistributionEvents.action,
+        source: schema.leadDistributionEvents.source,
+        strategy: schema.leadDistributionEvents.strategy,
+        reason: schema.leadDistributionEvents.reason,
+        previousOwnerName: previousOwner.name,
+        newOwnerName: newOwner.name,
+        fromBranchName: fromBranch.name,
+        toBranchName: toBranch.name,
+        actorName: actor.name,
+      })
+      .from(schema.leadDistributionEvents)
+      .leftJoin(previousOwner, eq(schema.leadDistributionEvents.previousOwnerId, previousOwner.id))
+      .leftJoin(newOwner, eq(schema.leadDistributionEvents.newOwnerId, newOwner.id))
+      .leftJoin(fromBranch, eq(schema.leadDistributionEvents.fromBranchId, fromBranch.id))
+      .leftJoin(toBranch, eq(schema.leadDistributionEvents.toBranchId, toBranch.id))
+      .leftJoin(actor, eq(schema.leadDistributionEvents.actorId, actor.id))
+      .where(
+        and(
+          eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+          eq(schema.leadDistributionEvents.leadId, parsed.data)
+        )
+      )
+      .orderBy(desc(schema.leadDistributionEvents.createdAt))
+      .limit(30);
+
+    return events.map((e) => ({
+      id: e.id,
+      createdAt: e.createdAt.toISOString(),
+      action: e.action,
+      source: e.source,
+      strategy: e.strategy ?? null,
+      reason: e.reason ?? null,
+      previousOwnerName: e.previousOwnerName ?? null,
+      newOwnerName: e.newOwnerName ?? null,
+      fromBranchName: e.fromBranchName ?? null,
+      toBranchName: e.toBranchName ?? null,
+      actorName: e.actorName ?? null,
+    }));
+  } catch (error) {
+    console.error("[getLeadAssignmentHistoryAction] Error:", error);
+    return [];
   }
 }
