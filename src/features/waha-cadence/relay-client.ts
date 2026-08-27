@@ -80,19 +80,79 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
   const rawBody = payload ? JSON.stringify(payload) : "";
   const timestamp = String(Date.now());
   const nonce = randomUUID();
+  const primaryHeaders = {
+    ...(rawBody ? { "content-type": "application/json" } : {}),
+    "x-ancora-timestamp": timestamp,
+    "x-ancora-nonce": nonce,
+    "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
+  };
+
   const response = await fetch(`${config.url}${path}`, {
     method,
-    headers: {
-      ...(rawBody ? { "content-type": "application/json" } : {}),
-      "x-ancora-timestamp": timestamp,
-      "x-ancora-nonce": nonce,
-      "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
-    },
+    headers: primaryHeaders,
     ...(rawBody ? { body: rawBody } : {}),
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
   });
+
   const data = await response.json().catch(() => null);
+
+  // Fallback caso a rota /v1/sessions retorne 404 (VPS usando rotas Fastify /internal/waha/connections)
+  if (response.status === 404 && path.startsWith("/v1/sessions")) {
+    const fastifyHeaders = {
+      ...(rawBody ? { "content-type": "application/json" } : {}),
+      "X-CorreTop-Internal-Token": config.secret,
+      "x-corretop-internal-token": config.secret,
+      Authorization: `Bearer ${config.secret}`,
+    };
+
+    const sessionId =
+      (payload as { sessionId?: string })?.sessionId ||
+      decodeURIComponent(path.split("/")[3]?.split("?")[0] ?? "");
+
+    let fallbackUrl = `${config.url}/internal/waha/connections`;
+    let fallbackBody = rawBody;
+
+    if (method === "POST" && path === "/v1/sessions") {
+      fallbackUrl = `${config.url}/internal/waha/connections`;
+      fallbackBody = JSON.stringify({
+        sessionName: sessionId,
+        tenantId: "system",
+        userId: "system",
+      });
+    } else if (method === "GET" && sessionId) {
+      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/qr`;
+    } else if (method === "DELETE" && sessionId) {
+      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}`;
+    }
+
+    const fallbackRes = await fetch(fallbackUrl, {
+      method,
+      headers: fastifyHeaders,
+      ...(method !== "GET" && fallbackBody ? { body: fallbackBody } : {}),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => null);
+
+    if (fallbackRes && fallbackRes.ok) {
+      const fbData = await fallbackRes.json().catch(() => null);
+      if (fbData && fbData.ok !== false) {
+        const rawStatus = String(fbData.status || "STARTING").toUpperCase();
+        let status: "pending" | "connecting" | "active" | "paused" | "offline" | "error" = "connecting";
+        if (rawStatus === "WORKING" || rawStatus === "CONNECTED") status = "active";
+        else if (rawStatus === "STOPPED") status = "offline";
+        else if (rawStatus === "FAILED" || rawStatus === "ERROR") status = "error";
+
+        return relaySessionStateSchema.parse({
+          sessionId: sessionId || "waha-session",
+          status,
+          displayPhoneNumber: fbData.phoneNumber ?? fbData.displayPhoneNumber ?? null,
+          qrCode: fbData.qr ?? fbData.qrCode ?? null,
+        });
+      }
+    }
+  }
+
   if (!response.ok) {
     const errorMsg = data?.message || data?.error || response.statusText || "Falha na comunicação";
     throw new Error(`O relay WAHA não confirmou a conexão (HTTP ${response.status}: ${errorMsg}).`);
