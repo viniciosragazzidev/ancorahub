@@ -6,6 +6,7 @@ import { enqueueMetaTemplateMessage } from "@/features/communication-channels/ou
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { scheduleBrokerLeadNotification } from "./broker-lead-cadence";
+import { checkBrokerNotificationCoalesceWindow, enqueueBrokerBatchSummaryNotification } from "./broker-notification-coalescer";
 
 const FALLBACK_PRODUCT_INTEREST = "Plano de saúde";
 
@@ -96,6 +97,27 @@ export async function enqueueBrokerLeadNotification(input: {
     : `lead-assignment:${input.leadId}:${input.brokerId}:${assignmentVersion}:broker-whatsapp`;
   const requestedBy = await resolveSystemUserId(input.tenantId);
   const now = new Date();
+
+  // Check if we should coalesce/batch notifications to prevent WhatsApp spam
+  const coalesceCheck = await checkBrokerNotificationCoalesceWindow({
+    tenantId: input.tenantId,
+    brokerId: input.brokerId,
+    now,
+  });
+
+  if (coalesceCheck.shouldCoalesce) {
+    const summaryOutbound = await enqueueBrokerBatchSummaryNotification({
+      tenantId: input.tenantId,
+      brokerId: input.brokerId,
+      destinationPhone,
+    });
+    return {
+      queued: true as const,
+      outboundId: summaryOutbound.id,
+      duplicate: summaryOutbound.duplicate,
+      coalesced: true as const,
+    };
+  }
   const [previousNotification] = await db.select({
     scheduledAt: schema.whatsappOutboundMessages.scheduledAt,
     sentAt: schema.whatsappOutboundMessages.sentAt,
