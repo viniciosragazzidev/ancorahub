@@ -155,3 +155,35 @@ corte reativa primeiro a Vercel e mantém o serviço VPS desativado.
 - A regra não altera exclusões, permissões, dados sensíveis ou a autoridade do
   servidor. Toda mutação continua validando tenant e gravando a auditoria já
   prevista pelo domínio.
+
+## Continuação — 27/08/2026: resiliência da central de qualificação
+
+- A rota `/qualificacao` deixa de usar uma única barreira `Promise.all` para
+  todos os módulos. Configurações, diagnósticos, regras, métricas e treinamento
+  carregam em grupos curtos, mantendo o máximo de três leituras auxiliares por
+  vez.
+- Uma falha transitória de diagnóstico, métricas, alertas ou treinamento passa
+  a devolver o fallback vazio seguro do próprio módulo, preservando os controles
+  da mesma sessão e do mesmo tenant. Falhas de autenticação, autorização e
+  contexto do tenant continuam bloqueantes.
+- Logs de operação passam a registrar somente o nome da seção, a classe do erro
+  e a duração acima de 750ms. Não registram telefone, lead, token, conteúdo de
+  mensagens ou identificador de tenant.
+- A indicação global de atualização em tempo real ganha uma janela de cinco
+  segundos para a reconexão do canal antes de informar indisponibilidade. Uma
+  reconexão bem-sucedida cancela o aviso, evitando o falso aspecto de perda de
+  conexão durante oscilações do provedor.
+- O `Dockerfile` já declara `DB_POOL_MAX=2`; se o log de inicialização continuar
+  mostrando `poolMax: 1`, existe uma substituição no ambiente do Coolify. O valor
+  operacional correto para o processo CRM auto-hospedado é `2`, conforme DEC-052.
+
+## Validação adicional pendente de ambiente
+
+- `qualificacao/page.test.tsx` cobre a regressão: a falha de um diagnóstico
+  auxiliar não pode rejeitar a renderização da central.
+- `realtime-sync-provider.test.ts` cobre a classificação da janela de
+  reconexão.
+- A instalação local deste worktree não contém dependências executáveis; os
+  comandos de type-check, testes e harness não podem resolver `tsx`, `esbuild`
+  e os módulos do projeto. O build do Coolify continua sendo a validação de
+  compilação obrigatória deste recorte.

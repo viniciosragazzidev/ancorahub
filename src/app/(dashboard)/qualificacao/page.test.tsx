@@ -55,4 +55,22 @@ describe("/qualificacao", () => {
     expect(mocks.getQualificationAlerts).toHaveBeenCalledWith("tenant-test");
     expect(mocks.getAgentTrainingCenter).toHaveBeenCalledOnce();
   });
+
+  it("mantém a central disponível quando um diagnóstico auxiliar falha", async () => {
+    mocks.getRequiredTenantContext.mockResolvedValue({ tenantId: "tenant-test", userId: "director-test", role: "director", jobTitle: "director" });
+    for (const loader of [
+      mocks.getQualificationTenantSettings,
+      mocks.getTenantTestNumbers,
+      mocks.getFollowUpRules,
+      mocks.getToolPermissions,
+      mocks.getDestinationRules,
+      mocks.getBrokerEligibilityProfiles,
+      mocks.getQualificationStats,
+      mocks.getQualificationAlerts,
+      mocks.getAgentTrainingCenter,
+    ]) loader.mockResolvedValue([]);
+    mocks.getWhatsAppDiagnosticStatus.mockRejectedValue(new Error("database temporarily unavailable"));
+
+    await expect(QualificacaoPage()).resolves.toBeDefined();
+  });
 });

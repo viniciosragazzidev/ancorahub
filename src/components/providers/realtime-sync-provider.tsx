@@ -50,6 +50,12 @@ const REFRESH_COALESCE_MS = 500;
 const RECONCILIATION_MS = 60_000;
 
 /**
+ * Supabase can briefly report a channel error while it reconnects. Waiting for
+ * this window avoids presenting a false "connection lost" state to the user.
+ */
+const REALTIME_FAILURE_GRACE_MS = 5_000;
+
+/**
  * Conversation workspaces already own a focused, tenant-authorized refresh
  * listener. Letting the shell refresh as well causes two RSC renders for a
  * single inbound message (the immediate workspace refresh plus the shell's
@@ -63,10 +69,15 @@ export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pa
   );
 }
 
+export function shouldDelayRealtimeUnavailable(status: string): boolean {
+  return status === "CHANNEL_ERROR" || status === "TIMED_OUT";
+}
+
 export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
   const router = useRouter();
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
+  const realtimeFailureTimerRef = useRef<number | null>(null);
   const refreshPendingRef = useRef(false);
   const pendingEventsRef = useRef(0);
   const shellStartedAtRef = useRef<number | null>(null);
@@ -201,9 +212,22 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   useEffect(() => {
     if (!syncTopic) return;
     const supabase = createClient();
+    const clearRealtimeFailureTimer = () => {
+      if (realtimeFailureTimerRef.current === null) return;
+      window.clearTimeout(realtimeFailureTimerRef.current);
+      realtimeFailureTimerRef.current = null;
+    };
+    const scheduleRealtimeUnavailable = () => {
+      if (realtimeFailureTimerRef.current !== null) return;
+      realtimeFailureTimerRef.current = window.setTimeout(() => {
+        realtimeFailureTimerRef.current = null;
+        setIsOnline(false);
+      }, REALTIME_FAILURE_GRACE_MS);
+    };
     const channel = supabase
       .channel(syncTopic, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "refresh" }, (payload) => {
+        clearRealtimeFailureTimer();
         const signal = payload.payload as Partial<RealtimeSyncBrowserDetail>;
         if (signal.kind === "domain.invalidated") {
           setIsOnline(true);
@@ -215,13 +239,17 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
         handleRemoteSignal({ kind: signal.kind, notificationId: signal.notificationId });
       })
       .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setIsOnline(false);
+        if (shouldDelayRealtimeUnavailable(status)) scheduleRealtimeUnavailable();
         if (status === "SUBSCRIBED") {
+          clearRealtimeFailureTimer();
           setIsOnline(true);
           setLastSyncedAt(Date.now());
         }
       });
-    return () => { void supabase.removeChannel(channel); };
+    return () => {
+      clearRealtimeFailureTimer();
+      void supabase.removeChannel(channel);
+    };
   }, [handleRemoteSignal, syncTopic]);
 
   useEffect(() => {
