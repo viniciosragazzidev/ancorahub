@@ -36,8 +36,8 @@ export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistribu
       if (Number(b.onDuty) !== Number(a.onDuty)) return Number(b.onDuty) - Number(a.onDuty);
       if (policy.ranking.enabled && b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore;
       if (a.activeLeads !== b.activeLeads) return a.activeLeads - b.activeLeads;
-      const aIdle = a.idleSince?.getTime() ?? Number.POSITIVE_INFINITY;
-      const bIdle = b.idleSince?.getTime() ?? Number.POSITIVE_INFINITY;
+      const aIdle = a.idleSince?.getTime() ?? 0;
+      const bIdle = b.idleSince?.getTime() ?? 0;
       if (aIdle !== bIdle) return aIdle - bIdle;
       return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
     });
