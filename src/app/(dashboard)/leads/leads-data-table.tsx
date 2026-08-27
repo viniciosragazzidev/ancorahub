@@ -420,16 +420,24 @@ export function LeadsDataTable({
                 <TableRow
                   key={row.id}
                   id={row.id}
-                  className="cursor-pointer"
+                  className="cursor-pointer hover:bg-muted/40 transition-colors"
                   style={
                     selectedIds.includes(row.original.id)
                       ? { backgroundColor: "var(--color-background-secondary-default)" }
                       : undefined
                   }
+                  onAction={() => onRowClick(row.original)}
                   onClick={() => onRowClick(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      onClick={() => {
+                        if (cell.column.id !== "select" && cell.column.id !== "actions") {
+                          onRowClick(row.original);
+                        }
+                      }}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

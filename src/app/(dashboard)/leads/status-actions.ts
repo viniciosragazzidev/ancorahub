@@ -245,3 +245,128 @@ export async function bulkChangeLeadStatusAction(
     };
   }
 }
+
+// ─── Transferir leads em lote para outra unidade ────────────────────
+
+export type BulkBranchReassignState = {
+  success?: boolean;
+  error?: string;
+  message?: string;
+  mutationId?: string;
+  changedLeadIds?: string[];
+  branchId?: string;
+};
+
+export async function bulkReassignBranchAction(
+  _previous: BulkBranchReassignState,
+  formData: FormData,
+): Promise<BulkBranchReassignState> {
+  const mutationId = randomUUID();
+  const parsed = z.object({
+    leadIds: z.array(z.string().uuid()).min(1),
+    branchId: z.string().uuid(),
+  }).safeParse({ leadIds: formData.getAll("leadIds"), branchId: formData.get("branchId") });
+
+  if (!parsed.success) return { mutationId, error: "Selecione leads e uma unidade válidos." };
+  const { leadIds, branchId } = parsed.data;
+
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director" && context.role !== "manager") {
+      return { mutationId, error: "Apenas diretores e gestores podem transferir leads de unidade." };
+    }
+
+    const db = getDatabase();
+    const now = new Date();
+    await db.update(schema.leads)
+      .set({
+        branchId,
+        corretorId: null,
+        status: "new",
+        distributionStatus: "unassigned",
+        assignedAt: null,
+        updatedAt: now,
+      })
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)));
+
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [branchId],
+      brokerIds: [],
+    }).catch(() => undefined);
+
+    return {
+      success: true,
+      mutationId,
+      changedLeadIds: leadIds,
+      branchId,
+      message: `${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} transferido${leadIds.length === 1 ? "" : "s"} para a nova unidade com sucesso.`,
+    };
+  } catch (error) {
+    return {
+      mutationId,
+      error: error instanceof Error ? error.message : "Não foi possível transferir os leads de unidade.",
+    };
+  }
+}
+
+// ─── Devolver leads em lote para a fila de qualificação ──────────────
+
+export type BulkRevertQualificationState = {
+  success?: boolean;
+  error?: string;
+  message?: string;
+  mutationId?: string;
+  changedLeadIds?: string[];
+};
+
+export async function bulkRevertToQualificationAction(
+  _previous: BulkRevertQualificationState,
+  formData: FormData,
+): Promise<BulkRevertQualificationState> {
+  const mutationId = randomUUID();
+  const leadIds = formData.getAll("leadIds").map(String).filter((id) => z.string().uuid().safeParse(id).success);
+
+  if (!leadIds.length) return { mutationId, error: "Selecione ao menos um lead para devolver à qualificação." };
+
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director" && context.role !== "manager") {
+      return { mutationId, error: "Apenas diretores e gestores podem devolver leads à fila de qualificação." };
+    }
+
+    const db = getDatabase();
+    const now = new Date();
+    await db.update(schema.leads)
+      .set({
+        qualificationStatus: "qualifying",
+        qualificationState: "IN_PROGRESS",
+        corretorId: null,
+        status: "new",
+        distributionStatus: "unassigned",
+        assignedAt: null,
+        updatedAt: now,
+      })
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)));
+
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [],
+      brokerIds: [],
+    }).catch(() => undefined);
+
+    return {
+      success: true,
+      mutationId,
+      changedLeadIds: leadIds,
+      message: `${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} devolvido${leadIds.length === 1 ? "" : "s"} para a fila de qualificação com sucesso.`,
+    };
+  } catch (error) {
+    return {
+      mutationId,
+      error: error instanceof Error ? error.message : "Não foi possível devolver os leads para qualificação.",
+    };
+  }
+}

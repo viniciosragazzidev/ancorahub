@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -224,6 +225,7 @@ export function LeadsWorkspace({
     totalPages: number;
   };
 }) {
+  const router = useRouter();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
@@ -338,6 +340,32 @@ export function LeadsWorkspace({
     }));
   }, [applyLeadPatch, brokers]);
 
+  const handleBulkBranchCommitted = useCallback(({ leadIds: changedLeadIds, branchId }: { leadIds: string[]; branchId: string }) => {
+    const branch = branches.find((item) => item.id === branchId);
+    applyLeadPatch(changedLeadIds, (lead) => ({
+      ...lead,
+      branchId,
+      branchName: branch?.name ?? lead.branchName,
+      corretorId: null,
+      corretorNome: null,
+      status: "new",
+      distributionStatus: "unassigned",
+    }));
+    router.refresh();
+  }, [applyLeadPatch, branches, router]);
+
+  const handleBulkRevertCommitted = useCallback(({ leadIds: changedLeadIds }: { leadIds: string[] }) => {
+    applyLeadPatch(changedLeadIds, (lead) => ({
+      ...lead,
+      qualificationStatus: "qualifying",
+      corretorId: null,
+      corretorNome: null,
+      status: "new",
+      distributionStatus: "unassigned",
+    }));
+    router.refresh();
+  }, [applyLeadPatch, router]);
+
   const selectionActions = useMemo(() => (
     <>
       {(contextRole === "director" || contextRole === "manager") && (
@@ -351,12 +379,16 @@ export function LeadsWorkspace({
           <BulkReassignDialog
             leadIds={multiSelect.selectedIds}
             brokers={brokers}
+            branches={branches}
+            role={contextRole}
             onCommitted={handleBulkReassignCommitted}
+            onBranchCommitted={handleBulkBranchCommitted}
+            onRevertCommitted={handleBulkRevertCommitted}
           />
         </>
       )}
     </>
-  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, handleBulkReassignCommitted, handleBulkStatusCommitted]);
+  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, branches, handleBulkReassignCommitted, handleBulkBranchCommitted, handleBulkRevertCommitted, handleBulkStatusCommitted]);
 
 
   const activeCount = useMemo(() => workspaceLeads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [workspaceLeads]);
