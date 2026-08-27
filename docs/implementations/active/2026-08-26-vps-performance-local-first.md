@@ -113,8 +113,9 @@ job, status HTTP e duração.
 
 No recurso da CRM no Coolify, configurar o healthcheck como
 `GET http://localhost:3000/api/health/live`. No recurso da infraestrutura, criar `CRM_CRON_URL`, `CRON_SECRET` e
-`SCHEDULER_ENABLED=false`. O valor de `CRON_SECRET` deve ser o mesmo do CRM.
-Não ativar o scheduler até a remoção explícita dos cron jobs na Vercel.
+`SCHEDULER_ENABLED=true`. O valor de `CRON_SECRET` deve ser o mesmo do CRM.
+Com a saída da Vercel concluída, o scheduler da VPS é responsável por recuperar
+jobs e efeitos que não forem executados pelo `after()`.
 
 ## Validações
 
@@ -131,3 +132,26 @@ As mudanças de telemetria são observacionais e podem ser revertidas sem tocar 
 dados. Para realtime, reverter restaura somente o refresh duplicado. Para o
 scheduler, manter a variável em `false` remove qualquer efeito; rollback do
 corte reativa primeiro a Vercel e mantém o serviço VPS desativado.
+
+## Continuação — 27/08/2026
+
+- A reatribuição e a assunção no drawer de Leads atualizam a linha e o painel
+  localmente no envio. Se o servidor recusar a transação, o snapshot anterior
+  é restaurado e o diálogo volta a ficar utilizável.
+- A confirmação da reatribuição grava o evento e o efeito de notificação na
+  mesma transação do lead. A tentativa de entrega ocorre por `after()` depois
+  da resposta; a outbox e o scheduler continuam responsáveis por retry.
+- O roteamento manual para unidade não executa a distribuição nem a entrega do
+  WhatsApp na requisição do usuário: ele confirma a mudança de unidade, enfileira
+  o job e atualiza a origem localmente.
+- A inbox de distribuição também mantém sua própria cópia otimista: ações por
+  linha e em lote atualizam/removem o lead elegível antes do refresh de
+  reconciliação. Atribuição, roteamento e distribuição automática compartilham
+  a mesma resposta com `mutationId`, invalidação privada e execução posterior
+  do processador/outbox.
+- Convites de equipe, reenvio de convite, ofertas e o botão manual de aviso de
+  lead deixam de aguardar o provedor Meta. A interface informa que o envio foi
+  preparado/enfileirado; o status definitivo vem da outbox e do webhook.
+- A regra não altera exclusões, permissões, dados sensíveis ou a autoridade do
+  servidor. Toda mutação continua validando tenant e gravando a auditoria já
+  prevista pelo domínio.

@@ -6,7 +6,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { buildLeadAssignmentConfirmedVariables } from "@/features/communication-channels/templates";
-import { notifyNewLead } from "@/features/notifications/send-push-helper";
+import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -138,12 +138,8 @@ export async function createLeadOffersForBrokers(input: {
     createdOffers.push({ offerId, brokerId: broker.id, whatsappMessageId: outbound.id });
   }
 
-  // Trigger outbound processing batch
-  if (createdOffers.length > 0) {
-    await processMetaOutboundBatch(10, input.tenantId).catch((err: unknown) => {
-      console.error("[createLeadOffersForBrokers] Error processing outbound batch:", err);
-    });
-  }
+  // Delivery stays in the durable outbound queue. The scheduler owns retry and
+  // provider I/O so offer creation never holds the operational interface open.
 
   return { created: createdOffers.length, expiresAt, createdOffers };
 }
@@ -323,6 +319,13 @@ export async function handleLeadOfferWebhookResponse(input: {
       entidadeId: offer.id,
       acao: "lead_offer_accepted",
     });
+    await enqueueLeadEffectTx(tx, {
+      tenantId: input.tenantId,
+      leadId: lead.id,
+      type: "NOTIFY_LEAD_ASSIGNED",
+      idempotencyKey: `lead-assigned:offer:${offer.id}`,
+      payload: { branchId: lead.branchId, brokerId: broker.id, leadName: lead.nome, isRedistribution: "false" },
+    });
 
     return { won: true, lead, broker };
   });
@@ -356,15 +359,6 @@ export async function handleLeadOfferWebhookResponse(input: {
         idempotencyKey: `lead-confirmed:${result.lead.id}:${result.broker.id}`,
       });
     }
-
-    await notifyNewLead(
-      result.lead.id,
-      input.tenantId,
-      result.lead.branchId,
-      result.broker.id,
-      result.lead.nome,
-      `lead-assigned:offer:${offer.id}`,
-    ).catch(console.error);
 
     // Notify other candidate brokers that lead was assigned to someone else
     const losingOffers = await db

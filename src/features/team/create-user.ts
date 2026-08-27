@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "./onboarding-helpers";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
 
 const createUserInput = z.object({
   name: z.string().trim().min(2).max(120),
@@ -154,17 +155,9 @@ export async function createTeamUser(rawInput: unknown) {
       });
       whatsappStatus = queued.duplicate || queued.status === "queued" ? "queued" : "failed";
       await db.update(schema.brokerInvitations).set({ deliveryStatus: whatsappStatus === "queued" ? "queued" : "failed" }).where(eq(schema.brokerInvitations.id, invitationId));
-      // Process the newly queued message immediately. The scheduled job remains
-      // the recovery path, but Vercel Hobby can run it only once per day.
-      try {
-        const firstAttempt = await processMetaOutboundBatch(10, context.tenantId);
-        if (firstAttempt.failed > 0) await processMetaOutboundBatch(10, context.tenantId);
-      } catch {
-        // Keep the invitation queued; the protected worker will retry it later.
-      }
-      const [delivery] = await db.select({ status: schema.brokerInvitations.deliveryStatus }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, invitationId), eq(schema.brokerInvitations.tenantId, context.tenantId))).limit(1);
-      if (delivery?.status === "sent") whatsappStatus = "sent";
-      else if (delivery?.status === "failed") whatsappStatus = "failed";
+      // Delivery is durable but intentionally asynchronous. The UI can finish
+      // onboarding immediately; the VPS worker handles delivery and retries.
+      scheduleAfterResponse("team-invitation-outbound", () => processMetaOutboundBatch(3, context.tenantId));
     } else {
       await db.update(schema.brokerInvitations).set({ deliveryStatus: "not_available" }).where(eq(schema.brokerInvitations.id, invitationId));
     }

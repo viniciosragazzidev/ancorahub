@@ -8,8 +8,10 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 
-import { notifyNewLead, notifyLeadReassigned } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned } from "@/features/notifications/send-push-helper";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
 
 const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable() });
 export type ManagementActionState = {
@@ -43,6 +45,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
     if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está em atendimento. Finalize ou libere o atendimento atual antes de reatribuir.");
     if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
     const brokerId = input.brokerId;
+    const assignmentEventId = randomUUID();
     const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true))).limit(1);
@@ -67,18 +70,34 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (tenantPolicy?.feedbackRequiredEnabled !== false) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; SLA reiniciado.` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "reatribuiu_lead" });
-    });
-
-    // Envia notificacoes de forma assincrona sem bloquear a resposta do Server Action
-    void notifyNewLead(lead.id, lead.tenantId, lead.branchId, input.brokerId, lead.nome).catch((error) => {
-      console.warn("[reassignLeadAction] notification_enqueue_failed", {
-        leadId: lead.id,
+      await tx.insert(schema.leadDistributionEvents).values({
+        id: assignmentEventId,
         tenantId: lead.tenantId,
-        brokerId: input.brokerId,
-        error: error instanceof Error ? error.message : "unknown_error",
+        leadId: lead.id,
+        fromBranchId: lead.branchId,
+        toBranchId: lead.branchId,
+        previousOwnerId: lead.corretorId,
+        newOwnerId: brokerId,
+        action: "assigned",
+        source: context.role === "director" ? "manual_director" : "manual_manager",
+        strategy: "manual",
+        reason: "Reatribuição manual",
+        actorId: context.userId,
+        createdAt: now,
+      });
+      await enqueueLeadEffectTx(tx, {
+        tenantId: lead.tenantId,
+        leadId: lead.id,
+        type: "NOTIFY_LEAD_ASSIGNED",
+        idempotencyKey: `lead-assigned:${assignmentEventId}`,
+        payload: {
+          branchId: lead.branchId,
+          brokerId,
+          leadName: lead.nome,
+          isRedistribution: lead.corretorId ? "true" : "false",
+        },
       });
     });
-
     // Notify the previous broker that the lead was reassigned
     if (lead.corretorId && lead.corretorId !== input.brokerId) {
       void notifyLeadReassigned(lead.id, lead.tenantId, lead.corretorId, lead.nome).catch(console.error);
@@ -90,6 +109,11 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       branchIds: [lead.branchId],
       brokerIds: [lead.corretorId, input.brokerId],
     }).catch(() => undefined);
+    scheduleAfterResponse("lead-assignment-effects", () => runLeadEffectOutboxProcessor({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      limit: 1,
+    }));
     return {
       success: true,
       mutationId,

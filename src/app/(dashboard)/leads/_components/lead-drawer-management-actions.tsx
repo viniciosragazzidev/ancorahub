@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -18,6 +18,15 @@ import { ManualQualificationDialog } from "./manual-qualification-dialog";
 type Broker = { id: string; name: string; branchId: string | null };
 type Branch = { id: string; name: string };
 type ManagementMode = "reassign" | "investigate";
+type ManagementCommit = {
+  entity?: {
+    leadId: string;
+    branchId?: string | null;
+    corretorId?: string | null;
+    status?: string;
+    distributionStatus?: string;
+  };
+};
 
 export function LeadDrawerManagementActions({
   leadId,
@@ -31,6 +40,8 @@ export function LeadDrawerManagementActions({
   qualificationState,
   currentOwner,
   onSuccess,
+  onReassignOptimistic,
+  onReassignRollback,
 }: {
   leadId: string;
   leadName?: string;
@@ -42,7 +53,9 @@ export function LeadDrawerManagementActions({
   qualificationStatus?: string | null;
   qualificationState?: string | null;
   currentOwner: string | null;
-  onSuccess?: () => void;
+  onSuccess?: (result: ManagementCommit) => void;
+  onReassignOptimistic?: (brokerId: string) => void;
+  onReassignRollback?: () => void;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<ManagementMode>("reassign");
@@ -71,7 +84,7 @@ export function LeadDrawerManagementActions({
     if (res.success) {
       toast.success("Lead movido de volta para a fila de qualificação!");
       router.refresh();
-      if (onSuccess) onSuccess();
+      onSuccess?.({});
     } else {
       toast.error(res.error ?? "Erro ao mover lead para qualificação.");
     }
@@ -84,19 +97,15 @@ export function LeadDrawerManagementActions({
     {},
   );
 
-  // The route action still uses a server-rendered detail view, so it keeps its
-  // remount key. Reassigning and assuming have a confirmed action contract and
-  // can resolve locally without a page refresh.
-  const [routeKey, setRouteKey] = useState(0);
-
-  const handleReassignSuccess = useCallback(() => {
+  const handleReassignSuccess = useCallback((result: typeof reassignState) => {
     toast.success("Lead reatribuído e SLA reiniciado.");
     setBrokerId("");
-    onSuccess?.();
+    onSuccess?.(result);
   }, [onSuccess]);
   const handleReassignError = useCallback((result: typeof reassignState) => {
+    onReassignRollback?.();
     if (result.error) toast.error(result.error);
-  }, []);
+  }, [onReassignRollback]);
   useActionDialogLifecycle({
     state: reassignState,
     pending: reassignPending,
@@ -104,10 +113,10 @@ export function LeadDrawerManagementActions({
     onError: handleReassignError,
   });
 
-  const handleAssumeSuccess = useCallback(() => {
+  const handleAssumeSuccess = useCallback((result: typeof assumeState) => {
     toast.success("Lead assumido para investigação.");
     setReason("");
-    onSuccess?.();
+    onSuccess?.(result);
   }, [onSuccess]);
   const handleAssumeError = useCallback((result: typeof assumeState) => {
     if (result.error) toast.error(result.error);
@@ -119,18 +128,19 @@ export function LeadDrawerManagementActions({
     onError: handleAssumeError,
   });
 
-  useEffect(() => {
-    if (routeState.success) {
-      toast.success(routeState.message ?? "Lead enviado para a unidade.");
-      setRouteKey((k) => k + 1);
-      if (onSuccess) onSuccess();
-    }
-    if (routeState.error) {
-      toast.error(routeState.error);
-      setRouteKey((k) => k + 1);
-    }
-  }, [routeState, onSuccess]);
-  useEffect(() => { if (routeState.success) router.refresh(); }, [routeState, router]);
+  const handleRouteSuccess = useCallback((result: typeof routeState) => {
+    toast.success(result.message ?? "Lead enviado para a unidade.");
+    onSuccess?.(result);
+  }, [onSuccess]);
+  const handleRouteError = useCallback((result: typeof routeState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: routeState,
+    pending: routePending,
+    onSuccess: handleRouteSuccess,
+    onError: handleRouteError,
+  });
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
@@ -142,7 +152,7 @@ export function LeadDrawerManagementActions({
       const res = await assumeLeadForMessagingAction(leadId);
       if (res.success) {
         toast.success("Você assumiu este atendimento.");
-        if (onSuccess) onSuccess();
+        onSuccess?.(res);
       } else if (res.error) {
         toast.error(res.error);
       }
@@ -169,7 +179,7 @@ export function LeadDrawerManagementActions({
           <p className="text-xs text-muted-foreground leading-normal">
             Este lead ainda não foi atribuído a nenhuma unidade. Selecione uma filial para enviá-lo à fila de distribuição.
           </p>
-          <form key={`route-${routeKey}`} action={routeAction} className="flex items-center gap-2">
+          <form action={routeAction} className="flex items-center gap-2">
             <input name="leadId" type="hidden" value={leadId} />
             <Select name="branchId" onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
               <SelectTrigger className="h-9 flex-1 text-xs" aria-label="Selecionar unidade">
@@ -264,7 +274,7 @@ export function LeadDrawerManagementActions({
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
       {mode === "reassign" ? (
-        <form action={reassign} className="space-y-3">
+        <form action={reassign} className="space-y-3" onSubmit={() => onReassignOptimistic?.(brokerId)}>
           <input name="leadId" type="hidden" value={leadId} />
           <input name="brokerId" type="hidden" value={brokerId} />
           <div className="space-y-1.5">

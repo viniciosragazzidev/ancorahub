@@ -7,7 +7,6 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
-import { notifyNewLead } from "@/features/notifications/send-push-helper";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { isWithinBusinessHours } from "@/shared/time/business-hours";
 
@@ -264,8 +263,7 @@ export async function routeLeadToBranchAndAssignBroker(
     .limit(1);
 
   const queueId = targetQueue?.id ?? null;
-  const notificationWarnings: string[] = [];
-  const assignmentNotificationKey = `lead-assigned:${randomUUID()}`;
+  const assignmentEventId = randomUUID();
 
   const assigned = await db.transaction(async (tx) => {
     const result = await tx
@@ -289,7 +287,7 @@ export async function routeLeadToBranchAndAssignBroker(
     if (!result.length) return false;
 
     await tx.insert(schema.leadDistributionEvents).values({
-      id: randomUUID(),
+      id: assignmentEventId,
       tenantId: context.tenantId,
       leadId,
       fromBranchId: lead.branchId,
@@ -311,17 +309,19 @@ export async function routeLeadToBranchAndAssignBroker(
       entidadeId: leadId,
       acao: "lead.routed_and_assigned",
     });
+    await enqueueLeadEffectTx(tx, {
+      tenantId: context.tenantId,
+      leadId,
+      type: "NOTIFY_LEAD_ASSIGNED",
+      idempotencyKey: `lead-assigned:${assignmentEventId}`,
+      payload: { branchId, brokerId, leadName: lead.nome, isRedistribution: "false" },
+    });
 
     return true;
   });
 
-  if (assigned) {
-    const notifyResult = await notifyNewLead(leadId, context.tenantId, branchId, brokerId, lead.nome, assignmentNotificationKey).catch(() => undefined);
-    if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
-  }
-
   return assigned
-    ? { status: "assigned", leadId, brokerId, strategy: "manual", notificationWarnings: notificationWarnings.length ? notificationWarnings : undefined }
+    ? { status: "assigned", leadId, brokerId, strategy: "manual" }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 
@@ -358,24 +358,22 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     }
     await tx.insert(schema.leadDistributionEvents).values({ id: assignmentEventId, tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: assignmentBranchId, fromQueueId: lead.queueId, toQueueId: lead.queueId, previousOwnerId: lead.corretorId, newOwnerId: brokerId, action: "assigned", source: source ?? "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: assignedAt });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.assigned" });
-    if (source === "automatic") {
-      await enqueueLeadEffectTx(tx, {
-        tenantId: context.tenantId,
-        leadId,
-        type: "NOTIFY_LEAD_ASSIGNED",
-        idempotencyKey: `lead-assigned:${assignmentEventId}`,
-        payload: { branchId: lead.branchId, brokerId, leadName: lead.nome },
-      });
-    }
+    await enqueueLeadEffectTx(tx, {
+      tenantId: context.tenantId,
+      leadId,
+      type: "NOTIFY_LEAD_ASSIGNED",
+      idempotencyKey: `lead-assigned:${assignmentEventId}`,
+      payload: {
+        branchId: assignmentBranchId,
+        brokerId,
+        leadName: lead.nome,
+        isRedistribution: lead.corretorId ? "true" : "false",
+      },
+    });
     return true;
   });
-  const notificationWarnings: string[] = [];
-  if (assigned && source !== "automatic") {
-    const notifyResult = await notifyNewLead(leadId, context.tenantId, assignmentBranchId, brokerId, lead.nome, `lead-assigned:${assignmentEventId}`, { isRedistribution: Boolean(lead.corretorId) }).catch(() => undefined);
-    if (notifyResult?.notificationError) notificationWarnings.push(notifyResult.notificationError);
-  }
   return assigned
-    ? { status: "assigned", leadId, brokerId, strategy: "manual", notificationWarnings: notificationWarnings.length ? notificationWarnings : undefined }
+    ? { status: "assigned", leadId, brokerId, strategy: "manual" }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 

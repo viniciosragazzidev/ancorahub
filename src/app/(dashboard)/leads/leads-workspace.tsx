@@ -229,6 +229,7 @@ export function LeadsWorkspace({
   const router = useRouter();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const drawerOptimisticSnapshots = useRef(new Map<string, LeadWorkspaceItem>());
   const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -366,6 +367,59 @@ export function LeadsWorkspace({
     }));
     router.refresh();
   }, [applyLeadPatch, router]);
+
+  const handleDrawerManagementCommitted = useCallback((result: {
+    entity?: { leadId: string; branchId?: string | null; corretorId?: string | null; status?: string; distributionStatus?: string };
+  }) => {
+    const entity = result.entity;
+    if (entity) drawerOptimisticSnapshots.current.delete(entity.leadId);
+    if (entity) {
+      const broker = entity.corretorId ? brokers.find((item) => item.id === entity.corretorId) : null;
+      applyLeadPatch([entity.leadId], (lead) => ({
+        ...lead,
+        branchId: entity.branchId ?? lead.branchId,
+        corretorId: entity.corretorId === undefined ? lead.corretorId : entity.corretorId,
+        corretorNome: entity.corretorId === undefined ? lead.corretorNome : broker?.name ?? null,
+        status: entity.status ?? lead.status,
+        assignedAt: new Date().toISOString(),
+        distributionStatus: entity.distributionStatus ?? (entity.corretorId ? "assigned" : lead.distributionStatus),
+      }));
+    }
+    setSelectedLead(null);
+  }, [applyLeadPatch, brokers]);
+
+  const handleDrawerReassignOptimistic = useCallback((brokerId: string) => {
+    const broker = brokers.find((item) => item.id === brokerId);
+    const now = new Date().toISOString();
+    setWorkspaceLeads((current) => current.map((lead) => {
+      if (lead.id !== selectedLead?.id) return lead;
+      drawerOptimisticSnapshots.current.set(lead.id, lead);
+      return {
+        ...lead,
+        corretorId: brokerId,
+        corretorNome: broker?.name ?? lead.corretorNome,
+        status: "distributed",
+        distributionStatus: "assigned",
+        assignedAt: now,
+      };
+    }));
+    setSelectedLead((current) => current && current.id === selectedLead?.id ? {
+      ...current,
+      corretorId: brokerId,
+      corretorNome: broker?.name ?? current.corretorNome,
+      status: "distributed",
+      distributionStatus: "assigned",
+      assignedAt: now,
+    } : current);
+  }, [brokers, selectedLead?.id]);
+
+  const handleDrawerReassignRollback = useCallback(() => {
+    const snapshots = new Map(drawerOptimisticSnapshots.current);
+    if (!snapshots.size) return;
+    setWorkspaceLeads((current) => current.map((lead) => snapshots.get(lead.id) ?? lead));
+    setSelectedLead((current) => current ? snapshots.get(current.id) ?? current : current);
+    drawerOptimisticSnapshots.current.clear();
+  }, []);
 
   const selectionActions = useMemo(() => (
     <>
@@ -762,7 +816,9 @@ export function LeadsWorkspace({
                         qualificationStatus={selectedLead.qualificationStatus}
                         qualificationState={selectedLead.qualificationState}
                         currentOwner={selectedLead.corretorNome}
-                        onSuccess={() => setSelectedLead(null)}
+                        onSuccess={handleDrawerManagementCommitted}
+                        onReassignOptimistic={handleDrawerReassignOptimistic}
+                        onReassignRollback={handleDrawerReassignRollback}
                       />
                     ) : (
                       <>

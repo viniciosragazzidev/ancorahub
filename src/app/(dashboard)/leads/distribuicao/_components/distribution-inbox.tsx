@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useId, useCallback } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useRef, useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { ArrowRight, CheckCircle, Loader2Icon, MagicWand, UserList } from "@/components/huge-icons";
@@ -125,6 +125,7 @@ function ActionForm({
   fields,
   label,
   onCampaignConflict,
+  onCommitted,
 }: {
   action: (
     previous: DistributionActionState,
@@ -134,6 +135,7 @@ function ActionForm({
   fields: Record<string, string>;
   label: string;
   onCampaignConflict?: (conflict: NonNullable<DistributionActionState["campaignConflict"]>, fields: Record<string, string>) => void;
+  onCommitted?: (state: DistributionActionState) => void;
 }) {
   const router = useRouter();
   const formKey = useId();
@@ -153,24 +155,21 @@ function ActionForm({
     }
   }
 
-  // Reset form + flash de sucesso
-  const prevSuccessRef = useState(state.success);
-  if (state.success !== prevSuccessRef[0]) {
-    prevSuccessRef[0] = state.success;
+  // Reset only after the action settles.  The visible queue is patched first;
+  // refresh is merely reconciliation and can never keep the button pending.
+  const handledMutationRef = useRef<string | undefined>();
+  useEffect(() => {
+    if (!state.mutationId || handledMutationRef.current === state.mutationId) return;
+    handledMutationRef.current = state.mutationId;
+    setFormVersion((value) => value + 1);
     if (state.success) {
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 1800);
-      setFormVersion((v) => v + 1);
-      router.refresh();
+      const timeout = window.setTimeout(() => setShowSuccess(false), 1800);
+      onCommitted?.(state);
+      startTransition(() => router.refresh());
+      return () => window.clearTimeout(timeout);
     }
-  }
-  const prevErrorRef = useState(state.error);
-  if (state.error !== prevErrorRef[0]) {
-    prevErrorRef[0] = state.error;
-    if (state.error) {
-      setFormVersion((v) => v + 1);
-    }
-  }
+  }, [onCommitted, router, state]);
 
   return (
     <form key={`${formKey}-${formVersion}`} action={formAction} className="flex flex-wrap items-center gap-2">
@@ -198,6 +197,7 @@ export function DistributionInbox({
   initialStatusFilter?: "all" | "unassigned" | "queued" | "returned_to_queue";
 }) {
   const router = useRouter();
+  const [inboxLeads, setInboxLeads] = useState(leads);
   const [selected, setSelected] = useState<string[]>([]);
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
   const managerBranchId = role === "manager" ? (branches[0]?.id ?? "") : "";
@@ -208,16 +208,19 @@ export function DistributionInbox({
   const [page, setPage] = useState(1);
   const [campaignConflictDialog, setCampaignConflictDialog] = useState<DistributionActionState["campaignConflict"] | null>(null);
   const [pendingOverrideFields, setPendingOverrideFields] = useState<Record<string, string> | null>(null);
+  const submittedBatchLeadIdsRef = useRef<string[]>([]);
+
+  useEffect(() => setInboxLeads(leads), [leads]);
 
   const selectable = useMemo(
     () =>
-      leads.filter(
+      inboxLeads.filter(
         (lead) =>
           lead.distributionStatus === "unassigned" ||
           lead.distributionStatus === "queued" ||
           lead.distributionStatus === "returned_to_queue",
       ),
-    [leads],
+    [inboxLeads],
   );
   const filtered = useMemo(
     () =>
@@ -317,12 +320,43 @@ export function DistributionInbox({
     setBatchBrokerId("");
   }
 
+  function applySingleCommit(state: DistributionActionState) {
+    const entity = state.entity;
+    if (!entity) return;
+    setInboxLeads((current) => current.flatMap((lead) => {
+      if (lead.id !== entity.leadId) return [lead];
+      if (entity.corretorId) return [];
+      return [{
+        ...lead,
+        branchId: entity.branchId ?? lead.branchId,
+        distributionStatus: entity.distributionStatus,
+      }];
+    }));
+  }
+
+  function submitBatch() {
+    submittedBatchLeadIdsRef.current = [...selected];
+    clearBatchUi();
+  }
+
   useEffect(() => {
-    if (batchState.success) router.refresh();
-  }, [batchState, router]);
+    if (!batchState.mutationId) return;
+    const submitted = batchState.processedLeadIds ?? submittedBatchLeadIdsRef.current;
+    if (!submitted.length) return;
+    setInboxLeads((current) => current.map((lead) =>
+      submitted.includes(lead.id)
+        ? { ...lead, branchId, distributionStatus: "queued" }
+        : lead,
+    ));
+    startTransition(() => router.refresh());
+  }, [batchState.mutationId, batchState.processedLeadIds, branchId, router]);
   useEffect(() => {
-    if (assignState.success) router.refresh();
-  }, [assignState, router]);
+    if (!assignState.mutationId) return;
+    const submitted = assignState.processedLeadIds ?? submittedBatchLeadIdsRef.current;
+    if (!submitted.length) return;
+    setInboxLeads((current) => current.filter((lead) => !submitted.includes(lead.id)));
+    startTransition(() => router.refresh());
+  }, [assignState.mutationId, assignState.processedLeadIds, router]);
 
   return (
     <>
@@ -342,7 +376,7 @@ export function DistributionInbox({
               <form
                 action={batchAction}
                 className="flex flex-wrap items-center gap-2"
-                onSubmit={clearBatchUi}
+                onSubmit={submitBatch}
               >
                 <input name="leadIds" type="hidden" value={selected.join(",")} />
                 {role === "director" ? (
@@ -365,7 +399,7 @@ export function DistributionInbox({
               <form
                 action={assignAction}
                 className="flex flex-wrap items-center justify-end gap-2"
-                onSubmit={clearBatchUi}
+                onSubmit={submitBatch}
               >
                 <input name="leadIds" type="hidden" value={selected.join(",")} />
                 <input
@@ -553,6 +587,7 @@ export function DistributionInbox({
                                     action={assignLeadToBrokerAction}
                                     fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id] }}
                                     label={`atribuir lead ${lead.name}`}
+                                    onCommitted={applySingleCommit}
                                   >
                                     <UserList /> Atribuir
                                   </ActionForm>
@@ -561,6 +596,7 @@ export function DistributionInbox({
                                   action={distributeLeadAutomaticallyAction}
                                   fields={{ leadId: lead.id }}
                                   label={`distribuir lead ${lead.name}`}
+                                  onCommitted={applySingleCommit}
                                 >
                                   <MagicWand /> Auto
                                 </ActionForm>
@@ -584,6 +620,7 @@ export function DistributionInbox({
                                   fields={{ leadId: lead.id, branchId }}
                                   label={`enviar lead ${lead.name} para a unidade`}
                                   onCampaignConflict={(conflict, f) => { setCampaignConflictDialog(conflict); setPendingOverrideFields(f); }}
+                                  onCommitted={applySingleCommit}
                                 >
                                   <ArrowRight /> Enviar para unidade
                                 </ActionForm>
