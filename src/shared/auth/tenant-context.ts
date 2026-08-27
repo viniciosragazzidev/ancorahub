@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "./errors";
@@ -20,7 +21,7 @@ export type { TenantContext };
 
 const TENANT_QUERY_TIMEOUT_MS = 5_000;
 
-export async function getRequiredTenantContext(): Promise<TenantContext> {
+async function resolveRequiredTenantContext(): Promise<TenantContext> {
   // Session phase is already timed by getRequiredSession()
   const { user: sessionUser } = await getRequiredSession();
 
@@ -150,3 +151,9 @@ export async function getRequiredTenantContext(): Promise<TenantContext> {
     throw error;
   }
 }
+
+/**
+ * Request-scoped only: a layout and its page share one authoritative tenant
+ * lookup, while every new request still rechecks membership and permissions.
+ */
+export const getRequiredTenantContext = cache(resolveRequiredTenantContext);

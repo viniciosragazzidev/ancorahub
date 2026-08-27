@@ -49,6 +49,20 @@ const REFRESH_COALESCE_MS = 500;
  */
 const RECONCILIATION_MS = 60_000;
 
+/**
+ * Conversation workspaces already own a focused, tenant-authorized refresh
+ * listener. Letting the shell refresh as well causes two RSC renders for a
+ * single inbound message (the immediate workspace refresh plus the shell's
+ * 500ms refresh). Other surfaces still use the shell fallback.
+ */
+export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pathname: string): boolean {
+  return !(
+    detail.kind === "domain.invalidated" &&
+    detail.domain === "conversations" &&
+    pathname.startsWith("/conversas")
+  );
+}
+
 export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
   const router = useRouter();
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
@@ -97,7 +111,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       // Browser storage unavailable — the coalesced refresh is still sufficient.
     }
     dispatchRealtimeSyncEvent(detail);
-    scheduleServerRefresh();
+    if (shouldScheduleShellRefresh(detail, window.location.pathname)) scheduleServerRefresh();
     if (broadcast) localBroadcastRef.current?.postMessage({ type: "local-first.invalidate", detail });
   }, [scheduleServerRefresh]);
 

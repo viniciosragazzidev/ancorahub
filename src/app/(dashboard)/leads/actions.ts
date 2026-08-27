@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { createManualLead } from "@/features/leads/manual-create";
@@ -8,8 +7,15 @@ import { canDeleteLead } from "@/features/leads/deletion-policy";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 
-export type LeadCreateState = { duplicate?: { id: string; nome: string; createdAt: string; corretorNome: string | null }; error?: string };
+export type LeadCreateState = {
+  duplicate?: { id: string; nome: string; createdAt: string; corretorNome: string | null };
+  error?: string;
+  success?: boolean;
+  mutationId?: string;
+  leadId?: string;
+};
 
 export async function createManualLeadAction(_previous: LeadCreateState, formData: FormData): Promise<LeadCreateState> {
   let result: Awaited<ReturnType<typeof createManualLead>>;
@@ -20,14 +26,15 @@ export async function createManualLeadAction(_previous: LeadCreateState, formDat
   }
 
   if (result.duplicate) return { duplicate: { id: result.duplicate.id, nome: result.duplicate.nome, createdAt: result.duplicate.createdAt.toISOString(), corretorNome: result.duplicate.corretorNome } };
-  redirect(`/leads/${result.leadId}`);
+  return { success: true, mutationId: crypto.randomUUID(), leadId: result.leadId };
 }
 
-export type LeadDeleteState = { error?: string };
+export type LeadDeleteState = { success?: boolean; error?: string; mutationId?: string };
 
 export async function deleteLeadAction(_previous: LeadDeleteState, formData: FormData): Promise<LeadDeleteState> {
+  const mutationId = crypto.randomUUID();
   const parsed = z.object({ leadId: z.string().uuid() }).safeParse({ leadId: formData.get("leadId") });
-  if (!parsed.success) return { error: "Lead inválido." };
+  if (!parsed.success) return { mutationId, error: "Lead inválido." };
 
   try {
     const context = await getRequiredTenantContext();
@@ -45,14 +52,16 @@ export async function deleteLeadAction(_previous: LeadDeleteState, formData: For
       await tx.insert(schema.auditLogs).values({ id: crypto.randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "lead.soft_deleted_by_director" });
       return true;
     });
-    if (!result) return { error: "Este lead já não está disponível." };
+    if (!result) return { mutationId, error: "Este lead já não está disponível." };
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+    }).catch(() => undefined);
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Não foi possível excluir o lead." };
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível excluir o lead." };
   }
 
-  // The active route is the lead that has just been soft-deleted. Revalidating
-  // it would render its `notFound()` boundary in the Server Action response,
-  // preventing the dialog from receiving a completed response. A Server Action
-  // redirect carries the fresh list view in that same response instead.
-  redirect("/leads");
+  // Returning a normal result lets the client reset its pending state, close
+  // the confirmation dialog, then navigate away from the now-deleted detail.
+  return { success: true, mutationId };
 }

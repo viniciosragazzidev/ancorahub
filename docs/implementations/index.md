@@ -2,6 +2,7 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
+| 2026-08-26 | `active/2026-08-26-vps-performance-local-first.md` | ativo | Telemetria segura, redução de refresh duplicado e scheduler VPS desligado por padrão, aguardando corte controlado da Vercel Cron. |
 | 2026-08-19 | `completed/2026-08-19-dialogs-action-result-refresh.md` | concluído | Conexão do resultado de Server Actions à UI em dialogs (distribuição, feedback-templates, materiais, documentos, agent-triggers e automações): fim do F5 para refletir mudanças. |
 | 2026-08-17 | `completed/2026-08-17-leads-mobile-responsiveness.md` | concluído | Refino da responsividade mobile de /leads: header com menu "Mais ações" abaixo de lg, abas com rolagem e rótulos curtos, lista mobile com seleção em lote, campanha e data, e filtros compactos. |
 | 2026-08-13 | `completed/2026-08-13-confirmation-dialog-action-response.md` | concluído | Exclusão de lead redireciona a resposta da Server Action para a lista ativa, evitando diálogo pendente após a exclusão lógica. |

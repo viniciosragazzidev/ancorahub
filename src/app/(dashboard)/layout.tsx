@@ -32,13 +32,36 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     throw error;
   }
 
-  const experienceMode = await getExperienceMode(context);
+  // These request-scoped reads are independent after the authenticated context
+  // is resolved. Starting them together keeps client-side route transitions from
+  // serializing the shell, preference, branding and pathname lookups.
+  const experienceModePromise = getExperienceMode(context);
+  const headersPromise = headers();
+  const wahaConnectionsEnabledPromise =
+    context.role === "broker"
+      ? getSystemSetting("feature_waha_connections_enabled")
+      : Promise.resolve("true");
+  const tenantPromise = getDatabase()
+    .select({
+      name: schema.tenants.name,
+      brandColor: schema.tenants.brandColor,
+      logoUrl: schema.tenants.logoUrl,
+    })
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, context.tenantId))
+    .limit(1);
+
+  const [experienceMode, headersList, tenantRows, wahaConnectionsEnabled] = await Promise.all([
+    experienceModePromise,
+    headersPromise,
+    tenantPromise,
+    wahaConnectionsEnabledPromise,
+  ]);
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
   const showLightConversations =
     !isLightBroker ||
-    (await getSystemSetting("feature_waha_connections_enabled")) !== "false";
+    wahaConnectionsEnabled !== "false";
 
-  const headersList = await headers();
   const pathname = headersList.get("x-pathname") || "";
 
   if (isLightBroker) {
@@ -63,15 +86,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     }
   }
 
-  const [tenant] = await getDatabase()
-    .select({
-      name: schema.tenants.name,
-      brandColor: schema.tenants.brandColor,
-      logoUrl: schema.tenants.logoUrl,
-    })
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, context.tenantId))
-    .limit(1);
+  const [tenant] = tenantRows;
   const syncTopic = getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId });
 
   return (

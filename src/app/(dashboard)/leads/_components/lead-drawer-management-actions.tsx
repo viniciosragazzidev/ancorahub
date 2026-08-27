@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useId } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
 import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
 
 type Broker = { id: string; name: string; branchId: string | null };
@@ -76,10 +77,6 @@ export function LeadDrawerManagementActions({
     }
   }
 
-  const reassignFormKey = useId();
-  const assumeFormKey = useId();
-  const routeFormKey = useId();
-
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
   const [routeState, routeAction, routePending] = useActionState(
@@ -87,36 +84,40 @@ export function LeadDrawerManagementActions({
     {},
   );
 
-  // Track form keys that change on success/error to force remount and reset pending state
-  const [reassignKey, setReassignKey] = useState(0);
-  const [assumeKey, setAssumeKey] = useState(0);
+  // The route action still uses a server-rendered detail view, so it keeps its
+  // remount key. Reassigning and assuming have a confirmed action contract and
+  // can resolve locally without a page refresh.
   const [routeKey, setRouteKey] = useState(0);
 
-  useEffect(() => {
-    if (reassignState.success) {
-      toast.success("Lead reatribuído e SLA reiniciado.");
-      setReassignKey((k) => k + 1);
-      if (onSuccess) onSuccess();
-    }
-    if (reassignState.error) {
-      toast.error(reassignState.error);
-      setReassignKey((k) => k + 1);
-    }
-  }, [reassignState, onSuccess]);
-  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState, router]);
+  const handleReassignSuccess = useCallback(() => {
+    toast.success("Lead reatribuído e SLA reiniciado.");
+    setBrokerId("");
+    onSuccess?.();
+  }, [onSuccess]);
+  const handleReassignError = useCallback((result: typeof reassignState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: reassignState,
+    pending: reassignPending,
+    onSuccess: handleReassignSuccess,
+    onError: handleReassignError,
+  });
 
-  useEffect(() => {
-    if (assumeState.success) {
-      toast.success("Lead assumido para investigação.");
-      setAssumeKey((k) => k + 1);
-      if (onSuccess) onSuccess();
-    }
-    if (assumeState.error) {
-      toast.error(assumeState.error);
-      setAssumeKey((k) => k + 1);
-    }
-  }, [assumeState, onSuccess]);
-  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState, router]);
+  const handleAssumeSuccess = useCallback(() => {
+    toast.success("Lead assumido para investigação.");
+    setReason("");
+    onSuccess?.();
+  }, [onSuccess]);
+  const handleAssumeError = useCallback((result: typeof assumeState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: assumeState,
+    pending: assumePending,
+    onSuccess: handleAssumeSuccess,
+    onError: handleAssumeError,
+  });
 
   useEffect(() => {
     if (routeState.success) {
@@ -141,7 +142,6 @@ export function LeadDrawerManagementActions({
       const res = await assumeLeadForMessagingAction(leadId);
       if (res.success) {
         toast.success("Você assumiu este atendimento.");
-        router.refresh();
         if (onSuccess) onSuccess();
       } else if (res.error) {
         toast.error(res.error);
@@ -264,7 +264,7 @@ export function LeadDrawerManagementActions({
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
       {mode === "reassign" ? (
-        <form key={`reassign-${reassignKey}`} action={reassign} className="space-y-3">
+        <form action={reassign} className="space-y-3">
           <input name="leadId" type="hidden" value={leadId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">Novo responsável</Label>
@@ -284,7 +284,7 @@ export function LeadDrawerManagementActions({
           </Button>
         </form>
       ) : (
-        <form key={`assume-${assumeKey}`} action={assume} className="space-y-3">
+        <form action={assume} className="space-y-3">
           <input name="leadId" type="hidden" value={leadId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-investigation-reason-drawer" className="text-xs">Motivo da investigação</Label>

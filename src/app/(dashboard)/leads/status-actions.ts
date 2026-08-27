@@ -2,15 +2,20 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { changeLeadStatus, type ChangeLeadStatusInput } from "@/features/leads/change-lead-status";
 import { assignLeadToBroker } from "@/features/lead-distribution/service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 
 export type StatusChangeState = {
   success?: boolean;
   error?: string;
   message?: string;
+  mutationId?: string;
+  changedLeadIds?: string[];
+  newStatus?: string;
 };
 
 // ─── Bulk reassign leads to a broker ────────────────────────────
@@ -19,28 +24,39 @@ export type BulkReassignState = {
   success?: boolean;
   error?: string;
   message?: string;
+  mutationId?: string;
+  changedLeadIds?: string[];
+  brokerId?: string;
 };
 
 export async function bulkReassignLeadsAction(
   _previous: BulkReassignState,
   formData: FormData,
 ): Promise<BulkReassignState> {
-  const leadIds = formData.getAll("leadIds") as string[];
-  const brokerId = formData.get("brokerId") as string;
+  const mutationId = randomUUID();
+  const parsed = z.object({
+    leadIds: z.array(z.string().uuid()).min(1),
+    brokerId: z.string().uuid(),
+  }).safeParse({ leadIds: formData.getAll("leadIds"), brokerId: formData.get("brokerId") });
 
-  if (!leadIds.length) return { error: "Nenhum lead selecionado." };
-  if (!brokerId) return { error: "Selecione um corretor válido." };
+  if (!parsed.success) return { mutationId, error: "Selecione leads e um corretor válidos." };
+  const { leadIds, brokerId } = parsed.data;
 
   try {
     const context = await getRequiredTenantContext();
     if (context.role !== "director" && context.role !== "manager") {
-      return { error: "Apenas diretores e gestores podem reatribuir leads." };
+      return { mutationId, error: "Apenas diretores e gestores podem reatribuir leads." };
     }
 
     const source = context.role === "director" ? "manual_director" : "manual_manager";
     let successCount = 0;
     let errorCount = 0;
     let lastError = "";
+    const changedLeadIds: string[] = [];
+    const affectedLeads = await getDatabase()
+      .select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)));
 
     for (const leadId of leadIds) {
       try {
@@ -53,6 +69,7 @@ export async function bulkReassignLeadsAction(
         );
         if (result.status === "assigned") {
           successCount++;
+          changedLeadIds.push(leadId);
           if (result.notificationWarnings?.length) {
             lastError = `Notificação: ${result.notificationWarnings.join("; ")}`;
           }
@@ -66,26 +83,37 @@ export async function bulkReassignLeadsAction(
       }
     }
 
-    // Revalidate
-    for (const id of leadIds) {
+    if (changedLeadIds.length) {
+      const changedLeadIdSet = new Set(changedLeadIds);
+      const changedLeads = affectedLeads.filter((lead) => changedLeadIdSet.has(lead.id));
+      void publishLeadInvalidation({
+        tenantId: context.tenantId,
+        actorId: context.userId,
+        branchIds: changedLeads.map((lead) => lead.branchId),
+        brokerIds: [brokerId, ...changedLeads.map((lead) => lead.corretorId)],
+      }).catch(() => undefined);
     }
 
     if (errorCount === 0) {
       const base = `${successCount} lead${successCount === 1 ? "" : "s"} reatribuído${successCount === 1 ? "" : "s"} com sucesso.`;
       const message = lastError ? `${base} ${lastError}` : base;
-      return { success: true, message };
+      return { success: true, mutationId, changedLeadIds, brokerId, message };
     }
 
     if (successCount > 0) {
       return {
         success: true,
+        mutationId,
+        changedLeadIds,
+        brokerId,
         message: `${successCount} reatribuído${successCount === 1 ? "" : "s"}, ${errorCount} erro${errorCount === 1 ? "" : "s"}. ${lastError}`,
       };
     }
 
-    return { error: `Nenhum lead reatribuído. ${lastError}` };
+    return { mutationId, error: `Nenhum lead reatribuído. ${lastError}` };
   } catch (error) {
     return {
+      mutationId,
       error: error instanceof Error ? error.message : "Não foi possível reatribuir os leads.",
     };
   }
@@ -95,6 +123,7 @@ export async function changeLeadStatusAction(
   _previous: StatusChangeState,
   formData: FormData,
 ): Promise<StatusChangeState> {
+  const mutationId = randomUUID();
   const rawInput: ChangeLeadStatusInput = {
     leadId: (formData.get("leadId") ?? "") as string,
     newStatus: (formData.get("newStatus") ?? formData.get("status") ?? "") as string,
@@ -103,9 +132,10 @@ export async function changeLeadStatusAction(
 
   try {
     await changeLeadStatus(rawInput);
-    return { success: true };
+    return { success: true, mutationId, changedLeadIds: [rawInput.leadId], newStatus: rawInput.newStatus };
   } catch (error) {
     return {
+      mutationId,
       error:
         error instanceof Error ? error.message : "Não foi possível alterar o status do lead.",
     };
@@ -172,30 +202,45 @@ export async function bulkChangeLeadStatusAction(
   _previous: StatusChangeState,
   formData: FormData,
 ): Promise<StatusChangeState> {
+  const mutationId = randomUUID();
   const leadIds = formData.getAll("leadIds") as string[];
   const newStatus = formData.get("newStatus") as string;
   const motivoPerda = (formData.get("motivoPerda") as string) || null;
 
-  if (!leadIds.length) return { error: "Nenhum lead selecionado." };
-  if (!newStatus) return { error: "Selecione um status válido." };
+  const parsedIds = z.array(z.string().uuid()).min(1).safeParse(leadIds);
+  if (!parsedIds.success) return { mutationId, error: "Selecione ao menos um lead válido." };
+  if (!newStatus) return { mutationId, error: "Selecione um status válido." };
 
   try {
     const context = await getRequiredTenantContext();
     if (context.role !== "director" && context.role !== "manager") {
-      return { error: "Apenas diretores e gestores podem alterar status em lote." };
+      return { mutationId, error: "Apenas diretores e gestores podem alterar status em lote." };
     }
 
-    const updatedIds = await bulkChangeLeadStatusDirect(context, leadIds, newStatus, motivoPerda);
-
-    for (const id of updatedIds) {
+    const updatedIds = await bulkChangeLeadStatusDirect(context, parsedIds.data, newStatus, motivoPerda);
+    if (updatedIds.length) {
+      const changedLeads = await getDatabase()
+        .select({ branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, updatedIds)));
+      void publishLeadInvalidation({
+        tenantId: context.tenantId,
+        actorId: context.userId,
+        branchIds: changedLeads.map((lead) => lead.branchId),
+        brokerIds: changedLeads.map((lead) => lead.corretorId),
+      }).catch(() => undefined);
     }
 
     return {
       success: true,
+      mutationId,
+      changedLeadIds: updatedIds,
+      newStatus,
       message: `${updatedIds.length} lead${updatedIds.length === 1 ? "" : "s"} atualizado${updatedIds.length === 1 ? "" : "s"} com sucesso.`,
     };
   } catch (error) {
     return {
+      mutationId,
       error: error instanceof Error ? error.message : "Não foi possível alterar o status dos leads.",
     };
   }

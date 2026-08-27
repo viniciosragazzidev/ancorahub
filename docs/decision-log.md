@@ -1,5 +1,48 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-087 — Resposta de mutação local-first em operações de Leads
+
+**Estado:** Aceita
+**Data:** 2026-08-27
+
+As mutações interativas de Leads que alteram a própria lista devem retornar um
+`mutationId` único e o resumo mínimo, sem PII, das entidades efetivamente
+alteradas. O cliente consome cada resposta uma única vez, encerra o estado
+pendente, fecha o diálogo de confirmação e aplica a alteração localmente antes
+da próxima leitura do Server Component. A resposta não depende de
+`router.refresh()` para parecer concluída.
+
+O servidor permanece a autoridade: entradas são validadas, tenant e permissões
+vêm da sessão, a transação e a auditoria continuam no servidor, e a próxima
+navegação ou sinal em tempo real reconcilia a projeção local. Após o commit, o
+servidor publica apenas a invalidação opaca do domínio `leads` para diretor,
+gestor de unidade e corretor elegíveis; nenhum dado de lead é levado ao canal.
+O contrato é a base para migrar gradualmente os demais diálogos de escrita.
+
+## DEC-086 — Liveness independente de prontidão de dependências
+
+**Estado:** Aceita
+**Data:** 2026-08-26
+
+O healthcheck do orquestrador mede somente se o processo do CRM está vivo, em
+`/api/health/live`, sem consultar banco, Meta ou WhatsApp. O endpoint
+`/api/health` permanece como readiness/diagnóstico de dependências e pode ficar
+degradado sem fazer o proxy remover um processo funcional do tráfego. A separação
+evita indisponibilidade total durante picos transitórios de webhook ou fila do
+pool de banco.
+
+## DEC-085 — Fonte única de agendamento operacional
+
+**Estado:** Aceita
+**Data:** 2026-08-26
+
+Cada ambiente terá somente uma fonte ativa para os endpoints cron de distribuição,
+efeitos de lead, WhatsApp, SLA, lembretes, Meta, WAHA e manutenção. O scheduler
+da VPS chama os endpoints idempotentes já existentes com `CRON_SECRET`, mas nasce
+desativado. A ativação só ocorre depois de a Vercel Cron ser desabilitada; rollback
+desativa primeiro o scheduler da VPS antes de reativar a Vercel. Essa ordem evita
+duplicação de saídas, notificações e redistribuições durante a migração.
+
 ## DEC-084 — Cadência e diagnóstico seguro dos avisos de novo lead
 
 **Estado:** Aceita
@@ -196,13 +239,16 @@ respeitam o escopo multi-tenant do papel.
 **Estado:** Aceita
 **Data:** 2026-07-23
 
-O cliente de banco mantém um limite pequeno por processo (padrão de uma conexão em
-runtime serverless), fecha conexões ociosas rapidamente e aceita `DB_POOL_MAX` como
-parâmetro operacional entre 1 e 10. Durante o build estático o limite temporário é
-maior para permitir os workers de geração. O proxy usa uma cache de cinco segundos
-somente para a consulta de identidade da sessão; permissões e dados de negócio
-continuam sempre sendo consultados e validados no servidor. O objetivo é evitar que
-prefetch/navegação de duas máquinas consuma o limite do projeto Supabase.
+O cliente de banco mantém um limite pequeno por processo, fecha conexões ociosas
+rapidamente e aceita `DB_POOL_MAX` como parâmetro operacional entre 1 e 10. O padrão
+do runtime serverless continua sendo uma conexão; a imagem Docker auto-hospedada usa
+duas conexões, pois o processo é longo e atende navegações concorrentes. Durante o
+build estático o limite temporário é maior para permitir os workers de geração. O
+proxy usa uma cache de cinco segundos somente para a consulta de identidade da
+sessão; permissões e dados de negócio continuam sempre sendo consultados e validados
+no servidor. O objetivo é evitar que prefetch/navegação de duas máquinas consuma o
+limite do projeto Supabase. Qualquer aumento acima de duas conexões exige medição de
+capacidade do pooler e configuração explícita de `DB_POOL_MAX` no orquestrador.
 
 ## DEC-053 - Início seguro do agente de atendimento
 

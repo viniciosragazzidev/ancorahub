@@ -41,8 +41,14 @@ export function LeadsPagination({
       params.set("page", page.toString());
       const newUrl = `${pathname}?${params.toString()}`;
       router.push(newUrl);
-      router.refresh();
     }
+  }
+
+  function prefetchPage(page: number) {
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", page.toString());
+    router.prefetch(`${pathname}?${params.toString()}`);
   }
 
   // Generate page numbers array (up to 5 pages shown)
@@ -74,6 +80,7 @@ export function LeadsPagination({
           className="h-8 gap-1 px-2.5 text-xs"
           disabled={currentPage <= 1}
           onClick={() => goToPage(currentPage - 1)}
+          onPointerEnter={() => prefetchPage(currentPage - 1)}
         >
           <ArrowLeft className="size-3.5" />
           Anterior
@@ -87,6 +94,7 @@ export function LeadsPagination({
               variant={p === currentPage ? "default" : "outline"}
               className="h-8 w-8 p-0 text-xs font-semibold"
               onClick={() => goToPage(p)}
+              onPointerEnter={() => prefetchPage(p)}
             >
               {p}
             </Button>
@@ -103,6 +111,7 @@ export function LeadsPagination({
           className="h-8 gap-1 px-2.5 text-xs"
           disabled={currentPage >= totalPages}
           onClick={() => goToPage(currentPage + 1)}
+          onPointerEnter={() => prefetchPage(currentPage + 1)}
         >
           Próxima
           <ArrowRight className="size-3.5" />

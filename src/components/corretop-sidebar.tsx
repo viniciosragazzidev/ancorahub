@@ -162,6 +162,7 @@ const marketingHiddenPaths = [
 ];
 
 const brokerHiddenPaths = ["/cotacao", "/automacoes"];
+const priorityNavigationPaths = new Set(["/dashboard", "/leads", "/conversas", "/clientes"]);
 const managerHiddenPaths = [
   "/marketing",
   "/integrations",
@@ -308,7 +309,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       )}
                       <SidebarMenuButton
                         isActive={isActive}
-                        render={<Link href={itemTargetUrl} onClick={() => isMobile && setOpenMobile(false)} />}
+                        render={
+                          <Link
+                            href={itemTargetUrl}
+                            prefetch={priorityNavigationPaths.has(itemTargetUrl)}
+                            onClick={() => isMobile && setOpenMobile(false)}
+                          />
+                        }
                         tooltip={displayLabel}
                         className="relative z-10 h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
                       >
