@@ -7,13 +7,14 @@ import React from "react";
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      position="top-right"
+      position="bottom-right"
       closeButton={false}
-      duration={4000}
-      gap={8}
+      duration={4500}
+      gap={10}
       visibleToasts={4}
       className="ct-toaster group"
       toastOptions={{
+        className: "group toast font-sans",
         style: {
           background: "transparent",
           border: "none",

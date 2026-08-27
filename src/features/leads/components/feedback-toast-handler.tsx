@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, startTransition } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -49,24 +49,54 @@ export function FeedbackToastHandler({ userId }: { userId: string }) {
     if (notification.type !== "lead_feedback_reminder" || isGloballySnoozed()) return;
     const isUrgent = notification.title.includes("urgente");
     toast.custom((toastId) => (
-      <div className="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-lg">
+      <div className="group relative flex w-full max-w-sm flex-col gap-3 rounded-xl border border-amber-500/30 bg-card/95 p-3.5 shadow-lg backdrop-blur-md select-none dark:bg-card/90">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">Feedback pendente</p>
-            <p className="mt-0.5 text-sm font-medium text-foreground">{notification.title}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{notification.message}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Feedback pendente</p>
+            <p className="mt-0.5 text-xs font-semibold leading-relaxed text-foreground">{notification.title}</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{notification.message}</p>
           </div>
-          <button type="button" onClick={() => toast.dismiss(toastId)} className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Fechar">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <button
+            type="button"
+            onClick={() => toast.dismiss(toastId)}
+            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+            aria-label="Fechar"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          {notification.leadId ? <Button size="sm" className="flex-1 text-xs" onClick={() => { startTransition(() => router.push(`/leads/${notification.leadId}#feedback`)); toast.dismiss(toastId); }}>Registrar agora</Button> : null}
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={() => { snoozeAllFeedback(); toast.dismiss(toastId); }}>Lembrar depois</Button>
+        <div className="flex items-center gap-2 pt-0.5">
+          {notification.leadId ? (
+            <Button
+              size="sm"
+              className="flex-1 text-xs h-8"
+              onClick={() => {
+                startTransition(() => router.push(`/leads/${notification.leadId}#feedback`));
+                toast.dismiss(toastId);
+              }}
+            >
+              Registrar agora
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 text-xs h-8"
+            onClick={() => {
+              snoozeAllFeedback();
+              toast.dismiss(toastId);
+            }}
+          >
+            Lembrar depois
+          </Button>
         </div>
-        {isUrgent ? <p className="text-[10px] font-medium text-destructive">Limite de tentativas excedido. O gestor foi notificado.</p> : null}
+        {isUrgent ? (
+          <p className="text-[10px] font-medium text-destructive">Limite de tentativas excedido. O gestor foi notificado.</p>
+        ) : null}
       </div>
-    ), { duration: Infinity, position: "bottom-right", style: { padding: 0, background: "transparent", boxShadow: "none", border: "none", width: "auto" } });
+    ), { duration: Infinity, position: "bottom-right", id: `feedback-${notification.id}` });
   }, [router]);
 
   useEffect(() => {
