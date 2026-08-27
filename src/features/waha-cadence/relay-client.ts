@@ -67,8 +67,12 @@ export async function getWahaRelayHealth() {
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
   });
-  if (!response.ok) throw new Error("Relay WAHA indisponível.");
-  return response.json() as Promise<{ status: "ok"; sessions: Array<{ id: string; status: string }> }>;
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const errorMsg = data?.message || data?.error || response.statusText || "Serviço indisponível";
+    throw new Error(`Relay WAHA indisponível (HTTP ${response.status}: ${errorMsg}).`);
+  }
+  return data as { status: "ok"; sessions: Array<{ id: string; status: string }> };
 }
 
 async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELETE", payload?: unknown) {
@@ -89,7 +93,10 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
     signal: AbortSignal.timeout(15_000),
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error("O relay WAHA não confirmou a conexão.");
+  if (!response.ok) {
+    const errorMsg = data?.message || data?.error || response.statusText || "Falha na comunicação";
+    throw new Error(`O relay WAHA não confirmou a conexão (HTTP ${response.status}: ${errorMsg}).`);
+  }
   return relaySessionStateSchema.parse(data);
 }
 
