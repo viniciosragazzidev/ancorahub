@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -40,6 +40,7 @@ export async function getQualificationTenantSettings(tenantId: string) {
     .select()
     .from(schema.aiQualificationConfigs)
     .where(eq(schema.aiQualificationConfigs.tenantId, tenantId))
+    .orderBy(desc(schema.aiQualificationConfigs.updatedAt))
     .limit(1);
 
   if (existing) {
@@ -85,6 +86,7 @@ export async function getQualificationTenantSettings(tenantId: string) {
         .select()
         .from(schema.aiQualificationConfigs)
         .where(eq(schema.aiQualificationConfigs.tenantId, tenantId))
+        .orderBy(desc(schema.aiQualificationConfigs.updatedAt))
         .limit(1)
     )[0] ??
     null
