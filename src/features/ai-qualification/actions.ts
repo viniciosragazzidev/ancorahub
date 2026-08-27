@@ -6,6 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import {
   getQualificationTenantSettings,
   updateQualificationTenantSettings,
+  setQualificationEnabled,
   type UpdateTenantSettingsInput,
 } from "./tenant-settings-service";
 import {
@@ -61,6 +62,12 @@ export async function updateQualificationSettingsAction(input: UpdateTenantSetti
   assertAdminRole(context.role);
   const result = await updateQualificationTenantSettings(context.tenantId, context.userId, input);
   return result;
+}
+
+export async function toggleQualificationEnabledAction(enabled: boolean) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  return setQualificationEnabled(context.tenantId, context.userId, enabled);
 }
 
 export async function fetchTestNumbersAction() {

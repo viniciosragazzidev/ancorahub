@@ -13,23 +13,23 @@ export type PauseMode = (typeof pauseModeValues)[number];
 
 export const updateTenantSettingsSchema = z.object({
   enabled: z.boolean(),
-  pauseMode: z.enum(pauseModeValues).default("handoff_active"),
-  assistantName: z.string().trim().min(1).max(100).default("Assistente Âncora Corretora"),
-  initialMessage: z.string().trim().min(1).max(5000),
-  handoffMessage: z.string().trim().min(1).max(5000),
-  outOfHoursMessage: z.string().trim().min(1).max(5000).default("Recebemos sua mensagem. Nossa equipe responderá no próximo horário de atendimento."),
-  absenceMessage: z.string().trim().min(1).max(5000).default("No momento não há um corretor disponível. Deixaremos seu atendimento na fila."),
-  tone: z.string().trim().default("friendly"),
-  useEmojis: z.boolean().default(false),
-  timeoutMinutes: z.number().int().min(5).max(1440).default(30),
+  pauseMode: z.enum(pauseModeValues).optional().default("handoff_active"),
+  assistantName: z.string().trim().max(100).optional().default("Assistente Âncora Corretora"),
+  initialMessage: z.string().trim().max(5000).optional().default("Olá! Sou o assistente virtual da Âncora Corretora. Vou fazer algumas perguntas rápidas para preparar seu atendimento."),
+  handoffMessage: z.string().trim().max(5000).optional().default("Vou encaminhar você para um corretor da equipe agora."),
+  outOfHoursMessage: z.string().trim().max(5000).optional().default("Recebemos sua mensagem. Nossa equipe responderá no próximo horário de atendimento."),
+  absenceMessage: z.string().trim().max(5000).optional().default("No momento não há um corretor disponível. Deixaremos seu atendimento na fila."),
+  tone: z.string().trim().optional().default("friendly"),
+  useEmojis: z.boolean().optional().default(false),
+  timeoutMinutes: z.coerce.number().int().min(1).max(1440).optional().default(30),
   businessContext: z.string().trim().max(100000).optional().default(""),
   customInstructions: z.string().trim().max(100000).optional().default(""),
   /** Minutos de cooldown antes de repetir o mesmo template de quick reply (default: 10) */
-  quickReplyCooldownMinutes: z.number().int().min(1).max(60).default(10),
+  quickReplyCooldownMinutes: z.coerce.number().int().optional().default(10),
   /** Janela de tempo (minutos) para contar respostas de "aguardando" (default: 30) */
-  quickReplyWaitWindowMinutes: z.number().int().min(5).max(120).default(30),
+  quickReplyWaitWindowMinutes: z.coerce.number().int().optional().default(30),
   /** Máximo de respostas de "aguardando" antes de suprimir (default: 2) */
-  quickReplyWaitLimitCount: z.number().int().min(1).max(10).default(2),
+  quickReplyWaitLimitCount: z.coerce.number().int().optional().default(2),
 });
 
 export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;
@@ -133,6 +133,58 @@ export async function updateQualificationTenantSettings(
     entidade: "ai_qualification_config",
     entidadeId: tenantId,
     acao: data.enabled ? "qualification_settings.enabled" : "qualification_settings.disabled",
+  });
+
+  return getQualificationTenantSettings(tenantId);
+}
+
+export async function setQualificationEnabled(tenantId: string, actorUserId: string, enabled: boolean) {
+  const db = getDatabase();
+  const current = await getQualificationTenantSettings(tenantId);
+  const now = new Date();
+
+  if (current) {
+    await db
+      .update(schema.aiQualificationConfigs)
+      .set({
+        enabled,
+        updatedBy: actorUserId,
+        updatedAt: now,
+      })
+      .where(eq(schema.aiQualificationConfigs.tenantId, tenantId));
+  } else {
+    await db.insert(schema.aiQualificationConfigs).values({
+      id: randomUUID(),
+      tenantId,
+      enabled,
+      pauseMode: "handoff_active",
+      assistantName: "Assistente Âncora Corretora",
+      initialMessage: "Olá! Sou o assistente virtual da Âncora Corretora.",
+      finalMessage: "Obrigado! Um corretor continuará seu atendimento em seguida.",
+      handoffMessage: "Vou encaminhar você para um corretor da equipe agora.",
+      outOfHoursMessage: "Recebemos sua mensagem. Responderemos no próximo horário.",
+      absenceMessage: "No momento não há um corretor disponível.",
+      language: "pt-BR",
+      tone: "friendly",
+      useEmojis: false,
+      formOfAddress: "voce",
+      maxConversationMinutes: 30,
+      maxQuestions: 6,
+      objectives: ["understand_need", "route_to_broker"],
+      timeoutMinutes: 30,
+      maxRetries: 2,
+      createdAt: now,
+      updatedAt: now,
+      updatedBy: actorUserId,
+    });
+  }
+
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: actorUserId,
+    entidade: "ai_qualification_config",
+    entidadeId: tenantId,
+    acao: enabled ? "qualification_settings.enabled" : "qualification_settings.disabled",
   });
 
   return getQualificationTenantSettings(tenantId);

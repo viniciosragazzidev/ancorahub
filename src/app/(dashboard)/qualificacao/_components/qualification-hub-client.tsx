@@ -48,6 +48,7 @@ import { MetaTemplatesPanel } from "./meta-templates-panel";
 
 import {
   updateQualificationSettingsAction,
+  toggleQualificationEnabledAction,
   addTestNumberAction,
   removeTestNumberAction,
   resetMemoryAction,
@@ -324,28 +325,12 @@ export function QualificationHubClient({
     const nextVal = e.target.checked;
     setEnabled(nextVal);
     try {
-      await updateQualificationSettingsAction({
-        enabled: nextVal,
-        pauseMode: pauseMode as "finish_active" | "handoff_active" | "pause_immediately",
-        assistantName: assistantName.trim() || "Assistente AncoraHub",
-        initialMessage: initialMessage.trim() || "Olá! Sou o assistente virtual do AncoraHub. Vou fazer algumas perguntas rápidas para preparar seu atendimento.",
-        handoffMessage: handoffMessage.trim() || "Vou encaminhar você para um corretor da equipe agora.",
-        outOfHoursMessage: settings?.outOfHoursMessage || "Recebemos sua mensagem. Nossa equipe responderá no próximo horário de atendimento.",
-        absenceMessage: settings?.absenceMessage || "No momento não há um corretor disponível. Deixaremos seu atendimento na fila.",
-        tone: settings?.tone ?? "friendly",
-        useEmojis: settings?.useEmojis ?? false,
-        timeoutMinutes: Number(timeoutMinutes) || 30,
-        businessContext,
-        customInstructions,
-        quickReplyCooldownMinutes: settings?.quickReplyCooldownMinutes ?? 10,
-        quickReplyWaitWindowMinutes: settings?.quickReplyWaitWindowMinutes ?? 30,
-        quickReplyWaitLimitCount: settings?.quickReplyWaitLimitCount ?? 2,
-      });
+      await toggleQualificationEnabledAction(nextVal);
       toast.success(nextVal ? "Operação da IA ativada com sucesso!" : "Operação da IA pausada com sucesso!");
       router.refresh();
     } catch (err) {
       console.error("[qualification-hub] handleToggleEnabled error:", err);
-      toast.error("Erro ao alterar status da IA.");
+      toast.error(err instanceof Error ? err.message : "Erro ao alterar status da IA.");
       setEnabled(!nextVal);
     }
   };
