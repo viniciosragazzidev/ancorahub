@@ -27,6 +27,21 @@ describe("POST /api/internal/performance", () => {
     expect(recordFrontendMetric).toHaveBeenCalledWith({ route: "/leads", metric: "lcp", value: 321 });
   });
 
+  it("accepts the client route-navigation metric without retaining the query string", async () => {
+    const response = await POST(new Request("https://crm.ancorasaude.cloud/api/internal/performance", {
+      method: "POST",
+      body: JSON.stringify({ route: "/leads?page=2", metric: "route_navigation", value: 187 }),
+      headers: { "content-type": "application/json" },
+    }));
+
+    expect(response.status).toBe(200);
+    expect(recordFrontendMetric).toHaveBeenCalledWith({
+      route: "/leads",
+      metric: "route_navigation",
+      value: 187,
+    });
+  });
+
   it("rejects malformed and oversized telemetry", async () => {
     const malformed = await POST(new Request("https://crm.ancorasaude.cloud/api/internal/performance", {
       method: "POST",

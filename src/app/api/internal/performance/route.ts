@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 const performanceMetricSchema = z.object({
   route: z.string().min(1).max(160).startsWith("/"),
-  metric: z.enum(["ttfb", "lcp", "inp", "cls", "route_load"]),
+  metric: z.enum(["ttfb", "lcp", "inp", "cls", "route_load", "route_navigation"]),
   value: z.number().finite().min(0).max(300_000),
 });
 

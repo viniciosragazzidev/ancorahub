@@ -49,14 +49,17 @@ export default async function LeadsPage({
 }) {
   await connection();
   const context = await getRequiredTenantContext();
+  const capabilityPromise = hasEffectiveCapability({
+    tenantId: context.tenantId,
+    role: context.role,
+    jobTitle: context.jobTitle,
+    customRoleId: context.customRoleId ?? null,
+    permission: "acessar_leads",
+  });
+  const experienceModePromise =
+    context.role === "broker" ? getExperienceMode(context) : Promise.resolve("NORMAL" as const);
   if (
-    !(await hasEffectiveCapability({
-      tenantId: context.tenantId,
-      role: context.role,
-      jobTitle: context.jobTitle,
-      customRoleId: context.customRoleId ?? null,
-      permission: "acessar_leads",
-    }))
+    !(await capabilityPromise)
   )
     redirect("/access-denied");
 
@@ -64,7 +67,7 @@ export default async function LeadsPage({
   // Mantém a experiência simples do dashboard lite: lista leve com busca,
   // filtros de situação e acesso direto ao atendimento. As ações de aceitar,
   // abrir e atualizar continuam funcionando no detalhe do lead.
-  if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+  if (context.role === "broker" && (await experienceModePromise) === "LIGHT") {
     const [slaRow] = await getDatabase()
       .select({ minutes: schema.tenants.slaFirstContactMinutes })
       .from(schema.tenants)
@@ -168,15 +171,23 @@ export default async function LeadsPage({
 
   const period = parsePeriod(filters.period);
   const eligibleCampaignsOnly = filters.eligibleCampaigns === "1";
-  const systemSettings = new Map(
-    (
-      await getSystemSettings([
+  const systemSettingsPromise = getSystemSettings([
         "feature_central_atencao_stagnant_days",
         "feature_lead_management_actions_enabled",
         ...(eligibleCampaignsOnly ? [`meta_lead_capture_mode_${context.tenantId}`] : []),
-      ])
-    ).map((setting) => [setting.key, setting.value]),
-  );
+      ]);
+  const userBranchPromise = context.branchId
+    ? db
+        .select({ name: schema.branches.name })
+        .from(schema.branches)
+        .where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId)))
+        .limit(1)
+    : Promise.resolve([]);
+  const [systemSettingRows, userBranchRows] = await Promise.all([
+    systemSettingsPromise,
+    userBranchPromise,
+  ]);
+  const systemSettings = new Map(systemSettingRows.map((setting) => [setting.key, setting.value]));
 
   // Pagination parameters
   const pageParam = parseInt(filters.page ?? "1", 10);
@@ -239,11 +250,7 @@ export default async function LeadsPage({
 
   let isMatrix = false;
   if (context.branchId) {
-    const [userBranch] = await db
-      .select({ name: schema.branches.name })
-      .from(schema.branches)
-      .where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId)))
-      .limit(1);
+    const [userBranch] = userBranchRows;
     isMatrix = userBranch?.name?.toLowerCase() === "matriz";
   } else {
     isMatrix = true;

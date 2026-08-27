@@ -47,7 +47,7 @@ export type ExternalMetric = {
 export type FrontendMetric = {
   type: "frontend";
   route: string;
-  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load";
+  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load" | "route_navigation";
   value: number;
   timestamp: number;
 };

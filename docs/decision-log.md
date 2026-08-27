@@ -220,13 +220,16 @@ respeitam o escopo multi-tenant do papel.
 **Estado:** Aceita
 **Data:** 2026-07-23
 
-O cliente de banco mantém um limite pequeno por processo (padrão de uma conexão em
-runtime serverless), fecha conexões ociosas rapidamente e aceita `DB_POOL_MAX` como
-parâmetro operacional entre 1 e 10. Durante o build estático o limite temporário é
-maior para permitir os workers de geração. O proxy usa uma cache de cinco segundos
-somente para a consulta de identidade da sessão; permissões e dados de negócio
-continuam sempre sendo consultados e validados no servidor. O objetivo é evitar que
-prefetch/navegação de duas máquinas consuma o limite do projeto Supabase.
+O cliente de banco mantém um limite pequeno por processo, fecha conexões ociosas
+rapidamente e aceita `DB_POOL_MAX` como parâmetro operacional entre 1 e 10. O padrão
+do runtime serverless continua sendo uma conexão; a imagem Docker auto-hospedada usa
+duas conexões, pois o processo é longo e atende navegações concorrentes. Durante o
+build estático o limite temporário é maior para permitir os workers de geração. O
+proxy usa uma cache de cinco segundos somente para a consulta de identidade da
+sessão; permissões e dados de negócio continuam sempre sendo consultados e validados
+no servidor. O objetivo é evitar que prefetch/navegação de duas máquinas consuma o
+limite do projeto Supabase. Qualquer aumento acima de duas conexões exige medição de
+capacidade do pooler e configuração explícita de `DB_POOL_MAX` no orquestrador.
 
 ## DEC-053 - Início seguro do agente de atendimento
 

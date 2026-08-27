@@ -33,6 +33,22 @@ para os cron jobs da Vercel.
   operacional agendado, não pelo request do usuário. A rota também passa a
   consultar somente a página solicitada e consolida as configurações usadas
   nela em uma única leitura.
+- A navegação agora reaproveita o contexto autenticado e de tenant dentro do
+  mesmo render do React, sem compartilhar sessão, permissão ou dados entre
+  requests. O layout também inicia as leituras independentes em paralelo.
+- Dashboard passa a separar o shell autenticado da carga do conteúdo em uma
+  fronteira de streaming; o modo leve e os checks independentes do workspace
+  são executados em paralelo. A paginação de leads deixa de solicitar um
+  `router.refresh()` adicional depois da navegação e pré-carrega as páginas
+  adjacentes ao foco do usuário.
+- A telemetria passa a registrar `route_navigation`, medindo do clique no link
+  interno até a troca de rota, sempre reduzindo o caminho ao primeiro segmento
+  e sem registrar query string ou identificadores. O refresh por revisão de
+  leads na montagem foi removido: a resposta Server Component já é atual e a
+  revisão continua sendo consumida para não reaplicar eventos antigos.
+- A imagem Docker define `DB_POOL_MAX=2` para o processo Next persistente da
+  VPS. O Coolify pode reduzir ou elevar esse valor explicitamente; aumentos
+  acima de dois exigem medir a capacidade disponível no pooler do Supabase.
 
 ## Decisão operacional
 
@@ -57,6 +73,13 @@ job, status HTTP e duração.
 - `src/app/(dashboard)/leads/page.tsx`
 - `src/app/(dashboard)/leads/leads-workspace.tsx`
 - `src/app/(dashboard)/leads/leads-data-table.tsx`
+- `src/app/(dashboard)/leads/_components/leads-pagination.tsx`
+- `src/app/(dashboard)/leads/_components/leads-live-sync.tsx`
+- `src/app/(dashboard)/dashboard/page.tsx`
+- `src/shared/auth/session.ts`
+- `src/shared/auth/tenant-context.ts`
+- `src/shared/db/client.ts`
+- `Dockerfile`
 - `corretop-infra/scheduler/*`
 - `corretop-infra/infra/docker-compose.coolify.yml`
 

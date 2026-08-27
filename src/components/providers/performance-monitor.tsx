@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 /**
  * PerformanceMonitor — reports Web Vitals and route timing to the server.
@@ -11,13 +12,53 @@ import { useEffect, useRef } from "react";
  * - INP (Interaction to Next Paint)
  * - CLS (Cumulative Layout Shift)
  * - Route load duration
+ * - Client navigation completion after an internal link click
  *
  * Data is sent via beacon API (non-blocking) to avoid impacting performance.
  * No PII is sent — only route name and metric values.
  */
 export function PerformanceMonitor() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const routeStartRef = useRef<number>(performance.now());
   const reportedRef = useRef(new Set<string>());
+  const pendingNavigationRef = useRef<{ target: string; startedAt: number } | null>(null);
+
+  useEffect(() => {
+    const captureNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element | null)?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || anchor.target || anchor.hasAttribute("download")) return;
+
+      const target = new URL(anchor.href, window.location.href);
+      if (target.origin !== window.location.origin) return;
+
+      const current = `${window.location.pathname}${window.location.search}`;
+      const destination = `${target.pathname}${target.search}`;
+      if (destination === current) return;
+
+      pendingNavigationRef.current = {
+        target: normalizeRoute(target.pathname),
+        startedAt: performance.now(),
+      };
+    };
+
+    window.addEventListener("click", captureNavigation, true);
+    return () => window.removeEventListener("click", captureNavigation, true);
+  }, []);
+
+  useEffect(() => {
+    const pending = pendingNavigationRef.current;
+    const route = normalizeRoute(pathname);
+    if (!pending || pending.target !== route) return;
+
+    pendingNavigationRef.current = null;
+    reportMetric({
+      route,
+      metric: "route_navigation",
+      value: Math.round(performance.now() - pending.startedAt),
+    });
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     const routeStart = routeStartRef.current;
@@ -140,7 +181,7 @@ export function PerformanceMonitor() {
 
 type MetricPayload = {
   route: string;
-  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load";
+  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load" | "route_navigation";
   value: number;
 };
 

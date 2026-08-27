@@ -42,6 +42,7 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV DB_POOL_MAX=2
 
 RUN apk add --no-cache curl \
   && addgroup --system --gid 1001 nodejs \
