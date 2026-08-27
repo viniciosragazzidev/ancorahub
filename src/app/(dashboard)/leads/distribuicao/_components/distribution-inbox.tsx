@@ -157,7 +157,7 @@ function ActionForm({
 
   // Reset only after the action settles.  The visible queue is patched first;
   // refresh is merely reconciliation and can never keep the button pending.
-  const handledMutationRef = useRef<string | undefined>();
+  const handledMutationRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!state.mutationId || handledMutationRef.current === state.mutationId) return;
     handledMutationRef.current = state.mutationId;

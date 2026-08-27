@@ -21,6 +21,7 @@ import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
@@ -1261,7 +1262,30 @@ export async function processInboundAiResponse({
   });
   const hasPriorMessages = pastMessages.some((message) => !sourceIdentifier || message.messageId !== sourceIdentifier);
   const automationState: ConversationAutomationState = conversation.status === "HUMAN_ACTIVE" ? "HUMAN_IN_PROGRESS" : conversation.status === "WAITING_HUMAN" ? "WAITING_HUMAN" : "AI_ACTIVE";
-  const quickReplyEnabled = (await getSystemSetting("feature_ai_quick_reply_enabled")) !== "false";
+  const quickReplyEnabled = (await getSystemSetting(FEATURE_FLAGS.AI_QUICK_REPLY.key)) !== "false";
+
+  // Carregar configuração de cooldown do tenant (configurável pelo diretor em /agentes-ia)
+  const tenantQrConfig = quickReplyEnabled
+    ? await db
+        .select({
+          quickReplyCooldownMinutes: schema.aiQualificationConfigs.quickReplyCooldownMinutes,
+          quickReplyWaitWindowMinutes: schema.aiQualificationConfigs.quickReplyWaitWindowMinutes,
+          quickReplyWaitLimitCount: schema.aiQualificationConfigs.quickReplyWaitLimitCount,
+        })
+        .from(schema.aiQualificationConfigs)
+        .where(eq(schema.aiQualificationConfigs.tenantId, tenantId))
+        .limit(1)
+        .then((rows) => rows[0])
+    : null;
+
+  const cooldownConfig = tenantQrConfig
+    ? {
+        cooldownMinutes: tenantQrConfig.quickReplyCooldownMinutes ?? 10,
+        waitWindowMinutes: tenantQrConfig.quickReplyWaitWindowMinutes ?? 30,
+        waitLimitCount: tenantQrConfig.quickReplyWaitLimitCount ?? 2,
+      }
+    : undefined;
+
   const quickReply = quickReplyEnabled ? resolveQuickReply({
     body: userMessageBody,
     messageKind,
@@ -1270,6 +1294,7 @@ export async function processInboundAiResponse({
     hasPriorMessages,
     hasPendingQuestion: Boolean(currentMemory.lastQuestionAsked),
     cooldown: { lastTemplateKey: conversation.quickReplyLastTemplate, lastSentAt: conversation.quickReplyLastSentAt, waitWindowStartedAt: conversation.quickReplyWaitWindowStartedAt, waitResponseCount: conversation.quickReplyWaitResponseCount },
+    cooldownConfig,
   }) : { resolved: false as const, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
   if (quickReply.resolved) {
     const templates = await loadQuickReplyTemplates(tenantId);
@@ -1319,7 +1344,8 @@ export async function processInboundAiResponse({
         updatedAt: now,
       }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
     }
-    const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < 30 * 60 * 1000;
+    const waitWindowMs = (cooldownConfig?.waitWindowMinutes ?? 30) * 60 * 1000;
+    const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < waitWindowMs;
     const isWaitRule = quickReply.ruleKey === "waiting_human" || quickReply.ruleKey === "waiting_response";
     const waitCount = isWaitRule && !suppressed ? (waitWindowActive ? conversation.quickReplyWaitResponseCount + 1 : 1) : conversation.quickReplyWaitResponseCount;
     const nextState = quickReply.nextState ?? automationState;

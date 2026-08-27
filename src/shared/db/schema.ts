@@ -490,6 +490,12 @@ export const aiQualificationConfigs = pgTable(
     version: integer("version").notNull().default(1),
     timeoutMinutes: integer("timeout_minutes").notNull().default(30),
     maxRetries: integer("max_retries").notNull().default(2),
+    /** Minutos de cooldown antes de repetir o mesmo template de quick reply (default: 10) */
+    quickReplyCooldownMinutes: integer("quick_reply_cooldown_minutes").notNull().default(10),
+    /** Janela de tempo (minutos) para contar respostas de "aguardando" (default: 30) */
+    quickReplyWaitWindowMinutes: integer("quick_reply_wait_window_minutes").notNull().default(30),
+    /** Máximo de respostas de "aguardando" dentro da janela antes de suprimir (default: 2) */
+    quickReplyWaitLimitCount: integer("quick_reply_wait_limit_count").notNull().default(2),
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,

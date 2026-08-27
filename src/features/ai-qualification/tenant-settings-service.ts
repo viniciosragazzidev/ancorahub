@@ -23,6 +23,12 @@ export const updateTenantSettingsSchema = z.object({
   timeoutMinutes: z.number().int().min(5).max(1440).default(30),
   businessContext: z.string().trim().max(100000).optional().default(""),
   customInstructions: z.string().trim().max(100000).optional().default(""),
+  /** Minutos de cooldown antes de repetir o mesmo template de quick reply (default: 10) */
+  quickReplyCooldownMinutes: z.number().int().min(1).max(60).default(10),
+  /** Janela de tempo (minutos) para contar respostas de "aguardando" (default: 30) */
+  quickReplyWaitWindowMinutes: z.number().int().min(5).max(120).default(30),
+  /** Máximo de respostas de "aguardando" antes de suprimir (default: 2) */
+  quickReplyWaitLimitCount: z.number().int().min(1).max(10).default(2),
 });
 
 export type UpdateTenantSettingsInput = z.infer<typeof updateTenantSettingsSchema>;
@@ -109,6 +115,9 @@ export async function updateQualificationTenantSettings(
       timeoutMinutes: data.timeoutMinutes,
       businessContext: data.businessContext ?? "",
       customInstructions: data.customInstructions ?? "",
+      quickReplyCooldownMinutes: data.quickReplyCooldownMinutes,
+      quickReplyWaitWindowMinutes: data.quickReplyWaitWindowMinutes,
+      quickReplyWaitLimitCount: data.quickReplyWaitLimitCount,
       version: (current?.version ?? 0) + 1,
       updatedBy: actorUserId,
       updatedAt: now,

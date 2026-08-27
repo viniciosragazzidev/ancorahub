@@ -79,6 +79,9 @@ type QualificationHubProps = {
     customInstructions?: string | null;
     version: number;
     updatedAt: string | Date | null;
+    quickReplyCooldownMinutes?: number | null;
+    quickReplyWaitWindowMinutes?: number | null;
+    quickReplyWaitLimitCount?: number | null;
   } | null;
   testNumbers: Array<{
     id: string;
@@ -317,9 +320,12 @@ export function QualificationHubClient({
         absenceMessage: settings?.absenceMessage ?? "Sem corretores",
         tone: settings?.tone ?? "friendly",
         useEmojis: settings?.useEmojis ?? false,
-        timeoutMinutes: Number(timeoutMinutes) || 20,
+        timeoutMinutes: Number(timeoutMinutes) || 30,
         businessContext,
         customInstructions,
+        quickReplyCooldownMinutes: settings?.quickReplyCooldownMinutes ?? 10,
+        quickReplyWaitWindowMinutes: settings?.quickReplyWaitWindowMinutes ?? 30,
+        quickReplyWaitLimitCount: settings?.quickReplyWaitLimitCount ?? 2,
       });
       toast.success("Configurações e Prompt de Conhecimento salvos com sucesso!");
     } catch (err) {

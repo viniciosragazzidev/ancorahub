@@ -3,6 +3,7 @@ import "server-only";
 import { inArray, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { FEATURE_FLAGS, type FeatureFlagDefinition } from "@/shared/feature-flags/catalog";
 
 type DatabaseError = { code?: string; cause?: { code?: string } };
 
@@ -37,6 +38,26 @@ export async function getSystemSetting(key: string) {
   const [setting] = await getSystemSettings([key]);
   return setting?.value;
 }
+
+/**
+ * Busca o valor de uma feature flag pelo catálogo central.
+ * Usa o defaultValue do catálogo quando a chave não existe no banco,
+ * eliminando a necessidade de `?? "valor"` espalhados pelo código.
+ *
+ * @example
+ * const enabled = await getFeatureFlag(FEATURE_FLAGS.AI_QUICK_REPLY);
+ * // retorna "true" se não configurado, respeitando o default do catálogo
+ */
+export async function getFeatureFlag(flag: FeatureFlagDefinition): Promise<string> {
+  const stored = await getSystemSetting(flag.key);
+  return stored ?? flag.defaultValue;
+}
+
+/**
+ * Re-exporta o catálogo para uso em arquivos que já importam de system-settings.
+ * Prefira importar diretamente de @/shared/feature-flags/catalog quando possível.
+ */
+export { FEATURE_FLAGS };
 
 async function ensureSystemSettingsTable() {
   await getDatabase().execute(sql`

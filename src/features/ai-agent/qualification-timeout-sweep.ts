@@ -44,7 +44,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       .where(eq(schema.aiQualificationConfigs.tenantId, tenant.id))
       .limit(1);
 
-    const timeoutMinutes = Math.max(5, config?.timeoutMinutes ?? 20); // Default 20 minutos
+    const timeoutMinutes = Math.max(5, config?.timeoutMinutes ?? 30); // Default 30 minutos (alinhado com aiQualificationConfigs)
     const cutoffDate = new Date(now - timeoutMinutes * 60 * 1000);
 
     // Buscar leads em processo de qualificação sem resposta após o tempo limite
