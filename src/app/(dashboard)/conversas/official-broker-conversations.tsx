@@ -78,7 +78,7 @@ export function OfficialBrokerConversations({
 
   const normalized = query.trim().toLocaleLowerCase("pt-BR");
   const filtered = useMemo(() => {
-    return conversations.filter((conversation) => {
+    const list = conversations.filter((conversation) => {
       const matchesSearch =
         !normalized ||
         [conversation.name, conversation.branchName ?? "", conversation.phoneMasked].some((val) =>
@@ -95,6 +95,15 @@ export function OfficialBrokerConversations({
               : true;
 
       return matchesSearch && matchesStatus;
+    });
+
+    return list.sort((a, b) => {
+      const lastA = a.messages.at(-1)?.sentAt;
+      const lastB = b.messages.at(-1)?.sentAt;
+      const timeA = lastA ? new Date(lastA).getTime() : 0;
+      const timeB = lastB ? new Date(lastB).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return a.name.localeCompare(b.name, "pt-BR");
     });
   }, [conversations, normalized, statusFilter]);
 

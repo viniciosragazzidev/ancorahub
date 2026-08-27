@@ -18,6 +18,7 @@ import {
   type OfficialBrokerMessage,
 } from "./official-broker-conversations";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
+import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -394,6 +395,7 @@ export default async function ConversationsPage({
           purpose: schema.whatsappOutboundMessages.purpose,
           messageType: schema.whatsappOutboundMessages.messageType,
           templateName: schema.whatsappOutboundMessages.templateName,
+          variables: schema.whatsappOutboundMessages.variables,
           status: schema.whatsappOutboundMessages.status,
           createdAt: schema.whatsappOutboundMessages.createdAt,
           sentAt: schema.whatsappOutboundMessages.sentAt,
@@ -484,7 +486,7 @@ export default async function ConversationsPage({
       addMessage(broker.id, {
         id: `out:${message.id}`,
         direction: "outgoing",
-        body: describeOfficialOutbound(message.purpose, message.messageType, message.templateName),
+        body: formatOfficialOutboundBody(message.purpose, message.messageType, message.templateName, message.variables),
         sentAt: (
           message.readAt ??
           message.deliveredAt ??
@@ -504,10 +506,11 @@ export default async function ConversationsPage({
     for (const message of inboundMessages) {
       const broker = findBroker(null, message.phone);
       if (!broker) continue;
+      const cleanBody = message.body?.trim();
       addMessage(broker.id, {
         id: `in:${message.id}`,
         direction: "incoming",
-        body: message.body || "[Mensagem sem texto]",
+        body: cleanBody && cleanBody !== "[text]" ? cleanBody : "Mensagem recebida do corretor",
         sentAt: message.sentAt.toISOString(),
         status: "received",
       });
@@ -516,6 +519,9 @@ export default async function ConversationsPage({
     officialBrokerConversations = brokers
       .map((broker) => {
         const invitation = invitationByBroker.get(broker.id);
+        const brokerMsgs = (messagesByBroker.get(broker.id) ?? []).sort(
+          (left, right) => new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime(),
+        );
         return {
           brokerProfileId: broker.id,
           name: broker.name,
@@ -523,15 +529,21 @@ export default async function ConversationsPage({
           branchName: broker.branchName,
           invitationStatus: invitation?.status ?? null,
           invitationDeliveryStatus: invitation?.deliveryStatus ?? null,
-          messages: (messagesByBroker.get(broker.id) ?? []).sort(
-            (left, right) => new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime(),
-          ),
+          messages: brokerMsgs,
         };
       })
       .filter(
         (conversation) =>
           conversation.messages.length > 0 || Boolean(conversation.invitationStatus),
-      );
+      )
+      .sort((a, b) => {
+        const lastA = a.messages.at(-1)?.sentAt;
+        const lastB = b.messages.at(-1)?.sentAt;
+        const timeA = lastA ? new Date(lastA).getTime() : 0;
+        const timeB = lastB ? new Date(lastB).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return a.name.localeCompare(b.name, "pt-BR");
+      });
 
     await db
       .insert(schema.auditLogs)
@@ -621,7 +633,21 @@ function normalizeOutboundStatus(status: string): OfficialBrokerMessage["status"
     ? (status as OfficialBrokerMessage["status"])
     : "queued";
 }
-function describeOfficialOutbound(purpose: string, messageType: string, templateName: string) {
+function formatOfficialOutboundBody(
+  purpose: string,
+  messageType: string,
+  templateName: string,
+  rawVariables: unknown,
+): string {
+  const variables = Array.isArray(rawVariables) ? (rawVariables as string[]) : [];
+
+  if (messageType === "text" && variables[0]?.trim()) {
+    return variables[0].trim();
+  }
+
+  const resolved = resolveTemplateTextBody(purpose, variables);
+  if (resolved) return resolved;
+
   if (purpose === "brokerInvitation") return "Convite para criar o primeiro acesso no AncoraHub.";
   if (purpose === "newLeadAssignment") return "Oferta de novo lead enviada ao corretor.";
   if (purpose === "leadAssignmentConfirmed")
