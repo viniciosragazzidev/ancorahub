@@ -429,7 +429,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (!ids.length) return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
   const [loads, brokerLeadHistory, slaAttempts] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, activeCommercialStatuses))).groupBy(schema.leads.corretorId),
-    db.select({ brokerId: schema.leads.corretorId, status: schema.leads.status, assignedAt: schema.leads.assignedAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
+    db.select({ brokerId: schema.leads.corretorId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
   ]);
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
@@ -439,7 +439,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const conversionRate = history.length ? history.filter((item) => item.status === "converted").length / history.length : 0;
     const slaRate = attempts.length ? attempts.filter((item) => item.firstContactAt && item.firstContactAt <= item.feedbackDueAt).length / attempts.length : 0;
     const idleSince = history.reduce<Date | null>((newest, item) => !item.assignedAt ? newest : (!newest || item.assignedAt > newest ? item.assignedAt : newest), null);
-    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
+    const unstartedLeads = history.filter((item) => item.status === "distributed" || item.status === "new" || (!item.serviceStartedAt && !item.firstContactAt)).length;
+    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
   }), intelligentPolicy.value);
   const decision = resolveDistributionCandidate(ranked, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");

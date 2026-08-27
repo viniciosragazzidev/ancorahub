@@ -345,6 +345,9 @@ export async function manuallyChangeQualificationStageAction(input: {
           lead.nome,
           `lead-assigned:${randomUUID()}`,
         ).catch(console.error);
+      } else {
+        const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
+        void distributeQualifiedLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId }).catch((err) => console.warn("[manuallyChangeQualificationStageAction] Immediate distribution error:", err));
       }
 
       if (input.sendMessageToCustomer && lead.telefone) {
