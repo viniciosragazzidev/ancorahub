@@ -5,7 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { getFeatureFlag } from "@/features/system-settings/queries";
 
 export const pauseModeValues = ["finish_active", "handoff_active", "pause_immediately"] as const;
 export type PauseMode = (typeof pauseModeValues)[number];
@@ -13,11 +14,11 @@ export type PauseMode = (typeof pauseModeValues)[number];
 export const updateTenantSettingsSchema = z.object({
   enabled: z.boolean(),
   pauseMode: z.enum(pauseModeValues).default("handoff_active"),
-  assistantName: z.string().trim().min(2).max(100).default("Assistente Âncora Corretora"),
-  initialMessage: z.string().trim().min(5).max(5000),
-  handoffMessage: z.string().trim().min(5).max(5000),
-  outOfHoursMessage: z.string().trim().min(5).max(5000),
-  absenceMessage: z.string().trim().min(5).max(5000),
+  assistantName: z.string().trim().min(1).max(100).default("Assistente Âncora Corretora"),
+  initialMessage: z.string().trim().min(1).max(5000),
+  handoffMessage: z.string().trim().min(1).max(5000),
+  outOfHoursMessage: z.string().trim().min(1).max(5000).default("Recebemos sua mensagem. Nossa equipe responderá no próximo horário de atendimento."),
+  absenceMessage: z.string().trim().min(1).max(5000).default("No momento não há um corretor disponível. Deixaremos seu atendimento na fila."),
   tone: z.string().trim().default("friendly"),
   useEmojis: z.boolean().default(false),
   timeoutMinutes: z.number().int().min(5).max(1440).default(30),
@@ -136,11 +137,11 @@ export async function updateQualificationTenantSettings(
 }
 
 export async function isQualificationEnabledForTenant(tenantId: string): Promise<boolean> {
-  const [globalEngineEnabled, settings] = await Promise.all([
-    getSystemSetting("ai_enabled"),
+  const [globalEngineFlag, settings] = await Promise.all([
+    getFeatureFlag(FEATURE_FLAGS.AI_ENABLED),
     getQualificationTenantSettings(tenantId),
   ]);
 
-  if (globalEngineEnabled !== "true") return false;
+  if (globalEngineFlag === "false") return false;
   return Boolean(settings?.enabled);
 }

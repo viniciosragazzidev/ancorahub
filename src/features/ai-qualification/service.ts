@@ -31,12 +31,15 @@ function parseData(value: unknown): QualificationData {
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+
 async function qualificationEnabled() {
   const [feature, engine] = await Promise.all([
-    getSystemSetting("feature_ai_whatsapp_qualification_enabled"),
-    getSystemSetting("ai_enabled"),
+    getFeatureFlag(FEATURE_FLAGS.AI_WHATSAPP_QUALIFICATION),
+    getFeatureFlag(FEATURE_FLAGS.AI_ENABLED),
   ]);
-  return feature !== "false" && feature !== "disabled" && engine === "true";
+  return feature !== "false" && feature !== "disabled" && engine !== "false";
 }
 
 async function getOrCreateConfig(tenantId: string) {

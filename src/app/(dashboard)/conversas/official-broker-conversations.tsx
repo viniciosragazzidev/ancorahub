@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -8,20 +10,40 @@ import { Button } from "@/components/ui/button";
 import { ContextNote } from "@/components/ui/context-note";
 import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Marker, MarkerContent } from "@/components/ui/marker";
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageHeader } from "@/components/ui/message";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogPopup,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Buildings,
   ChatCircleText,
   InfoIcon,
   MagnifyingGlass,
   ShieldCheck,
-  UserCheck,
   WhatsappLogo,
 } from "@/components/huge-icons";
+import { FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+import {
+  sendBrokerTemplateAction,
+  sendBrokerDirectMessageAction,
+} from "@/features/broker-workspace/broker-template-actions";
+import {
+  fetchMetaTemplatesAction,
+  fetchFreeMessageTemplatesAction,
+} from "@/features/ai-qualification/actions";
 
 export type OfficialBrokerMessage = {
   id: string;
@@ -39,10 +61,19 @@ export type OfficialBrokerConversation = {
   brokerProfileId: string;
   name: string;
   phoneMasked: string;
+  phoneRaw?: string;
   branchName: string | null;
   invitationStatus: string | null;
   invitationDeliveryStatus: string | null;
   messages: OfficialBrokerMessage[];
+};
+
+type TemplateOption = {
+  id: string;
+  name: string;
+  category: string;
+  content: string;
+  type: "meta" | "free";
 };
 
 const deliveryLabels: Record<OfficialBrokerMessage["status"], string> = {
@@ -70,11 +101,70 @@ export function OfficialBrokerConversations({
   enabled: boolean;
   conversations: OfficialBrokerConversation[];
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(
-    conversations[0]?.brokerProfileId ?? null,
+    conversations[0]?.brokerProfileId ?? null
   );
+
+  // Input individual chat
+  const [directMessageText, setDirectMessageText] = useState("");
+  const [isSendingDirect, setIsSendingDirect] = useState(false);
+
+  // Dialogs State
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showSingleTemplateModal, setShowSingleTemplateModal] = useState(false);
+
+  // Template Options
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  // Bulk Target Selection
+  const [selectedBrokerIds, setSelectedBrokerIds] = useState<string[]>([]);
+  const [isSendingBulk, setIsSendingBulk] = useState(false);
+
+  // Carregar templates do banco
+  const loadTemplates = async () => {
+    setIsLoadingTemplates(true);
+    try {
+      const [metaRes, freeRes] = await Promise.all([
+        fetchMetaTemplatesAction().catch(() => []),
+        fetchFreeMessageTemplatesAction().catch(() => []),
+      ]);
+
+      const formattedMeta: TemplateOption[] = (metaRes || []).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        category: t.category || "Oficial Meta",
+        content: t.components?.find((c: any) => c.type === "BODY")?.text || `[Modelo Meta: ${t.name}]`,
+        type: "meta",
+      }));
+
+      const formattedFree: TemplateOption[] = (freeRes || []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        category: t.category || "Livre 24h",
+        content: t.content,
+        type: "free",
+      }));
+
+      const combined = [...formattedFree, ...formattedMeta];
+      setTemplates(combined);
+      if (combined.length > 0 && !selectedTemplateId) {
+        setSelectedTemplateId(combined[0].id);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar templates:", err);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
 
   const normalized = query.trim().toLocaleLowerCase("pt-BR");
   const filtered = useMemo(() => {
@@ -82,7 +172,7 @@ export function OfficialBrokerConversations({
       const matchesSearch =
         !normalized ||
         [conversation.name, conversation.branchName ?? "", conversation.phoneMasked].some((val) =>
-          val.toLocaleLowerCase("pt-BR").includes(normalized),
+          val.toLocaleLowerCase("pt-BR").includes(normalized)
         );
 
       const matchesStatus =
@@ -110,6 +200,95 @@ export function OfficialBrokerConversations({
   const selected =
     filtered.find((item) => item.brokerProfileId === selectedId) ?? filtered[0] ?? null;
 
+  // Selecionar todos os visíveis no disparo em massa
+  const handleOpenBulkModal = () => {
+    setSelectedBrokerIds(filtered.map((c) => c.brokerProfileId));
+    setShowBulkModal(true);
+  };
+
+  const activeTemplate = templates.find((t) => t.id === selectedTemplateId) || templates[0];
+
+  // Envio Direto de Mensagem Texto para 1 corretor
+  const handleSendDirectMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || !directMessageText.trim()) return;
+    setIsSendingDirect(true);
+    try {
+      const res = await sendBrokerDirectMessageAction({
+        brokerProfileId: selected.brokerProfileId,
+        body: directMessageText,
+      });
+      if (res.success) {
+        toast.success(`Mensagem enviada para ${selected.name}`);
+        setDirectMessageText("");
+        router.refresh();
+      } else {
+        toast.error(res.error || "Erro ao enviar mensagem.");
+      }
+    } catch (err) {
+      toast.error("Erro inesperado ao enviar mensagem.");
+    } finally {
+      setIsSendingDirect(false);
+    }
+  };
+
+  // Envio de Template Individual para o corretor selecionado
+  const handleSendSingleTemplate = async () => {
+    if (!selected || !activeTemplate) return;
+    setIsSendingDirect(true);
+    try {
+      const res = await sendBrokerTemplateAction({
+        brokerProfileIds: [selected.brokerProfileId],
+        templateType: activeTemplate.type,
+        templateId: activeTemplate.id,
+        templateName: activeTemplate.name,
+        content: activeTemplate.content,
+      });
+
+      if (res.success) {
+        toast.success(`Modelo enviado com sucesso para ${selected.name}!`);
+        setShowSingleTemplateModal(false);
+        router.refresh();
+      } else {
+        toast.error(res.error || "Erro ao enviar modelo.");
+      }
+    } catch (err) {
+      toast.error("Falha ao enviar modelo de mensagem.");
+    } finally {
+      setIsSendingDirect(false);
+    }
+  };
+
+  // Envio em Massa de Template para Múltiplos Corretores
+  const handleSendBulkTemplate = async () => {
+    if (!selectedBrokerIds.length || !activeTemplate) {
+      toast.error("Selecione ao menos um corretor e um modelo de mensagem.");
+      return;
+    }
+    setIsSendingBulk(true);
+    try {
+      const res = await sendBrokerTemplateAction({
+        brokerProfileIds: selectedBrokerIds,
+        templateType: activeTemplate.type,
+        templateId: activeTemplate.id,
+        templateName: activeTemplate.name,
+        content: activeTemplate.content,
+      });
+
+      if (res.success) {
+        toast.success(res.message);
+        setShowBulkModal(false);
+        router.refresh();
+      } else {
+        toast.error(res.error || "Erro no disparo em massa.");
+      }
+    } catch (err) {
+      toast.error("Erro ao realizar disparo em massa.");
+    } finally {
+      setIsSendingBulk(false);
+    }
+  };
+
   if (!enabled) {
     return (
       <section className="flex min-h-[26rem] items-center justify-center rounded-xl border border-border bg-card p-6">
@@ -127,7 +306,7 @@ export function OfficialBrokerConversations({
       aria-label="Conversas oficiais com corretores"
       className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
     >
-      {/* Visual Header matching Lead Workspace */}
+      {/* Header com Ações de Disparo */}
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -142,15 +321,22 @@ export function OfficialBrokerConversations({
                 <Badge variant="secondary">{conversations.length}</Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Histórico de convites, ofertas de leads e respostas enviadas pelo número oficial da corretora.
+                Envio individual ou em massa de mensagens e modelos oficiais para a equipe.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              onClick={handleOpenBulkModal}
+              size="sm"
+              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+            >
+              <Zap className="size-3.5 fill-current" />
+              Disparo em Massa
+            </Button>
             <Badge variant="outline" className="gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
               <ShieldCheck className="size-3.5" /> Canal Oficial Meta
             </Badge>
-            <Badge variant="secondary">Visão da Direção</Badge>
           </div>
         </div>
       </header>
@@ -161,7 +347,7 @@ export function OfficialBrokerConversations({
           aria-label="Corretores com histórico no canal oficial"
           className={cn(
             "flex min-h-0 flex-col border-r border-border bg-card",
-            selected && "max-lg:hidden",
+            selected && "max-lg:hidden"
           )}
         >
           <div className="grid gap-2 border-b border-border p-3">
@@ -187,7 +373,7 @@ export function OfficialBrokerConversations({
                 className="h-6 px-2 text-[11px] font-medium"
                 onClick={() => setStatusFilter("ALL")}
               >
-                Todos
+                Todos ({conversations.length})
               </Button>
               <Button
                 size="sm"
@@ -226,7 +412,7 @@ export function OfficialBrokerConversations({
                       "w-full rounded-lg p-3 text-left transition-all duration-150 relative",
                       isSelected
                         ? "bg-muted/90 shadow-xs border-l-2 border-primary pl-2.5"
-                        : "hover:bg-muted/40",
+                        : "hover:bg-muted/40"
                     )}
                   >
                     <div className="flex items-start gap-3">
@@ -286,7 +472,7 @@ export function OfficialBrokerConversations({
           aria-live="polite"
           className={cn(
             "flex min-h-0 flex-col bg-muted/10 dark:bg-muted/5",
-            !selected && "max-lg:hidden",
+            !selected && "max-lg:hidden"
           )}
         >
           {selected ? (
@@ -337,10 +523,16 @@ export function OfficialBrokerConversations({
                   </div>
                 </div>
 
-                <div className="hidden sm:flex items-center gap-2">
-                  <Badge variant="outline" className="gap-1.5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
-                    <WhatsappLogo className="size-3.5" /> Número Oficial
-                  </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setShowSingleTemplateModal(true)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <FileText className="size-3.5 text-blue-500" />
+                    Enviar Modelo
+                  </Button>
                 </div>
               </header>
 
@@ -348,7 +540,7 @@ export function OfficialBrokerConversations({
               <div className="border-b border-border bg-card/50 px-4 py-2">
                 <ContextNote variant="info" icon={InfoIcon} className="py-1.5 text-[11px]">
                   <span>
-                    Canal Oficial de Comunicação com a Equipe. As mensagens deste chat registram interações automáticas de convite, alertas de SLA e ofertas de leads.
+                    Canal Oficial de Comunicação. Envie mensagens diretas ou escolha um modelo cadastrado no sistema.
                   </span>
                 </ContextNote>
               </div>
@@ -374,23 +566,250 @@ export function OfficialBrokerConversations({
                     <EmptyState
                       icon={ChatCircleText}
                       title="Nenhuma mensagem no histórico"
-                      description="As mensagens enviadas pelo número oficial ou recebidas deste corretor aparecerão neste espaço."
+                      description="As mensagens enviadas pelo número oficial aparecerão neste espaço."
                     />
                   ) : null}
                 </div>
               </ScrollArea>
+
+              {/* Input Footer para envio de mensagem rápida ao corretor */}
+              <footer className="border-t border-border bg-card p-3 lg:px-4">
+                <form onSubmit={handleSendDirectMessage} className="flex items-center gap-2">
+                  <Input
+                    value={directMessageText}
+                    onChange={(e) => setDirectMessageText(e.target.value)}
+                    placeholder={`Enviar mensagem no WhatsApp para ${selected.name}...`}
+                    className="flex-1 text-xs"
+                    disabled={isSendingDirect}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowSingleTemplateModal(true)}
+                    className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    title="Escolher modelo pré-cadastrado"
+                  >
+                    <FileText className="size-4" />
+                    <span className="hidden sm:inline">Modelos</span>
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isSendingDirect || !directMessageText.trim()}
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <Send className="size-3.5" />
+                    Enviar
+                  </Button>
+                </form>
+              </footer>
             </>
           ) : (
             <div className="flex h-full items-center justify-center p-6">
               <EmptyState
                 icon={ChatCircleText}
                 title="Selecione um corretor"
-                description="Escolha um corretor da lista ao lado para visualizar o histórico de mensagens enviadas pelo canal oficial."
+                description="Escolha um corretor da lista ao lado para enviar mensagens pelo canal oficial."
               />
             </div>
           )}
         </section>
       </div>
+
+      {/* MODAL 1: Envio Individual de Template */}
+      <Dialog open={showSingleTemplateModal} onOpenChange={setShowSingleTemplateModal}>
+        <DialogPopup className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileText className="size-5 text-blue-500" />
+              Enviar Modelo para {selected?.name}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Escolha um modelo de mensagem Meta ou Modelo Livre (janela 24h) para enviar diretamente a este corretor.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">Selecione o Modelo de Mensagem</label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Selecione um modelo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((tpl) => (
+                    <SelectItem key={tpl.id} value={tpl.id} className="text-xs">
+                      {tpl.name} ({tpl.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {activeTemplate && (
+              <div className="space-y-1.5 rounded-lg border p-3 bg-muted/20">
+                <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span>Prévia com dados de {selected?.name}:</span>
+                  <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
+                    {activeTemplate.type === "meta" ? "Modelo Meta (Aprovado)" : "Modelo Livre (Janela 24h)"}
+                  </Badge>
+                </div>
+                <div className="rounded border bg-background p-3 text-xs font-mono whitespace-pre-wrap">
+                  {activeTemplate.content
+                    .replace(/\{\{\s*nome\s*\}\}/gi, selected?.name || "Corretor")
+                    .replace(/\{\{\s*empresa\s*\}\}/gi, "Âncora Corretora")
+                    .replace(/\{\{\s*telefone\s*\}\}/gi, selected?.phoneMasked || "")}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowSingleTemplateModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSendSingleTemplate}
+              disabled={isSendingDirect || !activeTemplate}
+              size="sm"
+              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Send className="size-3.5" />
+              {isSendingDirect ? "Enviando..." : "Confirmar e Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+
+      {/* MODAL 2: Disparo em Massa de Templates */}
+      <Dialog open={showBulkModal} onOpenChange={setShowBulkModal}>
+        <DialogPopup className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Zap className="size-5 text-emerald-500 fill-current" />
+              Disparo de Mensagens em Massa para Corretores
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Envie um modelo pré-aprovado ou de envio livre para múltiplos corretores da equipe de uma só vez.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Seleção de Template */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">1. Modelo de Mensagem a Disparar</label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Selecione um modelo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((tpl) => (
+                    <SelectItem key={tpl.id} value={tpl.id} className="text-xs">
+                      {tpl.name} ({tpl.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Prévia do Template */}
+            {activeTemplate && (
+              <div className="rounded-lg border p-3 bg-muted/20 space-y-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Prévia da Mensagem (exemplo com variáveisl):</span>
+                  <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
+                    {activeTemplate.type === "meta" ? "Meta Aprovado" : "Livre 24h"}
+                  </Badge>
+                </div>
+                <div className="rounded border bg-background p-2.5 text-xs font-mono whitespace-pre-wrap max-h-28 overflow-y-auto">
+                  {activeTemplate.content
+                    .replace(/\{\{\s*nome\s*\}\}/gi, "Nome do Corretor")
+                    .replace(/\{\{\s*empresa\s*\}\}/gi, "Âncora Corretora")}
+                </div>
+              </div>
+            )}
+
+            {/* Seleção de Corretores Destinatários */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-foreground">
+                  2. Selecione os Corretores ({selectedBrokerIds.length} selecionados)
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-2"
+                    onClick={() => setSelectedBrokerIds(filtered.map((c) => c.brokerProfileId))}
+                  >
+                    Selecionar Todos ({filtered.length})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-2 text-muted-foreground"
+                    onClick={() => setSelectedBrokerIds([])}
+                  >
+                    Limpar Seleção
+                  </Button>
+                </div>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto rounded-lg border p-2 space-y-1 bg-background">
+                {filtered.map((b) => {
+                  const isChecked = selectedBrokerIds.includes(b.brokerProfileId);
+                  return (
+                    <label
+                      key={b.brokerProfileId}
+                      className="flex items-center justify-between rounded p-2 text-xs hover:bg-muted/40 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedBrokerIds((prev) => [...prev, b.brokerProfileId]);
+                            } else {
+                              setSelectedBrokerIds((prev) => prev.filter((id) => id !== b.brokerProfileId));
+                            }
+                          }}
+                        />
+                        <div>
+                          <span className="font-semibold text-foreground">{b.name}</span>
+                          <span className="text-[11px] text-muted-foreground ml-2">({b.branchName ?? "Sem unidade"})</span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {b.phoneMasked}
+                      </Badge>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowBulkModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSendBulkTemplate}
+              disabled={isSendingBulk || !selectedBrokerIds.length || !activeTemplate}
+              size="sm"
+              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Zap className="size-3.5 fill-current" />
+              {isSendingBulk
+                ? "Disparando..."
+                : `Disparar para ${selectedBrokerIds.length} Corretor(es)`}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </section>
   );
 }
@@ -402,113 +821,51 @@ function MessageBubble({
   message: OfficialBrokerMessage;
   brokerName: string;
 }) {
-  const outgoing = message.direction === "outgoing";
-  const statusVariant =
-    message.status === "failed"
-      ? "destructive"
-      : message.status === "delivered" ||
-          message.status === "read" ||
-          message.status === "received"
-        ? "success"
-        : "secondary";
+  const isOutgoing = message.direction === "outgoing";
 
   return (
-    <Message align={outgoing ? "end" : "start"} className="ct-reveal-fast">
-      {outgoing ? null : (
-        <MessageAvatar>
-          <UserAvatar
-            name={brokerName}
-            seed={brokerName}
-            size="sm"
-            className="shrink-0"
-          />
-        </MessageAvatar>
+    <div
+      className={cn(
+        "flex w-full items-end gap-2",
+        isOutgoing ? "justify-end" : "justify-start"
       )}
+    >
+      {!isOutgoing ? (
+        <UserAvatar name={brokerName} seed={brokerName} size="sm" className="mb-1 shrink-0" />
+      ) : null}
 
-      <MessageContent>
-        <MessageHeader>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-tight",
-              outgoing ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
-            )}
-          >
-            {outgoing ? (
-              <>
-                <WhatsappLogo className="size-3 text-emerald-500" aria-hidden="true" />
-                <span>Número Oficial da Corretora</span>
-              </>
-            ) : (
-              <>
-                <UserCheck className="size-3 text-muted-foreground" aria-hidden="true" />
-                <span>{brokerName}</span>
-              </>
-            )}
-          </span>
-        </MessageHeader>
-
-        <Bubble align={outgoing ? "end" : "start"} variant="outline">
-          <BubbleContent
-            className={cn(
-              "max-w-lg text-xs leading-relaxed shadow-2xs transition-all",
-              outgoing
-                ? "border-emerald-500/20 bg-emerald-500/[0.06] dark:bg-emerald-500/10 text-foreground"
-                : "bg-card border-border text-foreground",
-            )}
-          >
-            <p className="whitespace-pre-wrap break-words leading-5 font-sans">
-              {message.body}
-            </p>
-
-            {message.status === "failed" && message.error ? (
-              <div className="mt-2 rounded bg-destructive/10 p-2 text-[11px] font-medium text-destructive">
-                {message.error}
-              </div>
-            ) : null}
+      <div className={cn("flex max-w-[85%] sm:max-w-[75%] flex-col gap-1", isOutgoing && "items-end")}>
+        <Bubble variant={isOutgoing ? "default" : "muted"}>
+          <BubbleContent className="text-xs leading-relaxed whitespace-pre-wrap">
+            {message.body}
           </BubbleContent>
         </Bubble>
 
-        <MessageFooter>
-          <time dateTime={message.sentAt} className="tabular-nums text-[10px]">
-            {formatFullDate(message.sentAt)}
-          </time>
-          <span aria-hidden="true" className="opacity-40">
-            •
-          </span>
-          <Badge variant={statusVariant} className="text-[9px] px-1.5 py-0 font-medium">
-            {deliveryLabels[message.status]}
-          </Badge>
-          {message.templateName ? (
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-mono">
-              {message.templateName}
-            </Badge>
+        <div className="flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
+          <time>{formatTime(message.sentAt)}</time>
+          {isOutgoing && message.status ? (
+            <>
+              <span>•</span>
+              <span className={cn(message.status === "failed" && "text-rose-500 font-semibold")}>
+                {deliveryLabels[message.status] ?? message.status}
+              </span>
+            </>
           ) : null}
-          {message.attempts && message.attempts > 1 ? (
-            <span className="text-[10px] text-muted-foreground">
-              {message.attempts} tentativas
-            </span>
-          ) : null}
-        </MessageFooter>
-      </MessageContent>
-    </Message>
+        </div>
+
+        {message.error ? (
+          <p className="px-1 text-[10px] text-rose-500 font-medium">{message.error}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
-function formatTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
-}
-
-function formatFullDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : new Intl.DateTimeFormat("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(date);
+function formatTime(isoDate: string) {
+  try {
+    const d = new Date(isoDate);
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
 }
