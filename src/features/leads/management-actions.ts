@@ -69,20 +69,16 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "reatribuiu_lead" });
     });
 
-    // Queue the durable official notification before returning. Delivery itself is
-    // performed only by the outbox job, so this action never waits on Meta.
-    const notificationResult = await notifyNewLead(lead.id, lead.tenantId, lead.branchId, input.brokerId, lead.nome).catch((error) => {
+    // Envia notificacoes de forma assincrona sem bloquear a resposta do Server Action
+    void notifyNewLead(lead.id, lead.tenantId, lead.branchId, input.brokerId, lead.nome).catch((error) => {
       console.warn("[reassignLeadAction] notification_enqueue_failed", {
         leadId: lead.id,
         tenantId: lead.tenantId,
         brokerId: input.brokerId,
         error: error instanceof Error ? error.message : "unknown_error",
       });
-      return undefined;
     });
-    if (notificationResult?.notificationError) {
-      console.warn("[reassignLeadAction] notification_enqueue_warning", { leadId: lead.id, tenantId: lead.tenantId, brokerId: input.brokerId });
-    }
+
     // Notify the previous broker that the lead was reassigned
     if (lead.corretorId && lead.corretorId !== input.brokerId) {
       void notifyLeadReassigned(lead.id, lead.tenantId, lead.corretorId, lead.nome).catch(console.error);

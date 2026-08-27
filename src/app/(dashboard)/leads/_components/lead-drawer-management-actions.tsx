@@ -266,6 +266,7 @@ export function LeadDrawerManagementActions({
       {mode === "reassign" ? (
         <form action={reassign} className="space-y-3">
           <input name="leadId" type="hidden" value={leadId} />
+          <input name="brokerId" type="hidden" value={brokerId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">Novo responsável</Label>
             <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>

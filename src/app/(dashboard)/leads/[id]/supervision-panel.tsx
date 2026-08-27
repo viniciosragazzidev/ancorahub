@@ -240,6 +240,7 @@ export function SupervisionPanel({
             {mode === "reassign" ? (
               <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4">
                 <input name="leadId" type="hidden" value={leadId} />
+                <input name="brokerId" type="hidden" value={brokerId} />
                 <div className="space-y-2">
                   <Label htmlFor="lead-reassign-broker-panel" className="text-xs">Selecionar novo corretor</Label>
                   <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>
