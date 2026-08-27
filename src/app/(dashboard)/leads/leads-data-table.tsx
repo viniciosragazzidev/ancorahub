@@ -40,6 +40,7 @@ import { LeadStatusBadge, LeadQualificationBadge } from "@/components/status-bad
 import { LeadHealthBadge, computeLeadHealth } from "@/features/leads/components/lead-health-badge";
 import { maskPhone, maskName } from "@/features/quotes/utils";
 import { QualifyingLeadActions } from "./_components/qualifying-lead-actions";
+import { LeadsPagination } from "./_components/leads-pagination";
 import type { LeadWorkspaceItem, QualifyingLeadItem } from "./leads-workspace";
 
 /* --- Sort chevron --- */
@@ -448,18 +449,27 @@ export function LeadsDataTable({
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-3 pt-3">
-            <Pagination
-              page={serverPagination?.currentPage ?? localPagination.pageIndex + 1}
-              totalPages={totalPages}
-              onChange={(p) => {
-                if (serverPagination) goToServerPage(p);
-                else table.setPageIndex(p - 1);
-              }}
-            />
-          </div>
-        )}
+        <LeadsPagination
+          currentPage={serverPagination?.currentPage ?? localPagination.pageIndex + 1}
+          totalPages={totalPages}
+          totalItems={serverPagination?.totalItems ?? data.length}
+          pageSize={serverPagination?.pageSize ?? localPagination.pageSize}
+          onPageChange={(p) => {
+            if (serverPagination) goToServerPage(p);
+            else table.setPageIndex(p - 1);
+          }}
+          onPageSizeChange={(newSize) => {
+            if (serverPagination) {
+              const params = new URLSearchParams(searchParams.toString());
+              params.set("pageSize", String(newSize));
+              params.set("page", "1");
+              router.push(`${pathname}?${params.toString()}`);
+            } else {
+              table.setPageSize(newSize);
+              setLocalPagination({ pageIndex: 0, pageSize: newSize });
+            }
+          }}
+        />
       </section>
     </div>
   );
@@ -712,15 +722,17 @@ export function QualifyingLeadsDataTable({
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-3 pt-3">
-            <Pagination
-              page={pagination.pageIndex + 1}
-              totalPages={totalPages}
-              onChange={(p) => table.setPageIndex(p - 1)}
-            />
-          </div>
-        )}
+        <LeadsPagination
+          currentPage={pagination.pageIndex + 1}
+          totalPages={totalPages}
+          totalItems={data.length}
+          pageSize={pagination.pageSize}
+          onPageChange={(p) => table.setPageIndex(p - 1)}
+          onPageSizeChange={(newSize) => {
+            table.setPageSize(newSize);
+            setPagination({ pageIndex: 0, pageSize: newSize });
+          }}
+        />
       </section>
     </div>
   );
