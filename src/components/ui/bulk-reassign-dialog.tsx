@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
 import { toast } from "sonner";
 import { UserSwitch } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -17,36 +17,51 @@ import {
 import { AppSelect } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { bulkReassignLeadsAction } from "@/app/(dashboard)/leads/status-actions";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 export function BulkReassignDialog({
   leadIds,
   brokers = [],
+  onCommitted,
 }: {
   leadIds: string[];
   brokers: Array<{ id: string; name: string; branchId: string | null }>;
+  onCommitted?: (input: { leadIds: string[]; brokerId: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedBrokerId, setSelectedBrokerId] = useState("");
+  const [visibleError, setVisibleError] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(
     bulkReassignLeadsAction,
     {},
   );
 
-  useEffect(() => {
-    if (state.success) {
-      toast.success(
-        state.message ?? `Reatribuição concluída para ${leadIds.length} lead(s).`,
-      );
-      setOpen(false);
+  const handleSuccess = useCallback((result: typeof state) => {
+    toast.success(result.message ?? `Reatribuição concluída para ${leadIds.length} lead(s).`);
+    setOpen(false);
+    setSelectedBrokerId("");
+    if (result.changedLeadIds?.length && result.brokerId) {
+      onCommitted?.({ leadIds: result.changedLeadIds, brokerId: result.brokerId });
+    }
+  }, [leadIds.length, onCommitted]);
+  const handleError = useCallback((result: typeof state) => {
+    if (!result.error) return;
+    setVisibleError(result.error);
+    toast.error(result.error);
+  }, []);
+
+  useActionDialogLifecycle({ state, pending, onSuccess: handleSuccess, onError: handleError });
+
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen && !pending) {
       setSelectedBrokerId("");
+      setVisibleError(null);
     }
-    if (state.error) {
-      toast.error(state.error);
-    }
-  }, [state, leadIds.length]);
+  }, [pending]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button size="sm" variant="outline"><UserSwitch className="size-4" /> Reatribuir</Button>} />
       <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-sm">
         <DialogHeader>
@@ -57,7 +72,7 @@ export function BulkReassignDialog({
             responsável.
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-4" onSubmit={() => setVisibleError(null)}>
           {leadIds.map((id) => (
             <input key={id} name="leadIds" type="hidden" value={id} />
           ))}
@@ -77,6 +92,12 @@ export function BulkReassignDialog({
               }))}
             />
           </div>
+
+          {visibleError && (
+            <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {visibleError}
+            </p>
+          )}
 
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" disabled={pending}>Cancelar</Button>} />

@@ -11,6 +11,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
 import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 
 const formDataSchema = z.object({
   dependentes: z.string().optional().nullable(),
@@ -149,6 +150,12 @@ export async function createManualLead(rawInput: unknown) {
   });
   await db.insert(schema.leadInteractions).values({ id: randomUUID(), leadId, userId: context.userId, tipo: assigned ? "system_alert" : "note", conteudo: assigned ? "Lead criado e distribuído automaticamente para um corretor disponível." : "Lead criado manualmente; aguardando corretor disponível." });
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: leadId, acao: "criou" });
+  void publishLeadInvalidation({
+    tenantId: context.tenantId,
+    actorId: context.userId,
+    branchIds: [branchId],
+    brokerIds: corretorId ? [corretorId] : [],
+  }).catch(() => undefined);
   
   // Keep WhatsApp outbox processing inside the server action. Vercel can
   // terminate a function immediately after returning, dropping unawaited work.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState, useId } from "react";
+import { useActionState, useCallback, useState, useId } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText } from "@/components/huge-icons";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 type Broker = { id: string; name: string };
 type TaskItem = { completedAt: string | null | Date };
@@ -58,29 +59,37 @@ export function SupervisionPanel({
   const [reassignVersion, setReassignVersion] = useState(0);
   const [assumeVersion, setAssumeVersion] = useState(0);
 
-  useEffect(() => {
-    if (reassignState.success) {
-      toast.success("Lead reatribuído e SLA reiniciado.");
-      setReassignVersion((v) => v + 1);
-    }
-    if (reassignState.error) {
-      toast.error(reassignState.error);
-      setReassignVersion((v) => v + 1);
-    }
-  }, [reassignState]);
-  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState, router]);
+  const handleReassignSuccess = useCallback(() => {
+    toast.success("Lead reatribuído e SLA reiniciado.");
+    setBrokerId("");
+    setReassignVersion((version) => version + 1);
+    router.refresh();
+  }, [router]);
+  const handleReassignError = useCallback((result: typeof reassignState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: reassignState,
+    pending: reassignPending,
+    onSuccess: handleReassignSuccess,
+    onError: handleReassignError,
+  });
 
-  useEffect(() => {
-    if (assumeState.success) {
-      toast.success("Lead assumido para investigação.");
-      setAssumeVersion((v) => v + 1);
-    }
-    if (assumeState.error) {
-      toast.error(assumeState.error);
-      setAssumeVersion((v) => v + 1);
-    }
-  }, [assumeState]);
-  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState, router]);
+  const handleAssumeSuccess = useCallback(() => {
+    toast.success("Lead assumido para investigação.");
+    setReason("");
+    setAssumeVersion((version) => version + 1);
+    router.refresh();
+  }, [router]);
+  const handleAssumeError = useCallback((result: typeof assumeState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: assumeState,
+    pending: assumePending,
+    onSuccess: handleAssumeSuccess,
+    onError: handleAssumeError,
+  });
 
   // SLA calculations
   const elapsedMinutes = Math.max(0, Math.round((Date.now() - stageEnteredAt.getTime()) / 60000));

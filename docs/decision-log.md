@@ -1,5 +1,24 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-087 — Resposta de mutação local-first em operações de Leads
+
+**Estado:** Aceita
+**Data:** 2026-08-27
+
+As mutações interativas de Leads que alteram a própria lista devem retornar um
+`mutationId` único e o resumo mínimo, sem PII, das entidades efetivamente
+alteradas. O cliente consome cada resposta uma única vez, encerra o estado
+pendente, fecha o diálogo de confirmação e aplica a alteração localmente antes
+da próxima leitura do Server Component. A resposta não depende de
+`router.refresh()` para parecer concluída.
+
+O servidor permanece a autoridade: entradas são validadas, tenant e permissões
+vêm da sessão, a transação e a auditoria continuam no servidor, e a próxima
+navegação ou sinal em tempo real reconcilia a projeção local. Após o commit, o
+servidor publica apenas a invalidação opaca do domínio `leads` para diretor,
+gestor de unidade e corretor elegíveis; nenhum dado de lead é levado ao canal.
+O contrato é a base para migrar gradualmente os demais diálogos de escrita.
+
 ## DEC-086 — Liveness independente de prontidão de dependências
 
 **Estado:** Aceita

@@ -224,6 +224,7 @@ export function LeadsWorkspace({
     totalPages: number;
   };
 }) {
+  const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
@@ -238,6 +239,13 @@ export function LeadsWorkspace({
     return saved?.hidden ?? [];
   });
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  // The next Server Component payload remains authoritative. This mirror only
+  // bridges a committed action response so the workspace never looks stale
+  // while the next navigation or realtime reconciliation is pending.
+  useEffect(() => {
+    setWorkspaceLeads(leads);
+  }, [leads]);
 
   const visibleStatuses = useMemo(
     () => orderedStatuses.filter((s) => !hiddenStatuses.includes(s)),
@@ -285,7 +293,7 @@ export function LeadsWorkspace({
     viewport.scrollTo({ left: 0, behavior: "smooth" });
   }, []);
 
-  const leadsIds = useMemo(() => leads.map((l) => l.id), [leads]);
+  const leadsIds = useMemo(() => workspaceLeads.map((l) => l.id), [workspaceLeads]);
   const multiSelect = useMultiSelect(leadsIds);
   const isMarketing = contextJobTitle === "marketing";
   const shouldMask = (lead: LeadWorkspaceItem) => {
@@ -294,18 +302,41 @@ export function LeadsWorkspace({
   const groupedLeads = useMemo(
     () =>
       Object.fromEntries(
-        kanbanStatuses.map((status) => [status, leads.filter((lead) => lead.status === status)]),
+        kanbanStatuses.map((status) => [status, workspaceLeads.filter((lead) => lead.status === status)]),
       ),
-    [leads],
+    [workspaceLeads],
   );
   const filteredBrokers = useMemo(() => {
     if (!selectedLead || !brokers) return [];
     return brokers.filter((b) => b.branchId === selectedLead.branchId);
   }, [selectedLead, brokers]);
 
-  const unassignedCount = useMemo(() => leads.filter((l) => !l.corretorId).length, [leads]);
+  const unassignedCount = useMemo(() => workspaceLeads.filter((l) => !l.corretorId).length, [workspaceLeads]);
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
+
+  const applyLeadPatch = useCallback((leadIds: string[], patch: (lead: LeadWorkspaceItem) => LeadWorkspaceItem) => {
+    const changedIds = new Set(leadIds);
+    setWorkspaceLeads((current) => current.map((lead) => changedIds.has(lead.id) ? patch(lead) : lead));
+    setSelectedLead((current) => current && changedIds.has(current.id) ? patch(current) : current);
+    multiSelect.clear();
+  }, [multiSelect.clear]);
+
+  const handleBulkStatusCommitted = useCallback(({ leadIds: changedLeadIds, newStatus }: { leadIds: string[]; newStatus: string }) => {
+    const stageEnteredAt = new Date().toISOString();
+    applyLeadPatch(changedLeadIds, (lead) => ({ ...lead, status: newStatus, stageEnteredAt }));
+  }, [applyLeadPatch]);
+
+  const handleBulkReassignCommitted = useCallback(({ leadIds: changedLeadIds, brokerId }: { leadIds: string[]; brokerId: string }) => {
+    const broker = brokers.find((item) => item.id === brokerId);
+    applyLeadPatch(changedLeadIds, (lead) => ({
+      ...lead,
+      corretorId: brokerId,
+      corretorNome: broker?.name ?? lead.corretorNome,
+      assignedAt: new Date().toISOString(),
+      distributionStatus: "assigned",
+    }));
+  }, [applyLeadPatch, brokers]);
 
   const selectionActions = useMemo(() => (
     <>
@@ -315,19 +346,21 @@ export function LeadsWorkspace({
             leadIds={multiSelect.selectedIds}
             role={contextRole}
             bulkStatusAction={bulkChangeLeadStatusAction}
+            onCommitted={handleBulkStatusCommitted}
           />
           <BulkReassignDialog
             leadIds={multiSelect.selectedIds}
             brokers={brokers}
+            onCommitted={handleBulkReassignCommitted}
           />
         </>
       )}
     </>
-  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers]);
+  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, handleBulkReassignCommitted, handleBulkStatusCommitted]);
 
 
-  const activeCount = useMemo(() => leads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [leads]);
-  const convertedCount = useMemo(() => leads.filter((l) => l.status === "converted").length, [leads]);
+  const activeCount = useMemo(() => workspaceLeads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [workspaceLeads]);
+  const convertedCount = useMemo(() => workspaceLeads.filter((l) => l.status === "converted").length, [workspaceLeads]);
   const leadsTrend = useMemo(() => {
     return Array.from({ length: 7 }, (_, index) => {
       const date = new Date();
@@ -336,7 +369,7 @@ export function LeadsWorkspace({
       const dayStart = date.getTime();
       const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
-      const dayLeads = leads.filter((lead) => {
+      const dayLeads = workspaceLeads.filter((lead) => {
         const createdAt = new Date(lead.createdAt).getTime();
         return createdAt >= dayStart && createdAt < dayEnd;
       });
@@ -347,7 +380,7 @@ export function LeadsWorkspace({
         converted: dayLeads.filter((lead) => lead.status === "converted").length,
       };
     });
-  }, [leads]);
+  }, [workspaceLeads]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveDragId(String(event.active.id));
@@ -477,7 +510,7 @@ export function LeadsWorkspace({
           <div className="space-y-4">
             <SelectionToolbar
               selectedCount={multiSelect.count}
-              totalCount={leads.length}
+              totalCount={workspaceLeads.length}
               onClear={multiSelect.clear}
             >
               {selectionActions}
@@ -490,13 +523,13 @@ export function LeadsWorkspace({
                     Leads qualificados & distribuídos
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    {leads.length} lead(s) no total · ordenados pela entrada mais recente.
+                    {workspaceLeads.length} lead(s) no total · ordenados pela entrada mais recente.
                   </CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 <LeadsDataTable
-                  leads={leads}
+                  leads={workspaceLeads}
                   contextRole={contextRole}
                   shouldMask={shouldMask}
                   slaFirstContactMinutes={slaFirstContactMinutes}
@@ -520,7 +553,7 @@ export function LeadsWorkspace({
         <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
           <SelectionToolbar
             selectedCount={multiSelect.count}
-            totalCount={leads.length}
+            totalCount={workspaceLeads.length}
             onClear={multiSelect.clear}
           >
             {selectionActions}

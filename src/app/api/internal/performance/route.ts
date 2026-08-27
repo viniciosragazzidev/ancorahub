@@ -23,7 +23,8 @@ function telemetryRoute(route: string): string {
   // Performance telemetry must never retain a lead id, phone number, or any
   // other user-provided segment. The first route segment is enough to group
   // the operational surface without storing navigation detail.
-  const segment = route.split("/").filter(Boolean)[0];
+  const pathname = route.split(/[?#]/, 1)[0] ?? "/";
+  const segment = pathname.split("/").filter(Boolean)[0];
   return segment?.replace(/[^a-z0-9-]/gi, "") ? `/${segment.replace(/[^a-z0-9-]/gi, "")}` : "/";
 }
 

@@ -185,9 +185,9 @@ type MetricPayload = {
   value: number;
 };
 
-function normalizeRoute(pathname: string): string {
+function normalizeRoute(pathname: string | null | undefined): string {
   // Replace UUIDs and numeric IDs with [id]
-  return pathname
+  return (pathname ?? "/")
     .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/[id]")
     .replace(/\/\d+/g, "/[id]");
 }
