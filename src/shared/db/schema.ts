@@ -2176,6 +2176,35 @@ export const leadDistributionPolicies = pgTable(
   ],
 );
 
+/** Dynamic multi-attribute routing rules matrix used to map leads to queues/branches/broker groups. */
+export const leadRoutingRules = pgTable(
+  "lead_routing_rules",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    priority: integer("priority").notNull().default(1),
+    enabled: boolean("enabled").notNull().default(true),
+    conditions: jsonb("conditions").$type<{
+      planTypes?: string[];
+      sources?: string[];
+      cities?: string[];
+      minLives?: number;
+      maxLives?: number;
+      qualificationStatuses?: string[];
+    }>().notNull().default({}),
+    targetType: text("target_type").notNull().default("queue"), // "queue" | "branch" | "broker_group" | "specific_broker"
+    targetId: text("target_id").notNull(),
+    fallbackQueueId: text("fallback_queue_id").references(() => leadQueues.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("lead_routing_rules_tenant_idx").on(table.tenantId, table.enabled, table.priority),
+  ],
+);
+
 /** Short-lived authorization grants created by an authenticated CRM session. */
 export const extensionAuthCodes = pgTable(
   "extension_auth_codes",
