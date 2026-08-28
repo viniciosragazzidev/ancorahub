@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
-import { AvailabilityToggle } from "@/app/(dashboard)/corretor/resumo/_components/availability-toggle";
+import { AvailabilityToggle } from "@/components/availability-toggle";
 import { formatDate } from "@/features/quotes/utils";
 import type { PerfilData } from "./perfil-tabs";
 
