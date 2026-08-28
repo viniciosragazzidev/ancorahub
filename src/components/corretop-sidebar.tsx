@@ -67,58 +67,26 @@ type SidebarSection = { label: string; items: SidebarItem[] };
 
 const navSections: SidebarSection[] = [
   {
-    label: "Visão geral",
+    label: "Operação Comercial",
     items: [
-      { label: "Resumo", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
-    ],
-  },
-  {
-    label: "Comercial",
-    items: [
+      { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
       { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
-      { label: "Conversas", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
-      { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
-      { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
-      { label: "Cotações", icon: SlidersHorizontal, url: "/cotacao", permission: "acessar_cotacoes" },
-      { label: "Tabelas de Vendas", icon: FileArrowDown, url: "/ferramentas-vendas/tabelas-personalizadas", permission: "acessar_ferramentas_vendas" },
     ],
   },
   {
-    label: "Automação & IA",
+    label: "Roteamento & Inteligência",
     items: [
-      { label: "Inteligência do Tenant", icon: BookOpen, url: "/inteligencia", permission: "acessar_qualificacao_ia" },
-      { label: "Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
-      { label: "Distribuição & Plantão", icon: Redistribute, url: "/leads/distribuicao", permission: "acessar_qualificacao_ia" },
-      { label: "Automações & Regras", icon: Sparkle, url: "/automacoes", permission: "acessar_configuracoes" },
+      { label: "Distribuição & Desempenho", icon: Redistribute, url: "/distribuicao", permission: "acessar_qualificacao_ia" },
+      { label: "Robô de Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
     ],
   },
   {
-    label: "Gestão",
+    label: "Estrutura & Conexões",
     items: [
       { label: "Equipe", icon: Users, url: "/equipe", permission: "convidar_corretor" },
-      { label: "Metas", icon: Target, url: "/metas", permission: "gerenciar_metas" },
-      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
-      { label: "Financeiro & Comissões", icon: CurrencyCircleDollar, url: "/financeiro", permission: "acessar_financeiro" },
-    ],
-  },
-  {
-    label: "Operação",
-    items: [
-      { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
-      { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
-      { label: "Catálogo de Produtos", icon: FolderSimple, url: "/catalogo", permission: "acessar_catalogo" },
-      { label: "Materiais de Divulgação", icon: BookOpen, url: "/materiais-divulgacao", permission: "acessar_materiais_divulgacao" },
-      { label: "NOC & Alertas", icon: Monitor, url: "/noc", permission: "ver_dashboard_equipe" },
-    ],
-  },
-  {
-    label: "Administração",
-    items: [
-      { label: "Marketing Meta", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
-      { label: "Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
       { label: "Unidades", icon: Buildings, url: "/filiais", permission: "acessar_configuracoes_unidade" },
-      { label: "Parâmetros", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
-      { label: "Guia do Sistema", icon: BookOpen, url: "/guia", permission: "acessar_guia" },
+      { label: "Entrada & Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
+      { label: "Configurações", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
     ],
   },
 ];
