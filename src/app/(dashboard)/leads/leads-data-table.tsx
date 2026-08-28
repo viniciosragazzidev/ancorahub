@@ -72,6 +72,14 @@ export function LeadsDataTable({
     data: tableData,
     columns,
     pageCount,
+    meta: {
+      onRowClick: (row: LeadRow) => {
+        const original = leads.find((l) => l.id === row.id);
+        if (original && onRowClick) {
+          onRowClick(original);
+        }
+      },
+    },
     initialState: {
       sorting: [{ id: "createdAt", desc: true }],
       columnPinning: { left: ["select", "name"], right: ["actions"] },
@@ -164,6 +172,14 @@ export function QualifyingLeadsDataTable({
     data: tableData,
     columns,
     pageCount: 1,
+    meta: {
+      onRowClick: (row: LeadRow) => {
+        const original = leads.find((l) => l.id === row.id);
+        if (original && onOpen) {
+          onOpen(original);
+        }
+      },
+    },
     initialState: {
       sorting: [{ id: "createdAt", desc: true }],
     },

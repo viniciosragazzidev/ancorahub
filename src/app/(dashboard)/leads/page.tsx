@@ -27,6 +27,9 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
+import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
+import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
+import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
 
 export default async function LeadsPage({
   searchParams,
@@ -44,6 +47,9 @@ export default async function LeadsPage({
     page?: string;
     pageSize?: string;
     period?: string;
+    filters?: string;
+    sort?: string;
+    joinOperator?: string;
     eligibleCampaigns?: string;
   }>;
 }) {
@@ -316,6 +322,21 @@ export default async function LeadsPage({
           ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), inArray(schema.leads.metaCampaignId, metaCampaignEligibility.campaignIds))
           : sql`false`;
 
+  // TableCN dynamic URL filters & sorting
+  let parsedTableFilters: ExtendedColumnFilter<any>[] = [];
+  try {
+    if (filters.filters) parsedTableFilters = JSON.parse(filters.filters);
+  } catch {}
+
+  let parsedTableSort: ExtendedColumnSort<any>[] = [];
+  try {
+    if (filters.sort) parsedTableSort = JSON.parse(filters.sort);
+  } catch {}
+
+  const joinOp = (filters.joinOperator as JoinOperator) ?? "and";
+  const tablecnFilter = buildDrizzleFilter(parsedTableFilters, leadsColumnMap, joinOp);
+  const tablecnOrderBy = buildDrizzleOrderBy(parsedTableSort, leadsSortMap);
+
   const qualifiedOrDistributedFilter = or(
     isNotNull(schema.leads.corretorId),
     ne(schema.leads.qualificationState, "IN_PROGRESS"),
@@ -328,6 +349,7 @@ export default async function LeadsPage({
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt),
     qualifiedOrDistributedFilter,
+    ...(tablecnFilter ? [tablecnFilter] : []),
     ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
@@ -343,6 +365,7 @@ export default async function LeadsPage({
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
 
   const offset = (page - 1) * pageSize;
+  const finalOrderBy = tablecnOrderBy.length > 0 ? tablecnOrderBy : [desc(schema.leads.createdAt)];
 
   const [
     totalCountResult,
@@ -385,7 +408,7 @@ export default async function LeadsPage({
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
       .where(where)
-      .orderBy(desc(schema.leads.createdAt))
+      .orderBy(...finalOrderBy)
       .limit(pageSize)
       .offset(offset),
     db
