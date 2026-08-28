@@ -25,10 +25,12 @@ import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
 import { RoutingSimulatorPanel } from "./_components/routing-simulator-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
+import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
+import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 
 export const dynamic = "force-dynamic";
 
-type DistributionView = "roteamento" | "filas" | "operar" | "plantao" | "saude_historico";
+type DistributionView = "roteamento" | "resumo_dia" | "filas" | "operar" | "plantao" | "saude_historico";
 type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
 
 const activeStatuses = [
@@ -48,8 +50,8 @@ export default async function LeadDistributionPage({
 }) {
   const params = await searchParams;
   const view: DistributionView =
-    params.view === "filas" || params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
-      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view as DistributionView))
+    params.view === "resumo_dia" || params.view === "resumo" || params.view === "filas" || params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
+      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view === "resumo" ? "resumo_dia" : (params.view as DistributionView)))
       : "roteamento";
 
   const queueFilter: QueueFilter =
@@ -134,6 +136,7 @@ export default async function LeadDistributionPage({
     metaAdRoutes,
     dutySchedules,
     routingRules,
+    brokerSummary,
   ] = await Promise.all([
     db
       .select({
@@ -319,6 +322,11 @@ export default async function LeadDistributionPage({
       .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), eq(schema.unitDutySchedules.status, "active")))
       .orderBy(schema.unitDutySchedules.name),
     fetchRoutingRules(context.tenantId),
+    fetchBrokerDailySummary(context.tenantId, {
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 0, 0, 0, 0),
+      endDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 23, 59, 59, 999),
+      branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
+    }),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -428,6 +436,13 @@ export default async function LeadDistributionPage({
                 brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
               />
             </div>
+          }
+          resumoDiaContent={
+            <BrokerDailySummaryPanel
+              initialData={brokerSummary}
+              branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+              canFilterBranch={context.role === "director"}
+            />
           }
           filasContent={
             <>
