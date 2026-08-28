@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, MagnifyingGlass, UserCheck, WhatsappLogo } from "@/components/huge-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
 
@@ -37,9 +37,6 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Clientes Conquistados ({clients.length})
           </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <ExperienceModeToggle variant="badge" />
         </div>
       </div>
 

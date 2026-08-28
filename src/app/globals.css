@@ -822,12 +822,52 @@ body {
   }
 }
 
+/* Pulse ring: expanding border ring for pairing indicator */
+.ct-pulse-ring {
+  animation: ct-pulse-expand 1.8s ease-out infinite;
+}
+
+@keyframes ct-pulse-expand {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+/* Connection success: smooth scale-up + glow */
+.ct-connect-success {
+  animation: ct-connect-pop 600ms var(--ease-smooth-out) both;
+}
+
+@keyframes ct-connect-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
   .ct-qr-enter,
   .ct-shimmer-text::before,
   .ct-connected-pulse,
-  .ct-waiting-breathe {
+  .ct-waiting-breathe,
+  .ct-pulse-ring,
+  .ct-connect-success {
     animation: none !important;
   }
 

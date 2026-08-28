@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, PaperPlaneTilt, WhatsappLogo } from "@/components/huge-icons";
+import { ArrowLeft, CheckCircle, PaperPlaneTilt, WhatsappLogo } from "@/components/huge-icons";
 import { WhatsAppConnectDialog } from "@/components/whatsapp/whatsapp-connect-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
+import {
+  getWhatsAppConnection,
+  getWhatsAppSessionStatus,
+} from "@/app/(dashboard)/settings/whatsapp-actions";
 import {
   sendLeadMessageAction,
   sendTenantOfficialChannelMessageAction,
@@ -20,6 +23,7 @@ import {
   REALTIME_SYNC_BROWSER_EVENT,
   type RealtimeSyncBrowserDetail,
 } from "@/components/providers/realtime-events";
+import { toast } from "sonner";
 
 export type LightConversationMessage = {
   id: string;
@@ -79,6 +83,8 @@ export function LightConversationsView({
   const [connection, setConnection] = useState<Awaited<
     ReturnType<typeof getWhatsAppConnection>
   > | null>(null);
+  const connectionPollInFlight = useRef(false);
+  const connectionReadyRef = useRef(whatsappConnected);
   const refreshConversations = useCallback(() => router.refresh(), [router]);
   useEffect(() => setConversations(serverConversations), [serverConversations]);
   useEffect(
@@ -90,27 +96,55 @@ export function LightConversationsView({
       ),
     [initialLeadId, serverConversations],
   );
-  useEffect(() => {
-    void getWhatsAppConnection()
-      .then(setConnection)
-      .catch(() => undefined);
+  const refreshConnection = useCallback(async ({ announce = false }: { announce?: boolean } = {}) => {
+    const next = await getWhatsAppConnection();
+    const wasReady = connectionReadyRef.current;
+    const isReady = next.status === "ready" && next.chatInternoAtivo;
+    connectionReadyRef.current = isReady;
+    setConnection(next);
+    if (announce && isReady && !wasReady) {
+      toast.success("WhatsApp conectado. Sua carteira está pronta para atendimento.");
+    }
+    return next;
   }, []);
+  useEffect(() => {
+    void refreshConnection().catch(() => undefined);
+  }, [refreshConnection]);
   useEffect(() => {
     const onConversationInvalidated = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.kind === "domain.invalidated" && detail.domain === "conversations") {
+      if (detail?.kind !== "domain.invalidated") return;
+      if (detail.domain === "whatsapp_connection") {
+        void refreshConnection({ announce: true })
+          .then(() => refreshConversations())
+          .catch(() => refreshConversations());
+        return;
+      }
+      if (detail.domain === "conversations") {
         refreshConversations();
       }
     };
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
     return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
-  }, [refreshConversations]);
+  }, [refreshConnection, refreshConversations]);
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") refreshConversations();
-    }, 30_000);
+    if (!connection?.sessionId || connection.status !== "initializing") return;
+    const reconcile = async () => {
+      if (document.visibilityState !== "visible" || connectionPollInFlight.current) return;
+      connectionPollInFlight.current = true;
+      try {
+        const result = await getWhatsAppSessionStatus();
+        if (result.success) await refreshConnection({ announce: true });
+      } catch {
+        // O webhook continua sendo a via principal; falha transitória não bloqueia a tela.
+      } finally {
+        connectionPollInFlight.current = false;
+      }
+    };
+    void reconcile();
+    const interval = window.setInterval(() => void reconcile(), 2_000);
     return () => window.clearInterval(interval);
-  }, [refreshConversations]);
+  }, [connection?.sessionId, connection?.status, refreshConnection]);
   const selected = conversations.find((item) => item.id === selectedId) ?? null;
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
@@ -150,7 +184,11 @@ export function LightConversationsView({
         ),
     );
   }
-  if (!whatsappConnected) return <ConnectionEmptyState connection={connection} />;
+  const hasActiveConnection =
+    whatsappConnected || (connection?.status === "ready" && connection.chatInternoAtivo);
+  if (!hasActiveConnection) {
+    return <ConnectionEmptyState connection={connection} onConnectionChanged={() => refreshConnection({ announce: true })} />;
+  }
   return (
     <section className="flex h-[calc(100dvh-var(--header-height,3.5rem))] min-h-[38rem] max-lg:min-h-0 overflow-hidden border-y border-border/70 bg-background lg:border">
       <aside
@@ -179,6 +217,7 @@ export function LightConversationsView({
                 initial={connection}
                 triggerLabel="WhatsApp"
                 connectedLabel="WhatsApp"
+                onConnectionChanged={() => refreshConnection({ announce: true })}
               />
             ) : (
               <Button size="sm" variant="outline" disabled>
@@ -272,24 +311,101 @@ export function LightConversationsView({
 
 function ConnectionEmptyState({
   connection,
+  onConnectionChanged,
 }: {
   connection: Awaited<ReturnType<typeof getWhatsAppConnection>> | null;
+  onConnectionChanged: () => void;
 }) {
+  const [pairingActive, setPairingActive] = useState(false);
+  const pollRef = useRef(false);
+
+  // Live polling: when a session is pairing, check status every 2s outside dialog
+  useEffect(() => {
+    if (!connection?.sessionId || connection.status === "ready") {
+      setPairingActive(false);
+      return;
+    }
+    setPairingActive(true);
+    const check = async () => {
+      if (pollRef.current) return;
+      pollRef.current = true;
+      try {
+        await getWhatsAppSessionStatus();
+        // Notificar o parent — ele faz fetch do server e atualiza tudo
+        onConnectionChanged();
+      } catch {
+        // Silent — webhook is the primary path
+      } finally {
+        pollRef.current = false;
+      }
+    };
+    void check();
+    const timer = window.setInterval(check, 2_000);
+    return () => window.clearInterval(timer);
+  }, [connection?.sessionId, connection?.status]);
+
+  const isPairing = pairingActive && connection?.sessionId && connection.status !== "ready";
+
   return (
     <div className="mx-auto flex min-h-[32rem] w-full max-w-md flex-col items-center justify-center px-5 text-center">
-      <span className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
-        <WhatsappLogo className="size-8" />
-      </span>
-      <h1 className="mt-5 text-xl font-semibold tracking-tight">Conecte seu WhatsApp</h1>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        O WhatsApp é necessário para enviar e receber mensagens no atendimento Lite.
-      </p>
+      {/* Status icon with animated states */}
+      <div className="relative">
+        <span
+          className={cn(
+            "grid size-16 place-items-center rounded-2xl transition-all duration-500",
+            connection?.status === "ready"
+              ? "bg-emerald-100 text-emerald-600 scale-110"
+              : isPairing
+                ? "bg-primary/10 text-primary"
+                : "bg-primary/10 text-primary",
+          )}
+        >
+          {connection?.status === "ready" ? (
+            <CheckCircle className="size-8 ct-qr-enter" />
+          ) : (
+            <WhatsappLogo className={cn("size-8", isPairing && "ct-waiting-breathe")} />
+          )}
+        </span>
+        {/* Pairing pulse ring */}
+        {isPairing && (
+          <span className="absolute inset-0 rounded-2xl border-2 border-primary/30 ct-pulse-ring" />
+        )}
+      </div>
+
+      {connection?.status === "ready" ? (
+        <>
+          <h1 className="mt-5 text-xl font-semibold tracking-tight ct-qr-enter">WhatsApp conectado!</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground ct-qr-enter">
+            Sua carteira está pronta para atendimento.
+          </p>
+        </>
+      ) : isPairing ? (
+        <>
+          <h1 className="mt-5 text-xl font-semibold tracking-tight">Pareando WhatsApp…</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Escaneie o QR Code no seu celular. Assim que conectar, esta tela será atualizada automaticamente.
+          </p>
+          <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+            Verificando conexão a cada 2 segundos
+          </div>
+        </>
+      ) : (
+        <>
+          <h1 className="mt-5 text-xl font-semibold tracking-tight">Conecte seu WhatsApp</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            O WhatsApp é necessário para enviar e receber mensagens no atendimento Lite.
+          </p>
+        </>
+      )}
+
       {connection ? (
         <div className="mt-6">
           <WhatsAppConnectDialog
             initial={connection}
             triggerLabel="Conectar WhatsApp"
             connectedLabel="Gerenciar conexão"
+            onConnectionChanged={onConnectionChanged}
           />
         </div>
       ) : (

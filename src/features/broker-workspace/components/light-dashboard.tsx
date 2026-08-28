@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogPopup, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AncoraLogo } from "@/components/ancora-logo";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
@@ -82,7 +82,6 @@ export function LightDashboard({
           >
             {loggingOut ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <SignOut className="size-4" />}
           </button>
-          <ExperienceModeToggle variant="badge" />
         </div>
       </header>
 

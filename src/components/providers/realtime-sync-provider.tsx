@@ -64,7 +64,7 @@ const REALTIME_FAILURE_GRACE_MS = 5_000;
 export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pathname: string): boolean {
   return !(
     detail.kind === "domain.invalidated" &&
-    detail.domain === "conversations" &&
+    (detail.domain === "conversations" || detail.domain === "whatsapp_connection") &&
     pathname.startsWith("/conversas")
   );
 }

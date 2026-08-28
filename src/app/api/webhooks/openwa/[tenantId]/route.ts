@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
+import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
 import { getOpenWaContact, normalizeOpenWaStatus } from "@/lib/integrations/openwa";
 import { processInboundAiResponse } from "@/features/ai-agent/conversation-state-machine";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
@@ -33,6 +34,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   if ((eventName.includes("session") && eventName.includes("status")) || (typeof eventStatus === "string" && sessionStatuses.includes(eventStatus.toLowerCase()))) {
     const status = normalizeOpenWaStatus(eventStatus);
     await db.update(schema.whatsappConnections).set({ status, qrCode: status === "ready" ? null : undefined, connectedAt: status === "ready" ? new Date() : undefined, chatInternoAtivo: status === "ready" ? true : connection.active, updatedAt: new Date() }).where(eq(schema.whatsappConnections.id, connection.id));
+    revalidatePath("/conversas/broker");
+    if (connection.userId) {
+      void publishDomainInvalidation([{ tenantId, userId: connection.userId }], "whatsapp_connection");
+      void publishDomainInvalidation([{ tenantId, userId: connection.userId }], "conversations");
+    }
+    console.info("[waha.lite.connection_webhook_updated]", { status });
     return NextResponse.json({ accepted: true, status });
   }
   if (!connection.active) return NextResponse.json({ accepted: true, discarded: true });

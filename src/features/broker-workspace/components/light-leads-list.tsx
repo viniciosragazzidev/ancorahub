@@ -11,7 +11,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+
 import { cn } from "@/lib/utils";
 
 export type LightLeadItem = {
@@ -120,7 +120,6 @@ export function LightLeadsList({
           >
             <HelpCircle className="size-4" />
           </button>
-          <ExperienceModeToggle variant="badge" />
         </div>
       </div>
 

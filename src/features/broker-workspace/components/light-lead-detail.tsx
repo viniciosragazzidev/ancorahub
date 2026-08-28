@@ -33,7 +33,7 @@ import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-act
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+
 import { cn } from "@/lib/utils";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
@@ -419,7 +419,6 @@ export function LightLeadDetail({
           <ArrowLeft className="size-4" />
           Meus Leads
         </Link>
-        <ExperienceModeToggle variant="pill" />
       </div>
 
       {/* Sale Success Victory Animation Banner */}

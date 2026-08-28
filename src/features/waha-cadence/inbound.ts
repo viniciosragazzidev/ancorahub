@@ -182,6 +182,10 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
           [{ tenantId: source.connection.tenantId, userId: source.connection.userId }],
           "conversations",
         );
+        void publishDomainInvalidation(
+          [{ tenantId: source.connection.tenantId, userId: source.connection.userId }],
+          "whatsapp_connection",
+        );
       }
     }
 
