@@ -144,6 +144,12 @@ export async function enqueueWahaAiReply(input: { tenantId: string; runId: strin
     messageBody: body,
     idempotencyKey: `waha-ai:${run.id}:${id}`,
   });
+
+  // Disparar o envio imediato da resposta de IA sem esperar pelo ciclo do cron
+  void runWahaCadenceProcessor({ limit: 10 }).catch((err) =>
+    console.warn("[enqueueWahaAiReply] Immediate delivery flush failed", err)
+  );
+
   return id;
 }
 

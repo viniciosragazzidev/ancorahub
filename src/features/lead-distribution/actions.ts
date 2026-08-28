@@ -1,31 +1,65 @@
 "use server";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import {
   routeLeadToBranch,
   assignLeadToBroker,
-  processQueuedLead,
   routeLeadToBranchAndAssignBroker,
 } from "./service";
-import { enqueueLeadDistributionJob } from "./jobs";
+import { enqueueLeadDistributionJob, runLeadDistributionProcessor } from "./jobs";
+import { isWithinBusinessHours } from "@/shared/time/business-hours";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
-import { retryLeadEffectForTenant } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 
 export type DistributionActionState = {
   success?: boolean;
   message?: string;
   error?: string;
+  mutationId?: string;
+  entity?: {
+    leadId: string;
+    branchId?: string;
+    corretorId: string | null;
+    distributionStatus: "queued" | "unassigned" | "assigned";
+  };
   processed?: number;
+  processedLeadIds?: string[];
   conflicts?: number;
   campaignConflict?: { campaignId: string; queueName: string | null; leadId: string; branchId: string };
 };
 const leadId = z.string().uuid();
 const branchId = z.string().uuid();
 const brokerId = z.string().uuid();
+
+/**
+ * The transaction/queue insertion is the user-visible commit.  Processor work
+ * and cross-tab reconciliation must never keep a Server Action pending.
+ */
+function continueLeadDistributionAfterResponse(input: {
+  tenantId: string;
+  leadId: string;
+  actorId: string;
+  branchId?: string;
+}) {
+  void publishLeadInvalidation({
+    tenantId: input.tenantId,
+    actorId: input.actorId,
+    branchIds: input.branchId ? [input.branchId] : undefined,
+  }).catch(() => {});
+
+  scheduleAfterResponse("lead-distribution-processor", () =>
+    runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
+  );
+  scheduleAfterResponse("lead-assignment-effects", () =>
+    runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
+  );
+}
 
 const distributionPolicySchema = z.object({
   excludedBrokerIds: z.array(z.string().uuid()).default([]),
@@ -228,6 +262,7 @@ export async function routeLeadToBranchAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
   const parsed = z
     .object({ leadId, branchId, reason: z.string().trim().min(3).max(200).optional(), overrideCampaign: z.coerce.boolean().optional() })
     .safeParse({
@@ -237,7 +272,7 @@ export async function routeLeadToBranchAction(
       overrideCampaign: formData.get("overrideCampaign") === "true" ? true : undefined,
     });
   if (!parsed.success)
-    return { error: parsed.error.issues[0]?.message ?? "Selecione uma unidade válida." };
+    return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione uma unidade válida." };
   try {
     const context = await getRequiredTenantContext();
     const result = await routeLeadToBranch(
@@ -249,20 +284,39 @@ export async function routeLeadToBranchAction(
     );
     if (result.status === "campaign_conflict")
       return {
+        mutationId,
         error: "Este lead pertence a uma campanha vinculada a outra fila.",
         campaignConflict: { campaignId: result.campaignId, queueName: result.queueName, leadId: parsed.data.leadId, branchId: parsed.data.branchId },
       };
     if (result.status !== "routed")
       return {
+        mutationId,
         error:
           result.status === "conflict"
             ? "Este lead já foi atribuído."
             : "A unidade não pode receber leads agora.",
       };
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
-    return { success: true, message: "Lead enviado para a fila da unidade." };
+    continueLeadDistributionAfterResponse({
+      tenantId: context.tenantId,
+      leadId: parsed.data.leadId,
+      actorId: context.userId,
+      branchId: parsed.data.branchId,
+    });
+    return {
+      success: true,
+      mutationId,
+      message: "Lead enviado para a unidade. A distribuição seguirá em segundo plano.",
+      entity: {
+        leadId: parsed.data.leadId,
+        branchId: parsed.data.branchId,
+        corretorId: null,
+        distributionStatus: result.queueId ? "queued" : "unassigned",
+      },
+    };
   } catch (error) {
     return {
+      mutationId,
       error:
         error instanceof Error ? error.message : "Não foi possível enviar o lead para a unidade.",
     };
@@ -273,6 +327,7 @@ export async function assignLeadToBrokerAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
   const parsed = z
     .object({ leadId, brokerId, reason: z.string().trim().min(3).max(200).optional() })
     .safeParse({
@@ -281,22 +336,34 @@ export async function assignLeadToBrokerAction(
       reason: String(formData.get("reason") ?? "") || undefined,
     });
   if (!parsed.success)
-    return { error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
+    return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
   try {
+    const context = await getRequiredTenantContext();
     const result = await assignLeadToBroker(
-      await getRequiredTenantContext(),
+      context,
       parsed.data.leadId,
       parsed.data.brokerId,
       undefined,
       parsed.data.reason,
     );
-    if (result.status !== "assigned") return { error: result.reason };
-    const message = result.notificationWarnings?.length
-      ? `Lead atribuído ao corretor. Aviso: ${result.notificationWarnings.join("; ")}`
-      : "Lead atribuído ao corretor.";
-    return { success: true, message };
+    if (result.status !== "assigned") return { mutationId, error: result.reason };
+    continueLeadDistributionAfterResponse({
+      tenantId: context.tenantId,
+      leadId: parsed.data.leadId,
+      actorId: context.userId,
+    });
+    return {
+      success: true,
+      mutationId,
+      message: "Lead atribuído ao corretor. O aviso seguirá em segundo plano.",
+      entity: {
+        leadId: parsed.data.leadId,
+        corretorId: parsed.data.brokerId,
+        distributionStatus: "assigned",
+      },
+    };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Não foi possível atribuir o lead." };
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível atribuir o lead." };
   }
 }
 
@@ -304,6 +371,7 @@ export async function routeAndAssignLeadAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
   const parsed = z
     .object({ leadId, branchId, brokerId, reason: z.string().trim().min(3).max(200).optional() })
     .safeParse({
@@ -312,11 +380,11 @@ export async function routeAndAssignLeadAction(
       brokerId: formData.get("brokerId"),
       reason: String(formData.get("reason") ?? "") || undefined,
     });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  if (!parsed.success) return { mutationId, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   try {
     const context = await getRequiredTenantContext();
     if (context.role !== "director")
-      return { error: "Apenas Diretores podem rotear e atribuir em uma única operação." };
+      return { mutationId, error: "Apenas Diretores podem rotear e atribuir em uma única operação." };
     const result = await routeLeadToBranchAndAssignBroker(
       context,
       parsed.data.leadId,
@@ -324,14 +392,28 @@ export async function routeAndAssignLeadAction(
       parsed.data.brokerId,
       parsed.data.reason,
     );
-    if (result.status !== "assigned") return { error: result.reason };
+    if (result.status !== "assigned") return { mutationId, error: result.reason };
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
-    const message = result.notificationWarnings?.length
-      ? `Lead roteado e atribuído. Aviso: ${result.notificationWarnings.join("; ")}`
-      : "Lead roteado para unidade e atribuído ao corretor.";
-    return { success: true, message };
+    continueLeadDistributionAfterResponse({
+      tenantId: context.tenantId,
+      leadId: parsed.data.leadId,
+      actorId: context.userId,
+      branchId: parsed.data.branchId,
+    });
+    return {
+      success: true,
+      mutationId,
+      message: "Lead roteado e atribuído. O aviso seguirá em segundo plano.",
+      entity: {
+        leadId: parsed.data.leadId,
+        branchId: parsed.data.branchId,
+        corretorId: parsed.data.brokerId,
+        distributionStatus: "assigned",
+      },
+    };
   } catch (error) {
     return {
+      mutationId,
       error: error instanceof Error ? error.message : "Não foi possível processar a operação.",
     };
   }
@@ -341,17 +423,28 @@ export async function distributeLeadAutomaticallyAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
   const parsed = leadId.safeParse(formData.get("leadId"));
-  if (!parsed.success) return { error: "Lead inválido." };
+  if (!parsed.success) return { mutationId, error: "Lead inválido." };
   try {
-    const result = await processQueuedLead(await getRequiredTenantContext(), parsed.data);
-    if (result.status !== "assigned") return { error: result.reason };
-    const message = result.notificationWarnings?.length
-      ? `Lead distribuído automaticamente. Aviso: ${result.notificationWarnings.join("; ")}`
-      : "Lead distribuído automaticamente.";
-    return { success: true, message };
+    const context = await getRequiredTenantContext();
+    await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data });
+    continueLeadDistributionAfterResponse({ tenantId: context.tenantId, leadId: parsed.data, actorId: context.userId });
+    return {
+      success: true,
+      mutationId,
+      message: isWithinBusinessHours()
+        ? "Distribuição automática iniciada em segundo plano."
+        : "Distribuição automática agendada para o próximo horário comercial.",
+      entity: {
+        leadId: parsed.data,
+        corretorId: null,
+        distributionStatus: "queued",
+      },
+    };
   } catch (error) {
     return {
+      mutationId,
       error: error instanceof Error ? error.message : "Não foi possível distribuir o lead.",
     };
   }
@@ -361,24 +454,27 @@ export async function distributeLeadBatchAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
   const ids = String(formData.get("leadIds") ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
   const parsed = z.array(leadId).safeParse(ids);
   if (!parsed.success || !parsed.data.length)
-    return { error: "Selecione ao menos um lead válido." };
+    return { mutationId, error: "Selecione ao menos um lead válido." };
   const branch = branchId.safeParse(formData.get("branchId"));
-  if (!branch.success) return { error: "Selecione uma unidade." };
+  if (!branch.success) return { mutationId, error: "Selecione uma unidade." };
   try {
     const context = await getRequiredTenantContext();
     let processed = 0;
     let conflicts = 0;
+    const processedLeadIds: string[] = [];
     const enqueuePromises: Promise<unknown>[] = [];
     for (const id of parsed.data) {
       const result = await routeLeadToBranch(context, id, branch.data, "Distribuição em lote");
       if (result.status === "routed") {
         processed += 1;
+        processedLeadIds.push(id);
         enqueuePromises.push(
           enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: id }).catch(() => {}),
         );
@@ -387,14 +483,24 @@ export async function distributeLeadBatchAction(
       }
     }
     await Promise.allSettled(enqueuePromises);
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [branch.data],
+    }).catch(() => {});
+    scheduleAfterResponse("lead-distribution-batch", () =>
+      runLeadDistributionProcessor({ tenantId: context.tenantId, limit: Math.min(parsed.data.length, 10) }),
+    );
     return {
       success: conflicts === 0,
+      mutationId,
       processed,
+      processedLeadIds,
       conflicts,
       message: `${processed} lead${processed === 1 ? "" : "s"} enviado${processed === 1 ? "" : "s"} para a unidade.`,
     };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Não foi possível processar o lote." };
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível processar o lote." };
   }
 }
 
@@ -402,17 +508,18 @@ export async function assignLeadBatchToBrokerAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
   const ids = String(formData.get("leadIds") ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
   const parsed = z.array(leadId).safeParse(ids);
   if (!parsed.success || !parsed.data.length)
-    return { error: "Selecione ao menos um lead válido." };
+    return { mutationId, error: "Selecione ao menos um lead válido." };
   const broker = brokerId.safeParse(formData.get("brokerId"));
-  if (!broker.success) return { error: "Selecione um corretor." };
+  if (!broker.success) return { mutationId, error: "Selecione um corretor." };
   const branch = branchId.safeParse(formData.get("branchId"));
-  if (!branch.success) return { error: "Selecione uma unidade." };
+  if (!branch.success) return { mutationId, error: "Selecione uma unidade." };
   try {
     const context = await getRequiredTenantContext();
     const db = getDatabase();
@@ -425,6 +532,7 @@ export async function assignLeadBatchToBrokerAction(
     const branchByLead = new Map(leads.map((lead) => [lead.id, lead.branchId]));
     let processed = 0;
     let conflicts = 0;
+    const processedLeadIds: string[] = [];
     for (const id of parsed.data) {
       const result = branchByLead.get(id)
         ? await assignLeadToBroker(context, id, broker.data, undefined, "Atribuição em lote")
@@ -435,16 +543,105 @@ export async function assignLeadBatchToBrokerAction(
             broker.data,
             "Atribuição em lote",
           );
-      if (result.status === "assigned") processed += 1;
+      if (result.status === "assigned") {
+        processed += 1;
+        processedLeadIds.push(id);
+      }
       else conflicts += 1;
     }
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [branch.data],
+      brokerIds: [broker.data],
+    }).catch(() => {});
+    scheduleAfterResponse("lead-assignment-batch-effects", () =>
+      runLeadEffectOutboxProcessor({ tenantId: context.tenantId, limit: Math.min(parsed.data.length, 10) }),
+    );
     return {
       success: conflicts === 0,
+      mutationId,
       processed,
+      processedLeadIds,
       conflicts,
       message: `${processed} lead${processed === 1 ? "" : "s"} atribuído${processed === 1 ? "" : "s"} ao corretor.`,
     };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Não foi possível processar o lote." };
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível processar o lote." };
+  }
+}
+
+export type AssignmentHistoryItem = {
+  id: string;
+  createdAt: string;
+  action: string;
+  source: string;
+  strategy: string | null;
+  reason: string | null;
+  previousOwnerName: string | null;
+  newOwnerName: string | null;
+  fromBranchName: string | null;
+  toBranchName: string | null;
+  actorName: string | null;
+};
+
+export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promise<AssignmentHistoryItem[]> {
+  const parsed = leadId.safeParse(inputLeadId);
+  if (!parsed.success) return [];
+  try {
+    const context = await getRequiredTenantContext();
+    const db = getDatabase();
+
+    const previousOwner = aliasedTable(schema.user, "previous_owner");
+    const newOwner = aliasedTable(schema.user, "new_owner");
+    const actor = aliasedTable(schema.user, "actor");
+    const fromBranch = aliasedTable(schema.branches, "from_branch");
+    const toBranch = aliasedTable(schema.branches, "to_branch");
+
+    const events = await db
+      .select({
+        id: schema.leadDistributionEvents.id,
+        createdAt: schema.leadDistributionEvents.createdAt,
+        action: schema.leadDistributionEvents.action,
+        source: schema.leadDistributionEvents.source,
+        strategy: schema.leadDistributionEvents.strategy,
+        reason: schema.leadDistributionEvents.reason,
+        previousOwnerName: previousOwner.name,
+        newOwnerName: newOwner.name,
+        fromBranchName: fromBranch.name,
+        toBranchName: toBranch.name,
+        actorName: actor.name,
+      })
+      .from(schema.leadDistributionEvents)
+      .leftJoin(previousOwner, eq(schema.leadDistributionEvents.previousOwnerId, previousOwner.id))
+      .leftJoin(newOwner, eq(schema.leadDistributionEvents.newOwnerId, newOwner.id))
+      .leftJoin(fromBranch, eq(schema.leadDistributionEvents.fromBranchId, fromBranch.id))
+      .leftJoin(toBranch, eq(schema.leadDistributionEvents.toBranchId, toBranch.id))
+      .leftJoin(actor, eq(schema.leadDistributionEvents.actorId, actor.id))
+      .where(
+        and(
+          eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+          eq(schema.leadDistributionEvents.leadId, parsed.data)
+        )
+      )
+      .orderBy(desc(schema.leadDistributionEvents.createdAt))
+      .limit(30);
+
+    return events.map((e) => ({
+      id: e.id,
+      createdAt: e.createdAt.toISOString(),
+      action: e.action,
+      source: e.source,
+      strategy: e.strategy ?? null,
+      reason: e.reason ?? null,
+      previousOwnerName: e.previousOwnerName ?? null,
+      newOwnerName: e.newOwnerName ?? null,
+      fromBranchName: e.fromBranchName ?? null,
+      toBranchName: e.toBranchName ?? null,
+      actorName: e.actorName ?? null,
+    }));
+  } catch (error) {
+    console.error("[getLeadAssignmentHistoryAction] Error:", error);
+    return [];
   }
 }

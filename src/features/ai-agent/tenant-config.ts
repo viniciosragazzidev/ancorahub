@@ -102,6 +102,14 @@ export async function loadTenantAiAgentConfig(
   }
 }
 
+/**
+ * Configuração de emergência usada apenas quando o banco não está acessível
+ * (tabela inexistente, timeout, etc.).
+ *
+ * ⚠️  NÃO usar para inicializar novos registros — essa é a responsabilidade de
+ * `tenant-settings-service.ts::createQualificationTenantSettings()`.
+ * Os defaults configuráveis por tenant vivem na tabela `aiQualificationConfigs`.
+ */
 function getDefaultConfig(): TenantAiAgentConfig {
   return {
     assistantName: "Assistente Âncora Corretora",

@@ -66,10 +66,10 @@ export class WahaClientError extends Error {
  * Consistente com o mapping já existente no waha-relay/server.mjs.
  */
 export function normalizeWahaStatus(raw: string): WahaSessionStatus {
-  const s = raw.toUpperCase();
-  if (s === "WORKING") return "CONNECTED";
-  if (s === "STOPPED") return "DISCONNECTED";
-  if (s === "FAILED") return "ERROR";
-  if (s === "SCAN_QR_CODE" || s === "STARTING") return "WAITING_QR";
+  const s = raw.trim().toUpperCase();
+  if (["WORKING", "CONNECTED", "READY", "AUTHENTICATED", "OPEN", "ONLINE"].includes(s)) return "CONNECTED";
+  if (["FAILED", "ERROR", "INVALID", "UNAVAILABLE"].includes(s)) return "ERROR";
+  if (["SCAN_QR_CODE", "STARTING", "WAITING_QR", "WAITING_FOR_QR", "QR", "QR_READY", "CREATED", "INITIALIZING", "CONNECTING", "LOADING"].includes(s)) return "WAITING_QR";
+  if (["STOPPED", "DISCONNECTED", "CLOSED", "LOGGED_OUT", "LOGOUT", "OFFLINE"].includes(s)) return "DISCONNECTED";
   return "DISCONNECTED";
 }

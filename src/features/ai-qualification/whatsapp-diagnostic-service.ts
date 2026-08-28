@@ -25,7 +25,13 @@ export type WhatsAppConnectionDiagnostic = {
   lastError: string | null;
   averageLatencyMs: number;
   configVersion: number;
-  overallHealth: "connected" | "unstable" | "invalid_token" | "webhook_unavailable" | "incomplete_config" | "disabled";
+  overallHealth:
+    | "connected"
+    | "unstable"
+    | "invalid_token"
+    | "webhook_unavailable"
+    | "incomplete_config"
+    | "disabled";
 };
 
 export const sendWhatsAppTestMessageSchema = z.object({
@@ -61,15 +67,25 @@ export function maskPhoneNumber(phone: string): string {
   return `+${start}*****${end}`;
 }
 
-export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<WhatsAppConnectionDiagnostic> {
+export async function getWhatsAppDiagnosticStatus(
+  tenantId: string,
+): Promise<WhatsAppConnectionDiagnostic> {
   const db = getDatabase();
 
   // 1. Busca canal oficial Meta Cloud API
   const [metaChannel] = await db
     .select()
     .from(schema.communicationChannels)
-    .where(and(eq(schema.communicationChannels.tenantId, tenantId), eq(schema.communicationChannels.provider, "meta_cloud")))
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+    .where(
+      and(
+        eq(schema.communicationChannels.tenantId, tenantId),
+        eq(schema.communicationChannels.provider, "meta_cloud"),
+      ),
+    )
+    .orderBy(
+      desc(schema.communicationChannels.isDefault),
+      desc(schema.communicationChannels.createdAt),
+    )
     .limit(1);
 
   // 2. Busca conexão WhatsApp WAHA/OpenWA
@@ -84,7 +100,12 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
   const [lastInbound] = await db
     .select()
     .from(schema.whatsappMessages)
-    .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.direction, "inbound")))
+    .where(
+      and(
+        eq(schema.whatsappMessages.tenantId, tenantId),
+        eq(schema.whatsappMessages.direction, "inbound"),
+      ),
+    )
     .orderBy(desc(schema.whatsappMessages.createdAt))
     .limit(1);
 
@@ -95,8 +116,17 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
     .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
     .limit(1);
 
-  const isMetaConnected = Boolean(metaChannel && (metaChannel.status === "active" || metaChannel.status === "connected") && metaChannel.phoneNumberId);
-  const isWahaConnected = Boolean(wahaConn && (wahaConn.status === "ready" || wahaConn.status === "active" || wahaConn.status === "connected"));
+  const isMetaConnected = Boolean(
+    metaChannel &&
+    (metaChannel.status === "active" || metaChannel.status === "connected") &&
+    metaChannel.phoneNumberId,
+  );
+  const isWahaConnected = Boolean(
+    wahaConn &&
+    (wahaConn.status === "ready" ||
+      wahaConn.status === "active" ||
+      wahaConn.status === "connected"),
+  );
 
   const channelConnected = isMetaConnected || isWahaConnected;
 
@@ -120,15 +150,18 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
       tokenExpirationDays = 60;
     }
   } else if (wahaConn) {
-    officialNumber = wahaConn.sessionName || (wahaConn.sessionId ? `Sessão ${wahaConn.sessionId}` : null);
-    displayName = wahaConn.sessionName ? `WhatsApp (${wahaConn.sessionName})` : "Sessão WhatsApp WAHA";
+    officialNumber =
+      wahaConn.sessionName || (wahaConn.sessionId ? `Sessão ${wahaConn.sessionId}` : null);
+    displayName = wahaConn.sessionName ? `WhatsApp (${wahaConn.sessionName})` : "Sessão WhatsApp";
     wabaId = wahaConn.sessionId ? `WAHA_${wahaConn.sessionId.slice(-6)}` : null;
     phoneNumberId = wahaConn.sessionId ?? null;
     tokenStatus = isWahaConnected ? "valid" : "unconfigured";
     tokenExpirationDays = null;
   }
 
-  const webhookStatus: WhatsAppConnectionDiagnostic["webhookStatus"] = channelConnected ? "active" : "unconfigured";
+  const webhookStatus: WhatsAppConnectionDiagnostic["webhookStatus"] = channelConnected
+    ? "active"
+    : "unconfigured";
 
   let overallHealth: WhatsAppConnectionDiagnostic["overallHealth"] = "disabled";
   if (!metaChannel && !wahaConn) {
@@ -166,20 +199,25 @@ export async function getWhatsAppDiagnosticStatus(tenantId: string): Promise<Wha
   };
 }
 
-import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
+import {
+  getPreferredMetaCloudChannel,
+  sendMetaCloudChannelText,
+} from "@/features/communication-channels/service";
 import { getOpenWaSessionStatus, sendOpenWaText } from "@/lib/integrations/openwa";
 
 export async function sendWhatsAppTestMessage(
   tenantId: string,
   actorUserId: string,
-  input: SendWhatsAppTestMessageInput
+  input: SendWhatsAppTestMessageInput,
 ): Promise<SendWhatsAppTestMessageResult> {
   const data = sendWhatsAppTestMessageSchema.parse(input);
   const db = getDatabase();
 
   const normalizedNumber = normalizeWhatsAppDestination(data.destinationNumber);
   if (normalizedNumber.length < 12) {
-    throw new Error("Número de destino inválido. Informe o código de país e DDD (ex: 5571999999999).");
+    throw new Error(
+      "Número de destino inválido. Informe o código de país e DDD (ex: 5571999999999).",
+    );
   }
 
   const maskedDestination = maskPhoneNumber(normalizedNumber);
@@ -216,19 +254,25 @@ export async function sendWhatsAppTestMessage(
         .where(eq(schema.whatsappConnections.tenantId, tenantId))
         .limit(1);
 
-      if (connection?.sessionId && (connection.status === "ready" || connection.status === "active")) {
+      if (
+        connection?.sessionId &&
+        (connection.status === "ready" || connection.status === "active")
+      ) {
         const sent = await sendOpenWaText(connection.sessionId, normalizedNumber, data.messageText);
         messageId = sent.messageId || messageId;
         acceptedByMeta = true;
         initialStatus = "sent";
         delivered = true;
       } else {
-        errorReason = "Nenhum canal ativo de WhatsApp (Meta Cloud API ou Sessão WhatsApp) foi encontrado ou está pronto para envio neste tenant. Configure a conexão no painel de WhatsApp.";
+        errorReason =
+          "Nenhum canal ativo de WhatsApp (Meta Cloud API ou Sessão WhatsApp) foi encontrado ou está pronto para envio neste tenant. Configure a conexão no painel de WhatsApp.";
       }
     }
   } catch (err) {
     const providerCode =
-      err && typeof err === "object" && "code" in err && typeof err.code === "number" ? err.code : undefined;
+      err && typeof err === "object" && "code" in err && typeof err.code === "number"
+        ? err.code
+        : undefined;
     console.warn("[whatsapp-diagnostic] test_message.rejected", { providerCode });
     errorReason = getWhatsAppTestFailureMessage(err);
   }

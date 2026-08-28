@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -17,36 +17,51 @@ import {
 import { AppSelect } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import type { DistributionActionState } from "@/features/lead-distribution/actions";
+import type { StatusChangeState } from "@/app/(dashboard)/leads/status-actions";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 export function BulkStatusDialog({
   leadIds,
   role,
   bulkStatusAction,
+  onCommitted,
 }: {
   leadIds: string[];
   role: string;
   bulkStatusAction: (
-    prev: DistributionActionState,
+    prev: StatusChangeState,
     formData: FormData,
-  ) => Promise<DistributionActionState>;
+  ) => Promise<StatusChangeState>;
+  onCommitted?: (input: { leadIds: string[]; newStatus: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [targetStatus, setTargetStatus] = useState("");
+  const [visibleError, setVisibleError] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(bulkStatusAction, {});
 
-  useEffect(() => {
-    if (state.success) {
-      toast.success(
-        state.message ?? `${leadIds.length} lead(s) atualizado(s).`,
-      );
-      setOpen(false);
+  const handleSuccess = useCallback((result: typeof state) => {
+    toast.success(result.message ?? `${leadIds.length} lead(s) atualizado(s).`);
+    setOpen(false);
+    setTargetStatus("");
+    if (result.changedLeadIds?.length && result.newStatus) {
+      onCommitted?.({ leadIds: result.changedLeadIds, newStatus: result.newStatus });
+    }
+  }, [leadIds.length, onCommitted]);
+  const handleError = useCallback((result: typeof state) => {
+    if (!result.error) return;
+    setVisibleError(result.error);
+    toast.error(result.error);
+  }, []);
+
+  useActionDialogLifecycle({ state, pending, onSuccess: handleSuccess, onError: handleError });
+
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen && !pending) {
       setTargetStatus("");
+      setVisibleError(null);
     }
-    if (state.error && !state.success) {
-      toast.error(state.error);
-    }
-  }, [state, leadIds.length]);
+  }, [pending]);
 
   const validTargets =
     role === "director" || role === "manager"
@@ -54,7 +69,7 @@ export function BulkStatusDialog({
       : ["lost"];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button size="sm" variant="outline">Alterar status</Button>} />
       <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-sm">
         <DialogHeader>
@@ -67,7 +82,7 @@ export function BulkStatusDialog({
               : " Você pode marcar como perdido."}
           </DialogDescription>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-4" onSubmit={() => setVisibleError(null)}>
           {leadIds.map((id) => (
             <input key={id} name="leadIds" type="hidden" value={id} />
           ))}
@@ -109,9 +124,9 @@ export function BulkStatusDialog({
             </div>
           )}
 
-          {state.error && !state.success && (
+          {visibleError && (
             <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-              {state.error}
+              {visibleError}
             </p>
           )}
 

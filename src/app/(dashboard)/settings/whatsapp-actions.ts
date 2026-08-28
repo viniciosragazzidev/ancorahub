@@ -8,10 +8,16 @@ import { getDatabase, schema } from "@/shared/db";
 // ── WAHA via Fastify ──────────────────────────────────────────────────
 
 function vpsBaseUrl() {
-  const value = process.env.VPS_API_URL?.trim();
+  const value = (
+    process.env.VPS_API_URL ||
+    process.env.WAHA_API_URL ||
+    process.env.WAHA_RELAY_URL ||
+    process.env.NEXT_PUBLIC_VPS_API_URL
+  )?.trim();
   if (!value) return null;
   try {
-    const url = new URL(value);
+    const raw = value.startsWith("http") ? value : `https://${value}`;
+    const url = new URL(raw);
     return url.origin;
   } catch {
     return null;
@@ -19,10 +25,17 @@ function vpsBaseUrl() {
 }
 
 function vpsHeaders(hasJsonBody: boolean) {
+  const token = (
+    process.env.WHATSAPP_API_INTERNAL_TOKEN ||
+    process.env.VPS_INTERNAL_API_TOKEN ||
+    process.env.VPS_API_TOKEN ||
+    process.env.WAHA_RELAY_SHARED_SECRET
+  )?.trim() ?? "";
   return {
     ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
-    "X-CorreTop-Internal-Token": process.env.WHATSAPP_API_INTERNAL_TOKEN ?? "",
-    "Authorization": `Bearer ${process.env.VPS_INTERNAL_API_TOKEN ?? ""}`,
+    "X-CorreTop-Internal-Token": token,
+    "x-corretop-internal-token": token,
+    Authorization: `Bearer ${token}`,
   };
 }
 
@@ -46,7 +59,8 @@ async function vpsRequest<T extends WahaConnectionResponse>(
   options: { method?: string; body?: unknown } = {},
 ): Promise<T> {
   const base = vpsBaseUrl();
-  if (!base) throw new Error("VPS_API_URL não configurada no Vercel. Verifique as variáveis de ambiente.");
+  if (!base)
+    throw new Error("VPS_API_URL não configurada no Vercel. Verifique as variáveis de ambiente.");
 
   const url = `${base}${path}`;
   try {
@@ -61,17 +75,20 @@ async function vpsRequest<T extends WahaConnectionResponse>(
     const data = (await response.json().catch(() => null)) as T | null;
     if (!response.ok || !data?.ok) {
       const detail = data && "error" in data ? String(data.error) : `status ${response.status}`;
-      const routeHint = response.status === 404
-        ? ` A rota ${options.method ?? "GET"} ${path} não foi encontrada no servidor. Verifique se o Fastify service no VPS foi reiniciado com as rotas mais recentes.`
-        : "";
-      throw new Error(`WAHA (${detail})${routeHint}`);
+      const routeHint =
+        response.status === 404
+          ? ` A rota ${options.method ?? "GET"} ${path} não foi encontrada no servidor. Verifique se o Fastify service no VPS foi reiniciado com as rotas mais recentes.`
+          : "";
+      throw new Error(`WhatsApp (${detail})${routeHint}`);
     }
     return data;
   } catch (error) {
     if (error instanceof Error && /VPS_API_URL não configurada/.test(error.message)) throw error;
     if (error instanceof Error && /WAHA \(/.test(error.message)) throw error;
     // Erro de rede / timeout / DNS
-    throw new Error(`Não foi possível conectar ao servidor WAHA em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Não foi possível conectar ao serviço de WhatsApp em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -133,7 +150,7 @@ export async function getWhatsAppConnection() {
 
 /**
  * Inicia ou retoma conexão WhatsApp.
- * 
+ *
  * Idempotente: se a sessão já existe no WAHA, reutiliza em vez de destruir.
  * NÃO remove sessão existente — isso invalidava QR em pareamento.
  */
@@ -160,7 +177,9 @@ export async function startWhatsAppConnection() {
     let qrCode: string | null = null;
     if (!isReady) {
       try {
-        const qrResult = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`);
+        const qrResult = await vpsRequest(
+          `/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`,
+        );
         const qrStatus = normalizeWahaStatus(qrResult.status ?? status);
         qrCode = qrStatus === "ready" ? null : (qrResult.qr ?? null);
       } catch {
@@ -189,13 +208,18 @@ export async function startWhatsAppConnection() {
       status,
       qrCode,
       webhookSecret: connection?.webhookSecret ?? randomUUID(),
-      chatInternoAtivo: status === "ready" ? true : connection?.chatInternoAtivo ?? true,
-      connectedAt: isReady ? (connection?.connectedAt ?? new Date()) : connection?.connectedAt ?? null,
+      chatInternoAtivo: status === "ready" ? true : (connection?.chatInternoAtivo ?? true),
+      connectedAt: isReady
+        ? (connection?.connectedAt ?? new Date())
+        : (connection?.connectedAt ?? null),
       updatedAt: new Date(),
     };
 
     if (connection) {
-      await db.update(schema.whatsappConnections).set(values).where(eq(schema.whatsappConnections.id, connection.id));
+      await db
+        .update(schema.whatsappConnections)
+        .set(values)
+        .where(eq(schema.whatsappConnections.id, connection.id));
     } else {
       await db.insert(schema.whatsappConnections).values(values);
     }
@@ -204,29 +228,36 @@ export async function startWhatsAppConnection() {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível iniciar o WhatsApp.";
     // Normalizar código de erro para o frontend decidir UI
-    const code = /timeout|não respondeu/i.test(message) ? "WAHA_TIMEOUT"
-      : /indisponível|não foi possível conectar/i.test(message) ? "WAHA_UNAVAILABLE"
-      : /já existe|409/i.test(message) ? "SESSION_EXISTS"
-      : "WAHA_ERROR";
+    const code = /timeout|não respondeu/i.test(message)
+      ? "WAHA_TIMEOUT"
+      : /indisponível|não foi possível conectar/i.test(message)
+        ? "WAHA_UNAVAILABLE"
+        : /já existe|409/i.test(message)
+          ? "SESSION_EXISTS"
+          : "WAHA_ERROR";
     return { success: false, error: message, code };
   }
 }
 
 export async function refreshWhatsAppQr() {
   const { db, connection } = await getOwnConnection();
-  if (!connection?.sessionName) return { success: false, error: "Inicie uma sessão primeiro.", code: "NO_SESSION" };
+  if (!connection?.sessionName)
+    return { success: false, error: "Inicie uma sessão primeiro.", code: "NO_SESSION" };
 
   try {
-    const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`);
+    const result = await vpsRequest(
+      `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`,
+    );
     const status = normalizeWahaStatus(result.status ?? connection.status);
-    const qrCode = status === "ready" ? null : result.qr ?? null;
+    const qrCode = status === "ready" ? null : (result.qr ?? null);
 
     await db
       .update(schema.whatsappConnections)
       .set({
         qrCode,
         status,
-        connectedAt: status === "ready" ? connection.connectedAt ?? new Date() : connection.connectedAt,
+        connectedAt:
+          status === "ready" ? (connection.connectedAt ?? new Date()) : connection.connectedAt,
         chatInternoAtivo: status === "ready" ? true : connection.chatInternoAtivo,
         updatedAt: new Date(),
       })
@@ -234,16 +265,24 @@ export async function refreshWhatsAppQr() {
 
     return { success: true, qrCode, status };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Não foi possível atualizar o QR Code.";
-    const code = /timeout/i.test(message) ? "WAHA_TIMEOUT"
-      : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE"
-      : /QR|qr/i.test(message) ? "QR_ERROR"
-      : "WAHA_ERROR";
+    const message =
+      error instanceof Error ? error.message : "Não foi possível atualizar o QR Code.";
+    const code = /timeout/i.test(message)
+      ? "WAHA_TIMEOUT"
+      : /indisponível|conectar/i.test(message)
+        ? "WAHA_UNAVAILABLE"
+        : /QR|qr/i.test(message)
+          ? "QR_ERROR"
+          : "WAHA_ERROR";
     return { success: false, error: message, code };
   }
 }
 
-export async function toggleWhatsAppChatAction(): Promise<{ success: boolean; active?: boolean; error?: string }> {
+export async function toggleWhatsAppChatAction(): Promise<{
+  success: boolean;
+  active?: boolean;
+  error?: string;
+}> {
   const { context, db, connection } = await getOwnConnection();
   const active = !(connection?.chatInternoAtivo ?? true);
 
@@ -267,10 +306,13 @@ export async function toggleWhatsAppChatAction(): Promise<{ success: boolean; ac
 
 export async function getWhatsAppSessionStatus() {
   const { db, connection } = await getOwnConnection();
-  if (!connection?.sessionName) return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
+  if (!connection?.sessionName)
+    return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
 
   try {
-    const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/status`);
+    const result = await vpsRequest(
+      `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/status`,
+    );
     const status = normalizeWahaStatus(result.status ?? connection.status);
 
     await db
@@ -278,7 +320,8 @@ export async function getWhatsAppSessionStatus() {
       .set({
         status,
         qrCode: status === "ready" ? null : connection.qrCode,
-        connectedAt: status === "ready" ? connection.connectedAt ?? new Date() : connection.connectedAt,
+        connectedAt:
+          status === "ready" ? (connection.connectedAt ?? new Date()) : connection.connectedAt,
         chatInternoAtivo: status === "ready" ? true : connection.chatInternoAtivo,
         updatedAt: new Date(),
       })
@@ -287,9 +330,11 @@ export async function getWhatsAppSessionStatus() {
     return { success: true, status, phone: result.phoneNumber ?? null };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível consultar o status.";
-    const code = /timeout/i.test(message) ? "WAHA_TIMEOUT"
-      : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE"
-      : "WAHA_ERROR";
+    const code = /timeout/i.test(message)
+      ? "WAHA_TIMEOUT"
+      : /indisponível|conectar/i.test(message)
+        ? "WAHA_UNAVAILABLE"
+        : "WAHA_ERROR";
     return { success: false, error: message, code };
   }
 }
@@ -308,16 +353,25 @@ export async function diagnoseWahaConnection() {
       cache: "no-store",
       signal: AbortSignal.timeout(5_000),
     });
-    if (!healthRes.ok) return { ok: false, step: "health", error: `Health check retornou ${healthRes.status}` };
+    if (!healthRes.ok)
+      return { ok: false, step: "health", error: `Health check retornou ${healthRes.status}` };
   } catch (error) {
-    return { ok: false, step: "connectivity", error: `Não foi possível acessar ${base}. ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      ok: false,
+      step: "connectivity",
+      error: `Não foi possível acessar ${base}. ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 
   try {
     const wahaHealth = await vpsRequest("/internal/waha/health");
     return { ok: true, step: "waha", status: wahaHealth.status, timestamp: wahaHealth.timestamp };
   } catch (error) {
-    return { ok: false, step: "waha", error: error instanceof Error ? error.message : String(error) };
+    return {
+      ok: false,
+      step: "waha",
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -326,9 +380,12 @@ export async function resetWhatsAppSessionAction() {
 
   try {
     if (connection?.sessionName) {
-      await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/disconnect`, {
-        method: "POST",
-      });
+      await vpsRequest(
+        `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/disconnect`,
+        {
+          method: "POST",
+        },
+      );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
@@ -336,7 +393,11 @@ export async function resetWhatsAppSessionAction() {
     return {
       success: false,
       error: "Não foi possível confirmar a desconexão da sessão WhatsApp.",
-      code: /timeout/i.test(message) ? "WAHA_TIMEOUT" : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE" : "WAHA_ERROR",
+      code: /timeout/i.test(message)
+        ? "WAHA_TIMEOUT"
+        : /indisponível|conectar/i.test(message)
+          ? "WAHA_UNAVAILABLE"
+          : "WAHA_ERROR",
     };
   }
 
@@ -360,28 +421,47 @@ export async function resetWhatsAppSessionAction() {
 /** Recupera uma sessão WAHA falhada mantendo a identidade determinística do corretor. */
 export async function recoverWhatsAppFailedSessionAction() {
   const { db, connection } = await getOwnConnection();
-  if (!connection?.sessionName) return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
+  if (!connection?.sessionName)
+    return { success: false, error: "Sessão não configurada.", code: "NO_SESSION" };
 
   try {
-    const result = await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/recover`, {
-      method: "POST",
-    });
+    const result = await vpsRequest(
+      `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/recover`,
+      {
+        method: "POST",
+      },
+    );
     const status = normalizeWahaStatus(result.status ?? "STARTING");
-    const qrResult = status === "ready"
-      ? null
-      : await vpsRequest(`/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`).catch(() => null);
-    const qrCode = status === "ready" ? null : qrResult?.qr ?? null;
+    const qrResult =
+      status === "ready"
+        ? null
+        : await vpsRequest(
+            `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`,
+          ).catch(() => null);
+    const qrCode = status === "ready" ? null : (qrResult?.qr ?? null);
 
-    await db.update(schema.whatsappConnections).set({
-      status,
-      qrCode,
-      connectedAt: status === "ready" ? connection.connectedAt ?? new Date() : null,
-      updatedAt: new Date(),
-    }).where(eq(schema.whatsappConnections.id, connection.id));
+    await db
+      .update(schema.whatsappConnections)
+      .set({
+        status,
+        qrCode,
+        connectedAt: status === "ready" ? (connection.connectedAt ?? new Date()) : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.whatsappConnections.id, connection.id));
 
     return { success: true, sessionId: connection.sessionName, status, qrCode };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Não foi possível recuperar a sessão WhatsApp.";
-    return { success: false, error: message, code: /timeout/i.test(message) ? "WAHA_TIMEOUT" : /indisponível|conectar/i.test(message) ? "WAHA_UNAVAILABLE" : "WAHA_ERROR" };
+    const message =
+      error instanceof Error ? error.message : "Não foi possível recuperar a sessão WhatsApp.";
+    return {
+      success: false,
+      error: message,
+      code: /timeout/i.test(message)
+        ? "WAHA_TIMEOUT"
+        : /indisponível|conectar/i.test(message)
+          ? "WAHA_UNAVAILABLE"
+          : "WAHA_ERROR",
+    };
   }
 }

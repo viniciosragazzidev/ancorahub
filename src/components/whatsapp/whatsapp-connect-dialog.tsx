@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, LockKey, Monitor, WarningCircle, WhatsappLogo } from "@/components/huge-icons";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
-  diagnoseWahaConnection,
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
   recoverWhatsAppFailedSessionAction,
@@ -32,6 +32,50 @@ function statusLabel(status: string): string {
   }
 }
 
+/** Step indicator for the connection flow */
+function ConnectionSteps({ status, hasQr }: { status: string; hasQr: boolean }) {
+  const steps = [
+    { label: "Iniciar", done: status !== "disconnected" },
+    { label: "Escaneie", done: status === "ready" },
+    { label: "Conectado", done: status === "ready" },
+  ];
+  // If we have a QR, step 2 is in progress
+  const activeStep = status === "ready" ? 2 : hasQr ? 1 : status === "initializing" ? 0 : -1;
+
+  return (
+    <div className="flex items-center gap-1" role="list" aria-label="Progresso da conexão">
+      {steps.map((step, i) => (
+        <div key={step.label} className="flex items-center gap-1" role="listitem">
+          <span
+            className={cn(
+              "flex size-5 items-center justify-center rounded-full text-[10px] font-semibold transition-all duration-300",
+              step.done
+                ? "bg-emerald-500 text-white"
+                : i === activeStep
+                  ? "bg-primary text-primary-foreground animate-pulse"
+                  : "bg-muted text-muted-foreground",
+            )}
+          >
+            {step.done ? "✓" : i + 1}
+          </span>
+          <span className={cn(
+            "text-[11px] font-medium transition-colors duration-300",
+            step.done ? "text-emerald-600" : i === activeStep ? "text-foreground" : "text-muted-foreground",
+          )}>
+            {step.label}
+          </span>
+          {i < steps.length - 1 && (
+            <span className={cn(
+              "mx-1 h-px w-4 transition-colors duration-300",
+              step.done ? "bg-emerald-300" : "bg-border",
+            )} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function errorMessage(code?: string | null): string {
   switch (code) {
     case "WAHA_TIMEOUT": return "O servidor WhatsApp demorou para responder. Tente novamente.";
@@ -43,7 +87,7 @@ function errorMessage(code?: string | null): string {
   }
 }
 
-export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conectar WhatsApp", connectedLabel = "WhatsApp conectado" }: { initial: Connection; returnTo?: string; triggerLabel?: string; connectedLabel?: string }) {
+export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conectar WhatsApp", connectedLabel = "WhatsApp conectado", onConnectionChanged }: { initial: Connection; returnTo?: string; triggerLabel?: string; connectedLabel?: string; onConnectionChanged?: (connection?: Connection) => void }) {
   const router = useRouter();
   const [connection, setConnection] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -54,6 +98,37 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   const initializing = connection.status === "initializing" || connection.status === "recovering";
   const hasError = connection.status === "error";
   const label = statusLabel(connection.status);
+
+  // Elapsed time since QR was shown
+  const [elapsed, setElapsed] = useState(0);
+  const qrShownAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (initializing && connection.qrCode && !qrShownAt.current) {
+      qrShownAt.current = Date.now();
+    } else if (!initializing || !connection.qrCode) {
+      qrShownAt.current = null;
+      setElapsed(0);
+    }
+  }, [initializing, connection.qrCode]);
+
+  useEffect(() => {
+    if (!qrShownAt.current) return;
+    const tick = () => {
+      if (qrShownAt.current) setElapsed(Math.floor((Date.now() - qrShownAt.current) / 1000));
+    };
+    tick();
+    const timer = window.setInterval(tick, 1_000);
+    return () => window.clearInterval(timer);
+  }, [!!qrShownAt.current]);
+
+  useEffect(() => {
+    setConnection((current) =>
+      current.sessionId === initial.sessionId && current.status === initial.status
+        ? current
+        : initial,
+    );
+  }, [initial]);
 
   function recoverFromOutdatedAction(error: unknown): boolean {
     const message = error instanceof Error ? error.message : "";
@@ -90,9 +165,10 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         return;
       }
       if (result.status === "ready") {
-        const wasReady = previousStatus.current === "ready";
         updateStatus("ready");
-        if (!wasReady) toast.success("WhatsApp conectado com sucesso.");
+        // Notificar o parent ANTES de fechar — o parent faz fetch do server
+        // para garantir dados frescos e exibe o toast.
+        onConnectionChanged?.();
         setOpen(false);
         router.refresh();
         if (returnTo) router.replace(returnTo);
@@ -157,6 +233,12 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     return true;
   }
 
+  function openWhatsAppExternal() {
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    const destination = isMobile ? "whatsapp://send" : "https://web.whatsapp.com/";
+    window.open(destination, "_blank", "noopener,noreferrer");
+  }
+
   /**
    * Iniciar conexão WhatsApp.
    * 
@@ -170,13 +252,8 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     if (shouldBlockQrOnMobile()) return;
     startTransition(async () => {
       try {
-        // Diagnóstico rápido: verificar se o VPS está acessível
-        const diag = await diagnoseWahaConnection();
-        if (!diag.ok) {
-          toast.error(`Serviço indisponível: ${diag.error}`, { duration: 10000 });
-          return;
-        }
-        // IDEMPOTENTE: chamar start direto — Fastify decide reutilizar ou criar
+        // Chamada direta e idempotente: evita verificações de saúde redundantes antes do QR.
+        // O Fastify devolve erro tipado caso WAHA/VPS esteja indisponível.
         // NÃO chamar resetWhatsAppSessionAction() antes!
         const result = await startWhatsAppConnection();
         if (!result.success) {
@@ -184,14 +261,13 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           toast.error(errorMessage(code), { duration: 8000 });
           return;
         }
-        // Usar QR retornado pelo start e/ou buscar atualizado
-        const qr = await refreshWhatsAppQr();
-        const newQrCode = (qr.success ? qr.qrCode : null) ?? (result as { qrCode?: string | null }).qrCode ?? null;
+        // A action já busca o QR uma vez. Não repetir a mesma chamada antes do polling.
+        const newQrCode = (result as { qrCode?: string | null }).qrCode ?? null;
         setConnection((current) => ({
           ...current,
           sessionId: result.sessionId ?? current.sessionId,
           qrCode: newQrCode ?? current.qrCode,
-          status: (qr.success ? qr.status : null) ?? "initializing",
+          status: result.status ?? "initializing",
         }));
         if (newQrCode) {
           toast.success("Escaneie o QR Code no WhatsApp.");
@@ -258,6 +334,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           status: "disconnected",
           connectedAt: null,
         }));
+        onConnectionChanged?.();
         toast.success("WhatsApp desconectado.");
         router.refresh();
       } catch (error) {
@@ -296,25 +373,31 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
       <DialogTrigger render={<Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
       <DialogPopup className="max-w-2xl">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="flex-1">
             <DialogTitle className="flex items-center gap-2"><WhatsappLogo className="text-success" /> WhatsApp</DialogTitle>
             <DialogDescription className="mt-2">
               Conecte seu WhatsApp para iniciar seus atendimentos.
             </DialogDescription>
+            {/* Step indicator */}
+            {connection.sessionId && (
+              <div className="mt-3">
+                <ConnectionSteps status={connection.status} hasQr={!!connection.qrCode} />
+              </div>
+            )}
           </div>
-          <Badge variant={ready ? "success" : "outline"} className="ct-status-badge">{label}</Badge>
+          <Badge variant={ready ? "success" : "outline"} className="ct-status-badge shrink-0">{label}</Badge>
         </div>
 
         <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_15rem]">
           <div className="space-y-4">
             {/* Estado: Conectado */}
             {ready && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4 ct-connect-success">
                 <div className="flex items-center gap-2">
                   <span className="ct-connected-pulse size-2 rounded-full bg-emerald-500" />
-                  <p className="text-sm font-semibold">Online</p>
+                  <p className="text-sm font-semibold text-emerald-700">Online</p>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                <p className="mt-1 text-xs leading-5 text-emerald-600/80">
                   Seu WhatsApp está pronto para os atendimentos.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -349,14 +432,26 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
             {/* Estado: Inicializando / Aguardando QR */}
             {!ready && !hasError && initializing && (
               <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">
-                  {connection.qrCode ? "Escaneie o QR Code" : "Preparando sua conexão…"}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">
+                    {connection.qrCode ? "Escaneie o QR Code" : "Preparando sua conexão…"}
+                  </p>
+                  {connection.qrCode && elapsed > 0 && (
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      {elapsed}s
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
                   {connection.qrCode
                     ? "Abra o WhatsApp no celular, vá em Dispositivos conectados e escaneie o código."
                     : "Gerando QR Code..."}
                 </p>
+                {connection.qrCode && elapsed > 30 && (
+                  <p className="mt-2 text-[11px] text-amber-600">
+                    QR Code pode expirar. Se não escanear em breve, gere um novo.
+                  </p>
+                )}
               </div>
             )}
 
@@ -394,6 +489,9 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
                 )}
               </div>
             </div>
+            <Button className="w-full md:w-auto" onClick={openWhatsAppExternal} size="sm" variant="outline">
+              <WhatsappLogo className="size-4" /> Abrir WhatsApp Web ou app
+            </Button>
           </div>
 
           {/* QR Code panel */}
@@ -407,7 +505,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
             ) : (
               <div className="text-center text-slate-600">
                 {ready ? (
-                  <CheckCircle className="ct-qr-enter mx-auto size-9 text-emerald-600" />
+                  <CheckCircle className="ct-connect-success mx-auto size-9 text-emerald-600" />
                 ) : hasError ? (
                   <WarningCircle className="mx-auto size-7 text-destructive" />
                 ) : (

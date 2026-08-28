@@ -15,6 +15,10 @@ export interface AnimatedToastProps {
   title: ReactNode;
   description?: ReactNode;
   badgeLabel?: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
   onClose?: () => void;
   className?: string;
 }
@@ -33,6 +37,7 @@ export function AnimatedToast({
   title,
   description,
   badgeLabel,
+  action,
   onClose,
   className,
 }: AnimatedToastProps) {
@@ -70,13 +75,24 @@ export function AnimatedToast({
         </AnimatedBadge>
       </div>
 
-      <div className="min-w-0 flex-1 space-y-0.5">
+      <div className="min-w-0 flex-1 space-y-1">
         <div className="text-xs font-semibold leading-relaxed text-foreground">
           {title}
         </div>
         {description ? (
           <div className="text-[11px] leading-normal text-muted-foreground">
             {description}
+          </div>
+        ) : null}
+        {action ? (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={action.onClick}
+              className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer"
+            >
+              {action.label}
+            </button>
           </div>
         ) : null}
       </div>

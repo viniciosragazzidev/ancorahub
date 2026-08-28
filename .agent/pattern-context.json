@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "requiredContext": [
+    "docs/design-system/DESIGN_CONTRACT.md",
+    "docs/design-system/FOUNDATIONS.md",
+    "docs/design-system/COMPONENT_RULES.md",
+    "docs/design-system/PATTERN_RULES.md",
+    "docs/design-system/PATTERN_UX_RULES.md",
+    "docs/design-system/PATTERN_INTERACTION_CONTRACT.md",
+    "docs/design-system/NAVIGATION_PATTERNS.md",
+    ".agent/pattern-registry.json"
+  ],
+  "rule": "A page must declare an applicable blueprint before a UI implementation or refactor begins.",
+  "nonGoals": ["business-rules", "tenant-authority", "permission-decisions", "data-fetching"]
+}

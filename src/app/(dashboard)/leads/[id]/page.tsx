@@ -28,6 +28,7 @@ import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qu
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 import { BeneficiariesSection } from "./beneficiaries-section";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
@@ -50,6 +51,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   const { id } = await params;
   const context = await getRequiredTenantContext();
+  const brokerInternalChatEnabled =
+    context.role !== "broker" ||
+    (await getSystemSetting("feature_waha_connections_enabled")) !== "false";
   const db = getDatabase();
 
   let isMatrix = false;
@@ -128,9 +132,30 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       .where(eq(schema.user.id, context.userId))
       .limit(1);
 
-    const lightBeneficiaries = await getLeadBeneficiaries(id);
+    const [userWahaConn, lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers] = await Promise.all([
+      db.select({
+        status: schema.whatsappConnections.status,
+        chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
+      })
+      .from(schema.whatsappConnections)
+      .where(and(
+        eq(schema.whatsappConnections.tenantId, context.tenantId),
+        eq(schema.whatsappConnections.userId, context.userId),
+      ))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+      getLeadBeneficiaries(id),
+      getRequirementsForLead(id),
+      getLeadDocuments(id),
+      db.select({ id: schema.carriers.id, name: schema.carriers.name })
+        .from(schema.carriers)
+        .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active")))
+        .orderBy(schema.carriers.name),
+    ]);
+
+    const hasWahaConnected = userWahaConn?.status === "ready" && userWahaConn?.chatInternoAtivo === true;
+
     const lightFormData = readFormData(lead.formData);
-    const lightRequirements = await getRequirementsForLead(id);
 
     const lightLead: LightLeadDetailData = {
       id: lead.id,
@@ -167,6 +192,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <LightLeadDetail
         lead={lightLead}
         brokerName={brokerUser?.name || "Corretor"}
+        hasWahaConnected={Boolean(hasWahaConnected)}
         requirements={lightRequirements.map((req) => ({
           id: req.id,
           name: req.name,
@@ -174,6 +200,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           required: Boolean(req.required),
           appliesPerBeneficiary: Boolean(req.appliesPerBeneficiary),
         }))}
+        documents={lightLeadDocs.map((doc) => ({
+          id: doc.id,
+          filename: doc.filename,
+          status: doc.status,
+        }))}
+        carriers={lightCarriers}
       />
     );
   }
@@ -270,7 +302,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {/* Quick Header Actions */}
               <div id="lead-actions" className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {hasPermission(context.role, "acessar_conversas") ? (
-                  <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}`} />} variant="outline">
+                  <Button className="h-7 text-xs gap-1" render={<Link href={`/conversas?leadId=${lead.id}&draft=broker_intro`} />} variant="outline">
                     <ChatCircleText className="size-3.5 text-primary" />
                     Conversas
                   </Button>
@@ -428,7 +460,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     isOwner={context.userId === lead.corretorId}
                     phone={canSeePersonalData ? lead.telefone : null}
                     canSeePersonalData={canSeePersonalData}
-                    canAccessConversas={hasPermission(context.role, "acessar_conversas")}
+                    canAccessConversas={
+                      hasPermission(context.role, "acessar_conversas") && brokerInternalChatEnabled
+                    }
                     showFeedback={context.role === "broker" && context.userId === lead.corretorId && lead.status !== "lost" && lead.status !== "converted"}
                   />
                 )}

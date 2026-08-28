@@ -27,7 +27,7 @@ Nenhuma destas famílias atingiu `CANONICAL_READY`: faltam revisão visual, inve
 - DG-009: DataTable canônico.
 - DG-010: FormField/controles de formulário.
 - DG-011: responsabilidade/escala de overlays.
-- DG-001 a DG-007 ainda impedem declarar tokens visuais novos como aprovados.
+- DG-002 e DG-004 a DG-007 ainda impedem declarar uma convergência visual integral como aprovada.
 
 ## APIs e destino
 

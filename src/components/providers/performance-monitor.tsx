@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 /**
  * PerformanceMonitor — reports Web Vitals and route timing to the server.
@@ -11,25 +12,69 @@ import { useEffect, useRef } from "react";
  * - INP (Interaction to Next Paint)
  * - CLS (Cumulative Layout Shift)
  * - Route load duration
+ * - Client navigation completion after an internal link click
  *
  * Data is sent via beacon API (non-blocking) to avoid impacting performance.
  * No PII is sent — only route name and metric values.
  */
 export function PerformanceMonitor() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const routeStartRef = useRef<number>(performance.now());
+  const reportedRef = useRef(new Set<string>());
+  const pendingNavigationRef = useRef<{ target: string; startedAt: number } | null>(null);
+
+  useEffect(() => {
+    const captureNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element | null)?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || anchor.target || anchor.hasAttribute("download")) return;
+
+      const target = new URL(anchor.href, window.location.href);
+      if (target.origin !== window.location.origin) return;
+
+      const current = `${window.location.pathname}${window.location.search}`;
+      const destination = `${target.pathname}${target.search}`;
+      if (destination === current) return;
+
+      pendingNavigationRef.current = {
+        target: normalizeRoute(target.pathname),
+        startedAt: performance.now(),
+      };
+    };
+
+    window.addEventListener("click", captureNavigation, true);
+    return () => window.removeEventListener("click", captureNavigation, true);
+  }, []);
+
+  useEffect(() => {
+    const pending = pendingNavigationRef.current;
+    const route = normalizeRoute(pathname);
+    if (!pending || pending.target !== route) return;
+
+    pendingNavigationRef.current = null;
+    reportMetric({
+      route,
+      metric: "route_navigation",
+      value: Math.round(performance.now() - pending.startedAt),
+    });
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     const routeStart = routeStartRef.current;
     const pathname = window.location.pathname;
+    const route = normalizeRoute(pathname);
+    const reportOnce = (metric: MetricPayload["metric"], value: number) => {
+      const key = `${route}:${metric}`;
+      if (reportedRef.current.has(key)) return;
+      reportedRef.current.add(key);
+      reportMetric({ route, metric, value });
+    };
 
     // Report route load duration after page is fully loaded
     const reportRouteLoad = () => {
       const routeLoadDuration = Math.round(performance.now() - routeStart);
-      reportMetric({
-        route: normalizeRoute(pathname),
-        metric: "route_load",
-        value: routeLoadDuration,
-      });
+      reportOnce("route_load", routeLoadDuration);
     };
 
     // Report when page is fully loaded
@@ -44,26 +89,19 @@ export function PerformanceMonitor() {
     if (navigationEntries.length > 0) {
       const nav = navigationEntries[0] as PerformanceNavigationTiming;
       if (nav.responseStart > 0) {
-        reportMetric({
-          route: normalizeRoute(pathname),
-          metric: "ttfb",
-          value: Math.round(nav.responseStart),
-        });
+        reportOnce("ttfb", Math.round(nav.responseStart));
       }
     }
 
     // ── LCP ───────────────────────────────────────────────────────────
     let lcpObserver: PerformanceObserver | undefined;
+    let lcpValue = 0;
     try {
       lcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
         const last = entries[entries.length - 1];
         if (last) {
-          reportMetric({
-            route: normalizeRoute(pathname),
-            metric: "lcp",
-            value: Math.round(last.startTime),
-          });
+          lcpValue = Math.round(last.startTime);
         }
       });
       lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
@@ -91,12 +129,9 @@ export function PerformanceMonitor() {
     // Report CLS on page hide (final value)
     const handlePageHide = () => {
       if (clsValue > 0) {
-        reportMetric({
-          route: normalizeRoute(pathname),
-          metric: "cls",
-          value: Math.round(clsValue * 1000) / 1000,
-        });
+        reportOnce("cls", Math.round(clsValue * 1000) / 1000);
       }
+      if (lcpValue > 0) reportOnce("lcp", lcpValue);
     };
     window.addEventListener("pagehide", handlePageHide);
 
@@ -123,11 +158,7 @@ export function PerformanceMonitor() {
     // Report INP on page hide
     const handlePageHideInp = () => {
       if (maxInp > 0) {
-        reportMetric({
-          route: normalizeRoute(pathname),
-          metric: "inp",
-          value: Math.round(maxInp),
-        });
+        reportOnce("inp", Math.round(maxInp));
       }
     };
     window.addEventListener("pagehide", handlePageHideInp);
@@ -150,13 +181,13 @@ export function PerformanceMonitor() {
 
 type MetricPayload = {
   route: string;
-  metric: string;
+  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load" | "route_navigation";
   value: number;
 };
 
-function normalizeRoute(pathname: string): string {
+function normalizeRoute(pathname: string | null | undefined): string {
   // Replace UUIDs and numeric IDs with [id]
-  return pathname
+  return (pathname ?? "/")
     .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/[id]")
     .replace(/\/\d+/g, "/[id]");
 }

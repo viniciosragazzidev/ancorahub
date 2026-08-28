@@ -119,14 +119,12 @@ export function SuperDevSidebar() {
     toast.info("Encerrando sua sessão...");
     try {
       await signOut();
-      toast.success("Sessão encerrada.");
-      window.setTimeout(() => {
-        router.replace("/admin/login");
-        router.refresh();
-      }, 250);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível sair agora.");
+    } catch {
+      // signOut may fail if the server is unreachable, but we still redirect
+      // so the user can re-authenticate cleanly.
     }
+    // Hard navigation guarantees the proxy middleware runs with a cleared cookie.
+    window.location.href = "/admin/login";
   }
 
   return (

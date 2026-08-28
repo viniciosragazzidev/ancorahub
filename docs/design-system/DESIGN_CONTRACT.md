@@ -1,7 +1,7 @@
 # Contrato de Design System
 
 **Status:** ACTIVE  
-**Versão:** 1.1.0  
+**Versão:** 1.2.0
 **Fonte de verdade:** este contrato e documentos ligados; `design.md` é a fonte de evidência visual inicial. Em conflito, uma lacuna documentada impede nova regra até decisão aprovada.
 
 ## Escopo e não escopo
@@ -49,7 +49,7 @@ Mudanças usam semver: **patch** esclarece texto sem mudar regra; **minor** adic
 | Posso usar novo hex? | Não; abra gap ou use token existente. |
 | Qual fonte usar? | Open Runde, quando disponível; fallback é MISSING. |
 | Qual espaçamento usar? | Escala confirmada em `tokens/spacing.md`. |
-| Qual raio usar? | Apenas após resolver DG-003 para o caso; não inventar. |
+| Qual raio usar? | `radius.control` 10 px, `radius.card` 16 px, `radius.image` 20 px, `radius.panel` 32 px ou pill 999 px. |
 | Como é botão destrutivo? | MISSING: não criar variante visual nova. |
 | Como é uma tabela? | Pattern genérico; primitive detalhado é MISSING. |
 | Como reflow funciona? | MISSING: preservar comportamento existente até decisão. |
@@ -57,6 +57,12 @@ Mudanças usam semver: **patch** esclarece texto sem mudar regra; **minor** adic
 | O que fazer se faltar regra? | Registrar/usar [DESIGN_GAPS.md](./DESIGN_GAPS.md). |
 
 ## Changelog
+
+### 1.2.0 — 2026-08-20
+
+DG-001 e DG-003 foram resolvidos a partir da referência aprovada para o redesign
+global. O runtime passou a usar aliases centrais de superfície, ação e raio; não
+houve alteração de dados, permissões ou fluxos de negócio.
 
 ### 1.1.0 — 2026-08-20
 

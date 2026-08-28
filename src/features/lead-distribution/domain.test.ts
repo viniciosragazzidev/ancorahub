@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -43,6 +43,28 @@ describe("lead distribution domain", () => {
     expect(ranked.map((broker) => broker.id)).toEqual(["duty", "high"]);
   });
 
+  it("prioritizes brokers outside the 5-minute cooldown window", () => {
+    const now = new Date("2026-08-27T14:10:00Z");
+    const recentAssignment = new Date("2026-08-27T14:08:00Z"); // 2 min ago (cooled down)
+    const oldAssignment = new Date("2026-08-27T14:00:00Z"); // 10 min ago (ready)
+
+    const ranked = rankBrokers([
+      { id: "recent", createdAt: new Date("2026-01-01"), activeLeads: 1, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: recentAssignment, lastAssignedAt: recentAssignment, rankingScore: 0 },
+      { id: "ready", createdAt: new Date("2026-01-02"), activeLeads: 1, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: oldAssignment, lastAssignedAt: oldAssignment, rankingScore: 0 },
+    ], defaultIntelligentDistributionPolicy, now);
+
+    expect(ranked[0]?.id).toBe("ready");
+  });
+
+  it("prioritizes brokers with fewer unstarted leads", () => {
+    const ranked = rankBrokers([
+      { id: "busy", createdAt: new Date("2026-01-01"), activeLeads: 2, unstartedLeads: 3, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+      { id: "free", createdAt: new Date("2026-01-02"), activeLeads: 2, unstartedLeads: 0, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+    ], defaultIntelligentDistributionPolicy);
+
+    expect(ranked[0]?.id).toBe("free");
+  });
+
   it("calculates an explainable weighted broker score", () => {
     expect(calculateBrokerRankingScore({ conversionRate: 1, slaRate: 1, manualPriority: 0 }, defaultIntelligentDistributionPolicy)).toBe(80);
   });
@@ -80,5 +102,10 @@ describe("lead distribution domain", () => {
       queueBranchId: null,
       allowedBranchIds: [],
     })).toEqual([]);
+  });
+
+  it("keeps the Matriz available for human redistribution but out of automatic distribution", () => {
+    expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: true })).toBe(false);
+    expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: false })).toBe(true);
   });
 });

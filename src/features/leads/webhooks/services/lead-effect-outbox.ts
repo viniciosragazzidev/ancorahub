@@ -18,6 +18,7 @@ const payloadSchema = z.object({
   branchId: z.string().min(1).nullable().optional(),
   leadName: z.string().min(1).max(160).optional(),
   brokerId: z.string().min(1).optional(),
+  isRedistribution: z.enum(["true", "false"]).optional(),
   failedEffectId: z.string().min(1).optional(),
   failedEffectType: z.enum(effectTypes).optional(),
 }).strict();
@@ -135,7 +136,15 @@ async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect
   }
   if (effect.type === "NOTIFY_LEAD_ASSIGNED") {
     if (!payload.brokerId) throw new Error("NOTIFY_LEAD_ASSIGNED requer brokerId.");
-    await notifyNewLead(effect.leadId, effect.tenantId, payload.branchId ?? null, payload.brokerId, payload.leadName ?? "Novo lead", `lead-assigned:${effect.id}`);
+    await notifyNewLead(
+      effect.leadId,
+      effect.tenantId,
+      payload.branchId ?? null,
+      payload.brokerId,
+      payload.leadName ?? "Novo lead",
+      `lead-assigned:${effect.id}`,
+      { isRedistribution: payload.isRedistribution === "true" },
+    );
     return;
   }
   await notifyException(effect);

@@ -32,7 +32,7 @@ export function LeadAssignedNotificationButton({ leadId, className, compact = fa
         return;
       }
       const channels = result.channels?.join(" + ") || "canal disponível";
-      toast.success(`Aviso enviado por ${channels}.`, result.warnings?.length ? { description: result.warnings.join(" ") } : undefined);
+      toast.success(`Aviso preparado por ${channels}.`, result.warnings?.length ? { description: result.warnings.join(" ") } : undefined);
     });
   }
 

@@ -16,14 +16,17 @@ export function getTrustedAuthOrigins() {
   return Array.from(new Set([
     CANONICAL_PRODUCTION_ORIGIN,
     LEGACY_PRODUCTION_ORIGIN,
+    "https://staging.crm.ancorasaude.cloud",
     process.env.BETTER_AUTH_URL,
     process.env.NEXT_PUBLIC_APP_URL,
   ].filter((origin): origin is string => Boolean(origin))));
 }
 
 function getAuthBaseUrl() {
+  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
   if (process.env.NODE_ENV === "production") return CANONICAL_PRODUCTION_ORIGIN;
-  return process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return "http://localhost:3000";
 }
 
 function createAuth() {
@@ -51,7 +54,14 @@ function createAuth() {
         issuer: "Âncora Corretora",
         backupCodeOptions: { amount: 10, storeBackupCodes: "encrypted" },
       }),
-      passkey(),
+      // rpID fixado no domínio canônico: passkeys ficam válidas em qualquer
+      // subdomínio/host confiado do mesmo registrante (DEC-082). Sem rpID, a
+      // credencial seria emitida para o host da requisição (ex.: preview da
+      // Vercel) e não funcionaria na origem de produção.
+      passkey({
+        rpName: "Âncora Corretora",
+        rpID: process.env.PASSKEY_RP_ID ?? "ancorasaude.cloud",
+      }),
       nextCookies(),
     ],
     session: {

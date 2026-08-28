@@ -17,7 +17,6 @@ import { getRequestTiming, getDurations } from "@/shared/observability/request-t
 
 type RouteHandler = (
   request: Request,
-  context?: { params?: Record<string, string> },
 ) => Promise<Response | NextResponse>;
 
 function extractRouteName(pathname: string): string {
@@ -29,7 +28,11 @@ function extractRouteName(pathname: string): string {
 }
 
 export function withApiMetrics(handler: RouteHandler): RouteHandler {
-  return async (request: Request, context?: { params?: Record<string, string> }) => {
+  // This wrapper is currently used by static Route Handlers only. Keeping its
+  // exported signature to a single Request parameter preserves the exact
+  // Next.js 16 contract for static routes (whose generated context uses
+  // `params: Promise<{}>`).
+  return async (request: Request) => {
     const start = performance.now();
     const url = new URL(request.url);
     const route = extractRouteName(url.pathname);
@@ -38,7 +41,7 @@ export function withApiMetrics(handler: RouteHandler): RouteHandler {
     let status = 200;
 
     try {
-      const response = await handler(request, context);
+      const response = await handler(request);
 
       // Extract status from response object
       if (response && typeof response === "object" && "status" in response) {

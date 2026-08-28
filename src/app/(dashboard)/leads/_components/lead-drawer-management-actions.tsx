@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useId } from "react";
+import { useActionState, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -12,11 +12,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
 import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
 
 type Broker = { id: string; name: string; branchId: string | null };
 type Branch = { id: string; name: string };
 type ManagementMode = "reassign" | "investigate";
+type ManagementCommit = {
+  entity?: {
+    leadId: string;
+    branchId?: string | null;
+    corretorId?: string | null;
+    status?: string;
+    distributionStatus?: string;
+  };
+};
 
 export function LeadDrawerManagementActions({
   leadId,
@@ -30,6 +40,8 @@ export function LeadDrawerManagementActions({
   qualificationState,
   currentOwner,
   onSuccess,
+  onReassignOptimistic,
+  onReassignRollback,
 }: {
   leadId: string;
   leadName?: string;
@@ -41,7 +53,9 @@ export function LeadDrawerManagementActions({
   qualificationStatus?: string | null;
   qualificationState?: string | null;
   currentOwner: string | null;
-  onSuccess?: () => void;
+  onSuccess?: (result: ManagementCommit) => void;
+  onReassignOptimistic?: (brokerId: string) => void;
+  onReassignRollback?: () => void;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<ManagementMode>("reassign");
@@ -70,15 +84,11 @@ export function LeadDrawerManagementActions({
     if (res.success) {
       toast.success("Lead movido de volta para a fila de qualificação!");
       router.refresh();
-      if (onSuccess) onSuccess();
+      onSuccess?.({});
     } else {
       toast.error(res.error ?? "Erro ao mover lead para qualificação.");
     }
   }
-
-  const reassignFormKey = useId();
-  const assumeFormKey = useId();
-  const routeFormKey = useId();
 
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
@@ -87,49 +97,50 @@ export function LeadDrawerManagementActions({
     {},
   );
 
-  // Track form keys that change on success/error to force remount and reset pending state
-  const [reassignKey, setReassignKey] = useState(0);
-  const [assumeKey, setAssumeKey] = useState(0);
-  const [routeKey, setRouteKey] = useState(0);
+  const handleReassignSuccess = useCallback((result: typeof reassignState) => {
+    toast.success("Lead reatribuído e SLA reiniciado.");
+    setBrokerId("");
+    onSuccess?.(result);
+  }, [onSuccess]);
+  const handleReassignError = useCallback((result: typeof reassignState) => {
+    onReassignRollback?.();
+    if (result.error) toast.error(result.error);
+  }, [onReassignRollback]);
+  useActionDialogLifecycle({
+    state: reassignState,
+    pending: reassignPending,
+    onSuccess: handleReassignSuccess,
+    onError: handleReassignError,
+  });
 
-  useEffect(() => {
-    if (reassignState.success) {
-      toast.success("Lead reatribuído e SLA reiniciado.");
-      setReassignKey((k) => k + 1);
-      if (onSuccess) onSuccess();
-    }
-    if (reassignState.error) {
-      toast.error(reassignState.error);
-      setReassignKey((k) => k + 1);
-    }
-  }, [reassignState, onSuccess]);
-  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState, router]);
+  const handleAssumeSuccess = useCallback((result: typeof assumeState) => {
+    toast.success("Lead assumido para investigação.");
+    setReason("");
+    onSuccess?.(result);
+  }, [onSuccess]);
+  const handleAssumeError = useCallback((result: typeof assumeState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: assumeState,
+    pending: assumePending,
+    onSuccess: handleAssumeSuccess,
+    onError: handleAssumeError,
+  });
 
-  useEffect(() => {
-    if (assumeState.success) {
-      toast.success("Lead assumido para investigação.");
-      setAssumeKey((k) => k + 1);
-      if (onSuccess) onSuccess();
-    }
-    if (assumeState.error) {
-      toast.error(assumeState.error);
-      setAssumeKey((k) => k + 1);
-    }
-  }, [assumeState, onSuccess]);
-  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState, router]);
-
-  useEffect(() => {
-    if (routeState.success) {
-      toast.success(routeState.message ?? "Lead enviado para a unidade.");
-      setRouteKey((k) => k + 1);
-      if (onSuccess) onSuccess();
-    }
-    if (routeState.error) {
-      toast.error(routeState.error);
-      setRouteKey((k) => k + 1);
-    }
-  }, [routeState, onSuccess]);
-  useEffect(() => { if (routeState.success) router.refresh(); }, [routeState, router]);
+  const handleRouteSuccess = useCallback((result: typeof routeState) => {
+    toast.success(result.message ?? "Lead enviado para a unidade.");
+    onSuccess?.(result);
+  }, [onSuccess]);
+  const handleRouteError = useCallback((result: typeof routeState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: routeState,
+    pending: routePending,
+    onSuccess: handleRouteSuccess,
+    onError: handleRouteError,
+  });
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
@@ -141,8 +152,7 @@ export function LeadDrawerManagementActions({
       const res = await assumeLeadForMessagingAction(leadId);
       if (res.success) {
         toast.success("Você assumiu este atendimento.");
-        router.refresh();
-        if (onSuccess) onSuccess();
+        onSuccess?.(res);
       } else if (res.error) {
         toast.error(res.error);
       }
@@ -169,7 +179,7 @@ export function LeadDrawerManagementActions({
           <p className="text-xs text-muted-foreground leading-normal">
             Este lead ainda não foi atribuído a nenhuma unidade. Selecione uma filial para enviá-lo à fila de distribuição.
           </p>
-          <form key={`route-${routeKey}`} action={routeAction} className="flex items-center gap-2">
+          <form action={routeAction} className="flex items-center gap-2">
             <input name="leadId" type="hidden" value={leadId} />
             <Select name="branchId" onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
               <SelectTrigger className="h-9 flex-1 text-xs" aria-label="Selecionar unidade">
@@ -264,8 +274,9 @@ export function LeadDrawerManagementActions({
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
       {mode === "reassign" ? (
-        <form key={`reassign-${reassignKey}`} action={reassign} className="space-y-3">
+        <form action={reassign} className="space-y-3" onSubmit={() => onReassignOptimistic?.(brokerId)}>
           <input name="leadId" type="hidden" value={leadId} />
+          <input name="brokerId" type="hidden" value={brokerId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">Novo responsável</Label>
             <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>
@@ -284,7 +295,7 @@ export function LeadDrawerManagementActions({
           </Button>
         </form>
       ) : (
-        <form key={`assume-${assumeKey}`} action={assume} className="space-y-3">
+        <form action={assume} className="space-y-3">
           <input name="leadId" type="hidden" value={leadId} />
           <div className="space-y-1.5">
             <Label htmlFor="lead-investigation-reason-drawer" className="text-xs">Motivo da investigação</Label>

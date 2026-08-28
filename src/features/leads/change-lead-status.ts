@@ -128,16 +128,7 @@ export async function changeLeadStatus(
     throw new Error("CONFLICT_VERSION");
   }
 
-  // ─── Validações de transição ─────────────────────────────────────────
-
-  // 1. convertido: não pode ser selecionado manualmente
-  if (newStatus === "converted") {
-    throw new Error(
-      "O status 'Convertido' não pode ser definido manualmente. Ele é atribuído automaticamente ao registrar uma venda.",
-    );
-  }
-
-  // 2. validação de transição do pipeline
+  // 1. validação de transição do pipeline
   const allowedNext = VALID_TRANSITIONS[previousStatus];
   if (allowedNext && !allowedNext.includes(newStatus)) {
     throw new Error(

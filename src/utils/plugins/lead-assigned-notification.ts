@@ -9,6 +9,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
 import type { PluginContext } from "@/platform/plugins/types";
@@ -140,8 +141,9 @@ export const leadAssignedNotificationPlugin: ServerPluginDefinition<{
             requestedBy: context.userId,
             idempotencyKey: `${executionKey}:whatsapp`,
           });
-          await processMetaOutboundBatch(10, context.tenantId);
+          scheduleAfterResponse("manual-lead-assignment-notification", () => processMetaOutboundBatch(3, context.tenantId));
           delivered.push("whatsapp");
+          warnings.push("WhatsApp enfileirado para entrega.");
         } catch (error) {
           warnings.push(error instanceof Error ? error.message : "Não foi possível enfileirar o WhatsApp.");
         }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { cadenceDefinitionSchema, phoneHash, relaySignature, verifyRelaySignature } from "./contract";
+import {
+  cadenceDefinitionSchema,
+  normalizeWahaWebhookPayload,
+  phoneHash,
+  relaySignature,
+  verifyRelaySignature,
+  wahaWebhookSchema,
+} from "./contract";
 
 describe("WAHA cadence contract", () => {
   it("accepts a versioned cadence without sensitive content", () => {
@@ -30,5 +37,23 @@ describe("WAHA cadence contract", () => {
     const signature = relaySignature(secret, timestamp, nonce, rawBody);
     expect(verifyRelaySignature({ secret, timestamp, nonce, signature, rawBody })).toBe(true);
     expect(verifyRelaySignature({ secret, timestamp, nonce, signature: "00", rawBody })).toBe(false);
+  });
+
+  it("normalizes a WAHA WhatsApp JID before validating the inbound phone", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      eventId: "evt-1",
+      type: "message.inbound",
+      sessionId: "waha_session",
+      occurredAt: "2026-08-24T12:00:00.000Z",
+      message: {
+        id: "message-1",
+        from: "5511999999999@c.us",
+        to: "5511888888888@c.us",
+        body: "Olá",
+      },
+    }));
+
+    expect(event.message?.from).toBe("5511999999999");
+    expect(event.message?.to).toBe("5511888888888");
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, WarningCircle } from "@/components/huge-icons";
 import { toast } from "sonner";
 
@@ -10,14 +11,24 @@ import { CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppSelect } from "@/components/ui/select";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 const initialState: LeadCreateState = {};
 
 type PlanOption = { id: string; name: string; carrierName: string };
 
 export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(createManualLeadAction, initialState);
-  useEffect(() => { if (state.error) toast.error(state.error); }, [state.error]);
+  const handleSuccess = useCallback((result: LeadCreateState) => {
+    if (!result.leadId) return;
+    toast.success("Lead criado com sucesso.");
+    router.push(`/leads/${result.leadId}`);
+  }, [router]);
+  const handleError = useCallback((result: LeadCreateState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({ state, pending, onSuccess: handleSuccess, onError: handleError });
 
   const [tipo, setTipo] = useState("PF");
   const [dependentes, setDependentes] = useState("");
@@ -35,7 +46,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
   ];
 
   return (
-    <form action={action} onSubmit={() => toast.info("Salvando lead e distribuindo a oportunidade...")} className="space-y-4">
+    <form action={action} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="lead-name">Nome completo</Label>
         <Input id="lead-name" name="nome" placeholder="Ex.: Mariana Costa" required />

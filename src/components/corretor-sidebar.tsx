@@ -3,6 +3,7 @@
 import {
   Bell,
   ChartLineUp,
+  ChatCircleText,
   ClipboardText,
   Handshake,
   House,
@@ -37,16 +38,10 @@ import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey; requiresFeature?: boolean };
 
 const allBrokerItems: BrokerSidebarItem[] = [
-  { label: "Resumo", icon: House, url: "/corretor/resumo", permission: "acessar_dashboard" },
-  { label: "Minha fila", icon: ListChecks, url: "/minha-fila", permission: "acessar_leads" },
-  { label: "Tarefas", icon: ClipboardText, url: "/tarefas", permission: "acessar_tarefas" },
-  { label: "Checklist", icon: ClipboardText, url: "/checklist", permission: "acessar_documentos" },
-  { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
-  { label: "Clientes", icon: Handshake, url: "/clientes", permission: "acessar_clientes" },
-  { label: "Minha meta", icon: ChartLineUp, url: "/minha-meta", permission: "ver_meta_propria" },
-  { label: "Notificações", icon: Bell, url: "/notificacoes", permission: "acessar_notificacoes" },
-  { label: "Meu perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais", requiresFeature: true },
-  { label: "Configurações", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
+  { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
+  { label: "Meus Leads", icon: ListChecks, url: "/leads", permission: "acessar_leads" },
+  { label: "Minha Fila", icon: ListChecks, url: "/minha-fila", permission: "acessar_leads" },
+  { label: "Meu Perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais" },
 ];
 
 export function CorretorSidebar() {
@@ -86,14 +81,17 @@ export function CorretorSidebar() {
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
     try {
-      await signOut();
-      toast.success("Sessão encerrada.");
-      window.setTimeout(() => {
-        router.replace("/login");
-        router.refresh();
-      }, 250);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível sair agora.");
+      await signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            window.location.href = "/login";
+          },
+        },
+      });
+    } catch {
+      // signOut may fail if server is unreachable
+    } finally {
+      window.location.href = "/login";
     }
   }
 

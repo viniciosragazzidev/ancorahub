@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState, useId } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText } from "@/components/huge-icons";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
 import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 type Broker = { id: string; name: string };
 type TaskItem = { completedAt: string | null | Date };
@@ -49,6 +50,17 @@ export function SupervisionPanel({
   const [brokerId, setBrokerId] = useState("");
   const [reason, setReason] = useState("");
   const [isAssuming, setIsAssuming] = useState(false);
+  const [displayedAssignment, setDisplayedAssignment] = useState({
+    status: currentStatus,
+    ownerId: currentOwnerId,
+    ownerName: currentOwner,
+    assignedAt,
+  });
+  const reassignSnapshotRef = useRef<typeof displayedAssignment | null>(null);
+
+  useEffect(() => {
+    setDisplayedAssignment({ status: currentStatus, ownerId: currentOwnerId, ownerName: currentOwner, assignedAt });
+  }, [assignedAt, currentOwner, currentOwnerId, currentStatus]);
 
   const formKey = useId();
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
@@ -58,29 +70,61 @@ export function SupervisionPanel({
   const [reassignVersion, setReassignVersion] = useState(0);
   const [assumeVersion, setAssumeVersion] = useState(0);
 
-  useEffect(() => {
-    if (reassignState.success) {
-      toast.success("Lead reatribuído e SLA reiniciado.");
-      setReassignVersion((v) => v + 1);
+  const handleReassignSuccess = useCallback((result: typeof reassignState) => {
+    const entity = result.entity;
+    const broker = brokers.find((item) => item.id === entity?.corretorId);
+    if (entity) {
+      setDisplayedAssignment({
+        status: entity.status,
+        ownerId: entity.corretorId,
+        ownerName: broker?.name ?? currentOwner,
+        assignedAt: new Date(),
+      });
     }
-    if (reassignState.error) {
-      toast.error(reassignState.error);
-      setReassignVersion((v) => v + 1);
+    toast.success("Lead reatribuído e SLA reiniciado.");
+    reassignSnapshotRef.current = null;
+    setBrokerId("");
+    setReassignVersion((version) => version + 1);
+    startTransition(() => router.refresh());
+  }, [brokers, currentOwner, router]);
+  const handleReassignError = useCallback((result: typeof reassignState) => {
+    if (reassignSnapshotRef.current) {
+      setDisplayedAssignment(reassignSnapshotRef.current);
+      reassignSnapshotRef.current = null;
     }
-  }, [reassignState]);
-  useEffect(() => { if (reassignState.success) router.refresh(); }, [reassignState, router]);
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: reassignState,
+    pending: reassignPending,
+    onSuccess: handleReassignSuccess,
+    onError: handleReassignError,
+  });
 
-  useEffect(() => {
-    if (assumeState.success) {
-      toast.success("Lead assumido para investigação.");
-      setAssumeVersion((v) => v + 1);
+  const handleAssumeSuccess = useCallback((result: typeof assumeState) => {
+    const entity = result.entity;
+    if (entity) {
+      setDisplayedAssignment({
+        status: entity.status,
+        ownerId: entity.corretorId,
+        ownerName: entity.corretorId === currentUserId ? "Você" : currentOwner,
+        assignedAt: new Date(),
+      });
     }
-    if (assumeState.error) {
-      toast.error(assumeState.error);
-      setAssumeVersion((v) => v + 1);
-    }
-  }, [assumeState]);
-  useEffect(() => { if (assumeState.success) router.refresh(); }, [assumeState, router]);
+    toast.success("Lead assumido para investigação.");
+    setReason("");
+    setAssumeVersion((version) => version + 1);
+    startTransition(() => router.refresh());
+  }, [currentOwner, currentUserId, router]);
+  const handleAssumeError = useCallback((result: typeof assumeState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: assumeState,
+    pending: assumePending,
+    onSuccess: handleAssumeSuccess,
+    onError: handleAssumeError,
+  });
 
   // SLA calculations
   const elapsedMinutes = Math.max(0, Math.round((Date.now() - stageEnteredAt.getTime()) / 60000));
@@ -96,8 +140,14 @@ export function SupervisionPanel({
       setIsAssuming(true);
       const res = await assumeLeadForMessagingAction(leadId);
       if (res.success) {
+        setDisplayedAssignment({
+          status: res.entity?.status ?? displayedAssignment.status,
+          ownerId: currentUserId,
+          ownerName: "Você",
+          assignedAt: new Date(),
+        });
         toast.success("Você assumiu este atendimento.");
-        router.refresh();
+        startTransition(() => router.refresh());
       } else if (res.error) {
         toast.error(res.error);
       }
@@ -108,7 +158,19 @@ export function SupervisionPanel({
     }
   };
 
-  const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
+  const handleOptimisticReassign = () => {
+    const broker = brokers.find((item) => item.id === brokerId);
+    if (!broker) return;
+    reassignSnapshotRef.current = displayedAssignment;
+    setDisplayedAssignment({
+      status: "distributed",
+      ownerId: brokerId,
+      ownerName: broker.name,
+      assignedAt: new Date(),
+    });
+  };
+
+  const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(displayedAssignment.status);
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/[0.01] shadow-sm">
@@ -169,9 +231,9 @@ export function SupervisionPanel({
               <span className="text-xs font-semibold uppercase tracking-wider">Responsável</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground truncate">{currentOwner || "Não distribuído"}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{displayedAssignment.ownerName || "Não distribuído"}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {assignedAt ? `Designado em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(assignedAt))}` : "Aguardando fila de distribuição"}
+                {displayedAssignment.assignedAt ? `Designado em ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(displayedAssignment.assignedAt))}` : "Aguardando fila de distribuição"}
               </p>
             </div>
           </div>
@@ -197,12 +259,12 @@ export function SupervisionPanel({
         </div>
 
         {/* Row 2: Takeover banner if active under someone else */}
-        {activeStatus && currentOwnerId !== currentUserId && (
+        {activeStatus && displayedAssignment.ownerId !== currentUserId && (
           <div className="flex flex-col gap-4 rounded-xl border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">Intervir no Atendimento</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Este lead está sendo atendido por <strong>{currentOwner}</strong>. Se necessário, assuma o controle da conversa.
+                Este lead está sendo atendido por <strong>{displayedAssignment.ownerName}</strong>. Se necessário, assuma o controle da conversa.
               </p>
             </div>
             <Button
@@ -229,8 +291,9 @@ export function SupervisionPanel({
 
           <div className="rounded-lg border border-border bg-muted/[0.15] p-4">
             {mode === "reassign" ? (
-              <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4">
+              <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4" onSubmit={handleOptimisticReassign}>
                 <input name="leadId" type="hidden" value={leadId} />
+                <input name="brokerId" type="hidden" value={brokerId} />
                 <div className="space-y-2">
                   <Label htmlFor="lead-reassign-broker-panel" className="text-xs">Selecionar novo corretor</Label>
                   <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>

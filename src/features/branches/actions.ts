@@ -154,13 +154,14 @@ export async function toggleAutoDistributeAction(
     }
     const db = getDatabase();
     const [branch] = await db
-      .select({ id: schema.branches.id, autoDistribute: schema.branches.autoDistribute })
+      .select({ id: schema.branches.id, autoDistribute: schema.branches.autoDistribute, isDistributionHub: schema.branches.isDistributionHub })
       .from(schema.branches)
       .where(
         and(eq(schema.branches.id, branchId.data), eq(schema.branches.tenantId, context.tenantId)),
       )
       .limit(1);
     if (!branch) return { error: "Filial não encontrada." };
+    if (branch.isDistributionHub) return { error: "A Central de redistribuição não participa da distribuição automática." };
     // Manager can only toggle their own branch
     if (context.role === "manager" && context.branchId !== branch.id) {
       return { error: "Você só pode alterar a configuração da sua própria filial." };
@@ -170,6 +171,54 @@ export async function toggleAutoDistributeAction(
       .set({ autoDistribute: !branch.autoDistribute })
       .where(eq(schema.branches.id, branch.id));
     return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function toggleDistributionHubAction(
+  _previous: BranchActionState,
+  formData: FormData,
+): Promise<BranchActionState> {
+  const branchId = branchIdInput.safeParse(formData.get("branchId"));
+  if (!branchId.success) return { error: branchId.error.issues[0]?.message ?? "Filial inválida." };
+
+  try {
+    const context = await getDirectorContext();
+    const db = getDatabase();
+    const [branch] = await db
+      .select({ id: schema.branches.id, isDistributionHub: schema.branches.isDistributionHub })
+      .from(schema.branches)
+      .where(and(eq(schema.branches.id, branchId.data), eq(schema.branches.tenantId, context.tenantId)))
+      .limit(1);
+    if (!branch) return { error: "Filial não encontrada." };
+
+    await db.transaction(async (tx) => {
+      if (!branch.isDistributionHub) {
+        const [existingHub] = await tx
+          .select({ id: schema.branches.id })
+          .from(schema.branches)
+          .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.isDistributionHub, true)))
+          .limit(1);
+        if (existingHub) throw new Error("Já existe uma Central de redistribuição nesta corretora.");
+      }
+      await tx
+        .update(schema.branches)
+        .set({
+          isDistributionHub: !branch.isDistributionHub,
+          ...(branch.isDistributionHub ? {} : { autoDistribute: false }),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(schema.branches.id, branch.id), eq(schema.branches.tenantId, context.tenantId)));
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "branch",
+        entidadeId: branch.id,
+        acao: branch.isDistributionHub ? "central_redistribuicao_desativada" : "central_redistribuicao_ativada",
+      });
+    });
+    return { success: true, message: branch.isDistributionHub ? "Central de redistribuição desativada." : "Central de redistribuição ativada. A unidade não participará da distribuição automática." };
   } catch (error) {
     return actionError(error);
   }

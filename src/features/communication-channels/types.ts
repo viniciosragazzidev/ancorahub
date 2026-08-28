@@ -30,6 +30,11 @@ export type MetaWebhookMessage = {
 export type MetaWebhookStatus = {
   id: string;
   status: string;
+  errors?: Array<{
+    code?: number;
+    title?: string;
+    message?: string;
+  }>;
 };
 
 export type MetaWebhookChange = {

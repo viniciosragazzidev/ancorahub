@@ -5,6 +5,7 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
+import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { decryptChannelSecret } from "./secret-crypto";
 import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
@@ -83,6 +84,13 @@ export function samePhone(left: string, right: string) {
 
 export function matchesKnownBrokerPhone(phone: string, brokerPhones: readonly string[]) {
   return brokerPhones.some((brokerPhone) => samePhone(brokerPhone, phone));
+}
+
+export function getMetaDeliveryFailure(status: { errors?: Array<{ code?: number; title?: string; message?: string }> }) {
+  const error = status.errors?.[0];
+  if (!error) return { code: "META_DELIVERY_FAILED", message: "A Meta não informou o motivo da falha de entrega." };
+  const title = error.title?.trim() || "A Meta recusou a entrega para este destinatário.";
+  return { code: String(error.code ?? "META_DELIVERY_FAILED"), message: title.slice(0, 240) };
 }
 
 async function registerWebhookEvent(input: { channelId: string | null; externalEventId: string; eventType: string; payloadHash: string }) {
@@ -171,6 +179,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
           }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
           console.info("[whatsapp/broker-channel] inbound.received", { tenantId: channel.tenantId, brokerProfileId: brokerProfile.id, messageKind });
+          void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
           await setWebhookEventResult(eventId, "processed");
           processed += 1;
           continue;
@@ -186,7 +195,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           .filter((s) => s.length >= 8)
           .map((s) => sql`regexp_replace(${schema.leads.telefone}, '[^0-9]', '', 'g') LIKE ${'%' + s}`);
         const leads = phoneConditions.length
-          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus })
+          ? await db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, corretorId: schema.leads.corretorId })
               .from(schema.leads)
               .where(and(eq(schema.leads.tenantId, channel.tenantId), isNull(schema.leads.deletedAt), or(...phoneConditions)))
           : [];
@@ -230,6 +239,10 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           body: text || `[${messageKind}]`,
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+        void publishConversationInvalidation({
+          tenantId: channel.tenantId,
+          participantUserIds: [lead?.corretorId],
+        }).catch(() => undefined);
 
         if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
@@ -270,6 +283,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           });
         }
         await setWebhookEventResult(eventId, "processed");
+        void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
         processed += 1;
       }
 
@@ -279,7 +293,12 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         await db.update(schema.whatsappMessages).set({ providerStatus: status.status }).where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id), eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER)));
         const outboundUpdate: Partial<typeof schema.whatsappOutboundMessages.$inferInsert> = { updatedAt: new Date() };
         if (["sent", "delivered", "read"].includes(status.status)) outboundUpdate.status = status.status;
-        else if (["failed", "deleted"].includes(status.status)) outboundUpdate.status = "failed";
+        else if (["failed", "deleted"].includes(status.status)) {
+          outboundUpdate.status = "failed";
+          const deliveryFailure = getMetaDeliveryFailure(status);
+          outboundUpdate.providerErrorCode = deliveryFailure.code;
+          outboundUpdate.providerErrorMessage = deliveryFailure.message;
+        }
         if (status.status === "sent") outboundUpdate.sentAt = new Date();
         if (status.status === "delivered") outboundUpdate.deliveredAt = new Date();
         if (status.status === "read") outboundUpdate.readAt = new Date();
@@ -317,7 +336,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           await db.update(schema.leadOffers).set({ status: status.status.toUpperCase() as "DELIVERED" | "READ", updatedAt: new Date() }).where(and(eq(schema.leadOffers.outboundMessageId, outbound.id), eq(schema.leadOffers.tenantId, channel.tenantId)));
         }
 
-        await setWebhookEventResult(eventId, "processed");
+        await setWebhookEventResult(eventId, "processed", outboundUpdate.providerErrorCode ?? undefined);
         processed += 1;
       }
     }

@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 
 import { playSound } from "@/lib/sounds/player";
 import { notificationSound } from "@/lib/sounds/recipes";
 
-import { ArrowRight, BellRinging, X } from "@/components/huge-icons";
+import { ArrowRight, BellRinging } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/sonner";
 import type { IncomingLead } from "./incoming-lead-queue";
+
+let lastSoundPlayedAt = 0;
+const SOUND_THROTTLE_MS = 4000;
 
 export function IncomingLeadCard({
   item,
@@ -23,88 +23,97 @@ export function IncomingLeadCard({
   queuedCount?: number;
   onResolve: (item: IncomingLead, reason: "open" | "dismiss") => void;
 }) {
-  const reduceMotion = useReducedMotion();
-  const [mounted, setMounted] = useState(false);
+  const activeToastIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (!item) {
+      if (activeToastIdRef.current) {
+        toast.dismiss(activeToastIdRef.current);
+        activeToastIdRef.current = null;
+      }
+      return;
+    }
 
-  useEffect(() => {
-    if (item?.notificationId) {
+    const now = Date.now();
+    if (now - lastSoundPlayedAt >= SOUND_THROTTLE_MS) {
+      lastSoundPlayedAt = now;
       try {
         playSound(notificationSound, { volume: 0.8 });
       } catch {
-        // Fallback if browser requires user gesture for audio context
+        // Fallback se o navegador exigir gesto do usuário
       }
     }
-  }, [item?.notificationId]);
 
-  const cardContent = (
-    <AnimatePresence initial={false}>
-      {item ? (
-        <motion.div
-          key={item.notificationId}
+    const toastId = `incoming-lead-${item.notificationId}`;
+    activeToastIdRef.current = toastId;
+
+    toast.custom(
+      (t) => (
+        <div
           data-testid="incoming-lead-card"
-          role="alert"
-          aria-live="polite"
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
-          transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 28, mass: 0.7 }}
-          className="fixed inset-x-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[9999] sm:bottom-5 sm:left-auto sm:right-5 sm:w-[min(380px,calc(100vw-2rem))]"
+          className="group relative flex w-full max-w-sm flex-col gap-3 rounded-xl border border-primary/30 bg-card/95 p-3.5 shadow-lg backdrop-blur-md select-none dark:bg-card/90"
         >
-          <Card className="overflow-hidden border-primary/25 bg-card/95 p-0 shadow-[0_18px_50px_-24px_hsl(var(--primary)/0.45)] backdrop-blur-sm">
-            <div className="flex items-center gap-2 border-b border-primary/10 bg-primary/[0.04] px-4 py-3">
-              <motion.span
-                aria-hidden="true"
-                className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary"
-                animate={reduceMotion ? undefined : { scale: [1, 1.08, 1] }}
-                transition={reduceMotion ? undefined : { duration: 1.2, repeat: 1, ease: "easeOut" }}
-              >
-                <BellRinging className="size-4" />
-              </motion.span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Novo lead recebido</p>
-                <p className="truncate text-xs text-muted-foreground">Uma nova oportunidade entrou na sua fila</p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Dispensar novo lead"
-                onClick={() => onResolve(item, "dismiss")}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </Button>
+          <div className="flex items-center gap-2 border-b border-primary/10 bg-primary/[0.04] pb-2.5 -mx-3.5 -mt-3.5 px-3.5 pt-3.5 rounded-t-xl">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+              <BellRinging className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-primary">Novo lead recebido</p>
+              <p className="truncate text-[11px] text-muted-foreground">Uma nova oportunidade entrou na sua fila</p>
             </div>
-            <CardContent className="space-y-3 p-4">
-              <div>
-                <p className="text-base font-semibold leading-tight text-foreground">{item.title}</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.message}</p>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                {queuedCount > 0 ? (
-                  <span className="text-xs text-muted-foreground">+{queuedCount} aguardando</span>
-                ) : <span />}
-                <Button
-                  render={<Link href={`/leads/${encodeURIComponent(item.leadId)}`} onClick={() => onResolve(item, "open")} />}
-                  variant="default"
-                  size="sm"
-                  className={cn("gap-1.5 shadow-sm")}
-                >
-                  Atender agora
-                  <ArrowRight className="size-3.5" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  );
+            <button
+              type="button"
+              onClick={() => {
+                toast.dismiss(t);
+                onResolve(item, "dismiss");
+              }}
+              className="shrink-0 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 cursor-pointer"
+              aria-label="Dispensar novo lead"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
 
-  if (!mounted) return null;
-  return createPortal(cardContent, document.body);
+          <div className="space-y-1">
+            <p className="text-xs font-semibold leading-relaxed text-foreground">{item.title}</p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">{item.message}</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 pt-0.5">
+            {queuedCount > 0 ? (
+              <span className="text-[11px] text-muted-foreground">+{queuedCount} aguardando</span>
+            ) : (
+              <span />
+            )}
+            <Button
+              render={
+                <Link
+                  href={`/leads/${encodeURIComponent(item.leadId)}`}
+                  onClick={() => {
+                    toast.dismiss(t);
+                    onResolve(item, "open");
+                  }}
+                />
+              }
+              variant="default"
+              size="sm"
+              className="gap-1.5 h-8 text-xs shadow-sm"
+            >
+              Atender agora
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+      ),
+      { id: toastId, duration: 10000, position: "bottom-right" },
+    );
+
+    return () => {
+      toast.dismiss(toastId);
+    };
+  }, [item, queuedCount, onResolve]);
+
+  return null;
 }

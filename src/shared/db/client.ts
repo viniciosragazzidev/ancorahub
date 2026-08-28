@@ -17,10 +17,9 @@ export function connectionLimit() {
   if (process.env.NEXT_PHASE === "phase-production-build") return 3;
   const configured = Number.parseInt(process.env.DB_POOL_MAX ?? "", 10);
   if (Number.isFinite(configured) && configured >= 1 && configured <= 10) return configured;
-  // Each serverless instance can be multiplied by concurrent route renders.
-  // Keep the default to one socket in production; postgres.js queues concurrent
-  // queries inside the invocation instead of exhausting the project's shared
-  // connection limit. Operators can raise it deliberately with DB_POOL_MAX.
+  // Keep serverless deployments at one socket. The self-hosted Docker image
+  // explicitly sets DB_POOL_MAX=2 for its single long-lived Next process,
+  // avoiding head-of-line blocking without spending the shared pool budget.
   return process.env.NODE_ENV === "production" ? 1 : 3;
 }
 

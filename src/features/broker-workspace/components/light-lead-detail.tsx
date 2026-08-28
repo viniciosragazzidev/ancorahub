@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -33,11 +33,15 @@ import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-act
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
-import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+
 import { cn } from "@/lib/utils";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
+import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
+
+type ConfirmationDocument = { id: string; filename: string; status: string };
+type CarrierOption = { id: string; name: string };
 
 export type LiteRequirement = {
   id: string;
@@ -89,26 +93,52 @@ const DECLINE_REASONS = [
 ];
 
 const STEP_OPTIONS = [
-  { id: "quote_sent", label: "Cotação enviada", description: "Cotação enviada para o cliente", targetStatus: "quote_sent" },
-  { id: "negotiation", label: "Em negociação", description: "Negociando condições da proposta", targetStatus: "negotiation" },
-  { id: "no_interest", label: "Sem interesse", description: "Cliente optou por não seguir", targetStatus: "lost" },
-  { id: "no_contact", label: "Não consegui contato", description: "Sem retorno após tentativas", targetStatus: "lost" },
+  {
+    id: "quote_sent",
+    label: "Cotação enviada",
+    description: "Cotação enviada para o cliente",
+    targetStatus: "quote_sent",
+  },
+  {
+    id: "negotiation",
+    label: "Em negociação",
+    description: "Negociando condições da proposta",
+    targetStatus: "negotiation",
+  },
+  {
+    id: "no_interest",
+    label: "Sem interesse",
+    description: "Cliente optou por não seguir",
+    targetStatus: "lost",
+  },
+  {
+    id: "no_contact",
+    label: "Não consegui contato",
+    description: "Sem retorno após tentativas",
+    targetStatus: "lost",
+  },
 ];
 
 export function LightLeadDetail({
   lead,
   brokerName,
+  hasWahaConnected = false,
   requirements = [],
+  documents = [],
+  carriers = [],
 }: {
   lead: LightLeadDetailData;
   brokerName: string;
+  hasWahaConnected?: boolean;
   requirements?: LiteRequirement[];
+  documents?: ConfirmationDocument[];
+  carriers?: CarrierOption[];
 }) {
   const router = useRouter();
   const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
   const [leadStatus, setLeadStatus] = useState(lead.status);
   const [phoneUnlocked, setPhoneUnlocked] = useState(Boolean(accepted && lead.telefone));
-  
+
   const [accepting, startAcceptTransition] = useTransition();
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [declineReason, setDeclineReason] = useState(DECLINE_REASONS[0]);
@@ -124,14 +154,20 @@ export function LightLeadDetail({
 
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
   const [requestingSale, startRequestSaleTransition] = useTransition();
+  const brokerIntro = `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`;
+  const externalWhatsAppUrl = buildWhatsAppUrl(lead.telefone, brokerIntro);
 
   const [saleDocOpen, setSaleDocOpen] = useState(false);
+  const [showSaleConfirm, setShowSaleConfirm] = useState(false);
   const [docRequirementId, setDocRequirementId] = useState("");
   const [docBeneficiaryId, setDocBeneficiaryId] = useState("");
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docObservation, setDocObservation] = useState("");
   const [isSaleClosing, setIsSaleClosing] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const approvedDocument = useMemo(() => documents.find((d) => d.status === "approved"), [documents]);
+  const rejectedDocument = useMemo(() => documents.find((d) => d.status === "rejected"), [documents]);
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
 
@@ -157,7 +193,9 @@ export function LightLeadDetail({
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
             <XCircle className="size-6" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">Este atendimento não está mais disponível</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Este atendimento não está mais disponível
+          </h2>
           <p className="text-xs text-muted-foreground">
             Este lead já foi direcionado para outro corretor ou concluído.
           </p>
@@ -222,15 +260,11 @@ export function LightLeadDetail({
     });
   }
 
-  const greetingName = lead.nome.split(" ")[0];
-  const initialMsg = `Olá, ${greetingName}! Tudo bem? Sou ${brokerName.split(" ")[0]}, consultor responsável pelo seu atendimento.`;
-  const waUrl = buildWhatsAppUrl(lead.telefone, initialMsg);
-
   // Handle Step Update Save
   function handleSaveStep() {
     if (updatingStep) return;
 
-    const stepInfo = STEP_OPTIONS.find(s => s.id === selectedStep);
+    const stepInfo = STEP_OPTIONS.find((s) => s.id === selectedStep);
     const targetStatus = stepInfo?.targetStatus || "in_contact";
 
     const formData = new FormData();
@@ -239,7 +273,8 @@ export function LightLeadDetail({
     formData.append("status", targetStatus);
 
     if (selectedStep === "no_interest" || selectedStep === "no_contact") {
-      const reason = selectedStep === "no_contact" ? "Sem contato / Não atende" : (lossReason || "Sem interesse");
+      const reason =
+        selectedStep === "no_contact" ? "Sem contato / Não atende" : lossReason || "Sem interesse";
       formData.append("motivoPerda", reason);
       formData.append("lossReason", reason);
     }
@@ -248,7 +283,11 @@ export function LightLeadDetail({
 
     startUpdateTransition(async () => {
       try {
-        if (targetStatus === leadStatus && selectedStep !== "no_interest" && selectedStep !== "no_contact") {
+        if (
+          targetStatus === leadStatus &&
+          selectedStep !== "no_interest" &&
+          selectedStep !== "no_contact"
+        ) {
           toast.info("O lead já está nesta etapa.");
           resetStepDialog();
           return;
@@ -276,7 +315,9 @@ export function LightLeadDetail({
     if (requestingSale) return;
 
     setDocRequirementId("");
-    setDocBeneficiaryId(lead.beneficiaries?.find((b) => b.isHolder)?.id ?? lead.beneficiaries?.[0]?.id ?? "");
+    setDocBeneficiaryId(
+      lead.beneficiaries?.find((b) => b.isHolder)?.id ?? lead.beneficiaries?.[0]?.id ?? "",
+    );
     setDocFile(null);
     setDocObservation("");
     setIsSaleClosing(true);
@@ -378,17 +419,21 @@ export function LightLeadDetail({
           <ArrowLeft className="size-4" />
           Meus Leads
         </Link>
-        <ExperienceModeToggle variant="pill" />
       </div>
 
       {/* Sale Success Victory Animation Banner */}
       {saleSuccessAnim ? (
-        <Card variant="subtle" className="p-4 bg-primary/10 border-primary/30 text-center space-y-2 animate-in fade-in zoom-in duration-300">
+        <Card
+          variant="subtle"
+          className="p-4 bg-primary/10 border-primary/30 text-center space-y-2 animate-in fade-in zoom-in duration-300"
+        >
           <div className="mx-auto grid size-10 place-items-center rounded-full bg-primary text-primary-foreground">
             <CheckCircle className="size-6" />
           </div>
           <h3 className="text-base font-bold text-primary">✓ Venda registrada!</h3>
-          <p className="text-xs text-muted-foreground">O atendimento foi concluído e registrado como venda realizada.</p>
+          <p className="text-xs text-muted-foreground">
+            O atendimento foi concluído e registrado como venda realizada.
+          </p>
         </Card>
       ) : null}
 
@@ -433,30 +478,82 @@ export function LightLeadDetail({
         <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-muted/20 p-3.5 text-xs">
           <div>
             <span className="text-muted-foreground block text-[11px]">Produto / Plano</span>
-            <strong className="font-semibold text-foreground truncate block">{lead.planName || lead.carrierName || "Plano Familiar"}</strong>
+            <strong className="font-semibold text-foreground truncate block">
+              {lead.planName || lead.carrierName || "Plano Familiar"}
+            </strong>
           </div>
           <div>
             <span className="text-muted-foreground block text-[11px]">Tipo de Lead</span>
-            <strong className="font-semibold text-foreground truncate block">{lead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}</strong>
+            <strong className="font-semibold text-foreground truncate block">
+              {lead.tipo === "PJ" || lead.tipo === "PME" ? "PJ / PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
+            </strong>
           </div>
+
+          {phoneUnlocked && lead.email ? (
+            <div className="col-span-2">
+              <span className="text-muted-foreground block text-[11px]">E-mail</span>
+              <strong className="font-semibold text-foreground truncate block">
+                {lead.email}
+              </strong>
+            </div>
+          ) : null}
+
+          {lead.formData?.razaoSocial ? (
+            <div className="col-span-2">
+              <span className="text-muted-foreground block text-[11px]">Razão Social</span>
+              <strong className="font-semibold text-foreground truncate block">
+                {lead.formData.razaoSocial}
+              </strong>
+            </div>
+          ) : null}
+
+          {lead.formData?.cnpj ? (
+            <div>
+              <span className="text-muted-foreground block text-[11px]">CNPJ</span>
+              <strong className="font-semibold text-foreground truncate block">
+                {lead.formData.cnpj}
+              </strong>
+            </div>
+          ) : null}
+
           <div>
-            <span className="text-muted-foreground block text-[11px]">Origem</span>
-            <strong className="font-semibold text-foreground truncate block">{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</strong>
+            <span className="text-muted-foreground block text-[11px]">Origem / Campanha</span>
+            <strong className="font-semibold text-foreground truncate block">
+              {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook / Meta")}
+            </strong>
           </div>
           <div>
             <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
-            <strong className="font-semibold text-foreground truncate block">{lead.city || lead.branchName || "Não informada"}</strong>
+            <strong className="font-semibold text-foreground truncate block">
+              {lead.city || lead.branchName || "Não informada"}
+            </strong>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-[11px]">Data de Entrada</span>
+            <strong className="font-semibold text-foreground truncate block">
+              {new Date(lead.createdAt).toLocaleDateString("pt-BR")}
+            </strong>
+          </div>
+          <div>
+            <span className="text-muted-foreground block text-[11px]">Consentimento LGPD</span>
+            <strong className="font-semibold text-emerald-600 truncate block">
+              ✓ Confirmado
+            </strong>
           </div>
           <div className="col-span-2">
             <span className="text-muted-foreground block text-[11px]">Responsável</span>
-            <strong className="font-semibold text-foreground truncate block">{lead.corretorNome || brokerName}</strong>
+            <strong className="font-semibold text-foreground truncate block">
+              {lead.corretorNome || brokerName}
+            </strong>
           </div>
         </div>
 
         {/* Lead Summary */}
         {lead.summary ? (
           <div className="rounded-xl border border-border/60 bg-card p-3 text-xs space-y-1">
-            <span className="font-semibold text-primary uppercase text-[10px] tracking-wider block">Resumo do atendimento</span>
+            <span className="font-semibold text-primary uppercase text-[10px] tracking-wider block">
+              Resumo do atendimento
+            </span>
             <p className="text-muted-foreground leading-relaxed">{lead.summary}</p>
           </div>
         ) : null}
@@ -494,27 +591,55 @@ export function LightLeadDetail({
         ) : (
           /* State 2: AFTER ACCEPTANCE / IN SERVICE */
           <div className="pt-2 space-y-3">
-            <a
-              href={waUrl || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href={`/conversas/broker?leadId=${lead.id}&draft=broker_intro`}
               onClick={(e) => {
-                if (!waUrl) {
-                  e.preventDefault();
-                  toast.error("Telefone não disponível.");
-                  return;
-                }
-                const nowStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const nowStr = new Date().toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
                 setWhatsappOpenedAt(nowStr);
+
+                const isMobile =
+                  typeof window !== "undefined" &&
+                  (window.matchMedia("(max-width: 768px)").matches ||
+                    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                      navigator.userAgent,
+                    ));
+
+                if (isMobile && !hasWahaConnected) {
+                  e.preventDefault();
+                  toast.info("Acesse pelo computador para conectar seu WhatsApp ao sistema e habilitar automações.", {
+                    description: "Redirecionando para o aplicativo do WhatsApp...",
+                    duration: 4000,
+                  });
+
+                  if (externalWhatsAppUrl) {
+                    setTimeout(() => {
+                      window.location.href = externalWhatsAppUrl;
+                    }, 700);
+                  }
+                }
               }}
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "w-full h-12 text-sm font-bold gap-2.5 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-xl"
+                "w-full h-12 text-sm font-bold gap-2.5 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-xl",
               )}
             >
               <WhatsappLogo className="size-5" />
-              ABRIR NO WHATSAPP
-            </a>
+              ABRIR CHAT INTERNO
+            </Link>
+
+            {externalWhatsAppUrl ? (
+              <Button
+                className="w-full"
+                render={<a href={externalWhatsAppUrl} rel="noreferrer" target="_blank" />}
+                size="sm"
+                variant="outline"
+              >
+                <WhatsappLogo className="size-4" /> Abrir no WhatsApp Web ou app
+              </Button>
+            ) : null}
 
             {whatsappOpenedAt ? (
               <p className="text-center text-[11px] text-emerald-600 font-medium">
@@ -526,7 +651,17 @@ export function LightLeadDetail({
               <div>
                 <span className="text-[11px] text-muted-foreground block">Etapa atual</span>
                 <strong className="text-xs font-semibold text-foreground">
-                  {leadStatus === "in_contact" ? "Em atendimento" : leadStatus === "quote_sent" ? "Cotação enviada" : leadStatus === "negotiation" ? "Em negociação" : leadStatus === "converted" ? "Venda realizada" : leadStatus === "documentation_pending" ? "Documentação pendente" : "Contato iniciado"}
+                  {leadStatus === "in_contact"
+                    ? "Em atendimento"
+                    : leadStatus === "quote_sent"
+                      ? "Cotação enviada"
+                      : leadStatus === "negotiation"
+                        ? "Em negociação"
+                        : leadStatus === "converted"
+                          ? "Venda realizada"
+                          : leadStatus === "documentation_pending"
+                            ? "Documentação pendente"
+                            : "Contato iniciado"}
                 </strong>
               </div>
               <Button
@@ -540,26 +675,73 @@ export function LightLeadDetail({
               </Button>
             </div>
 
-            {/* Sale Registration Button - only when not yet converted and not pending */}
-            {leadStatus !== "converted" && leadStatus !== "lost" && leadStatus !== "documentation_pending" && (
-              <Button
-                size="sm"
-                onClick={handleRequestSale}
-                disabled={requestingSale}
-                className="w-full text-xs font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <FileText className="size-4" />
-                {requestingSale ? "Enviando..." : "REGISTRAR VENDA"}
-              </Button>
+            {/* Approved document - Release sale confirmation! */}
+            {approvedDocument && leadStatus !== "converted" && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 space-y-2 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle className="size-4" />
+                  Documentação Aprovada pelo Supervisor!
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O documento &quot;{approvedDocument.filename}&quot; foi aprovado. Confirme os dados da apólice para concluir a venda.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setShowSaleConfirm(true)}
+                  className="w-full text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <FileText className="size-4" />
+                  CONFIRMAR VENDA & CONVERTER
+                </Button>
+              </div>
+            )}
+
+            {/* Rejected document alert */}
+            {!approvedDocument && rejectedDocument && leadStatus !== "converted" && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3.5 space-y-2 text-center">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-destructive">
+                  <XCircle className="size-4" />
+                  Documentação Rejeitada pelo Supervisor
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O documento &quot;{rejectedDocument.filename}&quot; foi rejeitado. Reenvie a documentação corrigida.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handleRequestSale}
+                  disabled={requestingSale}
+                  className="w-full text-xs font-bold gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  <FileText className="size-4" />
+                  REENVIAR DOCUMENTAÇÃO
+                </Button>
+              </div>
             )}
 
             {/* Pending sale status */}
-            {leadStatus === "documentation_pending" && (
-              <div className="rounded-xl border border-amber-300/30 bg-amber-50 p-3 text-xs text-center">
-                <p className="font-semibold text-amber-700">Documentação de venda pendente</p>
-                <p className="mt-1 text-amber-600">Aguardando aprovação do supervisor.</p>
+            {!approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" && (
+              <div className="rounded-xl border border-amber-300/30 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-center">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">Documentação de venda em análise</p>
+                <p className="mt-1 text-amber-600 dark:text-amber-300">Aguardando aprovação do supervisor.</p>
               </div>
             )}
+
+            {/* Regular Register Sale Button when no docs attached yet */}
+            {!approvedDocument &&
+              !rejectedDocument &&
+              leadStatus !== "converted" &&
+              leadStatus !== "lost" &&
+              leadStatus !== "documentation_pending" && (
+                <Button
+                  size="sm"
+                  onClick={handleRequestSale}
+                  disabled={requestingSale}
+                  className="w-full text-xs font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <FileText className="size-4" />
+                  {requestingSale ? "Enviando..." : "REGISTRAR VENDA"}
+                </Button>
+              )}
           </div>
         )}
       </Card>
@@ -584,13 +766,17 @@ export function LightLeadDetail({
               isHolder: b.isHolder,
             }))}
             documentCount={0}
-            formData={lead.formData ? {
-              dependentes: lead.formData.dependentes,
-              mediaIdades: lead.formData.mediaIdades,
-              razaoSocial: lead.formData.razaoSocial,
-              cnpj: lead.formData.cnpj,
-              funcionarios: lead.formData.funcionarios,
-            } : undefined}
+            formData={
+              lead.formData
+                ? {
+                    dependentes: lead.formData.dependentes,
+                    mediaIdades: lead.formData.mediaIdades,
+                    razaoSocial: lead.formData.razaoSocial,
+                    cnpj: lead.formData.cnpj,
+                    funcionarios: lead.formData.funcionarios,
+                  }
+                : undefined
+            }
           />
         </div>
       )}
@@ -599,9 +785,12 @@ export function LightLeadDetail({
       <Dialog open={showDeclineModal} onOpenChange={setShowDeclineModal}>
         <DialogPopup className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold">Por que você não pode atender este lead?</DialogTitle>
+            <DialogTitle className="text-base font-bold">
+              Por que você não pode atender este lead?
+            </DialogTitle>
             <DialogDescription className="text-xs">
-              Selecione o motivo da recusa para que o sistema redistribua o lead para outro corretor.
+              Selecione o motivo da recusa para que o sistema redistribua o lead para outro
+              corretor.
             </DialogDescription>
           </DialogHeader>
 
@@ -611,7 +800,9 @@ export function LightLeadDetail({
                 key={r}
                 className={cn(
                   "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-colors",
-                  declineReason === r ? "border-primary bg-primary/5 text-foreground" : "border-border/70 hover:bg-muted/40"
+                  declineReason === r
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border/70 hover:bg-muted/40",
                 )}
               >
                 <span>{r}</span>
@@ -665,7 +856,9 @@ export function LightLeadDetail({
                 key={opt.id}
                 className={cn(
                   "flex items-start justify-between rounded-xl border p-3 text-xs cursor-pointer transition-colors",
-                  selectedStep === opt.id ? "border-primary bg-primary/5 text-foreground" : "border-border/70 hover:bg-muted/40"
+                  selectedStep === opt.id
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border/70 hover:bg-muted/40",
                 )}
               >
                 <div className="space-y-0.5">
@@ -686,7 +879,9 @@ export function LightLeadDetail({
             {/* Conditional Follow-up date pickers */}
             {selectedStep === "no_contact" && (
               <div className="mt-3 rounded-xl border border-primary/20 bg-muted/20 p-3 space-y-2 text-xs">
-                <span className="font-semibold text-foreground block">Quando deseja tentar novamente?</span>
+                <span className="font-semibold text-foreground block">
+                  Quando deseja tentar novamente?
+                </span>
                 <div className="grid grid-cols-2 gap-1.5">
                   {["Mais tarde", "Amanhã", "Em 2 dias", "Escolher data"].map((opt) => (
                     <button
@@ -695,7 +890,9 @@ export function LightLeadDetail({
                       onClick={() => setFollowupOption(opt)}
                       className={cn(
                         "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors text-center",
-                        followupOption === opt ? "border-primary bg-primary text-primary-foreground font-semibold" : "border-border bg-card text-muted-foreground"
+                        followupOption === opt
+                          ? "border-primary bg-primary text-primary-foreground font-semibold"
+                          : "border-border bg-card text-muted-foreground",
                       )}
                     >
                       {opt}
@@ -707,7 +904,9 @@ export function LightLeadDetail({
 
             {selectedStep === "quote_sent" && (
               <div className="mt-3 rounded-xl border border-primary/20 bg-muted/20 p-3 space-y-2 text-xs">
-                <span className="font-semibold text-foreground block">Quando deseja acompanhar novamente?</span>
+                <span className="font-semibold text-foreground block">
+                  Quando deseja acompanhar novamente?
+                </span>
                 <div className="grid grid-cols-2 gap-1.5">
                   {["Amanhã", "Em 2 dias", "Em 3 dias", "Escolher data"].map((opt) => (
                     <button
@@ -716,7 +915,9 @@ export function LightLeadDetail({
                       onClick={() => setFollowupOption(opt)}
                       className={cn(
                         "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors text-center",
-                        followupOption === opt ? "border-primary bg-primary text-primary-foreground font-semibold" : "border-border bg-card text-muted-foreground"
+                        followupOption === opt
+                          ? "border-primary bg-primary text-primary-foreground font-semibold"
+                          : "border-border bg-card text-muted-foreground",
                       )}
                     >
                       {opt}
@@ -728,7 +929,9 @@ export function LightLeadDetail({
 
             {selectedStep === "negotiation" && (
               <div className="mt-3 space-y-1.5 text-xs">
-                <span className="font-semibold text-foreground block">Deseja registrar uma observação? (Opcional)</span>
+                <span className="font-semibold text-foreground block">
+                  Deseja registrar uma observação? (Opcional)
+                </span>
                 <input
                   type="text"
                   placeholder="Ex: Cliente está comparando duas opções de operadoras"
@@ -741,7 +944,9 @@ export function LightLeadDetail({
 
             {selectedStep === "no_interest" && (
               <div className="mt-3 space-y-1.5 text-xs">
-                <span className="font-semibold text-foreground block">Por que o cliente não seguiu?</span>
+                <span className="font-semibold text-foreground block">
+                  Por que o cliente não seguiu?
+                </span>
                 <select
                   value={lossReason}
                   onChange={(e) => setLossReason(e.target.value)}
@@ -793,11 +998,15 @@ export function LightLeadDetail({
           <div className="space-y-3.5 py-1">
             {/* Tipo de documento */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-muted-foreground block">Tipo de documento</span>
+              <span className="text-[11px] font-semibold text-muted-foreground block">
+                Tipo de documento
+              </span>
               <AppSelect
                 value={docRequirementId}
                 onValueChange={setDocRequirementId}
-                placeholder={requirements.length ? "Selecione o tipo de documento" : "Nenhum tipo configurado"}
+                placeholder={
+                  requirements.length ? "Selecione o tipo de documento" : "Nenhum tipo configurado"
+                }
                 options={
                   requirements.length
                     ? requirements.map((req) => ({ value: req.id, label: req.name }))
@@ -808,7 +1017,9 @@ export function LightLeadDetail({
 
             {/* Dono do documento */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-muted-foreground block">Dono do documento</span>
+              <span className="text-[11px] font-semibold text-muted-foreground block">
+                Dono do documento
+              </span>
               <AppSelect
                 value={docBeneficiaryId}
                 onValueChange={setDocBeneficiaryId}
@@ -841,7 +1052,9 @@ export function LightLeadDetail({
 
             {/* Observação */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-muted-foreground block">Observação (opcional)</span>
+              <span className="text-[11px] font-semibold text-muted-foreground block">
+                Observação (opcional)
+              </span>
               <input
                 type="text"
                 placeholder="Ex: Contrato assinado pelo titular"
@@ -860,9 +1073,12 @@ export function LightLeadDetail({
                 className="mt-0.5 accent-primary"
               />
               <span>
-                <span className="font-semibold text-foreground block">Este documento é o fechamento da venda</span>
+                <span className="font-semibold text-foreground block">
+                  Este documento é o fechamento da venda
+                </span>
                 <span className="text-muted-foreground text-[11px] block">
-                  Marque para registrar como documento de venda e enviar para aprovação do supervisor.
+                  Marque para registrar como documento de venda e enviar para aprovação do
+                  supervisor.
                 </span>
               </span>
             </label>
@@ -889,6 +1105,14 @@ export function LightLeadDetail({
           </div>
         </DialogPopup>
       </Dialog>
+
+      <RegisterSalePanel
+        leadId={lead.id}
+        documents={documents}
+        carriers={carriers}
+        open={showSaleConfirm}
+        onOpenChange={setShowSaleConfirm}
+      />
     </div>
   );
 }

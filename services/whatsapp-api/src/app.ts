@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 
 import { getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
@@ -758,22 +758,30 @@ export function buildApp() {
     },
     async (request, reply) => {
       const CRM_WEBHOOK_URL = process.env.CRM_WEBHOOK_URL?.trim();
-      const CRM_INTERNAL_TOKEN = process.env.CRM_INTERNAL_TOKEN?.trim();
+      const CRM_WEBHOOK_SECRET = process.env.WAHA_RELAY_SHARED_SECRET?.trim();
 
-      if (!CRM_WEBHOOK_URL) {
-        request.log.warn({ operation: "waha.webhook.forward", error: "CRM_WEBHOOK_URL not configured" });
+      if (!CRM_WEBHOOK_URL || !CRM_WEBHOOK_SECRET) {
+        request.log.warn({
+          operation: "waha.webhook.forward",
+          error: !CRM_WEBHOOK_URL ? "CRM_WEBHOOK_URL not configured" : "WAHA_RELAY_SHARED_SECRET not configured",
+        });
         return reply.code(503).send({ accepted: false, error: "CRM webhook not configured" });
       }
 
       const rawBody = JSON.stringify(request.body);
+      const timestamp = String(Date.now());
+      const nonce = randomUUID();
+      const signature = createHmac("sha256", CRM_WEBHOOK_SECRET)
+        .update(`${timestamp}.${nonce}.${rawBody}`)
+        .digest("hex");
 
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
+          "x-ancora-timestamp": timestamp,
+          "x-ancora-nonce": nonce,
+          "x-ancora-signature": signature,
         };
-        if (CRM_INTERNAL_TOKEN) {
-          headers["Authorization"] = `Bearer ${CRM_INTERNAL_TOKEN}`;
-        }
 
         const response = await fetch(CRM_WEBHOOK_URL, {
           method: "POST",

@@ -61,21 +61,6 @@ export type QuickReplyResolution = {
   suppressReason?: "template_cooldown" | "wait_limit";
 };
 
-const defaultTemplates: Record<string, QuickReplyTemplate> = {
-  "human.already_assigned": { ruleKey: "human.already_assigned", templateKey: "human.already_assigned", body: "Recebi sua mensagem. O corretor responsável já foi avisado e continuará seu atendimento por aqui.", active: true },
-  "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor responsável.", active: true },
-  "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Olá novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
-  "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "Olá! Vou fazer algumas perguntas rápidas para preparar seu atendimento.", active: true },
-  "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: "Certo. Vou encaminhar seu atendimento para um corretor.", active: true },
-  "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Entendido. Registrei sua solicitação e o atendimento automático será interrompido.", active: true },
-  "wrong_number.confirmed": { ruleKey: "wrong_number.confirmed", templateKey: "wrong_number.confirmed", body: "Entendido. Vou interromper este atendimento e sinalizar o contato para a equipe.", active: true },
-  "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi o arquivo. O corretor responsável foi avisado para verificar.", active: true },
-  "message.unclear": { ruleKey: "message.unclear", templateKey: "message.unclear", body: "Recebi sua mensagem. Se preferir, posso encaminhar seu atendimento para um corretor.", active: true },
-  "callback.requested": { ruleKey: "callback.requested", templateKey: "callback.requested", body: "Certo. Vou avisar o corretor para retornar o contato assim que possível.", active: true },
-  "urgent.requested": { ruleKey: "urgent.requested", templateKey: "urgent.requested", body: "Entendi a urgência. Vou sinalizar o corretor responsável agora.", active: true },
-  "goodbye.confirmed": { ruleKey: "goodbye.confirmed", templateKey: "goodbye.confirmed", body: "Tudo bem. Quando precisar, estaremos por aqui.", active: true },
-  "thanks.confirmed": { ruleKey: "thanks.confirmed", templateKey: "thanks.confirmed", body: "Por nada! O corretor continua Ã  disposição.", active: true },
-};
 
 export function normalizeQuickReplyText(value: string | null | undefined) {
   return (value ?? "")
@@ -156,29 +141,67 @@ export const quickReplyRules: QuickReplyRule[] = [
   { key: "empty_or_unclear", intent: "EMPTY_OR_UNCLEAR", templateKey: "message.unclear", priority: 1, resolve: (input) => normalizeQuickReplyText(input.body).length === 0 },
 ];
 
+/**
+ * Configuração de cooldown do quick-reply.
+ * Esses valores vêm da tabela aiQualificationConfigs (configurável pelo diretor).
+ * Valores padrão refletem os defaults da tabela.
+ */
+export type QuickReplyCooldownConfig = {
+  /** Minutos de cooldown antes de repetir o mesmo template (default: 10) */
+  cooldownMinutes: number;
+  /** Janela de tempo (minutos) para contar respostas de aguardando (default: 30) */
+  waitWindowMinutes: number;
+  /** Máximo de respostas de aguardando antes de suprimir (default: 2) */
+  waitLimitCount: number;
+};
+
+export const defaultQuickReplyCooldownConfig: QuickReplyCooldownConfig = {
+  cooldownMinutes: 10,
+  waitWindowMinutes: 30,
+  waitLimitCount: 2,
+};
+
 function isWithin(date: Date | null | undefined, ms: number, now: Date) {
   return Boolean(date && now.getTime() - date.getTime() < ms);
 }
 
-export function isQuickReplySuppressed(input: { templateKey: string; ruleKey: string; cooldown?: QuickReplyCooldown; now?: Date }) {
+export function isQuickReplySuppressed(input: {
+  templateKey: string;
+  ruleKey: string;
+  cooldown?: QuickReplyCooldown;
+  now?: Date;
+  cooldownConfig?: QuickReplyCooldownConfig;
+}) {
   const now = input.now ?? new Date();
   const cooldown = input.cooldown;
+  const config = input.cooldownConfig ?? defaultQuickReplyCooldownConfig;
+
   if (!cooldown) return undefined;
-  if (cooldown.lastTemplateKey === input.templateKey && isWithin(cooldown.lastSentAt, 10 * 60 * 1000, now)) return "template_cooldown" as const;
-  if (input.ruleKey === "waiting_human" || input.ruleKey === "waiting_response") {
-    const count = isWithin(cooldown.waitWindowStartedAt, 30 * 60 * 1000, now) ? cooldown.waitResponseCount : 0;
-    if (count >= 2) return "wait_limit" as const;
+
+  if (
+    cooldown.lastTemplateKey === input.templateKey &&
+    isWithin(cooldown.lastSentAt, config.cooldownMinutes * 60 * 1000, now)
+  ) {
+    return "template_cooldown" as const;
   }
+
+  if (input.ruleKey === "waiting_human" || input.ruleKey === "waiting_response") {
+    const count = isWithin(cooldown.waitWindowStartedAt, config.waitWindowMinutes * 60 * 1000, now)
+      ? cooldown.waitResponseCount
+      : 0;
+    if (count >= config.waitLimitCount) return "wait_limit" as const;
+  }
+
   return undefined;
 }
 
-export function resolveQuickReply(input: QuickReplyInput): QuickReplyResolution {
+export function resolveQuickReply(input: QuickReplyInput & { cooldownConfig?: QuickReplyCooldownConfig }): QuickReplyResolution {
   if (parseStartQualification(input.body)) {
     return { resolved: false, intent: "GREETING", ruleKey: "start_qualification", templateKey: null, nextState: "AI_ACTIVE", notifyHuman: false };
   }
   const rule = [...quickReplyRules].sort((a, b) => b.priority - a.priority).find((candidate) => candidate.resolve(input));
   if (!rule) return { resolved: false, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
-  const suppressed = isQuickReplySuppressed({ templateKey: rule.templateKey, ruleKey: rule.key, cooldown: input.cooldown, now: input.now });
+  const suppressed = isQuickReplySuppressed({ templateKey: rule.templateKey, ruleKey: rule.key, cooldown: input.cooldown, now: input.now, cooldownConfig: input.cooldownConfig });
   if (suppressed) return { resolved: true, intent: rule.intent, ruleKey: rule.key, templateKey: rule.templateKey, notifyHuman: rule.intent !== "GREETING", suppressReason: suppressed };
   let nextState: ConversationAutomationState | undefined;
   if (rule.intent === "OPT_OUT" || rule.intent === "WRONG_NUMBER") nextState = "PAUSED";
@@ -189,7 +212,6 @@ export function resolveQuickReply(input: QuickReplyInput): QuickReplyResolution 
 
 export function getDefaultQuickReplyTemplates(): Record<string, QuickReplyTemplate> {
   return {
-    ...defaultTemplates,
     "human.already_assigned": { ruleKey: "human.already_assigned", templateKey: "human.already_assigned", body: "Recebi sua mensagem. O corretor respons\u00e1vel j\u00e1 foi avisado e continuar\u00e1 seu atendimento por aqui.", active: true },
     "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor respons\u00e1vel.", active: true },
     "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Ol\u00e1 novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },

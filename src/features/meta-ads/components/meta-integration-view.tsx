@@ -260,6 +260,7 @@ function MetaMasterCaptureControl({
 }) {
   const [updating, setUpdating] = useState(false);
   const [currentMode, setCurrentMode] = useState(globalMode);
+  const router = useRouter();
 
   const handleModeChange = async (newMode: "all" | "selective" | "disabled") => {
     setUpdating(true);
@@ -274,6 +275,7 @@ function MetaMasterCaptureControl({
         } else {
           toast.success("Modo seletivo ativado!", { description: "Apenas as campanhas, anúncios ou formulários selecionados capturarão leads." });
         }
+        router.refresh();
       } else {
         toast.error(res.error || "Erro ao alterar modo de captura.");
       }
@@ -493,6 +495,7 @@ function SelectableAssetList({
             : "Captura desativada para este item."
         );
         setEligibilityOverrides((current) => new Map(current).set(item.id, nextEligible));
+        router.refresh();
       } else {
         toast.error(res.error || "Erro ao atualizar elegibilidade.");
       }

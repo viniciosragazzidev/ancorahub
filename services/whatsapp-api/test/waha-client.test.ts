@@ -16,6 +16,12 @@ test("normalizeWahaStatus: WORKING → CONNECTED", () => {
   assert.equal(normalizeWahaStatus("WORKING"), "CONNECTED");
 });
 
+for (const status of ["CONNECTED", "READY", "AUTHENTICATED", "OPEN", "ONLINE"]) {
+  test(`normalizeWahaStatus: ${status} → CONNECTED`, () => {
+    assert.equal(normalizeWahaStatus(status), "CONNECTED");
+  });
+}
+
 test("normalizeWahaStatus: STOPPED → DISCONNECTED", () => {
   assert.equal(normalizeWahaStatus("STOPPED"), "DISCONNECTED");
 });

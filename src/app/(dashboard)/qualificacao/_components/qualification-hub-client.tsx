@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -48,6 +48,7 @@ import { MetaTemplatesPanel } from "./meta-templates-panel";
 
 import {
   updateQualificationSettingsAction,
+  toggleQualificationEnabledAction,
   addTestNumberAction,
   removeTestNumberAction,
   resetMemoryAction,
@@ -79,6 +80,9 @@ type QualificationHubProps = {
     customInstructions?: string | null;
     version: number;
     updatedAt: string | Date | null;
+    quickReplyCooldownMinutes?: number | null;
+    quickReplyWaitWindowMinutes?: number | null;
+    quickReplyWaitLimitCount?: number | null;
   } | null;
   testNumbers: Array<{
     id: string;
@@ -245,6 +249,19 @@ export function QualificationHubClient({
   const [customInstructions, setCustomInstructions] = useState(settings?.customInstructions ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    if (settings) {
+      setEnabled(settings.enabled);
+      setPauseMode(settings.pauseMode || "handoff_active");
+      setAssistantName(settings.assistantName || "Assistente AncoraHub");
+      setTimeoutMinutes(settings.timeoutMinutes || 30);
+      if (settings.initialMessage) setInitialMessage(settings.initialMessage);
+      if (settings.handoffMessage) setHandoffMessage(settings.handoffMessage);
+      if (settings.businessContext !== undefined) setBusinessContext(settings.businessContext || "");
+      if (settings.customInstructions !== undefined) setCustomInstructions(settings.customInstructions || "");
+    }
+  }, [settings]);
+
   // States
   const [testNumbers, setTestNumbers] = useState(initialTestNumbers);
   const [newPhone, setNewPhone] = useState("");
@@ -304,30 +321,50 @@ export function QualificationHubClient({
   const [simInput, setSimInput] = useState("");
   const [simIsLoading, setSimIsLoading] = useState(false);
 
+  const handleToggleEnabled = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextVal = e.target.checked;
+    setEnabled(nextVal);
+    try {
+      await toggleQualificationEnabledAction(nextVal);
+      toast.success(nextVal ? "Operação da IA ativada com sucesso!" : "Operação da IA pausada com sucesso!");
+      router.refresh();
+    } catch (err) {
+      console.error("[qualification-hub] handleToggleEnabled error:", err);
+      toast.error(err instanceof Error ? err.message : "Erro ao alterar status da IA.");
+      setEnabled(!nextVal);
+    }
+  };
+
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
       await updateQualificationSettingsAction({
         enabled,
         pauseMode: pauseMode as "finish_active" | "handoff_active" | "pause_immediately",
-        assistantName,
-        initialMessage,
-        handoffMessage,
-        outOfHoursMessage: settings?.outOfHoursMessage ?? "Fora do horário",
-        absenceMessage: settings?.absenceMessage ?? "Sem corretores",
+        assistantName: assistantName.trim() || "Assistente AncoraHub",
+        initialMessage: initialMessage.trim() || "Olá! Sou o assistente virtual do AncoraHub. Vou fazer algumas perguntas rápidas para preparar seu atendimento.",
+        handoffMessage: handoffMessage.trim() || "Vou encaminhar você para um corretor da equipe agora.",
+        outOfHoursMessage: settings?.outOfHoursMessage || "Recebemos sua mensagem. Nossa equipe responderá no próximo horário de atendimento.",
+        absenceMessage: settings?.absenceMessage || "No momento não há um corretor disponível. Deixaremos seu atendimento na fila.",
         tone: settings?.tone ?? "friendly",
         useEmojis: settings?.useEmojis ?? false,
-        timeoutMinutes: Number(timeoutMinutes) || 20,
+        timeoutMinutes: Number(timeoutMinutes) || 30,
         businessContext,
         customInstructions,
+        quickReplyCooldownMinutes: settings?.quickReplyCooldownMinutes ?? 10,
+        quickReplyWaitWindowMinutes: settings?.quickReplyWaitWindowMinutes ?? 30,
+        quickReplyWaitLimitCount: settings?.quickReplyWaitLimitCount ?? 2,
       });
-      toast.success("Configurações e Prompt de Conhecimento salvos com sucesso!");
+      toast.success("Configurações e Operação da IA salvas com sucesso!");
+      router.refresh();
     } catch (err) {
+      console.error("[qualification-hub] handleSaveSettings error:", err);
       toast.error("Erro ao salvar configurações da qualificação.");
     } finally {
       setIsSaving(false);
     }
   };
+
 
 const handleSaveFollowUpRule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -639,7 +676,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                       <input
                         type="checkbox"
                         checked={enabled}
-                        onChange={(e) => setEnabled(e.target.checked)}
+                        onChange={handleToggleEnabled}
                         className="sr-only peer"
                       />
                       <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />

@@ -22,10 +22,15 @@ import { QueueControlCenter } from "./_components/queue-control-center";
 import { DistributionTabsContainer } from "./_components/distribution-tabs-container";
 import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
+import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
+import { RoutingSimulatorPanel } from "./_components/routing-simulator-panel";
+import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
+import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
+import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 
 export const dynamic = "force-dynamic";
 
-type DistributionView = "operar" | "filas" | "plantao" | "saude_historico";
+type DistributionView = "roteamento" | "resumo_dia" | "filas" | "operar" | "plantao" | "saude_historico";
 type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
 
 const activeStatuses = [
@@ -45,9 +50,9 @@ export default async function LeadDistributionPage({
 }) {
   const params = await searchParams;
   const view: DistributionView =
-    params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
-      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view as DistributionView))
-      : "filas";
+    params.view === "resumo_dia" || params.view === "resumo" || params.view === "filas" || params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
+      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view === "resumo" ? "resumo_dia" : (params.view as DistributionView)))
+      : "roteamento";
 
   const queueFilter: QueueFilter =
     params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
@@ -130,6 +135,8 @@ export default async function LeadDistributionPage({
     metaCampaignRoutes,
     metaAdRoutes,
     dutySchedules,
+    routingRules,
+    brokerSummary,
   ] = await Promise.all([
     db
       .select({
@@ -314,6 +321,12 @@ export default async function LeadDistributionPage({
       .leftJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
       .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), eq(schema.unitDutySchedules.status, "active")))
       .orderBy(schema.unitDutySchedules.name),
+    fetchRoutingRules(context.tenantId),
+    fetchBrokerDailySummary(context.tenantId, {
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 0, 0, 0, 0),
+      endDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 23, 59, 59, 999),
+      branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
+    }),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -408,6 +421,29 @@ export default async function LeadDistributionPage({
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <DistributionTabsContainer
           initialView={view}
+          roteamentoContent={
+            <div className="space-y-6">
+              <RoutingMatrixPanel
+                rules={routingRules}
+                queues={queues.map((q) => ({ id: q.id, name: q.name }))}
+                branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+                brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
+                canEdit={context.role === "director" || context.role === "manager"}
+              />
+              <RoutingSimulatorPanel
+                queues={queues.map((q) => ({ id: q.id, name: q.name }))}
+                branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+                brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
+              />
+            </div>
+          }
+          resumoDiaContent={
+            <BrokerDailySummaryPanel
+              initialData={brokerSummary}
+              branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+              canFilterBranch={context.role === "director"}
+            />
+          }
           filasContent={
             <>
               <QueueControlCenter

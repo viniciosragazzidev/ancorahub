@@ -8,11 +8,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogPopup, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AncoraLogo } from "@/components/ancora-logo";
-import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 function getGreeting() {
@@ -29,7 +28,6 @@ export function LightDashboard({
   data: BrokerWorkspaceData;
   logoUrl?: string | null;
 }) {
-  const router = useRouter();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const firstName = data.viewer.name.split(" ")[0] || "Corretor";
@@ -39,15 +37,17 @@ export function LightDashboard({
     setLoggingOut(true);
     toast.info("Encerrando sua sessão...");
     try {
-      await signOut();
-      toast.success("Sessão encerrada.");
-      window.setTimeout(() => {
-        router.replace("/login");
-        router.refresh();
-      }, 250);
-    } catch (error) {
-      setLoggingOut(false);
-      toast.error(error instanceof Error ? error.message : "Não foi possível sair agora.");
+      await signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            window.location.href = "/login";
+          },
+        },
+      });
+    } catch {
+      // signOut may fail if server is unreachable
+    } finally {
+      window.location.href = "/login";
     }
   }
 
@@ -82,7 +82,6 @@ export function LightDashboard({
           >
             {loggingOut ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <SignOut className="size-4" />}
           </button>
-          <ExperienceModeToggle variant="badge" />
         </div>
       </header>
 

@@ -5,7 +5,8 @@ import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { notifyNewLead } from "@/features/notifications/send-push-helper";
+import { buildLeadAssignmentConfirmedVariables } from "@/features/communication-channels/templates";
+import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -15,6 +16,17 @@ function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
   const b = normalizePhone(right);
   return Boolean(a && b) && (a === b || a.endsWith(b) || b.endsWith(a) || a.slice(-11) === b.slice(-11));
+}
+
+function readLeadFormValue(formData: unknown, keys: string[]) {
+  if (!formData || typeof formData !== "object" || Array.isArray(formData)) return null;
+  const record = formData as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
 }
 
 export type LeadOfferStatus = "PENDING" | "SENT" | "DELIVERED" | "READ" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "LOST" | "CANCELLED";
@@ -126,12 +138,8 @@ export async function createLeadOffersForBrokers(input: {
     createdOffers.push({ offerId, brokerId: broker.id, whatsappMessageId: outbound.id });
   }
 
-  // Trigger outbound processing batch
-  if (createdOffers.length > 0) {
-    await processMetaOutboundBatch(10, input.tenantId).catch((err: unknown) => {
-      console.error("[createLeadOffersForBrokers] Error processing outbound batch:", err);
-    });
-  }
+  // Delivery stays in the durable outbound queue. The scheduler owns retry and
+  // provider I/O so offer creation never holds the operational interface open.
 
   return { created: createdOffers.length, expiresAt, createdOffers };
 }
@@ -235,6 +243,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         nome: schema.leads.nome,
         telefone: schema.leads.telefone,
         tipo: schema.leads.tipo,
+        formData: schema.leads.formData,
         corretorId: schema.leads.corretorId,
         branchId: schema.leads.branchId,
         queueId: schema.leads.queueId,
@@ -310,6 +319,13 @@ export async function handleLeadOfferWebhookResponse(input: {
       entidadeId: offer.id,
       acao: "lead_offer_accepted",
     });
+    await enqueueLeadEffectTx(tx, {
+      tenantId: input.tenantId,
+      leadId: lead.id,
+      type: "NOTIFY_LEAD_ASSIGNED",
+      idempotencyKey: `lead-assigned:offer:${offer.id}`,
+      payload: { branchId: lead.branchId, brokerId: broker.id, leadName: lead.nome, isRedistribution: "false" },
+    });
 
     return { won: true, lead, broker };
   });
@@ -317,6 +333,10 @@ export async function handleLeadOfferWebhookResponse(input: {
   if (result.won && result.lead && result.broker) {
     const brokerName = result.broker.name || "Corretor(a)";
     const leadTypeLabel = result.lead.tipo === "pme" ? "PME" : result.lead.tipo === "pj" ? "Empresarial" : "Pessoa Física";
+    const interest = readLeadFormValue(result.lead.formData, ["produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse"])
+      ?? "Plano de saúde";
+    const dependents = readLeadFormValue(result.lead.formData, ["dependentes", "n_dependentes", "numeroDependentes", "qtdDependentes"])
+      ?? "Não informado";
 
     // Enqueue confirmation template: lead_assignment_confirmed
     if (result.broker.phone) {
@@ -326,20 +346,19 @@ export async function handleLeadOfferWebhookResponse(input: {
         recipientId: result.broker.id,
         destinationPhone: result.broker.phone,
         purpose: "leadAssignmentConfirmed",
-        variables: [brokerName, result.lead.nome, result.lead.telefone, leadTypeLabel, result.lead.id],
+        variables: buildLeadAssignmentConfirmedVariables({
+          corretorNome: brokerName,
+          clienteNome: result.lead.nome,
+          clienteTelefone: result.lead.telefone,
+          interesse: interest,
+          tipo: leadTypeLabel,
+          dependentes: dependents,
+          leadId: result.lead.id,
+        }),
         requestedBy: broker.id,
         idempotencyKey: `lead-confirmed:${result.lead.id}:${result.broker.id}`,
       });
     }
-
-    await notifyNewLead(
-      result.lead.id,
-      input.tenantId,
-      result.lead.branchId,
-      result.broker.id,
-      result.lead.nome,
-      `lead-assigned:offer:${offer.id}`,
-    ).catch(console.error);
 
     // Notify other candidate brokers that lead was assigned to someone else
     const losingOffers = await db

@@ -115,7 +115,7 @@ const listClasses: Record<Variant, string> = {
     "inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   line:
     "inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  segment: "inline-flex items-center gap-0 rounded-lg bg-muted/40 p-0.5",
+  segment: "inline-flex items-center gap-0 rounded-[var(--radius-control)] bg-muted/40 p-0.5",
 };
 
 function TabsList({
@@ -192,14 +192,19 @@ function TabsTrigger({
     );
   }
 
-  const radius = variant === "pill" ? "rounded-full" : "rounded-md";
+  const radius = variant === "pill" ? "rounded-full" : "rounded-[var(--radius-control)]";
 
   return (
     <div className="relative">
       {active && (
         <motion.span
           layoutId={layoutId}
-          style={{ borderRadius: variant === "pill" ? 9999 : 8 }}
+          style={{
+            borderRadius:
+              variant === "pill"
+                ? "var(--border-radius-pill)"
+                : "var(--radius-control)",
+          }}
           className={cn(
             "absolute inset-0 bg-primary",
             radius,

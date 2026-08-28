@@ -47,7 +47,7 @@ export type ExternalMetric = {
 export type FrontendMetric = {
   type: "frontend";
   route: string;
-  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load";
+  metric: "ttfb" | "lcp" | "inp" | "cls" | "route_load" | "route_navigation";
   value: number;
   timestamp: number;
 };
@@ -229,6 +229,30 @@ export function getExternalStats(windowMs: number = 60_000) {
   return { providers, totalCalls: extMetrics.length };
 }
 
+/**
+ * Aggregates browser performance metrics without returning individual routes.
+ * Route-level telemetry is intentionally kept out of the public health
+ * response: health is useful to an uptime monitor and must never become a
+ * catalogue of tenant navigation.
+ */
+export function getFrontendStats(windowMs: number = 60_000) {
+  const frontendMetrics = getRecentMetrics(windowMs).filter((m): m is FrontendMetric => m.type === "frontend");
+  const byMetric = new Map<FrontendMetric["metric"], number[]>();
+
+  for (const metric of frontendMetrics) {
+    const values = byMetric.get(metric.metric) ?? [];
+    values.push(metric.value);
+    byMetric.set(metric.metric, values);
+  }
+
+  return {
+    totalMeasurements: frontendMetrics.length,
+    metrics: Object.fromEntries(
+      [...byMetric.entries()].map(([metric, values]) => [metric, computeStats(values)]),
+    ) as Partial<Record<FrontendMetric["metric"], ReturnType<typeof computeStats>>>,
+  };
+}
+
 // ─── Slow Request Log ─────────────────────────────────────────────────
 
 const WARN_THRESHOLD_MS = 1_000;
@@ -300,6 +324,7 @@ export function getMetricsSummary(windowMs: number = 60_000) {
     api: getApiStats(windowMs),
     db: getDbStats(windowMs),
     external: getExternalStats(windowMs),
+    frontend: getFrontendStats(windowMs),
     slowRequests: getSlowRequests(windowMs).length,
   };
 }

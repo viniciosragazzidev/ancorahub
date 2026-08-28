@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
+import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { EmptyState } from "@/components/empty-state";
@@ -204,6 +206,7 @@ export function LeadsWorkspace({
   brokers = [],
   branches = [],
   pageSize = 20,
+  pagination,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -223,7 +226,10 @@ export function LeadsWorkspace({
     totalPages: number;
   };
 }) {
+  const router = useRouter();
+  const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const drawerOptimisticSnapshots = useRef(new Map<string, LeadWorkspaceItem>());
   const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -237,6 +243,13 @@ export function LeadsWorkspace({
     return saved?.hidden ?? [];
   });
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  // The next Server Component payload remains authoritative. This mirror only
+  // bridges a committed action response so the workspace never looks stale
+  // while the next navigation or realtime reconciliation is pending.
+  useEffect(() => {
+    setWorkspaceLeads(leads);
+  }, [leads]);
 
   const visibleStatuses = useMemo(
     () => orderedStatuses.filter((s) => !hiddenStatuses.includes(s)),
@@ -284,7 +297,7 @@ export function LeadsWorkspace({
     viewport.scrollTo({ left: 0, behavior: "smooth" });
   }, []);
 
-  const leadsIds = useMemo(() => leads.map((l) => l.id), [leads]);
+  const leadsIds = useMemo(() => workspaceLeads.map((l) => l.id), [workspaceLeads]);
   const multiSelect = useMultiSelect(leadsIds);
   const isMarketing = contextJobTitle === "marketing";
   const shouldMask = (lead: LeadWorkspaceItem) => {
@@ -293,18 +306,120 @@ export function LeadsWorkspace({
   const groupedLeads = useMemo(
     () =>
       Object.fromEntries(
-        kanbanStatuses.map((status) => [status, leads.filter((lead) => lead.status === status)]),
+        kanbanStatuses.map((status) => [status, workspaceLeads.filter((lead) => lead.status === status)]),
       ),
-    [leads],
+    [workspaceLeads],
   );
   const filteredBrokers = useMemo(() => {
     if (!selectedLead || !brokers) return [];
     return brokers.filter((b) => b.branchId === selectedLead.branchId);
   }, [selectedLead, brokers]);
 
-  const unassignedCount = useMemo(() => leads.filter((l) => !l.corretorId).length, [leads]);
+  const unassignedCount = useMemo(() => workspaceLeads.filter((l) => !l.corretorId).length, [workspaceLeads]);
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
+
+  const applyLeadPatch = useCallback((leadIds: string[], patch: (lead: LeadWorkspaceItem) => LeadWorkspaceItem) => {
+    const changedIds = new Set(leadIds);
+    setWorkspaceLeads((current) => current.map((lead) => changedIds.has(lead.id) ? patch(lead) : lead));
+    setSelectedLead((current) => current && changedIds.has(current.id) ? patch(current) : current);
+    multiSelect.clear();
+  }, [multiSelect.clear]);
+
+  const handleBulkStatusCommitted = useCallback(({ leadIds: changedLeadIds, newStatus }: { leadIds: string[]; newStatus: string }) => {
+    const stageEnteredAt = new Date().toISOString();
+    applyLeadPatch(changedLeadIds, (lead) => ({ ...lead, status: newStatus, stageEnteredAt }));
+  }, [applyLeadPatch]);
+
+  const handleBulkReassignCommitted = useCallback(({ leadIds: changedLeadIds, brokerId }: { leadIds: string[]; brokerId: string }) => {
+    const broker = brokers.find((item) => item.id === brokerId);
+    applyLeadPatch(changedLeadIds, (lead) => ({
+      ...lead,
+      corretorId: brokerId,
+      corretorNome: broker?.name ?? lead.corretorNome,
+      assignedAt: new Date().toISOString(),
+      distributionStatus: "assigned",
+    }));
+  }, [applyLeadPatch, brokers]);
+
+  const handleBulkBranchCommitted = useCallback(({ leadIds: changedLeadIds, branchId }: { leadIds: string[]; branchId: string }) => {
+    const branch = branches.find((item) => item.id === branchId);
+    applyLeadPatch(changedLeadIds, (lead) => ({
+      ...lead,
+      branchId,
+      branchName: branch?.name ?? lead.branchName,
+      corretorId: null,
+      corretorNome: null,
+      status: "new",
+      distributionStatus: "unassigned",
+    }));
+    router.refresh();
+  }, [applyLeadPatch, branches, router]);
+
+  const handleBulkRevertCommitted = useCallback(({ leadIds: changedLeadIds }: { leadIds: string[] }) => {
+    applyLeadPatch(changedLeadIds, (lead) => ({
+      ...lead,
+      qualificationStatus: "qualifying",
+      corretorId: null,
+      corretorNome: null,
+      status: "new",
+      distributionStatus: "unassigned",
+    }));
+    router.refresh();
+  }, [applyLeadPatch, router]);
+
+  const handleDrawerManagementCommitted = useCallback((result: {
+    entity?: { leadId: string; branchId?: string | null; corretorId?: string | null; status?: string; distributionStatus?: string };
+  }) => {
+    const entity = result.entity;
+    if (entity) drawerOptimisticSnapshots.current.delete(entity.leadId);
+    if (entity) {
+      const broker = entity.corretorId ? brokers.find((item) => item.id === entity.corretorId) : null;
+      applyLeadPatch([entity.leadId], (lead) => ({
+        ...lead,
+        branchId: entity.branchId ?? lead.branchId,
+        corretorId: entity.corretorId === undefined ? lead.corretorId : entity.corretorId,
+        corretorNome: entity.corretorId === undefined ? lead.corretorNome : broker?.name ?? null,
+        status: entity.status ?? lead.status,
+        assignedAt: new Date().toISOString(),
+        distributionStatus: entity.distributionStatus ?? (entity.corretorId ? "assigned" : lead.distributionStatus),
+      }));
+    }
+    setSelectedLead(null);
+  }, [applyLeadPatch, brokers]);
+
+  const handleDrawerReassignOptimistic = useCallback((brokerId: string) => {
+    const broker = brokers.find((item) => item.id === brokerId);
+    const now = new Date().toISOString();
+    setWorkspaceLeads((current) => current.map((lead) => {
+      if (lead.id !== selectedLead?.id) return lead;
+      drawerOptimisticSnapshots.current.set(lead.id, lead);
+      return {
+        ...lead,
+        corretorId: brokerId,
+        corretorNome: broker?.name ?? lead.corretorNome,
+        status: "distributed",
+        distributionStatus: "assigned",
+        assignedAt: now,
+      };
+    }));
+    setSelectedLead((current) => current && current.id === selectedLead?.id ? {
+      ...current,
+      corretorId: brokerId,
+      corretorNome: broker?.name ?? current.corretorNome,
+      status: "distributed",
+      distributionStatus: "assigned",
+      assignedAt: now,
+    } : current);
+  }, [brokers, selectedLead?.id]);
+
+  const handleDrawerReassignRollback = useCallback(() => {
+    const snapshots = new Map(drawerOptimisticSnapshots.current);
+    if (!snapshots.size) return;
+    setWorkspaceLeads((current) => current.map((lead) => snapshots.get(lead.id) ?? lead));
+    setSelectedLead((current) => current ? snapshots.get(current.id) ?? current : current);
+    drawerOptimisticSnapshots.current.clear();
+  }, []);
 
   const selectionActions = useMemo(() => (
     <>
@@ -314,19 +429,25 @@ export function LeadsWorkspace({
             leadIds={multiSelect.selectedIds}
             role={contextRole}
             bulkStatusAction={bulkChangeLeadStatusAction}
+            onCommitted={handleBulkStatusCommitted}
           />
           <BulkReassignDialog
             leadIds={multiSelect.selectedIds}
             brokers={brokers}
+            branches={branches}
+            role={contextRole}
+            onCommitted={handleBulkReassignCommitted}
+            onBranchCommitted={handleBulkBranchCommitted}
+            onRevertCommitted={handleBulkRevertCommitted}
           />
         </>
       )}
     </>
-  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers]);
+  ), [contextRole, multiSelect.selectedIds, multiSelect.count, brokers, branches, handleBulkReassignCommitted, handleBulkBranchCommitted, handleBulkRevertCommitted, handleBulkStatusCommitted]);
 
 
-  const activeCount = useMemo(() => leads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [leads]);
-  const convertedCount = useMemo(() => leads.filter((l) => l.status === "converted").length, [leads]);
+  const activeCount = useMemo(() => workspaceLeads.filter((l) => l.status === "in_contact" || l.status === "negotiation").length, [workspaceLeads]);
+  const convertedCount = useMemo(() => workspaceLeads.filter((l) => l.status === "converted").length, [workspaceLeads]);
   const leadsTrend = useMemo(() => {
     return Array.from({ length: 7 }, (_, index) => {
       const date = new Date();
@@ -335,7 +456,7 @@ export function LeadsWorkspace({
       const dayStart = date.getTime();
       const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
-      const dayLeads = leads.filter((lead) => {
+      const dayLeads = workspaceLeads.filter((lead) => {
         const createdAt = new Date(lead.createdAt).getTime();
         return createdAt >= dayStart && createdAt < dayEnd;
       });
@@ -346,7 +467,7 @@ export function LeadsWorkspace({
         converted: dayLeads.filter((lead) => lead.status === "converted").length,
       };
     });
-  }, [leads]);
+  }, [workspaceLeads]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveDragId(String(event.active.id));
@@ -476,7 +597,7 @@ export function LeadsWorkspace({
           <div className="space-y-4">
             <SelectionToolbar
               selectedCount={multiSelect.count}
-              totalCount={leads.length}
+              totalCount={workspaceLeads.length}
               onClear={multiSelect.clear}
             >
               {selectionActions}
@@ -489,18 +610,19 @@ export function LeadsWorkspace({
                     Leads qualificados & distribuídos
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    {leads.length} lead(s) no total · ordenados pela entrada mais recente.
+                    {workspaceLeads.length} lead(s) no total · ordenados pela entrada mais recente.
                   </CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 <LeadsDataTable
-                  leads={leads}
+                  leads={workspaceLeads}
                   contextRole={contextRole}
                   shouldMask={shouldMask}
                   slaFirstContactMinutes={slaFirstContactMinutes}
                   slaStagnantDays={slaStagnantDays}
                   pageSize={pageSize}
+                  pagination={pagination}
                   selectedIds={multiSelect.selectedIds}
                   isAllSelected={multiSelect.isAllSelected}
                   onToggleRow={multiSelect.toggle}
@@ -518,7 +640,7 @@ export function LeadsWorkspace({
         <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
           <SelectionToolbar
             selectedCount={multiSelect.count}
-            totalCount={leads.length}
+            totalCount={workspaceLeads.length}
             onClear={multiSelect.clear}
           >
             {selectionActions}
@@ -659,6 +781,11 @@ export function LeadsWorkspace({
                         <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
                       </dl>
                     </SheetSection>
+                    <LeadAssignmentHistory
+                      leadId={selectedLead.id}
+                      assignedAt={selectedLead.assignedAt}
+                      corretorNome={selectedLead.corretorNome}
+                    />
                     <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
                       Ver detalhe completo
                       <ArrowUpRight />
@@ -689,7 +816,9 @@ export function LeadsWorkspace({
                         qualificationStatus={selectedLead.qualificationStatus}
                         qualificationState={selectedLead.qualificationState}
                         currentOwner={selectedLead.corretorNome}
-                        onSuccess={() => setSelectedLead(null)}
+                        onSuccess={handleDrawerManagementCommitted}
+                        onReassignOptimistic={handleDrawerReassignOptimistic}
+                        onReassignRollback={handleDrawerReassignRollback}
                       />
                     ) : (
                       <>

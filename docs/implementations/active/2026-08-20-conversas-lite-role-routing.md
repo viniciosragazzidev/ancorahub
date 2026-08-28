@@ -26,12 +26,21 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 
 ## Evolução do atendimento Lite
 
+- Ao abrir a conversa de um lead pelo atalho de WhatsApp, a aplicação usa
+  `?leadId=<id>&draft=broker_intro`. A rota valida no servidor que o lead pertence
+  ao corretor autenticado e preenche uma mensagem editável; ela nunca é enviada
+  automaticamente.
+- Os atalhos da fila e do detalhe Lite apontam diretamente para
+  `/conversas/broker`, mantendo `leadId` e `draft=broker_intro`.
+- O texto inicial vem de `broker_lite_opening_draft` quando configurado, aceita
+  somente `{nome}` e usa uma saudação segura como fallback. O texto não é colocado
+  na URL nem confiado ao navegador.
 - `/conversas/broker` segue o blueprint `CHAT_PAGE`: lista pesquisável de conversas,
   conversa ativa, ação para abrir o lead e retorno responsivo para a lista em telas
   estreitas.
 - A seleção fica em `?leadId=`, de forma que o corretor pode retornar à conversa
   correta sem usar estado implícito do navegador.
-- O diálogo `Conexão WAHA` disponibiliza a ação explícita de **Desconectar** para a
+- O diálogo de conexão do WhatsApp disponibiliza a ação explícita de **Desconectar** para a
   própria sessão autenticada do corretor; não há ação para sessões de terceiros.
 - Eventos de conexões de corretor não dependem de `feature_waha_cadence_enabled`.
   A cadência continua sob seu kill switch; a conversa humana respeita apenas o
@@ -43,12 +52,29 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - A desconexão de uma sessão WAHA faz `POST` sem corpo; o cliente VPS omite
   `Content-Type: application/json` nesse caso para o Fastify não rejeitar a requisição
   com `FST_ERR_CTP_EMPTY_JSON_BODY` antes de alcançar o WAHA.
+- O provedor não aparece em rótulos, botões ou erros voltados ao usuário: a
+  superfície usa somente “WhatsApp”. Identificadores técnicos, logs e contratos
+  internos foram preservados para não alterar a integração.
+- O contato oficial ativo do tenant, inclusive quando gerido pelo canal Meta, é
+  incluído na carteira Lite sem criar um lead sintético. Suas mensagens são lidas e
+  respondidas exclusivamente pela sessão autenticada do corretor; a ação valida
+  tenant, canal ativo e conexão pronta no servidor e registra auditoria sem corpo.
+- A tela Lite reage ao sinal de invalidação `conversations` e reconcilia a cada 30
+  segundos enquanto estiver visível. Assim, uma mensagem persistida aparece sem
+  recarregamento manual mesmo se o sinal em tempo real for perdido.
+- A consulta de mensagens não depende de existir lead na carteira: conversas do
+  número oficial continuam sendo carregadas para um corretor que ainda não recebeu
+  nenhum lead.
+- Mensagem desconhecida recebida na conexão pessoal do corretor não cria lead,
+  não entra no intake do tenant e não aciona qualificação por IA. A criação
+  sintética permanece exclusiva do relay oficial do tenant.
 
 ## Validações
 
 - `npx eslint src/app/(dashboard)/conversas/page.tsx src/app/(dashboard)/conversas/broker/page.tsx` — executado no recorte.
 - `npm run type-check` — aprovado.
 - `npx vitest run src/features/broker-workspace/experience-mode.test.ts --reporter=verbose` — 1 teste aprovado.
+- `npx vitest run src/features/broker-workspace/official-tenant-conversations.test.ts --reporter=verbose` — mensagem do canal oficial Meta aparece como conversa autorizada.
 - `npm run agent:verify -- --level full` — documentação, arquivos alterados,
   arquitetura, segurança, performance e type-check aprovados; evidência em
   `reports/agent/verification/2026-08-20T17-47-26.694Z.md`.

@@ -55,6 +55,7 @@ export async function GET() {
             errors: metrics.db.errors,
           },
           external: metrics.external,
+          frontend: metrics.frontend,
         },
         slowRequests: metrics.slowRequests,
       },

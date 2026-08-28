@@ -8,10 +8,23 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 
-import { notifyNewLead, notifyLeadReassigned } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned } from "@/features/notifications/send-push-helper";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
 
 const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable() });
-export type ManagementActionState = { success?: boolean; error?: string };
+export type ManagementActionState = {
+  success?: boolean;
+  error?: string;
+  mutationId?: string;
+  entity?: {
+    leadId: string;
+    branchId: string | null;
+    corretorId: string | null;
+    status: string;
+  };
+};
 
 async function getManagedLead(leadId: string) {
   const context = await getRequiredTenantContext();
@@ -25,12 +38,14 @@ async function getManagedLead(leadId: string) {
 }
 
 export async function reassignLeadAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
+  const mutationId = randomUUID();
   try {
     const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null });
     const { context, db, lead } = await getManagedLead(input.leadId);
     if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está em atendimento. Finalize ou libere o atendimento atual antes de reatribuir.");
     if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
     const brokerId = input.brokerId;
+    const assignmentEventId = randomUUID();
     const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true))).limit(1);
@@ -55,22 +70,62 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (tenantPolicy?.feedbackRequiredEnabled !== false) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; SLA reiniciado.` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "reatribuiu_lead" });
+      await tx.insert(schema.leadDistributionEvents).values({
+        id: assignmentEventId,
+        tenantId: lead.tenantId,
+        leadId: lead.id,
+        fromBranchId: lead.branchId,
+        toBranchId: lead.branchId,
+        previousOwnerId: lead.corretorId,
+        newOwnerId: brokerId,
+        action: "assigned",
+        source: context.role === "director" ? "manual_director" : "manual_manager",
+        strategy: "manual",
+        reason: "Reatribuição manual",
+        actorId: context.userId,
+        createdAt: now,
+      });
+      await enqueueLeadEffectTx(tx, {
+        tenantId: lead.tenantId,
+        leadId: lead.id,
+        type: "NOTIFY_LEAD_ASSIGNED",
+        idempotencyKey: `lead-assigned:${assignmentEventId}`,
+        payload: {
+          branchId: lead.branchId,
+          brokerId,
+          leadName: lead.nome,
+          isRedistribution: lead.corretorId ? "true" : "false",
+        },
+      });
     });
-
-    // Trigger push notifications (best-effort; warnings logged but don't block reassign)
-    notifyNewLead(lead.id, lead.tenantId, lead.branchId, input.brokerId, lead.nome).then((result) => {
-      if (result?.notificationError) console.warn("[reassignLeadAction] Notification warning:", result.notificationError);
-    }).catch(console.error);
     // Notify the previous broker that the lead was reassigned
     if (lead.corretorId && lead.corretorId !== input.brokerId) {
       void notifyLeadReassigned(lead.id, lead.tenantId, lead.corretorId, lead.nome).catch(console.error);
     }
 
-    return { success: true };
-  } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível reatribuir o lead." }; }
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [lead.branchId],
+      brokerIds: [lead.corretorId, input.brokerId],
+    }).catch(() => undefined);
+    scheduleAfterResponse("lead-assignment-effects", () => runLeadEffectOutboxProcessor({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      limit: 1,
+    }));
+    return {
+      success: true,
+      mutationId,
+      entity: { leadId: lead.id, branchId: lead.branchId, corretorId: input.brokerId, status: "distributed" },
+    };
+  } catch (error) {
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível reatribuir o lead." };
+  }
 }
 
 export async function assumeLeadForInvestigationAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
+  const mutationId = randomUUID();
   try {
     const leadId = z.string().uuid().parse(formData.get("leadId"));
     const reason = z.string().trim().min(3).max(200).parse(formData.get("reason"));
@@ -82,14 +137,33 @@ export async function assumeLeadForInvestigationAction(_prev: ManagementActionSt
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead assumido para investigação por ${context.role === "director" ? "Diretor" : "Gestor"}. Motivo: ${reason}` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "assumiu_lead_investigacao" });
     });
-    return { success: true };
-  } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível assumir o lead para investigação." }; }
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [lead.branchId],
+      brokerIds: [lead.corretorId, context.userId],
+    }).catch(() => undefined);
+    return {
+      success: true,
+      mutationId,
+      entity: { leadId: lead.id, branchId: lead.branchId, corretorId: context.userId, status: "under_analysis" },
+    };
+  } catch (error) {
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível assumir o lead para investigação." };
+  }
 }
 
 export async function assumeLeadForMessagingAction(leadId: string): Promise<ManagementActionState> {
+  const mutationId = randomUUID();
   try {
     const { context, db, lead } = await getManagedLead(z.string().uuid().parse(leadId));
-    if (lead.corretorId === context.userId) return { success: true };
+    if (lead.corretorId === context.userId) {
+      return {
+        success: true,
+        mutationId,
+        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: context.userId, status: lead.status },
+      };
+    }
     if (!lead.corretorId) throw new Error("Este lead ainda não possui um corretor responsável.");
     const currentOwnerId = lead.corretorId;
     if (!["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
@@ -106,6 +180,18 @@ export async function assumeLeadForMessagingAction(leadId: string): Promise<Mana
       return true;
     });
     if (!updated) throw new Error("Este atendimento foi assumido por outra pessoa. Atualize a página.");
-    return { success: true };
-  } catch (error) { return { error: error instanceof Error ? error.message : "Não foi possível assumir o atendimento." }; }
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: [lead.branchId],
+      brokerIds: [currentOwnerId, context.userId],
+    }).catch(() => undefined);
+    return {
+      success: true,
+      mutationId,
+      entity: { leadId: lead.id, branchId: lead.branchId, corretorId: context.userId, status: lead.status },
+    };
+  } catch (error) {
+    return { mutationId, error: error instanceof Error ? error.message : "Não foi possível assumir o atendimento." };
+  }
 }

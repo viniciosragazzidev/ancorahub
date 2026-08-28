@@ -428,6 +428,14 @@ export async function getMetaSyncDiagnosticAction() {
   return getMetaSyncAuditDiagnostic(context.tenantId);
 }
 
+async function ensureCaptureModeActiveIfDisabled(tenantId: string) {
+  const { getSystemSetting, setSystemSetting } = await import("@/features/system-settings/queries");
+  const stored = await getSystemSetting(`meta_lead_capture_mode_${tenantId}`).catch(() => null);
+  if (stored === "disabled" || !stored) {
+    await setSystemSetting(`meta_lead_capture_mode_${tenantId}`, "selective");
+  }
+}
+
 /** Alternar elegibilidade de captura de leads da campanha */
 export async function toggleMetaCampaignCaptureEligibilityAction(input: {
   campaignId: string;
@@ -450,6 +458,10 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
 
     if (!campaign) {
       return { success: false, error: "Campanha Meta não encontrada." };
+    }
+
+    if (input.enabled) {
+      await ensureCaptureModeActiveIfDisabled(context.tenantId);
     }
 
     const now = new Date();
@@ -540,6 +552,9 @@ export async function toggleMetaAdCaptureEligibilityAction(input: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    if (input.enabled) {
+      await ensureCaptureModeActiveIfDisabled(context.tenantId);
+    }
     const db = getDatabase();
     const now = new Date();
     await db
@@ -571,6 +586,9 @@ export async function toggleMetaFormCaptureEligibilityAction(input: {
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const context = await getRequiredTenantContext();
+    if (input.enabled) {
+      await ensureCaptureModeActiveIfDisabled(context.tenantId);
+    }
     const db = getDatabase();
     const now = new Date();
     await db
@@ -604,6 +622,9 @@ export async function batchSetMetaCaptureEligibilityAction(input: {
   try {
     if (!input.assetIds.length) return { success: true, count: 0 };
     const context = await getRequiredTenantContext();
+    if (input.enabled) {
+      await ensureCaptureModeActiveIfDisabled(context.tenantId);
+    }
     const db = getDatabase();
     const now = new Date();
 

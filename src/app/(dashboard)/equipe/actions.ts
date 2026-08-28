@@ -5,6 +5,7 @@ import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTeamUser } from "@/features/team/create-user";
+import { generatePasswordResetLinkForMember } from "@/features/team/password-recovery";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole, requireCanManageMember } from "@/shared/auth/team-permissions";
@@ -12,6 +13,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "@/features/team/onboarding-helpers";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
 
 // Pending invitations don't have a userId, they use brokerProfileId
 type PendingInvite = {
@@ -610,22 +612,9 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
           idempotencyKey: `team-invitation:${newInvite.id}`,
         });
         whatsappStatus = queued.duplicate || queued.status === "queued" ? "queued" : "failed";
-        await processMetaOutboundBatch(10, context.tenantId);
-        // A failed approved-template attempt can enqueue the text fallback.
-        // Process that fallback in the same request instead of waiting for cron.
-        const [delivery] = await db
-          .select({ status: schema.brokerInvitations.deliveryStatus })
-          .from(schema.brokerInvitations)
-          .where(and(eq(schema.brokerInvitations.id, newInvite.id), eq(schema.brokerInvitations.tenantId, context.tenantId)))
-          .limit(1);
-        if (delivery?.status === "queued") await processMetaOutboundBatch(10, context.tenantId);
-        const [finalDelivery] = await db
-          .select({ status: schema.brokerInvitations.deliveryStatus })
-          .from(schema.brokerInvitations)
-          .where(and(eq(schema.brokerInvitations.id, newInvite.id), eq(schema.brokerInvitations.tenantId, context.tenantId)))
-          .limit(1);
-        if (finalDelivery?.status === "sent") whatsappStatus = "sent";
-        else if (finalDelivery?.status === "failed") whatsappStatus = "failed";
+        // The message was stored in the transactional outbox. Do not wait for
+        // provider delivery before releasing the dialog state to the user.
+        scheduleAfterResponse("team-invitation-resend-outbound", () => processMetaOutboundBatch(3, context.tenantId));
       } catch {
         whatsappStatus = "failed";
       }
@@ -816,3 +805,20 @@ export async function importBrokersAction(
     return { success: false, error: message };
   }
 }
+
+export async function generateResetPasswordLinkAction(
+  _prev: TeamActionState & { resetUrl?: string },
+  formData: FormData,
+): Promise<TeamActionState & { resetUrl?: string }> {
+  try {
+    const userId = String(formData.get("userId") ?? "").trim();
+    if (!userId) throw new Error("ID do usuário é obrigatório.");
+
+    const result = await generatePasswordResetLinkForMember(userId);
+    return { success: true, resetUrl: result.resetUrl };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Erro ao gerar link de redefinição de senha.";
+    return { success: false, error: message };
+  }
+}
+

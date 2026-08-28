@@ -267,6 +267,7 @@ export const branches = pgTable(
     status: branchStatus("status").notNull().default("active"),
     acceptingLeads: boolean("accepting_leads").notNull().default(true),
     autoDistribute: boolean("auto_distribute").notNull().default(true),
+    isDistributionHub: boolean("is_distribution_hub").notNull().default(false),
     createdAt,
     updatedAt,
   },
@@ -419,6 +420,7 @@ export const leads = pgTable(
     metaAdId: text("meta_ad_id"),
     metaFormId: text("meta_form_id"),
     metaPageId: text("meta_page_id"),
+    redistributionCount: integer("redistribution_count").notNull().default(0),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedBy: text("deleted_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
@@ -488,6 +490,12 @@ export const aiQualificationConfigs = pgTable(
     version: integer("version").notNull().default(1),
     timeoutMinutes: integer("timeout_minutes").notNull().default(30),
     maxRetries: integer("max_retries").notNull().default(2),
+    /** Minutos de cooldown antes de repetir o mesmo template de quick reply (default: 10) */
+    quickReplyCooldownMinutes: integer("quick_reply_cooldown_minutes").notNull().default(10),
+    /** Janela de tempo (minutos) para contar respostas de "aguardando" (default: 30) */
+    quickReplyWaitWindowMinutes: integer("quick_reply_wait_window_minutes").notNull().default(30),
+    /** Máximo de respostas de "aguardando" dentro da janela antes de suprimir (default: 2) */
+    quickReplyWaitLimitCount: integer("quick_reply_wait_limit_count").notNull().default(2),
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
@@ -1917,7 +1925,7 @@ export const wahaNumbers = pgTable(
     branchId: text("branch_id").references(() => branches.id, { onDelete: "restrict" }),
     scope: text("scope").notNull().default("platform"),
     label: text("label"),
-    capabilities: jsonb("capabilities").$type<{ inbound: boolean; cadence: boolean; ai: boolean }>().notNull().default({ inbound: true, cadence: false, ai: false }),
+    capabilities: jsonb("capabilities").$type<{ inbound: boolean; cadence: boolean; ai: boolean; brokerFallback?: boolean; qualificationFallback?: boolean }>().notNull().default({ inbound: true, cadence: false, ai: false }),
     status: text("status").notNull().default("pending"),
     maxMessagesPerHour: integer("max_messages_per_hour").notNull().default(60),
     minIntervalSeconds: integer("min_interval_seconds").notNull().default(45),
@@ -2165,6 +2173,35 @@ export const leadDistributionPolicies = pgTable(
   (table) => [
     index("lead_distribution_policies_tenant_idx").on(table.tenantId, table.queueId),
     uniqueIndex("lead_distribution_policies_scope_unique").on(table.tenantId, table.queueId, table.profileKey),
+  ],
+);
+
+/** Dynamic multi-attribute routing rules matrix used to map leads to queues/branches/broker groups. */
+export const leadRoutingRules = pgTable(
+  "lead_routing_rules",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    priority: integer("priority").notNull().default(1),
+    enabled: boolean("enabled").notNull().default(true),
+    conditions: jsonb("conditions").$type<{
+      planTypes?: string[];
+      sources?: string[];
+      cities?: string[];
+      minLives?: number;
+      maxLives?: number;
+      qualificationStatuses?: string[];
+    }>().notNull().default({}),
+    targetType: text("target_type").notNull().default("queue"), // "queue" | "branch" | "broker_group" | "specific_broker"
+    targetId: text("target_id").notNull(),
+    fallbackQueueId: text("fallback_queue_id").references(() => leadQueues.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("lead_routing_rules_tenant_idx").on(table.tenantId, table.enabled, table.priority),
   ],
 );
 

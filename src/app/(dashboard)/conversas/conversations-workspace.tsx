@@ -5,6 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import {
+  REALTIME_SYNC_BROWSER_EVENT,
+  type RealtimeSyncBrowserDetail,
+} from "@/components/providers/realtime-events";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "@/components/ui/message";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
@@ -14,6 +18,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
+import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -68,6 +73,7 @@ import {
 import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-message";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
+import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
 
 export type ConversationMessage = {
   id: string;
@@ -153,6 +159,19 @@ export function ConversationsWorkspace({
     return () => window.clearTimeout(sync);
   }, [initialConversations]);
 
+  // The Director workspace consumes the same opaque conversation signal as
+  // Lite. The resulting refresh re-runs server-side tenant and lead scoping.
+  useEffect(() => {
+    const onConversationInvalidated = (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
+      if (detail?.kind === "domain.invalidated" && detail.domain === "conversations") {
+        router.refresh();
+      }
+    };
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+  }, [router]);
+
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
@@ -229,19 +248,12 @@ export function ConversationsWorkspace({
       aria-label="Central de conversas"
       className="flex h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:h-full w-full flex-col overflow-hidden bg-card"
     >
-      <header className="shrink-0 border-b border-border bg-card px-4 py-2.5 sm:px-5">
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight">Atendimentos</h2>
-              <Badge className="tabular-nums" variant="secondary">
-                {conversations.length}
-              </Badge>
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">Histórico e contexto de cada lead no seu escopo.</p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 overflow-x-auto max-w-full no-scrollbar py-0.5">
+      <FilterToolbar
+        aria-label="Filtros dos atendimentos"
+        className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
+        filters={
+          <>
+            <h2 className="sr-only">Filtros dos atendimentos</h2>
             {role === "director" && branches.length > 0 ? (
               <Select
                 labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
@@ -262,15 +274,16 @@ export function ConversationsWorkspace({
               </Select>
             ) : null}
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
               <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
               <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
               <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
               <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
             </div>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+        results={`${filtered.length} de ${conversations.length} atendimentos`}
+      />
 
       <div
           className={cn(
@@ -478,13 +491,27 @@ function ConversationHeader({
     }
   }
 
+  async function handleCopyLeadLink() {
+    const url = `${window.location.origin}/conversas?leadId=${client.id}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Link da conversa copiado para a área de transferência!");
+  }
+
   return (
-    <header className="shrink-0 border-b border-border bg-card px-4 py-2.5 sm:px-5">
-      <div className="flex items-center justify-between gap-3 min-w-0">
+    <header className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-5">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <Button aria-label="Voltar para atendimentos" className="lg:hidden shrink-0" onClick={onBack} size="icon-sm" type="button" variant="ghost">
-            <ArrowLeft className="size-3.5" />
+          <Button
+            aria-label="Voltar para lista de atendimentos"
+            className="lg:hidden shrink-0"
+            onClick={onBack}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <ArrowLeft className="size-4" />
           </Button>
+
           <ContactAvatar name={client.nome} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
@@ -594,6 +621,10 @@ function ConversationHeader({
           </DropdownMenu>
 
           <div className="flex items-center gap-1 border-l border-border/60 pl-1.5 sm:pl-2">
+            <Tooltip>
+              <TooltipTrigger render={<Button aria-label="Copiar link direto da conversa" onClick={() => void handleCopyLeadLink()} size="icon-sm" type="button" variant="ghost"><LinkSimple className="size-3.5" /></Button>} />
+              <TooltipContent>Copiar link da conversa</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))} />} />
               <TooltipContent>Ligar</TooltipContent>
@@ -779,16 +810,21 @@ function ChatInput({
     }
   }
 
+  function handleAppendQuickResponse(quickText: string) {
+    setText((prev) => (prev ? `${prev}\n${quickText}` : quickText));
+  }
+
   return (
     <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
       <form onSubmit={handleSend} className="flex gap-2 items-center">
+        <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
         <div className="relative flex-1">
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Digite sua mensagem para o cliente..."
+            placeholder="Digite sua mensagem para o cliente (ou escolha uma resposta rápida)..."
             disabled={isPending}
-            className="pr-10 h-10 text-sm"
+            className="h-10 text-sm"
           />
           {error && (
             <p className="absolute -top-6 left-1 text-[11px] font-medium text-destructive truncate max-w-full">
@@ -1361,6 +1397,8 @@ function ClientProfile({
             leadName={client.nome}
           />
 
+          <LeadNotesSection leadId={client.id} />
+
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">
               <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-2">
@@ -1517,4 +1555,34 @@ function formatRelative(value: string) {
 
 function getWhatsAppUrl(phone: string) {
   return `https://wa.me/${phone.replace(/\D/g, "")}`;
+}
+
+function LeadNotesSection({ leadId }: { leadId: string }) {
+  const storageKey = `ancora_lead_note_${leadId}`;
+  const [note, setNote] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(storageKey) ?? "";
+  });
+  const [saved, setSaved] = useState(false);
+
+  function handleChange(val: string) {
+    setNote(val);
+    localStorage.setItem(storageKey, val);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <ProfileSection
+      action={saved ? <span className="text-[10px] text-emerald-500 font-semibold">Salvo ✓</span> : undefined}
+      title="Anotações Privadas"
+    >
+      <textarea
+        value={note}
+        onChange={(e) => handleChange(e.target.value)}
+        placeholder="Anote preferências do cliente (ex: busca plano sem coparticipação, 2 dependentes)..."
+        className="w-full min-h-[70px] text-xs p-2 rounded-lg border border-border bg-card text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+      />
+    </ProfileSection>
+  );
 }

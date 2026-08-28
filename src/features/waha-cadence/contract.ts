@@ -88,6 +88,30 @@ export const wahaWebhookSchema = z.object({
 
 export type WahaWebhookEvent = z.infer<typeof wahaWebhookSchema>;
 
+/**
+ * WAHA may send WhatsApp JIDs (for example `5511999999999@c.us`) while the
+ * CRM contract stores phones as digits. Normalize only the transport envelope
+ * before schema validation; any non-phone sender still fails the strict regex.
+ */
+export function normalizeWahaWebhookPayload(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  const event = payload as Record<string, unknown>;
+  const message = event.message;
+  if (!message || typeof message !== "object" || Array.isArray(message)) return event;
+
+  const normalizeJid = (value: unknown) =>
+    typeof value === "string" ? value.replace(/@[^\s]+$/, "").replace(/\D/g, "") : value;
+
+  return {
+    ...event,
+    message: {
+      ...(message as Record<string, unknown>),
+      from: normalizeJid((message as Record<string, unknown>).from),
+      to: normalizeJid((message as Record<string, unknown>).to),
+    },
+  };
+}
+
 export function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }

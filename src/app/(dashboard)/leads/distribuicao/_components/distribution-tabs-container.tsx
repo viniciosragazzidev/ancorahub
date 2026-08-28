@@ -5,12 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function DistributionTabsContainer({
   initialView,
+  roteamentoContent,
+  resumoDiaContent,
   filasContent,
   operarContent,
   plantaoContent,
   saudeHistoricoContent,
 }: {
   initialView: string;
+  roteamentoContent: React.ReactNode;
+  resumoDiaContent: React.ReactNode;
   filasContent: React.ReactNode;
   operarContent: React.ReactNode;
   plantaoContent: React.ReactNode;
@@ -29,13 +33,17 @@ export function DistributionTabsContainer({
 
   return (
     <Tabs value={activeTab} onValueChange={handleValueChange} variant="segment" className="w-full space-y-6">
-      <TabsList className="max-w-2xl w-full justify-start overflow-x-auto">
-        <TabsTrigger value="filas">Central de Filas</TabsTrigger>
-        <TabsTrigger value="operar">Operar Fila</TabsTrigger>
-        <TabsTrigger value="plantao">Plantão & Equipe</TabsTrigger>
-        <TabsTrigger value="saude_historico">Saúde & Histórico</TabsTrigger>
+      <TabsList className="max-w-5xl w-full justify-start overflow-x-auto">
+        <TabsTrigger value="roteamento">🔀 Matriz de Roteamento</TabsTrigger>
+        <TabsTrigger value="resumo_dia">📈 Resumo do Dia</TabsTrigger>
+        <TabsTrigger value="filas">🏢 Filas & Unidades</TabsTrigger>
+        <TabsTrigger value="operar">📥 Operar & Inbox</TabsTrigger>
+        <TabsTrigger value="plantao">📅 Plantão & Escala</TabsTrigger>
+        <TabsTrigger value="saude_historico">📊 Saúde & Auditoria</TabsTrigger>
       </TabsList>
 
+      <TabsContent value="roteamento" className="space-y-6">{roteamentoContent}</TabsContent>
+      <TabsContent value="resumo_dia" className="space-y-6">{resumoDiaContent}</TabsContent>
       <TabsContent value="filas" className="space-y-6">{filasContent}</TabsContent>
       <TabsContent value="operar" className="space-y-6">{operarContent}</TabsContent>
       <TabsContent value="plantao" className="space-y-6">{plantaoContent}</TabsContent>

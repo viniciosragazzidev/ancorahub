@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { headers } from "next/headers";
 import { getAuth } from "./index";
 import { AuthenticationError } from "./errors";
@@ -10,9 +11,9 @@ import {
   getRequestTiming,
 } from "@/shared/observability/request-timing";
 
-const SESSION_TIMEOUT_MS = 5_000;
+const SESSION_TIMEOUT_MS = 15_000;
 
-export async function getRequiredSession() {
+async function resolveRequiredSession() {
   markAuthStart();
 
   try {
@@ -72,3 +73,11 @@ export async function getRequiredSession() {
     throw error;
   }
 }
+
+/**
+ * Authentication is requested by the shared dashboard layout and again by
+ * several route-level data loaders. React scopes this memoization to the
+ * current server render, so it removes duplicate Better Auth reads without
+ * retaining a session across users or requests.
+ */
+export const getRequiredSession = cache(resolveRequiredSession);

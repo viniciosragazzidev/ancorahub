@@ -1,5 +1,103 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-087 — Resposta de mutação local-first em operações de Leads
+
+**Estado:** Aceita
+**Data:** 2026-08-27
+
+As mutações interativas de Leads que alteram a própria lista devem retornar um
+`mutationId` único e o resumo mínimo, sem PII, das entidades efetivamente
+alteradas. O cliente consome cada resposta uma única vez, encerra o estado
+pendente, fecha o diálogo de confirmação e aplica a alteração localmente antes
+da próxima leitura do Server Component. A resposta não depende de
+`router.refresh()` para parecer concluída.
+
+O servidor permanece a autoridade: entradas são validadas, tenant e permissões
+vêm da sessão, a transação e a auditoria continuam no servidor, e a próxima
+navegação ou sinal em tempo real reconcilia a projeção local. Após o commit, o
+servidor publica apenas a invalidação opaca do domínio `leads` para diretor,
+gestor de unidade e corretor elegíveis; nenhum dado de lead é levado ao canal.
+O contrato é a base para migrar gradualmente os demais diálogos de escrita.
+
+## DEC-086 — Liveness independente de prontidão de dependências
+
+**Estado:** Aceita
+**Data:** 2026-08-26
+
+O healthcheck do orquestrador mede somente se o processo do CRM está vivo, em
+`/api/health/live`, sem consultar banco, Meta ou WhatsApp. O endpoint
+`/api/health` permanece como readiness/diagnóstico de dependências e pode ficar
+degradado sem fazer o proxy remover um processo funcional do tráfego. A separação
+evita indisponibilidade total durante picos transitórios de webhook ou fila do
+pool de banco.
+
+## DEC-085 — Fonte única de agendamento operacional
+
+**Estado:** Aceita
+**Data:** 2026-08-26
+
+Cada ambiente terá somente uma fonte ativa para os endpoints cron de distribuição,
+efeitos de lead, WhatsApp, SLA, lembretes, Meta, WAHA e manutenção. O scheduler
+da VPS chama os endpoints idempotentes já existentes com `CRON_SECRET`, mas nasce
+desativado. A ativação só ocorre depois de a Vercel Cron ser desabilitada; rollback
+desativa primeiro o scheduler da VPS antes de reativar a Vercel. Essa ordem evita
+duplicação de saídas, notificações e redistribuições durante a migração.
+
+## DEC-084 — Cadência e diagnóstico seguro dos avisos de novo lead
+
+**Estado:** Aceita
+**Data:** 2026-08-25
+
+O aviso oficial `new_lead_broker` mantém uma cadência mínima de dez minutos por
+corretor. Novas atribuições não são descartadas: entram na outbox na ordem recebida e
+são agendadas para a próxima posição disponível, sempre respeitando a janela da
+DEC-083. O processamento serializa esses avisos no lote para que itens já pendentes
+não sejam enviados juntos.
+
+Falhas de entrega posteriores ao aceite da API são diferentes de erros de envio. O
+webhook da Meta persiste no ledger somente o código e o título seguro do primeiro erro
+do status, sem payload bruto nem telefone. Isso permite distinguir destinatário,
+política ou qualidade de canal sem expor PII e sem reverter a atribuição do lead.
+
+## DEC-083 — Janela comercial para distribuição automática e aviso de novo lead
+
+**Estado:** Aceita
+**Data:** 2026-08-25
+
+A distribuição automática, inclusive as retomadas por recusa, SLA e conclusão de
+qualificação, executa somente de segunda a sexta entre 08:00 (inclusivo) e 18:00
+(exclusivo), no fuso `America/Sao_Paulo`. Fora da janela, o lead continua
+persistido na fila e o job idempotente é reagendado para a próxima abertura; não há
+perda de lead nem consumo de tentativa.
+
+O template oficial `new_lead_broker` segue a mesma janela: a atribuição é durável
+imediatamente, mas a saída fica pendente até a abertura. Antes de enviar, a outbox
+revalida que o destinatário ainda é o corretor responsável e cancela o aviso se a
+atribuição foi substituída. Atribuições manuais continuam permitidas fora do horário;
+somente o efeito automático e o aviso são postergados.
+
+## DEC-082 — Auto-login e passkey no primeiro acesso
+
+**Estado:** Aceita
+**Data:** 2026-08-21
+
+Ao concluir o onboarding de primeiro acesso, o membro é autenticado
+automaticamente pelo fluxo público de credenciais do better-auth
+(`signIn.email` com a senha recém-definida, ainda em memória) e levado ao
+dashboard sem passar pela tela de login. Se o sign-in falhar, a ativação
+permanece válida e o fluxo caí no login manual — a ativação da conta nunca
+depende do auto-login.
+
+O wizard ganha uma etapa opcional de biometria **posterior** à autenticação:
+o registro de passkey (`addPasskey`) exige sessão ativa, portanto a etapa só
+aparece depois do auto-login, com detecção de suporte a autenticador de
+plataforma, opção explícita "Fazer depois" e fallback ao lembrete existente
+(`PasskeyToastHandler`). O registro audita `cadastrou_passkey` pela ação de
+segurança existente. O plugin passkey passa a fixar `rpName` e `rpID` do
+domínio canônico para que as credenciais não fiquem presas a um host de
+preview; o login por passkey continua disponível em ambos os domínios de
+produção confiados.
+
 ## DEC-081 — Feedback instantâneo server-first
 
 **Estado:** Aceita
@@ -40,6 +138,18 @@ fila geral seleciona somente unidades explicitamente permitidas em sua política
 nunca usa a Matriz como destino. A Matriz é ponto administrativo de entrada. Sem
 corretor ou unidade elegível, o lead permanece em fila e o trabalho é repetido com
 motivo auditável, sem descartar a atribuição de fila.
+
+## DEC-082 — Matriz como Central de redistribuição, fora da distribuição automática
+
+**Estado:** Aceita
+**Data:** 2026-08-21
+
+Cada tenant pode marcar uma única unidade como Central de redistribuição (Matriz). A
+Central não participa da seleção automática, mesmo quando estiver ativa, aceitando
+leads ou configurada para distribuição. Leads nela permanecem aguardando a decisão do
+Diretor, que pode encaminhá-los a uma unidade ativa e, quando necessário, atribuí-los
+diretamente a um corretor elegível. A marca é reversível, auditada e não é inferida
+pelo nome da unidade.
 
 ## DEC-079 — Notificação oficial ao corretor em toda atribuição de lead
 
@@ -129,13 +239,16 @@ respeitam o escopo multi-tenant do papel.
 **Estado:** Aceita
 **Data:** 2026-07-23
 
-O cliente de banco mantém um limite pequeno por processo (padrão de uma conexão em
-runtime serverless), fecha conexões ociosas rapidamente e aceita `DB_POOL_MAX` como
-parâmetro operacional entre 1 e 10. Durante o build estático o limite temporário é
-maior para permitir os workers de geração. O proxy usa uma cache de cinco segundos
-somente para a consulta de identidade da sessão; permissões e dados de negócio
-continuam sempre sendo consultados e validados no servidor. O objetivo é evitar que
-prefetch/navegação de duas máquinas consuma o limite do projeto Supabase.
+O cliente de banco mantém um limite pequeno por processo, fecha conexões ociosas
+rapidamente e aceita `DB_POOL_MAX` como parâmetro operacional entre 1 e 10. O padrão
+do runtime serverless continua sendo uma conexão; a imagem Docker auto-hospedada usa
+duas conexões, pois o processo é longo e atende navegações concorrentes. Durante o
+build estático o limite temporário é maior para permitir os workers de geração. O
+proxy usa uma cache de cinco segundos somente para a consulta de identidade da
+sessão; permissões e dados de negócio continuam sempre sendo consultados e validados
+no servidor. O objetivo é evitar que prefetch/navegação de duas máquinas consuma o
+limite do projeto Supabase. Qualquer aumento acima de duas conexões exige medição de
+capacidade do pooler e configuração explícita de `DB_POOL_MAX` no orquestrador.
 
 ## DEC-053 - Início seguro do agente de atendimento
 

@@ -103,7 +103,7 @@ export function DataTable<TData, TValue>({
                 onChange={(event) =>
                   table.getColumn(searchKey)?.setFilterValue(event.target.value)
                 }
-                className="h-9 rounded-xl border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground"
+                className="h-9 rounded-[var(--radius-control)] border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
           ) : (
@@ -113,7 +113,7 @@ export function DataTable<TData, TValue>({
                 placeholder={searchPlaceholder}
                 value={globalFilter ?? ""}
                 onChange={(event) => setGlobalFilter(event.target.value)}
-                className="h-9 rounded-xl border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground"
+                className="h-9 rounded-[var(--radius-control)] border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
           )}
@@ -125,7 +125,7 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-border/75 bg-white shadow-[var(--shadow-card)] dark:bg-card">
+      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border/75 bg-card">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-transparent border-b border-border">
@@ -133,7 +133,7 @@ export function DataTable<TData, TValue>({
                 <TableRow key={headerGroup.id} className="h-10 border-b border-border hover:bg-transparent">
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id} className="h-9 px-3.5 font-medium text-[11px] text-muted-foreground">
+                      <TableHead key={header.id} className="h-9 px-3.5 font-medium text-xs text-muted-foreground">
                         {header.isPlaceholder
                           ? null
                           : flexRender(

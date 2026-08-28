@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -269,5 +269,116 @@ export async function completePasswordReset(token: string, newPassword: string) 
     });
   });
 
-  return { success: true };
+  return { success: true, userEmail: request.userEmail };
 }
+
+/**
+ * Gera um link de redefinição de senha para um membro da equipe (solicitado por diretor ou gestor).
+ */
+export async function generatePasswordResetLinkForMember(targetIdentifier: string) {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director" && context.role !== "manager") {
+    throw new Error("Permissão insuficiente para gerar link de redefinição de senha.");
+  }
+
+  const db = getDatabase();
+
+  // 1. Tentar encontrar usuário por ID direto em user
+  let [user] = await db
+    .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
+    .from(schema.user)
+    .where(eq(schema.user.id, targetIdentifier))
+    .limit(1);
+
+  let targetUserId = user?.id;
+
+  // 2. Se não encontrou por user.id, tentar por brokerProfiles.id ou brokerProfiles.userId
+  if (!targetUserId) {
+    const [broker] = await db
+      .select({ userId: schema.brokerProfiles.userId, invitedEmail: schema.brokerProfiles.invitedEmail })
+      .from(schema.brokerProfiles)
+      .where(
+        and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          or(
+            eq(schema.brokerProfiles.id, targetIdentifier),
+            eq(schema.brokerProfiles.userId, targetIdentifier),
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (broker?.userId) {
+      targetUserId = broker.userId;
+      [user] = await db
+        .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
+        .from(schema.user)
+        .where(eq(schema.user.id, targetUserId))
+        .limit(1);
+    }
+  }
+
+  // 3. Se ainda não encontrou, tentar por tenantMemberships.id
+  if (!targetUserId) {
+    const [membership] = await db
+      .select({ userId: schema.tenantMemberships.userId })
+      .from(schema.tenantMemberships)
+      .where(
+        and(
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.id, targetIdentifier),
+        ),
+      )
+      .limit(1);
+
+    if (membership?.userId) {
+      targetUserId = membership.userId;
+      [user] = await db
+        .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
+        .from(schema.user)
+        .where(eq(schema.user.id, targetUserId))
+        .limit(1);
+    }
+  }
+
+  if (!user || !targetUserId) {
+    throw new Error("Este membro ainda não possui uma conta de usuário cadastrada no sistema.");
+  }
+
+  const id = randomUUID();
+  const token = randomBytes(32).toString("hex");
+  const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+  const now = new Date();
+
+  await db.insert(schema.passwordResetRequests).values({
+    id,
+    tenantId: context.tenantId,
+    userId: targetUserId,
+    userEmail: user.email,
+    status: "approved",
+    token,
+    tokenExpiresAt,
+    reviewedBy: context.userId,
+    reviewedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Revogar sessões ativas do membro por segurança
+  await db.delete(schema.session).where(eq(schema.session.userId, targetUserId));
+
+  // Log de auditoria
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "user",
+    entidadeId: targetUserId,
+    acao: "team.generated_password_reset_link",
+  });
+
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "").replace(/\/$/, "");
+  const resetUrl = `${baseUrl}/recuperar-senha?token=${encodeURIComponent(token)}`;
+
+  return { success: true, resetUrl };
+}
+

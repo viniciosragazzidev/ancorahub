@@ -4,10 +4,13 @@ import { desc, eq, and, isNull } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LightConversationsView } from "@/features/broker-workspace/components/light-conversations-view";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { buildOfficialTenantConversations } from "@/features/broker-workspace/official-tenant-conversations";
 import { samePhone } from "@/features/communication-channels/service";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasPermission } from "@/shared/auth/permissions";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 // Não gerar estaticamente — a página depende de sessão
 export const dynamic = "force-dynamic";
@@ -20,9 +23,9 @@ export const maxDuration = 300;
 export default async function BrokerConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string }>;
+  searchParams: Promise<{ leadId?: string; draft?: string }>;
 }) {
-  const { leadId } = await searchParams;
+  const { leadId, draft } = await searchParams;
   const context = await getRequiredTenantContext();
 
   if (!hasPermission(context.role, "acessar_conversas")) {
@@ -31,14 +34,22 @@ export default async function BrokerConversationsPage({
 
   // A superfície WAHA Lite é exclusiva do papel Corretor com o modo Lite ativo.
   // Diretores, gestores e corretores no modo normal usam a central geral.
-  if (context.role !== "broker" || await getExperienceMode(context) !== "LIGHT") {
+  if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") {
     redirect("/conversas");
+  }
+
+  // Pausa global reversível: não desconecta nem exclui a sessão do corretor,
+  // apenas bloqueia a superfície interna até a reativação pelo Super-admin.
+  if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
+    redirect("/minha-fila");
   }
 
   const db = getDatabase();
 
-  // ── Buscar leads do corretor ──────────────────────────────────────────
-  const lightLeads = await db
+  // These queries are isolated by the authenticated tenant/user context and
+  // do not depend on one another. Run them concurrently so the workspace can
+  // start rendering as soon as the slowest authorized read completes.
+  const lightLeadsPromise = db
     .select({
       id: schema.leads.id,
       nome: schema.leads.nome,
@@ -57,28 +68,96 @@ export default async function BrokerConversationsPage({
     )
     .orderBy(desc(schema.leads.stageEnteredAt))
     .limit(100);
+  const lightClientsPromise = db
+    .select({
+      id: schema.clients.id,
+      leadId: schema.clients.leadId,
+      nome: schema.clients.nome,
+      telefone: schema.clients.telefone,
+    })
+    .from(schema.clients)
+    .where(
+      and(
+        eq(schema.clients.tenantId, context.tenantId),
+        eq(schema.clients.corretorId, context.userId),
+      ),
+    )
+    .limit(100);
+  const tenantNumbersPromise = db
+    .select({
+      id: schema.wahaNumbers.id,
+      label: schema.wahaNumbers.label,
+      phone: schema.wahaNumbers.displayPhoneNumber,
+    })
+    .from(schema.wahaNumbers)
+    .where(eq(schema.wahaNumbers.tenantId, context.tenantId));
+  const tenantChannelsPromise = db
+    .select({
+      id: schema.communicationChannels.id,
+      name: schema.communicationChannels.verifiedName,
+      phone: schema.communicationChannels.displayPhoneNumber,
+    })
+    .from(schema.communicationChannels)
+    .where(
+      and(
+        eq(schema.communicationChannels.tenantId, context.tenantId),
+        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+        eq(schema.communicationChannels.status, "active"),
+      ),
+    );
+  const messageRowsPromise = db
+    .select({
+      id: schema.whatsappMessages.id,
+      leadId: schema.whatsappMessages.leadId,
+      clientId: schema.whatsappMessages.clientId,
+      phone: schema.whatsappMessages.phone,
+      body: schema.whatsappMessages.body,
+      direction: schema.whatsappMessages.direction,
+      senderRole: schema.whatsappMessages.senderRole,
+      providerStatus: schema.whatsappMessages.providerStatus,
+      sentAt: schema.whatsappMessages.sentAt,
+    })
+    .from(schema.whatsappMessages)
+    .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(500);
+  const connectionPromise = db
+    .select({
+      sessionName: schema.whatsappConnections.sessionName,
+      status: schema.whatsappConnections.status,
+      chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
+    })
+    .from(schema.whatsappConnections)
+    .where(
+      and(
+        eq(schema.whatsappConnections.tenantId, context.tenantId),
+        eq(schema.whatsappConnections.userId, context.userId),
+      ),
+    )
+    .limit(1);
+  const draftTemplatePromise =
+    draft === "broker_intro"
+      ? getSystemSetting("broker_lite_opening_draft")
+      : Promise.resolve(null);
 
-  const leadIds = lightLeads.map((l) => l.id);
+  const [lightLeads, lightClients, tenantNumbers, tenantChannels, messageRows, connectionRows, draftTemplate] = await Promise.all([
+    lightLeadsPromise,
+    lightClientsPromise,
+    tenantNumbersPromise,
+    tenantChannelsPromise,
+    messageRowsPromise,
+    connectionPromise,
+    draftTemplatePromise,
+  ]);
 
-  // ── Buscar mensagens ──────────────────────────────────────────────────
-  const messageRows = leadIds.length
-    ? await db
-        .select({
-          id: schema.whatsappMessages.id,
-          leadId: schema.whatsappMessages.leadId,
-          phone: schema.whatsappMessages.phone,
-          body: schema.whatsappMessages.body,
-          direction: schema.whatsappMessages.direction,
-          senderRole: schema.whatsappMessages.senderRole,
-          providerStatus: schema.whatsappMessages.providerStatus,
-          sentAt: schema.whatsappMessages.sentAt,
-        })
-        .from(schema.whatsappMessages)
-        .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
-        .orderBy(desc(schema.whatsappMessages.sentAt))
-        .limit(500)
-    : [];
-
+  const selectedLead = leadId ? lightLeads.find((lead) => lead.id === leadId) : null;
+  const initialDraft =
+    draft === "broker_intro" && selectedLead
+      ? (
+          draftTemplate?.trim() ||
+          "Olá, {nome}! Sou seu corretor e vou seguir com seu atendimento por aqui."
+        ).replaceAll("{nome}", selectedLead.nome.split(" ")[0] || selectedLead.nome)
+      : undefined;
   const messagesByLead = new Map<string, typeof messageRows>();
   for (const msg of messageRows) {
     const matched = lightLeads.find(
@@ -101,6 +180,8 @@ export default async function BrokerConversationsPage({
     const latest = msgs.at(-1) ?? null;
     return {
       id: lead.id,
+      kind: "lead" as const,
+      sendTarget: { kind: "lead" as const, leadId: lead.id },
       nome: lead.nome,
       telefone: lead.telefone,
       status: lead.status,
@@ -122,35 +203,80 @@ export default async function BrokerConversationsPage({
     };
   });
 
+  const clientConversations = lightClients.map((client) => {
+    const msgs = messageRows
+      .filter(
+        (message) =>
+          message.clientId === client.id ||
+          message.leadId === client.leadId ||
+          samePhone(message.phone, client.telefone),
+      )
+      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+      .slice(-100);
+    const latest = msgs.at(-1) ?? null;
+    return {
+      id: `client:${client.id}`,
+      kind: "client" as const,
+      sendTarget: { kind: "lead" as const, leadId: client.leadId },
+      nome: client.nome,
+      telefone: client.telefone,
+      status: "Cliente",
+      latestMessage: latest
+        ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() }
+        : null,
+      messages: msgs.map((message) => ({
+        id: message.id,
+        body: message.body,
+        direction: message.direction,
+        sentAt: message.sentAt.toISOString(),
+        senderRole: message.senderRole,
+        providerStatus: message.providerStatus,
+      })),
+    };
+  });
+
+  const officialConversations = buildOfficialTenantConversations(
+    [
+      ...tenantNumbers.map((number) => ({
+        id: number.id,
+        source: "number" as const,
+        name: number.label || "Número oficial do tenant",
+        phone: number.phone,
+      })),
+      ...tenantChannels
+        .filter((channel) => Boolean(channel.phone))
+        .map((channel) => ({
+          id: channel.id,
+          source: "channel" as const,
+          name: channel.name || "Número oficial do tenant",
+          phone: channel.phone!,
+        })),
+    ],
+    messageRows
+      .filter((message) => !message.leadId && !message.clientId)
+      .map((message) => ({
+        id: message.id,
+        body: message.body,
+        direction: message.direction,
+        sentAt: message.sentAt.toISOString(),
+        phone: message.phone,
+        senderRole: message.senderRole,
+        providerStatus: message.providerStatus,
+      })),
+  );
+
   // Sort: conversas com mensagens recentes primeiro
-  conversations.sort((a, b) => {
-    const timeA = a.latestMessage
-      ? new Date(a.latestMessage.sentAt).getTime()
-      : 0;
-    const timeB = b.latestMessage
-      ? new Date(b.latestMessage.sentAt).getTime()
-      : 0;
+  const scopedConversations = [...conversations, ...clientConversations, ...officialConversations];
+  scopedConversations.sort((a, b) => {
+    const timeA = a.latestMessage ? new Date(a.latestMessage.sentAt).getTime() : 0;
+    const timeB = b.latestMessage ? new Date(b.latestMessage.sentAt).getTime() : 0;
     return timeB - timeA;
   });
 
   // ── Status WhatsApp do corretor ───────────────────────────────────────
-  const [conn] = await db
-    .select({
-      sessionName: schema.whatsappConnections.sessionName,
-      status: schema.whatsappConnections.status,
-      chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
-    })
-    .from(schema.whatsappConnections)
-    .where(
-      and(
-        eq(schema.whatsappConnections.tenantId, context.tenantId),
-        eq(schema.whatsappConnections.userId, context.userId),
-      ),
-    )
-    .limit(1);
+  const [conn] = connectionRows;
 
-  const whatsappConnected =
-    conn?.status === "ready" && conn?.chatInternoAtivo === true;
+  const whatsappConnected = conn?.status === "ready" && conn?.chatInternoAtivo === true;
 
   return (
     <>
@@ -158,8 +284,9 @@ export default async function BrokerConversationsPage({
       <main className="min-h-0 w-full flex-1 bg-background p-0">
         <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:min-h-0 w-full overflow-hidden bg-card">
           <LightConversationsView
-            conversations={conversations}
+            conversations={scopedConversations}
             initialLeadId={leadId}
+            initialDraft={initialDraft}
             whatsappConnected={whatsappConnected}
           />
         </div>
