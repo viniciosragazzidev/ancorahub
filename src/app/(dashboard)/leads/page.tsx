@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -6,8 +6,6 @@ export const dynamic = "force-dynamic";
 import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
 import { LeadsLiveSync } from "./_components/leads-live-sync";
-import { LeadsFilters } from "./_components/leads-filters";
-import { LeadsPagination } from "./_components/leads-pagination";
 import { LeadsWorkspace } from "./leads-workspace";
 import { LeadsHeaderActions } from "./_components/leads-header-actions";
 import { WifiHigh, Plus, Target } from "@/components/huge-icons";
@@ -26,28 +24,30 @@ import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
-import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
+import { createSearchParamsCache, parseAsInteger, parseAsString } from "nuqs/server";
+import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
+import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
+import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
+
+const searchParamsCache = createSearchParamsCache({
+  page: parseAsInteger.withDefault(1),
+  pageSize: parseAsInteger.withDefault(20),
+  sort: parseAsString.withDefault("[]"),
+  filters: parseAsString.withDefault("[]"),
+  joinOperator: parseAsString.withDefault("and"),
+  period: parseAsString.withDefault(""),
+  eligibleCampaigns: parseAsString.withDefault(""),
+  attention: parseAsString.withDefault(""),
+  new: parseAsString.withDefault(""),
+});
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    attention?: string;
-    status?: string;
-    search?: string;
-    branch?: string;
-    new?: string;
-    tipo?: string;
-    origem?: string;
-    qualification?: string;
-    corretor?: string;
-    page?: string;
-    pageSize?: string;
-    period?: string;
-    eligibleCampaigns?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await connection();
+  const parsed = searchParamsCache.parse(await searchParams);
   const context = await getRequiredTenantContext();
   const capabilityPromise = hasEffectiveCapability({
     tenantId: context.tenantId,
@@ -166,11 +166,9 @@ export default async function LeadsPage({
     return <LightLeadsList leads={lightItems} />;
   }
 
-  const filters = await searchParams;
   const db = getDatabase();
-
-  const period = parsePeriod(filters.period);
-  const eligibleCampaignsOnly = filters.eligibleCampaigns === "1";
+  const period = parsePeriod(parsed.period);
+  const eligibleCampaignsOnly = parsed.eligibleCampaigns === "1";
   const systemSettingsPromise = getSystemSettings([
         "feature_central_atencao_stagnant_days",
         "feature_lead_management_actions_enabled",
@@ -189,22 +187,24 @@ export default async function LeadsPage({
   ]);
   const systemSettings = new Map(systemSettingRows.map((setting) => [setting.key, setting.value]));
 
-  // Pagination parameters
-  const pageParam = parseInt(filters.page ?? "1", 10);
-  const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
-  const pageSizeParam = parseInt(filters.pageSize ?? "20", 10);
-  const pageSize = Number.isInteger(pageSizeParam) && [10, 20, 50, 100].includes(pageSizeParam) ? pageSizeParam : 20;
+  const tableFilters: ExtendedColumnFilter<Record<string, unknown>>[] = parsed.filters ? JSON.parse(parsed.filters) : [];
+  const tableSort: ExtendedColumnSort<Record<string, unknown>>[] = parsed.sort ? JSON.parse(parsed.sort) : [];
+  const joinOperator = (parsed.joinOperator as JoinOperator) ?? "and";
+
+  const drizzleFilterCondition = buildDrizzleFilter(tableFilters, leadsColumnMap, joinOperator);
+  const orderByColumns = buildDrizzleOrderBy(tableSort, leadsSortMap);
+
+  const page = parsed.page;
+  const pageSize = parsed.pageSize;
 
   const configuredStagnantDays = Number(systemSettings.get("feature_central_atencao_stagnant_days") ?? 3);
   const stagnantDays =
-    Number.isInteger(configuredStagnantDays) && configuredStagnantDays >= 1 && configuredStagnantDays <= 30
+    Number.isFinite(configuredStagnantDays) && configuredStagnantDays >= 1 && configuredStagnantDays <= 30
       ? configuredStagnantDays
       : 3;
   const attention =
-    filters.attention === "unworked" || filters.attention === "stalled"
-      ? filters.attention
-      : filters.status === "stalled" || filters.status === "unworked"
-      ? (filters.status as "unworked" | "stalled")
+    parsed.attention === "unworked" || parsed.attention === "stalled"
+      ? parsed.attention
       : null;
   const stalledSince = sql<Date>`now() - (${stagnantDays} * interval '1 day')`;
   const attentionNote =
@@ -213,8 +213,7 @@ export default async function LeadsPage({
       : attention === "stalled"
       ? `Exibindo leads ativos sem avanço de etapa há mais de ${stagnantDays} dias.`
       : null;
-  const isValidStatus = filters.status && (schema.leadStatusValues as readonly string[]).includes(filters.status);
-  const statusFilter =
+  const attentionCondition =
     attention === "unworked"
       ? and(inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.serviceStartedAt))
       : attention === "stalled"
@@ -228,12 +227,7 @@ export default async function LeadsPage({
           ]),
           lt(schema.leads.stageEnteredAt, stalledSince)
         )
-      : isValidStatus
-      ? eq(schema.leads.status, filters.status as (typeof schema.leadStatusValues)[number])
       : null;
-  const searchFilter = filters.search
-    ? or(ilike(schema.leads.nome, `%${filters.search}%`), ilike(schema.leads.telefone, `%${filters.search}%`))
-    : null;
 
   const expiredUnworkedBrokerFilter =
     context.role === "broker"
@@ -258,63 +252,21 @@ export default async function LeadsPage({
 
   const isMarketing = context.jobTitle === "marketing";
 
-  const branchFilter = isMarketing
+  const roleBranchFilter = isMarketing
     ? isMatrix
-      ? filters.branch
-        ? eq(schema.leads.branchId, filters.branch)
-        : null
+      ? null
       : eq(schema.leads.branchId, context.branchId!)
     : context.role === "manager" && context.branchId
     ? eq(schema.leads.branchId, context.branchId)
     : context.role === "broker"
     ? eq(schema.leads.corretorId, context.userId)
-    : filters.branch
-    ? eq(schema.leads.branchId, filters.branch)
     : null;
 
-  const tipoFilter = filters.tipo === "PF"
-    ? eq(schema.leads.tipo, "PF")
-    : filters.tipo === "PJ"
-      ? inArray(schema.leads.tipo, ["PJ", "PME"])
-      : filters.tipo === "PME"
-        ? eq(schema.leads.tipo, "PME")
-        : null;
-  const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
-  const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
-  const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
-  const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
-  const metaCampaignEligibility = eligibleCampaignsOnly
-      ? await Promise.all([
-        Promise.resolve(systemSettings.get(`meta_lead_capture_mode_${context.tenantId}`) ?? null),
-        db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled })
-          .from(schema.metaCampaignQueueRoutes)
-          .where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId))
-          .catch(() => []),
-        db.select({ id: schema.metaAdQueueRoutes.id })
-          .from(schema.metaAdQueueRoutes)
-          .where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId))
-          .limit(1)
-          .catch(() => []),
-        db.select({ id: schema.metaFormQueueRoutes.id })
-          .from(schema.metaFormQueueRoutes)
-          .where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId))
-          .limit(1)
-          .catch(() => []),
-      ]).then(([storedMode, campaignRules, adRules, formRules]) => resolveMetaCampaignEligibility({
-        storedMode,
-        campaignRules,
-        hasTenantRules: campaignRules.length > 0 || adRules.length > 0 || formRules.length > 0,
-      }))
+  const periodFilter = parsed.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
+
+  const eligibleCampaignFilter = eligibleCampaignsOnly
+    ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), isNotNull(schema.leads.metaCampaignId))
     : null;
-  const eligibleCampaignFilter = !metaCampaignEligibility
-    ? null
-    : metaCampaignEligibility.mode === "disabled"
-      ? sql`false`
-      : metaCampaignEligibility.mode === "all"
-        ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), isNotNull(schema.leads.metaCampaignId))
-        : metaCampaignEligibility.campaignIds.length
-          ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), inArray(schema.leads.metaCampaignId, metaCampaignEligibility.campaignIds))
-          : sql`false`;
 
   const qualifiedOrDistributedFilter = or(
     isNotNull(schema.leads.corretorId),
@@ -328,16 +280,11 @@ export default async function LeadsPage({
     eq(schema.leads.tenantId, context.tenantId),
     isNull(schema.leads.deletedAt),
     qualifiedOrDistributedFilter,
-    ...(periodFilter ? [periodFilter] : []),
-    ...(statusFilter ? [statusFilter] : []),
-    ...(searchFilter ? [searchFilter] : []),
-    ...(branchFilter ? [branchFilter] : []),
-    ...(tipoFilter ? [tipoFilter] : []),
-    ...(origemFilter ? [origemFilter] : []),
-    ...(qualificationFilter ? [qualificationFilter] : []),
-    ...(corretorFilter ? [corretorFilter] : []),
-    ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
-    ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
+    drizzleFilterCondition,
+    ...(attentionCondition ? [attentionCondition] : []),
+    ...(roleBranchFilter ? [roleBranchFilter] : []),
+    ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : []),
+    ...(periodFilter ? [periodFilter] : [])
   );
 
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
@@ -385,7 +332,7 @@ export default async function LeadsPage({
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
       .where(where)
-      .orderBy(desc(schema.leads.createdAt))
+      .orderBy(...(orderByColumns.length ? orderByColumns : [desc(schema.leads.createdAt)]))
       .limit(pageSize)
       .offset(offset),
     db
@@ -526,14 +473,9 @@ export default async function LeadsPage({
   const leadManagementActionsEnabled = systemSettings.get("feature_lead_management_actions_enabled") !== "false";
   // RCD: detect if any filter is active to switch empty state copy
   const isFiltered = !!(
-    filters.search ||
-    filters.status ||
-    filters.attention ||
-    filters.corretor ||
-    filters.branch ||
-    filters.origem ||
-    filters.tipo ||
-    filters.qualification ||
+    parsed.filters ||
+    parsed.sort ||
+    parsed.attention ||
     eligibleCampaignsOnly
   );
 
@@ -552,7 +494,7 @@ export default async function LeadsPage({
             jobTitle={context.jobTitle}
             branchId={context.branchId}
             urgentLead={urgentLead}
-            initiallyOpen={filters.new === "1"}
+            initiallyOpen={parsed.new === "1"}
           >
             <NextUrgentLeadButton lead={urgentLead} />
           </LeadsHeaderActions>
@@ -582,22 +524,6 @@ export default async function LeadsPage({
             </Button>
           </div>
         ) : null}
-
-        {/* Filters */}
-        <LeadsFilters
-          branches={branches}
-          brokers={brokers}
-          initialBranch={filters.branch}
-          initialCorretor={filters.corretor}
-          initialOrigem={filters.origem}
-          initialPageSize={filters.pageSize}
-          initialQualification={filters.qualification}
-          initialSearch={filters.search}
-          initialStatus={filters.status}
-          initialTipo={filters.tipo}
-          initialEligibleCampaigns={filters.eligibleCampaigns}
-          storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
-        />
 
         {/* Workspace or RCD Directional Empty State */}
         {leads.length || qualifyingLeads.length ? (

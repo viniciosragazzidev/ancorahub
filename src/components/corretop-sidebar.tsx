@@ -67,10 +67,18 @@ type SidebarSection = { label: string; items: SidebarItem[] };
 
 const navSections: SidebarSection[] = [
   {
+    label: "Visão Geral",
+    items: [
+      { label: "Dashboard", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
+    ],
+  },
+  {
     label: "Operação Comercial",
     items: [
       { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
       { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
+      { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
+      { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
     ],
   },
   {
