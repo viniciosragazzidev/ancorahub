@@ -626,7 +626,7 @@ export function LeadsWorkspace({
                   selectedIds={multiSelect.selectedIds}
                   isAllSelected={multiSelect.isAllSelected}
                   onToggleRow={multiSelect.toggle}
-                  onSelectAll={(checked) => {
+                  onSelectAll={(checked: boolean) => {
                     if (checked) multiSelect.setSelected(leadsIds);
                     else multiSelect.clear();
                   }}
