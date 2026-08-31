@@ -135,12 +135,33 @@ export default async function BrokerConversationsPage({
       ),
     )
     .limit(1);
-  const draftTemplatePromise =
-    draft === "broker_intro"
-      ? getSystemSetting("broker_lite_opening_draft")
-      : Promise.resolve(null);
+  const officialOutboundPromise = db
+    .select({
+      id: schema.whatsappOutboundMessages.id,
+      purpose: schema.whatsappOutboundMessages.purpose,
+      messageType: schema.whatsappOutboundMessages.messageType,
+      templateName: schema.whatsappOutboundMessages.templateName,
+      variables: schema.whatsappOutboundMessages.variables,
+      status: schema.whatsappOutboundMessages.status,
+      createdAt: schema.whatsappOutboundMessages.createdAt,
+      sentAt: schema.whatsappOutboundMessages.sentAt,
+      deliveredAt: schema.whatsappOutboundMessages.deliveredAt,
+      readAt: schema.whatsappOutboundMessages.readAt,
+      channelId: schema.whatsappOutboundMessages.channelId,
+      destinationPhone: schema.whatsappOutboundMessages.destinationPhone,
+    })
+    .from(schema.whatsappOutboundMessages)
+    .where(
+      and(
+        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+        eq(schema.whatsappOutboundMessages.recipientType, "user"),
+        eq(schema.whatsappOutboundMessages.recipientId, context.userId),
+      ),
+    )
+    .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
+    .limit(100);
 
-  const [lightLeads, lightClients, tenantNumbers, tenantChannels, messageRows, connectionRows, draftTemplate] = await Promise.all([
+  const [lightLeads, lightClients, tenantNumbers, tenantChannels, messageRows, connectionRows, draftTemplate, officialOutbounds] = await Promise.all([
     lightLeadsPromise,
     lightClientsPromise,
     tenantNumbersPromise,
@@ -148,6 +169,7 @@ export default async function BrokerConversationsPage({
     messageRowsPromise,
     connectionPromise,
     draftTemplatePromise,
+    officialOutboundPromise,
   ]);
 
   const selectedLead = leadId ? lightLeads.find((lead) => lead.id === leadId) : null;
@@ -263,6 +285,7 @@ export default async function BrokerConversationsPage({
         senderRole: message.senderRole,
         providerStatus: message.providerStatus,
       })),
+    officialOutbounds,
   );
 
   // Sort: conversas com mensagens recentes primeiro
