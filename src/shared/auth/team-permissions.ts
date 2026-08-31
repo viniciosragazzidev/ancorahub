@@ -27,23 +27,48 @@ export function canCreateRole(role: TenantRole, targetRole: CreatableTeamRole) {
 export type ManagedTeamRole = CreatableTeamRole;
 
 export function canManageMember(
-  context: TenantContext,
+  context: TenantContext | {
+    userId: string;
+    role: TenantRole;
+    branchId: string | null;
+    allowedUnitIds?: string[];
+    scope?: { unitIds: readonly string[]; tenantWide: boolean };
+  },
   target: { role: TenantRole; branchId: string | null; userId: string },
 ) {
   if (context.userId === target.userId) return false;
   if (target.role === "director") return false;
   if (context.role === "director") return true;
+
+  // Escopo de unidades autorizadas do gestor / supervisor
+  const authorizedUnitIds: readonly string[] =
+    "scope" in context && context.scope?.unitIds
+      ? context.scope.unitIds
+      : "allowedUnitIds" in context && Array.isArray(context.allowedUnitIds) && context.allowedUnitIds.length > 0
+        ? context.allowedUnitIds
+        : context.branchId
+          ? [context.branchId]
+          : [];
+
+  const isTargetInScope = target.branchId ? authorizedUnitIds.includes(target.branchId) : false;
+
   if (context.role === "manager") {
-    return (target.role === "supervisor" || target.role === "broker") && target.branchId === context.branchId;
+    return (target.role === "supervisor" || target.role === "broker") && isTargetInScope;
   }
   if (context.role === "supervisor") {
-    return target.role === "broker" && target.branchId === context.branchId;
+    return target.role === "broker" && isTargetInScope;
   }
   return false;
 }
 
 export function requireCanManageMember(
-  context: TenantContext,
+  context: TenantContext | {
+    userId: string;
+    role: TenantRole;
+    branchId: string | null;
+    allowedUnitIds?: string[];
+    scope?: { unitIds: readonly string[]; tenantWide: boolean };
+  },
   target: { role: TenantRole; branchId: string | null; userId: string },
 ) {
   if (!canManageMember(context, target)) {
@@ -51,3 +76,4 @@ export function requireCanManageMember(
   }
   return context;
 }
+

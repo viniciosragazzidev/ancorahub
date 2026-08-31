@@ -226,7 +226,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // Determine direction based on fromMe flag
   const isOutgoing = event.message.fromMe === true;
-  const normalizedPhone = normalizePhone(event.message.from);
+  const contactPhoneRaw = isOutgoing && event.message.to ? event.message.to : event.message.from;
+  const normalizedPhone = normalizePhone(contactPhoneRaw);
+
 
   // ── 6. Resolve lead/client (race-safe) ─────────────────────────────────
   const leadResolveStart = Date.now();
