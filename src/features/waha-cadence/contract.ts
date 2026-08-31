@@ -67,6 +67,8 @@ export const wahaWebhookSchema = z.object({
     type: z.enum(["text", "image", "audio", "video", "document", "sticker", "location", "contact"]).default("text"),
     /** Whether this message was sent by the session owner (broker's own messages) */
     fromMe: z.boolean().default(false),
+    /** Provider-origin metadata used only for observability and outgoing reconciliation. */
+    source: z.string().trim().min(1).max(64).optional(),
     /** Caption for media messages */
     caption: z.string().max(1_000).optional(),
     /** Reply context: the ID of the message being replied to */
@@ -152,7 +154,10 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
           ? (innerPayload.media as Record<string, unknown>)
           : null;
 
-      const bodyText = String(innerPayload.body ?? innerPayload.caption ?? "").trim() || " ";
+      const bodyText = String(innerPayload.body ?? innerPayload.caption ?? "").trim() || `[${mappedType}]`;
+      const source = typeof innerPayload.source === "string" && innerPayload.source.trim()
+        ? innerPayload.source.trim().slice(0, 64)
+        : undefined;
 
       return {
         eventId,
@@ -166,6 +171,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
           body: bodyText,
           type: mappedType,
           fromMe: Boolean(innerPayload.fromMe),
+          source,
           caption: innerPayload.caption ? String(innerPayload.caption) : undefined,
           replyToId: (innerPayload.replyTo as Record<string, unknown>)?.id
             ? String((innerPayload.replyTo as Record<string, unknown>).id)

@@ -68,6 +68,7 @@ describe("WAHA cadence contract", () => {
         to: "5511888888888@c.us",
         body: "Olá do WhatsApp!",
         fromMe: false,
+        source: "app",
         hasMedia: false,
         type: "chat",
       },
@@ -83,6 +84,26 @@ describe("WAHA cadence contract", () => {
     expect(event.message?.body).toBe("Olá do WhatsApp!");
     expect(event.message?.type).toBe("text");
     expect(event.message?.fromMe).toBe(false);
+    expect(event.message?.source).toBe("app");
+  });
+
+  it("accepts source metadata forwarded for an outgoing CRM reconciliation", () => {
+    const event = wahaWebhookSchema.parse({
+      eventId: "evt-message-any-api",
+      type: "message.inbound",
+      sessionId: "waha_session",
+      occurredAt: "2026-08-24T12:00:00.000Z",
+      message: {
+        id: "true_5511999999999@c.us_ABC",
+        from: "5511888888888",
+        to: "5511999999999",
+        body: "Mensagem enviada pelo CRM",
+        fromMe: true,
+        source: "api",
+      },
+    });
+
+    expect(event.message?.source).toBe("api");
   });
 
   it("normalizes a native WAHA engine session.status webhook payload", () => {

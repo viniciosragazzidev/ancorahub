@@ -272,7 +272,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         leadId,
         clientId,
         provider: "waha",
-        providerStatus: "received",
+        providerStatus: isOutgoing ? "sent" : "received",
         messageId: providerMessageId,
         phone: normalizedPhone,
         direction: isOutgoing ? "outgoing" : "incoming",
@@ -284,7 +284,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       });
 
     // Update cadence run if applicable
-    if (runId) {
+    if (runId && !isOutgoing) {
       await tx
         .update(schema.wahaCadenceRuns)
         .set({ inboundAt: new Date(event.occurredAt), status: "active", updatedAt: new Date() })
@@ -341,7 +341,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   // Log metrics (no PII)
   console.info("[waha/inbound] processed", {
     eventType: event.type,
+    eventId: event.eventId,
+    sessionId: event.sessionId,
+    messageId: event.message.id,
     direction: isOutgoing ? "outgoing" : "incoming",
+    source: event.message.source ?? null,
+    remotePhoneHash: phoneHash(normalizedPhone).slice(0, 16),
+    conversationId: null,
     hasLead: Boolean(leadId),
     hasClient: Boolean(clientId),
     eventDedupMs: metrics.eventDedupMs,
