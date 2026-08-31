@@ -8,6 +8,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 
 export type LeadCreateState = {
   duplicate?: { id: string; nome: string; createdAt: string; corretorNome: string | null };
@@ -38,15 +40,37 @@ export async function deleteLeadAction(_previous: LeadDeleteState, formData: For
 
   try {
     const context = await getRequiredTenantContext();
-    if (!canDeleteLead(context.role)) throw new AuthorizationError("Somente o Diretor pode excluir um lead.");
     const db = getDatabase();
     const now = new Date();
+    const accessContext = toEffectiveLeadAccessContext(context);
+
     const result = await db.transaction(async (tx) => {
-      const [lead] = await tx.select({ id: schema.leads.id }).from(schema.leads)
+      const [lead] = await tx.select({
+        id: schema.leads.id,
+        tenantId: schema.leads.tenantId,
+        branchId: schema.leads.branchId,
+        corretorId: schema.leads.corretorId,
+      }).from(schema.leads)
         .where(and(eq(schema.leads.id, parsed.data.leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1);
       if (!lead) return false;
+
+      const resourceScope = buildLeadResourceScope(lead);
+      const legacyAllowed = canDeleteLead(context.role);
+
+      await evaluateShadowAuthorization({
+        operationKey: "lead.delete",
+        legacyAllowed,
+        context: accessContext,
+        capability: "acessar_leads",
+        resource: resourceScope,
+      });
+
+      if (!canDeleteLead(context.role) && !accessContext.canAccessAllUnits) {
+        throw new AuthorizationError("Somente o Diretor pode excluir um lead.");
+      }
+
       await tx.update(schema.leads).set({ deletedAt: now, deletedBy: context.userId, updatedAt: now })
-        .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId)));
+        .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt)));
       await tx.update(schema.aiConversations).set({ status: "CLOSED", automationState: "CLOSED", closedAt: now, updatedAt: now })
         .where(and(eq(schema.aiConversations.tenantId, context.tenantId), eq(schema.aiConversations.leadId, lead.id)));
       await tx.insert(schema.auditLogs).values({ id: crypto.randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "lead.soft_deleted_by_director" });

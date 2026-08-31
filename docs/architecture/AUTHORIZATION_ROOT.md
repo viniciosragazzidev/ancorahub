@@ -1,4 +1,4 @@
-# Canonical Authorization & Multi-Scope Foundation (Fase 1A & Fase 1B)
+# Canonical Authorization & Multi-Scope Foundation (Fases 1A, 1B & 1C)
 
 ## 1. Visão Geral
 
@@ -66,57 +66,59 @@ O `AuthorizationService` disponibiliza 4 métodos canônicos:
 
 ---
 
-## 5. Adapters de Domínio (Domain Authorization Adapters)
+## 5. Privilege Escalation Protection
 
-Para desacoplar os domínios do núcleo de autorização:
-
-### Leads (`src/features/leads/lead-authorization.ts`)
-- **`buildLeadResourceScope(lead)`**: Converte entidades de lead em descritor canônico `{ tenantId, unitId, ownerUserId }`.
-- **`buildLeadScopeWhere(context, options?)`**: Constrói cláusula SQL Drizzle para isolamento de tenant, multiunidade e posse (`corretorId`).
-
-### Clientes (`src/features/customers/customer-authorization.ts`)
-- **`buildClientResourceScope(client)`**: Converte entidades de cliente em descritor canônico `{ tenantId, unitId, ownerUserId }`.
-- **`buildClientScopeWhere(context, options?)`**: Constrói cláusula SQL Drizzle para isolamento de tenant, multiunidade e posse (`corretorId`).
+A governança canônica impede que qualquer ator conceda privilégios superiores ou transversais à sua própria autoridade:
+- **Papel Alvo**: Um Gestor só pode criar/gerenciar Supervisores ou Corretores (`canCreateRole`, `requireCanUpdateMemberAuthority`). Não pode promover ninguém a Diretor ou Gestor.
+- **Auto-Escalonamento**: Usuários não podem alterar o próprio papel, filiais administradas ou custom roles para ampliar seus próprios acessos.
+- **Escopo Custom Role**: Cargos personalizados com escopo em todo o tenant (`customRoleScope = "tenant"`) só podem ser atribuídos por Diretores (`requireCanUpdateMemberAuthority`).
+- **Scope Escalation**: Gestores não podem mover membros ou atribuir filiais que não estejam no seu `allowedUnitIds`.
 
 ---
 
-## 6. Modo Sombra (Shadow Authorization Mode)
+## 6. Actor / Resource / Target Authorization
 
-Para garantir uma migração gradual e sem risco de regressão:
-- O módulo [`src/shared/auth/shadow-mode.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/shared/auth/shadow-mode.ts) permite avaliar as regras legadas lado a lado com a decisão canônica.
-- Ativado via variável de ambiente `AUTH_SHADOW_MODE=true` ou System Setting `feature_auth_shadow_mode=true`.
-- Classifica divergências em: `LEGACY_TOO_PERMISSIVE`, `LEGACY_TOO_RESTRICTIVE`, `SCOPE_MODEL_GAP`, `CUSTOM_ROLE_GAP`, `TEAM_SCOPE_GAP`, `QUERY_SCOPE_GAP`.
-- Discrepâncias emitem logs estruturados seguros sob o evento `auth_shadow_mismatch` (sem PII ou segredos).
+Operações que transferem titularidade de recursos exigem validação da tríade **Actor + Resource + Target**:
+1. **Ator**: Possui permissão (`leads_reassign` ou Diretor / Gestor autorizado)?
+2. **Recurso**: O lead/cliente pertence ao tenant e a uma filial autorizada para o ator?
+3. **Destinatário**: O usuário de destino (corretor) pertence ao mesmo tenant, está ativo e vinculado à filial compatível do recurso?
 
----
-
-## 7. Consumidores Migrados
-
-### Fase 1A (Fundação e Unidades)
-1. **`assertBranchProfileAccess`** ([`src/features/branches/queries.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/branches/queries.ts))
-2. **`toggleAutoDistributeAction`** ([`src/features/branches/actions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/branches/actions.ts))
-3. **`toggleBrokerAvailabilityAction`** ([`src/features/branches/actions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/branches/actions.ts))
-4. **`canManageMember`** ([`src/shared/auth/team-permissions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/shared/auth/team-permissions.ts))
-
-### Fase 1B (Expansão Leads e Clientes)
-5. **`getLeadTimeline`** ([`src/features/leads/queries.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/leads/queries.ts))
-6. **`addLeadNoteAction`** ([`src/features/leads/actions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/leads/actions.ts))
-7. **`updateLeadLivesCountAction`** ([`src/features/leads/actions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/leads/actions.ts))
-8. **`LeadDetailPage`** ([`src/app/(dashboard)/leads/[id]/page.tsx`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/app/%28dashboard%29/leads/%5Bid%5D/page.tsx))
-9. **`LeadsPageContent`** ([`src/app/(dashboard)/leads/page.tsx`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/app/%28dashboard%29/leads/page.tsx))
-10. **`CustomersPage`** ([`src/app/(dashboard)/clientes/page.tsx`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/app/%28dashboard%29/clientes/page.tsx))
-11. **`ClientDetailPage`** ([`src/app/(dashboard)/clientes/[clientId]/page.tsx`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/app/%28dashboard%29/clientes/%5BclientId%5D/page.tsx))
+Implementado canonicamente em:
+- `reassignLeadAction` ([`src/features/leads/management-actions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/leads/management-actions.ts))
+- `transferLeadsAction` ([`src/app/(dashboard)/equipe/actions.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/app/%28dashboard%29/equipe/actions.ts))
 
 ---
 
-## 8. Matriz de Segurança Validada
+## 7. Multi-Unit Scope Administration
 
-Coberta por 37 testes automatizados de autorização canônica:
-- ✅ Isolamento multi-tenant estrito (Diretor, Gestor e Corretor).
-- ✅ Prevenção de IDOR para gestor multiunidade (Unidade A e B permitidas, Unidade C bloqueada).
-- ✅ Titularidade própria do corretor (Broker Self vs Broker Alheio).
-- ✅ Bloqueio por falta de capacidade vs bloqueio por escopo fora da unidade.
-- ✅ Fail-closed em escopo vazio ou desativado.
-- ✅ Custom Roles com escopo `tenant` e `branch`.
-- ✅ Scoping server-side para listagem, busca, contagem e paginação.
-- ✅ Classificação e telemetria segura no Shadow Mode.
+A escrita na tabela `tenant_manager_branches` é controlada pelo serviço canônico:
+- **`setManagerBranchesAuthorized`** ([`src/features/team/manager-branches-service.ts`](file:///c:/Users/kyper/Desktop/Kyper/Projects/ancorahub/src/features/team/manager-branches-service.ts))
+- Garante interseção estrita: `requestedUnits ∩ tenantBranches ∩ actorAllowedUnits`.
+- Rejeita qualquer tentativa de vincular unidades inexistentes, inativas, cross-tenant ou fora da autoridade do gestor que executa a ação.
+
+---
+
+## 8. Bulk Mutation Authorization
+
+Operações em lote aplicam regras determinísticas para evitar mutações parciais ou desautorizadas:
+- **`ATOMIC_DENY`**: Em `bulkToggleTeamMemberStatusAction`, todos os IDs fornecidos no lote passam por pré-validação atômica server-side. Se qualquer ID for de outro tenant ou estiver fora do escopo do gestor, a operação inteira é abortada com erro amigável sem mutações parciais.
+- **Scoped Mutation SQL**: Em `transferLeadsAction`, a mutação no banco de dados inclui cláusula `WHERE` explícita por `tenant_id` e `branch_id`, prevenindo TOCTOU e atualizações indevidas.
+
+---
+
+## 9. Authorization Readiness Gate
+
+| Gate | Requisito | Status | Evidência |
+|---|---|---|---|
+| **GATE-A** | Isolamento multi-tenant canônico em leitura e escrita | **PASS** | Suíte de testes cross-tenant em Leads, Clientes, Equipe e Distribuição com 0 falhas |
+| **GATE-B** | Gestor multi-unidade validado em leitura e escrita | **PASS** | `setManagerBranchesAuthorized`, `canManageMember` e queries de listagem cobrindo gestores A+B |
+| **GATE-C** | Custom roles com capability + scope | **PASS** | Testes de RBAC canônico com escopo `tenant` vs `branch` |
+| **GATE-D** | IDOR em mutations críticas coberto | **PASS** | `reassignLeadAction`, `deleteLeadAction`, `transferLeadsAction` e `bulkToggle` protegidos |
+| **GATE-E** | Administração de scope protegida contra escalonamento | **PASS** | `setManagerBranchesAuthorized` impede auto-atribuição e unidades fora de escopo |
+| **GATE-F** | Alteração de role/custom role protegida contra escalation | **PASS** | `requireCanUpdateMemberAuthority` impede promoção indevida |
+| **GATE-G** | Query scoping em Lead e Cliente operacional | **PASS** | `buildLeadScopeWhere` e `buildClientScopeWhere` ativos nas páginas principais |
+| **GATE-H** | Nenhum caminho CRITICAL com bypass de autorização | **PASS** | Ações críticas de equipe, ownership e delete migradas para canônico |
+| **GATE-I** | Configurações de Distribuição com autorização central | **PASS** | `saveDistributionPolicyAction` e `assertManager` protegidos sem alterar o motor |
+| **GATE-J** | Shadow mismatches classificados | **PASS** | `shadow-mode.ts` com tipagem formal de divergências |
+
+**Decisão Final do Gate**: `AUTHORIZATION_READY_FOR_DISTRIBUTION = YES`

@@ -3,6 +3,8 @@
 import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import {
   routeLeadToBranch,
   assignLeadToBroker,
@@ -85,7 +87,18 @@ export async function saveDistributionPolicyAction(
     return { success: false, error: "Os pesos do ranking não podem ultrapassar 100." };
   try {
     const context = await getRequiredTenantContext();
-    if (context.role !== "director")
+    const accessContext = toEffectiveLeadAccessContext(context);
+    const legacyAllowed = context.role === "director";
+
+    await evaluateShadowAuthorization({
+      operationKey: "lead_distribution.policy_update",
+      legacyAllowed,
+      context: accessContext,
+      capability: "distribution_settings_manage",
+      resource: { tenantId: context.tenantId, unitId: null, teamId: null, ownerUserId: null },
+    });
+
+    if (context.role !== "director" && !accessContext.canAccessAllUnits)
       return { success: false, error: "Apenas o Diretor pode alterar a política de distribuição." };
     const db = getDatabase();
     const now = new Date();

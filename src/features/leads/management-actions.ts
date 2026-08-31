@@ -30,14 +30,37 @@ export type ManagementActionState = {
   };
 };
 
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
+
 async function getManagedLead(leadId: string) {
   const context = await getRequiredTenantContext();
-  if (context.role !== "manager" && context.role !== "director") throw new AuthorizationError("Apenas Gestores e Diretores podem gerenciar leads.");
   const db = getDatabase();
   const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, status: schema.leads.status, corretorId: schema.leads.corretorId })
     .from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) throw new Error("Lead não encontrado.");
-  if (context.role === "manager" && context.branchId !== lead.branchId) throw new AuthorizationError("Este lead está fora da sua filial.");
+
+  const resourceScope = buildLeadResourceScope(lead);
+  const accessContext = toEffectiveLeadAccessContext(context);
+  const legacyAllowed =
+    context.role === "director" ||
+    (context.role === "manager" && Boolean(context.branchId) && context.branchId === lead.branchId);
+
+  await evaluateShadowAuthorization({
+    operationKey: "lead.reassign",
+    legacyAllowed,
+    context: accessContext,
+    capability: "leads_reassign",
+    resource: resourceScope,
+  });
+
+  const isDirector = context.role === "director" || accessContext.canAccessAllUnits;
+  const isAllowed = isDirector || AuthorizationService.can(accessContext, "leads_reassign", resourceScope) || (context.role === "manager" && accessContext.allowedUnitIds.includes(lead.branchId ?? ""));
+  if (!isAllowed) {
+    throw new AuthorizationError("Este lead está fora da sua filial ou escopo autorizado.");
+  }
+
   return { context, db, lead };
 }
 
