@@ -568,27 +568,14 @@ export function LeadsWorkspace({
               description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
             />
           ) : (
-            <Card className="border-transparent bg-transparent shadow-none">
-              <CardHeader className="border-b border-border/50 p-4">
-                <div className="flex flex-col gap-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Target size={17} />
-                    Leads em qualificação por IA
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {qualifyingLeads.length} lead(s) em triagem · o robô qualifica e encaminha para a fila de distribuição.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <QualifyingLeadsDataTable
-                  leads={qualifyingLeads}
-                  queues={queues}
-                  pageSize={pageSize}
-                  onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                />
-              </CardContent>
-            </Card>
+            <div className="w-full">
+              <QualifyingLeadsDataTable
+                leads={qualifyingLeads}
+                queues={queues}
+                pageSize={pageSize}
+                onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+              />
+            </div>
           )}
         </TabsContent>
 
@@ -602,38 +589,25 @@ export function LeadsWorkspace({
             >
               {selectionActions}
             </SelectionToolbar>
-            <Card className="border-transparent bg-transparent shadow-none">
-              <CardHeader className="border-b border-border/50 p-4">
-                <div className="flex flex-col gap-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <UserList size={17} />
-                    Leads qualificados & distribuídos
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {workspaceLeads.length} lead(s) no total · ordenados pela entrada mais recente.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <LeadsDataTable
-                  leads={workspaceLeads}
-                  contextRole={contextRole}
-                  shouldMask={shouldMask}
-                  slaFirstContactMinutes={slaFirstContactMinutes}
-                  slaStagnantDays={slaStagnantDays}
-                  pageSize={pageSize}
-                  pagination={pagination}
-                  selectedIds={multiSelect.selectedIds}
-                  isAllSelected={multiSelect.isAllSelected}
-                  onToggleRow={multiSelect.toggle}
-                  onSelectAll={(checked: boolean) => {
-                    if (checked) multiSelect.setSelected(leadsIds);
-                    else multiSelect.clear();
-                  }}
-                  onRowClick={setSelectedLead}
-                />
-              </CardContent>
-            </Card>
+            <div className="w-full">
+              <LeadsDataTable
+                leads={workspaceLeads}
+                contextRole={contextRole}
+                shouldMask={shouldMask}
+                slaFirstContactMinutes={slaFirstContactMinutes}
+                slaStagnantDays={slaStagnantDays}
+                pageSize={pageSize}
+                pagination={pagination}
+                selectedIds={multiSelect.selectedIds}
+                isAllSelected={multiSelect.isAllSelected}
+                onToggleRow={multiSelect.toggle}
+                onSelectAll={(checked: boolean) => {
+                  if (checked) multiSelect.setSelected(leadsIds);
+                  else multiSelect.clear();
+                }}
+                onRowClick={setSelectedLead}
+              />
+            </div>
           </div>
         </TabsContent>
 

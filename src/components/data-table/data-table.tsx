@@ -33,10 +33,10 @@ export function DataTable<TData>({
   return (
     <div className={cn("w-full space-y-3", className)} {...props}>
       {children}
-      <div className={cn("relative rounded-md border border-border/60 overflow-hidden shadow-xs bg-transparent", containerClassName)}>
+      <div className={cn("relative rounded-xl border border-border/60 overflow-hidden bg-background/40 backdrop-blur-xs shadow-2xs", containerClassName)}>
         <div className="overflow-x-auto">
           <Table className="w-full text-xs">
-            <TableHeader className="bg-muted/40 dark:bg-muted/20 border-b border-border/60">
+            <TableHeader className="bg-muted/50 dark:bg-muted/20 border-b border-border/60">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent border-border/60">
                   {headerGroup.headers.map((header) => {
@@ -47,7 +47,7 @@ export function DataTable<TData>({
                         style={{
                           ...getCommonPinningStyles({ column: header.column }),
                         }}
-                        className="h-9 px-3 py-2 text-left align-middle text-xs font-semibold text-muted-foreground select-none"
+                        className="h-9 px-3 py-2 text-left align-middle text-xs font-bold text-muted-foreground select-none tracking-tight"
                       >
                         {header.isPlaceholder
                           ? null
@@ -67,7 +67,7 @@ export function DataTable<TData>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="hover:bg-muted/30 dark:hover:bg-muted/15 transition-colors border-b border-border/40 cursor-pointer"
+                    className="hover:bg-muted/40 dark:hover:bg-muted/20 transition-all border-b border-border/40 cursor-pointer"
                     onClick={() => {
                       table.options.meta?.onRowClick?.(row.original);
                     }}
