@@ -63,8 +63,16 @@ export function AnimatedToast({
       animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
       exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.95, filter: "blur(4px)" }}
       transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
+      style={{
+        backgroundColor:
+          "color-mix(in srgb, var(--popover) 92%, transparent)",
+        boxShadow:
+          "0 1.5rem 3.5rem rgb(15 23 42 / 0.16), 0 0.25rem 0.75rem rgb(15 23 42 / 0.08), 0 0 0 1px rgb(15 23 42 / 0.03)",
+        backdropFilter: "blur(0.75rem)",
+        WebkitBackdropFilter: "blur(0.75rem)",
+      }}
       className={cn(
-        "group relative flex w-full max-w-sm items-start gap-3 rounded-xl border bg-card/95 p-3.5 shadow-lg backdrop-blur-md transition-all select-none dark:bg-card/90",
+        "group relative flex w-full max-w-sm items-start gap-3 rounded-xl border p-3.5 transition-all select-none",
         STATUS_BORDER[status],
         className
       )}

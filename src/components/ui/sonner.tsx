@@ -12,7 +12,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       duration={4500}
       gap={10}
       visibleToasts={4}
-      className="ct-toaster group"
+      className="ct-toaster"
       toastOptions={{
         className: "group toast font-sans",
         style: {
