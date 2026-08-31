@@ -112,6 +112,7 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
 
     let fallbackUrl = `${config.url}/internal/waha/connections`;
     let fallbackBody = rawBody;
+    let fallbackMethod = method;
 
     if (method === "POST" && path === "/v1/sessions") {
       fallbackUrl = `${config.url}/internal/waha/connections`;
@@ -121,15 +122,19 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
         userId: "system",
       });
     } else if (method === "GET" && sessionId) {
-      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/qr`;
+      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/status`;
     } else if (method === "DELETE" && sessionId) {
-      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}`;
+      // O Fastify não expõe DELETE direto: a desconexão é uma operação de
+      // lifecycle que encerra e remove a sessão de forma controlada.
+      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/disconnect`;
+      fallbackMethod = "POST";
+      fallbackBody = "";
     }
 
     const fallbackRes = await fetch(fallbackUrl, {
-      method,
+      method: fallbackMethod,
       headers: fastifyHeaders,
-      ...(method !== "GET" && fallbackBody ? { body: fallbackBody } : {}),
+      ...(fallbackMethod !== "GET" && fallbackBody ? { body: fallbackBody } : {}),
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     }).catch(() => null);
