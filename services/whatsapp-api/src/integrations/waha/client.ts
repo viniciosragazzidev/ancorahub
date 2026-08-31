@@ -248,13 +248,30 @@ export class WahaClient {
    */
   async createSession(name: string): Promise<WahaSession> {
     try {
+      const webhookUrl =
+        process.env.WHATSAPP_HOOK_URL?.trim() ||
+        (process.env.INTERNAL_API_URL
+          ? `${process.env.INTERNAL_API_URL}/internal/webhooks/waha`
+          : "http://api:3000/internal/webhooks/waha");
+
       await this.request(`/api/sessions/`, {
         method: "POST",
         timeoutMs: 8_000,
-        body: { name },
+        body: {
+          name,
+          config: {
+            webhooks: [
+              {
+                url: webhookUrl,
+                events: ["message", "message.any", "session.status", "message.ack"],
+              },
+            ],
+          },
+        },
         headers: { "content-type": "application/json" },
       });
     } catch (error) {
+
       // 409 = sessão já existe — resolver existente e retornar
       if (error instanceof WahaClientError && error.providerStatusCode === 409) {
         const existing = await this.getSession(name);

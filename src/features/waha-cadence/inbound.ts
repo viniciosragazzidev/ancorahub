@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -66,12 +66,13 @@ function phoneSuffixConditions(
   column: AnyPgColumn,
   normalizedPhone: string,
 ) {
-  const suffix = normalizedPhone.slice(-8);
+  const last4 = normalizedPhone.slice(-4);
   return or(
     eq(column, normalizedPhone),
-    like(column, `%${suffix}`),
+    like(column, `%${last4}`),
   );
 }
+
 
 /** Observability counters for webhook processing */
 interface WebhookMetrics {
@@ -560,14 +561,18 @@ async function isTenantOfficialNumberPhone(
     db
       .select({ phone: schema.wahaNumbers.displayPhoneNumber })
       .from(schema.wahaNumbers)
-      .where(eq(schema.wahaNumbers.tenantId, tenantId)),
+      .where(
+        or(
+          eq(schema.wahaNumbers.tenantId, tenantId),
+          isNull(schema.wahaNumbers.tenantId),
+        ),
+      ),
     db
       .select({ phone: schema.communicationChannels.displayPhoneNumber })
       .from(schema.communicationChannels)
       .where(
         and(
           eq(schema.communicationChannels.tenantId, tenantId),
-          eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
           eq(schema.communicationChannels.status, "active"),
         ),
       ),
@@ -575,3 +580,4 @@ async function isTenantOfficialNumberPhone(
   return [...numbers, ...channels]
     .some((entry) => Boolean(entry.phone) && samePhone(entry.phone!, normalizedPhone));
 }
+
