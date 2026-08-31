@@ -1,114 +1,157 @@
 /**
- * Request timing utilities for performance instrumentation.
- *
- * Each server request carries a lightweight timing state that records
- * how long auth, tenant resolution, and DB operations take.
- *
- * NO PII or tokens are ever logged — only durations and route names.
+ * Request-scoped, opt-in performance diagnostics. SQL, bind values, cookies,
+ * tenant IDs and user IDs are never logged by this module.
  */
+import "server-only";
 
-type TimingEntry = {
-  startMs: number;
-  endMs?: number;
-};
+import { createHash } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 
+type TimingEntry = { startMs: number; endMs?: number };
 type RequestTiming = {
   requestId: string;
-  route?: string;
+  route: string;
+  sampled: boolean;
+  requestStartMs: number;
+  activeSpans: number;
+  queryCount: number;
+  queryFingerprints: Set<string>;
   auth: TimingEntry;
   tenantQuery: TimingEntry;
   dbTotal: TimingEntry;
 };
+type PerfSpanFields = Record<string, boolean | number | string | undefined>;
 
 const WARN_THRESHOLD_MS = 1_000;
-const SLOW_THRESHOLD_MS = 3_000;
-const CRITICAL_THRESHOLD_MS = 5_000;
-
-/**
- * Minimal request-scoped timing store using AsyncLocalStorage.
- * Falls back gracefully when ALS is unavailable (edge runtime, etc.).
- */
-let asyncLocalStorage: import("node:async_hooks").AsyncLocalStorage<RequestTiming> | undefined;
-
-try {
-  // Dynamic import to avoid breaking edge runtime or build
-  const { AsyncLocalStorage } = require("node:async_hooks") as typeof import("node:async_hooks");
-  asyncLocalStorage = new AsyncLocalStorage<RequestTiming>();
-} catch {
-  // Edge runtime or build phase — timing is best-effort only
-}
+const storage = new AsyncLocalStorage<RequestTiming>();
 
 function generateRequestId(): string {
-  // Short random ID — no crypto dependency for perf reasons
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/**
- * Run a callback within a timing context. Returns the timing record
- * after the callback completes (or throws).
- */
+function sampleRate(): number {
+  const value = Number(process.env.PERF_DIAGNOSTICS_SAMPLE_RATE);
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
+}
+
+export function isPerfDiagnosticsEnabled(): boolean {
+  return process.env.PERF_DIAGNOSTICS === "true";
+}
+
+function emit(span: string, timing: RequestTiming, startedAt: number, fields: PerfSpanFields = {}): void {
+  if (!timing.sampled) return;
+  console.info(JSON.stringify({
+    type: "perf_span",
+    requestId: timing.requestId,
+    route: timing.route,
+    span,
+    durationMs: Math.round(performance.now() - startedAt),
+    ...fields,
+  }));
+}
+
+/** Wrap a page render, Route Handler, or Server Action. */
 export async function withRequestTiming<T>(
   route: string,
   fn: () => Promise<T>,
+  requestId?: string | null,
 ): Promise<{ result: T; timing: RequestTiming }> {
   const timing: RequestTiming = {
-    requestId: generateRequestId(),
+    requestId: requestId || generateRequestId(),
     route,
+    sampled: isPerfDiagnosticsEnabled() && Math.random() < sampleRate(),
+    requestStartMs: performance.now(),
+    activeSpans: 0,
+    queryCount: 0,
+    queryFingerprints: new Set<string>(),
     auth: { startMs: 0 },
     tenantQuery: { startMs: 0 },
     dbTotal: { startMs: 0 },
   };
 
-  if (!asyncLocalStorage) {
-    // Fallback: no ALS available, just run without timing context
-    const result = await fn();
-    return { result, timing };
-  }
-
-  return asyncLocalStorage.run(timing, async () => {
-    const result = await fn();
-    return { result, timing };
+  return storage.run(timing, async () => {
+    try {
+      const result = await fn();
+      emit("request.total", timing, timing.requestStartMs, { outcome: "success", dbQueryCount: timing.queryCount, dbQueryShapes: timing.queryFingerprints.size });
+      return { result, timing };
+    } catch (error) {
+      emit("request.total", timing, timing.requestStartMs, { outcome: "error", dbQueryCount: timing.queryCount, dbQueryShapes: timing.queryFingerprints.size });
+      throw error;
+    }
   });
 }
 
-/** Get the current request timing from ALS context. Returns undefined if outside context. */
+/** Times a safe logical operation. `parallel` exposes concurrent fan-out. */
+export async function withPerfSpan<T>(span: string, fn: () => Promise<T>, fields: PerfSpanFields = {}): Promise<T> {
+  const timing = storage.getStore();
+  if (!timing?.sampled) return fn();
+  const startedAt = performance.now();
+  const parallel = timing.activeSpans > 0;
+  timing.activeSpans += 1;
+  try {
+    const result = await fn();
+    emit(span, timing, startedAt, { ...fields, parallel });
+    return result;
+  } catch (error) {
+    emit(span, timing, startedAt, { ...fields, parallel, outcome: "error" });
+    throw error;
+  } finally {
+    timing.activeSpans -= 1;
+  }
+}
+
+/** Server Actions post back to the current route, so action names disambiguate them in traces. */
+export async function withServerActionTiming<T>(route: string, action: string, fn: () => Promise<T>): Promise<T> {
+  const { result } = await withRequestTiming(route, () => withPerfSpan("server_action.total", fn, { action }));
+  return result;
+}
+
+/** postgres.js invokes this at statement issue time; query text is hashed then discarded. */
+export function recordIssuedDatabaseQuery(query: string): void {
+  const timing = storage.getStore();
+  if (!timing?.sampled) return;
+  timing.queryCount += 1;
+  timing.queryFingerprints.add(createHash("sha256").update(query).digest("hex").slice(0, 12));
+}
+
+/** Get the current request timing from ALS context. */
 export function getRequestTiming(): RequestTiming | undefined {
-  return asyncLocalStorage?.getStore();
+  return storage.getStore();
 }
 
 /** Mark auth phase start */
 export function markAuthStart(): void {
-  const t = asyncLocalStorage?.getStore();
+  const t = storage.getStore();
   if (t) t.auth.startMs = performance.now();
 }
 
 /** Mark auth phase end */
 export function markAuthEnd(): void {
-  const t = asyncLocalStorage?.getStore();
+  const t = storage.getStore();
   if (t) t.auth.endMs = performance.now();
 }
 
 /** Mark tenant query phase start */
 export function markTenantStart(): void {
-  const t = asyncLocalStorage?.getStore();
+  const t = storage.getStore();
   if (t) t.tenantQuery.startMs = performance.now();
 }
 
 /** Mark tenant query phase end */
 export function markTenantEnd(): void {
-  const t = asyncLocalStorage?.getStore();
+  const t = storage.getStore();
   if (t) t.tenantQuery.endMs = performance.now();
 }
 
 /** Mark DB total phase start */
 export function markDbStart(): void {
-  const t = asyncLocalStorage?.getStore();
+  const t = storage.getStore();
   if (t) t.dbTotal.startMs = performance.now();
 }
 
 /** Mark DB total phase end */
 export function markDbEnd(): void {
-  const t = asyncLocalStorage?.getStore();
+  const t = storage.getStore();
   if (t) t.dbTotal.endMs = performance.now();
 }
 
@@ -124,35 +167,10 @@ export function getDurations(timing: RequestTiming) {
 
 /** Log a completed request timing. No PII. */
 export function logRequestTiming(timing: RequestTiming): void {
+  const totalMs = Math.round(performance.now() - timing.requestStartMs);
+  if (totalMs < WARN_THRESHOLD_MS || !timing.sampled) return;
   const durations = getDurations(timing);
-  const totalMs = Math.round(
-    (timing.dbTotal.endMs ?? performance.now()) - timing.auth.startMs,
-  );
-
-  const level =
-    totalMs > CRITICAL_THRESHOLD_MS
-      ? "CRITICAL"
-      : totalMs > SLOW_THRESHOLD_MS
-        ? "SLOW"
-        : totalMs > WARN_THRESHOLD_MS
-          ? "WARN"
-          : "OK";
-
-  // Only log slow requests to avoid noise
-  if (level === "OK") return;
-
-  console.log(
-    JSON.stringify({
-      type: "request_timing",
-      requestId: timing.requestId,
-      route: timing.route ?? "unknown",
-      level,
-      authMs: durations.authMs,
-      tenantMs: durations.tenantMs,
-      dbMs: durations.dbMs,
-      totalMs,
-    }),
-  );
+  console.info(JSON.stringify({ type: "request_timing", requestId: timing.requestId, route: timing.route, authMs: durations.authMs, tenantMs: durations.tenantMs, dbMs: durations.dbMs, totalMs }));
 }
 
 /**
