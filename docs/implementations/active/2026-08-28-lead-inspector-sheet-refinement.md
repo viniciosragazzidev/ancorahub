@@ -24,6 +24,15 @@ existente em abas.
   reatribuição ou investigação.
 - Histórico de atribuições permanece abaixo da decisão atual.
 
+### Refinamento visual de 31/08
+
+- A identidade do lead ganhou espaçamento consistente e os badges passam a quebrar
+  linha sem disputar espaço com o nome e telefone.
+- O resumo operacional usa uma única grade responsiva: cada marco mantém rótulo e
+  valor alinhados, em duas colunas largas ou uma coluna em telas estreitas.
+- Ações rápidas e intervenções agora usam o mesmo cabeçalho de seção e conteúdo
+  interno, evitando controles soltos e bordas duplicadas.
+
 ## Estados e acessibilidade
 
 - O botão de fechar, abas e ações preservam teclado e foco fornecidos pelos

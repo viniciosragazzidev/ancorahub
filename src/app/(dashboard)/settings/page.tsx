@@ -73,7 +73,7 @@ export default async function SettingsPage() {
           account={account}
           company={context.role === "director" ? company : undefined}
           unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />}
-          availability={brokerAvailability ? <BrokerAvailabilitySettings windows={brokerAvailability.windows} /> : undefined}
+          availability={brokerAvailability ? <BrokerAvailabilitySettings windows={brokerAvailability.windows} schemaReady={brokerAvailability.availabilitySchemaReady} /> : undefined}
           atendimento={atendimento}
           whatsapp={whatsapp}
           integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined}

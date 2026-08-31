@@ -31,6 +31,17 @@ o onboarding. Em caso de contingência, o Super-admin desativa
 `feature_broker_availability_onboarding_enabled`; os dados e a auditoria são
 preservados e a seleção volta aos critérios anteriores.
 
+## Incidente de compatibilidade (31/08)
+
+A migration `0140_add_broker_availability_windows.sql` já existia no repositório,
+mas estava ausente do catálogo `drizzle/meta/_journal.json`, que é a fonte usada pelo
+executor controlado `npm run db:migrate`. Como o carregador compartilhado do corretor
+consulta a agenda ao renderizar o shell, a ausência da tabela produzia `42P01` em
+todas as rotas desse papel. A migration foi registrada no catálogo e a leitura agora
+trata exclusivamente essa tabela ausente como capacidade temporariamente indisponível,
+sem derrubar o restante do CRM. A migration deve ser aplicada uma vez no banco de
+produção pelo passo controlado antes de reativar o onboarding.
+
 ## Validações
 
 - `npx tsc --noEmit`

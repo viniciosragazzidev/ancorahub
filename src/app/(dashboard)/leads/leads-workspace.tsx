@@ -49,6 +49,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetSection,
+  SheetSectionHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -688,7 +689,7 @@ export function LeadsWorkspace({
             <SheetBody>
               <div className="space-y-5">
                 <SheetSection>
-                  <div className="space-y-4 p-4">
+                  <div className="p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className={`truncate text-lg font-semibold tracking-tight ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
@@ -698,12 +699,10 @@ export function LeadsWorkspace({
                           {shouldMask(selectedLead) ? "••••-••••" : (contextRole === "broker" && selectedLead.status === "distributed" ? maskPhone(selectedLead.telefone) : selectedLead.telefone)}
                         </p>
                       </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <div className="flex max-w-[11rem] shrink-0 flex-wrap justify-end gap-1.5">
                           <LeadStatusBadge status={selectedLead.status} />
                           <LeadQualificationBadge status={selectedLead.qualificationStatus} />
-                          <LeadHealthBadge
-                          health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
-                        />
+                          <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
                       </div>
                     </div>
                   </div>
@@ -725,55 +724,67 @@ export function LeadsWorkspace({
                 )}
                 {contextRole === "manager" || contextRole === "director" ? (
                   <>
-                    <SheetSection className="p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
+                    <SheetSection>
+                      <SheetSectionHeader>
+                        <div className="min-w-0">
                           <p className="text-sm font-semibold">Resumo operacional</p>
                           <p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p>
                         </div>
                         <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
-                      </div>
-                      <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                        <DetailRow label="Responsável" value={selectedLead.corretorNome ?? "Aguardando distribuição"} />
-                        <DetailRow label="Unidade" value={selectedLead.branchName ?? "Sem unidade"} />
-                        <DetailRow label="Atribuído em" value={formatDate(selectedLead.assignedAt, { dateStyle: "short", timeStyle: "short" })} />
-                        <DetailRow label="1º contato" value={formatDate(selectedLead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} />
-                        <DetailRow label="Atendimento iniciado" value={formatDate(selectedLead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} />
-                        <DetailRow label="Etapa atual desde" value={formatDate(selectedLead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} />
+                      </SheetSectionHeader>
+                      <dl className="grid overflow-hidden rounded-b-xl sm:grid-cols-2">
+                        <OperationalDetail label="Responsável" value={selectedLead.corretorNome ?? "Aguardando distribuição"} />
+                        <OperationalDetail label="Unidade" value={selectedLead.branchName ?? "Sem unidade"} />
+                        <OperationalDetail label="Recebeu o lead" value={formatDate(selectedLead.assignedAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <OperationalDetail label="Primeiro contato" value={formatDate(selectedLead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <OperationalDetail label="Atendimento iniciado" value={formatDate(selectedLead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <OperationalDetail label="Etapa atual desde" value={formatDate(selectedLead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} />
                       </dl>
                     </SheetSection>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />}>
-                        <ChatCircleText />
-                        Abrir conversa
-                      </Button>
-                      <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
-                        Ver cadastro
-                        <ArrowUpRight />
-                      </Button>
-                    </div>
-
-                    <SheetSection className="p-4">
-                      <div>
-                        <p className="text-sm font-semibold">Intervir na operação</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p>
+                    <SheetSection>
+                      <SheetSectionHeader>
+                        <div>
+                          <p className="text-sm font-semibold">Ações rápidas</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Acesse o atendimento ou o cadastro completo.</p>
+                        </div>
+                      </SheetSectionHeader>
+                      <div className="grid gap-2 p-4 sm:grid-cols-2">
+                        <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />}>
+                          <ChatCircleText />
+                          Abrir conversa
+                        </Button>
+                        <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
+                          Ver cadastro
+                          <ArrowUpRight />
+                        </Button>
                       </div>
-                      <LeadDrawerManagementActions
-                        leadId={selectedLead.id}
-                        leadName={selectedLead.nome}
-                        brokers={filteredBrokers}
-                        branches={branches}
-                        leadBranchId={selectedLead.branchId}
-                        contextRole={contextRole}
-                        currentStatus={selectedLead.status}
-                        qualificationStatus={selectedLead.qualificationStatus}
-                        qualificationState={selectedLead.qualificationState}
-                        currentOwner={selectedLead.corretorNome}
-                        onSuccess={handleDrawerManagementCommitted}
-                        onReassignOptimistic={handleDrawerReassignOptimistic}
-                        onReassignRollback={handleDrawerReassignRollback}
-                      />
+                    </SheetSection>
+
+                    <SheetSection>
+                      <SheetSectionHeader>
+                        <div>
+                          <p className="text-sm font-semibold">Intervir na operação</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p>
+                        </div>
+                      </SheetSectionHeader>
+                      <div className="p-4">
+                        <LeadDrawerManagementActions
+                          leadId={selectedLead.id}
+                          leadName={selectedLead.nome}
+                          brokers={filteredBrokers}
+                          branches={branches}
+                          leadBranchId={selectedLead.branchId}
+                          contextRole={contextRole}
+                          currentStatus={selectedLead.status}
+                          qualificationStatus={selectedLead.qualificationStatus}
+                          qualificationState={selectedLead.qualificationState}
+                          currentOwner={selectedLead.corretorNome}
+                          onSuccess={handleDrawerManagementCommitted}
+                          onReassignOptimistic={handleDrawerReassignOptimistic}
+                          onReassignRollback={handleDrawerReassignRollback}
+                        />
+                      </div>
                     </SheetSection>
 
                     <LeadAssignmentHistory
@@ -1207,6 +1218,15 @@ function DetailRow({ label, value }: { label: string; value: string | ReactNode 
       <div className="min-w-0 text-right font-medium break-words">
         {value}
       </div>
+    </div>
+  );
+}
+
+function OperationalDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-b border-border/70 px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(odd)]:border-border/70">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-sm font-medium text-foreground" title={value}>{value}</dd>
     </div>
   );
 }

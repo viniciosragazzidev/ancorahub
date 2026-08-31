@@ -8,7 +8,7 @@ import type { TenantContext } from "@/shared/auth/tenant-context";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import type { BrokerAvailabilityWindowInput } from "./contracts";
+import { isBrokerAvailabilityTableMissing, type BrokerAvailabilityWindowInput } from "./contracts";
 
 export const BROKER_AVAILABILITY_ONBOARDING_TOUR = "broker-availability-onboarding";
 export const BROKER_AVAILABILITY_ONBOARDING_VERSION = 1;
@@ -60,40 +60,52 @@ export async function getBrokerAvailabilityProfile(contextInput?: TenantContext)
   const context = contextInput ?? (await getRequiredTenantContext());
   assertBroker(context);
   const db = getDatabase();
-  const [windows, progress, membership] = await Promise.all([
-    db
-      .select({ dayOfWeek: schema.brokerAvailabilityWindows.dayOfWeek, startsAt: schema.brokerAvailabilityWindows.startsAt, endsAt: schema.brokerAvailabilityWindows.endsAt })
-      .from(schema.brokerAvailabilityWindows)
-      .where(and(eq(schema.brokerAvailabilityWindows.tenantId, context.tenantId), eq(schema.brokerAvailabilityWindows.brokerId, context.userId)))
-      .orderBy(asc(schema.brokerAvailabilityWindows.dayOfWeek), asc(schema.brokerAvailabilityWindows.startsAt)),
-    db
-      .select({ status: schema.userOnboardingProgress.status, currentStep: schema.userOnboardingProgress.currentStep, completedAt: schema.userOnboardingProgress.completedAt })
-      .from(schema.userOnboardingProgress)
-      .where(and(
-        eq(schema.userOnboardingProgress.tenantId, context.tenantId),
-        eq(schema.userOnboardingProgress.userId, context.userId),
-        eq(schema.userOnboardingProgress.tourKey, BROKER_AVAILABILITY_ONBOARDING_TOUR),
-        eq(schema.userOnboardingProgress.version, BROKER_AVAILABILITY_ONBOARDING_VERSION),
-      ))
-      .limit(1),
-    db
-      .select({ availabilityStatus: schema.tenantMemberships.availabilityStatus })
-      .from(schema.tenantMemberships)
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, context.userId)))
-      .limit(1),
-  ]);
+  try {
+    const [windows, progress, membership] = await Promise.all([
+      db
+        .select({ dayOfWeek: schema.brokerAvailabilityWindows.dayOfWeek, startsAt: schema.brokerAvailabilityWindows.startsAt, endsAt: schema.brokerAvailabilityWindows.endsAt })
+        .from(schema.brokerAvailabilityWindows)
+        .where(and(eq(schema.brokerAvailabilityWindows.tenantId, context.tenantId), eq(schema.brokerAvailabilityWindows.brokerId, context.userId)))
+        .orderBy(asc(schema.brokerAvailabilityWindows.dayOfWeek), asc(schema.brokerAvailabilityWindows.startsAt)),
+      db
+        .select({ status: schema.userOnboardingProgress.status, currentStep: schema.userOnboardingProgress.currentStep, completedAt: schema.userOnboardingProgress.completedAt })
+        .from(schema.userOnboardingProgress)
+        .where(and(
+          eq(schema.userOnboardingProgress.tenantId, context.tenantId),
+          eq(schema.userOnboardingProgress.userId, context.userId),
+          eq(schema.userOnboardingProgress.tourKey, BROKER_AVAILABILITY_ONBOARDING_TOUR),
+          eq(schema.userOnboardingProgress.version, BROKER_AVAILABILITY_ONBOARDING_VERSION),
+        ))
+        .limit(1),
+      db
+        .select({ availabilityStatus: schema.tenantMemberships.availabilityStatus })
+        .from(schema.tenantMemberships)
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, context.userId)))
+        .limit(1),
+    ]);
 
-  return {
-    windows,
-    availabilityStatus: membership[0]?.availabilityStatus ?? "offline",
-    onboarding: progress[0] ?? null,
-  };
+    return {
+      windows,
+      availabilityStatus: membership[0]?.availabilityStatus ?? "offline",
+      onboarding: progress[0] ?? null,
+      availabilitySchemaReady: true,
+    };
+  } catch (error) {
+    if (!isBrokerAvailabilityTableMissing(error)) throw error;
+    return {
+      windows: [],
+      availabilityStatus: "offline" as const,
+      onboarding: null,
+      availabilitySchemaReady: false,
+    };
+  }
 }
 
 export async function needsBrokerAvailabilityOnboarding(contextInput?: TenantContext) {
   const context = contextInput ?? (await getRequiredTenantContext());
   if (context.role !== "broker" || !(await isBrokerAvailabilityOnboardingEnabled())) return false;
   const profile = await getBrokerAvailabilityProfile(context);
+  if (!profile.availabilitySchemaReady) return false;
   return profile.onboarding?.status !== "completed";
 }
 

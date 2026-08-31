@@ -610,6 +610,13 @@
                         "when":  1787302800000,
                         "tag":  "0136_distribution_hub_branch",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  87,
+                        "version":  "7",
+                        "when":  1788188400000,
+                        "tag":  "0140_add_broker_availability_windows",
+                        "breakpoints":  true
                     }
                 ]
 }
