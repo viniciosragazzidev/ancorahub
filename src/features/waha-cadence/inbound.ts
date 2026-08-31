@@ -35,8 +35,6 @@ export function shouldCreateSyntheticLead(input: {
   isTenantOfficialNumber: boolean;
 }) {
   return (
-    input.sourceKind === "number" &&
-    !input.isOutgoing &&
     !input.hasLead &&
     !input.hasClient &&
     !input.isTenantOfficialNumber
@@ -44,17 +42,16 @@ export function shouldCreateSyntheticLead(input: {
 }
 
 /**
- * A broker connection is a restricted workspace, not a tenant intake channel.
- * Persist only CRM contacts assigned to that broker or the tenant's official
- * number; personal chats never enter the tenant database.
+ * All valid inbound and outbound broker messages should be persisted to CRM.
  */
 export function shouldPersistBrokerConnectionMessage(input: {
   hasLead: boolean;
   hasClient: boolean;
   isTenantOfficialNumber: boolean;
 }) {
-  return input.hasLead || input.hasClient || input.isTenantOfficialNumber;
+  return true;
 }
+
 
 /**
  * SQL pre-filter for tolerant phone matching. Generates LIKE conditions on the
@@ -525,6 +522,7 @@ async function resolveContact(
     await db.insert(schema.leads).values({
       id: newLeadId,
       tenantId,
+      corretorId: source.kind === "connection" ? source.connection.userId : undefined,
       nome: `Lead WhatsApp (${normalizedPhone.slice(-4)})`,
       telefone: normalizedPhone,
       origem: "webhook",

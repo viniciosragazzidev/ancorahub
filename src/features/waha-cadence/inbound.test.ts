@@ -6,7 +6,7 @@ import {
 } from "./inbound";
 
 describe("shouldCreateSyntheticLead", () => {
-  it("never creates a tenant lead from an unknown inbound to a broker connection", () => {
+  it("creates a tenant lead from an inbound to a broker connection when none exists", () => {
     expect(
       shouldCreateSyntheticLead({
         sourceKind: "connection",
@@ -15,7 +15,7 @@ describe("shouldCreateSyntheticLead", () => {
         hasClient: false,
         isTenantOfficialNumber: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("keeps tenant relay intake for unknown external inbound", () => {
@@ -32,17 +32,17 @@ describe("shouldCreateSyntheticLead", () => {
 });
 
 describe("broker WAHA workspace boundary", () => {
-  it("does not persist a personal contact outside the broker CRM scope", () => {
+  it("persists inbound broker messages", () => {
     expect(
       shouldPersistBrokerConnectionMessage({
         hasLead: false,
         hasClient: false,
         isTenantOfficialNumber: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("keeps only a linked lead/client or the tenant official number", () => {
+  it("keeps a linked lead/client or the tenant official number", () => {
     expect(
       shouldPersistBrokerConnectionMessage({
         hasLead: true,
