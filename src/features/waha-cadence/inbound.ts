@@ -320,8 +320,8 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     }
   }
 
-  // ── 8. AI processing (optional, background, only for inbound) ──────────
-  if (!isOutgoing && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
+  // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────
+  if (!isOutgoing && source.kind === "number" && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
     const { processInboundAiResponse } =
       await import("@/features/ai-agent/conversation-state-machine");
     const aiPromise = processInboundAiResponse({
