@@ -343,7 +343,7 @@ export class WahaClient {
       });
       return { operation: "stop", outcome: "completed" };
     } catch (error) {
-      if (isExpectedCleanupError(error)) {
+      if (isExpectedCleanupError(error, "stop")) {
         return cleanupIgnored("stop", error);
       }
       throw error;
@@ -364,7 +364,7 @@ export class WahaClient {
       });
       cleanup.push({ operation: "logout", outcome: "completed" });
     } catch (error) {
-      if (!isExpectedCleanupError(error)) throw error;
+      if (!isExpectedCleanupError(error, "logout")) throw error;
       cleanup.push(cleanupIgnored("logout", error));
     }
 
@@ -375,7 +375,7 @@ export class WahaClient {
       });
       cleanup.push({ operation: "delete", outcome: "completed" });
     } catch (error) {
-      if (!isExpectedCleanupError(error)) throw error;
+      if (!isExpectedCleanupError(error, "delete")) throw error;
       cleanup.push(cleanupIgnored("delete", error));
     }
     return cleanup;
@@ -456,8 +456,17 @@ function isTimeoutError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "TimeoutError";
 }
 
-function isExpectedCleanupError(error: unknown): error is WahaClientError {
-  return error instanceof WahaClientError && (error.providerStatusCode === 400 || error.providerStatusCode === 404);
+function isExpectedCleanupError(
+  error: unknown,
+  operation: WahaRecoveryCleanup["operation"],
+): error is WahaClientError {
+  if (!(error instanceof WahaClientError)) return false;
+
+  // WAHA pode sinalizar que stop/logout já não se aplicam à sessão com 400,
+  // 404 ou 422. Isso é seguro para o cleanup: a remoção ainda é tentada.
+  // Não toleramos 422 no DELETE, pois a sessão pode continuar ativa.
+  if (operation === "delete") return error.providerStatusCode === 404;
+  return [400, 404, 422].includes(error.providerStatusCode ?? 0);
 }
 
 function cleanupIgnored(operation: WahaRecoveryCleanup["operation"], error: WahaClientError): WahaRecoveryCleanup {

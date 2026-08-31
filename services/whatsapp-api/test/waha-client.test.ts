@@ -233,6 +233,29 @@ test("recoverFailedSession: delete 404 considera sessão ausente e recria", asyn
   assert.equal(result.cleanup.at(-1)?.providerStatusCode, 404);
 });
 
+test("disconnect cleanup: stop e logout 422 não impedem a remoção da sessão", async () => {
+  const calls: string[] = [];
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${target}`);
+    if (target.endsWith("/stop") || target.endsWith("/logout")) {
+      return new Response(JSON.stringify({ error: "invalid state" }), { status: 422 });
+    }
+    if (target.endsWith("/api/sessions/disconnect-me") && method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  const stop = await client.stopSession("disconnect-me");
+  const deletion = await client.deleteSession("disconnect-me");
+
+  assert.deepEqual(stop, { operation: "stop", outcome: "ignored", providerStatusCode: 422, normalizedError: "WAHA_INTERNAL_ERROR" });
+  assert.deepEqual(deletion.map((item) => item.outcome), ["ignored", "completed"]);
+  assert.equal(calls.length, 3);
+});
+
 // ── WahaClient.getQr ──────────────────────────────────────────────────
 
 test("getQr: sessão em WAITING_QR com JSON data → retorna base64", async () => {
