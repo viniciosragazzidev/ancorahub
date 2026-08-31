@@ -19,6 +19,7 @@ interface DataTableProps<TData> extends React.HTMLAttributes<HTMLDivElement> {
   table: TanstackTable<TData>;
   actionBar?: React.ReactNode;
   children?: React.ReactNode;
+  containerClassName?: string;
 }
 
 export function DataTable<TData>({
@@ -26,12 +27,13 @@ export function DataTable<TData>({
   actionBar,
   children,
   className,
+  containerClassName,
   ...props
 }: DataTableProps<TData>) {
   return (
     <div className={cn("w-full space-y-3", className)} {...props}>
       {children}
-      <div className="relative rounded-md border border-border/60 bg-card overflow-hidden shadow-xs dark:bg-card/90">
+      <div className={cn("relative rounded-md border border-border/60 overflow-hidden shadow-xs bg-transparent", containerClassName)}>
         <div className="overflow-x-auto">
           <Table className="w-full text-xs">
             <TableHeader className="bg-muted/40 dark:bg-muted/20 border-b border-border/60">

@@ -275,23 +275,28 @@ export function QualificationHubClient({
   const activeAlertsCount = alerts.filter((a) => a.status === "active").length;
 
   const tabs = [
-    { id: "overview", label: "1. Contexto & Prompt do Agente", icon: MessageSquare, color: "text-primary" },
-    { id: "meta_templates", label: "2. Modelos de Mensagem Meta", icon: FileText, color: "text-blue-500" },
-    { id: "agent_triggers", label: "3. Loja de Triggers do Agente", icon: Zap, color: "text-amber-500" },
-    { id: "training", label: "4. Treinamento e Versões", icon: Layers },
-    { id: "whatsapp_diag", label: "5. WhatsApp Diagnóstico", icon: Phone, color: "text-emerald-500" },
-    { id: "followup_rules", label: "6. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "mcp_governance", label: "7. Ferramentas & Governança MCP", icon: ShieldAlert, color: "text-amber-500" },
-    { id: "destinations", label: "8. Destino dos Leads", icon: ArrowRightLeft, color: "text-sky-500" },
-    { id: "brokers", label: "9. Elegibilidade Corretores", icon: UserCheck },
-    { id: "alerts", label: `10. Alertas (${activeAlertsCount})`, icon: AlertTriangle, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
-    { id: "simulator", label: "11. Simulador Web", icon: SlidersHorizontal },
+    { id: "overview", label: "1. Prompt & Comportamento", icon: MessageSquare, color: "text-primary" },
+    { id: "meta_templates", label: "2. Modelos de Mensagem (Meta)", icon: FileText, color: "text-blue-500" },
+    { id: "agent_triggers", label: "3. Triggers & Permissões MCP", icon: Zap, color: "text-amber-500" },
+    { id: "followup_rules", label: "4. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
+    { id: "training", label: "5. Versões & Publicação", icon: Layers },
+    { id: "whatsapp_diag", label: "6. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
+    { id: "simulator", label: `7. Simulador & Alertas${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
   ];
 
   const requestedTab = searchParams.get("tab");
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
 
-  const activeTab = selectedTab ?? (tabs.some((t) => t.id === requestedTab) ? requestedTab! : "overview");
+  const tabRedirectMap: Record<string, string> = {
+    mcp_governance: "agent_triggers",
+    destinations: "overview",
+    brokers: "overview",
+    system_messages: "overview",
+    alerts: "simulator",
+  };
+
+  const resolvedRequestedTab = tabRedirectMap[requestedTab ?? ""] ?? requestedTab;
+  const activeTab = selectedTab ?? (tabs.some((t) => t.id === resolvedRequestedTab) ? resolvedRequestedTab! : "overview");
 
   const handleSelectTab = (tabId: string) => {
     setSelectedTab(tabId);
@@ -861,10 +866,76 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         {/* TAB 2: MODELOS DE MENSAGEM META */}
         {activeTab === "meta_templates" && <MetaTemplatesPanel />}
 
-        {/* TAB 3: LOJA DE TRIGGERS DO AGENTE */}
-        {activeTab === "agent_triggers" && <AgentTriggersPanel />}
+        {/* TAB 3: TRIGGERS & PERMISSÕES MCP */}
+        {activeTab === "agent_triggers" && (
+          <div className="space-y-6">
+            <AgentTriggersPanel />
+            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <ShieldAlert className="size-4 text-amber-500" />
+                  Governança & Permissões de Ferramentas (MCP)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Controle estrito do que a IA pode consultar ou modificar. Ações críticas permanecem desativadas.
+                </p>
+              </div>
 
-        {/* TAB 3: REGRAS DE FOLLOW-UP */}
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/50 font-semibold border-b">
+                    <tr>
+                      <th className="p-3">Ferramenta / Tool</th>
+                      <th className="p-3">Categoria</th>
+                      <th className="p-3">Descrição</th>
+                      <th className="p-3">Permissão</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {toolPermissions.map((tool) => (
+                      <tr key={tool.toolName} className={tool.isCritical ? "bg-rose-500/5" : ""}>
+                        <td className="p-3 font-semibold">{tool.displayName}</td>
+                        <td className="p-3">
+                          <Badge
+                            variant={
+                              tool.category === "critical"
+                                ? "destructive"
+                                : tool.category === "read_only"
+                                ? "secondary"
+                                : "outline"
+                            }
+                            className="text-[10px]"
+                          >
+                            {tool.category}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{tool.description}</td>
+                        <td className="p-3">
+                          {tool.isCritical ? (
+                            <Badge variant="destructive" className="gap-1 text-[10px]">
+                              <Lock className="size-3" /> Bloqueado (Crítico)
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant={tool.permission === "allowed" ? "default" : "outline"}
+                              size="sm"
+                              className="h-7 text-[11px]"
+                              onClick={() => handleToggleToolPermission(tool.toolName, tool.permission, tool.isCritical)}
+                            >
+                              {tool.permission === "allowed" ? "Permitido" : "Bloqueado"}
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* TAB 4: REGRAS DE FOLLOW-UP */}
         {activeTab === "followup_rules" && (
           <div className="space-y-6">
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
@@ -996,255 +1067,64 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </div>
         )}
 
+        {/* TAB 5: VERSÕES & PUBLICAÇÃO */}
         {activeTab === "training" && (
           <div className="grid gap-6">
             <AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} />
           </div>
         )}
 
-        {/* TAB 4: GOVERNANÇA MCP */}
-        {activeTab === "mcp_governance" && (
-          <div className="space-y-6">
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <ShieldAlert className="size-4 text-amber-500" />
-                  Governança & Permissões de Ferramentas (MCP)
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Controle estrito do que a IA pode consultar ou modificar. Ações críticas permanecem desativadas.
-                </p>
-              </div>
-
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-muted/50 font-semibold border-b">
-                    <tr>
-                      <th className="p-3">Ferramenta / Tool</th>
-                      <th className="p-3">Categoria</th>
-                      <th className="p-3">Descrição</th>
-                      <th className="p-3">Permissão</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {toolPermissions.map((tool) => (
-                      <tr key={tool.toolName} className={tool.isCritical ? "bg-rose-500/5" : ""}>
-                        <td className="p-3 font-semibold">{tool.displayName}</td>
-                        <td className="p-3">
-                          <Badge
-                            variant={
-                              tool.category === "critical"
-                                ? "destructive"
-                                : tool.category === "read_only"
-                                ? "secondary"
-                                : "outline"
-                            }
-                            className="text-[10px]"
-                          >
-                            {tool.category}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-muted-foreground">{tool.description}</td>
-                        <td className="p-3">
-                          {tool.isCritical ? (
-                            <Badge variant="destructive" className="gap-1 text-[10px]">
-                              <Lock className="size-3" /> Bloqueado (Crítico)
-                            </Badge>
-                          ) : (
-                            <Button
-                              variant={tool.permission === "allowed" ? "default" : "outline"}
-                              size="sm"
-                              className="h-7 text-[11px]"
-                              onClick={() => handleToggleToolPermission(tool.toolName, tool.permission, tool.isCritical)}
-                            >
-                              {tool.permission === "allowed" ? "Permitido" : "Bloqueado"}
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* TAB 5: DESTINO DOS LEADS */}
-        {activeTab === "destinations" && (
-          <div className="space-y-6">
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <ArrowRightLeft className="size-4 text-sky-500" />
-                  Destino & Encaminhamento de Leads Qualificados
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Defina a rota e prioridade de distribuição conforme a classificação/temperatura do lead.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {destinationRules.map((rule) => (
-                  <div key={rule.id} className="p-4 rounded-lg border bg-card flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            rule.temperatureClass === "hot"
-                              ? "destructive"
-                              : rule.temperatureClass === "warm"
-                              ? "warning"
-                              : "secondary"
-                          }
-                          className="uppercase text-[10px]"
-                        >
-                          Lead {rule.temperatureClass}
-                        </Badge>
-                        <span className="font-semibold text-sm">Destino: {rule.destinationType}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Prioridade: {rule.priority} | SLA Target: {rule.slaMinutes} min | Fallback: {rule.fallbackDestinationType}
-                      </p>
-                    </div>
-                    <Badge variant="outline">Ordem #{rule.sortOrder}</Badge>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* TAB 6: ELEGIBILIDADE CORRETORES */}
-        {activeTab === "brokers" && (
-          <div className="space-y-6">
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <UserCheck className="size-4 text-emerald-500" />
-                  Elegibilidade e Capacidade dos Corretores
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Defina os limites diários, capacidade simultânea e participação de plantão por corretor.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {brokerProfiles.map((broker) => (
-                  <div key={broker.id} className="p-4 rounded-lg border bg-card space-y-3">
-                    <div className="flex items-center justify-between border-b pb-2">
-                      <div>
-                        <div className="font-semibold text-sm">{broker.userName}</div>
-                        <div className="text-xs text-muted-foreground">{broker.userEmail}</div>
-                      </div>
-                      <Badge variant={broker.active ? "success" : "secondary"}>
-                        {broker.active ? "Ativo no Plantão" : "Pausado"}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>Capacidade Simultânea: <span className="font-semibold">{broker.maxSimultaneousCapacity} leads</span></div>
-                      <div>Limite Diário: <span className="font-semibold">{broker.dailyLimit} leads</span></div>
-                      <div>Plantão: <span className="font-semibold">{broker.participatesInDuty ? "Sim" : "Não"}</span></div>
-                      <div>Especialidades: <span className="font-semibold">PME, Individual</span></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* TAB 7: MENSAGENS DO SISTEMA */}
-        {activeTab === "system_messages" && (
-          <div className="space-y-6">
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <FileText className="size-4 text-primary" />
-                  Mensagens Estáticas do Sistema (Sem uso de IA)
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Respostas fixas para situações determinísticas (Encerramento, Opt-out, Fora de horário, Aguardando corretor).
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Mensagem de Encerramento Determinístico (Após Qualificação)</Label>
-                  <Textarea
-                    defaultValue={settings?.finalMessage ?? "Obrigado pelas informações, {{firstName}}! Sua qualificação foi concluída e um de nossos corretores entrará em contato em instantes."}
-                    rows={3}
-                  />
-                  <p className="text-[11px] text-muted-foreground">Enviada uma única vez ao finalizar. IA não é chamada.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Aviso Pós-Encerramento (Aguardando Corretor)</Label>
-                  <Textarea
-                    defaultValue="Seu atendimento já foi encaminhado. Um corretor entrará em contato assim que estiver disponível."
-                    rows={2}
-                  />
-                  <p className="text-[11px] text-muted-foreground">Enviado apenas no primeiro envio do cliente pós-encerramento. IA desativada.</p>
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* TAB 8: ALERTAS OPERACIONAIS */}
-        {activeTab === "alerts" && (
-          <div className="space-y-6">
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <AlertTriangle className="size-4 text-rose-500" />
-                  Central de Alertas Operacionais
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Monitoramento em tempo real de filas sem corretor, desconexões e problemas operacionais.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {alerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={`p-4 rounded-lg border flex items-start justify-between ${
-                      alert.status === "active" ? "bg-rose-500/5 border-rose-500/20" : "bg-card opacity-70"
-                    }`}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={alert.level === "critical" ? "destructive" : "warning"} className="text-[10px]">
-                          {alert.level}
-                        </Badge>
-                        <span className="font-semibold text-sm">{alert.alertType}</span>
-                      </div>
-                      <p className="text-xs text-foreground">{alert.message}</p>
-                      {alert.suggestedAction && (
-                        <p className="text-[11px] text-muted-foreground font-medium">Ação recomendada: {alert.suggestedAction}</p>
-                      )}
-                    </div>
-                    {alert.status === "active" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAcknowledgeAlert(alert.id)}
-                        className="text-xs h-8"
-                      >
-                        Resolver
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* TAB 9: SIMULADOR WEB */}
+        {/* TAB 7: SIMULADOR & ALERTAS */}
         {activeTab === "simulator" && (
           <div className="space-y-6">
+            {alerts.length > 0 && (
+              <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <AlertTriangle className="size-4 text-rose-500" />
+                    Central de Alertas Operacionais ({activeAlertsCount} ativos)
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Monitoramento em tempo real de filas sem corretor, desconexões e problemas operacionais.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`p-4 rounded-lg border flex items-start justify-between ${
+                        alert.status === "active" ? "bg-rose-500/5 border-rose-500/20" : "bg-card opacity-70"
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={alert.level === "critical" ? "destructive" : "warning"} className="text-[10px]">
+                            {alert.level}
+                          </Badge>
+                          <span className="font-semibold text-sm">{alert.alertType}</span>
+                        </div>
+                        <p className="text-xs text-foreground">{alert.message}</p>
+                        {alert.suggestedAction && (
+                          <p className="text-[11px] text-muted-foreground font-medium">Ação recomendada: {alert.suggestedAction}</p>
+                        )}
+                      </div>
+                      {alert.status === "active" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAcknowledgeAlert(alert.id)}
+                          className="text-xs h-8"
+                        >
+                          Resolver
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-4">
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1307,6 +1187,8 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
       </div>
     </div>
   </div>
-  </div>
-  );
+</div>
+);
 }
+
+
