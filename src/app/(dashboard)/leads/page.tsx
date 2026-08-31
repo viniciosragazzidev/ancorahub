@@ -27,6 +27,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
 import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
@@ -352,14 +353,13 @@ async function LeadsPageContent({
   );
 
   const where = and(
-    eq(schema.leads.tenantId, context.tenantId),
+    buildLeadScopeWhere(context, { requestedBranchId: filters.branch }),
     isNull(schema.leads.deletedAt),
     qualifiedOrDistributedFilter,
     ...(tablecnFilter ? [tablecnFilter] : []),
     ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
-    ...(branchFilter ? [branchFilter] : []),
     ...(tipoFilter ? [tipoFilter] : []),
     ...(origemFilter ? [origemFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),

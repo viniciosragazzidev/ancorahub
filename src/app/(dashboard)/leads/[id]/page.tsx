@@ -30,6 +30,7 @@ import { LeadDocumentsSection } from "@/features/documents/components/lead-docum
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
 import { getSystemSetting } from "@/features/system-settings/queries";
 
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { BeneficiariesSection } from "./beneficiaries-section";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
 import { maskPhone, maskName } from "@/features/quotes/utils";
@@ -47,36 +48,13 @@ function getCurrentTimestamp() {
 }
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
-
-
   const { id } = await params;
   const context = await getRequiredTenantContext();
+  const isMarketing = context.jobTitle === "marketing";
   const brokerInternalChatEnabled =
     context.role !== "broker" ||
     (await getSystemSetting("feature_waha_connections_enabled")) !== "false";
   const db = getDatabase();
-
-  let isMatrix = false;
-  if (context.branchId) {
-    const [userBranch] = await db
-      .select({ name: schema.branches.name })
-      .from(schema.branches)
-      .where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId)))
-      .limit(1);
-    isMatrix = userBranch?.name?.toLowerCase() === "matriz";
-  } else {
-    isMatrix = true;
-  }
-
-  const isMarketing = context.jobTitle === "marketing";
-
-  const scopeFilter = isMarketing
-    ? (isMatrix ? undefined : eq(schema.leads.branchId, context.branchId!))
-    : (context.role === "broker"
-      ? eq(schema.leads.corretorId, context.userId)
-      : context.role === "manager" && context.branchId
-        ? eq(schema.leads.branchId, context.branchId)
-        : undefined);
 
   const [lead] = await db
     .select({
@@ -116,9 +94,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
     .where(and(
       eq(schema.leads.id, id),
-      eq(schema.leads.tenantId, context.tenantId),
       isNull(schema.leads.deletedAt),
-      scopeFilter,
+      buildLeadScopeWhere(context),
     ))
     .limit(1);
 
