@@ -9,6 +9,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { isBrokerAvailabilityTableMissing, type BrokerAvailabilityWindowInput } from "./contracts";
+import { shouldRequireBrokerAvailabilityOnboarding } from "./service-helpers";
 
 export const BROKER_AVAILABILITY_ONBOARDING_TOUR = "broker-availability-onboarding";
 export const BROKER_AVAILABILITY_ONBOARDING_VERSION = 1;
@@ -106,7 +107,7 @@ export async function needsBrokerAvailabilityOnboarding(contextInput?: TenantCon
   if (context.role !== "broker" || !(await isBrokerAvailabilityOnboardingEnabled())) return false;
   const profile = await getBrokerAvailabilityProfile(context);
   if (!profile.availabilitySchemaReady) return false;
-  return profile.onboarding?.status !== "completed";
+  return shouldRequireBrokerAvailabilityOnboarding(profile.onboarding?.status);
 }
 
 export async function saveOwnBrokerAvailability(input: unknown) {
@@ -151,13 +152,6 @@ export async function completeBrokerAvailabilityOnboarding() {
   if (!(await isBrokerAvailabilityOnboardingEnabled())) return { enabled: false };
 
   const db = getDatabase();
-  const [hasWindow] = await db
-    .select({ id: schema.brokerAvailabilityWindows.id })
-    .from(schema.brokerAvailabilityWindows)
-    .where(and(eq(schema.brokerAvailabilityWindows.tenantId, context.tenantId), eq(schema.brokerAvailabilityWindows.brokerId, context.userId)))
-    .limit(1);
-  if (!hasWindow) throw new Error("Defina sua disponibilidade antes de concluir.");
-
   const now = new Date();
   await db.transaction(async (tx) => {
     await tx.insert(schema.userOnboardingProgress).values({
@@ -171,6 +165,34 @@ export async function completeBrokerAvailabilityOnboarding() {
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "broker_availability_onboarding", entidadeId: context.userId,
       acao: "completed", createdAt: now,
+    });
+  });
+  return { enabled: true };
+}
+
+/**
+ * A disponibilidade é uma recomendação configurável, não um bloqueio de acesso.
+ * Registrar o descarte evita que o modal volte a interromper a operação do corretor.
+ */
+export async function skipBrokerAvailabilityOnboarding() {
+  const context = await getRequiredTenantContext();
+  assertBroker(context);
+  if (!(await isBrokerAvailabilityOnboardingEnabled())) return { enabled: false };
+
+  const now = new Date();
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.userOnboardingProgress).values({
+      id: randomUUID(), tenantId: context.tenantId, userId: context.userId,
+      tourKey: BROKER_AVAILABILITY_ONBOARDING_TOUR, version: BROKER_AVAILABILITY_ONBOARDING_VERSION,
+      status: "skipped", currentStep: 0, skippedAt: now, lastViewedAt: now, createdAt: now, updatedAt: now,
+    }).onConflictDoUpdate({
+      target: [schema.userOnboardingProgress.tenantId, schema.userOnboardingProgress.userId, schema.userOnboardingProgress.tourKey, schema.userOnboardingProgress.version],
+      set: { status: "skipped", currentStep: 0, skippedAt: now, lastViewedAt: now, updatedAt: now },
+    });
+    await tx.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "broker_availability_onboarding", entidadeId: context.userId,
+      acao: "skipped", createdAt: now,
     });
   });
   return { enabled: true };

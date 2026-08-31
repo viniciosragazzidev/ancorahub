@@ -94,24 +94,17 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
 
   // ── Plantão credential filter ──────────────────────────────────────
   const local = getLocalDutyParts(new Date());
-  const scheduledBrokerIds = availabilityOnboardingEnabled !== "false"
-    ? new Set(
-        (
-          await db
-            .select({ brokerId: schema.brokerAvailabilityWindows.brokerId })
-            .from(schema.brokerAvailabilityWindows)
-            .where(
-              and(
-                eq(schema.brokerAvailabilityWindows.tenantId, tenantId),
-                eq(schema.brokerAvailabilityWindows.dayOfWeek, local.weekday),
-                lte(schema.brokerAvailabilityWindows.startsAt, local.time),
-                gt(schema.brokerAvailabilityWindows.endsAt, local.time)
-              )
-            )
-        ).map((window) => window.brokerId)
-      )
-    : null;
-  const eligibleBySchedule = scheduledBrokerIds ? brokers.filter((broker) => scheduledBrokerIds.has(broker.id)) : brokers;
+  const scheduleRows = availabilityOnboardingEnabled !== "false"
+    ? await db
+        .select({ brokerId: schema.brokerAvailabilityWindows.brokerId, dayOfWeek: schema.brokerAvailabilityWindows.dayOfWeek, startsAt: schema.brokerAvailabilityWindows.startsAt, endsAt: schema.brokerAvailabilityWindows.endsAt })
+        .from(schema.brokerAvailabilityWindows)
+        .where(and(eq(schema.brokerAvailabilityWindows.tenantId, tenantId), inArray(schema.brokerAvailabilityWindows.brokerId, brokers.map((broker) => broker.id))))
+    : [];
+  const configuredBrokerIds = new Set(scheduleRows.map((window) => window.brokerId));
+  const scheduledBrokerIds = new Set(scheduleRows.filter((window) => window.dayOfWeek === local.weekday && window.startsAt <= local.time && window.endsAt > local.time).map((window) => window.brokerId));
+  const eligibleBySchedule = availabilityOnboardingEnabled === "false"
+    ? brokers
+    : brokers.filter((broker) => !configuredBrokerIds.has(broker.id) || scheduledBrokerIds.has(broker.id));
   if (!eligibleBySchedule.length) return null;
   const activeSchedules = await db.select({ id: schema.unitDutySchedules.id, webhookCredentialId: schema.unitDutySchedules.webhookCredentialId })
     .from(schema.unitDutySchedules)

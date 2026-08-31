@@ -1,16 +1,17 @@
 # Registro de Decisões de Produto e Arquitetura
 
-## DEC-088 — Agenda pessoal como critério de distribuição automática
+## DEC-088 — Agenda pessoal opcional como critério de distribuição automática
 
 **Estado:** Aceita
 **Data:** 2026-08-31
 
-Cada Corretor declara ao menos uma janela semanal de disponibilidade antes de
-receber novos leads automaticamente. A agenda é pessoal, auditável e editável
-em `/settings`; ela é um critério adicional à unidade, ao status imediato de
-disponibilidade, à carga e ao plantão aplicável. Uma ausência de agenda exclui
-o corretor somente da atribuição automática e mantém sua carteira existente
-acessível.
+O Corretor pode declarar janelas semanais de disponibilidade, sem bloquear o
+acesso ou o recebimento de novos leads ao pular a configuração. A agenda é
+pessoal, auditável e editável em `/settings`; quando configurada, ela é um
+critério adicional à unidade, ao status imediato de disponibilidade, à carga e
+ao plantão aplicável. Sem agenda, a distribuição automática usa os demais
+critérios existentes; com agenda, respeita somente suas janelas ativas. A
+carteira existente permanece acessível em todos os casos.
 
 A agenda respeita o fuso operacional `America/Sao_Paulo` e não substitui a
 janela comercial global da DEC-083: ambos os critérios devem ser atendidos.
@@ -19,9 +20,9 @@ explícita. O Super-admin pode suspender a capacidade globalmente sem apagar
 agendas ou auditoria; enquanto suspensa, a distribuição volta a considerar os
 demais critérios existentes.
 
-O onboarding apresenta também a conexão do WhatsApp pessoal. Essa conexão é
-recomendada e pode ser concluída depois, portanto não bloqueia o acesso após a
-agenda obrigatória ser confirmada.
+O onboarding apresenta também a conexão do WhatsApp pessoal. Ambos os passos
+são recomendados e podem ser fechados para configuração posterior; o descarte
+é persistido e auditado, evitando interrupções repetidas.
 
 ## DEC-087 — Resposta de mutação local-first em operações de Leads
 

@@ -2,17 +2,19 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { CheckCircle, Monitor, WhatsappLogo } from "@/components/huge-icons";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { BrokerAvailabilityScheduleEditor } from "./broker-availability-schedule-editor";
-import { completeBrokerAvailabilityOnboardingAction } from "../actions";
+import { completeBrokerAvailabilityOnboardingAction, skipBrokerAvailabilityOnboardingAction } from "../actions";
 import type { BrokerAvailabilityWindowInput } from "../service";
 
 export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindows: BrokerAvailabilityWindowInput[] }) {
   const [windows, setWindows] = useState(initialWindows);
   const [step, setStep] = useState(initialWindows.length ? 2 : 1);
+  const [open, setOpen] = useState(true);
   const [desktop, setDesktop] = useState<boolean | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,13 +38,29 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
     });
   }
 
+  function skip() {
+    if (pending) return;
+    startTransition(async () => {
+      try {
+        await skipBrokerAvailabilityOnboardingAction();
+        setOpen(false);
+        toast.success("Você pode configurar sua disponibilidade em Configurações quando quiser.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Não foi possível fechar o onboarding.");
+      }
+    });
+  }
+
   return (
-    <Dialog open>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) skip(); }}>
       <DialogPopup className="w-[calc(100vw-24px)] max-w-2xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
         <div className="border-b border-border bg-muted/25 px-5 py-5 sm:px-6">
+          <Button type="button" variant="ghost" size="icon-sm" className="absolute right-4 top-4 rounded-full" aria-label="Fechar e configurar depois" onClick={skip} disabled={pending}>
+            <X className="size-4" aria-hidden="true" />
+          </Button>
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Primeira configuração</p>
           <DialogTitle className="mt-2 text-xl">Prepare seu recebimento de leads</DialogTitle>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Antes de entrar na operação, precisamos saber quando você pode receber novos atendimentos. Você poderá alterar isso em Configurações quando quiser.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Você pode informar seus horários agora ou configurar depois em Configurações. A conexão do WhatsApp também é recomendada e opcional.</p>
           <p className="mt-3 text-sm font-medium">Etapa {step} de 2 · {step === 1 ? "Disponibilidade" : "WhatsApp de atendimento"}</p>
         </div>
         <div className="max-h-[70vh] overflow-y-auto p-5 sm:p-6">

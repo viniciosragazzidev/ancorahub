@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isBrokerAvailabilityTableMissing } from "./contracts";
+import { shouldRequireBrokerAvailabilityOnboarding } from "./service-helpers";
 
 describe("broker availability schema compatibility", () => {
   it("recognizes only the missing availability table error", () => {
@@ -13,5 +14,14 @@ describe("broker availability schema compatibility", () => {
   it("does not mask unrelated database failures", () => {
     expect(isBrokerAvailabilityTableMissing({ code: "42P01", query: "select * from leads" })).toBe(false);
     expect(isBrokerAvailabilityTableMissing({ code: "23505", query: "select * from broker_availability_windows" })).toBe(false);
+  });
+});
+
+describe("broker availability onboarding optionality", () => {
+  it("does not reopen after the broker closes the optional onboarding", () => {
+    expect(shouldRequireBrokerAvailabilityOnboarding("skipped")).toBe(false);
+    expect(shouldRequireBrokerAvailabilityOnboarding("completed")).toBe(false);
+    expect(shouldRequireBrokerAvailabilityOnboarding("not_started")).toBe(true);
+    expect(shouldRequireBrokerAvailabilityOnboarding(null)).toBe(true);
   });
 });
