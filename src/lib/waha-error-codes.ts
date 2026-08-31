@@ -36,7 +36,7 @@ export function wahaActionCodeFromMessage(message: string): WahaErrorCode {
 export function wahaActionErrorMessage(code?: string | null): string {
   switch (code) {
     case "WAHA_TIMEOUT":
-      return "O servidor WhatsApp demorou para responder. Tente novamente.";
+      return "O servidor WhatsApp demorou para responder. Tente novamente ou forçar a desconexão local.";
     case "WAHA_UNAVAILABLE":
       return "Serviço de WhatsApp temporariamente indisponível.";
     case "WAHA_UNAUTHORIZED":
@@ -46,7 +46,7 @@ export function wahaActionErrorMessage(code?: string | null): string {
     case "WAHA_BAD_RESPONSE":
       return "O WhatsApp respondeu de forma inesperada. Tente novamente.";
     case "WAHA_UNREACHABLE":
-      return "Não foi possível alcançar o servidor de WhatsApp. Avise o administrador e tente novamente mais tarde.";
+      return "O servidor WhatsApp está temporariamente inacessível. Tente novamente ou forçar a desconexão local.";
     case "SESSION_EXISTS":
       return "Sessão já existe. Reconectando…";
     case "QR_ERROR":

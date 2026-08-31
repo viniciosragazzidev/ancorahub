@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { wahaActionErrorMessage } from "@/lib/waha-error-codes";
 import {
+  forceDisconnectWhatsAppSession,
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
   recoverWhatsAppFailedSessionAction,
@@ -315,7 +316,21 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
       try {
         const result = await resetWhatsAppSessionAction();
         if (!result.success) {
-          toast.error(errorMessage(result.code));
+          // Se o VPS está inacessível, oferecer opção de forçar desconexão local
+          if (result.code === "WAHA_UNREACHABLE" || result.code === "WAHA_TIMEOUT") {
+            toast.error(
+              "O servidor WhatsApp está inacessível. Você pode forçar a desconexão local, mas a sessão remota pode permanecer ativa até o timeout do servidor.",
+              {
+                duration: 10000,
+                action: {
+                  label: "Forçar desconexão",
+                  onClick: () => forceDisconnect(),
+                },
+              },
+            );
+          } else {
+            toast.error(errorMessage(result.code));
+          }
           return;
         }
         setConnection((current) => ({
@@ -328,6 +343,31 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         }));
         onConnectionChanged?.();
         toast.success("WhatsApp desconectado.");
+        router.refresh();
+      } catch (error) {
+        showUnexpectedActionError(error);
+      }
+    });
+  }
+
+  function forceDisconnect() {
+    startTransition(async () => {
+      try {
+        const result = await forceDisconnectWhatsAppSession();
+        if (!result.success) {
+          toast.error("Não foi possível limpar a sessão local.");
+          return;
+        }
+        setConnection((current) => ({
+          ...current,
+          sessionId: null,
+          sessionName: null,
+          qrCode: null,
+          status: "disconnected",
+          connectedAt: null,
+        }));
+        onConnectionChanged?.();
+        toast.success("Sessão desconectada localmente. A sessão remota será encerrada automaticamente pelo servidor.");
         router.refresh();
       } catch (error) {
         showUnexpectedActionError(error);

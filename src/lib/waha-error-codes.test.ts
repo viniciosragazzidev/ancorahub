@@ -38,10 +38,10 @@ describe("wahaActionErrorMessage", () => {
     expect(wahaActionErrorMessage("QR_ERROR")).toContain("QR Code");
   });
 
-  it("orienta o usuário a acionar o administrador quando o servidor está inalcançável", () => {
+  it("orienta o usuário a forçar desconexão quando o servidor está inalcançável", () => {
     const message = wahaActionErrorMessage("WAHA_UNREACHABLE");
-    expect(message).toContain("Não foi possível alcançar o servidor de WhatsApp");
-    expect(message).toContain("administrador");
+    expect(message).toContain("servidor WhatsApp está temporariamente inacessível");
+    expect(message).toContain("forçar a desconexão local");
   });
 
   it("usa a mensagem genérica para códigos desconhecidos ou ausentes", () => {

@@ -422,6 +422,44 @@ export async function resetWhatsAppSessionAction() {
   return { success: true };
 }
 
+/**
+ * Força a desconexão local SEM chamar o VPS.
+ *
+ * Use quando o VPS está inacessível (WAHA_UNREACHABLE) e o usuário precisa
+ * liberar a sessão no CRM. O registro remoto no WAHA pode permanecer ativo
+ * até o timeout natural do serviço.
+ *
+ * AVISO: Esta operação NÃO garante que a sessão WAHA foi encerrada.
+ * O usuário deve estar ciente de que pode haver uma sessão órfã no servidor.
+ */
+export async function forceDisconnectWhatsAppSession() {
+  const { db, connection } = await getOwnConnection();
+
+  if (!connection) {
+    return { success: true };
+  }
+
+  console.warn("[waha] force disconnect: limpeza local sem confirmação do VPS", {
+    sessionName: connection.sessionName,
+    tenantId: connection.tenantId,
+    userId: connection.userId,
+  });
+
+  await db
+    .update(schema.whatsappConnections)
+    .set({
+      sessionId: null,
+      sessionName: null,
+      status: "disconnected",
+      qrCode: null,
+      connectedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.whatsappConnections.id, connection.id));
+
+  return { success: true, forced: true };
+}
+
 /** Recupera uma sessão WAHA falhada mantendo a identidade determinística do corretor. */
 export async function recoverWhatsAppFailedSessionAction() {
   const { db, connection } = await getOwnConnection();
