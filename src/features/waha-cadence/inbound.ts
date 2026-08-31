@@ -35,6 +35,8 @@ export function shouldCreateSyntheticLead(input: {
   isTenantOfficialNumber: boolean;
 }) {
   return (
+    input.sourceKind === "number" &&
+    !input.isOutgoing &&
     !input.hasLead &&
     !input.hasClient &&
     !input.isTenantOfficialNumber
@@ -42,15 +44,18 @@ export function shouldCreateSyntheticLead(input: {
 }
 
 /**
- * All valid inbound and outbound broker messages should be persisted to CRM.
+ * A broker connection is a restricted workspace, not a tenant intake channel.
+ * Persist only CRM contacts (leads/clients) or the tenant's official
+ * number; personal chats never enter the tenant database.
  */
 export function shouldPersistBrokerConnectionMessage(input: {
   hasLead: boolean;
   hasClient: boolean;
   isTenantOfficialNumber: boolean;
 }) {
-  return true;
+  return input.hasLead || input.hasClient || input.isTenantOfficialNumber;
 }
+
 
 
 /**
