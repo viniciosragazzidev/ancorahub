@@ -135,6 +135,11 @@ export default async function BrokerConversationsPage({
       ),
     )
     .limit(1);
+  const draftTemplatePromise =
+    draft === "broker_intro"
+      ? getSystemSetting("broker_lite_opening_draft")
+      : Promise.resolve(null);
+
   const officialOutboundPromise = db
     .select({
       id: schema.whatsappOutboundMessages.id,
