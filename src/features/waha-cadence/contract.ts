@@ -89,21 +89,150 @@ export const wahaWebhookSchema = z.object({
 export type WahaWebhookEvent = z.infer<typeof wahaWebhookSchema>;
 
 /**
- * WAHA may send WhatsApp JIDs (for example `5511999999999@c.us`) while the
- * CRM contract stores phones as digits. Normalize only the transport envelope
- * before schema validation; any non-phone sender still fails the strict regex.
+ * Normaliza envelopes de webhook do WAHA para o schema canônico do CRM.
+ * Suporta tanto o payload nativo do motor WAHA ({ event: "message", session: "...", payload: { ... } })
+ * quanto payloads já pré-formatados pelo relay.
  */
 export function normalizeWahaWebhookPayload(payload: unknown): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-  const event = payload as Record<string, unknown>;
-  const message = event.message;
-  if (!message || typeof message !== "object" || Array.isArray(message)) return event;
+  const raw = payload as Record<string, unknown>;
 
   const normalizeJid = (value: unknown) =>
     typeof value === "string" ? value.replace(/@[^\s]+$/, "").replace(/\D/g, "") : value;
 
+  const rawEventType = String(raw.event || raw.type || "");
+  const isNativeWahaMessage =
+    rawEventType === "message" ||
+    rawEventType === "message.any" ||
+    rawEventType === "message.inbound";
+  const isNativeWahaSession = rawEventType === "session.status";
+  const isNativeWahaAck = rawEventType === "message.ack" || rawEventType === "message.status";
+
+  const innerPayload =
+    raw.payload && typeof raw.payload === "object" && !Array.isArray(raw.payload)
+      ? (raw.payload as Record<string, unknown>)
+      : null;
+
+  if (innerPayload && (isNativeWahaMessage || isNativeWahaSession || isNativeWahaAck)) {
+    const sessionId = String(raw.session || raw.sessionId || "");
+    const eventId = String(
+      raw.id ||
+        innerPayload.id ||
+        `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    );
+
+    let occurredAt = new Date().toISOString();
+    const ts = innerPayload.timestamp ?? raw.timestamp ?? raw.occurredAt;
+    if (typeof ts === "number") {
+      occurredAt = new Date(ts > 1e11 ? ts : ts * 1000).toISOString();
+    } else if (typeof ts === "string") {
+      const parsed = Date.parse(ts);
+      if (!Number.isNaN(parsed)) occurredAt = new Date(parsed).toISOString();
+    }
+
+    if (isNativeWahaMessage) {
+      const rawType = String(innerPayload.type || "chat");
+      const mappedType =
+        rawType === "chat"
+          ? "text"
+          : [
+              "image",
+              "audio",
+              "video",
+              "document",
+              "sticker",
+              "location",
+              "contact",
+            ].includes(rawType)
+            ? rawType
+            : "text";
+
+      const mediaObj =
+        innerPayload.media && typeof innerPayload.media === "object"
+          ? (innerPayload.media as Record<string, unknown>)
+          : null;
+
+      const bodyText = String(innerPayload.body ?? innerPayload.caption ?? "").trim() || " ";
+
+      return {
+        eventId,
+        type: "message.inbound",
+        sessionId,
+        occurredAt,
+        message: {
+          id: String(innerPayload.id || eventId),
+          from: normalizeJid(innerPayload.from),
+          to: normalizeJid(innerPayload.to) || undefined,
+          body: bodyText,
+          type: mappedType,
+          fromMe: Boolean(innerPayload.fromMe),
+          caption: innerPayload.caption ? String(innerPayload.caption) : undefined,
+          replyToId: (innerPayload.replyTo as Record<string, unknown>)?.id
+            ? String((innerPayload.replyTo as Record<string, unknown>).id)
+            : undefined,
+          media: mediaObj
+            ? {
+                mimeType: String(mediaObj.mimetype || mediaObj.mimeType || "application/octet-stream"),
+                fileName: mediaObj.filename ? String(mediaObj.filename) : undefined,
+                sizeBytes: typeof mediaObj.sizeBytes === "number" ? mediaObj.sizeBytes : undefined,
+              }
+            : undefined,
+        },
+      };
+    }
+
+    if (isNativeWahaSession) {
+      const rawStatus = String(innerPayload.status || raw.sessionStatus || "active").toUpperCase();
+      let sessionStatus: "active" | "paused" | "offline" | "error" = "active";
+      if (rawStatus === "WORKING" || rawStatus === "CONNECTED" || rawStatus === "ACTIVE") {
+        sessionStatus = "active";
+      } else if (rawStatus === "PAUSED") {
+        sessionStatus = "paused";
+      } else if (rawStatus === "STOPPED" || rawStatus === "OFFLINE") {
+        sessionStatus = "offline";
+      } else if (rawStatus === "FAILED" || rawStatus === "ERROR") {
+        sessionStatus = "error";
+      }
+
+      return {
+        eventId,
+        type: "session.status",
+        sessionId,
+        occurredAt,
+        sessionStatus,
+      };
+    }
+
+    if (isNativeWahaAck) {
+      const ackVal = innerPayload.ack;
+      const status: "sent" | "delivered" | "read" | "failed" =
+        ackVal === 3
+          ? "read"
+          : ackVal === 2
+            ? "delivered"
+            : ackVal === 1
+              ? "sent"
+              : "delivered";
+
+      return {
+        eventId,
+        type: "message.status",
+        sessionId,
+        occurredAt,
+        delivery: {
+          idempotencyKey: String(innerPayload.idempotencyKey || innerPayload.id || eventId),
+          providerMessageId: String(innerPayload.id || ""),
+          status,
+        },
+      };
+    }
+  }
+
+  const message = raw.message;
+  if (!message || typeof message !== "object" || Array.isArray(message)) return raw;
+
   return {
-    ...event,
+    ...raw,
     message: {
       ...(message as Record<string, unknown>),
       from: normalizeJid((message as Record<string, unknown>).from),
@@ -111,6 +240,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
     },
   };
 }
+
 
 export function normalizePhone(value: string) {
   return value.replace(/\D/g, "");

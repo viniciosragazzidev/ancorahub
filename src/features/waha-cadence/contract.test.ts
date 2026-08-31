@@ -56,4 +56,50 @@ describe("WAHA cadence contract", () => {
     expect(event.message?.from).toBe("5511999999999");
     expect(event.message?.to).toBe("5511888888888");
   });
+
+  it("normalizes a native WAHA engine message webhook payload", () => {
+    const nativeWahaPayload = {
+      event: "message",
+      session: "default",
+      payload: {
+        id: "false_5511999999999@c.us_3EB0C1234567890",
+        timestamp: 1692113399,
+        from: "5511999999999@c.us",
+        to: "5511888888888@c.us",
+        body: "Olá do WhatsApp!",
+        fromMe: false,
+        hasMedia: false,
+        type: "chat",
+      },
+    };
+
+    const normalized = normalizeWahaWebhookPayload(nativeWahaPayload);
+    const event = wahaWebhookSchema.parse(normalized);
+
+    expect(event.type).toBe("message.inbound");
+    expect(event.sessionId).toBe("default");
+    expect(event.message?.from).toBe("5511999999999");
+    expect(event.message?.to).toBe("5511888888888");
+    expect(event.message?.body).toBe("Olá do WhatsApp!");
+    expect(event.message?.type).toBe("text");
+    expect(event.message?.fromMe).toBe(false);
+  });
+
+  it("normalizes a native WAHA engine session.status webhook payload", () => {
+    const nativeSessionPayload = {
+      event: "session.status",
+      session: "default",
+      payload: {
+        status: "WORKING",
+      },
+    };
+
+    const normalized = normalizeWahaWebhookPayload(nativeSessionPayload);
+    const event = wahaWebhookSchema.parse(normalized);
+
+    expect(event.type).toBe("session.status");
+    expect(event.sessionId).toBe("default");
+    expect(event.sessionStatus).toBe("active");
+  });
 });
+

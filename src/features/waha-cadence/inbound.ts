@@ -359,24 +359,55 @@ async function resolveSession(
   db: ReturnType<typeof getDatabase>,
   sessionId: string,
 ): Promise<SessionSource | null> {
-  // Try platform/tenant numbers first (relay sessions)
+  if (!sessionId) return null;
+
+  // 1. Try platform/tenant numbers first (relay sessions)
   const [number] = await db
     .select()
     .from(schema.wahaNumbers)
-    .where(eq(schema.wahaNumbers.relaySessionId, sessionId))
+    .where(
+      or(
+        eq(schema.wahaNumbers.relaySessionId, sessionId),
+        eq(schema.wahaNumbers.id, sessionId),
+      ),
+    )
     .limit(1);
   if (number) return { kind: "number", number };
 
-  // Fallback: broker-level connections (direct WAHA sessions)
+  // 2. Broker-level connections (direct WAHA sessions)
   const [connection] = await db
     .select()
     .from(schema.whatsappConnections)
-    .where(eq(schema.whatsappConnections.sessionName, sessionId))
+    .where(
+      or(
+        eq(schema.whatsappConnections.sessionName, sessionId),
+        eq(schema.whatsappConnections.sessionId, sessionId),
+        eq(schema.whatsappConnections.id, sessionId),
+      ),
+    )
     .limit(1);
   if (connection) return { kind: "connection", connection };
 
+  // 3. Fallback for "default" or single-active session
+  if (sessionId === "default" || sessionId === "session_default") {
+    const [singleNumber] = await db
+      .select()
+      .from(schema.wahaNumbers)
+      .where(eq(schema.wahaNumbers.status, "ready"))
+      .limit(2);
+    if (singleNumber) return { kind: "number", number: singleNumber };
+
+    const [singleConnection] = await db
+      .select()
+      .from(schema.whatsappConnections)
+      .where(eq(schema.whatsappConnections.status, "ready"))
+      .limit(2);
+    if (singleConnection) return { kind: "connection", connection: singleConnection };
+  }
+
   return null;
 }
+
 
 /**
  * Resolve lead/client from phone number. Race-safe: uses transaction with
