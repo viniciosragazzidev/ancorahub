@@ -463,10 +463,11 @@ function isExpectedCleanupError(
   if (!(error instanceof WahaClientError)) return false;
 
   // WAHA pode sinalizar que stop/logout já não se aplicam à sessão com 400,
-  // 404 ou 422. Isso é seguro para o cleanup: a remoção ainda é tentada.
-  // Não toleramos 422 no DELETE, pois a sessão pode continuar ativa.
+  // 404, 422 ou 425 (not in valid state — ex.: logout em sessão que não está
+  // WORKING). Isso é seguro para o cleanup: a remoção ainda é tentada.
+  // Não toleramos 422/425 no DELETE, pois a sessão pode continuar ativa.
   if (operation === "delete") return error.providerStatusCode === 404;
-  return [400, 404, 422].includes(error.providerStatusCode ?? 0);
+  return [400, 404, 422, 425].includes(error.providerStatusCode ?? 0);
 }
 
 function cleanupIgnored(operation: WahaRecoveryCleanup["operation"], error: WahaClientError): WahaRecoveryCleanup {

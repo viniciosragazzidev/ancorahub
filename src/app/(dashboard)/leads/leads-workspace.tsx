@@ -679,9 +679,9 @@ export function LeadsWorkspace({
       <Sheet open={Boolean(selectedLead)} onOpenChange={(open) => !open && setSelectedLead(null)}>
         <SheetContent className="w-full sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>Detalhes do lead</SheetTitle>
+            <SheetTitle>Operação do lead</SheetTitle>
             <SheetDescription>
-              Contexto rápido para decidir o próximo passo sem sair da fila.
+              Situação, responsável e intervenções de gestão em um só lugar.
             </SheetDescription>
           </SheetHeader>
           {selectedLead ? (
@@ -723,6 +723,66 @@ export function LeadsWorkspace({
                     </p>
                   </div>
                 )}
+                {contextRole === "manager" || contextRole === "director" ? (
+                  <>
+                    <SheetSection className="p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">Resumo operacional</p>
+                          <p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p>
+                        </div>
+                        <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
+                      </div>
+                      <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                        <DetailRow label="Responsável" value={selectedLead.corretorNome ?? "Aguardando distribuição"} />
+                        <DetailRow label="Unidade" value={selectedLead.branchName ?? "Sem unidade"} />
+                        <DetailRow label="Atribuído em" value={formatDate(selectedLead.assignedAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <DetailRow label="1º contato" value={formatDate(selectedLead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <DetailRow label="Atendimento iniciado" value={formatDate(selectedLead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <DetailRow label="Etapa atual desde" value={formatDate(selectedLead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} />
+                      </dl>
+                    </SheetSection>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />}>
+                        <ChatCircleText />
+                        Abrir conversa
+                      </Button>
+                      <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
+                        Ver cadastro
+                        <ArrowUpRight />
+                      </Button>
+                    </div>
+
+                    <SheetSection className="p-4">
+                      <div>
+                        <p className="text-sm font-semibold">Intervir na operação</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p>
+                      </div>
+                      <LeadDrawerManagementActions
+                        leadId={selectedLead.id}
+                        leadName={selectedLead.nome}
+                        brokers={filteredBrokers}
+                        branches={branches}
+                        leadBranchId={selectedLead.branchId}
+                        contextRole={contextRole}
+                        currentStatus={selectedLead.status}
+                        qualificationStatus={selectedLead.qualificationStatus}
+                        qualificationState={selectedLead.qualificationState}
+                        currentOwner={selectedLead.corretorNome}
+                        onSuccess={handleDrawerManagementCommitted}
+                        onReassignOptimistic={handleDrawerReassignOptimistic}
+                        onReassignRollback={handleDrawerReassignRollback}
+                      />
+                    </SheetSection>
+
+                    <LeadAssignmentHistory
+                      leadId={selectedLead.id}
+                      assignedAt={selectedLead.assignedAt}
+                      corretorNome={selectedLead.corretorNome}
+                    />
+                  </>
+                ) : (
                 <Tabs defaultValue="summary" variant="underline" className="min-h-0">
                   <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start">
                     <TabsTrigger value="summary">Resumo</TabsTrigger>
@@ -778,24 +838,7 @@ export function LeadsWorkspace({
                         <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
                       </div>
                     )}
-                    {contextRole === "manager" || contextRole === "director" ? (
-                      <LeadDrawerManagementActions
-                        leadId={selectedLead.id}
-                        leadName={selectedLead.nome}
-                        brokers={filteredBrokers}
-                        branches={branches}
-                        leadBranchId={selectedLead.branchId}
-                        contextRole={contextRole}
-                        currentStatus={selectedLead.status}
-                        qualificationStatus={selectedLead.qualificationStatus}
-                        qualificationState={selectedLead.qualificationState}
-                        currentOwner={selectedLead.corretorNome}
-                        onSuccess={handleDrawerManagementCommitted}
-                        onReassignOptimistic={handleDrawerReassignOptimistic}
-                        onReassignRollback={handleDrawerReassignRollback}
-                      />
-                    ) : (
-                      <>
+                    <>
                         <div className={cn("grid gap-2", hasPermission(contextRole, "acessar_conversas") ? "grid-cols-2" : "grid-cols-1")}>
                           <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />}>
                             <ArrowUpRight />
@@ -838,10 +881,10 @@ export function LeadsWorkspace({
                           <LeadQuickNote leadId={selectedLead.id} />
                           <LeadReminder leadId={selectedLead.id} />
                         </div>
-                      </>
-                    )}
+                    </>
                   </TabsContent>
                 </Tabs>
+                )}
               </div>
             </SheetBody>
           ) : null}

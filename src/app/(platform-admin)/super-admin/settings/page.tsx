@@ -6,6 +6,7 @@ import {
   updateCentralAtencaoSettingsAction,
   updateGlobalSearchSettingsAction,
   updateBrokerWorkspaceSettingsAction,
+  updateBrokerAvailabilityOnboardingSettingsAction,
   updateWorkflowAutomationSettingsAction,
   updateCleanUiOperationalSettingsAction,
   updateInterfaceMotionSettingsAction,
@@ -57,6 +58,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_stagnant_days",
     "feature_global_search_enabled",
     "feature_broker_workspace_enabled",
+    "feature_broker_availability_onboarding_enabled",
     "feature_workflow_automation_enabled",
     CLEAN_UI_FEATURE,
     "feature_interface_motion_enabled",
@@ -115,6 +117,7 @@ export default async function SuperAdminSettingsPage() {
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
+  const brokerAvailabilityOnboardingEnabled = settingMap.get("feature_broker_availability_onboarding_enabled") !== "false";
   const workflowAutomationEnabled =
     settingMap.get("feature_workflow_automation_enabled") === "true";
   const cleanUiOperationalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
@@ -237,6 +240,23 @@ export default async function SuperAdminSettingsPage() {
                   <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>
                     {brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}
                   </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Agenda obrigatória do corretor</CardTitle>
+                <CardDescription>
+                  Exige a configuração da disponibilidade semanal e usa a agenda para filtrar a distribuição automática. Atribuições manuais continuam possíveis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerAvailabilityOnboardingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="brokerAvailabilityOnboardingEnabled" value="true" defaultChecked={brokerAvailabilityOnboardingEnabled} className="size-4" />
+                    <span><span className="font-medium">Exigir agenda para novos leads automáticos</span><span className="block text-xs text-muted-foreground">Desativar preserva as agendas salvas, mas deixa de usá-las para bloquear a distribuição.</span></span>
+                  </label>
+                  <Button type="submit" variant={brokerAvailabilityOnboardingEnabled ? "outline" : "default"}>{brokerAvailabilityOnboardingEnabled ? "Salvar controle" : "Ativar agenda obrigatória"}</Button>
                 </form>
               </CardContent>
             </Card>

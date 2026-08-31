@@ -145,6 +145,22 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
   });
 }
 
+export async function updateBrokerAvailabilityOnboardingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("brokerAvailabilityOnboardingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_broker_availability_onboarding_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_availability_onboarding.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "broker_availability_onboarding",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateWorkflowAutomationSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("workflowAutomationEnabled") === "true" ? "true" : "false";

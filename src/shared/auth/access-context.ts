@@ -4,6 +4,7 @@ import type { PermissionKey } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "./tenant-context";
 import type { TenantContext } from "./types";
 import { listEffectiveCapabilities } from "@/features/custom-roles/service";
+import { withPerfSpan } from "@/shared/observability/request-timing";
 
 export type AccessScopeType = "GLOBAL" | "UNITS" | "SELF" | "NONE";
 
@@ -17,14 +18,15 @@ export type AccessContext = TenantContext & {
 export async function resolveAccessContext(
   existingContext?: TenantContext,
 ): Promise<AccessContext> {
-  const context = existingContext ?? (await getRequiredTenantContext());
+  return withPerfSpan("access_context.resolve", async () => {
+    const context = existingContext ?? (await getRequiredTenantContext());
 
-  const permissionList = await listEffectiveCapabilities({
-    tenantId: context.tenantId,
-    role: context.role,
-    jobTitle: context.jobTitle,
-    customRoleId: context.customRoleId ?? null,
-  });
+    const permissionList = await withPerfSpan("rbac.resolve", () => listEffectiveCapabilities({
+      tenantId: context.tenantId,
+      role: context.role,
+      jobTitle: context.jobTitle,
+      customRoleId: context.customRoleId ?? null,
+    }));
 
   const permissions = new Set<PermissionKey>(permissionList);
 
@@ -48,11 +50,12 @@ export async function resolveAccessContext(
     }
   }
 
-  return {
-    ...context,
-    permissions,
-    scopeType,
-    allowedUnitIds,
-    canAccessAllUnits,
-  };
+    return {
+      ...context,
+      permissions,
+      scopeType,
+      allowedUnitIds,
+      canAccessAllUnits,
+    };
+  });
 }

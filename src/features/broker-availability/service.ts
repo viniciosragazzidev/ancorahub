@@ -8,6 +8,7 @@ import type { TenantContext } from "@/shared/auth/tenant-context";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
+import type { BrokerAvailabilityWindowInput } from "./contracts";
 
 export const BROKER_AVAILABILITY_ONBOARDING_TOUR = "broker-availability-onboarding";
 export const BROKER_AVAILABILITY_ONBOARDING_VERSION = 1;
@@ -24,17 +25,7 @@ export const brokerAvailabilityScheduleSchema = z.object({
   windows: z.array(availabilityWindowSchema).min(1, "Escolha ao menos um período para receber leads."),
 });
 
-export type BrokerAvailabilityWindowInput = z.infer<typeof availabilityWindowSchema>;
-
-export const WEEKDAY_LABELS = [
-  "Domingo",
-  "Segunda-feira",
-  "Terça-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sábado",
-] as const;
+export { WEEKDAY_LABELS, type BrokerAvailabilityWindowInput } from "./contracts";
 
 function assertNoOverlaps(windows: BrokerAvailabilityWindowInput[]) {
   const byDay = new Map<number, BrokerAvailabilityWindowInput[]>();

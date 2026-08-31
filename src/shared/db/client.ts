@@ -3,8 +3,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-// Timing for DB is managed by tenant-context.ts and session.ts
-// Individual query timing can be added via Drizzle query hooks if needed
+import { recordIssuedDatabaseQuery } from "@/shared/observability/request-timing";
 
 type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
@@ -63,6 +62,11 @@ function logDbConfig(databaseUrl: string): void {
         isPooled,
         poolMax,
         driver: usesPostgresJsDriver(databaseUrl) ? "postgres.js" : "neon-serverless",
+        prepare: false,
+        connectTimeoutSeconds: 10,
+        idleTimeoutSeconds: 5,
+        maxLifetimeSeconds: 60,
+        statementTimeoutMs: statementTimeoutMs(),
         env: process.env.NODE_ENV,
       }),
     );
@@ -94,6 +98,10 @@ function createPostgresDatabase(databaseUrl: string): Database {
       connect_timeout: 10,
       idle_timeout: 5,
       max_lifetime: 60,
+      // postgres.js offers an issue-time debug hook, not a completion hook.
+      // It is used only to count/hash query shapes inside an opt-in request
+      // trace; raw SQL and parameters are discarded before logging.
+      debug: (_connection, query) => recordIssuedDatabaseQuery(query),
       connection: {
         statement_timeout: statementTimeoutMs(),
         idle_in_transaction_session_timeout: 60_000,

@@ -12,6 +12,7 @@ import { NotificationCountProvider } from "@/components/providers/notification-c
 import { FeedbackToastHandler } from "@/features/leads/components/feedback-toast-handler";
 import { PasskeyToastHandler } from "@/components/passkey-toast-handler";
 import { RouteOnboardingLoader } from "@/features/onboarding/components/route-onboarding-loader";
+import { BrokerAvailabilityOnboardingLoader } from "@/features/broker-availability/components/broker-availability-onboarding-loader";
 import { CommandPalette } from "@/components/command-palette";
 import { SystemFeedbackDrawer } from "@/components/system-feedback-drawer";
 import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
@@ -103,6 +104,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         <TenantOnboardingDialogLoader />
         <DirectorWizardLoader />
         <RouteOnboardingLoader />
+        <BrokerAvailabilityOnboardingLoader />
         <RealtimeSyncProvider
           tenantId={context.tenantId}
           userId={context.userId}

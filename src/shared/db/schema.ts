@@ -1301,6 +1301,29 @@ export const userOnboardingProgress = pgTable(
   ],
 );
 
+/**
+ * Weekly availability declared by a broker for automatic lead distribution.
+ * Times are stored in the tenant's operational timezone (America/Sao_Paulo
+ * for the current distribution engine) and each row represents one interval.
+ */
+export const brokerAvailabilityWindows = pgTable(
+  "broker_availability_windows",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    dayOfWeek: integer("day_of_week").notNull(),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at").notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("broker_availability_windows_lookup_idx").on(table.tenantId, table.brokerId, table.dayOfWeek, table.startsAt),
+    unique("broker_availability_windows_unique_interval").on(table.tenantId, table.brokerId, table.dayOfWeek, table.startsAt, table.endsAt),
+  ],
+);
+
 export const dutyRosterAssignments = pgTable(
   "duty_roster_assignments",
   {

@@ -159,6 +159,15 @@ export const FEATURE_FLAGS = {
     description:
       "Rascunho de abertura padrão para o modo corretor lite no chat.",
   },
+
+  BROKER_AVAILABILITY_ONBOARDING: {
+    key: "feature_broker_availability_onboarding_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Exige que corretores declarem sua agenda semanal e aplica essa agenda à distribuição automática de leads.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────

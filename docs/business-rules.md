@@ -40,6 +40,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-022 | Perda exige motivo. | Transição para `perdido` sem motivo → recusada. | RF014 |
 | BR-023 | Novo lead é distribuído por round-robin entre corretores elegíveis da filial. | Lead recebido → próximo elegível recebe atribuição, conforme política do tenant. | RF020–021, RF102 |
 | BR-024 | Elegibilidade considera usuário ativo, filial/escopo aplicável, disponibilidade e limite de carga. | Corretor fora de qualquer critério → excluído do round-robin. | RF021, RF110–112 |
+| BR-024A | Agenda semanal pessoal também é critério da distribuição automática. | Corretor fora de sua janela declarada em `America/Sao_Paulo`, sem agenda concluída ou pausado → excluído da escolha automática; atribuição manual permanece disponível e auditável. | DEC-088 |
 | BR-025 | O SLA tem dois relógios: primeiro contato e última interação. | Limite ultrapassado → marca não trabalhado, notifica e/ou redistribui conforme configuração. | RF022–024 |
 | BR-026 | Estagnação é diferente de SLA de interação. | Lead permanece na etapa além do limite, ainda que haja interação → alerta de estagnação. | RF194 |
 | BR-027 | Reabertura e reatribuição são decisões de Gestor/Diretor e preservam histórico. | Reabertura → lead volta ao fluxo com evento de auditoria/timeline. | RF196 |

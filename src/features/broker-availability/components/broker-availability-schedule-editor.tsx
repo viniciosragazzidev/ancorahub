@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { saveOwnBrokerAvailabilityAction } from "../actions";
-import { WEEKDAY_LABELS, type BrokerAvailabilityWindowInput } from "../service";
+import { WEEKDAY_LABELS, type BrokerAvailabilityWindowInput } from "../contracts";
 
 type Props = {
   initialWindows: BrokerAvailabilityWindowInput[];

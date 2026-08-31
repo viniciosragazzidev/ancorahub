@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { wahaActionErrorMessage } from "@/lib/waha-error-codes";
 import {
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
@@ -19,8 +20,6 @@ import {
 } from "@/app/(dashboard)/settings/whatsapp-actions";
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
-
-type ErrorCode = "WAHA_TIMEOUT" | "WAHA_UNAVAILABLE" | "WAHA_UNAUTHORIZED" | "WAHA_INTERNAL_ERROR" | "WAHA_BAD_RESPONSE" | "WAHA_ERROR" | "SESSION_EXISTS" | "QR_ERROR" | "NO_SESSION";
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -77,17 +76,7 @@ function ConnectionSteps({ status, hasQr }: { status: string; hasQr: boolean }) 
 }
 
 function errorMessage(code?: string | null): string {
-  switch (code) {
-    case "WAHA_TIMEOUT": return "O servidor WhatsApp demorou para responder. Tente novamente.";
-    case "WAHA_UNAVAILABLE": return "Serviço de WhatsApp temporariamente indisponível.";
-    case "WAHA_UNAUTHORIZED": return "A configuração do serviço WhatsApp precisa de atenção. Avise o administrador.";
-    case "WAHA_INTERNAL_ERROR": return "Não foi possível encerrar a sessão no WhatsApp. Tente novamente.";
-    case "WAHA_BAD_RESPONSE": return "O WhatsApp respondeu de forma inesperada. Tente novamente.";
-    case "SESSION_EXISTS": return "Sessão já existe. Reconectando…";
-    case "QR_ERROR": return "QR Code expirou ou indisponível. Gere um novo.";
-    case "NO_SESSION": return "Nenhuma sessão ativa. Inicie uma nova conexão.";
-    default: return "Não foi possível completar a operação. Tente novamente.";
-  }
+  return wahaActionErrorMessage(code);
 }
 
 export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conectar WhatsApp", connectedLabel = "WhatsApp conectado", onConnectionChanged }: { initial: Connection; returnTo?: string; triggerLabel?: string; connectedLabel?: string; onConnectionChanged?: (connection?: Connection) => void }) {

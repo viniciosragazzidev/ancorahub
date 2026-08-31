@@ -256,6 +256,46 @@ test("disconnect cleanup: stop e logout 422 não impedem a remoção da sessão"
   assert.equal(calls.length, 3);
 });
 
+test("disconnect cleanup: stop e logout 425 (not in valid state) não impedem a remoção da sessão", async () => {
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    if (target.endsWith("/stop") || target.endsWith("/logout")) {
+      // WAHA responde 425 quando logout é chamado em sessão que não está WORKING.
+      return new Response(JSON.stringify({ error: "not in valid state" }), { status: 425 });
+    }
+    if (target.endsWith("/api/sessions/disconnect-425") && method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  const stop = await client.stopSession("disconnect-425");
+  const deletion = await client.deleteSession("disconnect-425");
+
+  assert.deepEqual(stop, { operation: "stop", outcome: "ignored", providerStatusCode: 425, normalizedError: "WAHA_INTERNAL_ERROR" });
+  assert.deepEqual(deletion.map((item) => item.outcome), ["ignored", "completed"]);
+});
+
+test("disconnect cleanup: delete 425/422 continua sendo falha observável", async () => {
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    if (target.endsWith("/stop") || target.endsWith("/logout")) {
+      return new Response(null, { status: 204 });
+    }
+    if (method === "DELETE") {
+      return new Response(JSON.stringify({ error: "not in valid state" }), { status: 425 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  await assert.rejects(
+    () => client.deleteSession("delete-425"),
+    (err: unknown) => err instanceof WahaClientError && err.providerStatusCode === 425,
+  );
+});
+
 // ── WahaClient.getQr ──────────────────────────────────────────────────
 
 test("getQr: sessão em WAITING_QR com JSON data → retorna base64", async () => {

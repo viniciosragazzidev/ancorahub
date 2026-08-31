@@ -16,6 +16,8 @@ import { UnitTab } from "./_components/unit-tab";
 import { FeedbackTab } from "./_components/feedback-tab";
 import { getIntegrationsData } from "./integrations-actions";
 import { ExtensionTab } from "./extension/extension-tab";
+import { getBrokerAvailabilityProfile } from "@/features/broker-availability/service";
+import { BrokerAvailabilitySettings } from "@/features/broker-availability/components/broker-availability-settings";
 
 import { RelatedActions } from "@/components/related-actions";
 
@@ -40,7 +42,8 @@ export default async function SettingsPage() {
   }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
   const integrations = canViewIntegrations ? await getIntegrationsData() : null;
-  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "whatsapp", "seguranca", "extensao"];
+  const brokerAvailability = context.role === "broker" ? await getBrokerAvailabilityProfile(context) : null;
+  const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "disponibilidade", "whatsapp", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
   const atendimento = canEditFeedback ? (
@@ -70,6 +73,7 @@ export default async function SettingsPage() {
           account={account}
           company={context.role === "director" ? company : undefined}
           unit={<UnitTab branch={membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null} currentRole={context.role} />}
+          availability={brokerAvailability ? <BrokerAvailabilitySettings windows={brokerAvailability.windows} /> : undefined}
           atendimento={atendimento}
           whatsapp={whatsapp}
           integrations={integrations ? <IntegrationsTab branches={integrations.branches} integrations={integrations.integrations} /> : undefined}

@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { wahaActionCodeFromMessage } from "@/lib/waha-error-codes";
 
 // ── WAHA via Fastify ──────────────────────────────────────────────────
 
@@ -85,16 +86,19 @@ async function vpsRequest<T extends WahaConnectionResponse>(
   } catch (error) {
     if (error instanceof Error && /VPS_API_URL não configurada/.test(error.message)) throw error;
     if (error instanceof Error && /WAHA \(/.test(error.message)) throw error;
-    // Erro de rede / timeout / DNS
+    // Erro de rede / TLS / DNS / timeout. O código WAHA_UNREACHABLE (ou
+    // WAHA_TIMEOUT) é embutido na mensagem para que a classificação
+    // preservada no retorno da action não colapse em WAHA_ERROR genérico.
+    const detail = error instanceof Error ? error.message : String(error);
+    const networkCode = /timeout|aborted/i.test(detail) ? "WAHA_TIMEOUT" : "WAHA_UNREACHABLE";
     throw new Error(
-      `Não foi possível conectar ao serviço de WhatsApp em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${error instanceof Error ? error.message : String(error)}`,
+      `${networkCode} Não foi possível conectar ao serviço de WhatsApp em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${detail}`,
     );
   }
 }
 
 function wahaActionErrorCode(message: string) {
-  const code = message.match(/\b(WAHA_(?:TIMEOUT|UNAVAILABLE|UNAUTHORIZED|INTERNAL_ERROR|BAD_RESPONSE))\b/)?.[1];
-  return code ?? "WAHA_ERROR";
+  return wahaActionCodeFromMessage(message);
 }
 
 // ── Connection helpers ────────────────────────────────────────────────
@@ -345,10 +349,21 @@ export async function diagnoseWahaConnection() {
     if (!healthRes.ok)
       return { ok: false, step: "health", error: `Health check retornou ${healthRes.status}` };
   } catch (error) {
+    const cause = (error as { cause?: { code?: string; message?: string } })?.cause;
+    const detail = cause?.code ?? (error instanceof Error ? error.message : String(error));
+    const kind = /ENOTFOUND|EAI_AGAIN/i.test(detail)
+      ? "dns"
+      : /TLS|SSL|handshake|certificate/i.test(detail)
+        ? "tls"
+        : /timeout|aborted/i.test(detail)
+          ? "timeout"
+          : "network";
     return {
       ok: false,
       step: "connectivity",
-      error: `Não foi possível acessar ${base}. ${error instanceof Error ? error.message : String(error)}`,
+      kind,
+      base,
+      error: `Não foi possível acessar ${base} (${kind}). ${detail}`,
     };
   }
 
@@ -381,11 +396,12 @@ export async function resetWhatsAppSessionAction() {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
-    console.warn("[waha] reset: disconnect failed:", message);
+    const code = wahaActionErrorCode(message);
+    console.warn("[waha] reset: disconnect failed:", { code, message: message.slice(0, 300) });
     return {
       success: false,
       error: "Não foi possível confirmar a desconexão da sessão WhatsApp.",
-      code: wahaActionErrorCode(message),
+      code,
     };
   }
 
