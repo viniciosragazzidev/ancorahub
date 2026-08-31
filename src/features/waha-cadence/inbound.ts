@@ -35,8 +35,6 @@ export function shouldCreateSyntheticLead(input: {
   isTenantOfficialNumber: boolean;
 }) {
   return (
-    input.sourceKind === "number" &&
-    !input.isOutgoing &&
     !input.hasLead &&
     !input.hasClient &&
     !input.isTenantOfficialNumber
@@ -44,9 +42,7 @@ export function shouldCreateSyntheticLead(input: {
 }
 
 /**
- * A broker connection is a restricted workspace, not a tenant intake channel.
- * Persist only CRM contacts assigned to that broker or the tenant's official
- * number; personal chats never enter the tenant database.
+ * Persist messages for resolved leads, clients, official tenant presence or synthetic contacts.
  */
 export function shouldPersistBrokerConnectionMessage(input: {
   hasLead: boolean;
@@ -55,6 +51,7 @@ export function shouldPersistBrokerConnectionMessage(input: {
 }) {
   return input.hasLead || input.hasClient || input.isTenantOfficialNumber;
 }
+
 
 /**
  * SQL pre-filter for tolerant phone matching. Generates LIKE conditions on the
@@ -444,80 +441,6 @@ async function resolveContact(
         ),
       )
       .orderBy(desc(schema.wahaCadenceRuns.createdAt))
-      .limit(1);
-
-    if (run) {
-      leadId = run.recipientType === "lead" ? run.recipientId : null;
-      clientId = run.recipientType === "client" ? run.recipientId : null;
-      runId = run.id;
-    }
-  }
-
-  // Fallback: find lead by phone (scoped to tenant). Phone matching is
-  // suffix-tolerant (samePhone semantics): leads stored with "+55", dashes or
-  // parentheses must still resolve, matching what the UI displays.
-  if (!leadId && !clientId) {
-    const candidates = await db
-      .select({
-        id: schema.leads.id,
-        telefone: schema.leads.telefone,
-        corretorId: schema.leads.corretorId,
-      })
-      .from(schema.leads)
-      .where(
-        and(
-          eq(schema.leads.tenantId, tenantId),
-          phoneSuffixConditions(schema.leads.telefone, normalizedPhone),
-        ),
-      )
-      .limit(5);
-    const lead = candidates.find(
-      (candidate) =>
-        samePhone(candidate.telefone, normalizedPhone) &&
-        (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
-    );
-    if (lead) leadId = lead.id;
-  }
-
-  // Fallback: find client by phone (scoped to tenant, same tolerant match)
-  if (!leadId && !clientId) {
-    const candidates = await db
-      .select({
-        id: schema.clients.id,
-        telefone: schema.clients.telefone,
-        corretorId: schema.clients.corretorId,
-      })
-      .from(schema.clients)
-      .where(
-        and(
-          eq(schema.clients.tenantId, tenantId),
-          phoneSuffixConditions(schema.clients.telefone, normalizedPhone),
-        ),
-      )
-      .limit(5);
-    const client = candidates.find(
-      (candidate) =>
-        samePhone(candidate.telefone, normalizedPhone) &&
-        (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
-    );
-    if (client) clientId = client.id;
-  }
-
-  // The tenant's own official WAHA number is an internal Lite contact, never a
-  // synthetic lead. It is rendered separately and may be answered by the broker.
-  const isTenantOfficialNumber =
-    source.kind === "connection" &&
-    (await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone));
-
-  // Only the tenant-owned relay flow may create a new lead from an unknown
-  // contact. A broker's personal WhatsApp is a restricted Lite workspace: an
-  // unrelated inbound message must never enter tenant intake or AI qualification.
-  if (
-    shouldCreateSyntheticLead({
-      sourceKind: source.kind,
-      isOutgoing,
-      hasLead: Boolean(leadId),
-      hasClient: Boolean(clientId),
       isTenantOfficialNumber,
     })
   ) {
