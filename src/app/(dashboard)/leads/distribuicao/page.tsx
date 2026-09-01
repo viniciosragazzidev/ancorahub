@@ -396,7 +396,7 @@ export default async function LeadDistributionPage({
     return {
       ...queue,
       count: leads.length,
-      oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${oldest.toLocaleDateString("pt-BR")}`,
+      oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(oldest)}`,
     };
   });
 
@@ -550,7 +550,7 @@ export default async function LeadDistributionPage({
                             </p>
                           </div>
                           <time className="shrink-0 text-[10px] text-muted-foreground">
-                            {event.createdAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                            {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(event.createdAt)}
                           </time>
                         </div>
                       ))}

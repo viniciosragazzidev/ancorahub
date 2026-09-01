@@ -103,6 +103,14 @@ export const FEATURE_FLAGS = {
       "Segundos de debounce antes do agente processar uma mensagem. 0 = desabilitado. Máximo: 2 (limitado internamente).",
   },
 
+  CONVERSATION_INTELLIGENCE: {
+    key: "feature_conversation_intelligence_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o motor de análise contínua de conversas e auto-feedback com IA.",
+  },
+
   AI_MEMORY_RESET_MODE: {
     key: "ai_memory_reset_mode",
     scope: "global",

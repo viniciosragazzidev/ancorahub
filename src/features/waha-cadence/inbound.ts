@@ -15,6 +15,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { samePhone } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence";
 import {
   phoneHash,
   normalizePhone,
@@ -322,6 +323,11 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       tenantId,
       participantUserIds: [],
     }).catch(() => undefined);
+  }
+
+  // ── 7.1 Agendar análise de inteligência conversacional com debounce de 45s ──
+  if (leadId && tenantId) {
+    scheduleLeadConversationAnalysis(leadId, tenantId);
   }
 
   // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────

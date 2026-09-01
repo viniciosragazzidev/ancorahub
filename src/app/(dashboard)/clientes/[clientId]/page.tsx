@@ -177,7 +177,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>Convertido em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(client.convertedAt)}</span>
+                  <span>Convertido em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(client.convertedAt)}</span>
                   {client.branchName && (
                     <>
                       <span>•</span>
@@ -409,7 +409,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                           </Badge>
                         </div>
                         <CardDescription className="text-xs">
-                          Registrada em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(sale.saleDate)}
+                          Registrada em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(sale.saleDate)}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2 text-xs">
