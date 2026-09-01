@@ -28,7 +28,11 @@ type DeliveryRoute = "meta_only" | "meta_then_waha" | "waha_direct";
 async function resolveInternalBrokerDeliveryRoute(input: { tenantId: string; recipientType: string; purpose: string }) {
   if (!isInternalBrokerNotice(input)) return { route: "meta_only" as const, wahaNumberId: null };
   const policy = await getInternalBrokerNotificationPolicy(input.tenantId);
-  const number = policy.enabled ? await getSelectedInternalWahaNumber(input.tenantId, policy.wahaNumberId) : null;
+  if (!policy.enabled) return { route: "meta_only" as const, wahaNumberId: null };
+  let number = await getSelectedInternalWahaNumber(input.tenantId, policy.wahaNumberId);
+  if (!number) {
+    number = await findActiveWahaFallbackNumber(input.tenantId, null, "brokerFallback");
+  }
   if (!number) return { route: "meta_only" as const, wahaNumberId: null };
   return { route: policy.deliveryMode as DeliveryRoute, wahaNumberId: number.id };
 }
@@ -140,7 +144,7 @@ export async function enqueueMetaTemplateMessage(input: {
   return { id, status: "queued" as const, duplicate: false };
 }
 
-/** Queue a tenant-scoped text message through the same protected Meta outbox. */
+/** Queue a tenant-scoped text message through the protected outbox (supports Meta Cloud or WAHA Direct for team). */
 export async function enqueueMetaTextMessage(input: {
   tenantId: string;
   channelId?: string;
@@ -151,10 +155,16 @@ export async function enqueueMetaTextMessage(input: {
   requestedBy?: string | null;
   idempotencyKey: string;
   scheduledAt?: Date;
+  purpose?: string;
 }) {
   const destinationPhone = phoneSchema.parse(input.destinationPhone);
   const body = z.string().trim().min(1).max(4096).parse(input.body);
   const db = getDatabase();
+  const delivery = await resolveInternalBrokerDeliveryRoute({
+    tenantId: input.tenantId,
+    recipientType: input.recipientType,
+    purpose: input.purpose ?? "directText",
+  });
   const channelQuery = input.channelId
     ? and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId))
     : and(
@@ -162,19 +172,21 @@ export async function enqueueMetaTextMessage(input: {
         inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
         eq(schema.communicationChannels.status, "active"),
       );
-  const [channel] = await db.select({ id: schema.communicationChannels.id })
-    .from(schema.communicationChannels)
-    .where(channelQuery)
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
-    .limit(1);
-  if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
+  const [channel] = delivery.route === "waha_direct"
+    ? []
+    : await db.select({ id: schema.communicationChannels.id })
+        .from(schema.communicationChannels)
+        .where(channelQuery)
+        .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+        .limit(1);
+  if (delivery.route !== "waha_direct" && !channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
   const id = randomUUID();
   const now = new Date();
   await db.insert(schema.whatsappOutboundMessages).values({
-    id, tenantId: input.tenantId, channelId: channel.id, deliveryRoute: "meta_only", wahaNumberId: null, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
-    destinationPhone, purpose: "aiQualification", messageType: "text", templateName: "__text__", templateLanguage: "pt_BR", variables: [body],
+    id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: delivery.route, wahaNumberId: delivery.wahaNumberId, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
+    destinationPhone, purpose: input.purpose ?? "directText", messageType: "text", templateName: "__text__", templateLanguage: "pt_BR", variables: [body],
     status: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued", idempotencyKey: input.idempotencyKey,
     scheduledAt: input.scheduledAt ?? null, queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
   });
@@ -262,7 +274,13 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
 export async function findActiveWahaFallbackNumber(tenantId: string, branchId?: string | null, capability: "brokerFallback" | "qualificationFallback" = "brokerFallback") {
   const db = getDatabase();
   const numbers = await db
-    .select({ id: schema.wahaNumbers.id, relaySessionId: schema.wahaNumbers.relaySessionId, capabilities: schema.wahaNumbers.capabilities, status: schema.wahaNumbers.status })
+    .select({
+      id: schema.wahaNumbers.id,
+      relaySessionId: schema.wahaNumbers.relaySessionId,
+      displayPhoneNumber: schema.wahaNumbers.displayPhoneNumber,
+      capabilities: schema.wahaNumbers.capabilities,
+      status: schema.wahaNumbers.status,
+    })
     .from(schema.wahaNumbers)
     .where(
       and(
@@ -274,7 +292,7 @@ export async function findActiveWahaFallbackNumber(tenantId: string, branchId?: 
     .orderBy(desc(schema.wahaNumbers.updatedAt))
     .limit(5);
 
-  return numbers.find((n) => n.capabilities?.[capability] !== false);
+  return numbers.find((n) => n.capabilities?.[capability] !== false) ?? null;
 }
 
 type WahaDeliveryRow = {
@@ -290,7 +308,10 @@ type WahaDeliveryRow = {
 };
 
 async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direct" | "fallback") {
-  const number = await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId);
+  let number = await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId);
+  if (!number) {
+    number = await findActiveWahaFallbackNumber(row.tenantId, null, "brokerFallback");
+  }
   if (!number) throw new Error("O número WAHA oficial de avisos internos não está ativo.");
   const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
   const body = row.messageType === "text" ? variables[0] ?? "" : resolveTemplateTextBody(row.purpose, variables);

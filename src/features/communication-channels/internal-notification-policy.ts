@@ -31,14 +31,8 @@ export function isMissingInternalBrokerNotificationPolicyTable(error: unknown) {
     && (error as { code?: unknown }).code === "42P01";
 }
 
-export function isInternalBrokerNotice(input: { recipientType: string; purpose: string }) {
-  return input.recipientType === "user" && [
-    "brokerLeadNotification",
-    "newLeadAssignment",
-    "leadAssignmentConfirmed",
-    "leadAssignmentUnavailable",
-    "leadAssignmentExpired",
-  ].includes(input.purpose);
+export function isInternalBrokerNotice(input: { recipientType: string; purpose?: string }) {
+  return input.recipientType === "user";
 }
 
 export async function getInternalBrokerNotificationPolicy(tenantId: string) {
