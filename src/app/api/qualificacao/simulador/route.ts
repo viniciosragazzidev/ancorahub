@@ -197,11 +197,14 @@ ${customInstructions ? `\n\nINSTRUÇÕES ADICIONAIS:\n${customInstructions}` : "
         cliente_nome: mergedMemory.nome || "cliente",
         corretora_nome: "Âncora Corretora",
       });
+    } else if (lower.includes("diferen") || lower.includes("como funciona") || lower.includes("o que é") || lower.includes("o que e")) {
+      fallbackReply = `O plano Individual é para você (pessoa física), o Familiar inclui dependentes, e o Empresarial (PME) é contratado via CNPJ ou MEI com valores até 30% mais acessíveis! Qual dessas modalidades você gostaria de simular?`;
     } else if (!mergedMemory.nome) {
       fallbackReply = `Olá! Tudo bem? Sou a ${assistantName} da Âncora Corretora. Que ótimo falar com você! Para eu te passar as melhores opções de planos e valores, como posso te chamar?`;
     } else if (!mergedMemory.plano) {
       fallbackReply = `Perfeito, ${mergedMemory.nome}! Você busca um plano Individual, Familiar ou Empresarial (CNPJ)?`;
     } else if (!mergedMemory.vidas) {
+
       fallbackReply = `Entendido! Quantas pessoas no total utilizarão o plano?`;
     } else if (!mergedMemory.idade) {
       fallbackReply = `E quais seriam as idades aproximadas de cada pessoa?`;
