@@ -17,6 +17,20 @@ const policyInputSchema = z.object({
   wahaNumberId: z.string().min(1).nullable(),
 });
 
+const defaultInternalBrokerNotificationPolicy = {
+  enabled: true,
+  deliveryMode: "meta_then_waha" as const,
+  wahaNumberId: null,
+};
+
+/** Keeps the integration page available while a rolling deployment finishes its database migration. */
+export function isMissingInternalBrokerNotificationPolicyTable(error: unknown) {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error as { code?: unknown }).code === "42P01";
+}
+
 export function isInternalBrokerNotice(input: { recipientType: string; purpose: string }) {
   return input.recipientType === "user" && [
     "brokerLeadNotification",
@@ -31,14 +45,22 @@ export async function getInternalBrokerNotificationPolicy(tenantId: string) {
   if ((await getSystemSetting("feature_waha_internal_broker_notifications_enabled")) === "false") {
     return { enabled: false, deliveryMode: "meta_then_waha" as const, wahaNumberId: null };
   }
-  const [settings] = await getDatabase().select({
-    enabled: schema.tenantInternalNotificationSettings.enabled,
-    deliveryMode: schema.tenantInternalNotificationSettings.deliveryMode,
-    wahaNumberId: schema.tenantInternalNotificationSettings.wahaNumberId,
-  }).from(schema.tenantInternalNotificationSettings)
-    .where(eq(schema.tenantInternalNotificationSettings.tenantId, tenantId)).limit(1);
+  try {
+    const [settings] = await getDatabase().select({
+      enabled: schema.tenantInternalNotificationSettings.enabled,
+      deliveryMode: schema.tenantInternalNotificationSettings.deliveryMode,
+      wahaNumberId: schema.tenantInternalNotificationSettings.wahaNumberId,
+    }).from(schema.tenantInternalNotificationSettings)
+      .where(eq(schema.tenantInternalNotificationSettings.tenantId, tenantId)).limit(1);
 
-  return settings ?? { enabled: true, deliveryMode: "meta_then_waha" as const, wahaNumberId: null };
+    return settings ?? defaultInternalBrokerNotificationPolicy;
+  } catch (error) {
+    if (isMissingInternalBrokerNotificationPolicyTable(error)) {
+      console.warn("[internal-broker-notifications] policy_table_pending_migration");
+      return defaultInternalBrokerNotificationPolicy;
+    }
+    throw error;
+  }
 }
 
 export async function getSelectedInternalWahaNumber(tenantId: string, wahaNumberId: string | null) {
