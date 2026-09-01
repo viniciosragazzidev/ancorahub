@@ -45,6 +45,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
 import { MetaTemplatesPanel } from "./meta-templates-panel";
+import { SituationalPlaybooksPanel } from "./situational-playbooks-panel";
 
 import {
   updateQualificationSettingsAction,
@@ -276,12 +277,13 @@ export function QualificationHubClient({
 
   const tabs = [
     { id: "overview", label: "1. Prompt & Comportamento", icon: MessageSquare, color: "text-primary" },
-    { id: "meta_templates", label: "2. Modelos de Mensagem (Meta)", icon: FileText, color: "text-blue-500" },
-    { id: "agent_triggers", label: "3. Triggers & Permissões MCP", icon: Zap, color: "text-amber-500" },
-    { id: "followup_rules", label: "4. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "training", label: "5. Versões & Publicação", icon: Layers },
-    { id: "whatsapp_diag", label: "6. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
-    { id: "simulator", label: `7. Simulador & Alertas${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "situational_playbooks", label: "2. Roteiros & Situações IA", icon: Sparkles, color: "text-amber-500" },
+    { id: "meta_templates", label: "3. Modelos de Mensagem (Meta)", icon: FileText, color: "text-blue-500" },
+    { id: "agent_triggers", label: "4. Triggers & Permissões MCP", icon: Zap, color: "text-amber-500" },
+    { id: "followup_rules", label: "5. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
+    { id: "training", label: "6. Versões & Publicação", icon: Layers },
+    { id: "whatsapp_diag", label: "7. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
+    { id: "simulator", label: `8. Simulador & Alertas${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
   ];
 
   const requestedTab = searchParams.get("tab");
@@ -293,6 +295,8 @@ export function QualificationHubClient({
     brokers: "overview",
     system_messages: "overview",
     alerts: "simulator",
+    situations: "situational_playbooks",
+    playbooks: "situational_playbooks",
   };
 
   const resolvedRequestedTab = tabRedirectMap[requestedTab ?? ""] ?? requestedTab;
@@ -310,6 +314,11 @@ export function QualificationHubClient({
     }
   };
 
+  const handleTestInSimulator = (testInputText: string) => {
+    handleSelectTab("simulator");
+    setSimInput(testInputText);
+  };
+
   // Follow-up Rule Form State
   const [newRuleName, setNewRuleName] = useState("");
   const [newRuleTrigger, setNewRuleTrigger] = useState("qualification_abandoned");
@@ -321,10 +330,11 @@ export function QualificationHubClient({
   const [simMemory, setSimMemory] = useState<SimMemory>({});
   const [simConversation, setSimConversation] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [simMessages, setSimMessages] = useState<Array<{ sender: "user" | "bot"; text: string }>>([
-    { sender: "bot", text: initialMessage + " Para começarmos, qual é o seu nome completo?" },
+    { sender: "bot", text: `Olá! Tudo bem? Sou a ${assistantName || "Ana"} da Âncora Corretora. Que ótimo falar com você! Para te passar as melhores opções de planos, como posso te chamar?` },
   ]);
   const [simInput, setSimInput] = useState("");
   const [simIsLoading, setSimIsLoading] = useState(false);
+
 
   const handleToggleEnabled = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextVal = e.target.checked;
@@ -804,8 +814,17 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </div>
         )}
 
-        {/* TAB 2: WHATSAPP DIAGNÓSTICO & TESTES */}
+        {/* TAB 2: ROTEIROS & SITUAÇÕES IA */}
+        {activeTab === "situational_playbooks" && (
+          <SituationalPlaybooksPanel
+            assistantName={assistantName}
+            onTestInSimulator={handleTestInSimulator}
+          />
+        )}
+
+        {/* TAB 7: WHATSAPP DIAGNÓSTICO & TESTES */}
         {activeTab === "whatsapp_diag" && (
+
           <div className="space-y-6">
             <div className="grid gap-6 md:grid-cols-3">
               <Card variant="subtle" className="rounded-xl border-border/80 md:col-span-1 space-y-4 p-5">
