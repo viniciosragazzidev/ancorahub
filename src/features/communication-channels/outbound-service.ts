@@ -113,10 +113,18 @@ export async function enqueueMetaTemplateMessage(input: {
   const delivery = await resolveInternalBrokerDeliveryRoute(input);
   const channelQuery = input.channelId
     ? and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId))
-    : and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), eq(schema.communicationChannels.registrationStatus, "registered"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true));
+    : and(
+        eq(schema.communicationChannels.tenantId, input.tenantId),
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+        eq(schema.communicationChannels.status, "active"),
+      );
   const [channel] = delivery.route === "waha_direct"
     ? []
-    : await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(channelQuery).limit(1);
+    : await db.select({ id: schema.communicationChannels.id })
+        .from(schema.communicationChannels)
+        .where(channelQuery)
+        .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+        .limit(1);
   if (delivery.route !== "waha_direct" && !channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const id = randomUUID();
   const now = new Date();
@@ -149,8 +157,16 @@ export async function enqueueMetaTextMessage(input: {
   const db = getDatabase();
   const channelQuery = input.channelId
     ? and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId))
-    : and(eq(schema.communicationChannels.tenantId, input.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.status, "active"), eq(schema.communicationChannels.registrationStatus, "registered"), isNull(schema.communicationChannels.branchId), eq(schema.communicationChannels.isDefault, true));
-  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(channelQuery).limit(1);
+    : and(
+        eq(schema.communicationChannels.tenantId, input.tenantId),
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+        eq(schema.communicationChannels.status, "active"),
+      );
+  const [channel] = await db.select({ id: schema.communicationChannels.id })
+    .from(schema.communicationChannels)
+    .where(channelQuery)
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+    .limit(1);
   if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
