@@ -75,7 +75,7 @@ export async function getSelectedInternalWahaNumber(tenantId: string, wahaNumber
     eq(schema.wahaNumbers.id, wahaNumberId),
     eq(schema.wahaNumbers.tenantId, tenantId),
     eq(schema.wahaNumbers.scope, "tenant"),
-    inArray(schema.wahaNumbers.status, ["active", "WORKING"]),
+    inArray(schema.wahaNumbers.status, ["active", "WORKING", "ready", "CONNECTED"]),
   )).limit(1);
 
   return number?.capabilities?.brokerFallback === false ? null : number ?? null;

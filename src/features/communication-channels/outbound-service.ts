@@ -267,7 +267,7 @@ export async function findActiveWahaFallbackNumber(tenantId: string, branchId?: 
     .where(
       and(
         eq(schema.wahaNumbers.tenantId, tenantId),
-        inArray(schema.wahaNumbers.status, ["WORKING", "active"]),
+        inArray(schema.wahaNumbers.status, ["WORKING", "active", "ready", "CONNECTED"]),
         ...(branchId ? [or(eq(schema.wahaNumbers.branchId, branchId), isNull(schema.wahaNumbers.branchId))] : []),
       ),
     )

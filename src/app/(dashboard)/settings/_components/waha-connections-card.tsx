@@ -168,7 +168,9 @@ export function WahaConnectionsCard({
   }
 
   const tenantNumbers = connections.filter(
-    (connection) => connection.scope === "tenant" && ["active", "WORKING"].includes(connection.status),
+    (connection) =>
+      connection.scope === "tenant" &&
+      ["active", "working", "ready", "connected"].includes(String(connection.status || "").toLowerCase()),
   );
 
   return (
