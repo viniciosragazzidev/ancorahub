@@ -20,6 +20,7 @@ import {
   createWahaConnectionAction,
   refreshWahaConnectionAction,
   updateWahaCapabilitiesAction,
+  updateInternalBrokerNotificationPolicyAction,
 } from "../waha-connection-actions";
 
 type Connection = {
@@ -37,14 +38,22 @@ type Connection = {
   };
 };
 
+type InternalNotificationPolicy = {
+  enabled: boolean;
+  deliveryMode: "meta_then_waha" | "waha_direct";
+  wahaNumberId: string | null;
+};
+
 export function WahaConnectionsCard({
   connections,
   role,
   enabled,
+  internalNotificationPolicy = null,
 }: {
   connections: Connection[];
   role: "director" | "manager";
   enabled: boolean;
+  internalNotificationPolicy?: InternalNotificationPolicy | null;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -102,6 +111,19 @@ export function WahaConnectionsCard({
     }
     toast.success("Funções do número atualizadas.");
   }
+  async function saveInternalPolicy(formData: FormData): Promise<void> {
+    setPending(true);
+    const result = await updateInternalBrokerNotificationPolicyAction(formData);
+    setPending(false);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(result.result.deliveryMode === "waha_direct" ? "Avisos internos serão enviados direto pelo WAHA." : "Meta voltou a ser o canal prioritário dos avisos internos.");
+    router.refresh();
+  }
+
+  const tenantNumbers = connections.filter((connection) => connection.scope === "tenant" && ["active", "WORKING"].includes(connection.status));
 
   return (
     <Card className="border-border bg-card shadow-none">
@@ -126,6 +148,40 @@ export function WahaConnectionsCard({
             <Button disabled={pending} type="submit">
               {pending ? "Iniciando..." : "Conectar número"}
             </Button>
+          </form>
+        ) : null}
+        {role === "director" ? (
+          <form action={saveInternalPolicy} className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Avisos internos aos corretores</p>
+                <p className="text-xs leading-5 text-muted-foreground">Esta regra afeta somente atribuições, reatribuições e alertas operacionais. Ela não altera o atendimento de leads.</p>
+              </div>
+              <label className="flex shrink-0 items-center gap-2 text-xs font-medium">
+                <input defaultChecked={internalNotificationPolicy?.enabled ?? true} name="enabled" type="checkbox" value="true" />
+                Ativar WAHA interno
+              </label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-medium">
+                Número oficial de avisos
+                <select defaultValue={internalNotificationPolicy?.wahaNumberId ?? ""} disabled={!enabled || pending} name="wahaNumberId" className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="">Não configurado</option>
+                  {tenantNumbers.map((connection) => <option key={connection.id} value={connection.id}>{connection.label ?? connection.displayPhoneNumber} · {connection.displayPhoneNumber}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium">
+                Entrega de avisos internos
+                <select defaultValue={internalNotificationPolicy?.deliveryMode ?? "meta_then_waha"} disabled={!enabled || pending} name="deliveryMode" className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="meta_then_waha">Meta primeiro; WAHA se a Meta falhar</option>
+                  <option value="waha_direct">WAHA direto — não enviar pela Meta</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground">O modo direto desativa a Meta apenas nestes avisos internos e exige um número WAHA ativo da empresa.</p>
+              <Button disabled={!enabled || pending} size="sm" type="submit" variant="outline">{pending ? "Salvando..." : "Salvar avisos internos"}</Button>
+            </div>
           </form>
         ) : null}
         {qrCode ? (

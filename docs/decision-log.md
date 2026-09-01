@@ -1,5 +1,21 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-089 — Número WAHA oficial para avisos internos ao corretor
+
+**Estado:** Aceita
+**Data:** 2026-09-01
+
+O Diretor pode selecionar um número WAHA ativo, pertencente ao escopo do próprio
+tenant, para avisos internos destinados aos corretores. A política possui dois
+modos reversíveis: `meta_then_waha`, que mantém a Meta como tentativa inicial e
+executa uma única contingência WAHA após falha confirmada, e `waha_direct`, que
+envia diretamente pelo número selecionado sem tentar a Meta.
+
+A política é restrita a eventos internos de atribuição e oferta de lead. Ela não
+altera atendimento de leads ou clientes, qualificação por IA, campanhas, canal
+oficial Meta ou conversas sincronizadas. A configuração é auditada por tenant e
+um kill switch global do Super-admin suspende o uso WAHA preservando a outbox.
+
 ## DEC-088 — Agenda pessoal opcional como critério de distribuição automática
 
 **Estado:** Aceita

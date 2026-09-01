@@ -2827,7 +2827,9 @@ export const whatsappOutboundMessages = pgTable(
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    channelId: text("channel_id").notNull().references(() => communicationChannels.id, { onDelete: "restrict" }),
+    channelId: text("channel_id").references(() => communicationChannels.id, { onDelete: "restrict" }),
+    deliveryRoute: text("delivery_route", { enum: ["meta_only", "meta_then_waha", "waha_direct"] }).notNull().default("meta_only"),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "set null" }),
     recipientType: text("recipient_type").notNull(),
     recipientId: text("recipient_id"),
     destinationPhone: text("destination_phone").notNull(),
@@ -2858,7 +2860,26 @@ export const whatsappOutboundMessages = pgTable(
     index("whatsapp_outbound_messages_queue_idx").on(table.status, table.nextAttemptAt, table.createdAt),
     index("whatsapp_outbound_messages_tenant_idx").on(table.tenantId, table.createdAt),
     index("whatsapp_outbound_messages_provider_idx").on(table.providerMessageId),
+    index("whatsapp_outbound_messages_waha_number_idx").on(table.wahaNumberId),
   ],
+);
+
+/**
+ * Delivery policy for operational notices sent to brokers. This is deliberately
+ * separate from the Meta channel because it must never affect lead attendance.
+ */
+export const tenantInternalNotificationSettings = pgTable(
+  "tenant_internal_notification_settings",
+  {
+    tenantId: text("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    deliveryMode: text("delivery_mode", { enum: ["meta_then_waha", "waha_direct"] }).notNull().default("meta_then_waha"),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("tenant_internal_notification_waha_idx").on(table.wahaNumberId)],
 );
 
 export const leadOffers = pgTable(

@@ -364,6 +364,7 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   const values = {
     enabled: formData.get("enabled") === "true" ? "true" : "false",
     aiEnabled: formData.get("aiEnabled") === "true" ? "true" : "false",
+    internalBrokerNotificationsEnabled: formData.get("internalBrokerNotificationsEnabled") === "true" ? "true" : "false",
     maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 5, 1, 10),
     retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
     leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
@@ -371,6 +372,7 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   await Promise.all([
     setSystemSetting("feature_waha_cadence_enabled", values.enabled, now),
     setSystemSetting("feature_waha_ai_enabled", values.aiEnabled, now),
+    setSystemSetting("feature_waha_internal_broker_notifications_enabled", values.internalBrokerNotificationsEnabled, now),
     setSystemSetting("waha_cadence_max_attempts", values.maxAttempts, now),
     setSystemSetting("waha_cadence_retry_base_seconds", values.retryBaseSeconds, now),
     setSystemSetting("waha_cadence_lease_seconds", values.leaseSeconds, now),

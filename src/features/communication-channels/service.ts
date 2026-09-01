@@ -12,6 +12,7 @@ import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { META_CLOUD_PROVIDER } from "./types";
 import type { MetaWebhookPayload } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
+import { dispatchWahaFallbackAfterMetaDeliveryFailure } from "./outbound-service";
 
 export async function isMetaCloudWhatsAppEnabled() {
   const [row] = await getDatabase()
@@ -328,7 +329,11 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             }
           }
         }
-        const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose });
+        const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose, deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute });
+
+        if (outbound?.deliveryRoute === "meta_then_waha" && ["failed", "deleted"].includes(status.status)) {
+          await dispatchWahaFallbackAfterMetaDeliveryFailure(outbound.id, channel.tenantId);
+        }
 
         if (outbound?.purpose === "brokerInvitation" && outbound.recipientId && ["delivered", "read"].includes(status.status)) {
           await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryMessageId: status.id, deliveredAt: new Date() }).where(and(eq(schema.brokerInvitations.id, outbound.recipientId), eq(schema.brokerInvitations.tenantId, channel.tenantId)));

@@ -54,6 +54,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita o agente de IA integrado ao WAHA.",
   },
 
+  WAHA_INTERNAL_BROKER_NOTIFICATIONS: {
+    key: "feature_waha_internal_broker_notifications_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o WAHA para avisos internos de distribuição destinados a corretores.",
+  },
+
   // ── IA / Qualificação ─────────────────────────────────────────────────────
   AI_ENABLED: {
     key: "ai_enabled",

@@ -82,6 +82,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_waha_cadence_enabled",
     "feature_waha_connections_enabled",
     "feature_waha_ai_enabled",
+    "feature_waha_internal_broker_notifications_enabled",
     "waha_cadence_max_attempts",
     "waha_cadence_retry_base_seconds",
     "waha_cadence_lease_seconds",
@@ -154,6 +155,7 @@ export default async function SuperAdminSettingsPage() {
   const wahaCadenceEnabled = settingMap.get("feature_waha_cadence_enabled") === "true";
   const wahaConnectionsEnabled = settingMap.get("feature_waha_connections_enabled") === "true";
   const wahaAiEnabled = settingMap.get("feature_waha_ai_enabled") === "true";
+  const wahaInternalBrokerNotificationsEnabled = settingMap.get("feature_waha_internal_broker_notifications_enabled") !== "false";
   const wahaMaxAttempts = settingMap.get("waha_cadence_max_attempts") ?? "5";
   const wahaRetryBaseSeconds = settingMap.get("waha_cadence_retry_base_seconds") ?? "60";
   const wahaLeaseSeconds = settingMap.get("waha_cadence_lease_seconds") ?? "120";
@@ -1343,6 +1345,21 @@ export default async function SuperAdminSettingsPage() {
                       <span className="font-medium">Cadências habilitadas</span>
                       <span className="block text-xs text-muted-foreground">
                         Pausa a fila sem apagar histórico.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm md:col-span-3">
+                    <input
+                      type="checkbox"
+                      name="internalBrokerNotificationsEnabled"
+                      value="true"
+                      defaultChecked={wahaInternalBrokerNotificationsEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">WAHA para avisos internos de corretores</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Kill switch reversível: não altera o atendimento de leads pelo canal oficial.
                       </span>
                     </span>
                   </label>
