@@ -6,15 +6,20 @@
 **Data:** 2026-09-01
 
 O Diretor pode selecionar um número WAHA ativo, pertencente ao escopo do próprio
-tenant, para avisos internos destinados aos corretores. A política possui dois
+tenant, para avisos internos e conversas operacionais com corretores. A política possui dois
 modos reversíveis: `meta_then_waha`, que mantém a Meta como tentativa inicial e
 executa uma única contingência WAHA após falha confirmada, e `waha_direct`, que
 envia diretamente pelo número selecionado sem tentar a Meta.
 
-A política é restrita a eventos internos de atribuição e oferta de lead. Ela não
-altera atendimento de leads ou clientes, qualificação por IA, campanhas, canal
-oficial Meta ou conversas sincronizadas. A configuração é auditada por tenant e
-um kill switch global do Super-admin suspende o uso WAHA preservando a outbox.
+A política é restrita a eventos internos de atribuição, oferta e conversa
+Diretor/Gestor–Corretor. Em `waha_direct`, a outbox usa exclusivamente o número
+selecionado: número pausado ou indisponível bloqueia o registro com motivo claro,
+sem fallback para Meta ou outra sessão WAHA. Saídas pertencem somente à outbox e
+entradas internas assinadas pertencem somente ao ledger de mensagens, idempotente
+por tenant e identificador do provedor. Ela não altera atendimento de leads ou
+clientes, qualificação por IA, campanhas ou o canal oficial Meta. A configuração
+é auditada por tenant e um kill switch global do Super-admin suspende o uso WAHA
+preservando a outbox.
 
 ## DEC-088 — Agenda pessoal opcional como critério de distribuição automática
 

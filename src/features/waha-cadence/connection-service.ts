@@ -165,6 +165,20 @@ export async function changeOwnWahaConnection(id: string, operation: "pause" | "
   }
   const now = new Date();
   await getDatabase().update(schema.wahaNumbers).set({ status: stateStatus, lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, id));
+  if (stateStatus === "active") {
+    await getDatabase().update(schema.whatsappOutboundMessages).set({
+      status: "queued",
+      providerErrorCode: null,
+      providerErrorMessage: "Número WAHA retomado; aguardando novo envio.",
+      nextAttemptAt: null,
+      updatedAt: now,
+    }).where(and(
+      eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+      eq(schema.whatsappOutboundMessages.wahaNumberId, id),
+      eq(schema.whatsappOutboundMessages.status, "pending"),
+      eq(schema.whatsappOutboundMessages.providerErrorCode, "WAHA_INTERNAL_NUMBER_UNAVAILABLE"),
+    ));
+  }
   await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id, acao: `waha_connection.resume:${number.scope}`, createdAt: now });
   return {
     sessionId: number.relaySessionId,

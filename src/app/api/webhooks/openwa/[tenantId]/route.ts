@@ -11,22 +11,25 @@ import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
 export async function POST(request: Request, { params }: { params: Promise<{ tenantId: string }> }) {
-  const { tenantId } = await params;
+  const { tenantId: routeTenantId } = await params;
   const raw = await request.text();
   let payload: OpenWaPayload;
   try { payload = JSON.parse(raw) as OpenWaPayload; } catch { return NextResponse.json({ accepted: true, discarded: true }); }
   const sessionId = String((payload as OpenWaPayload & { sessionId?: string }).sessionId ?? (payload.data as (OpenWaPayload & { sessionId?: string }) | undefined)?.sessionId ?? "");
+  if (!sessionId) return NextResponse.json({ accepted: true, discarded: true });
   const db = getDatabase();
-  const [connection] = await db.select({ id: schema.whatsappConnections.id, secret: schema.whatsappConnections.webhookSecret, active: schema.whatsappConnections.chatInternoAtivo, sessionId: schema.whatsappConnections.sessionId, userId: schema.whatsappConnections.userId }).from(schema.whatsappConnections).where(and(eq(schema.whatsappConnections.tenantId, tenantId), ...(sessionId ? [eq(schema.whatsappConnections.sessionId, sessionId)] : []))).limit(1);
+  const [connection] = await db.select({ id: schema.whatsappConnections.id, tenantId: schema.whatsappConnections.tenantId, secret: schema.whatsappConnections.webhookSecret, active: schema.whatsappConnections.chatInternoAtivo, sessionId: schema.whatsappConnections.sessionId, userId: schema.whatsappConnections.userId }).from(schema.whatsappConnections).where(eq(schema.whatsappConnections.sessionId, sessionId)).limit(1);
   if (!connection) return NextResponse.json({ accepted: true, discarded: true });
-  const effectiveSessionId = sessionId || connection.sessionId || "";
-  if (connection.secret) {
-    const provided = request.headers.get("x-openwa-signature") ?? request.headers.get("x-signature") ?? "";
-    const expected = createHmac("sha256", connection.secret).update(raw).digest("hex");
-    const left = Buffer.from(provided.replace(/^sha256=/, ""));
-    const right = Buffer.from(expected);
-    if (left.length !== right.length || !timingSafeEqual(left, right)) return NextResponse.json({ accepted: false, error: "Invalid signature" }, { status: 401 });
-  }
+  // The URL is only a routing hint. The tenant authority is the signed session.
+  if (connection.tenantId !== routeTenantId) return NextResponse.json({ accepted: true, discarded: true });
+  const tenantId = connection.tenantId;
+  const effectiveSessionId = connection.sessionId || "";
+  if (!connection.secret) return NextResponse.json({ accepted: false, error: "Unauthorized" }, { status: 401 });
+  const provided = request.headers.get("x-openwa-signature") ?? request.headers.get("x-signature") ?? "";
+  const expected = createHmac("sha256", connection.secret).update(raw).digest("hex");
+  const left = Buffer.from(provided.replace(/^sha256=/, ""));
+  const right = Buffer.from(expected);
+  if (left.length !== right.length || !timingSafeEqual(left, right)) return NextResponse.json({ accepted: false, error: "Invalid signature" }, { status: 401 });
   const eventName = String((payload as OpenWaPayload & { event?: string; type?: string }).event ?? (payload as OpenWaPayload & { type?: string }).type ?? "").toLowerCase();
   const eventData = payload.data ?? payload;
   const eventStatus = (eventData as OpenWaPayload & { status?: string; session?: { status?: string } }).status ?? (eventData as OpenWaPayload & { session?: { status?: string } }).session?.status;
@@ -78,6 +81,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   }
   if (!lead && !client && !isInternal) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
   const providerMessageId = event.id ?? event.messageId ?? null;
+  if (!providerMessageId) return NextResponse.json({ accepted: true, discarded: true });
+  // Internal conversation history owns inbound messages only; outgoing messages
+  // are represented by the outbox and must not be duplicated by WAHA echoes.
+  if (isInternal && isOutgoing) return NextResponse.json({ accepted: true, discarded: true });
   await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body: body || `[${messageKind}]`, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
   if (!isOutgoing && lead?.id && connection.userId) {
     const aiPromise = processInboundAiResponse({

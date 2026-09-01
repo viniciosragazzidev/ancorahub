@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 
 import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -21,6 +21,7 @@ import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
+import { getInternalBrokerNotificationPolicy } from "@/features/communication-channels/internal-notification-policy";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
@@ -59,7 +60,7 @@ export default async function ConversationsPage({
   const db = getDatabase();
 
   const isDirector = context.role === "director";
-  const canSeeBrokerTab = isDirector || context.role === "manager";
+  const canSeeBrokerTab = isDirector || (context.role === "manager" && Boolean(context.branchId));
   const officialBrokerTab = canSeeBrokerTab && tab === "corretores";
   const scope =
     context.role === "manager" && context.branchId
@@ -408,12 +409,23 @@ export default async function ConversationsPage({
   });
 
   let officialBrokerConversations: OfficialBrokerConversation[] = [];
-  const officialBrokerMessagesEnabled = officialBrokerTab
-    ? await isMetaCloudWhatsAppEnabled()
-    : false;
+  const [metaCloudEnabled, internalBrokerPolicy] = officialBrokerTab
+    ? await Promise.all([
+        isMetaCloudWhatsAppEnabled(),
+        getInternalBrokerNotificationPolicy(context.tenantId),
+      ])
+    : [false, null] as const;
+  const officialBrokerMessagesEnabled = metaCloudEnabled || Boolean(
+    internalBrokerPolicy?.enabled && internalBrokerPolicy.deliveryMode === "waha_direct" && internalBrokerPolicy.wahaNumberId,
+  );
+  const internalBrokerDeliveryChannel =
+    internalBrokerPolicy?.enabled &&
+    internalBrokerPolicy.deliveryMode === "waha_direct" &&
+    internalBrokerPolicy.wahaNumberId
+      ? "waha_direct" as const
+      : "meta" as const;
   if (officialBrokerTab && officialBrokerMessagesEnabled) {
-    const [brokers, invitations, outboundMessages, inboundMessages] = await Promise.all([
-      db
+    const brokers = await db
         .select({
           id: schema.brokerProfiles.id,
           userId: schema.brokerProfiles.userId,
@@ -429,8 +441,19 @@ export default async function ConversationsPage({
             eq(schema.branches.tenantId, context.tenantId),
           ),
         )
-        .where(eq(schema.brokerProfiles.tenantId, context.tenantId))
-        .orderBy(asc(schema.brokerProfiles.professionalName)),
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId!) : undefined,
+        ))
+        .orderBy(asc(schema.brokerProfiles.professionalName));
+    const brokerProfileIds = brokers.map((broker) => broker.id);
+    const brokerUserIds = brokers.flatMap((broker) => broker.userId ? [broker.userId] : []);
+    const brokerPhones = brokers.flatMap((broker) => {
+      const phone = normalizePhone(broker.phone);
+      return phone ? [phone] : [];
+    });
+    const [invitations, outboundMessages, inboundMessages] = brokerProfileIds.length > 0
+      ? await Promise.all([
       db
         .select({
           id: schema.brokerInvitations.id,
@@ -440,7 +463,7 @@ export default async function ConversationsPage({
           createdAt: schema.brokerInvitations.createdAt,
         })
         .from(schema.brokerInvitations)
-        .where(eq(schema.brokerInvitations.tenantId, context.tenantId))
+        .where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), inArray(schema.brokerInvitations.brokerProfileId, brokerProfileIds)))
         .orderBy(desc(schema.brokerInvitations.createdAt)),
       db
         .select({
@@ -457,6 +480,7 @@ export default async function ConversationsPage({
           deliveredAt: schema.whatsappOutboundMessages.deliveredAt,
           readAt: schema.whatsappOutboundMessages.readAt,
           attempts: schema.whatsappOutboundMessages.attempts,
+          deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute,
           providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
         })
         .from(schema.whatsappOutboundMessages)
@@ -471,6 +495,10 @@ export default async function ConversationsPage({
           and(
             eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
             eq(schema.whatsappOutboundMessages.recipientType, "user"),
+            or(
+              inArray(schema.whatsappOutboundMessages.recipientId, [...brokerProfileIds, ...brokerUserIds]),
+              inArray(schema.whatsappOutboundMessages.destinationPhone, brokerPhones),
+            ),
           ),
         )
         .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
@@ -488,11 +516,13 @@ export default async function ConversationsPage({
           and(
             eq(schema.whatsappMessages.tenantId, context.tenantId),
             eq(schema.whatsappMessages.direction, "incoming"),
+            inArray(schema.whatsappMessages.phone, brokerPhones),
           ),
         )
         .orderBy(desc(schema.whatsappMessages.sentAt))
         .limit(500),
-    ]);
+      ])
+      : [[], [], []] as const;
 
     const brokerByProfileId = new Map(brokers.map((b) => [b.id, b]));
     const brokerByUserId = new Map(brokers.filter((b) => b.userId).map((b) => [b.userId!, b]));
@@ -545,8 +575,8 @@ export default async function ConversationsPage({
         templateName: message.templateName === "__text__" ? undefined : message.templateName,
         attempts: message.attempts,
         error:
-          message.status === "failed"
-            ? message.providerErrorMessage ?? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe."
+          message.status === "failed" || (message.status === "pending" && Boolean(message.providerErrorMessage))
+            ? getOfficialBrokerDeliveryError(message.deliveryRoute, message.providerErrorMessage)
             : null,
       });
     }
@@ -648,6 +678,7 @@ export default async function ConversationsPage({
           {officialBrokerTab ? (
             <OfficialBrokerConversations
               enabled={officialBrokerMessagesEnabled}
+              deliveryChannel={internalBrokerDeliveryChannel}
               conversations={officialBrokerConversations}
             />
           ) : (
@@ -679,6 +710,12 @@ function normalizeOutboundStatus(status: string): OfficialBrokerMessage["status"
   return ["pending", "queued", "sent", "delivered", "read", "failed"].includes(status)
     ? (status as OfficialBrokerMessage["status"])
     : "queued";
+}
+function getOfficialBrokerDeliveryError(deliveryRoute: string, providerErrorMessage: string | null) {
+  if (deliveryRoute === "waha_direct") {
+    return "O WAHA não confirmou o envio. Verifique a conexão do número selecionado e tente novamente.";
+  }
+  return providerErrorMessage ?? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe.";
 }
 function formatOfficialOutboundBody(
   purpose: string,

@@ -9,15 +9,17 @@ import {
   relaySignature,
 } from "./contract";
 
+export type WahaTransport = "relay" | "fastify";
+
 /**
- * Keep the company-number flow on the same reachable Fastify base used by
- * broker Lite connections. A legacy WAHA_RELAY_URL must not shadow VPS_API_URL.
+ * A dedicated relay owns the /v1 contract. In its absence the VPS API is the
+ * Fastify transport and must never receive a speculative /v1 request.
  */
 export function resolveWahaRelayBaseUrl(environment: Record<string, string | undefined> = process.env) {
   const value = (
+    environment.WAHA_RELAY_URL ||
     environment.VPS_API_URL ||
     environment.WAHA_API_URL ||
-    environment.WAHA_RELAY_URL ||
     environment.NEXT_PUBLIC_VPS_API_URL
   )?.trim();
   if (!value) return null;
@@ -28,8 +30,15 @@ export function resolveWahaRelayBaseUrl(environment: Record<string, string | und
   }
 }
 
+export function resolveWahaTransport(environment: Record<string, string | undefined> = process.env): WahaTransport | null {
+  if (environment.WAHA_RELAY_URL?.trim()) return "relay";
+  if (environment.VPS_API_URL?.trim() || environment.WAHA_API_URL?.trim() || environment.NEXT_PUBLIC_VPS_API_URL?.trim()) return "fastify";
+  return null;
+}
+
 function relayConfig() {
   const url = resolveWahaRelayBaseUrl();
+  const transport = resolveWahaTransport();
 
   const secret = (
     process.env.WHATSAPP_API_INTERNAL_TOKEN ||
@@ -38,10 +47,10 @@ function relayConfig() {
     process.env.WAHA_RELAY_SHARED_SECRET
   )?.trim();
 
-  if (!url || !secret) {
+  if (!url || !secret || !transport) {
     throw new Error("Relay WAHA não configurado. Defina VPS_API_URL e WHATSAPP_API_INTERNAL_TOKEN no ambiente.");
   }
-  return { url, secret };
+  return { url, secret, transport };
 }
 
 function getFastifyHeaders(secret: string, hasBody: boolean) {
@@ -61,11 +70,10 @@ export async function sendWahaRelayMessage(input: {
 }) {
   const config = relayConfig();
   const payload = relaySendRequestSchema.parse({ requestId: randomUUID(), ...input });
-  const rawBody = JSON.stringify(payload);
-  const timestamp = String(Date.now());
-  const nonce = randomUUID();
-
-  try {
+  if (config.transport === "relay") {
+    const rawBody = JSON.stringify(payload);
+    const timestamp = String(Date.now());
+    const nonce = randomUUID();
     const response = await fetch(`${config.url}/v1/messages`, {
       method: "POST",
       headers: {
@@ -79,17 +87,17 @@ export async function sendWahaRelayMessage(input: {
       signal: AbortSignal.timeout(15_000),
     });
 
-    if (response.ok) {
-      const data = (await response.json().catch(() => null)) as { messageId?: string; errorCode?: string } | null;
-      if (data?.messageId) {
-        return { messageId: data.messageId };
-      }
+    const data = (await response.json().catch(() => null)) as { messageId?: string; errorCode?: string; error?: string } | null;
+    if (response.ok && data?.messageId) {
+      return { messageId: data.messageId };
     }
-  } catch {
-    // Fall through to Fastify endpoint
+    const error = new Error(`O relay WAHA não confirmou o envio (${data?.errorCode ?? data?.error ?? response.statusText}).`) as Error & { status?: number; code?: string };
+    error.status = response.status;
+    error.code = "relay_send_failed";
+    throw error;
   }
 
-  // Fallback para o Fastify /internal/waha/messages/text (usado pelo broker)
+  // VPS_API_URL uses Fastify's internal route directly.
   const phone = input.destination.replace(/\D/g, "");
   const fastifyRes = await fetch(`${config.url}/internal/waha/messages/text`, {
     method: "POST",
@@ -111,7 +119,6 @@ export async function sendWahaRelayMessage(input: {
       status: fastifyRes.status,
       errorDetail,
       sessionId: input.sessionId,
-      phone,
     });
     const error = new Error(`O serviço WAHA não confirmou o envio da mensagem (${errorDetail}).`) as Error & {
       status?: number;

@@ -153,7 +153,8 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       .where(
         and(
           eq(schema.brokerProfiles.tenantId, context.tenantId),
-          eq(schema.brokerProfiles.id, input.brokerProfileId)
+          eq(schema.brokerProfiles.id, input.brokerProfileId),
+          context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId ?? "__missing_branch__") : undefined,
         )
       )
       .limit(1);
@@ -176,7 +177,7 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
 
     const idempotencyKey = `broker-direct:${broker.id}:${Date.now()}`;
 
-    await enqueueMetaTextMessage({
+    const queued = await enqueueMetaTextMessage({
       tenantId: context.tenantId,
       channelId: channel?.id,
       recipientType: "user",
@@ -187,7 +188,27 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       idempotencyKey,
     });
 
-    await processMetaOutboundBatch(10, context.tenantId);
+    // Process precisely the message that was just created; older outbox records
+    // must not delay a director's conversation with a broker.
+    await processMetaOutboundBatch(1, context.tenantId, queued.id);
+    const [delivery] = await db
+      .select({
+        status: schema.whatsappOutboundMessages.status,
+        providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
+      })
+      .from(schema.whatsappOutboundMessages)
+      .where(and(
+        eq(schema.whatsappOutboundMessages.id, queued.id),
+        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+      ))
+      .limit(1);
+    if (!delivery || !["sent", "delivered", "read"].includes(delivery.status)) {
+      revalidatePath("/conversas");
+      return {
+        success: false,
+        error: delivery?.providerErrorMessage ?? "A mensagem ficou pendente de envio.",
+      };
+    }
 
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),

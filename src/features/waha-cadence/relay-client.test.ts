@@ -2,19 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { resolveWahaRelayBaseUrl } from "./relay-client";
+import { resolveWahaRelayBaseUrl, resolveWahaTransport } from "./relay-client";
 
 describe("resolveWahaRelayBaseUrl", () => {
-  it("uses the same VPS address preferred by the broker Lite connection", () => {
+  it("uses a dedicated relay only when it is explicitly configured", () => {
     expect(resolveWahaRelayBaseUrl({
       VPS_API_URL: "https://working-relay.example.com",
-      WAHA_RELAY_URL: "https://stale-relay.example.com",
-    })).toBe("https://working-relay.example.com");
+      WAHA_RELAY_URL: "https://dedicated-relay.example.com",
+    })).toBe("https://dedicated-relay.example.com");
+    expect(resolveWahaTransport({
+      VPS_API_URL: "https://working-relay.example.com",
+      WAHA_RELAY_URL: "https://dedicated-relay.example.com",
+    })).toBe("relay");
   });
 
-  it("uses the dedicated relay URL only when the VPS address is absent", () => {
-    expect(resolveWahaRelayBaseUrl({
-      WAHA_RELAY_URL: "https://relay.example.com/",
-    })).toBe("https://relay.example.com");
+  it("uses Fastify directly when only VPS_API_URL is configured", () => {
+    expect(resolveWahaRelayBaseUrl({ VPS_API_URL: "https://api.example.com/" })).toBe("https://api.example.com");
+    expect(resolveWahaTransport({ VPS_API_URL: "https://api.example.com/" })).toBe("fastify");
   });
 });

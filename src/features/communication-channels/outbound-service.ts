@@ -25,16 +25,32 @@ export type WhatsAppOutboundStatus = (typeof whatsappOutboundStatusValues)[numbe
 
 type DeliveryRoute = "meta_only" | "meta_then_waha" | "waha_direct";
 
+export function selectInternalBrokerDeliveryRoute(input: {
+  enabled: boolean;
+  deliveryMode: "meta_then_waha" | "waha_direct";
+  configuredWahaNumberId: string | null;
+  activeWahaNumberId: string | null;
+}): { route: DeliveryRoute; wahaNumberId: string | null } {
+  if (!input.enabled) return { route: "meta_only", wahaNumberId: null };
+  if (input.deliveryMode === "waha_direct") {
+    return { route: "waha_direct", wahaNumberId: input.configuredWahaNumberId };
+  }
+  if (!input.activeWahaNumberId) return { route: "meta_only", wahaNumberId: null };
+  return { route: "meta_then_waha", wahaNumberId: input.activeWahaNumberId };
+}
+
 async function resolveInternalBrokerDeliveryRoute(input: { tenantId: string; recipientType: string; purpose: string }) {
   if (!isInternalBrokerNotice(input)) return { route: "meta_only" as const, wahaNumberId: null };
   const policy = await getInternalBrokerNotificationPolicy(input.tenantId);
-  if (!policy.enabled) return { route: "meta_only" as const, wahaNumberId: null };
-  let number = await getSelectedInternalWahaNumber(input.tenantId, policy.wahaNumberId);
-  if (!number) {
-    number = await findActiveWahaFallbackNumber(input.tenantId, null, "brokerFallback");
-  }
-  if (!number) return { route: "meta_only" as const, wahaNumberId: null };
-  return { route: policy.deliveryMode as DeliveryRoute, wahaNumberId: number.id };
+  const selected = await getSelectedInternalWahaNumber(input.tenantId, policy.wahaNumberId);
+  // Preserve the director's explicit choice. A paused or unavailable direct
+  // number is blocked later by the outbox instead of silently changing channel.
+  return selectInternalBrokerDeliveryRoute({
+    enabled: policy.enabled,
+    deliveryMode: policy.deliveryMode,
+    configuredWahaNumberId: policy.wahaNumberId,
+    activeWahaNumberId: selected?.id ?? null,
+  });
 }
 
 export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean; attempts: number }) {
@@ -308,18 +324,18 @@ type WahaDeliveryRow = {
 };
 
 async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direct" | "fallback") {
-  let number = await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId);
+  const number = await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId);
   if (!number) {
-    number = await findActiveWahaFallbackNumber(row.tenantId, null, "brokerFallback");
+    const error = new Error("O número WAHA selecionado para avisos internos está pausado ou indisponível.") as Error & { code?: string };
+    error.code = "WAHA_INTERNAL_NUMBER_UNAVAILABLE";
+    throw error;
   }
-  if (!number) throw new Error("O número WAHA oficial de avisos internos não está ativo.");
   const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
   const body = row.messageType === "text" ? variables[0] ?? "" : resolveTemplateTextBody(row.purpose, variables);
   console.info("[waha_internal_outbound] sending notice", {
     outboundId: row.id,
     mode,
     relaySessionId: number.relaySessionId,
-    destinationPhone: row.destinationPhone,
   });
   const sent = await sendWahaRelayMessage({
     idempotencyKey: `waha-${mode}-${row.id}-${row.attempts}`,
@@ -339,19 +355,6 @@ async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direc
     nextAttemptAt: null,
     updatedAt: now,
   }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
-
-  await db.insert(schema.whatsappMessages).values({
-    id: randomUUID(),
-    tenantId: row.tenantId,
-    provider: "waha",
-    providerStatus: "sent",
-    messageId: sent.messageId,
-    phone: row.destinationPhone.replace(/\D/g, ""),
-    direction: "outgoing",
-    body,
-    sentAt: now,
-    createdAt: now,
-  }).catch(() => {});
 
   return sent;
 }
@@ -386,11 +389,18 @@ export async function dispatchWahaFallbackAfterMetaDeliveryFailure(outboundId: s
   }
 }
 
-export async function processMetaOutboundBatch(limit = 10, tenantId?: string): Promise<{ processed: number; sent: number; failed: number; retried: number }> {
+export async function processMetaOutboundBatch(limit = 10, tenantId?: string, outboundId?: string): Promise<{ processed: number; sent: number; failed: number; retried: number }> {
   const db = getDatabase();
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 50);
   const now = new Date();
-  const rows = await db.select().from(schema.whatsappOutboundMessages).where(and(tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined, or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")), or(lte(schema.whatsappOutboundMessages.scheduledAt, now), isNull(schema.whatsappOutboundMessages.scheduledAt)), or(lte(schema.whatsappOutboundMessages.nextAttemptAt, now), isNull(schema.whatsappOutboundMessages.nextAttemptAt)))).orderBy(asc(schema.whatsappOutboundMessages.createdAt)).limit(safeLimit);
+  const rows = await db.select().from(schema.whatsappOutboundMessages).where(and(
+    tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined,
+    outboundId ? eq(schema.whatsappOutboundMessages.id, outboundId) : undefined,
+    or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")),
+    or(isNull(schema.whatsappOutboundMessages.providerErrorCode), ne(schema.whatsappOutboundMessages.providerErrorCode, "WAHA_INTERNAL_NUMBER_UNAVAILABLE")),
+    or(lte(schema.whatsappOutboundMessages.scheduledAt, now), isNull(schema.whatsappOutboundMessages.scheduledAt)),
+    or(lte(schema.whatsappOutboundMessages.nextAttemptAt, now), isNull(schema.whatsappOutboundMessages.nextAttemptAt)),
+  )).orderBy(asc(schema.whatsappOutboundMessages.createdAt)).limit(safeLimit);
   let sent = 0;
   let failed = 0;
   let retried = 0;
@@ -441,8 +451,22 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string): P
       }
 
       if (row.deliveryRoute === "waha_direct") {
-        await sendSelectedWahaInternalNotice({ ...row, attempts: row.attempts + 1 }, "direct");
-        sent += 1;
+        try {
+          await sendSelectedWahaInternalNotice({ ...row, attempts: row.attempts + 1 }, "direct");
+          sent += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message.slice(0, 240) : "Número WAHA interno indisponível.";
+          const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code ?? "WAHA_DIRECT_SEND_FAILED") : "WAHA_DIRECT_SEND_FAILED";
+          await db.update(schema.whatsappOutboundMessages).set({
+            status: "pending",
+            attempts: row.attempts,
+            nextAttemptAt: null,
+            providerErrorCode: code,
+            providerErrorMessage: message,
+            updatedAt: new Date(),
+          }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+          failed += 1;
+        }
         return;
       }
 
