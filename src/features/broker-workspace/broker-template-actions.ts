@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -103,7 +104,6 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
     // Processar batch imediatamente
     await processMetaOutboundBatch(10, context.tenantId);
 
-    // Registrar log de auditoria
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
       userId: context.userId,
@@ -111,6 +111,10 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
       entidadeId: context.tenantId,
       acao: `disparo_template_corretores:${parsed.templateType}:${sentCount}_enviados`,
     });
+
+    try {
+      revalidatePath("/conversas");
+    } catch {}
 
     return {
       success: true,
@@ -192,6 +196,10 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       entidadeId: broker.id,
       acao: "mensagem_direta_corretor_enviada",
     });
+
+    try {
+      revalidatePath("/conversas");
+    } catch {}
 
     return { success: true };
   } catch (error) {

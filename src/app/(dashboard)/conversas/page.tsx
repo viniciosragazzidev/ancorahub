@@ -488,7 +488,6 @@ export default async function ConversationsPage({
           and(
             eq(schema.whatsappMessages.tenantId, context.tenantId),
             eq(schema.whatsappMessages.direction, "incoming"),
-            isNull(schema.whatsappMessages.leadId),
           ),
         )
         .orderBy(desc(schema.whatsappMessages.sentAt))
