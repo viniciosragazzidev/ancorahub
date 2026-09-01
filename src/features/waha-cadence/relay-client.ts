@@ -197,15 +197,15 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
     decodeURIComponent(path.split("/")[3]?.split("?")[0] ?? "");
 
   let fallbackUrl = `${config.url}/internal/waha/connections`;
-  let fallbackBody = rawBody;
-  let fallbackMethod = method;
+  const tenantId = (payload as { tenantId?: string })?.tenantId || "system";
+  const userId = (payload as { userId?: string })?.userId || "system";
 
   if (method === "POST" && path === "/v1/sessions") {
     fallbackUrl = `${config.url}/internal/waha/connections`;
     fallbackBody = JSON.stringify({
       sessionName: sessionId,
-      tenantId: "system",
-      userId: "system",
+      tenantId,
+      userId,
     });
   } else if (method === "GET" && sessionId) {
     fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/status`;

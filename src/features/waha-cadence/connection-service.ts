@@ -57,16 +57,32 @@ export async function createOwnWahaConnection(input: { label: string }) {
   const scope = scopeFor(context);
   const id = randomUUID();
   const relaySessionId = `ancora-${context.tenantId.slice(0, 8)}-${id.slice(0, 8)}`.toLowerCase();
-  const initial = await createWahaRelaySession(relaySessionId);
+  const initial = await createWahaRelaySession(relaySessionId, {
+    tenantId: context.tenantId,
+    userId: context.userId,
+  });
   const now = new Date();
   await getDatabase().insert(schema.wahaNumbers).values({
-    id, relaySessionId, label, tenantId: context.tenantId, branchId: scope === "branch" ? context.branchId : null,
-    scope, status: initial.status, displayPhoneNumber: initial.displayPhoneNumber ?? "Aguardando leitura do QR",
-    capabilities: { inbound: true, cadence: false, ai: false }, createdBy: context.userId, lastHealthAt: now, updatedAt: now,
+    id,
+    relaySessionId,
+    label,
+    tenantId: context.tenantId,
+    branchId: scope === "branch" ? context.branchId : null,
+    scope,
+    status: initial.status,
+    displayPhoneNumber: initial.displayPhoneNumber ?? `Pendente (${id.slice(0, 6)})`,
+    capabilities: { inbound: true, cadence: false, ai: false },
+    createdBy: context.userId,
+    lastHealthAt: now,
+    updatedAt: now,
   });
   await getDatabase().insert(schema.auditLogs).values({
-    id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id,
-    acao: `waha_connection.created:${scope}`, createdAt: now,
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "waha_number",
+    entidadeId: id,
+    acao: `waha_connection.created:${scope}`,
+    createdAt: now,
   });
   return { id, ...initial };
 }
@@ -105,9 +121,33 @@ export async function changeOwnWahaConnection(id: string, operation: "pause" | "
   await assertAvailable(context);
   const [number] = await getDatabase().select().from(schema.wahaNumbers).where(whereOwnNumber(context, id)).limit(1);
   if (!number) throw new Error("Número não encontrado.");
-  const state = operation === "pause" ? await pauseWahaRelaySession(number.relaySessionId) : operation === "resume" ? await resumeWahaRelaySession(number.relaySessionId) : await disconnectWahaRelaySession(number.relaySessionId);
+
+  if (operation === "disconnect") {
+    await disconnectWahaRelaySession(number.relaySessionId).catch(() => null);
+    await getDatabase().delete(schema.wahaNumbers).where(eq(schema.wahaNumbers.id, id));
+    await getDatabase().insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "waha_number",
+      entidadeId: id,
+      acao: `waha_connection.deleted:${number.scope}`,
+      createdAt: new Date(),
+    });
+    return {
+      sessionId: number.relaySessionId,
+      status: "offline" as const,
+      displayPhoneNumber: null,
+      qrCode: null,
+    };
+  }
+
+  const state = operation === "pause" ? await pauseWahaRelaySession(number.relaySessionId) : await resumeWahaRelaySession(number.relaySessionId);
   const now = new Date();
   await getDatabase().update(schema.wahaNumbers).set({ status: state.status, displayPhoneNumber: state.displayPhoneNumber ?? number.displayPhoneNumber, lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, id));
   await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id, acao: `waha_connection.${operation}:${number.scope}`, createdAt: now });
   return state;
+}
+
+export async function deleteOwnWahaConnection(id: string) {
+  return changeOwnWahaConnection(id, "disconnect");
 }

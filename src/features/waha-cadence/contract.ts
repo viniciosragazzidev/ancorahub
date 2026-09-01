@@ -44,7 +44,9 @@ export const relaySendRequestSchema = z.object({
 
 export const relaySessionCreateSchema = z.object({
   sessionId: z.string().regex(/^[a-z0-9-]{8,120}$/),
-}).strict();
+  tenantId: z.string().optional(),
+  userId: z.string().optional(),
+});
 
 export const relaySessionStateSchema = z.object({
   sessionId: z.string().min(1).max(120),
@@ -246,7 +248,6 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
     },
   };
 }
-
 
 export function normalizePhone(value: string) {
   return value.replace(/\D/g, "");

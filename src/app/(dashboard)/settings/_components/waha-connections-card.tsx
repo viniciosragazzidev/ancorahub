@@ -454,9 +454,7 @@ export function WahaConnectionsCard({
             <DialogHeader>
               <DialogTitle>Desconectar este número?</DialogTitle>
               <DialogDescription>
-                O número {disconnectTarget?.displayPhoneNumber ?? ""} deixará de enviar e receber
-                mensagens pelo CRM. O histórico é preservado e você pode conectá-lo novamente
-                depois.
+                A sessão do número {disconnectTarget?.displayPhoneNumber ?? ""} será desconectada do servidor e removida do CRM para que você possa gerar uma nova conexão limpa.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
