@@ -53,7 +53,7 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
       key: "analysisDebounceSeconds",
       resolutionStrategy: "ROOT_ONLY",
       overrideAllowedAt: [],
-      validator: (val) => ({
+      validator: (val: unknown) => ({
         valid: typeof val === "number" && val >= 10 && val <= 300,
         error: "analysisDebounceSeconds deve estar entre 10 e 300 segundos",
       }),
@@ -62,7 +62,7 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
       key: "periodicReconciliationMinutes",
       resolutionStrategy: "ROOT_ONLY",
       overrideAllowedAt: [],
-      validator: (val) => ({
+      validator: (val: unknown) => ({
         valid: typeof val === "number" && val >= 15,
         error: "periodicReconciliationMinutes deve ser no mínimo 15 minutos",
       }),
@@ -71,7 +71,7 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
       key: "confidenceThresholdAuto",
       resolutionStrategy: "RESTRICTIVE_INTERSECTION",
       overrideAllowedAt: ["TENANT"],
-      validator: (val) => ({
+      validator: (val: unknown) => ({
         valid: typeof val === "number" && val >= 0.85 && val <= 1.0,
         error: "confidenceThresholdAuto deve ser entre 0.85 e 1.0",
       }),
@@ -80,7 +80,7 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
       key: "confidenceThresholdSuggest",
       resolutionStrategy: "NEAREST_OVERRIDE_WINS",
       overrideAllowedAt: ["TENANT", "UNIT"],
-      validator: (val) => ({
+      validator: (val: unknown) => ({
         valid: typeof val === "number" && val >= 0.50 && val < 0.90,
         error: "confidenceThresholdSuggest deve ser entre 0.50 e 0.89",
       }),
