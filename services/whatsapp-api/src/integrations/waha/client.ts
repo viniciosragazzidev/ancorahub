@@ -248,13 +248,30 @@ export class WahaClient {
    */
   async createSession(name: string): Promise<WahaSession> {
     try {
+      const webhookUrl =
+        process.env.WHATSAPP_HOOK_URL?.trim() ||
+        (process.env.INTERNAL_API_URL
+          ? `${process.env.INTERNAL_API_URL}/internal/webhooks/waha`
+          : "http://api:3000/internal/webhooks/waha");
+
       await this.request(`/api/sessions/`, {
         method: "POST",
         timeoutMs: 8_000,
-        body: { name },
+        body: {
+          name,
+          config: {
+            webhooks: [
+              {
+                url: webhookUrl,
+                events: ["message", "message.any", "session.status", "message.ack"],
+              },
+            ],
+          },
+        },
         headers: { "content-type": "application/json" },
       });
     } catch (error) {
+
       // 409 = sessão já existe — resolver existente e retornar
       if (error instanceof WahaClientError && error.providerStatusCode === 409) {
         const existing = await this.getSession(name);
@@ -343,7 +360,7 @@ export class WahaClient {
       });
       return { operation: "stop", outcome: "completed" };
     } catch (error) {
-      if (isExpectedCleanupError(error)) {
+      if (isExpectedCleanupError(error, "stop")) {
         return cleanupIgnored("stop", error);
       }
       throw error;
@@ -364,7 +381,7 @@ export class WahaClient {
       });
       cleanup.push({ operation: "logout", outcome: "completed" });
     } catch (error) {
-      if (!isExpectedCleanupError(error)) throw error;
+      if (!isExpectedCleanupError(error, "logout")) throw error;
       cleanup.push(cleanupIgnored("logout", error));
     }
 
@@ -375,7 +392,7 @@ export class WahaClient {
       });
       cleanup.push({ operation: "delete", outcome: "completed" });
     } catch (error) {
-      if (!isExpectedCleanupError(error)) throw error;
+      if (!isExpectedCleanupError(error, "delete")) throw error;
       cleanup.push(cleanupIgnored("delete", error));
     }
     return cleanup;
@@ -456,8 +473,18 @@ function isTimeoutError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "TimeoutError";
 }
 
-function isExpectedCleanupError(error: unknown): error is WahaClientError {
-  return error instanceof WahaClientError && (error.providerStatusCode === 400 || error.providerStatusCode === 404);
+function isExpectedCleanupError(
+  error: unknown,
+  operation: WahaRecoveryCleanup["operation"],
+): error is WahaClientError {
+  if (!(error instanceof WahaClientError)) return false;
+
+  // WAHA pode sinalizar que stop/logout já não se aplicam à sessão com 400,
+  // 404, 422 ou 425 (not in valid state — ex.: logout em sessão que não está
+  // WORKING). Isso é seguro para o cleanup: a remoção ainda é tentada.
+  // Não toleramos 422/425 no DELETE, pois a sessão pode continuar ativa.
+  if (operation === "delete") return error.providerStatusCode === 404;
+  return [400, 404, 422, 425].includes(error.providerStatusCode ?? 0);
 }
 
 function cleanupIgnored(operation: WahaRecoveryCleanup["operation"], error: WahaClientError): WahaRecoveryCleanup {

@@ -1,99 +1,74 @@
 "use client";
 
 import type { Column } from "@tanstack/react-table";
-import {
-  ChevronDown,
-  ChevronsUpDown,
-  ChevronUp,
-  EyeOff,
-  X,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, EyeOff } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 
 interface DataTableColumnHeaderProps<TData, TValue>
-  extends React.ComponentProps<typeof DropdownMenuTrigger> {
+  extends React.HTMLAttributes<HTMLDivElement> {
   column: Column<TData, TValue>;
-  label: string;
+  title: string;
 }
 
 export function DataTableColumnHeader<TData, TValue>({
   column,
-  label,
+  title,
   className,
-  ...props
 }: DataTableColumnHeaderProps<TData, TValue>) {
-  if (!column.getCanSort() && !column.getCanHide()) {
-    return <div className={cn(className)}>{label}</div>;
+  if (!column.getCanSort()) {
+    return <div className={cn("text-xs font-semibold text-muted-foreground", className)}>{title}</div>;
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        className={cn(
-          "-ml-1.5 flex h-8 items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring data-[state=open]:bg-accent [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground",
-          className,
-        )}
-        {...props}
-      >
-        {label}
-        {column.getCanSort() &&
-          (column.getIsSorted() === "desc" ? (
-            <ChevronDown />
-          ) : column.getIsSorted() === "asc" ? (
-            <ChevronUp />
-          ) : (
-            <ChevronsUpDown />
-          ))}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-28">
-        {column.getCanSort() && (
-          <>
-            <DropdownMenuCheckboxItem
-              className="relative pr-8 pl-2 [&>span:first-child]:right-2 [&>span:first-child]:left-auto [&_svg]:text-muted-foreground"
-              checked={column.getIsSorted() === "asc"}
-              onClick={() => column.toggleSorting(false)}
+    <div className={cn("flex items-center space-x-2", className)}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="xs"
+              className="-ml-3 h-8 text-xs font-semibold hover:bg-muted/50"
             >
-              <ChevronUp />
-              Asc
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              className="relative pr-8 pl-2 [&>span:first-child]:right-2 [&>span:first-child]:left-auto [&_svg]:text-muted-foreground"
-              checked={column.getIsSorted() === "desc"}
-              onClick={() => column.toggleSorting(true)}
-            >
-              <ChevronDown />
-              Desc
-            </DropdownMenuCheckboxItem>
-            {column.getIsSorted() && (
-              <DropdownMenuItem
-                className="pl-2 [&_svg]:text-muted-foreground"
-                onClick={() => column.clearSorting()}
-              >
-                <X />
-                Reset
+              <span>{title}</span>
+              {column.getIsSorted() === "desc" ? (
+                <ArrowDown className="ml-1.5 h-3.5 w-3.5 text-primary" />
+              ) : column.getIsSorted() === "asc" ? (
+                <ArrowUp className="ml-1.5 h-3.5 w-3.5 text-primary" />
+              ) : (
+                <ChevronsUpDown className="ml-1.5 h-3.5 w-3.5 opacity-50" />
+              )}
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="start" className="w-36">
+          <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
+            <ArrowUp className="mr-2 h-3.5 w-3.5 text-muted-foreground/70" />
+            Crescente
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
+            <ArrowDown className="mr-2 h-3.5 w-3.5 text-muted-foreground/70" />
+            Decrescente
+          </DropdownMenuItem>
+          {column.getCanHide() && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
+                <EyeOff className="mr-2 h-3.5 w-3.5 text-muted-foreground/70" />
+                Ocultar
               </DropdownMenuItem>
-            )}
-          </>
-        )}
-        {column.getCanHide() && (
-          <DropdownMenuCheckboxItem
-            className="relative pr-8 pl-2 [&>span:first-child]:right-2 [&>span:first-child]:left-auto [&_svg]:text-muted-foreground"
-            checked={!column.getIsVisible()}
-            onClick={() => column.toggleVisibility(false)}
-          >
-            <EyeOff />
-            Hide
-          </DropdownMenuCheckboxItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

@@ -81,20 +81,31 @@ async function trySetting(key: string): Promise<string | null> {
 }
 
 async function resolveProviderConfigs(tenantId: string): Promise<ProviderConfig[]> {
-  const [groqKeySetting, openrouterKeySetting, groqModelSetting, openrouterModelSetting] = await Promise.all([
+  const [
+    groqKeySetting,
+    tenantGroqKeySetting,
+    openrouterKeySetting,
+    tenantOpenrouterKeySetting,
+    groqModelSetting,
+    openrouterModelSetting,
+  ] = await Promise.all([
     trySetting("ai_groq_api_key"),
+    trySetting(`groq_key_${tenantId}`),
+    trySetting("ai_openrouter_api_key"),
     trySetting(`openrouter_key_${tenantId}`),
     trySetting(`groq_model_${tenantId}`),
     trySetting(`openrouter_model_${tenantId}`),
   ]);
 
-  const groqApiKey = process.env.GROQ_API_KEY || groqKeySetting || "";
-  const openrouterApiKey = process.env.OPENROUTER_API_KEY || openrouterKeySetting || "";
+  const groqApiKey = process.env.GROQ_API_KEY || tenantGroqKeySetting || groqKeySetting || "";
+  const openrouterApiKey = process.env.OPENROUTER_API_KEY || tenantOpenrouterKeySetting || openrouterKeySetting || "";
+
 
   const groqModel =
     process.env.GROQ_MODEL?.trim() ||
     groqModelSetting ||
     DEFAULT_GROQ_MODEL;
+
   const openrouterModel =
     openrouterModelSetting && openrouterModelSetting !== LEGACY_OPENROUTER_MODEL
       ? openrouterModelSetting
@@ -144,7 +155,6 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
     }
 
     // Se um provedor/modelo já respondeu nesta conversa, tente-o primeiro
-    // (mantém a continuidade dos retries de correção no mesmo modelo).
     if (input.prefer) {
       const index = pairs.findIndex(
         (pair) => pair.provider === input.prefer?.provider && pair.model === input.prefer?.model,
@@ -161,7 +171,7 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
       try {
         const response = await fetch(pair.endpoint, {
           method: "POST",
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(12000),
           headers: {
             "Authorization": `Bearer ${pair.apiKey}`,
             "Content-Type": "application/json",

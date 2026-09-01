@@ -8,7 +8,12 @@ import { createTeamUser } from "@/features/team/create-user";
 import { generatePasswordResetLinkForMember } from "@/features/team/password-recovery";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { requireCanCreateRole, requireCanManageMember } from "@/shared/auth/team-permissions";
+import {
+  requireCanCreateRole,
+  requireCanManageMember,
+  canManageMember,
+  requireCanUpdateMemberAuthority,
+} from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "@/features/team/onboarding-helpers";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
@@ -96,13 +101,21 @@ export async function updateTeamMemberAction(
       throw new Error("Membro nao encontrado.");
     }
 
-    requireCanManageMember(context, {
-      role: member.role,
-      branchId: member.branchId,
-      userId: member.userId,
+    const normalizedBranchId = input.branchId || null;
+    requireCanUpdateMemberAuthority({
+      actorContext: context,
+      targetMember: {
+        role: member.role,
+        branchId: member.branchId,
+        userId: member.userId,
+      },
+      proposed: {
+        role: input.role,
+        branchId: normalizedBranchId,
+        customRoleScope: member.customRoleScope,
+      },
     });
 
-    const normalizedBranchId = input.branchId || null;
     const requiresBranch = requiresMemberBranch({
       jobTitle: input.jobTitle,
       customRoleScope: member.customRoleScope,
@@ -110,12 +123,6 @@ export async function updateTeamMemberAction(
     if (requiresBranch && !normalizedBranchId) {
       throw new Error("Gestor e Corretor, ou cargos limitados a uma unidade, precisam de uma unidade vinculada.");
     }
-
-    if (context.role === "manager" && context.branchId && normalizedBranchId !== context.branchId) {
-      throw new Error("Gestores so podem manter corretores na propria filial.");
-    }
-
-    requireCanCreateRole(context, input.role);
 
     const branchRows = normalizedBranchId
       ? await db
@@ -186,87 +193,73 @@ export async function bulkToggleTeamMemberStatusAction(
     const db = getDatabase();
 
     const nextActive = targetStatus === "active";
-    let updatedCount = 0;
-    const errorMessages: string[] = [];
 
+    // 1. ATOMIC_DENY Pre-Validation: Verifica se todos os membros pertencem ao tenant e se o ator tem autoridade sobre cada um
+    const memberRecords = [];
     for (const memberId of memberIds) {
-      try {
-        const [member] = await db
-          .select({
-            membershipId: schema.tenantMemberships.id,
-            userId: schema.user.id,
-            role: schema.tenantMemberships.role,
-            branchId: schema.tenantMemberships.branchId,
-            status: schema.user.status,
-          })
-          .from(schema.tenantMemberships)
-          .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-          .where(
-            and(
-              eq(schema.tenantMemberships.id, memberId),
-              eq(schema.tenantMemberships.tenantId, context.tenantId),
-            ),
-          )
-          .limit(1);
+      const [member] = await db
+        .select({
+          membershipId: schema.tenantMemberships.id,
+          userId: schema.user.id,
+          role: schema.tenantMemberships.role,
+          branchId: schema.tenantMemberships.branchId,
+          status: schema.user.status,
+        })
+        .from(schema.tenantMemberships)
+        .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+        .where(
+          and(
+            eq(schema.tenantMemberships.id, memberId),
+            eq(schema.tenantMemberships.tenantId, context.tenantId),
+          ),
+        )
+        .limit(1);
 
-        if (!member) {
-          errorMessages.push(`Membro ${memberId} não encontrado.`);
-          continue;
-        }
-
-        requireCanManageMember(context, {
-          role: member.role,
-          branchId: member.branchId,
-          userId: member.userId,
-        });
-
-        await db.transaction(async (tx) => {
-          await tx.update(schema.user).set({
-            active: nextActive,
-            status: nextActive ? "active" : "disabled",
-            updatedAt: new Date(),
-          }).where(eq(schema.user.id, member.userId));
-
-          await tx.update(schema.tenantMemberships).set({
-            status: nextActive ? "active" : "inactive",
-            updatedAt: new Date(),
-          }).where(eq(schema.tenantMemberships.id, member.membershipId));
-
-          await tx.insert(schema.auditLogs).values({
-            id: randomUUID(),
-            userId: context.userId,
-            entidade: "tenant_membership",
-            entidadeId: member.membershipId,
-            acao: nextActive ? "reativou_membro" : "desativou_membro",
-          });
-
-          if (!nextActive) {
-            await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
-          }
-        });
-
-        updatedCount++;
-      } catch (error) {
-        errorMessages.push(error instanceof Error ? error.message : "Erro desconhecido");
+      if (!member) {
+        return { error: `Membro ${memberId} não encontrado ou não pertence a este tenant.` };
       }
+
+      if (!canManageMember(context, { role: member.role, branchId: member.branchId, userId: member.userId })) {
+        return { error: `Você não tem permissão para alterar o status do membro ${memberId}.` };
+      }
+
+      memberRecords.push(member);
+    }
+
+    let updatedCount = 0;
+    for (const member of memberRecords) {
+      await db.transaction(async (tx) => {
+        await tx.update(schema.user).set({
+          active: nextActive,
+          status: nextActive ? "active" : "disabled",
+          updatedAt: new Date(),
+        }).where(eq(schema.user.id, member.userId));
+
+        await tx.update(schema.tenantMemberships).set({
+          status: nextActive ? "active" : "inactive",
+          updatedAt: new Date(),
+        }).where(eq(schema.tenantMemberships.id, member.membershipId));
+
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "tenant_membership",
+          entidadeId: member.membershipId,
+          acao: nextActive ? "reativou_membro" : "desativou_membro",
+        });
+
+        if (!nextActive) {
+          await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        }
+      });
+      updatedCount++;
     }
 
 
-    if (errorMessages.length === 0) {
-      return {
-        success: true,
-        message: `${updatedCount} membro${updatedCount === 1 ? "" : "s"} ${nextActive ? "ativado" : "desativado"}${updatedCount === 1 ? "" : "s"} com sucesso.`,
-      };
-    }
-
-    if (updatedCount > 0) {
-      return {
-        success: true,
-        message: `${updatedCount} atualizado${updatedCount === 1 ? "" : "s"}, ${errorMessages.length} erro${errorMessages.length === 1 ? "" : "s"}. ${errorMessages[0]}`,
-      };
-    }
-
-    return { error: `Nenhum membro atualizado. ${errorMessages[0] ?? ""}` };
+    return {
+      success: true,
+      message: `${updatedCount} membro${updatedCount === 1 ? "" : "s"} ${nextActive ? "ativado" : "desativado"}${updatedCount === 1 ? "" : "s"} com sucesso.`,
+    };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Erro ao atualizar membros em lote.",
@@ -506,8 +499,18 @@ export async function transferLeadsAction(
     if (!source || !target || source.role !== "broker" || target.role !== "broker" || target.status !== "active" || source.branchId !== target.branchId) {
       throw new Error("A transferência só pode ocorrer entre corretores ativos da mesma unidade.");
     }
-    if (context.role === "manager" && source.branchId !== context.branchId) {
-      throw new Error("Gestores só podem transferir leads dentro da própria unidade.");
+
+    const isDirector = context.role === "director";
+    const authorizedUnitIds = isDirector
+      ? []
+      : ("allowedUnitIds" in context && Array.isArray(context.allowedUnitIds))
+        ? context.allowedUnitIds
+        : context.branchId
+          ? [context.branchId]
+          : [];
+
+    if (!isDirector && (!source.branchId || !authorizedUnitIds.includes(source.branchId))) {
+      throw new Error("Gestores só podem transferir leads dentro das unidades autorizadas.");
     }
 
     await db
@@ -516,8 +519,9 @@ export async function transferLeadsAction(
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
-          eq(schema.leads.corretorId, input.fromUserId)
-        )
+          eq(schema.leads.corretorId, input.fromUserId),
+          source.branchId ? eq(schema.leads.branchId, source.branchId) : sql`true`,
+        ),
       );
 
     return { success: true };

@@ -12,6 +12,13 @@ describe("AuthorizationService", () => {
     jobTitle: "director",
     branchId: null,
     permissions: new Set(["acessar_leads", "leads_view_all", "acessar_financeiro"]),
+    scope: {
+      tenantWide: true,
+      unitIds: [],
+      teamIds: [],
+      ownership: "ANY",
+      provenance: { units: "TENANT_WIDE" },
+    },
     scopeType: "GLOBAL",
     allowedUnitIds: [],
     canAccessAllUnits: true,
@@ -24,6 +31,13 @@ describe("AuthorizationService", () => {
     jobTitle: "manager",
     branchId: "branch-sp",
     permissions: new Set(["acessar_leads", "criar_lead_manual"]),
+    scope: {
+      tenantWide: false,
+      unitIds: ["branch-sp"],
+      teamIds: [],
+      ownership: "SCOPED",
+      provenance: { units: "TENANT_MANAGER_BRANCHES" },
+    },
     scopeType: "UNITS",
     allowedUnitIds: ["branch-sp"],
     canAccessAllUnits: false,
@@ -36,10 +50,18 @@ describe("AuthorizationService", () => {
     jobTitle: "broker",
     branchId: "branch-sp",
     permissions: new Set(["acessar_leads"]),
+    scope: {
+      tenantWide: false,
+      unitIds: ["branch-sp"],
+      teamIds: [],
+      ownership: "SELF",
+      provenance: { units: "SELF_BROKER" },
+    },
     scopeType: "SELF",
     allowedUnitIds: ["branch-sp"],
     canAccessAllUnits: false,
   };
+
 
   describe("can & requirePermission", () => {
     it("permite ação quando o usuário possui a permissão", () => {

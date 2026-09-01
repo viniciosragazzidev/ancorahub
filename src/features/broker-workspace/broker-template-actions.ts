@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -52,7 +53,7 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
       return { success: false, error: "Nenhum corretor válido foi encontrado para envio." };
     }
 
-    // 2. Buscar canal ativo corporativo
+    // 2. Buscar canal ativo corporativo Meta (opcional, caso WAHA direto esteja ativo)
     const [channel] = await db
       .select({ id: schema.communicationChannels.id })
       .from(schema.communicationChannels)
@@ -64,10 +65,6 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
         )
       )
       .limit(1);
-
-    if (!channel) {
-      return { success: false, error: "Nenhum canal Meta Cloud WhatsApp ativo foi encontrado." };
-    }
 
     let sentCount = 0;
     let failCount = 0;
@@ -89,7 +86,7 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
       try {
         await enqueueMetaTextMessage({
           tenantId: context.tenantId,
-          channelId: channel.id,
+          channelId: channel?.id,
           recipientType: "user",
           recipientId: broker.userId ?? broker.id,
           destinationPhone: broker.phone,
@@ -105,9 +102,8 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
     }
 
     // Processar batch imediatamente
-    processMetaOutboundBatch(10, context.tenantId).catch(() => {});
+    await processMetaOutboundBatch(10, context.tenantId);
 
-    // Registrar log de auditoria
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
       userId: context.userId,
@@ -115,6 +111,10 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
       entidadeId: context.tenantId,
       acao: `disparo_template_corretores:${parsed.templateType}:${sentCount}_enviados`,
     });
+
+    try {
+      revalidatePath("/conversas");
+    } catch {}
 
     return {
       success: true,
@@ -153,7 +153,8 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       .where(
         and(
           eq(schema.brokerProfiles.tenantId, context.tenantId),
-          eq(schema.brokerProfiles.id, input.brokerProfileId)
+          eq(schema.brokerProfiles.id, input.brokerProfileId),
+          context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId ?? "__missing_branch__") : undefined,
         )
       )
       .limit(1);
@@ -174,15 +175,11 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       )
       .limit(1);
 
-    if (!channel) {
-      return { success: false, error: "Canal oficial de WhatsApp não está ativo." };
-    }
-
     const idempotencyKey = `broker-direct:${broker.id}:${Date.now()}`;
 
-    await enqueueMetaTextMessage({
+    const queued = await enqueueMetaTextMessage({
       tenantId: context.tenantId,
-      channelId: channel.id,
+      channelId: channel?.id,
       recipientType: "user",
       recipientId: broker.userId ?? broker.id,
       destinationPhone: broker.phone,
@@ -191,7 +188,27 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       idempotencyKey,
     });
 
-    processMetaOutboundBatch(10, context.tenantId).catch(() => {});
+    // Process precisely the message that was just created; older outbox records
+    // must not delay a director's conversation with a broker.
+    await processMetaOutboundBatch(1, context.tenantId, queued.id);
+    const [delivery] = await db
+      .select({
+        status: schema.whatsappOutboundMessages.status,
+        providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
+      })
+      .from(schema.whatsappOutboundMessages)
+      .where(and(
+        eq(schema.whatsappOutboundMessages.id, queued.id),
+        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+      ))
+      .limit(1);
+    if (!delivery || !["sent", "delivered", "read"].includes(delivery.status)) {
+      revalidatePath("/conversas");
+      return {
+        success: false,
+        error: delivery?.providerErrorMessage ?? "A mensagem ficou pendente de envio.",
+      };
+    }
 
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
@@ -200,6 +217,10 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       entidadeId: broker.id,
       acao: "mensagem_direta_corretor_enviada",
     });
+
+    try {
+      revalidatePath("/conversas");
+    } catch {}
 
     return { success: true };
   } catch (error) {

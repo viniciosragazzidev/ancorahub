@@ -24,12 +24,14 @@ import { DeleteLeadControl } from "./delete-lead-control";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
+import { AiConversationInsightCard } from "@/features/conversation-intelligence";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
 import { LeadActionHub } from "@/features/leads/components/lead-action-hub";
 import { getSystemSetting } from "@/features/system-settings/queries";
 
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 import { BeneficiariesSection } from "./beneficiaries-section";
 import { getLeadBeneficiaries } from "@/features/post-sale/queries";
 import { maskPhone, maskName } from "@/features/quotes/utils";
@@ -47,36 +49,13 @@ function getCurrentTimestamp() {
 }
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
-
-
   const { id } = await params;
   const context = await getRequiredTenantContext();
+  const isMarketing = context.jobTitle === "marketing";
   const brokerInternalChatEnabled =
     context.role !== "broker" ||
     (await getSystemSetting("feature_waha_connections_enabled")) !== "false";
   const db = getDatabase();
-
-  let isMatrix = false;
-  if (context.branchId) {
-    const [userBranch] = await db
-      .select({ name: schema.branches.name })
-      .from(schema.branches)
-      .where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId)))
-      .limit(1);
-    isMatrix = userBranch?.name?.toLowerCase() === "matriz";
-  } else {
-    isMatrix = true;
-  }
-
-  const isMarketing = context.jobTitle === "marketing";
-
-  const scopeFilter = isMarketing
-    ? (isMatrix ? undefined : eq(schema.leads.branchId, context.branchId!))
-    : (context.role === "broker"
-      ? eq(schema.leads.corretorId, context.userId)
-      : context.role === "manager" && context.branchId
-        ? eq(schema.leads.branchId, context.branchId)
-        : undefined);
 
   const [lead] = await db
     .select({
@@ -116,9 +95,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
     .where(and(
       eq(schema.leads.id, id),
-      eq(schema.leads.tenantId, context.tenantId),
       isNull(schema.leads.deletedAt),
-      scopeFilter,
+      buildLeadScopeWhere(context),
     ))
     .limit(1);
 
@@ -186,6 +164,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       })),
       formData: lightFormData,
       consentimentoLgpd: lead.consentimentoLgpd,
+      aiIntelligence: qualificationDetails?.aiIntelligence || null,
+      aiPolicyResult: qualificationDetails?.aiPolicyResult || null,
     };
 
     return (
@@ -284,7 +264,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <span>Criado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(lead.createdAt)}</span>
+                  <span>Criado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</span>
                   <span>•</span>
                   <span>Unidade: <strong className="font-semibold text-foreground">{lead.branchNome ?? "Geral/Sem filial"}</strong></span>
                 </div>
@@ -470,6 +450,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   Esta é a etapa atual. As próximas etapas são liberadas conforme o status do lead avança.
                 </div>
 
+                <AiConversationInsightCard
+                  leadId={lead.id}
+                  assessment={(qualificationDetails as any).aiIntelligence}
+                  policyResult={(qualificationDetails as any).aiPolicyResult}
+                  lastAnalyzedAt={(qualificationDetails as any).aiLastAnalyzedAt}
+                  canManage={context.role !== "broker" || lead.corretorId === context.userId}
+                />
+
                 <Card className="border-amber-500/20 bg-amber-500/5 shadow-none">
                   <CardHeader className="pb-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -553,7 +541,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                       <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceCampaign || "Campanha Meta"}</p></div>
                       <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceAd || "Anúncio Padrão"}</p></div>
                       <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceForm || "Formulário Direct"}</p></div>
-                      <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(lead.createdAt)}</p></div>
+                      <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</p></div>
                     </CardContent>
                   </Card>
                 )}

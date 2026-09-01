@@ -175,7 +175,7 @@ async function processDelivery(row: typeof schema.wahaDeliveryOutbox.$inferSelec
   const [run] = await db.select().from(schema.wahaCadenceRuns).where(and(eq(schema.wahaCadenceRuns.id, row.runId), eq(schema.wahaCadenceRuns.tenantId, row.tenantId), inArray(schema.wahaCadenceRuns.status, ["queued", "active"]))).limit(1);
   if (!run) throw new Error("Execução não está disponível.");
   const [version] = await db.select().from(schema.wahaCadenceVersions).where(and(eq(schema.wahaCadenceVersions.id, run.versionId), eq(schema.wahaCadenceVersions.tenantId, row.tenantId), eq(schema.wahaCadenceVersions.status, "published"))).limit(1);
-  const [number] = await db.select().from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.id, row.wahaNumberId), eq(schema.wahaNumbers.status, "active"))).limit(1);
+  const [number] = await db.select().from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.id, row.wahaNumberId), inArray(schema.wahaNumbers.status, ["active", "WORKING", "ready", "CONNECTED"]))).limit(1);
   if (number && !number.capabilities.cadence && row.kind === "cadence") throw new Error("Cadência desativada para este número.");
   if (!version || !number) throw new Error("Versão ou número WAHA indisponível.");
   const definition = cadenceDefinitionSchema.parse(version.definition);

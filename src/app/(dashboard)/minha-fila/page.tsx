@@ -270,7 +270,7 @@ export default async function MinhaFilaPage() {
     }).length;
 
     return {
-      label: new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(date),
+      label: new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "America/Sao_Paulo" }).format(date),
       leads: leadsCreated,
       urgent: urgentCreated,
       active: activeCreated,
@@ -380,7 +380,7 @@ export default async function MinhaFilaPage() {
                   <span className={`mt-0.5 size-1.5 shrink-0 rounded-full ${task.dueAt && task.dueAt.getTime() < Date.now() ? "bg-destructive" : task.priority === "urgent" ? "bg-accent" : "bg-muted-foreground"}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-medium group-hover:text-primary">{task.title}</span>
-                    <span className="block truncate text-[10px] text-muted-foreground">{task.leadName}{task.dueAt ? ` · ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(task.dueAt)}` : ""}</span>
+                    <span className="block truncate text-[10px] text-muted-foreground">{task.leadName}{task.dueAt ? ` · ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(task.dueAt)}` : ""}</span>
                   </span>
                 </Link>
               ))}

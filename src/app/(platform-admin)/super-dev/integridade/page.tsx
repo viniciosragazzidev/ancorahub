@@ -243,13 +243,13 @@ export default async function SuperDevIntegrityPage() {
             {vpsHealth.status === "online" ? (
               <>
                 <p><span className="font-medium text-foreground">Fastify:</span> OK</p>
-                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(vpsHealth.checkedAt))}</p>
+                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(vpsHealth.checkedAt))}</p>
                 <p><span className="font-medium text-foreground">Latência:</span> {vpsHealth.latencyMs} ms</p>
               </>
             ) : (
               <>
                 <p><span className="font-medium text-foreground">Último erro:</span> {vpsHealth.errorCode.toUpperCase()}</p>
-                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(vpsHealth.checkedAt))}</p>
+                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(vpsHealth.checkedAt))}</p>
                 <p><span className="font-medium text-foreground">Latência:</span> {vpsHealth.latencyMs} ms</p>
               </>
             )}

@@ -10,7 +10,7 @@ function assertAdminRole(role: string) {
   }
 }
 
-export const brokerSummaryQuerySchema = z.object({
+const brokerSummaryQuerySchema = z.object({
   period: z.enum(["today", "week", "month", "custom"]).default("today"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
