@@ -100,7 +100,7 @@ export function BrokerAvailabilityScheduleEditor({ initialWindows, onSaved, subm
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+      <div className="sticky bottom-0 z-10 -mx-5 -mb-5 sm:-mx-6 sm:-mb-6 bg-card/95 backdrop-blur border-t border-border p-4 flex flex-wrap items-center justify-between gap-3 shadow-md rounded-b-lg">
         <p className="text-xs text-muted-foreground">Horários em America/São Paulo.</p>
         <Button type="button" onClick={save} disabled={pending}>{pending ? "Salvando…" : submitLabel}</Button>
       </div>

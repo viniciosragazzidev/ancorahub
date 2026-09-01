@@ -53,8 +53,8 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) skip(); }}>
-      <DialogPopup className="w-[calc(100vw-24px)] max-w-2xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
-        <div className="border-b border-border bg-muted/25 px-5 py-5 sm:px-6">
+      <DialogPopup className="flex flex-col max-h-[88dvh] w-[calc(100vw-24px)] max-w-2xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
+        <div className="shrink-0 border-b border-border bg-muted/25 px-5 py-5 sm:px-6 relative">
           <Button type="button" variant="ghost" size="icon-sm" className="absolute right-4 top-4 rounded-full" aria-label="Fechar e configurar depois" onClick={skip} disabled={pending}>
             <X className="size-4" aria-hidden="true" />
           </Button>
@@ -63,7 +63,7 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Você pode informar seus horários agora ou configurar depois em Configurações. A conexão do WhatsApp também é recomendada e opcional.</p>
           <p className="mt-3 text-sm font-medium">Etapa {step} de 2 · {step === 1 ? "Disponibilidade" : "WhatsApp de atendimento"}</p>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto p-5 sm:p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6">
           {step === 1 ? <BrokerAvailabilityScheduleEditor initialWindows={windows} submitLabel="Salvar e continuar" onSaved={(saved) => { setWindows(saved); setStep(2); }} /> : (
             <div className="space-y-5">
               <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/[0.04] p-4">
@@ -75,7 +75,7 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
             </div>
           )}
         </div>
-        {step === 2 ? <div className="flex justify-end border-t border-border px-5 py-4 sm:px-6"><Button onClick={complete} disabled={pending}>{pending ? "Concluindo…" : "Concluir e entrar no CRM"}</Button></div> : null}
+        {step === 2 ? <div className="shrink-0 flex justify-end border-t border-border px-5 py-4 sm:px-6 bg-card"><Button onClick={complete} disabled={pending}>{pending ? "Concluindo…" : "Concluir e entrar no CRM"}</Button></div> : null}
       </DialogPopup>
     </Dialog>
   );
