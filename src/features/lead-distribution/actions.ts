@@ -3,6 +3,8 @@
 import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import {
   routeLeadToBranch,
   assignLeadToBroker,
@@ -13,6 +15,7 @@ import { isWithinBusinessHours } from "@/shared/time/business-hours";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
@@ -56,9 +59,10 @@ function continueLeadDistributionAfterResponse(input: {
   scheduleAfterResponse("lead-distribution-processor", () =>
     runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
   );
-  scheduleAfterResponse("lead-assignment-effects", () =>
-    runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
-  );
+  scheduleAfterResponse("lead-assignment-effects", async () => {
+    await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 5 });
+    await processMetaOutboundBatch(10, input.tenantId);
+  });
 }
 
 const distributionPolicySchema = z.object({
@@ -85,7 +89,18 @@ export async function saveDistributionPolicyAction(
     return { success: false, error: "Os pesos do ranking não podem ultrapassar 100." };
   try {
     const context = await getRequiredTenantContext();
-    if (context.role !== "director")
+    const accessContext = toEffectiveLeadAccessContext(context);
+    const legacyAllowed = context.role === "director";
+
+    await evaluateShadowAuthorization({
+      operationKey: "lead_distribution.policy_update",
+      legacyAllowed,
+      context: accessContext,
+      capability: "distribution_settings_manage",
+      resource: { tenantId: context.tenantId, unitId: null, teamId: null, ownerUserId: null },
+    });
+
+    if (context.role !== "director" && !accessContext.canAccessAllUnits)
       return { success: false, error: "Apenas o Diretor pode alterar a política de distribuição." };
     const db = getDatabase();
     const now = new Date();

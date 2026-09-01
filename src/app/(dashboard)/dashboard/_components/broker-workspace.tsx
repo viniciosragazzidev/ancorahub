@@ -40,7 +40,7 @@ const sourceLabels = {
 
 function formatDueAt(value: Date | null) {
   if (!value) return "Sem horário definido";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(value);
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(value);
 }
 
 function isOverdue(value: Date | null) {

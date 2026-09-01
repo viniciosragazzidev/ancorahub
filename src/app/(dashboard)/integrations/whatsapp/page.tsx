@@ -3,6 +3,7 @@ import { getMetaCloudConfigurationState } from "@/features/communication-channel
 import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { listOwnWahaConnections } from "@/features/waha-cadence/connection-service";
+import { getInternalBrokerNotificationPolicy } from "@/features/communication-channels/internal-notification-policy";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { and, asc, eq } from "drizzle-orm";
@@ -18,7 +19,7 @@ export default async function WhatsAppIntegrationPage() {
 
   const db = getDatabase();
   const wahaConnectionsEnabled = (await getSystemSetting("feature_waha_connections_enabled")) === "true";
-  const [metaEnabled, channels, branches, wahaConnections] = await Promise.all([
+  const [metaEnabled, channels, branches, wahaConnections, internalNotificationPolicy] = await Promise.all([
     isMetaCloudWhatsAppEnabled(),
     db.select({
       id: schema.communicationChannels.id,
@@ -47,6 +48,7 @@ export default async function WhatsAppIntegrationPage() {
       ? db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"))).orderBy(asc(schema.branches.name))
       : Promise.resolve([] as { id: string; name: string }[]),
     wahaConnectionsEnabled ? listOwnWahaConnections().catch(() => []) : Promise.resolve([]),
+    context.role === "director" ? getInternalBrokerNotificationPolicy(context.tenantId) : Promise.resolve(null),
   ]);
 
   const companyAccount = channels.find((channel) => channel.branchId === null && channel.isDefault) ?? channels.find((channel) => channel.branchId === null) ?? null;
@@ -55,7 +57,7 @@ export default async function WhatsAppIntegrationPage() {
     <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
     <WhatsAppPage
       official={{ ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels, companyAccount }}
-      waha={(context.role === "director" || context.role === "manager") ? <WahaConnectionsCard connections={wahaConnections} enabled={wahaConnectionsEnabled} role={context.role} /> : null}
+      waha={(context.role === "director" || context.role === "manager") ? <WahaConnectionsCard connections={wahaConnections} enabled={wahaConnectionsEnabled} role={context.role} internalNotificationPolicy={internalNotificationPolicy} /> : null}
     />
   </>;
 }

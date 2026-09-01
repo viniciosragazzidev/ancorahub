@@ -21,7 +21,7 @@ function assertAdminRole(role: string) {
   }
 }
 
-export const routingRuleSchema = z.object({
+const routingRuleSchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2, "Informe um nome para a regra").max(100),
   enabled: z.boolean().default(true),

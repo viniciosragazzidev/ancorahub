@@ -56,23 +56,38 @@ export type BranchProfileData = {
   topBrokers: BranchTopBroker[] | null; // null = caller has no permission
 };
 
+import { resolveAccessContext } from "@/shared/auth/access-context";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
+
 // ─── Authorization helper ─────────────────────────────────────────────────────
 
 async function assertBranchProfileAccess(branchId: string) {
-  const context = await getRequiredTenantContext();
+  const accessContext = await resolveAccessContext();
 
-  // Director: any branch in the same tenant.
-  // Manager & Broker: only their own branch.
-  if (context.role !== "director") {
-    if (!context.branchId || context.branchId !== branchId) {
-      throw new AuthorizationError(
-        "Você não tem permissão para acessar o perfil desta unidade.",
-      );
-    }
-  }
+  const legacyAllowed =
+    accessContext.role === "director" ||
+    (Boolean(accessContext.branchId) && accessContext.branchId === branchId);
 
-  return context;
+  await evaluateShadowAuthorization({
+    operationKey: "branches.getBranchProfileData",
+    legacyAllowed,
+    context: accessContext,
+    capability: "ver_perfil_unidade",
+    resource: {
+      tenantId: accessContext.tenantId,
+      unitId: branchId,
+    },
+  });
+
+  AuthorizationService.require(accessContext, "ver_perfil_unidade", {
+    tenantId: accessContext.tenantId,
+    unitId: branchId,
+  });
+
+  return accessContext;
 }
+
 
 // ─── Main query ───────────────────────────────────────────────────────────────
 

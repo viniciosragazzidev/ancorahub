@@ -27,6 +27,8 @@ import { RoutingSimulatorPanel } from "./_components/routing-simulator-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
+import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
+import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +139,7 @@ export default async function LeadDistributionPage({
     dutySchedules,
     routingRules,
     brokerSummary,
+    dutyRoster,
   ] = await Promise.all([
     db
       .select({
@@ -327,6 +330,7 @@ export default async function LeadDistributionPage({
       endDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 23, 59, 59, 999),
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
     }),
+    getDutyRosterSnapshot(context),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -392,7 +396,7 @@ export default async function LeadDistributionPage({
     return {
       ...queue,
       count: leads.length,
-      oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${oldest.toLocaleDateString("pt-BR")}`,
+      oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(oldest)}`,
     };
   });
 
@@ -523,19 +527,7 @@ export default async function LeadDistributionPage({
             </>
           }
           plantaoContent={
-            <DistributionPanel
-              branches={enrichedBranches}
-              brokers={brokers.map((broker) => ({
-                id: broker.id,
-                name: broker.name,
-                email: broker.email,
-                branchId: broker.branchId,
-                branchName: broker.branchName,
-                availabilityStatus: broker.availabilityStatus,
-                activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-              }))}
-              canManageAcceptingLeads={context.role === "director"}
-            />
+            <DutyOperationsWorkspace snapshot={dutyRoster} />
           }
           saudeHistoricoContent={
             <div className="grid gap-6 lg:grid-cols-2">
@@ -558,7 +550,7 @@ export default async function LeadDistributionPage({
                             </p>
                           </div>
                           <time className="shrink-0 text-[10px] text-muted-foreground">
-                            {event.createdAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                            {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(event.createdAt)}
                           </time>
                         </div>
                       ))}

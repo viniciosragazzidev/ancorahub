@@ -145,7 +145,7 @@ export default async function SuperDevDashboard() {
                     <p className="text-muted-foreground">Por: {log.actorName} ({log.actorEmail})</p>
                   </div>
                   <span className="text-muted-foreground text-[10px]">
-                    {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(log.createdAt))}
+                    {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(log.createdAt))}
                   </span>
                 </div>
               ))}

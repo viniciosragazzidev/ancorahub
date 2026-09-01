@@ -96,9 +96,12 @@ const invitationLabels: Record<string, { label: string; variant: "success" | "wa
 
 export function OfficialBrokerConversations({
   enabled,
+  deliveryChannel,
   conversations,
 }: {
   enabled: boolean;
+  /** The outbound transport for internal system-to-broker notices. */
+  deliveryChannel: "meta" | "waha_direct";
   conversations: OfficialBrokerConversation[];
 }) {
   const router = useRouter();
@@ -316,12 +319,14 @@ export function OfficialBrokerConversations({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold tracking-tight">
-                  Canal Oficial com Corretores
+                  {deliveryChannel === "waha_direct" ? "Canal Interno com Corretores" : "Canal Oficial com Corretores"}
                 </h2>
                 <Badge variant="secondary">{conversations.length}</Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Envio individual ou em massa de mensagens e modelos oficiais para a equipe.
+                {deliveryChannel === "waha_direct"
+                  ? "Histórico centralizado no CRM; avisos internos são enviados pelo número WAHA selecionado."
+                  : "Envio individual ou em massa de mensagens e modelos oficiais para a equipe."}
               </p>
             </div>
           </div>
@@ -335,7 +340,7 @@ export function OfficialBrokerConversations({
               Disparo em Massa
             </Button>
             <Badge variant="outline" className="gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
-              <ShieldCheck className="size-3.5" /> Canal Oficial Meta
+              <ShieldCheck className="size-3.5" /> {deliveryChannel === "waha_direct" ? "WAHA interno direto" : "Canal Oficial Meta"}
             </Badge>
           </div>
         </div>
@@ -540,7 +545,9 @@ export function OfficialBrokerConversations({
               <div className="border-b border-border bg-card/50 px-4 py-2">
                 <ContextNote variant="info" icon={InfoIcon} className="py-1.5 text-[11px]">
                   <span>
-                    Canal Oficial de Comunicação. Envie mensagens diretas ou escolha um modelo cadastrado no sistema.
+                    {deliveryChannel === "waha_direct"
+                      ? "Canal interno de comunicação. O CRM preserva este histórico e envia os avisos pelo número WAHA selecionado."
+                      : "Canal Oficial de Comunicação. Envie mensagens diretas ou escolha um modelo cadastrado no sistema."}
                   </span>
                 </ContextNote>
               </div>
@@ -566,7 +573,9 @@ export function OfficialBrokerConversations({
                     <EmptyState
                       icon={ChatCircleText}
                       title="Nenhuma mensagem no histórico"
-                      description="As mensagens enviadas pelo número oficial aparecerão neste espaço."
+                      description={deliveryChannel === "waha_direct"
+                        ? "As mensagens enviadas pelo número WAHA selecionado aparecerão neste espaço."
+                        : "As mensagens enviadas pelo número oficial aparecerão neste espaço."}
                     />
                   ) : null}
                 </div>

@@ -20,6 +20,8 @@ import { getLeadBeneficiaries } from "@/features/post-sale/queries";
 import { CustomerRenewalStatus } from "@/features/post-sale/components/customer-renewal-status";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 
+import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
+
 export const dynamic = "force-dynamic";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
@@ -48,12 +50,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     .where(
       and(
         eq(schema.clients.id, clientId),
-        eq(schema.clients.tenantId, context.tenantId),
-        context.role === "broker"
-          ? eq(schema.clients.corretorId, context.userId)
-          : context.role === "manager" && context.branchId
-            ? eq(schema.clients.branchId, context.branchId)
-            : undefined,
+        buildClientScopeWhere(context),
       ),
     )
     .limit(1);
@@ -180,7 +177,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>Convertido em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(client.convertedAt)}</span>
+                  <span>Convertido em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(client.convertedAt)}</span>
                   {client.branchName && (
                     <>
                       <span>•</span>
@@ -412,7 +409,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                           </Badge>
                         </div>
                         <CardDescription className="text-xs">
-                          Registrada em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(sale.saleDate)}
+                          Registrada em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(sale.saleDate)}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2 text-xs">

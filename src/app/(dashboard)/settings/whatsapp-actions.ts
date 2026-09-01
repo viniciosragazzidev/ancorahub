@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { wahaActionCodeFromMessage } from "@/lib/waha-error-codes";
 
 // ── WAHA via Fastify ──────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ type WahaConnectionResponse = {
 
 async function vpsRequest<T extends WahaConnectionResponse>(
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
   const base = vpsBaseUrl();
   if (!base)
@@ -69,7 +70,7 @@ async function vpsRequest<T extends WahaConnectionResponse>(
       headers: vpsHeaders(options.body !== undefined),
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(options.timeoutMs ?? 15_000),
     });
 
     const data = (await response.json().catch(() => null)) as T | null;
@@ -85,11 +86,19 @@ async function vpsRequest<T extends WahaConnectionResponse>(
   } catch (error) {
     if (error instanceof Error && /VPS_API_URL não configurada/.test(error.message)) throw error;
     if (error instanceof Error && /WAHA \(/.test(error.message)) throw error;
-    // Erro de rede / timeout / DNS
+    // Erro de rede / TLS / DNS / timeout. O código WAHA_UNREACHABLE (ou
+    // WAHA_TIMEOUT) é embutido na mensagem para que a classificação
+    // preservada no retorno da action não colapse em WAHA_ERROR genérico.
+    const detail = error instanceof Error ? error.message : String(error);
+    const networkCode = /timeout|aborted/i.test(detail) ? "WAHA_TIMEOUT" : "WAHA_UNREACHABLE";
     throw new Error(
-      `Não foi possível conectar ao serviço de WhatsApp em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${error instanceof Error ? error.message : String(error)}`,
+      `${networkCode} Não foi possível conectar ao serviço de WhatsApp em ${base}. Verifique se o VPS está online e acessível. Detalhes: ${detail}`,
     );
   }
+}
+
+function wahaActionErrorCode(message: string) {
+  return wahaActionCodeFromMessage(message);
 }
 
 // ── Connection helpers ────────────────────────────────────────────────
@@ -228,13 +237,7 @@ export async function startWhatsAppConnection() {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível iniciar o WhatsApp.";
     // Normalizar código de erro para o frontend decidir UI
-    const code = /timeout|não respondeu/i.test(message)
-      ? "WAHA_TIMEOUT"
-      : /indisponível|não foi possível conectar/i.test(message)
-        ? "WAHA_UNAVAILABLE"
-        : /já existe|409/i.test(message)
-          ? "SESSION_EXISTS"
-          : "WAHA_ERROR";
+    const code = /já existe|409/i.test(message) ? "SESSION_EXISTS" : wahaActionErrorCode(message);
     return { success: false, error: message, code };
   }
 }
@@ -267,13 +270,7 @@ export async function refreshWhatsAppQr() {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Não foi possível atualizar o QR Code.";
-    const code = /timeout/i.test(message)
-      ? "WAHA_TIMEOUT"
-      : /indisponível|conectar/i.test(message)
-        ? "WAHA_UNAVAILABLE"
-        : /QR|qr/i.test(message)
-          ? "QR_ERROR"
-          : "WAHA_ERROR";
+    const code = /QR|qr/i.test(message) ? "QR_ERROR" : wahaActionErrorCode(message);
     return { success: false, error: message, code };
   }
 }
@@ -330,11 +327,7 @@ export async function getWhatsAppSessionStatus() {
     return { success: true, status, phone: result.phoneNumber ?? null };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível consultar o status.";
-    const code = /timeout/i.test(message)
-      ? "WAHA_TIMEOUT"
-      : /indisponível|conectar/i.test(message)
-        ? "WAHA_UNAVAILABLE"
-        : "WAHA_ERROR";
+    const code = wahaActionErrorCode(message);
     return { success: false, error: message, code };
   }
 }
@@ -356,10 +349,21 @@ export async function diagnoseWahaConnection() {
     if (!healthRes.ok)
       return { ok: false, step: "health", error: `Health check retornou ${healthRes.status}` };
   } catch (error) {
+    const cause = (error as { cause?: { code?: string; message?: string } })?.cause;
+    const detail = cause?.code ?? (error instanceof Error ? error.message : String(error));
+    const kind = /ENOTFOUND|EAI_AGAIN/i.test(detail)
+      ? "dns"
+      : /TLS|SSL|handshake|certificate/i.test(detail)
+        ? "tls"
+        : /timeout|aborted/i.test(detail)
+          ? "timeout"
+          : "network";
     return {
       ok: false,
       step: "connectivity",
-      error: `Não foi possível acessar ${base}. ${error instanceof Error ? error.message : String(error)}`,
+      kind,
+      base,
+      error: `Não foi possível acessar ${base} (${kind}). ${detail}`,
     };
   }
 
@@ -384,20 +388,20 @@ export async function resetWhatsAppSessionAction() {
         `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/disconnect`,
         {
           method: "POST",
+          // stop + logout + delete podem consumir até 15 s no WAHA. A margem
+          // evita que o CRM cancele uma desconexão que ainda está sendo concluída.
+          timeoutMs: 22_000,
         },
       );
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
-    console.warn("[waha] reset: disconnect failed:", message);
+    const code = wahaActionErrorCode(message);
+    console.warn("[waha] reset: disconnect failed:", { code, message: message.slice(0, 300) });
     return {
       success: false,
       error: "Não foi possível confirmar a desconexão da sessão WhatsApp.",
-      code: /timeout/i.test(message)
-        ? "WAHA_TIMEOUT"
-        : /indisponível|conectar/i.test(message)
-          ? "WAHA_UNAVAILABLE"
-          : "WAHA_ERROR",
+      code,
     };
   }
 
@@ -416,6 +420,44 @@ export async function resetWhatsAppSessionAction() {
   }
 
   return { success: true };
+}
+
+/**
+ * Força a desconexão local SEM chamar o VPS.
+ *
+ * Use quando o VPS está inacessível (WAHA_UNREACHABLE) e o usuário precisa
+ * liberar a sessão no CRM. O registro remoto no WAHA pode permanecer ativo
+ * até o timeout natural do serviço.
+ *
+ * AVISO: Esta operação NÃO garante que a sessão WAHA foi encerrada.
+ * O usuário deve estar ciente de que pode haver uma sessão órfã no servidor.
+ */
+export async function forceDisconnectWhatsAppSession() {
+  const { db, connection } = await getOwnConnection();
+
+  if (!connection) {
+    return { success: true };
+  }
+
+  console.warn("[waha] force disconnect: limpeza local sem confirmação do VPS", {
+    sessionName: connection.sessionName,
+    tenantId: connection.tenantId,
+    userId: connection.userId,
+  });
+
+  await db
+    .update(schema.whatsappConnections)
+    .set({
+      sessionId: null,
+      sessionName: null,
+      status: "disconnected",
+      qrCode: null,
+      connectedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.whatsappConnections.id, connection.id));
+
+  return { success: true, forced: true };
 }
 
 /** Recupera uma sessão WAHA falhada mantendo a identidade determinística do corretor. */
@@ -457,11 +499,7 @@ export async function recoverWhatsAppFailedSessionAction() {
     return {
       success: false,
       error: message,
-      code: /timeout/i.test(message)
-        ? "WAHA_TIMEOUT"
-        : /indisponível|conectar/i.test(message)
-          ? "WAHA_UNAVAILABLE"
-          : "WAHA_ERROR",
+      code: wahaActionErrorCode(message),
     };
   }
 }

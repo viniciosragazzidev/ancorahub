@@ -8,6 +8,9 @@ import { z } from "zod";
 
 import { assertTenantAccess } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 
@@ -62,8 +65,26 @@ export async function addLeadNoteAction(
 
     if (!lead) return { error: "Lead não encontrado." };
     assertTenantAccess(context, lead.tenantId);
-    if (context.role === "broker" && lead.corretorId !== context.userId) return { error: "Você só pode registrar notas nos seus leads." };
-    if (context.role === "manager" && (!context.branchId || lead.branchId !== context.branchId)) return { error: "Você só pode registrar notas na sua filial." };
+
+    const resourceScope = buildLeadResourceScope(lead);
+    const legacyAllowed =
+      context.role === "director" ||
+      (context.role === "broker" && lead.corretorId === context.userId) ||
+      (context.role === "manager" && Boolean(context.branchId) && lead.branchId === context.branchId);
+
+    const accessContext = toEffectiveLeadAccessContext(context);
+
+    await evaluateShadowAuthorization({
+      operationKey: "lead.note.create",
+      legacyAllowed,
+      context: accessContext,
+      capability: "acessar_leads",
+      resource: resourceScope,
+    });
+
+    if (!AuthorizationService.can(accessContext, "acessar_leads", resourceScope)) {
+      return { error: "Permissão insuficiente para registrar notas neste lead." };
+    }
 
     const isManagerOrDirector = context.role === "manager" || context.role === "director";
 
@@ -113,6 +134,7 @@ export async function updateLeadLivesCountAction(
       .select({
         id: schema.leads.id,
         tenantId: schema.leads.tenantId,
+        branchId: schema.leads.branchId,
         corretorId: schema.leads.corretorId,
         qualificationDetails: schema.leads.qualificationDetails,
       })
@@ -121,8 +143,26 @@ export async function updateLeadLivesCountAction(
       .limit(1);
 
     if (!lead) return { error: "Lead não encontrado." };
-    if (context.role === "broker" && lead.corretorId !== context.userId) {
-      return { error: "Você só pode alterar dados dos seus leads." };
+    assertTenantAccess(context, lead.tenantId);
+
+    const resourceScope = buildLeadResourceScope(lead);
+    const legacyAllowed =
+      context.role === "director" ||
+      (context.role === "broker" && lead.corretorId === context.userId) ||
+      (context.role === "manager" && Boolean(context.branchId) && lead.branchId === context.branchId);
+
+    const accessContext = toEffectiveLeadAccessContext(context);
+
+    await evaluateShadowAuthorization({
+      operationKey: "lead.cadastral.update_lives",
+      legacyAllowed,
+      context: accessContext,
+      capability: "acessar_leads",
+      resource: resourceScope,
+    });
+
+    if (!AuthorizationService.can(accessContext, "acessar_leads", resourceScope)) {
+      return { error: "Permissão insuficiente para alterar dados deste lead." };
     }
 
     const currentDetails = (typeof lead.qualificationDetails === "object" && lead.qualificationDetails !== null)

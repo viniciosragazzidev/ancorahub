@@ -38,9 +38,11 @@ import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey; requiresFeature?: boolean };
 
 const allBrokerItems: BrokerSidebarItem[] = [
+  { label: "Dashboard", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
   { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
   { label: "Meus Leads", icon: ListChecks, url: "/leads", permission: "acessar_leads" },
   { label: "Minha Fila", icon: ListChecks, url: "/minha-fila", permission: "acessar_leads" },
+  { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
   { label: "Meu Perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais" },
 ];
 

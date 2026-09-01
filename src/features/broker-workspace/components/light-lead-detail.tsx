@@ -39,6 +39,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
+import { AiConversationInsightCard } from "@/features/conversation-intelligence";
 
 type ConfirmationDocument = { id: string; filename: string; status: string };
 type CarrierOption = { id: string; name: string };
@@ -82,6 +83,8 @@ export type LightLeadDetailData = {
   }>;
   formData?: Record<string, string | null> | null;
   consentimentoLgpd?: boolean;
+  aiIntelligence?: any;
+  aiPolicyResult?: any;
 };
 
 const DECLINE_REASONS = [
@@ -557,6 +560,14 @@ export function LightLeadDetail({
             <p className="text-muted-foreground leading-relaxed">{lead.summary}</p>
           </div>
         ) : null}
+
+        {/* AI Conversation Diagnostic */}
+        <AiConversationInsightCard
+          leadId={lead.id}
+          assessment={lead.aiIntelligence}
+          policyResult={lead.aiPolicyResult}
+          canManage={lead.isCurrentBroker}
+        />
 
         {/* Action Buttons Container */}
         {isDistributed ? (

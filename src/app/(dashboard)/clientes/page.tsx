@@ -6,6 +6,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { ClientesList } from "./clientes-list";
+import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightClientsList, type LightClientItem } from "@/features/broker-workspace/components/light-clients-list";
@@ -32,22 +34,9 @@ export default async function CustomersPage({
         .where(eq(schema.branches.tenantId, context.tenantId))
     : [];
 
-  // Scope filter based on role & branch selection
-  const clientScope = context.role === "broker"
-    ? eq(schema.clients.corretorId, context.userId)
-    : branchParam
-      ? eq(schema.clients.branchId, branchParam)
-      : context.role === "manager" && context.branchId
-        ? eq(schema.clients.branchId, context.branchId)
-        : undefined;
-
-  const leadScope = context.role === "broker"
-    ? eq(schema.leads.corretorId, context.userId)
-    : branchParam
-      ? eq(schema.leads.branchId, branchParam)
-      : context.role === "manager" && context.branchId
-        ? eq(schema.leads.branchId, context.branchId)
-        : undefined;
+  // Canonical scope filters for Clients and Leads
+  const clientScope = buildClientScopeWhere(context, { requestedBranchId: branchParam });
+  const leadScope = buildLeadScopeWhere(context, { requestedBranchId: branchParam });
 
   const periodStartDate = periodStart(period);
 
@@ -63,7 +52,7 @@ export default async function CustomersPage({
         convertedAt: schema.clients.convertedAt,
       })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId)))
+      .where(buildClientScopeWhere(context))
       .orderBy(desc(schema.clients.convertedAt));
 
     return <LightClientsList clients={clients} />;
@@ -93,26 +82,26 @@ export default async function CustomersPage({
       .from(schema.clients)
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.clients.branchId, schema.branches.id))
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, periodStartDate)))
+      .where(and(clientScope, gte(schema.clients.convertedAt, periodStartDate)))
       .orderBy(desc(schema.clients.convertedAt)),
 
     // Total clients
     db
       .select({ total: count() })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, periodStartDate))),
+      .where(and(clientScope, gte(schema.clients.convertedAt, periodStartDate))),
 
     // Total leads (for conversion rate)
     db
       .select({ total: count() })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, periodStartDate))),
+      .where(and(leadScope, gte(schema.leads.createdAt, periodStartDate))),
 
     // Distinct brokers with clients
     db
       .select({ total: countDistinct(schema.clients.corretorId) })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), clientScope, gte(schema.clients.convertedAt, periodStartDate))),
+      .where(and(clientScope, gte(schema.clients.convertedAt, periodStartDate))),
 
     // Upcoming renewals (clients with active customers whose contract anniversary is within 30 days)
     db
@@ -134,7 +123,6 @@ export default async function CustomersPage({
       .from(schema.clients)
       .where(
         and(
-          eq(schema.clients.tenantId, context.tenantId),
           clientScope,
           gte(schema.clients.convertedAt, periodStartDate),
         ),

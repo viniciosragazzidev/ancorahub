@@ -83,6 +83,11 @@ export type ConversationMessage = {
   sentAt: string;
   senderRole?: string | null;
   providerStatus?: string | null;
+  providerFailure?: {
+    code: string;
+    title: string;
+    message: string;
+  } | null;
 };
 
 export type AiConversationData = {
@@ -881,9 +886,11 @@ function MessageSenderBadge({
 function MessageStatusIndicator({
   status,
   direction,
+  failure,
 }: {
   status?: string | null;
   direction: string;
+  failure?: ConversationMessage["providerFailure"];
 }) {
   const isOutbound = direction === "outgoing" || direction === "outbound";
   if (!isOutbound) return null;
@@ -905,9 +912,12 @@ function MessageStatusIndicator({
       );
     case "failed":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive" title="Falha ao entregar mensagem">
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive"
+          title={failure ? `${failure.title} (${failure.code})` : "Falha ao entregar mensagem"}
+        >
           <span aria-hidden="true" className="grid size-3 shrink-0 place-items-center rounded-full bg-destructive/15 text-destructive text-[9px] font-bold">!</span>
-          Falha
+          {failure ? `Falha: ${failure.title}` : "Falha"}
         </span>
       );
     case "queued":
@@ -977,10 +987,20 @@ function MessageRow({
           {isOutbound ? (
             <>
               <span aria-hidden="true" className="opacity-60">•</span>
-              <MessageStatusIndicator status={message.providerStatus} direction={message.direction} />
+              <MessageStatusIndicator
+                status={message.providerStatus}
+                direction={message.direction}
+                failure={message.providerFailure}
+              />
             </>
           ) : null}
         </MessageFooter>
+        {isOutbound && message.providerStatus === "failed" && message.providerFailure ? (
+          <p className="mt-1 max-w-80 text-right text-xs leading-5 text-destructive" role="status">
+            <span className="font-semibold">Motivo ({message.providerFailure.code}): </span>
+            {message.providerFailure.message}
+          </p>
+        ) : null}
       </MessageContent>
     </Message>
   );
