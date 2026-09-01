@@ -540,12 +540,7 @@ export default async function ConversationsPage({
         id: `out:${message.id}`,
         direction: "outgoing",
         body: formatOfficialOutboundBody(message.purpose, message.messageType, message.templateName, message.variables),
-        sentAt: (
-          message.readAt ??
-          message.deliveredAt ??
-          message.sentAt ??
-          message.createdAt
-        ).toISOString(),
+        sentAt: (message.sentAt ?? message.createdAt).toISOString(),
         status: normalizeOutboundStatus(message.status),
         purpose: message.purpose,
         templateName: message.templateName === "__text__" ? undefined : message.templateName,

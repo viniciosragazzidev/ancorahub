@@ -33,13 +33,15 @@ export function shouldCreateSyntheticLead(input: {
   hasLead: boolean;
   hasClient: boolean;
   isTenantOfficialNumber: boolean;
+  isBrokerOrTeam?: boolean;
 }) {
   return (
     input.sourceKind === "number" &&
     !input.isOutgoing &&
     !input.hasLead &&
     !input.hasClient &&
-    !input.isTenantOfficialNumber
+    !input.isTenantOfficialNumber &&
+    !input.isBrokerOrTeam
   );
 }
 
@@ -303,21 +305,23 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   });
   metrics.persistMs = Date.now() - persistStart;
 
-  // Only an opaque invalidation is broadcast. Each browser re-fetches its own
-  // server-authorized scope, so a personal broker chat cannot reach Directors.
-  if (source.kind === "connection") {
-    try {
-      revalidatePath("/conversas");
-      revalidatePath("/conversas/broker");
-    } catch {
-      // Cache invalidation is best-effort outside a render request.
-    }
-    if (source.connection.tenantId && source.connection.userId) {
-      void publishConversationInvalidation({
-        tenantId: source.connection.tenantId,
-        participantUserIds: [source.connection.userId],
-      }).catch(() => undefined);
-    }
+  // Invalidate cache and push realtime sync
+  try {
+    revalidatePath("/conversas");
+    revalidatePath("/conversas/broker");
+  } catch {
+    // Cache invalidation is best-effort outside a render request.
+  }
+  if (source.kind === "connection" && source.connection.tenantId && source.connection.userId) {
+    void publishConversationInvalidation({
+      tenantId: source.connection.tenantId,
+      participantUserIds: [source.connection.userId],
+    }).catch(() => undefined);
+  } else if (tenantId) {
+    void publishConversationInvalidation({
+      tenantId,
+      participantUserIds: [],
+    }).catch(() => undefined);
   }
 
   // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────
@@ -433,6 +437,15 @@ async function resolveContact(
   let clientId: string | null = null;
   let runId: string | null = null;
 
+  // 0. Comunicação interna com Corretores, Equipe ou Números da Empresa:
+  // NUNCA deve virar lead nem acionar IA de qualificação.
+  const isBrokerOrTeam = await isBrokerOrTeamPhone(db, tenantId, normalizedPhone);
+  const isTenantOfficial = await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone);
+
+  if (isBrokerOrTeam || isTenantOfficial) {
+    return { leadId: null, clientId: null, runId: null };
+  }
+
   // For number-based flow, check cadence runs first
   if (source.kind === "number") {
     const hash = phoneHash(normalizedPhone);
@@ -505,12 +518,6 @@ async function resolveContact(
     if (client) clientId = client.id;
   }
 
-  // The tenant's own official WAHA number is an internal Lite contact, never a
-  // synthetic lead. It is rendered separately and may be answered by the broker.
-  const isTenantOfficialNumber =
-    source.kind === "connection" &&
-    (await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone));
-
   // Only the tenant-owned relay flow may create a new lead from an unknown
   // contact. A broker's personal WhatsApp is a restricted Lite workspace: an
   // unrelated inbound message must never enter tenant intake or AI qualification.
@@ -520,7 +527,8 @@ async function resolveContact(
       isOutgoing,
       hasLead: Boolean(leadId),
       hasClient: Boolean(clientId),
-      isTenantOfficialNumber,
+      isTenantOfficialNumber: isTenantOfficial,
+      isBrokerOrTeam,
     })
   ) {
     const newLeadId = randomUUID();
@@ -553,6 +561,23 @@ async function markIgnored(db: ReturnType<typeof getDatabase>, eventId: string, 
     .update(schema.wahaWebhookEvents)
     .set({ status: "ignored", errorCode: code, processedAt: new Date() })
     .where(eq(schema.wahaWebhookEvents.id, eventId));
+}
+
+/**
+ * Whether the phone belongs to a broker or team member in the tenant.
+ */
+export async function isBrokerOrTeamPhone(
+  db: ReturnType<typeof getDatabase>,
+  tenantId: string,
+  normalizedPhone: string,
+): Promise<boolean> {
+  const brokers = await db
+    .select({ phone: schema.brokerProfiles.phone })
+    .from(schema.brokerProfiles)
+    .where(eq(schema.brokerProfiles.tenantId, tenantId));
+
+  return brokers
+    .some((entry) => Boolean(entry.phone) && samePhone(entry.phone!, normalizedPhone));
 }
 
 /**

@@ -56,23 +56,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   const rawMessageKind = String(event.type ?? event.message?.type ?? "").toLowerCase();
   const messageKind = (["audio", "image", "document", "video", "sticker"] as const).includes(rawMessageKind as "audio" | "image" | "document" | "video" | "sticker") ? rawMessageKind as "audio" | "image" | "document" | "video" | "sticker" : "text";
   if (!phone) { console.info("[OpenWA] mensagem descartada: payload sem telefone"); return NextResponse.json({ accepted: true, discarded: true }); }
-  const [leads, clients] = await Promise.all([
+  const [leads, clients, brokers, numbers, channels] = await Promise.all([
     db.select({ id: schema.leads.id, phone: schema.leads.telefone, status: schema.leads.status }).from(schema.leads).where(eq(schema.leads.tenantId, tenantId)),
     db.select({ id: schema.clients.id, phone: schema.clients.telefone }).from(schema.clients).where(eq(schema.clients.tenantId, tenantId)),
+    db.select({ phone: schema.brokerProfiles.phone }).from(schema.brokerProfiles).where(eq(schema.brokerProfiles.tenantId, tenantId)),
+    db.select({ phone: schema.wahaNumbers.displayPhoneNumber }).from(schema.wahaNumbers).where(eq(schema.wahaNumbers.tenantId, tenantId)),
+    db.select({ phone: schema.communicationChannels.displayPhoneNumber }).from(schema.communicationChannels).where(eq(schema.communicationChannels.tenantId, tenantId)),
   ]);
   const samePhone = (value: string) => { const candidate = value.replace(/\D/g, ""); return candidate === phone || candidate.endsWith(phone) || phone.endsWith(candidate) || candidate.slice(-11) === phone.slice(-11); };
-  const matchingLeads = leads.filter((item) => samePhone(item.phone));
+  const isInternal = [...brokers, ...numbers, ...channels].some((b) => b.phone && samePhone(b.phone));
+  const matchingLeads = isInternal ? [] : leads.filter((item) => samePhone(item.phone));
   const isOutgoing = event.direction === "outgoing" || event.fromMe === true;
   let lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
-  const client = clients.find((item) => samePhone(item.phone));
-  if (!lead && !client && !isOutgoing) {
+  const client = isInternal ? undefined : clients.find((item) => samePhone(item.phone));
+  if (!lead && !client && !isOutgoing && !isInternal) {
     const leadId = randomUUID();
     await db.insert(schema.leads).values({ id: leadId, tenantId, nome: `Lead WhatsApp (${phone.slice(-4)})`, telefone: phone, origem: "webhook", status: "new", serviceStartedAt: new Date() });
     lead = { id: leadId, phone, status: "new" };
     await enqueueLeadDistributionJob({ tenantId, leadId });
     console.info("[OpenWA] novo lead criado", { tenantId, leadId });
   }
-  if (!lead && !client) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
+  if (!lead && !client && !isInternal) { console.info("[OpenWA] mensagem descartada: contato não vinculado"); return NextResponse.json({ accepted: true, discarded: true }); }
   const providerMessageId = event.id ?? event.messageId ?? null;
   await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body: body || `[${messageKind}]`, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
   if (!isOutgoing && lead?.id && connection.userId) {
