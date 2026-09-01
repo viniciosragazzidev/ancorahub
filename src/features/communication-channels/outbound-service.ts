@@ -315,7 +315,12 @@ async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direc
   if (!number) throw new Error("O número WAHA oficial de avisos internos não está ativo.");
   const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
   const body = row.messageType === "text" ? variables[0] ?? "" : resolveTemplateTextBody(row.purpose, variables);
-  if (!body) throw new Error("Não foi possível preparar o aviso interno para envio pelo WAHA.");
+  console.info("[waha_internal_outbound] sending notice", {
+    outboundId: row.id,
+    mode,
+    relaySessionId: number.relaySessionId,
+    destinationPhone: row.destinationPhone,
+  });
   const sent = await sendWahaRelayMessage({
     idempotencyKey: `waha-${mode}-${row.id}-${row.attempts}`,
     sessionId: number.relaySessionId,

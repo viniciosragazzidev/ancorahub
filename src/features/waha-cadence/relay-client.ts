@@ -104,9 +104,16 @@ export async function sendWahaRelayMessage(input: {
     signal: AbortSignal.timeout(15_000),
   });
 
-  const fbData = (await fastifyRes.json().catch(() => null)) as { ok?: boolean; messageId?: string } | null;
+  const fbData = (await fastifyRes.json().catch(() => null)) as { ok?: boolean; messageId?: string; error?: string; message?: string } | null;
   if (!fastifyRes.ok || !fbData?.messageId) {
-    const error = new Error("O serviço WAHA não confirmou o envio da mensagem.") as Error & {
+    const errorDetail = fbData?.error || fbData?.message || fastifyRes.statusText || "Erro desconhecido";
+    console.error("[sendWahaRelayMessage] failed:", {
+      status: fastifyRes.status,
+      errorDetail,
+      sessionId: input.sessionId,
+      phone,
+    });
+    const error = new Error(`O serviço WAHA não confirmou o envio da mensagem (${errorDetail}).`) as Error & {
       status?: number;
       code?: string;
     };

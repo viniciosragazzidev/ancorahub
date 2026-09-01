@@ -141,11 +141,37 @@ export async function changeOwnWahaConnection(id: string, operation: "pause" | "
     };
   }
 
-  const state = operation === "pause" ? await pauseWahaRelaySession(number.relaySessionId) : await resumeWahaRelaySession(number.relaySessionId);
+  if (operation === "pause") {
+    const now = new Date();
+    await getDatabase().update(schema.wahaNumbers).set({ status: "paused", lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, id));
+    await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id, acao: `waha_connection.pause:${number.scope}`, createdAt: now });
+    return {
+      sessionId: number.relaySessionId,
+      status: "paused" as const,
+      displayPhoneNumber: number.displayPhoneNumber,
+      qrCode: null,
+    };
+  }
+
+  // operation === "resume"
+  let stateStatus: "active" | "connecting" | "offline" | "error" = "active";
+  try {
+    const live = await getWahaRelaySession(number.relaySessionId);
+    if (live.status === "active" || live.status === "connecting" || live.status === "offline" || live.status === "error") {
+      stateStatus = live.status;
+    }
+  } catch {
+    stateStatus = "active";
+  }
   const now = new Date();
-  await getDatabase().update(schema.wahaNumbers).set({ status: state.status, displayPhoneNumber: state.displayPhoneNumber ?? number.displayPhoneNumber, lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, id));
-  await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id, acao: `waha_connection.${operation}:${number.scope}`, createdAt: now });
-  return state;
+  await getDatabase().update(schema.wahaNumbers).set({ status: stateStatus, lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, id));
+  await getDatabase().insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "waha_number", entidadeId: id, acao: `waha_connection.resume:${number.scope}`, createdAt: now });
+  return {
+    sessionId: number.relaySessionId,
+    status: stateStatus,
+    displayPhoneNumber: number.displayPhoneNumber,
+    qrCode: null,
+  };
 }
 
 export async function deleteOwnWahaConnection(id: string) {
