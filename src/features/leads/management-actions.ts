@@ -11,6 +11,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { notifyLeadReassigned } from "@/features/notifications/send-push-helper";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { checkBrokerScheduleAvailability } from "@/features/leads/assignment";
 import { withServerActionTiming } from "@/shared/observability/request-timing";
@@ -142,10 +143,14 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         branchIds: [lead.branchId],
         brokerIds: [lead.corretorId, input.brokerId],
       }).catch(() => undefined);
-      scheduleAfterResponse("lead-assignment-effects", () => runLeadEffectOutboxProcessor({
-        tenantId: context.tenantId,
-        limit: 1,
-      }));
+      scheduleAfterResponse("lead-assignment-effects", async () => {
+        await runLeadEffectOutboxProcessor({
+          tenantId: context.tenantId,
+          leadId: lead.id,
+          limit: 5,
+        });
+        await processMetaOutboundBatch(10, context.tenantId);
+      });
       return {
         success: true,
         warning,

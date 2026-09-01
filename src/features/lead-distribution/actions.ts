@@ -15,6 +15,7 @@ import { isWithinBusinessHours } from "@/shared/time/business-hours";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
@@ -58,9 +59,10 @@ function continueLeadDistributionAfterResponse(input: {
   scheduleAfterResponse("lead-distribution-processor", () =>
     runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
   );
-  scheduleAfterResponse("lead-assignment-effects", () =>
-    runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
-  );
+  scheduleAfterResponse("lead-assignment-effects", async () => {
+    await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 5 });
+    await processMetaOutboundBatch(10, input.tenantId);
+  });
 }
 
 const distributionPolicySchema = z.object({

@@ -197,6 +197,8 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
     decodeURIComponent(path.split("/")[3]?.split("?")[0] ?? "");
 
   let fallbackUrl = `${config.url}/internal/waha/connections`;
+  let fallbackBody = rawBody;
+  let fallbackMethod = method;
   const tenantId = (payload as { tenantId?: string })?.tenantId || "system";
   const userId = (payload as { userId?: string })?.userId || "system";
 
@@ -279,8 +281,15 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
   throw new Error(`O serviço WAHA não confirmou a conexão (${errorMsg}).`);
 }
 
-export async function createWahaRelaySession(sessionId: string) {
-  const payload = relaySessionCreateSchema.parse({ sessionId });
+export async function createWahaRelaySession(
+  sessionId: string,
+  meta?: { tenantId?: string; userId?: string },
+) {
+  const payload = relaySessionCreateSchema.parse({
+    sessionId,
+    tenantId: meta?.tenantId,
+    userId: meta?.userId,
+  });
   return relaySessionRequest("/v1/sessions", "POST", payload);
 }
 
