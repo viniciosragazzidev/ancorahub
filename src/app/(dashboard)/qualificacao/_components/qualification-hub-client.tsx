@@ -281,9 +281,8 @@ export function QualificationHubClient({
     { id: "meta_templates", label: "3. Modelos de Mensagem (Meta)", icon: FileText, color: "text-blue-500" },
     { id: "agent_triggers", label: "4. Triggers & Permissões MCP", icon: Zap, color: "text-amber-500" },
     { id: "followup_rules", label: "5. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "training", label: "6. Versões & Publicação", icon: Layers },
-    { id: "whatsapp_diag", label: "7. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
-    { id: "simulator", label: `8. Simulador & Alertas${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "whatsapp_diag", label: "6. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
+    { id: "simulator", label: `7. Simulador & Alertas${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
   ];
 
   const requestedTab = searchParams.get("tab");
@@ -297,7 +296,9 @@ export function QualificationHubClient({
     alerts: "simulator",
     situations: "situational_playbooks",
     playbooks: "situational_playbooks",
+    training: "overview",
   };
+
 
   const resolvedRequestedTab = tabRedirectMap[requestedTab ?? ""] ?? requestedTab;
   const activeTab = selectedTab ?? (tabs.some((t) => t.id === resolvedRequestedTab) ? resolvedRequestedTab! : "overview");
@@ -1083,13 +1084,6 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                 ))}
               </div>
             </Card>
-          </div>
-        )}
-
-        {/* TAB 5: VERSÕES & PUBLICAÇÃO */}
-        {activeTab === "training" && (
-          <div className="grid gap-6">
-            <AgentTrainingTab enabled={agentTraining.enabled} canEdit={agentTraining.canEdit} versions={agentTraining.versions} />
           </div>
         )}
 
