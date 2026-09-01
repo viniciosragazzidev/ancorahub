@@ -323,7 +323,8 @@ async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direc
     body,
   });
   const now = new Date();
-  await getDatabase().update(schema.whatsappOutboundMessages).set({
+  const db = getDatabase();
+  await db.update(schema.whatsappOutboundMessages).set({
     status: "sent",
     providerMessageId: sent.messageId,
     providerErrorCode: null,
@@ -333,6 +334,20 @@ async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direc
     nextAttemptAt: null,
     updatedAt: now,
   }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+
+  await db.insert(schema.whatsappMessages).values({
+    id: randomUUID(),
+    tenantId: row.tenantId,
+    provider: "waha",
+    providerStatus: "sent",
+    messageId: sent.messageId,
+    phone: row.destinationPhone.replace(/\D/g, ""),
+    direction: "outgoing",
+    body,
+    sentAt: now,
+    createdAt: now,
+  }).catch(() => {});
+
   return sent;
 }
 

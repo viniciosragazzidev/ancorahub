@@ -460,7 +460,7 @@ export default async function ConversationsPage({
           providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
         })
         .from(schema.whatsappOutboundMessages)
-        .innerJoin(
+        .leftJoin(
           schema.communicationChannels,
           and(
             eq(schema.whatsappOutboundMessages.channelId, schema.communicationChannels.id),
@@ -470,7 +470,6 @@ export default async function ConversationsPage({
         .where(
           and(
             eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
-            eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
             eq(schema.whatsappOutboundMessages.recipientType, "user"),
           ),
         )
@@ -488,7 +487,6 @@ export default async function ConversationsPage({
         .where(
           and(
             eq(schema.whatsappMessages.tenantId, context.tenantId),
-            eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER),
             eq(schema.whatsappMessages.direction, "incoming"),
             isNull(schema.whatsappMessages.leadId),
           ),

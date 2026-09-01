@@ -52,7 +52,7 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
       return { success: false, error: "Nenhum corretor válido foi encontrado para envio." };
     }
 
-    // 2. Buscar canal ativo corporativo
+    // 2. Buscar canal ativo corporativo Meta (opcional, caso WAHA direto esteja ativo)
     const [channel] = await db
       .select({ id: schema.communicationChannels.id })
       .from(schema.communicationChannels)
@@ -64,10 +64,6 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
         )
       )
       .limit(1);
-
-    if (!channel) {
-      return { success: false, error: "Nenhum canal Meta Cloud WhatsApp ativo foi encontrado." };
-    }
 
     let sentCount = 0;
     let failCount = 0;
@@ -89,7 +85,7 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
       try {
         await enqueueMetaTextMessage({
           tenantId: context.tenantId,
-          channelId: channel.id,
+          channelId: channel?.id,
           recipientType: "user",
           recipientId: broker.userId ?? broker.id,
           destinationPhone: broker.phone,
@@ -105,7 +101,7 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
     }
 
     // Processar batch imediatamente
-    processMetaOutboundBatch(10, context.tenantId).catch(() => {});
+    await processMetaOutboundBatch(10, context.tenantId);
 
     // Registrar log de auditoria
     await db.insert(schema.auditLogs).values({
@@ -174,15 +170,11 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       )
       .limit(1);
 
-    if (!channel) {
-      return { success: false, error: "Canal oficial de WhatsApp não está ativo." };
-    }
-
     const idempotencyKey = `broker-direct:${broker.id}:${Date.now()}`;
 
     await enqueueMetaTextMessage({
       tenantId: context.tenantId,
-      channelId: channel.id,
+      channelId: channel?.id,
       recipientType: "user",
       recipientId: broker.userId ?? broker.id,
       destinationPhone: broker.phone,
@@ -191,7 +183,7 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
       idempotencyKey,
     });
 
-    processMetaOutboundBatch(10, context.tenantId).catch(() => {});
+    await processMetaOutboundBatch(10, context.tenantId);
 
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
