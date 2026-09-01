@@ -70,6 +70,7 @@ const navSections: SidebarSection[] = [
     label: "Visão Geral",
     items: [
       { label: "Dashboard", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
+      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
     ],
   },
   {
@@ -84,6 +85,7 @@ const navSections: SidebarSection[] = [
   {
     label: "Roteamento & Inteligência",
     items: [
+      { label: "Campanhas de Marketing", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
       { label: "Distribuição & Desempenho", icon: Redistribute, url: "/distribuicao", permission: "acessar_qualificacao_ia" },
       { label: "Robô de Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
     ],
@@ -177,7 +179,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
   const userName = user?.name ?? "Usuário";
   const userRole = user?.role ?? "";
   const roleKey = user?.roleKey ?? null;
-  const isPlantaoActive = pathname.startsWith("/leads/distribuicao/plantao");
+  const isPlantaoActive = pathname.startsWith("/distribuicao") && pathname.includes("view=plantao") || pathname.startsWith("/leads/distribuicao/plantao");
   const visibleSections = navSections
     .map((section) => ({
       ...section,
@@ -231,7 +233,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={isPlantaoActive}
-                render={<Link href="/leads/distribuicao/plantao" onClick={() => isMobile && setOpenMobile(false)} />}
+                render={<Link href="/distribuicao?view=plantao" onClick={() => isMobile && setOpenMobile(false)} />}
                 tooltip="Plantão ao vivo"
                 className="group/plantao relative h-9 justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[11px] font-semibold uppercase text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/40 hover:bg-emerald-500/15 dark:text-emerald-400 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-emerald-500/25 group-data-[collapsible=icon]:bg-emerald-500/12 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
               >
