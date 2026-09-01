@@ -124,8 +124,7 @@ describe("Situational Playbooks & Polished AI Responses (Qualificação Centrali
 
       expect(systemPrompt).toContain("Juliana");
       expect(systemPrompt).toContain("Corretora Elite");
-      expect(systemPrompt).toContain("SAUDAÇÃO & APRESENTAÇÃO");
-      expect(systemPrompt).toContain("MEMÓRIA ATIVA");
+      expect(systemPrompt).toContain("MODO 1 — ROTEIRO DE QUALIFICAÇÃO");
       expect(systemPrompt).toContain("DIRETRIZES DE ATENDIMENTO SITUACIONAL & POLIDEZ");
     });
   });

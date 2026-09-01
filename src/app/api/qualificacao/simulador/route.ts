@@ -34,6 +34,35 @@ export async function POST(req: NextRequest) {
     }
 
     const lastUserMsg = messages.filter((m) => m.role === "user").pop()?.content ?? "";
+    const lower = lastUserMsg.toLowerCase().trim();
+
+    // Auto-extrair na memória do servidor caso o cliente envie valores diretos
+    const mergedMemory: Record<string, string> = { ...memory };
+    if (!mergedMemory.nome && !lower.includes("plano") && !lower.includes("quanto") && !lower.includes("hospital") && lower.length >= 2 && lower.length <= 40 && !/\d/.test(lower) && !lower.includes("@")) {
+      const nameMatch = lastUserMsg.match(/(?:meu nome e|meu nome é|me chamo|sou o|sou a|eu sou|me chamo de)\s+([A-ZÀ-Úa-zà-ú\s]+)/i);
+      mergedMemory.nome = nameMatch?.[1] ? nameMatch[1].trim() : lastUserMsg.trim();
+    }
+    if (/\b(individual|pf|para mim|so para mim|só para mim)\b/i.test(lower)) {
+      mergedMemory.plano = "Individual";
+    } else if (/\b(familiar|familia|família)\b/i.test(lower)) {
+      mergedMemory.plano = "Familiar";
+    } else if (/\b(pme|pj|empresarial|empresa|cnpj)\b/i.test(lower)) {
+      mergedMemory.plano = "Empresarial";
+    }
+    const livesMatch = lastUserMsg.match(/(\d+)\s*(?:pessoas|vidas|dependentes)?/i);
+    if (livesMatch?.[1]) {
+      mergedMemory.vidas = `${livesMatch[1]} pessoas`;
+    }
+    const ageMatch = lastUserMsg.match(/(\d+)\s*(?:anos|ano)/i);
+    if (ageMatch?.[1]) {
+      mergedMemory.idade = `${ageMatch[1]} anos`;
+    } else if (!mergedMemory.idade && mergedMemory.vidas && /^\d{1,2}$/.test(lastUserMsg.trim())) {
+      mergedMemory.idade = `${lastUserMsg.trim()} anos`;
+    }
+    const emailMatch = lastUserMsg.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailMatch?.[1]) {
+      mergedMemory.email = emailMatch[1].trim();
+    }
 
     // Load tenant config and playbooks
     let assistantName = "Ana";
@@ -63,8 +92,8 @@ export async function POST(req: NextRequest) {
       email: "e-mail para envio da cotação comparativa",
     };
 
-    const collected = Object.entries(memory).filter(([, v]) => Boolean(v));
-    const missing = fieldOrder.filter((f) => !memory[f]);
+    const collected = Object.entries(mergedMemory).filter(([, v]) => Boolean(v));
+    const missing = fieldOrder.filter((f) => !mergedMemory[f]);
     const nextField = missing[0];
 
     const collectedBlock = collected.length > 0
@@ -72,28 +101,49 @@ export async function POST(req: NextRequest) {
       : "";
 
     const nextHint = nextField
-      ? `\nPRÓXIMA AÇÃO: Cumprimente e pergunte sobre "${fieldLabels[nextField]}" de forma empática.`
-      : `\nPRÓXIMA AÇÃO: Todos os campos coletados. Agradeça e avise que um corretor especialista entrará em contato.`;
+      ? `\nPRÓXIMA AÇÃO OBRIGATÓRIA: Pergunte sobre "${fieldLabels[nextField]}".`
+      : `\nPRÓXIMA AÇÃO OBRIGATÓRIA: Todos os campos coletados. Confirme brevemente e avise que um corretor entrará em contato.`;
 
     const situationalSection = buildSituationalPromptSection({
       playbooks,
       variables: {
         assistente_nome: assistantName,
         corretora_nome: "Âncora Corretora",
-        cliente_nome: memory.nome,
+        cliente_nome: mergedMemory.nome,
       },
     });
 
-    const systemPrompt = `Você é ${assistantName}, atendente virtual consultiva da Âncora Corretora especialista em planos de saúde.
+    const systemPrompt = `Você é ${assistantName}, atendente virtual especialista em planos de saúde da Âncora Corretora.
 Sua missão é atender leads de forma acolhedora, humana e fluida no WhatsApp.
 
 ═══════════════════════════════════════════════
-DIRETRIZES FUNDAMENTAIS
+MODO DE OPERAÇÃO
 ═══════════════════════════════════════════════
-- Ao iniciar uma conversa direta, NUNCA faça perguntas secas como "Qual seu nome completo?". Apresente-se cordialmente e pergunte com carinho como pode chamar o cliente.
-- Se o cliente fizer perguntas sobre preços, explique educadamente que o valor depende de idade/cidade e pergunte a quantidade de pessoas.
-- Responda em no máximo 2 frases por mensagem.
+
+## MODO 1 — ROTEIRO (padrão)
+Colete os campos abaixo em ordem, um por vez, de forma natural e conversacional:
+1. nome completo
+2. tipo de plano (Individual, Familiar ou PME/Empresarial)
+3. quantidade de pessoas a incluir
+4. faixa etária das pessoas
+5. cidade e estado
+6. e-mail para a cotação
 ${collectedBlock}${nextHint}
+
+## MODO 2 — RESPOSTA LATERAL
+Se o cliente fizer uma pergunta paralela (ex: "O que vocês oferecem?", "Qual o preço?", "Atendem onde?"):
+- Responda em UMA frase curta usando o contexto da corretora.
+- IMEDIATAMENTE depois, retome o roteiro com a próxima pergunta pendente.
+
+## MODO 3 — TRANSFERÊNCIA FLUIDA
+Se o cliente pedir para falar com humano ou atendente:
+- Responda com empatia e avise que vai transferir agora [SOLICITOU_HUMANO].
+
+REGRAS ABSOLUTAS:
+- Máximo 2 frases por resposta
+- NUNCA invente preços exatos
+- NUNCA repita perguntas já respondidas
+- Responda sempre em português brasileiro
 
 ${situationalSection}
 
@@ -129,7 +179,7 @@ ${customInstructions ? `\n\nINSTRUÇÕES ADICIONAIS:\n${customInstructions}` : "
             reply,
             modelUsed: data.model ?? result.model,
             latencyMs: 0,
-            shouldTransferToHuman: false,
+            shouldTransferToHuman: reply.includes("[SOLICITOU_HUMANO]"),
           });
         }
       } catch (aiError) {
@@ -141,24 +191,26 @@ ${customInstructions ? `\n\nINSTRUÇÕES ADICIONAIS:\n${customInstructions}` : "
     const matched = matchBestPlaybook(lastUserMsg, playbooks);
     let fallbackReply = "";
 
-    if (matched) {
+    if (matched && (lower.includes("quanto") || lower.includes("hospital") || lower.includes("preco") || lower.includes("preço") || lower.includes("atendente") || lower.includes("humano"))) {
       fallbackReply = interpolatePlaybookVariables(matched.recommendedResponse, {
         assistente_nome: assistantName,
-        cliente_nome: memory.nome || "cliente",
+        cliente_nome: mergedMemory.nome || "cliente",
         corretora_nome: "Âncora Corretora",
       });
-    } else if (!memory.nome) {
+    } else if (!mergedMemory.nome) {
       fallbackReply = `Olá! Tudo bem? Sou a ${assistantName} da Âncora Corretora. Que ótimo falar com você! Para eu te passar as melhores opções de planos e valores, como posso te chamar?`;
-    } else if (!memory.plano) {
-      fallbackReply = `Perfeito, ${memory.nome}! Você busca um plano Individual, Familiar ou Empresarial (CNPJ)?`;
-    } else if (!memory.vidas) {
+    } else if (!mergedMemory.plano) {
+      fallbackReply = `Perfeito, ${mergedMemory.nome}! Você busca um plano Individual, Familiar ou Empresarial (CNPJ)?`;
+    } else if (!mergedMemory.vidas) {
       fallbackReply = `Entendido! Quantas pessoas no total utilizarão o plano?`;
-    } else if (!memory.idade) {
+    } else if (!mergedMemory.idade) {
       fallbackReply = `E quais seriam as idades aproximadas de cada pessoa?`;
-    } else if (!memory.cidade) {
+    } else if (!mergedMemory.cidade) {
       fallbackReply = `Em qual cidade você busca atendimento para verificarmos a rede credenciada de hospitais?`;
+    } else if (!mergedMemory.email) {
+      fallbackReply = `Qual é o seu melhor e-mail para enviarmos a cotação comparativa?`;
     } else {
-      fallbackReply = `Excelente, ${memory.nome}! Já anotei todas as informações. Vou conectar você agora com um dos nossos corretores especialistas para te passar a tabela completa!`;
+      fallbackReply = `Excelente, ${mergedMemory.nome}! Já anotei todas as informações. Vou conectar você agora com um dos nossos corretores especialistas para te passar a tabela completa!`;
     }
 
     return NextResponse.json({

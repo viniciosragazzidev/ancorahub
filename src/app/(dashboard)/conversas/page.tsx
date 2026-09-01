@@ -20,6 +20,7 @@ import {
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
@@ -136,6 +137,8 @@ export default async function ConversationsPage({
             direction: schema.whatsappMessages.direction,
             senderRole: schema.whatsappMessages.senderRole,
             providerStatus: schema.whatsappMessages.providerStatus,
+            messageId: schema.whatsappMessages.messageId,
+            communicationChannelId: schema.whatsappMessages.communicationChannelId,
             sentAt: schema.whatsappMessages.sentAt,
           })
           .from(schema.whatsappMessages)
@@ -185,6 +188,54 @@ export default async function ConversationsPage({
       ])
     : ([[], [], []] as const);
 
+  const failedMessageEventKeys = isDirector
+    ? Array.from(
+        new Set(
+          messageRows
+            .filter((message) => message.providerStatus === "failed" || message.providerStatus === "deleted")
+            .flatMap((message) =>
+              message.messageId
+                ? [`${message.messageId}:failed`, `${message.messageId}:deleted`]
+                : [],
+            ),
+        ),
+      )
+    : [];
+
+  const failedDeliveryEvents = failedMessageEventKeys.length
+    ? await db
+        .select({
+          externalEventId: schema.communicationChannelWebhookEvents.externalEventId,
+          errorCode: schema.communicationChannelWebhookEvents.errorCode,
+        })
+        .from(schema.communicationChannelWebhookEvents)
+        .innerJoin(
+          schema.communicationChannels,
+          eq(
+            schema.communicationChannelWebhookEvents.channelId,
+            schema.communicationChannels.id,
+          ),
+        )
+        .where(
+          and(
+            eq(schema.communicationChannels.tenantId, context.tenantId),
+            inArray(
+              schema.communicationChannelWebhookEvents.externalEventId,
+              failedMessageEventKeys,
+            ),
+          ),
+        )
+    : [];
+
+  const failureByProviderMessageId = new Map(
+    failedDeliveryEvents.flatMap((event) => {
+      if (!event.externalEventId || !event.errorCode) return [];
+      const messageId = event.externalEventId.replace(/:(?:failed|deleted)$/, "");
+      const failure = getDirectorFacingMetaDeliveryFailure(event.errorCode);
+      return failure ? [[messageId, failure] as const] : [];
+    }),
+  );
+
   const messagesByLead = new Map<string, ConversationMessage[]>();
   for (const lead of leads) {
     const rawMatched = messageRows
@@ -216,6 +267,10 @@ export default async function ConversationsPage({
         direction: msg.direction,
         senderRole: msg.senderRole,
         providerStatus: msg.providerStatus,
+        providerFailure:
+          isDirector && msg.messageId
+            ? failureByProviderMessageId.get(msg.messageId) ?? null
+            : null,
         sentAt: msg.sentAt.toISOString(),
       });
     }
