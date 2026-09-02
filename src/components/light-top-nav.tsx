@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,10 +8,13 @@ import {
   PauseCircle,
   ChevronDown,
   LogOut,
+  Settings,
   Home,
   ListChecks,
   MessageSquare,
   Users,
+  Menu,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -89,12 +92,27 @@ export function LightTopNavBar({
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-  const tenantInitials = (branding?.tenantName || "Âncora")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    closeMobileMenu();
+  }, [pathname, closeMobileMenu]);
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        closeMobileMenu();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [mobileMenuOpen, closeMobileMenu]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-primary/20 bg-primary text-primary-foreground shadow-sm select-none">
@@ -119,13 +137,10 @@ export function LightTopNavBar({
                 ⚓
               </div>
             )}
-            <span className="font-bold text-sm tracking-tight text-white hidden md:inline truncate max-w-[150px]">
-              {branding?.tenantName || "Âncora Corretora"}
-            </span>
           </Link>
 
-          {/* ITENS DE NAVEGAÇÃO (ESTILO HORIZONTAL TABS) */}
-          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto [scrollbar-width:none]">
+          {/* ITENS DE NAVEGAÇÃO — desktop */}
+          <nav className="hidden md:flex items-center gap-1 sm:gap-1.5 overflow-x-auto [scrollbar-width:none]">
             {navItems.map((item) => {
               const active = isTabActive(item.href);
               const Icon = item.icon;
@@ -146,6 +161,17 @@ export function LightTopNavBar({
               );
             })}
           </nav>
+
+          {/* BOTÃO HAMBURGUER — mobile */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="md:hidden flex items-center justify-center size-8 rounded-lg hover:bg-white/15 transition-colors cursor-pointer"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
 
         {/* LADO DIREITO: DISPONIBILIDADE + IDENTIFICAÇÃO + PERFIL */}
@@ -176,18 +202,6 @@ export function LightTopNavBar({
             )}
           </button>
 
-          {/* BADGE DA CORRETORA/TENANT */}
-          <div className="hidden lg:flex items-center gap-1.5 rounded-lg bg-white/15 border border-white/20 px-2 py-1 text-xs text-white">
-            <span className="grid size-4 place-items-center rounded bg-white text-primary text-[9px] font-bold">
-              {tenantInitials || "AC"}
-            </span>
-            <span className="truncate max-w-[120px] font-medium text-[11px]">
-              {branding?.tenantName || "Corretora"}
-            </span>
-          </div>
-
-          <div className="h-5 w-px bg-white/25 hidden sm:block" />
-
           {/* MENU DE PERFIL DO USUÁRIO */}
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -209,20 +223,16 @@ export function LightTopNavBar({
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56 mt-1">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-semibold leading-none">{user?.name || "Corretor"}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+              <DropdownMenuLabel className="font-normal px-3 py-2.5">
+                <div className="flex flex-col gap-0.5">
+                  <p className="text-[13px] font-semibold leading-tight tracking-tight text-foreground truncate">{user?.name || "Corretor"}</p>
+                  <p className="text-[11px] leading-tight text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem render={<Link href="/minha-fila" className="cursor-pointer" />}>
-                <ListChecks className="mr-2 size-4" />
-                <span>Minha Fila</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href="/clientes" className="cursor-pointer" />}>
-                <Users className="mr-2 size-4" />
-                <span>Meus Clientes</span>
+              <DropdownMenuItem render={<Link href="/settings" className="cursor-pointer" />}>
+                <Settings className="mr-2 size-4" />
+                <span>Configurações</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -236,6 +246,37 @@ export function LightTopNavBar({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* MENU MOBILE DROPDOWN */}
+      {mobileMenuOpen && (
+        <div
+          ref={mobileMenuRef}
+          className="md:hidden border-t border-white/20 bg-primary animate-in slide-in-from-top-2 fade-in duration-150"
+        >
+          <nav className="flex flex-col p-2 gap-0.5">
+            <Link
+              href="/settings"
+              onClick={closeMobileMenu}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition-all"
+            >
+              <Settings className="size-4.5" />
+              <span>Configurações</span>
+            </Link>
+            <div className="my-1 border-t border-white/15" />
+            <button
+              type="button"
+              onClick={() => {
+                closeMobileMenu();
+                signOut();
+              }}
+              className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer"
+            >
+              <LogOut className="size-4.5" />
+              <span>Sair da conta</span>
+            </button>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

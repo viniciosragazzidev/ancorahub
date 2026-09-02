@@ -390,7 +390,7 @@ export function BrokerDailySummaryPanel({
                       <Button
                         render={
                           <Link
-                            href={`/leads?corretorId=${item.brokerId}`}
+                            href={`/leads?corretor=${item.brokerId}`}
                             className="inline-flex items-center gap-1"
                           />
                         }

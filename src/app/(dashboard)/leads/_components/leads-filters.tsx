@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -49,8 +49,6 @@ export function LeadsFilters({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
-
   const [open, setOpen] = useState(false);
 
   // States
@@ -119,12 +117,7 @@ export function LeadsFilters({
   function applyFilters() {
     const preferences = currentPreferences();
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
-    startTransition(() => {
-      router.push(buildUrl(preferences));
-      // The explicit refresh bypasses a stale App Router cache entry while
-      // preserving client navigation and scroll position.
-      router.refresh();
-    });
+    router.push(buildUrl(preferences));
   }
 
   function handleReset() {
@@ -139,10 +132,7 @@ export function LeadsFilters({
     setPageSize("20");
 
     window.localStorage.removeItem(storageKey);
-    startTransition(() => {
-      router.push("/leads");
-      router.refresh();
-    });
+    router.push("/leads");
   }
 
   const statusLabels: Record<string, string> = {
@@ -198,7 +188,7 @@ export function LeadsFilters({
             )}
           </PopoverTrigger>
 
-          <PopoverContent aria-busy={isPending} align="end" side="bottom" sideOffset={8} className="w-84 rounded-xl border border-border bg-popover p-0 shadow-[0_18px_45px_rgb(15_23_42/0.14)] sm:w-96">
+          <PopoverContent align="end" side="bottom" sideOffset={8} className="w-84 rounded-xl border border-border bg-popover p-0 shadow-[0_18px_45px_rgb(15_23_42/0.14)] sm:w-96">
             <div className="flex items-center justify-between border-b border-border/70 p-3.5">
               <div className="flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
@@ -395,7 +385,6 @@ export function LeadsFilters({
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={isPending}
                 onClick={handleReset}
                 className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
@@ -404,8 +393,7 @@ export function LeadsFilters({
               </Button>
 
               <StatefulButton
-                state={isPending ? "loading" : "idle"}
-                loadingText="Aplicando..."
+                state="idle"
                 onClick={applyFilters}
                 size="sm"
                 className="h-8 gap-1.5 px-3.5 text-xs font-semibold"

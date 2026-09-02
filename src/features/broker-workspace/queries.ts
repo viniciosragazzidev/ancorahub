@@ -96,7 +96,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
         stageEnteredAt: schema.leads.stageEnteredAt,
       })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), inArray(schema.leads.status, activeLeadStatuses)))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt), inArray(schema.leads.status, activeLeadStatuses)))
       .orderBy(desc(schema.leads.createdAt))
       .limit(200),
   ]);

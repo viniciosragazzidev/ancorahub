@@ -21,7 +21,6 @@ import {
   parseAsStringEnum,
   useQueryState,
 } from "nuqs";
-import { useRouter } from "next/navigation";
 
 import { dataTableConfig } from "@/config/data-table";
 import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
@@ -49,7 +48,6 @@ export function useDataTable<TData>({
   initialState,
   ...props
 }: UseDataTableProps<TData>) {
-  const router = useRouter();
   const [isPending, startTransition] = React.useTransition();
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>(
     initialState?.rowSelection ?? {}
@@ -87,13 +85,15 @@ export function useDataTable<TData>({
       .withDefault("and")
   );
 
+  // nuqs with shallow:false already triggers server rendering via router.push().
+  // An explicit router.refresh() after that causes a redundant second full
+  // server render (all DB queries re-execute). We only wait for the URL
+  // params to commit; the Next.js router handles the rest.
   const refreshAfterUrlCommit = React.useCallback(
     (updates: Array<Promise<URLSearchParams>>) => {
-      void Promise.all(updates)
-        .then(() => router.refresh())
-        .catch(() => undefined);
+      void Promise.all(updates).catch(() => undefined);
     },
-    [router]
+    []
   );
 
   const pagination: PaginationState = React.useMemo(

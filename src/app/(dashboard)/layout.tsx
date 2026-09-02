@@ -38,10 +38,6 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // serializing the shell, preference, branding and pathname lookups.
   const experienceModePromise = getExperienceMode(context);
   const headersPromise = headers();
-  const wahaConnectionsEnabledPromise =
-    context.role === "broker"
-      ? getSystemSetting("feature_waha_connections_enabled")
-      : Promise.resolve("true");
   const tenantPromise = getDatabase()
     .select({
       name: schema.tenants.name,
@@ -78,22 +74,17 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     experienceMode,
     headersList,
     tenantRows,
-    wahaConnectionsEnabled,
     userRows,
     membershipRows,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
     tenantPromise,
-    wahaConnectionsEnabledPromise,
     userPromise,
     membershipPromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
-  const showLightConversations =
-    !isLightBroker ||
-    wahaConnectionsEnabled !== "false";
 
   const pathname = headersList.get("x-pathname") || "";
 
@@ -128,7 +119,6 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     <AgentDrawerProvider>
       <AppShell
         isLightBroker={isLightBroker}
-        showLightConversations={showLightConversations}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

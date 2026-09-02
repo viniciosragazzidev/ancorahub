@@ -39,14 +39,12 @@ export function AppShell({
   branding,
   user,
   isLightBroker = false,
-  showLightConversations = true,
   initialAvailability = "available",
 }: {
   children: ReactNode;
   branding?: Branding;
   user?: UserInfo;
   isLightBroker?: boolean;
-  showLightConversations?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
 }) {
   const pathname = usePathname();
@@ -105,11 +103,10 @@ export function AppShell({
           } as CSSProperties
         }
       >
-        <div className="flex min-h-dvh w-full flex-col bg-background selection:bg-primary/20">
+        <div className="flex h-dvh w-full flex-col bg-background selection:bg-primary/20 overflow-hidden">
           <LightTopNavBar
             branding={branding}
             user={user}
-            showConversations={showLightConversations}
             initialAvailability={initialAvailability}
           />
           <main className="flex-1 min-h-0 w-full overflow-y-auto">
