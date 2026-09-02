@@ -119,7 +119,12 @@ export function LeadsFilters({
   function applyFilters() {
     const preferences = currentPreferences();
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
-    startTransition(() => router.push(buildUrl(preferences)));
+    startTransition(() => {
+      router.push(buildUrl(preferences));
+      // The explicit refresh bypasses a stale App Router cache entry while
+      // preserving client navigation and scroll position.
+      router.refresh();
+    });
   }
 
   function handleReset() {
@@ -134,7 +139,10 @@ export function LeadsFilters({
     setPageSize("20");
 
     window.localStorage.removeItem(storageKey);
-    startTransition(() => router.push("/leads"));
+    startTransition(() => {
+      router.push("/leads");
+      router.refresh();
+    });
   }
 
   const statusLabels: Record<string, string> = {

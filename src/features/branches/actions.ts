@@ -8,6 +8,9 @@ import { z } from "zod";
 
 import { requireRole } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { resolveAccessContext } from "@/shared/auth/access-context";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import { getDatabase, schema } from "@/shared/db";
 
 export type BranchActionState = { success?: boolean; error?: string; message?: string };
@@ -148,24 +151,48 @@ export async function toggleAutoDistributeAction(
   if (!branchId.success) return { error: branchId.error.issues[0]?.message ?? "Filial inválida." };
 
   try {
-    const context = await getRequiredTenantContext();
-    if (context.role !== "manager" && context.role !== "director") {
-      return { error: "Apenas Gestores e Diretores podem alterar esta configuração." };
-    }
+    const accessContext = await resolveAccessContext();
     const db = getDatabase();
     const [branch] = await db
-      .select({ id: schema.branches.id, autoDistribute: schema.branches.autoDistribute, isDistributionHub: schema.branches.isDistributionHub })
+      .select({
+        id: schema.branches.id,
+        autoDistribute: schema.branches.autoDistribute,
+        isDistributionHub: schema.branches.isDistributionHub,
+      })
       .from(schema.branches)
       .where(
-        and(eq(schema.branches.id, branchId.data), eq(schema.branches.tenantId, context.tenantId)),
+        and(
+          eq(schema.branches.id, branchId.data),
+          eq(schema.branches.tenantId, accessContext.tenantId),
+        ),
       )
       .limit(1);
     if (!branch) return { error: "Filial não encontrada." };
-    if (branch.isDistributionHub) return { error: "A Central de redistribuição não participa da distribuição automática." };
-    // Manager can only toggle their own branch
-    if (context.role === "manager" && context.branchId !== branch.id) {
-      return { error: "Você só pode alterar a configuração da sua própria filial." };
+    if (branch.isDistributionHub) {
+      return { error: "A Central de redistribuição não participa da distribuição automática." };
     }
+
+    const legacyAllowed =
+      accessContext.role === "director" ||
+      (accessContext.role === "manager" && accessContext.branchId === branch.id);
+
+    await evaluateShadowAuthorization({
+      operationKey: "branches.toggleAutoDistributeAction",
+      legacyAllowed,
+      context: accessContext,
+      capability: "gerenciar_configuracoes_unidade",
+      resource: { tenantId: accessContext.tenantId, unitId: branch.id },
+    });
+
+    if (
+      !AuthorizationService.can(accessContext, "gerenciar_configuracoes_unidade", {
+        tenantId: accessContext.tenantId,
+        unitId: branch.id,
+      })
+    ) {
+      return { error: "Você só pode alterar a configuração de filiais sob sua gestão." };
+    }
+
     await db
       .update(schema.branches)
       .set({ autoDistribute: !branch.autoDistribute })
@@ -232,9 +259,7 @@ export async function toggleBrokerAvailabilityAction(
   if (!brokerId.success) return { error: "Corretor inválido." };
 
   try {
-    const context = await getRequiredTenantContext();
-    if (context.role !== "manager" && context.role !== "director")
-      return { error: "Apenas Gestores e Diretores podem controlar o recebimento." };
+    const accessContext = await resolveAccessContext();
     const db = getDatabase();
     const [membership] = await db
       .select({
@@ -247,7 +272,7 @@ export async function toggleBrokerAvailabilityAction(
       .from(schema.tenantMemberships)
       .where(
         and(
-          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.tenantId, accessContext.tenantId),
           eq(schema.tenantMemberships.userId, brokerId.data),
           eq(schema.tenantMemberships.role, "broker"),
           eq(schema.tenantMemberships.status, "active"),
@@ -255,11 +280,33 @@ export async function toggleBrokerAvailabilityAction(
       )
       .limit(1);
     if (!membership) return { error: "Corretor não encontrado nesta corretora." };
+
+    const legacyAllowed =
+      accessContext.role === "director" ||
+      (accessContext.role === "manager" &&
+        Boolean(accessContext.branchId) &&
+        membership.branchId === accessContext.branchId);
+
+    await evaluateShadowAuthorization({
+      operationKey: "branches.toggleBrokerAvailabilityAction",
+      legacyAllowed,
+      context: accessContext,
+      capability: "gerenciar_configuracoes_unidade",
+      resource: {
+        tenantId: accessContext.tenantId,
+        unitId: membership.branchId,
+      },
+    });
+
     if (
-      context.role === "manager" &&
-      (!context.branchId || membership.branchId !== context.branchId)
-    )
-      return { error: "Você só pode controlar corretores da sua filial." };
+      !AuthorizationService.can(accessContext, "gerenciar_configuracoes_unidade", {
+        tenantId: accessContext.tenantId,
+        unitId: membership.branchId,
+      })
+    ) {
+      return { error: "Você só pode controlar corretores de filiais sob sua gestão." };
+    }
+
     const nextStatus = membership.availabilityStatus === "available" ? "paused" : "available";
     await db.transaction(async (tx) => {
       await tx
@@ -268,7 +315,7 @@ export async function toggleBrokerAvailabilityAction(
         .where(eq(schema.tenantMemberships.id, membership.id));
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),
-        userId: context.userId,
+        userId: accessContext.userId,
         entidade: "tenant_membership",
         entidadeId: membership.id,
         acao:
@@ -295,10 +342,7 @@ export async function setBrokersAvailabilityAction(
   if (!target.success) return { error: "Ação inválida." };
 
   try {
-    const context = await getRequiredTenantContext();
-    if (context.role !== "manager" && context.role !== "director") {
-      return { error: "Apenas Gestores e Diretores podem controlar o recebimento." };
-    }
+    const accessContext = await resolveAccessContext();
     const db = getDatabase();
     const memberships = await db
       .select({
@@ -309,19 +353,22 @@ export async function setBrokersAvailabilityAction(
       .from(schema.tenantMemberships)
       .where(
         and(
-          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.tenantId, accessContext.tenantId),
           inArray(schema.tenantMemberships.userId, parsed.data),
           eq(schema.tenantMemberships.role, "broker"),
           eq(schema.tenantMemberships.status, "active"),
         ),
       );
     if (!memberships.length) return { error: "Nenhum corretor encontrado nesta corretora." };
-    if (
-      context.role === "manager" &&
-      memberships.some((membership) => membership.branchId !== context.branchId)
-    ) {
-      return { error: "Você só pode controlar corretores da sua filial." };
+
+    const unauthorized = memberships.some(
+      (m) =>
+        !AuthorizationService.canAccessUnit(accessContext, m.branchId),
+    );
+    if (unauthorized) {
+      return { error: "Você só pode controlar corretores de filiais sob sua gestão." };
     }
+
     let updated = 0;
     await db.transaction(async (tx) => {
       for (const membership of memberships) {
@@ -337,7 +384,7 @@ export async function setBrokersAvailabilityAction(
           .where(eq(schema.tenantMemberships.id, membership.id));
         await tx.insert(schema.auditLogs).values({
           id: randomUUID(),
-          userId: context.userId,
+          userId: accessContext.userId,
           entidade: "tenant_membership",
           entidadeId: membership.id,
           acao:

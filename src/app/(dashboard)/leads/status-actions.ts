@@ -8,6 +8,9 @@ import { assignLeadToBroker } from "@/features/lead-distribution/service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
+import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
 export type StatusChangeState = {
   success?: boolean;
@@ -92,6 +95,14 @@ export async function bulkReassignLeadsAction(
         branchIds: changedLeads.map((lead) => lead.branchId),
         brokerIds: [brokerId, ...changedLeads.map((lead) => lead.corretorId)],
       }).catch(() => undefined);
+
+      scheduleAfterResponse("lead-reassign-batch-effects", async () => {
+        await runLeadEffectOutboxProcessor({
+          tenantId: context.tenantId,
+          limit: Math.max(changedLeadIds.length * 2, 10),
+        });
+        await processMetaOutboundBatch(10, context.tenantId);
+      });
     }
 
     if (errorCount === 0) {
@@ -128,6 +139,8 @@ export async function changeLeadStatusAction(
     leadId: (formData.get("leadId") ?? "") as string,
     newStatus: (formData.get("newStatus") ?? formData.get("status") ?? "") as string,
     motivoPerda: (formData.get("motivoPerda") ?? formData.get("lossReason")) as string | null,
+    justificativaRegressao: (formData.get("justificativaRegressao") ??
+      formData.get("regressionJustification")) as string | null,
   };
 
   try {

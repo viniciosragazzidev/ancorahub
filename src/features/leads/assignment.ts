@@ -3,15 +3,49 @@ import "server-only";
 import { and, asc, count, eq, gt, inArray, isNull, lte, not, or } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 
 const activeStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
-function getLocalDutyParts(date: Date) {
+export function getLocalDutyParts(date: Date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
   const weekday = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[parts.find((part) => part.type === "weekday")?.value as "Sun" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat"] ?? 0;
   const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
   const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
   return { weekday, time: `${hour === "24" ? "00" : hour}:${minute}` };
+}
+
+export async function checkBrokerScheduleAvailability(tenantId: string, brokerId: string, date: Date = new Date()) {
+  const db = getDatabase();
+  const local = getLocalDutyParts(date);
+
+  const totalWindows = await db
+    .select({ total: count(schema.brokerAvailabilityWindows.id) })
+    .from(schema.brokerAvailabilityWindows)
+    .where(
+      and(
+        eq(schema.brokerAvailabilityWindows.tenantId, tenantId),
+        eq(schema.brokerAvailabilityWindows.brokerId, brokerId)
+      )
+    );
+
+  if (Number(totalWindows[0]?.total ?? 0) === 0) return { isConfigured: false, isWithinSchedule: true };
+
+  const windows = await db
+    .select({ id: schema.brokerAvailabilityWindows.id })
+    .from(schema.brokerAvailabilityWindows)
+    .where(
+      and(
+        eq(schema.brokerAvailabilityWindows.tenantId, tenantId),
+        eq(schema.brokerAvailabilityWindows.brokerId, brokerId),
+        eq(schema.brokerAvailabilityWindows.dayOfWeek, local.weekday),
+        lte(schema.brokerAvailabilityWindows.startsAt, local.time),
+        gt(schema.brokerAvailabilityWindows.endsAt, local.time)
+      )
+    )
+    .limit(1);
+
+  return { isConfigured: true, isWithinSchedule: windows.length > 0 };
 }
 
 /**
@@ -23,7 +57,7 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
   if (!branchId) return null;
   const db = getDatabase();
 
-  const [branch, brokers] = await Promise.all([
+  const [branch, brokers, availabilityOnboardingEnabled] = await Promise.all([
     db
       .select({ autoDistribute: schema.branches.autoDistribute, isDistributionHub: schema.branches.isDistributionHub })
       .from(schema.branches)
@@ -44,6 +78,7 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
         ...(excludeBrokerId ? [not(eq(schema.user.id, excludeBrokerId))] : []),
       ))
       .orderBy(asc(schema.user.createdAt)),
+    getFeatureFlag(FEATURE_FLAGS.BROKER_AVAILABILITY_ONBOARDING),
   ]);
 
   if (!branch[0] || !branch[0].autoDistribute || branch[0].isDistributionHub) return null;
@@ -59,6 +94,18 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
 
   // ── Plantão credential filter ──────────────────────────────────────
   const local = getLocalDutyParts(new Date());
+  const scheduleRows = availabilityOnboardingEnabled !== "false"
+    ? await db
+        .select({ brokerId: schema.brokerAvailabilityWindows.brokerId, dayOfWeek: schema.brokerAvailabilityWindows.dayOfWeek, startsAt: schema.brokerAvailabilityWindows.startsAt, endsAt: schema.brokerAvailabilityWindows.endsAt })
+        .from(schema.brokerAvailabilityWindows)
+        .where(and(eq(schema.brokerAvailabilityWindows.tenantId, tenantId), inArray(schema.brokerAvailabilityWindows.brokerId, brokers.map((broker) => broker.id))))
+    : [];
+  const configuredBrokerIds = new Set(scheduleRows.map((window) => window.brokerId));
+  const scheduledBrokerIds = new Set(scheduleRows.filter((window) => window.dayOfWeek === local.weekday && window.startsAt <= local.time && window.endsAt > local.time).map((window) => window.brokerId));
+  const eligibleBySchedule = availabilityOnboardingEnabled === "false"
+    ? brokers
+    : brokers.filter((broker) => !configuredBrokerIds.has(broker.id) || scheduledBrokerIds.has(broker.id));
+  if (!eligibleBySchedule.length) return null;
   const activeSchedules = await db.select({ id: schema.unitDutySchedules.id, webhookCredentialId: schema.unitDutySchedules.webhookCredentialId })
     .from(schema.unitDutySchedules)
     .where(and(
@@ -90,7 +137,7 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
       ));
 
     const rosterIds = new Set(rosterAssignments.map((a) => a.brokerId));
-    const filtered = brokers.filter((b) => rosterIds.has(b.id));
+    const filtered = eligibleBySchedule.filter((b) => rosterIds.has(b.id));
     if (!filtered.length) return null;
     const ids = filtered.map((b) => b.id);
     const workloads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(eq(schema.leads.tenantId, tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, activeStatuses))).groupBy(schema.leads.corretorId);
@@ -104,7 +151,7 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
   }
 
   // ── Fallback: all available brokers (no plantão filter) ────────────
-  const ids = brokers.map((broker) => broker.id);
+  const ids = eligibleBySchedule.map((broker) => broker.id);
   const workloads = await db
     .select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) })
     .from(schema.leads)
@@ -113,8 +160,8 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
   const loadByBroker = new Map(workloads.map((item) => [item.brokerId, Number(item.total)]));
 
   // Limit Priority Grouping
-  const brokersBelowLimit = brokers.filter(b => (loadByBroker.get(b.id) ?? 0) < limit);
-  const targetBrokers = brokersBelowLimit.length > 0 ? brokersBelowLimit : brokers;
+  const brokersBelowLimit = eligibleBySchedule.filter(b => (loadByBroker.get(b.id) ?? 0) < limit);
+  const targetBrokers = brokersBelowLimit.length > 0 ? brokersBelowLimit : eligibleBySchedule;
 
   return [...targetBrokers].sort((a, b) => (loadByBroker.get(a.id) ?? 0) - (loadByBroker.get(b.id) ?? 0))[0]?.id ?? null;
 }

@@ -15,6 +15,7 @@ import {
   Share,
   Sparkle,
   Users,
+  Warning,
   WhatsappLogo,
   XCircle,
 } from "@/components/huge-icons";
@@ -32,6 +33,8 @@ import {
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
+import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
+import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 
 import { cn } from "@/lib/utils";
@@ -39,6 +42,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
+import { AiConversationInsightCard } from "@/features/conversation-intelligence/components/ai-conversation-insight-card";
 
 type ConfirmationDocument = { id: string; filename: string; status: string };
 type CarrierOption = { id: string; name: string };
@@ -82,6 +86,8 @@ export type LightLeadDetailData = {
   }>;
   formData?: Record<string, string | null> | null;
   consentimentoLgpd?: boolean;
+  aiIntelligence?: any;
+  aiPolicyResult?: any;
 };
 
 const DECLINE_REASONS = [
@@ -149,8 +155,21 @@ export function LightLeadDetail({
   const [followupOption, setFollowupOption] = useState<string>("tomorrow");
   const [observation, setObservation] = useState<string>("");
   const [lossReason, setLossReason] = useState<string>("Preço");
+  const [regressionJustification, setRegressionJustification] = useState<string>("");
   const [saleSuccessAnim, setSaleSuccessAnim] = useState(false);
   const [updatingStep, startUpdateTransition] = useTransition();
+
+  const potentialSaleCheck = useMemo(
+    () => isAiPotentialSale(lead.aiIntelligence ? { aiIntelligence: lead.aiIntelligence } : lead),
+    [lead],
+  );
+
+  const isSelectedStepRegression = useMemo(() => {
+    const stepInfo = STEP_OPTIONS.find((s) => s.id === selectedStep);
+    if (!stepInfo) return false;
+    if (stepInfo.targetStatus === "lost") return true;
+    return (LEAD_STATUS_ORDER[stepInfo.targetStatus] ?? 0) < (LEAD_STATUS_ORDER[leadStatus] ?? 0);
+  }, [selectedStep, leadStatus]);
 
   const [whatsappOpenedAt, setWhatsappOpenedAt] = useState<string | null>(null);
   const [requestingSale, startRequestSaleTransition] = useTransition();
@@ -177,12 +196,14 @@ export function LightLeadDetail({
     else setSelectedStep("quote_sent");
 
     setObservation("");
+    setRegressionJustification("");
     setShowUpdateSheet(true);
   }
 
   function resetStepDialog() {
     setShowUpdateSheet(false);
     setObservation("");
+    setRegressionJustification("");
   }
 
   // Check if lead is unavailable for this broker
@@ -280,6 +301,18 @@ export function LightLeadDetail({
     }
 
     if (observation.trim()) formData.append("notes", observation);
+
+    // Proteção de Regressão da IA
+    if (potentialSaleCheck.isPotentialSale && isSelectedStepRegression) {
+      if (regressionJustification.trim().length < 15) {
+        toast.error(
+          "Proteção de Regressão IA: É obrigatório fornecer uma justificativa detalhada com no mínimo 15 caracteres.",
+        );
+        return;
+      }
+      formData.append("justificativaRegressao", regressionJustification.trim());
+      formData.append("regressionJustification", regressionJustification.trim());
+    }
 
     startUpdateTransition(async () => {
       try {
@@ -557,6 +590,14 @@ export function LightLeadDetail({
             <p className="text-muted-foreground leading-relaxed">{lead.summary}</p>
           </div>
         ) : null}
+
+        {/* AI Conversation Diagnostic */}
+        <AiConversationInsightCard
+          leadId={lead.id}
+          assessment={lead.aiIntelligence}
+          policyResult={lead.aiPolicyResult}
+          canManage={lead.isCurrentBroker}
+        />
 
         {/* Action Buttons Container */}
         {isDistributed ? (
@@ -959,6 +1000,36 @@ export function LightLeadDetail({
                   <option value="Sem interesse">Sem interesse</option>
                   <option value="Outro">Outro motivo</option>
                 </select>
+              </div>
+            )}
+
+            {/* Proteção de Regressão IA */}
+            {potentialSaleCheck.isPotentialSale && isSelectedStepRegression && (
+              <div className="mt-3 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-400">
+                  <Warning className="size-4 shrink-0" />
+                  Proteção de Regressão IA
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  A IA identificou este atendimento como uma potencial venda (
+                  <span className="text-amber-700 dark:text-amber-300 font-medium">
+                    {potentialSaleCheck.reason}
+                  </span>
+                  ). Para recuar a etapa ou descartar, é obrigatório registrar uma justificativa detalhada para a supervisão:
+                </p>
+                <textarea
+                  rows={3}
+                  placeholder="Explique detalhadamente por que este lead está recuando/sendo perdido (mínimo 15 caracteres)..."
+                  value={regressionJustification}
+                  onChange={(e) => setRegressionJustification(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-card p-2 text-xs focus:ring-1 focus:ring-primary"
+                />
+                {regressionJustification.trim().length > 0 &&
+                  regressionJustification.trim().length < 15 && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-medium">
+                      Faltam {15 - regressionJustification.trim().length} caracteres para o mínimo exigido.
+                    </span>
+                  )}
               </div>
             )}
           </div>

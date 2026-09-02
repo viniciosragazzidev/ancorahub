@@ -70,15 +70,8 @@ export function formatCurrency(
 }
 
 
-export function formatPhoneForWhatsApp(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("55") ? digits : `55${digits}`;
-}
-
-export function buildWhatsAppLink(phone: string, message: string): string {
-  const encoded = encodeURIComponent(message);
-  return `https://wa.me/${formatPhoneForWhatsApp(phone)}?text=${encoded}`;
-}
+import { formatPhoneForWhatsApp, buildWhatsAppLink } from "@/shared/utils/phone";
+export { formatPhoneForWhatsApp, buildWhatsAppLink };
 
 export function buildQuoteSummary(quote: {
   leadName: string;

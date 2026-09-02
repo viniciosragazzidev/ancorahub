@@ -58,14 +58,9 @@ export type SendWhatsAppTestMessageResult = {
   maskedDestination: string;
 };
 
-/** Mask phone numbers for non-privileged log views (e.g. +55 71 *****-9999) */
-export function maskPhoneNumber(phone: string): string {
-  const clean = phone.replace(/\D/g, "");
-  if (clean.length < 8) return "***";
-  const start = clean.slice(0, 4);
-  const end = clean.slice(-4);
-  return `+${start}*****${end}`;
-}
+import { maskPhone } from "@/shared/utils/phone";
+/** Mask phone numbers for non-privileged log views */
+export const maskPhoneNumber = maskPhone;
 
 export async function getWhatsAppDiagnosticStatus(
   tenantId: string,

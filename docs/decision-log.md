@@ -1,5 +1,87 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
+
+**Estado:** Aceita
+**Data:** 2026-09-01
+
+O `/relatorios` passa a ser a camada de inteligência operacional da corretora, com
+famílias de relatórios (Visão geral, Comercial, Equipe, Unidades, Financeiro) sobre um
+catálogo canônico de métricas versionado em `src/features/reports/metrics`. O catálogo
+é a única fonte de cálculo: nenhuma superfície nova pode recalcular métricas
+localmente. Na primeira entrega migram para o catálogo o próprio `/relatorios` e os
+consumidores de maior risco de divergência (NOC, `/clientes`, broker-summary); os
+demais migram por telas com dívida registrada no roadmap.
+
+A taxa de conversão canônica (`commercial.conversion_rate`) é **coorte de entrada**:
+leads recebidos no período que alcançaram `converted` ÷ leads recebidos no período
+(excluídos duplicados/descartados), garantindo que numerador e denominador resolvem
+para a mesma população no drill-down. O relatório de funil exibe exatamente os 8
+estágios da máquina de estados do ADR-001, sem agrupamento paralelo. O período segue a
+DEC-059 (presets 7/14/30/90) com comparação derivada da janela anterior equivalente;
+diferenças de taxa são apresentadas em pontos percentuais.
+
+O acesso por papel é conservador: Diretor vê todas as famílias; Gestor vê Visão geral,
+Comercial, Equipe e Unidades restritas à própria unidade, sem comparativo entre
+unidades; Supervisor vê Comercial e Equipe apenas dos supervisionados, sem valores;
+Corretor vê somente Comercial com dados próprios. Abas fora do escopo não são
+renderizadas e o seletor de unidade nunca amplia o escopo da sessão. A seção "O que
+exige atenção" reutiliza os parâmetros existentes do tenant (`slaFirstContactMinutes`,
+`slaStagnantDays`) em vez de criar configuração paralela.
+
+A atribuição histórica usa a titularidade persistida no registro no momento do evento;
+snapshot por evento (`broker_at_sale`, `unit_at_event`) fica como dívida documentada
+para a fase 2/3. A capacidade global `feature_reporting_center_enabled`, controlada e
+auditada pelo Super-admin, alterna entre a nova central e o layout legado sem perda de
+dados (padrão DEC-070). Cohorts, relatórios salvos/programados, aba Atendimento,
+Conversation Intelligence e AI Analyst permanecem fases futuras. Plano completo em
+`docs/product/reporting-root-plan.md`; decisão técnica em ADR-0040.
+
+## DEC-089 — Número WAHA oficial para avisos internos ao corretor
+
+**Estado:** Aceita
+**Data:** 2026-09-01
+
+O Diretor pode selecionar um número WAHA ativo, pertencente ao escopo do próprio
+tenant, para avisos internos e conversas operacionais com corretores. A política possui dois
+modos reversíveis: `meta_then_waha`, que mantém a Meta como tentativa inicial e
+executa uma única contingência WAHA após falha confirmada, e `waha_direct`, que
+envia diretamente pelo número selecionado sem tentar a Meta.
+
+A política é restrita a eventos internos de atribuição, oferta e conversa
+Diretor/Gestor–Corretor. Em `waha_direct`, a outbox usa exclusivamente o número
+selecionado: número pausado ou indisponível bloqueia o registro com motivo claro,
+sem fallback para Meta ou outra sessão WAHA. Saídas pertencem somente à outbox e
+entradas internas assinadas pertencem somente ao ledger de mensagens, idempotente
+por tenant e identificador do provedor. Ela não altera atendimento de leads ou
+clientes, qualificação por IA, campanhas ou o canal oficial Meta. A configuração
+é auditada por tenant e um kill switch global do Super-admin suspende o uso WAHA
+preservando a outbox.
+
+## DEC-088 — Agenda pessoal opcional como critério de distribuição automática
+
+**Estado:** Aceita
+**Data:** 2026-08-31
+
+O Corretor pode declarar janelas semanais de disponibilidade, sem bloquear o
+acesso ou o recebimento de novos leads ao pular a configuração. A agenda é
+pessoal, auditável e editável em `/settings`; quando configurada, ela é um
+critério adicional à unidade, ao status imediato de disponibilidade, à carga e
+ao plantão aplicável. Sem agenda, a distribuição automática usa os demais
+critérios existentes; com agenda, respeita somente suas janelas ativas. A
+carteira existente permanece acessível em todos os casos.
+
+A agenda respeita o fuso operacional `America/Sao_Paulo` e não substitui a
+janela comercial global da DEC-083: ambos os critérios devem ser atendidos.
+Atribuições manuais seguem permitidas, pois dependem de decisão humana
+explícita. O Super-admin pode suspender a capacidade globalmente sem apagar
+agendas ou auditoria; enquanto suspensa, a distribuição volta a considerar os
+demais critérios existentes.
+
+O onboarding apresenta também a conexão do WhatsApp pessoal. Ambos os passos
+são recomendados e podem ser fechados para configuração posterior; o descarte
+é persistido e auditado, evitando interrupções repetidas.
+
 ## DEC-087 — Resposta de mutação local-first em operações de Leads
 
 **Estado:** Aceita

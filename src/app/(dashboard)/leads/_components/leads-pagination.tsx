@@ -41,6 +41,7 @@ export function LeadsPagination({
       const newUrl = `${pathname}?${params.toString()}`;
       startTransition(() => {
         router.push(newUrl);
+        router.refresh();
       });
     }
   }
@@ -63,6 +64,7 @@ export function LeadsPagination({
       const newUrl = `${pathname}?${params.toString()}`;
       startTransition(() => {
         router.push(newUrl);
+        router.refresh();
       });
     }
   }

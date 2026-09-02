@@ -143,6 +143,25 @@ test("POST /disconnect com WAHA configurado retorna resposta controlada", async 
   await app.close();
 });
 
+test("POST /disconnect preserva o código seguro do provider para o CRM", async () => {
+  configure();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response("Unauthorized", { status: 401 })) as typeof globalThis.fetch;
+  const app = buildApp();
+  try {
+    const response = await app.inject({
+      method: "POST",
+      url: "/internal/waha/connections/waha_abc123/disconnect",
+      headers: AUTH_HEADERS,
+    });
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.json().error, "WAHA_UNAUTHORIZED");
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
 test("POST /recover concorrente para sessão FAILED recria somente uma sessão", async () => {
   configure();
   const originalFetch = globalThis.fetch;

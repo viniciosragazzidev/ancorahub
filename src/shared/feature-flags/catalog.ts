@@ -54,6 +54,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita o agente de IA integrado ao WAHA.",
   },
 
+  WAHA_INTERNAL_BROKER_NOTIFICATIONS: {
+    key: "feature_waha_internal_broker_notifications_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o WAHA para avisos internos de distribuição destinados a corretores.",
+  },
+
   // ── IA / Qualificação ─────────────────────────────────────────────────────
   AI_ENABLED: {
     key: "ai_enabled",
@@ -93,6 +101,14 @@ export const FEATURE_FLAGS = {
     defaultValue: "0",
     description:
       "Segundos de debounce antes do agente processar uma mensagem. 0 = desabilitado. Máximo: 2 (limitado internamente).",
+  },
+
+  CONVERSATION_INTELLIGENCE: {
+    key: "feature_conversation_intelligence_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o motor de análise contínua de conversas e auto-feedback com IA.",
   },
 
   AI_MEMORY_RESET_MODE: {
@@ -158,6 +174,24 @@ export const FEATURE_FLAGS = {
     defaultValue: "",
     description:
       "Rascunho de abertura padrão para o modo corretor lite no chat.",
+  },
+
+  REPORTING_CENTER: {
+    key: "feature_reporting_center_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Habilita a Central de Relatórios (Reporting 1): catálogo canônico de métricas, abas por papel, funil de 8 estágios, seção de atenção e drill-down explicável. Desativa = layout legado anterior.",
+  },
+
+  BROKER_AVAILABILITY_ONBOARDING: {
+    key: "feature_broker_availability_onboarding_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Exige que corretores declarem sua agenda semanal e aplica essa agenda à distribuição automática de leads.",
   },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 

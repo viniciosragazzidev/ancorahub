@@ -6,6 +6,7 @@ import {
   updateCentralAtencaoSettingsAction,
   updateGlobalSearchSettingsAction,
   updateBrokerWorkspaceSettingsAction,
+  updateBrokerAvailabilityOnboardingSettingsAction,
   updateWorkflowAutomationSettingsAction,
   updateCleanUiOperationalSettingsAction,
   updateInterfaceMotionSettingsAction,
@@ -33,6 +34,7 @@ import {
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
   updateUserProfileSettingsAction,
+  updateReportingCenterSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
@@ -57,6 +59,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_stagnant_days",
     "feature_global_search_enabled",
     "feature_broker_workspace_enabled",
+    "feature_broker_availability_onboarding_enabled",
     "feature_workflow_automation_enabled",
     CLEAN_UI_FEATURE,
     "feature_interface_motion_enabled",
@@ -80,6 +83,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_waha_cadence_enabled",
     "feature_waha_connections_enabled",
     "feature_waha_ai_enabled",
+    "feature_waha_internal_broker_notifications_enabled",
     "waha_cadence_max_attempts",
     "waha_cadence_retry_base_seconds",
     "waha_cadence_lease_seconds",
@@ -115,6 +119,7 @@ export default async function SuperAdminSettingsPage() {
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
+  const brokerAvailabilityOnboardingEnabled = settingMap.get("feature_broker_availability_onboarding_enabled") !== "false";
   const workflowAutomationEnabled =
     settingMap.get("feature_workflow_automation_enabled") === "true";
   const cleanUiOperationalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
@@ -123,6 +128,7 @@ export default async function SuperAdminSettingsPage() {
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
+  const reportingCenterEnabled = settingMap.get("feature_reporting_center_enabled") !== "false";
   const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const realtimeSyncEnabled = settingMap.get("feature_realtime_sync_enabled") !== "false";
@@ -151,6 +157,7 @@ export default async function SuperAdminSettingsPage() {
   const wahaCadenceEnabled = settingMap.get("feature_waha_cadence_enabled") === "true";
   const wahaConnectionsEnabled = settingMap.get("feature_waha_connections_enabled") === "true";
   const wahaAiEnabled = settingMap.get("feature_waha_ai_enabled") === "true";
+  const wahaInternalBrokerNotificationsEnabled = settingMap.get("feature_waha_internal_broker_notifications_enabled") !== "false";
   const wahaMaxAttempts = settingMap.get("waha_cadence_max_attempts") ?? "5";
   const wahaRetryBaseSeconds = settingMap.get("waha_cadence_retry_base_seconds") ?? "60";
   const wahaLeaseSeconds = settingMap.get("waha_cadence_lease_seconds") ?? "120";
@@ -237,6 +244,23 @@ export default async function SuperAdminSettingsPage() {
                   <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>
                     {brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}
                   </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Agenda obrigatória do corretor</CardTitle>
+                <CardDescription>
+                  Exige a configuração da disponibilidade semanal e usa a agenda para filtrar a distribuição automática. Atribuições manuais continuam possíveis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerAvailabilityOnboardingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="brokerAvailabilityOnboardingEnabled" value="true" defaultChecked={brokerAvailabilityOnboardingEnabled} className="size-4" />
+                    <span><span className="font-medium">Exigir agenda para novos leads automáticos</span><span className="block text-xs text-muted-foreground">Desativar preserva as agendas salvas, mas deixa de usá-las para bloquear a distribuição.</span></span>
+                  </label>
+                  <Button type="submit" variant={brokerAvailabilityOnboardingEnabled ? "outline" : "default"}>{brokerAvailabilityOnboardingEnabled ? "Salvar controle" : "Ativar agenda obrigatória"}</Button>
                 </form>
               </CardContent>
             </Card>
@@ -784,6 +808,46 @@ export default async function SuperAdminSettingsPage() {
 
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
+                <CardTitle>Central de Relatórios (Reporting 1)</CardTitle>
+                <CardDescription>
+                  Ativa o catálogo canônico de métricas, abas por papel (Visão geral, Comercial,
+                  Equipe, Unidades, Financeiro), funil de 8 estágios, seção de atenção com
+                  parâmetros do tenant e drill-down explicável. Desativa para o layout legado
+                  anterior.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={updateReportingCenterSettingsAction}
+                  className="flex flex-wrap items-center justify-between gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="reportingCenterEnabled"
+                      value="true"
+                      defaultChecked={reportingCenterEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Central de relatórios habilitada</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Desativação restaura o layout legado e preserva auditoria.
+                      </span>
+                    </span>
+                  </label>
+                  <Button
+                    type="submit"
+                    variant={reportingCenterEnabled ? "outline" : "default"}
+                  >
+                    {reportingCenterEnabled ? "Salvar controle" : "Ativar central de relatórios"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
                 <CardTitle>Captação manual de Lead Ads</CardTitle>
                 <CardDescription>
                   Libera o webhook Page/leadgen com um token técnico exclusivo da plataforma. Cada
@@ -1323,6 +1387,21 @@ export default async function SuperAdminSettingsPage() {
                       <span className="font-medium">Cadências habilitadas</span>
                       <span className="block text-xs text-muted-foreground">
                         Pausa a fila sem apagar histórico.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm md:col-span-3">
+                    <input
+                      type="checkbox"
+                      name="internalBrokerNotificationsEnabled"
+                      value="true"
+                      defaultChecked={wahaInternalBrokerNotificationsEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">WAHA para avisos internos de corretores</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Kill switch reversível: não altera o atendimento de leads pelo canal oficial.
                       </span>
                     </span>
                   </label>
