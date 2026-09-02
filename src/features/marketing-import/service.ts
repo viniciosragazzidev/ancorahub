@@ -96,10 +96,8 @@ function validateHeaders(headers: string[], type: ImportType): Map<string, numbe
   return headerMap;
 }
 
-function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[\s()\-+]/g, "");
-  return digits.startsWith("55") ? digits : `55${digits}`;
-}
+import { ensureBrazilPhone } from "@/shared/utils/phone";
+// normalizePhone agora é ensureBrazilPhone — ambos garantem prefixo 55
 
 function parseDate(raw: string): Date | null {
   if (!raw || raw.trim() === "") return null;
@@ -119,7 +117,7 @@ function parseDate(raw: string): Date | null {
 function validateRow(row: RawRow, index: number, type: ImportType): { normalized: NormalizedRow; errors: string[] } {
   const errors: string[] = [];
   const nome = row.nome.trim();
-  const telefone = normalizePhone(row.telefone);
+  const telefone = ensureBrazilPhone(row.telefone);
   const email = row.email.trim().toLowerCase() || null;
   const operadora = (row.operadora || "").trim();
   const campanha = (row.campanha || "").trim();

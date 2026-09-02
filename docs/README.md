@@ -13,6 +13,7 @@
 | `product/resume-dashboard-plan.md` | Conteúdo e prioridades da home executiva `/resume` | Plano de produto vigente |
 | `product/corretor-resume-dashboard-plan.md` | Conteúdo e prioridades da home pessoal do Corretor | Plano de produto vigente |
 | `product/financeiro-role-based-plan.md` | Plano do Financeiro por papel, com governança, auditoria e controle do Super-admin | Plano de produto vigente |
+| `product/reporting-root-plan.md` | Plano da camada de inteligência operacional `/relatorios`: catálogo canônico de métricas, famílias, drill-down e fases | Plano de produto vigente (DEC-090, ADR-0040) |
 | `product/visao-de-mercado-e-funcionalidades.md` | Visão executiva, funcional e de impacto comercial do AncoraHub | Material de mercado e operação |
 | `product/plano-simplificacao-filas.md` | Diagnóstico e plano de simplificação das filas de leads, plantões e exceções | Proposta de produto pendente de decisões de operação |
 | `decision-log.md` | Decisões tomadas e pendências | Controle de decisão vigente |

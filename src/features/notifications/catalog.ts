@@ -17,6 +17,7 @@ export const notificationCapabilities = [
   { id: "lead_reopened", label: "Lead reaberto", description: "Notifica o corretor e a gestão quando um lead perdido é reaberto.", channels: "Toast + push" },
   { id: "lead_archived", label: "Lead arquivado", description: "Notifica quando um lead é arquivado (disponível para uso futuro).", channels: "Toast/in-app" },
   { id: "quick_reply_human", label: "Quick Reply e atendimento humano", description: "Aviso ao corretor quando uma mensagem foi resolvida automaticamente ou solicita atendimento humano.", channels: "Toast + push" },
+  { id: "lead_ai_insight", label: "Insight e Diagnóstico de IA na Conversa", description: "Notifica o corretor e a gestão quando a IA identifica sinais de compra, objeções críticas ou sugere avanço no funil.", channels: "Toast + push" },
 ] as const;
 
 export type NotificationCapabilityId = (typeof notificationCapabilities)[number]["id"];

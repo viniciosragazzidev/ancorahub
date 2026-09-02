@@ -2,77 +2,189 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { relaySendRequestSchema, relaySessionCreateSchema, relaySessionStateSchema, relaySignature } from "./contract";
+import {
+  relaySendRequestSchema,
+  relaySessionCreateSchema,
+  relaySessionStateSchema,
+  relaySignature,
+} from "./contract";
 
-function relayConfig() {
-  const url = (
-    process.env.WAHA_RELAY_URL ||
-    process.env.VPS_API_URL ||
-    process.env.WAHA_API_URL ||
-    process.env.NEXT_PUBLIC_VPS_API_URL
-  )?.trim().replace(/\/$/, "");
+export type WahaTransport = "relay" | "fastify";
 
-  const secret = (
-    process.env.WAHA_RELAY_SHARED_SECRET ||
-    process.env.WHATSAPP_API_INTERNAL_TOKEN ||
-    process.env.VPS_INTERNAL_API_TOKEN ||
-    process.env.VPS_API_TOKEN
+/**
+ * The corporate-number connector shares the proven VPS/Fastify transport with
+ * the broker Lite connection. A legacy dedicated relay remains an explicit
+ * fallback only when no VPS endpoint is configured.
+ */
+export function resolveWahaRelayBaseUrl(environment: Record<string, string | undefined> = process.env) {
+  const value = (
+    environment.VPS_API_URL ||
+    environment.WAHA_API_URL ||
+    environment.NEXT_PUBLIC_VPS_API_URL ||
+    environment.WAHA_RELAY_URL
   )?.trim();
-
-  if (!url || !secret) {
-    throw new Error("Relay WAHA não configurado. Defina WAHA_RELAY_URL e WAHA_RELAY_SHARED_SECRET no ambiente.");
+  if (!value) return null;
+  try {
+    return new URL(value.startsWith("http") ? value : `https://${value}`).origin;
+  } catch {
+    return null;
   }
-  return { url, secret };
 }
 
-export async function sendWahaRelayMessage(input: { idempotencyKey: string; sessionId: string; destination: string; body: string }) {
+export function resolveWahaTransport(environment: Record<string, string | undefined> = process.env): WahaTransport | null {
+  if (environment.VPS_API_URL?.trim() || environment.WAHA_API_URL?.trim() || environment.NEXT_PUBLIC_VPS_API_URL?.trim()) return "fastify";
+  if (environment.WAHA_RELAY_URL?.trim()) return "relay";
+  return null;
+}
+
+function relayConfig() {
+  const url = resolveWahaRelayBaseUrl();
+  const transport = resolveWahaTransport();
+
+  const secret = (
+    process.env.WHATSAPP_API_INTERNAL_TOKEN ||
+    process.env.VPS_INTERNAL_API_TOKEN ||
+    process.env.VPS_API_TOKEN ||
+    process.env.WAHA_RELAY_SHARED_SECRET
+  )?.trim();
+
+  if (!url || !secret || !transport) {
+    throw new Error("Relay WAHA não configurado. Defina VPS_API_URL e WHATSAPP_API_INTERNAL_TOKEN no ambiente.");
+  }
+  return { url, secret, transport };
+}
+
+function getFastifyHeaders(secret: string, hasBody: boolean) {
+  return {
+    ...(hasBody ? { "content-type": "application/json" } : {}),
+    "X-CorreTop-Internal-Token": secret,
+    "x-corretop-internal-token": secret,
+    Authorization: `Bearer ${secret}`,
+  };
+}
+
+export async function sendWahaRelayMessage(input: {
+  idempotencyKey: string;
+  sessionId: string;
+  destination: string;
+  body: string;
+}) {
   const config = relayConfig();
   const payload = relaySendRequestSchema.parse({ requestId: randomUUID(), ...input });
-  const rawBody = JSON.stringify(payload);
-  const timestamp = String(Date.now());
-  const nonce = randomUUID();
-  const response = await fetch(`${config.url}/v1/messages`, {
+  if (config.transport === "relay") {
+    const rawBody = JSON.stringify(payload);
+    const timestamp = String(Date.now());
+    const nonce = randomUUID();
+    const response = await fetch(`${config.url}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ancora-timestamp": timestamp,
+        "x-ancora-nonce": nonce,
+        "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
+      },
+      body: rawBody,
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    const data = (await response.json().catch(() => null)) as { messageId?: string; errorCode?: string; error?: string } | null;
+    if (response.ok && data?.messageId) {
+      return { messageId: data.messageId };
+    }
+    const error = new Error(`O relay WAHA não confirmou o envio (${data?.errorCode ?? data?.error ?? response.statusText}).`) as Error & { status?: number; code?: string };
+    error.status = response.status;
+    error.code = "relay_send_failed";
+    throw error;
+  }
+
+  // VPS_API_URL uses Fastify's internal route directly.
+  const phone = input.destination.replace(/\D/g, "");
+  const fastifyRes = await fetch(`${config.url}/internal/waha/messages/text`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-ancora-timestamp": timestamp,
-      "x-ancora-nonce": nonce,
-      "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
-    },
-    body: rawBody,
+    headers: getFastifyHeaders(config.secret, true),
+    body: JSON.stringify({
+      sessionName: input.sessionId,
+      chatId: phone,
+      text: input.body,
+      idempotencyKey: input.idempotencyKey,
+    }),
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
   });
-  const data = await response.json().catch(() => null) as { messageId?: string; errorCode?: string } | null;
-  if (!response.ok || !data?.messageId) {
-    const error = new Error("O relay WAHA não confirmou o envio.") as Error & { status?: number; code?: string };
-    error.status = response.status;
-    error.code = data?.errorCode ?? "relay_send_failed";
+
+  const fbData = (await fastifyRes.json().catch(() => null)) as { ok?: boolean; messageId?: string; error?: string; message?: string } | null;
+  if (!fastifyRes.ok || !fbData?.messageId) {
+    const errorDetail = fbData?.error || fbData?.message || fastifyRes.statusText || "Erro desconhecido";
+    console.error("[sendWahaRelayMessage] failed:", {
+      status: fastifyRes.status,
+      errorDetail,
+      sessionId: input.sessionId,
+    });
+    const error = new Error(`O serviço WAHA não confirmou o envio da mensagem (${errorDetail}).`) as Error & {
+      status?: number;
+      code?: string;
+    };
+    error.status = fastifyRes.status;
+    error.code = "relay_send_failed";
     throw error;
   }
-  return { messageId: data.messageId };
+  return { messageId: fbData.messageId };
 }
 
 export async function getWahaRelayHealth() {
   const config = relayConfig();
+
+  if (config.transport === "fastify") {
+    const response = await fetch(`${config.url}/internal/waha/health`, {
+      headers: getFastifyHeaders(config.secret, false),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => null);
+
+    if (response?.ok) {
+      const data = await response.json().catch(() => null);
+      return (data ?? { status: "ok", sessions: [] }) as { status: "ok"; sessions: Array<{ id: string; status: string }> };
+    }
+
+    throw new Error(`Serviço WAHA indisponível em ${config.url}.`);
+  }
+
   const timestamp = String(Date.now());
   const nonce = randomUUID();
   const rawBody = "";
-  const response = await fetch(`${config.url}/v1/health`, {
-    headers: {
-      "x-ancora-timestamp": timestamp,
-      "x-ancora-nonce": nonce,
-      "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
-    },
+
+  try {
+    const response = await fetch(`${config.url}/v1/health`, {
+      headers: {
+        "x-ancora-timestamp": timestamp,
+        "x-ancora-nonce": nonce,
+        "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      if (data) return data as { status: "ok"; sessions: Array<{ id: string; status: string }> };
+    }
+  } catch {
+    // Fall through
+  }
+
+  // Fallback Fastify health
+  const fastifyRes = await fetch(`${config.url}/health`, {
+    headers: getFastifyHeaders(config.secret, false),
     cache: "no-store",
     signal: AbortSignal.timeout(10_000),
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const errorMsg = data?.message || data?.error || response.statusText || "Serviço indisponível";
-    throw new Error(`Relay WAHA indisponível (HTTP ${response.status}: ${errorMsg}).`);
+  }).catch(() => null);
+
+  if (fastifyRes && fastifyRes.ok) {
+    return { status: "ok", sessions: [] };
   }
-  return data as { status: "ok"; sessions: Array<{ id: string; status: string }> };
+
+  throw new Error(`Serviço WAHA indisponível em ${config.url}.`);
 }
 
 async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELETE", payload?: unknown) {
@@ -87,81 +199,131 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
     "x-ancora-signature": relaySignature(config.secret, timestamp, nonce, rawBody),
   };
 
-  const response = await fetch(`${config.url}${path}`, {
-    method,
-    headers: primaryHeaders,
-    ...(rawBody ? { body: rawBody } : {}),
+  let primaryResponse: Response | null = null;
+  let primaryData: unknown = null;
+
+  if (config.transport === "relay") {
+    try {
+      primaryResponse = await fetch(`${config.url}${path}`, {
+        method,
+        headers: primaryHeaders,
+        ...(rawBody ? { body: rawBody } : {}),
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (primaryResponse.ok) {
+        primaryData = await primaryResponse.json().catch(() => null);
+        if (primaryData) {
+          return relaySessionStateSchema.parse(primaryData);
+        }
+      }
+    } catch {
+      // A rota do relay pode estar temporariamente indisponível; tente o adaptador Fastify.
+    }
+  }
+
+  // Fastify is the primary path when VPS_API_URL is configured, and a fallback
+  // for a legacy dedicated relay. Never probe /v1 on the Fastify endpoint.
+  const fastifyHeaders = getFastifyHeaders(config.secret, Boolean(rawBody));
+  const sessionId =
+    (payload as { sessionId?: string })?.sessionId ||
+    decodeURIComponent(path.split("/")[3]?.split("?")[0] ?? "");
+
+  let fallbackUrl = `${config.url}/internal/waha/connections`;
+  let fallbackBody = rawBody;
+  let fallbackMethod = method;
+  const tenantId = (payload as { tenantId?: string })?.tenantId || "system";
+  const userId = (payload as { userId?: string })?.userId || "system";
+
+  if (method === "POST" && path === "/v1/sessions") {
+    fallbackUrl = `${config.url}/internal/waha/connections`;
+    fallbackBody = JSON.stringify({
+      sessionName: sessionId,
+      tenantId,
+      userId,
+    });
+  } else if (method === "GET" && sessionId) {
+    fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/status`;
+  } else if (method === "DELETE" && sessionId) {
+    fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/disconnect`;
+    fallbackMethod = "POST";
+    fallbackBody = "";
+  }
+
+  const fallbackRes = await fetch(fallbackUrl, {
+    method: fallbackMethod,
+    headers: fastifyHeaders,
+    ...(fallbackMethod !== "GET" && fallbackBody ? { body: fallbackBody } : {}),
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
-  });
+  }).catch(() => null);
 
-  const data = await response.json().catch(() => null);
+  if (fallbackRes && fallbackRes.ok) {
+    const fbData = (await fallbackRes.json().catch(() => null)) as {
+      ok?: boolean;
+      status?: string;
+      phoneNumber?: string | null;
+      displayPhoneNumber?: string | null;
+      qr?: string | null;
+      qrCode?: string | null;
+    } | null;
 
-  // Fallback caso a rota /v1/sessions retorne 404 (VPS usando rotas Fastify /internal/waha/connections)
-  if (response.status === 404 && path.startsWith("/v1/sessions")) {
-    const fastifyHeaders = {
-      ...(rawBody ? { "content-type": "application/json" } : {}),
-      "X-CorreTop-Internal-Token": config.secret,
-      "x-corretop-internal-token": config.secret,
-      Authorization: `Bearer ${config.secret}`,
-    };
+    if (fbData && fbData.ok !== false) {
+      const rawStatus = String(fbData.status || "STARTING").toUpperCase();
+      let status: "pending" | "connecting" | "active" | "paused" | "offline" | "error" = "connecting";
+      if (rawStatus === "WORKING" || rawStatus === "CONNECTED") status = "active";
+      else if (rawStatus === "STOPPED") status = "offline";
+      else if (rawStatus === "FAILED" || rawStatus === "ERROR") status = "error";
 
-    const sessionId =
-      (payload as { sessionId?: string })?.sessionId ||
-      decodeURIComponent(path.split("/")[3]?.split("?")[0] ?? "");
+      let qrCode = fbData.qr ?? fbData.qrCode ?? null;
 
-    let fallbackUrl = `${config.url}/internal/waha/connections`;
-    let fallbackBody = rawBody;
-
-    if (method === "POST" && path === "/v1/sessions") {
-      fallbackUrl = `${config.url}/internal/waha/connections`;
-      fallbackBody = JSON.stringify({
-        sessionName: sessionId,
-        tenantId: "system",
-        userId: "system",
-      });
-    } else if (method === "GET" && sessionId) {
-      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/qr`;
-    } else if (method === "DELETE" && sessionId) {
-      fallbackUrl = `${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}`;
-    }
-
-    const fallbackRes = await fetch(fallbackUrl, {
-      method,
-      headers: fastifyHeaders,
-      ...(method !== "GET" && fallbackBody ? { body: fallbackBody } : {}),
-      cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
-    }).catch(() => null);
-
-    if (fallbackRes && fallbackRes.ok) {
-      const fbData = await fallbackRes.json().catch(() => null);
-      if (fbData && fbData.ok !== false) {
-        const rawStatus = String(fbData.status || "STARTING").toUpperCase();
-        let status: "pending" | "connecting" | "active" | "paused" | "offline" | "error" = "connecting";
-        if (rawStatus === "WORKING" || rawStatus === "CONNECTED") status = "active";
-        else if (rawStatus === "STOPPED") status = "offline";
-        else if (rawStatus === "FAILED" || rawStatus === "ERROR") status = "error";
-
-        return relaySessionStateSchema.parse({
-          sessionId: sessionId || "waha-session",
-          status,
-          displayPhoneNumber: fbData.phoneNumber ?? fbData.displayPhoneNumber ?? null,
-          qrCode: fbData.qr ?? fbData.qrCode ?? null,
-        });
+      // Se a sessão está aguardando leitura do QR e não veio no status, buscar no endpoint /qr
+      if (status !== "active" && !qrCode && sessionId) {
+        try {
+          const qrRes = await fetch(`${config.url}/internal/waha/connections/${encodeURIComponent(sessionId)}/qr`, {
+            headers: fastifyHeaders,
+            cache: "no-store",
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (qrRes.ok) {
+            const qrData = (await qrRes.json().catch(() => null)) as { ok?: boolean; qr?: string } | null;
+            if (qrData?.qr) {
+              qrCode = qrData.qr;
+            }
+          }
+        } catch {
+          // QR pode ainda não estar pronto no primeiro instante
+        }
       }
+
+      return relaySessionStateSchema.parse({
+        sessionId: sessionId || "waha-session",
+        status,
+        displayPhoneNumber: fbData.phoneNumber ?? fbData.displayPhoneNumber ?? null,
+        qrCode,
+      });
     }
   }
 
-  if (!response.ok) {
-    const errorMsg = data?.message || data?.error || response.statusText || "Falha na comunicação";
-    throw new Error(`O relay WAHA não confirmou a conexão (HTTP ${response.status}: ${errorMsg}).`);
-  }
-  return relaySessionStateSchema.parse(data);
+  const errorMsg =
+    (primaryData as { message?: string; error?: string })?.message ||
+    (primaryData as { message?: string; error?: string })?.error ||
+    primaryResponse?.statusText ||
+    "Não foi possível conectar ao serviço WAHA";
+
+  throw new Error(`O serviço WAHA não confirmou a conexão (${errorMsg}).`);
 }
 
-export async function createWahaRelaySession(sessionId: string) {
-  const payload = relaySessionCreateSchema.parse({ sessionId });
+export async function createWahaRelaySession(
+  sessionId: string,
+  meta?: { tenantId?: string; userId?: string },
+) {
+  const payload = relaySessionCreateSchema.parse({
+    sessionId,
+    tenantId: meta?.tenantId,
+    userId: meta?.userId,
+  });
   return relaySessionRequest("/v1/sessions", "POST", payload);
 }
 

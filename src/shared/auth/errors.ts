@@ -10,14 +10,17 @@ export class AuthenticationError extends Error {
   }
 }
 
+import type { AuthorizationDenyReason } from "./types";
+
 export class AuthorizationError extends Error {
-  readonly code: "ACCESS_DENIED" | "INCONSISTENT_MEMBERSHIP" | "TENANT_TIMEOUT";
+  readonly code: "ACCESS_DENIED" | "INCONSISTENT_MEMBERSHIP" | "TENANT_TIMEOUT" | AuthorizationDenyReason;
 
   constructor(
     message: string,
-    code: "ACCESS_DENIED" | "INCONSISTENT_MEMBERSHIP" | "TENANT_TIMEOUT" = "ACCESS_DENIED",
+    code: "ACCESS_DENIED" | "INCONSISTENT_MEMBERSHIP" | "TENANT_TIMEOUT" | AuthorizationDenyReason = "ACCESS_DENIED",
   ) {
     super(message);
     this.code = code;
   }
 }
+

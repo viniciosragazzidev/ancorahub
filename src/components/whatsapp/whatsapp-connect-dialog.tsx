@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { wahaActionErrorMessage } from "@/lib/waha-error-codes";
 import {
+  forceDisconnectWhatsAppSession,
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
   recoverWhatsAppFailedSessionAction,
@@ -19,8 +21,6 @@ import {
 } from "@/app/(dashboard)/settings/whatsapp-actions";
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
-
-type ErrorCode = "WAHA_TIMEOUT" | "WAHA_UNAVAILABLE" | "WAHA_ERROR" | "SESSION_EXISTS" | "QR_ERROR" | "NO_SESSION";
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -77,14 +77,7 @@ function ConnectionSteps({ status, hasQr }: { status: string; hasQr: boolean }) 
 }
 
 function errorMessage(code?: string | null): string {
-  switch (code) {
-    case "WAHA_TIMEOUT": return "O servidor WhatsApp demorou para responder. Tente novamente.";
-    case "WAHA_UNAVAILABLE": return "Serviço de WhatsApp temporariamente indisponível.";
-    case "SESSION_EXISTS": return "Sessão já existe. Reconectando…";
-    case "QR_ERROR": return "QR Code expirou ou indisponível. Gere um novo.";
-    case "NO_SESSION": return "Nenhuma sessão ativa. Inicie uma nova conexão.";
-    default: return "Não foi possível completar a operação. Tente novamente.";
-  }
+  return wahaActionErrorMessage(code);
 }
 
 export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conectar WhatsApp", connectedLabel = "WhatsApp conectado", onConnectionChanged }: { initial: Connection; returnTo?: string; triggerLabel?: string; connectedLabel?: string; onConnectionChanged?: (connection?: Connection) => void }) {
@@ -323,7 +316,21 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
       try {
         const result = await resetWhatsAppSessionAction();
         if (!result.success) {
-          toast.error(errorMessage(result.code));
+          // Se o VPS está inacessível, oferecer opção de forçar desconexão local
+          if (result.code === "WAHA_UNREACHABLE" || result.code === "WAHA_TIMEOUT") {
+            toast.error(
+              "O servidor WhatsApp está inacessível. Você pode forçar a desconexão local, mas a sessão remota pode permanecer ativa até o timeout do servidor.",
+              {
+                duration: 10000,
+                action: {
+                  label: "Forçar desconexão",
+                  onClick: () => forceDisconnect(),
+                },
+              },
+            );
+          } else {
+            toast.error(errorMessage(result.code));
+          }
           return;
         }
         setConnection((current) => ({
@@ -336,6 +343,31 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         }));
         onConnectionChanged?.();
         toast.success("WhatsApp desconectado.");
+        router.refresh();
+      } catch (error) {
+        showUnexpectedActionError(error);
+      }
+    });
+  }
+
+  function forceDisconnect() {
+    startTransition(async () => {
+      try {
+        const result = await forceDisconnectWhatsAppSession();
+        if (!result.success) {
+          toast.error("Não foi possível limpar a sessão local.");
+          return;
+        }
+        setConnection((current) => ({
+          ...current,
+          sessionId: null,
+          sessionName: null,
+          qrCode: null,
+          status: "disconnected",
+          connectedAt: null,
+        }));
+        onConnectionChanged?.();
+        toast.success("Sessão desconectada localmente. A sessão remota será encerrada automaticamente pelo servidor.");
         router.refresh();
       } catch (error) {
         showUnexpectedActionError(error);

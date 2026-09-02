@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, MagnifyingGlass, UserCheck, WhatsappLogo } from "@/components/huge-icons";
+import { ArrowRight, MagnifyingGlass, UserCheck, WhatsappLogo, X } from "@/components/huge-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -29,92 +29,117 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
   }, [clients, searchQuery]);
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 pb-24 sm:px-6">
-      {/* Top Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Meus Clientes</span>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Clientes Conquistados ({clients.length})
-          </h1>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 pb-28 sm:px-6 flex-1">
+        {/* Top Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary">Meus Clientes</span>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Clientes Conquistados ({clients.length})
+            </h1>
+          </div>
         </div>
-      </div>
 
-      {/* Search Input */}
-      <div className="relative">
-        <MagnifyingGlass className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Buscar cliente por nome ou telefone..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-xl border border-border bg-card py-2 pl-9 pr-4 text-xs shadow-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
+        {/* Search Input */}
+        <div className="relative">
+          <MagnifyingGlass className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            aria-label="Buscar cliente por nome ou telefone"
+            placeholder="Buscar cliente por nome ou telefone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-xl border border-border bg-card py-2 pl-9 pr-9 text-xs shadow-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Limpar busca"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
 
-      {/* Clients List */}
-      <div className="space-y-3">
-        {filteredClients.length > 0 ? (
-          filteredClients.map((client) => {
-            const rawPhone = client.phone?.replace(/\D/g, "");
-            const convertedDateStr = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            });
+        {/* Clients List */}
+        <div className="space-y-3">
+          {filteredClients.length > 0 ? (
+            filteredClients.map((client) => {
+              const convertedDateStr = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              });
 
-            return (
-              <Card key={client.id} variant="subtle" className="p-4 bg-card/95 hover:border-primary/30 transition-colors">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <h3 className="text-base font-semibold text-foreground truncate">{client.name}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Venda concluída em {convertedDateStr}
-                    </p>
-                    {client.phone ? (
-                      <p className="text-xs font-mono font-medium text-primary">{client.phone}</p>
-                    ) : null}
-                  </div>
+              return (
+                <Card key={client.id} variant="subtle" className="p-4 bg-card/95 hover:border-primary/30 transition-colors">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <h2 className="text-base font-semibold text-foreground truncate">{client.name}</h2>
+                      <p className="text-xs text-muted-foreground">
+                        Venda concluída em {convertedDateStr}
+                      </p>
+                      {client.phone ? (
+                        <p className="text-xs font-mono font-medium text-primary">{client.phone}</p>
+                      ) : null}
+                    </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {buildWhatsAppUrl(client.phone) ? (
-                      <a
-                        href={buildWhatsAppUrl(client.phone)!}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <div className="flex items-center gap-2 shrink-0">
+                      {buildWhatsAppUrl(client.phone) ? (
+                        <a
+                          href={buildWhatsAppUrl(client.phone)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            buttonVariants({ size: "sm" }),
+                            "h-9 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center rounded-xl",
+                          )}
+                        >
+                          <WhatsappLogo className="size-4" />
+                          WhatsApp
+                        </a>
+                      ) : null}
+                      <Link
+                        href={`/clientes/${client.id}`}
                         className={cn(
-                          buttonVariants({ size: "sm" }),
-                          "h-9 px-3 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center"
+                          buttonVariants({ variant: "outline", size: "sm" }),
+                          "h-9 px-3 text-xs font-semibold gap-1 rounded-xl",
                         )}
                       >
-                        <WhatsappLogo className="size-4" />
-                        WhatsApp
-                      </a>
-                    ) : null}
-                    <Link
-                      href={`/clientes/${client.id}`}
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "sm" }),
-                        "h-9 px-3 text-xs font-semibold gap-1"
-                      )}
-                    >
-                      Ver
-                      <ArrowRight className="size-3.5" />
-                    </Link>
+                        Ver
+                        <ArrowRight className="size-3.5" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            );
-          })
-        ) : (
-          <Card variant="subtle" className="flex flex-col items-center justify-center p-8 text-center bg-card/95 border-dashed">
-            <UserCheck className="size-8 text-muted-foreground/60" />
-            <h3 className="mt-2 text-sm font-semibold text-foreground">Nenhum cliente encontrado</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Você ainda não tem clientes cadastrados ou nenhum resultado para a busca.
-            </p>
-          </Card>
-        )}
+                </Card>
+              );
+            })
+          ) : (
+            <Card variant="subtle" className="flex flex-col items-center justify-center p-8 text-center bg-card/95 border-dashed">
+              <UserCheck className="size-8 text-muted-foreground/60" />
+              <h2 className="mt-2 text-sm font-semibold text-foreground">
+                {searchQuery.trim() ? `Nenhum resultado para "${searchQuery.trim()}"` : "Nenhum cliente encontrado"}
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {searchQuery.trim()
+                  ? "Tente outro nome ou telefone."
+                  : "Você ainda não tem clientes cadastrados."}
+              </p>
+              {searchQuery.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="mt-3 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                >
+                  Limpar busca
+                </button>
+              )}
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );

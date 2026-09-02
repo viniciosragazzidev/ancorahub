@@ -27,9 +27,13 @@ export function RouteError({
   imageSrc = "/404.png",
 }: RouteErrorProps) {
   useEffect(() => {
-    // O digest permite correlacionar o erro no servidor sem expor a mensagem interna.
-    if (error.digest) console.error("route_render_error", { digest: error.digest })
-  }, [error])
+    console.error("RouteError details:", {
+      message: error.message,
+      digest: error.digest,
+      stack: error.stack,
+      error,
+    });
+  }, [error]);
 
   const handleRetry = () => {
     if (typeof reset === "function") {
@@ -83,11 +87,17 @@ export function RouteError({
         </Link>
       </div>
 
-      {error.digest ? (
-        <p className="mt-4 text-xs text-muted-foreground" role="status">
-          Código de referência: {error.digest}
-        </p>
-      ) : null}
+      {(error.message || error.digest) && (
+        <details className="mt-6 w-full max-w-md text-left text-xs text-muted-foreground border border-border/50 rounded-lg p-2.5 bg-muted/30">
+          <summary className="cursor-pointer font-medium hover:text-foreground">
+            Detalhes técnicos do erro
+          </summary>
+          <div className="mt-2 space-y-1 font-mono text-[11px] break-all">
+            {error.message && <p><span className="font-semibold text-foreground">Mensagem:</span> {error.message}</p>}
+            {error.digest && <p><span className="font-semibold text-foreground">Digest:</span> {error.digest}</p>}
+          </div>
+        </details>
+      )}
     </main>
   )
 }

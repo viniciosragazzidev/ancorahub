@@ -7,7 +7,6 @@ import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
 import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
-import { LeadsPagination } from "./_components/leads-pagination";
 import { LeadsWorkspace } from "./leads-workspace";
 import { LeadsHeaderActions } from "./_components/leads-header-actions";
 import { WifiHigh, Plus, Target } from "@/components/huge-icons";
@@ -27,8 +26,18 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
+import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
+import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
+import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
+import { withPerfSpan, withRequestTiming } from "@/shared/observability/request-timing";
 
-export default async function LeadsPage({
+export default async function LeadsPage(props: Parameters<typeof LeadsPageContent>[0]) {
+  const { result } = await withRequestTiming("/leads", () => LeadsPageContent(props));
+  return result;
+}
+
+async function LeadsPageContent({
   searchParams,
 }: {
   searchParams: Promise<{
@@ -44,18 +53,21 @@ export default async function LeadsPage({
     page?: string;
     pageSize?: string;
     period?: string;
+    filters?: string;
+    sort?: string;
+    joinOperator?: string;
     eligibleCampaigns?: string;
   }>;
 }) {
   await connection();
-  const context = await getRequiredTenantContext();
-  const capabilityPromise = hasEffectiveCapability({
+  const context = await withPerfSpan("tenant_context.resolve", () => getRequiredTenantContext());
+  const capabilityPromise = withPerfSpan("rbac.leads_access", () => hasEffectiveCapability({
     tenantId: context.tenantId,
     role: context.role,
     jobTitle: context.jobTitle,
     customRoleId: context.customRoleId ?? null,
     permission: "acessar_leads",
-  });
+  }));
   const experienceModePromise =
     context.role === "broker" ? getExperienceMode(context) : Promise.resolve("NORMAL" as const);
   if (
@@ -68,14 +80,14 @@ export default async function LeadsPage({
   // filtros de situação e acesso direto ao atendimento. As ações de aceitar,
   // abrir e atualizar continuam funcionando no detalhe do lead.
   if (context.role === "broker" && (await experienceModePromise) === "LIGHT") {
-    const [slaRow] = await getDatabase()
+    const [slaRow] = await withPerfSpan("leads.light.sla_settings", () => getDatabase()
       .select({ minutes: schema.tenants.slaFirstContactMinutes })
       .from(schema.tenants)
       .where(eq(schema.tenants.id, context.tenantId))
-      .limit(1);
+      .limit(1));
     const lightSlaMinutes = Math.max(1, Number(slaRow?.minutes ?? 15));
 
-    const lightLeads = await getDatabase()
+    const lightLeads = await withPerfSpan("leads.light.list", () => getDatabase()
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
@@ -107,10 +119,10 @@ export default async function LeadsPage({
         )
       )
       .orderBy(desc(schema.leads.createdAt))
-      .limit(500);
+      .limit(500));
 
     const lightPendingTasks = lightLeads.length
-      ? await getDatabase()
+      ? await withPerfSpan("leads.light.pending_tasks", () => getDatabase()
           .select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt })
           .from(schema.leadTasks)
           .where(
@@ -120,7 +132,7 @@ export default async function LeadsPage({
               isNull(schema.leadTasks.completedAt),
               isNotNull(schema.leadTasks.dueAt)
             )
-          )
+          ))
       : [];
 
     const earliestTaskDue = new Map<string, Date>();
@@ -183,10 +195,10 @@ export default async function LeadsPage({
         .where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId)))
         .limit(1)
     : Promise.resolve([]);
-  const [systemSettingRows, userBranchRows] = await Promise.all([
+  const [systemSettingRows, userBranchRows] = await withPerfSpan("leads.bootstrap", () => Promise.all([
     systemSettingsPromise,
     userBranchPromise,
-  ]);
+  ]));
   const systemSettings = new Map(systemSettingRows.map((setting) => [setting.key, setting.value]));
 
   // Pagination parameters
@@ -284,7 +296,7 @@ export default async function LeadsPage({
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
   const metaCampaignEligibility = eligibleCampaignsOnly
-      ? await Promise.all([
+      ? await withPerfSpan("leads.campaign_eligibility", () => Promise.all([
         Promise.resolve(systemSettings.get(`meta_lead_capture_mode_${context.tenantId}`) ?? null),
         db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled })
           .from(schema.metaCampaignQueueRoutes)
@@ -304,7 +316,7 @@ export default async function LeadsPage({
         storedMode,
         campaignRules,
         hasTenantRules: campaignRules.length > 0 || adRules.length > 0 || formRules.length > 0,
-      }))
+      })))
     : null;
   const eligibleCampaignFilter = !metaCampaignEligibility
     ? null
@@ -316,6 +328,21 @@ export default async function LeadsPage({
           ? and(eq(schema.leads.sourceChannel, "meta_lead_ads"), inArray(schema.leads.metaCampaignId, metaCampaignEligibility.campaignIds))
           : sql`false`;
 
+  // TableCN dynamic URL filters & sorting
+  let parsedTableFilters: ExtendedColumnFilter<any>[] = [];
+  try {
+    if (filters.filters) parsedTableFilters = JSON.parse(filters.filters);
+  } catch {}
+
+  let parsedTableSort: ExtendedColumnSort<any>[] = [];
+  try {
+    if (filters.sort) parsedTableSort = JSON.parse(filters.sort);
+  } catch {}
+
+  const joinOp = (filters.joinOperator as JoinOperator) ?? "and";
+  const tablecnFilter = buildDrizzleFilter(parsedTableFilters, leadsColumnMap, joinOp);
+  const tablecnOrderBy = buildDrizzleOrderBy(parsedTableSort, leadsSortMap);
+
   const qualifiedOrDistributedFilter = or(
     isNotNull(schema.leads.corretorId),
     ne(schema.leads.qualificationState, "IN_PROGRESS"),
@@ -325,13 +352,13 @@ export default async function LeadsPage({
   );
 
   const where = and(
-    eq(schema.leads.tenantId, context.tenantId),
+    buildLeadScopeWhere(context, { requestedBranchId: filters.branch }),
     isNull(schema.leads.deletedAt),
     qualifiedOrDistributedFilter,
+    ...(tablecnFilter ? [tablecnFilter] : []),
     ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
     ...(searchFilter ? [searchFilter] : []),
-    ...(branchFilter ? [branchFilter] : []),
     ...(tipoFilter ? [tipoFilter] : []),
     ...(origemFilter ? [origemFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),
@@ -343,6 +370,7 @@ export default async function LeadsPage({
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
 
   const offset = (page - 1) * pageSize;
+  const finalOrderBy = tablecnOrderBy.length > 0 ? tablecnOrderBy : [desc(schema.leads.createdAt)];
 
   const [
     totalCountResult,
@@ -356,10 +384,10 @@ export default async function LeadsPage({
     rawQualifyingLeads,
     activeQueues,
     urgentLead,
-  ] = await Promise.all([
-    db.select({ total: count() }).from(schema.leads).where(where),
-    listAvailableCatalogPlans(context),
-    db
+  ] = await withPerfSpan("leads.data_loader", () => Promise.all([
+    withPerfSpan("leads.count", () => db.select({ total: count() }).from(schema.leads).where(where)),
+    withPerfSpan("leads.catalog_plans", () => listAvailableCatalogPlans(context)),
+    withPerfSpan("leads.list", () => db
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
@@ -385,10 +413,10 @@ export default async function LeadsPage({
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
       .where(where)
-      .orderBy(desc(schema.leads.createdAt))
+      .orderBy(...finalOrderBy)
       .limit(pageSize)
-      .offset(offset),
-    db
+      .offset(offset)),
+    withPerfSpan("leads.legacy_plans", () => db
       .select({ id: schema.carrierPlans.id, name: schema.carrierPlans.name, carrierName: schema.carriers.name })
       .from(schema.carrierPlans)
       .innerJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
@@ -399,8 +427,8 @@ export default async function LeadsPage({
           eq(schema.carriers.status, "active")
         )
       )
-      .orderBy(schema.carriers.name, schema.carrierPlans.name),
-    db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId)),
+      .orderBy(schema.carriers.name, schema.carrierPlans.name)),
+    withPerfSpan("leads.branches", () => db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId))),
     isDirector
       ? db
           .select({ count: count() })
@@ -408,11 +436,11 @@ export default async function LeadsPage({
           .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.acceptingLeads, false)))
           .then((r) => Number(r[0]?.count ?? 0))
       : Promise.resolve(0),
-    db
+    withPerfSpan("leads.sla_settings", () => db
       .select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes, slaStagnantDays: schema.tenants.slaStagnantDays })
       .from(schema.tenants)
       .where(eq(schema.tenants.id, context.tenantId))
-      .then((r) => r[0] ?? { slaFirstContactMinutes: "15", slaStagnantDays: "3" }),
+      .then((r) => r[0] ?? { slaFirstContactMinutes: "15", slaStagnantDays: "3" })),
     context.role === "manager" || context.role === "director"
       ? db
           .select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId })
@@ -429,7 +457,7 @@ export default async function LeadsPage({
             )
           )
       : Promise.resolve([]),
-    db
+    withPerfSpan("leads.qualifying_list", () => db
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
@@ -470,17 +498,17 @@ export default async function LeadsPage({
         )
       )
       .orderBy(desc(schema.leads.createdAt))
-      .limit(50),
-    db
+      .limit(50)),
+    withPerfSpan("leads.active_queues", () => db
       .select({
         id: schema.leadQueues.id,
         name: schema.leadQueues.name,
         branchId: schema.leadQueues.branchId,
       })
       .from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))),
-    getUrgentLeadForUser().catch(() => null),
-  ]);
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active")))),
+    withPerfSpan("leads.urgent", () => getUrgentLeadForUser().catch(() => null)),
+  ]));
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
@@ -536,6 +564,21 @@ export default async function LeadsPage({
     filters.qualification ||
     eligibleCampaignsOnly
   );
+  const leadViewKey = [
+    page,
+    pageSize,
+    filters.search ?? "",
+    filters.status ?? "",
+    filters.branch ?? "",
+    filters.tipo ?? "",
+    filters.origem ?? "",
+    filters.qualification ?? "",
+    filters.corretor ?? "",
+    filters.eligibleCampaigns ?? "",
+    filters.filters ?? "",
+    filters.sort ?? "",
+    filters.joinOperator ?? "",
+  ].join(":");
 
   return (
     <>
@@ -585,6 +628,7 @@ export default async function LeadsPage({
 
         {/* Filters */}
         <LeadsFilters
+          key={leadViewKey}
           branches={branches}
           brokers={brokers}
           initialBranch={filters.branch}
@@ -603,6 +647,7 @@ export default async function LeadsPage({
         {leads.length || qualifyingLeads.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
+              key={leadViewKey}
               leads={leads.map((lead) => ({
                 ...lead,
                 createdAt: lead.createdAt.toISOString(),

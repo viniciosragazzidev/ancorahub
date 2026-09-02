@@ -39,14 +39,18 @@ export type RoutingRule = {
 };
 
 export async function fetchRoutingRules(tenantId: string): Promise<RoutingRule[]> {
-  const db = getDatabase();
-  const rows = await db
-    .select()
-    .from(schema.leadRoutingRules)
-    .where(eq(schema.leadRoutingRules.tenantId, tenantId))
-    .orderBy(asc(schema.leadRoutingRules.priority));
+  try {
+    const db = getDatabase();
+    const rows = await db
+      .select()
+      .from(schema.leadRoutingRules)
+      .where(eq(schema.leadRoutingRules.tenantId, tenantId))
+      .orderBy(asc(schema.leadRoutingRules.priority));
 
-  return rows as RoutingRule[];
+    return rows as RoutingRule[];
+  } catch {
+    return [];
+  }
 }
 
 export function evaluateLeadAgainstConditions(

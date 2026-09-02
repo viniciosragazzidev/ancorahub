@@ -293,3 +293,66 @@ export function detectFormat(id?: string, name?: string): FormatType {
   }
   return "none";
 }
+
+// ─── Formatação de exibição (display) ─────────────────────────────────────────
+
+import { BUSINESS_TIME_ZONE } from "@/shared/time/business-hours";
+
+/**
+ * Formata Date para exibição no locale pt-BR com timezone America/Sao_Paulo.
+ * Esta é a função canônica para formatação de datas em todo o app.
+ *
+ * Substitui todas as chamadas inline de:
+ *   new Intl.DateTimeFormat("pt-BR", { ... }).format(date)
+ * em Server Components, garantindo que o timezone seja sempre America/Sao_Paulo.
+ *
+ * @example formatDateIntl(new Date()) → "01/09/2026, 14:30"
+ * @example formatDateIntl(date, { dateStyle: "long" }) → "1 de setembro de 2026"
+ * @example formatDateIntl(date, { timeStyle: "short" }) → "14:30"
+ */
+export function formatDateIntl(
+  value: Date | string | number | null | undefined,
+  options: Intl.DateTimeFormatOptions = { dateStyle: "short", timeStyle: "short" },
+): string {
+  if (value === null || value === undefined) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: BUSINESS_TIME_ZONE,
+    ...options,
+  }).format(date);
+}
+
+/**
+ * Formata valor numérico como moeda BRL para exibição.
+ * Diferente de formatCurrency (que é para input masking), esta é para display.
+ *
+ * Substitui: formatCurrency em quotes/utils e api/pdf/route
+ *
+ * @example formatCurrencyDisplay(1234.5) → "R$ 1.234,50"
+ */
+export function formatCurrencyDisplay(
+  value: string | number | null | undefined,
+  options?: Intl.NumberFormatOptions,
+): string {
+  if (value === null || value === undefined) return "—";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "R$ 0,00";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    ...options,
+  }).format(num);
+}
+
+/**
+ * Formata valor numérico como moeda compacta (R$ 1,2K / R$ 1,5M).
+ * Substitui: formatCurrencyCompact em features/quotes/utils.ts
+ */
+export function formatCurrencyCompact(value: string | number): string {
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "R$ 0";
+  if (num >= 1_000_000) return `R$ ${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `R$ ${(num / 1_000).toFixed(1)}K`;
+  return formatCurrencyDisplay(num);
+}

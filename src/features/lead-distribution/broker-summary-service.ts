@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, gte, lte, inArray, isNull, count, avg } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { percentage } from "@/features/reports/metrics/metrics-math";
 
 export type BrokerDailySummaryItem = {
   brokerId: string;
@@ -221,7 +222,7 @@ export async function fetchBrokerDailySummary(
       latencyCount += recCount;
     }
 
-    const conversionRate = recCount > 0 ? Math.round((convCount / recCount) * 1000) / 10 : 0;
+    const conversionRate = percentage(convCount, recCount);
     const avgFirstContactMinutes = rec?.avgLatency ? Math.round(rec.avgLatency / 60) : null;
 
     return {
