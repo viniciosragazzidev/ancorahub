@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
@@ -52,12 +52,44 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     .where(eq(schema.tenants.id, context.tenantId))
     .limit(1);
 
-  const [experienceMode, headersList, tenantRows, wahaConnectionsEnabled] = await Promise.all([
+  const userPromise = getDatabase()
+    .select({
+      name: schema.user.name,
+      email: schema.user.email,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, context.userId))
+    .limit(1);
+
+  const membershipPromise = getDatabase()
+    .select({
+      availabilityStatus: schema.tenantMemberships.availabilityStatus,
+    })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, context.userId),
+      ),
+    )
+    .limit(1);
+
+  const [
+    experienceMode,
+    headersList,
+    tenantRows,
+    wahaConnectionsEnabled,
+    userRows,
+    membershipRows,
+  ] = await Promise.all([
     experienceModePromise,
     headersPromise,
     tenantPromise,
     wahaConnectionsEnabledPromise,
+    userPromise,
+    membershipPromise,
   ]);
+
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
   const showLightConversations =
     !isLightBroker ||
@@ -88,6 +120,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   }
 
   const [tenant] = tenantRows;
+  const [currentUser] = userRows;
+  const [membership] = membershipRows;
   const syncTopic = getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId });
 
   return (
@@ -100,6 +134,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           brandColor: tenant?.brandColor ?? null,
           logoUrl: tenant?.logoUrl ?? null,
         }}
+        user={{
+          name: currentUser?.name ?? null,
+          email: currentUser?.email ?? null,
+          role: context.role,
+        }}
+        initialAvailability={(membership?.availabilityStatus as "available" | "paused" | "offline") ?? "available"}
       >
         <TenantOnboardingDialogLoader />
         <DirectorWizardLoader />
@@ -115,8 +155,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             <FeedbackToastHandler userId={context.userId} />
             <PasskeyToastHandler userId={context.userId} />
             <CommandPalette />
-            <SystemFeedbackDrawer />
-            <AgentDrawer />
+            {!isLightBroker && <SystemFeedbackDrawer />}
+            {!isLightBroker && <AgentDrawer />}
             {children}
           </NotificationCountProvider>
         </RealtimeSyncProvider>

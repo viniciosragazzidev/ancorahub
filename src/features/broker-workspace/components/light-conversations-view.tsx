@@ -824,7 +824,7 @@ function ChatInput({
   }
 
   return (
-    <div className="border-t border-border/60 bg-card p-3 sm:px-5 max-lg:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-3 space-y-2.5">
+    <div className="border-t border-border/60 bg-card p-3 sm:px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:pb-3.5 space-y-2.5">
       {/* ATALHOS DE RESPOSTAS RÁPIDAS CONTEXTUAIS */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] [scrollbar-width:none]">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1 pr-1 shrink-0">
