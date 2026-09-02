@@ -438,12 +438,13 @@ export class WahaClient {
    * Retorna o providerMessageId se sucesso.
    */
   async sendText(sessionName: string, chatId: string, text: string): Promise<{ messageId: string }> {
+    const resolvedChatId = await this.resolveChatId(sessionName, chatId);
     const result = await this.request<{ id?: string | { _serialized?: string }; messageId?: string }>(
       "/api/sendText",
       {
         method: "POST",
         timeoutMs: 10_000,
-        body: { session: sessionName, chatId, text },
+        body: { session: sessionName, chatId: resolvedChatId, text },
         headers: { "content-type": "application/json" },
       },
     );
@@ -463,6 +464,42 @@ export class WahaClient {
     }
 
     return { messageId };
+  }
+
+  /**
+   * Resolve um telefone para o identificador de conversa que o WAHA/WebJS
+   * reconhece. Em algumas contas o WhatsApp usa @lid, não <telefone>@c.us;
+   * enviar diretamente para o telefone causa "No LID for user".
+   *
+   * Não há fallback para o telefone quando a resolução falha: isso apenas
+   * repetiria o envio inválido e esconderia a causa do erro.
+   */
+  private async resolveChatId(sessionName: string, chatId: string): Promise<string> {
+    if (chatId.includes("@")) return chatId;
+
+    const phone = chatId.replace(/\D/g, "");
+    if (!/^\d{10,15}$/.test(phone)) {
+      throw new WahaClientError("WAHA_RECIPIENT_NOT_FOUND", 400, "Destinatário WAHA inválido.");
+    }
+
+    const query = new URLSearchParams({ session: sessionName, phone });
+    const result = await this.request<{
+      exists?: boolean;
+      numberExists?: boolean;
+      chatId?: string;
+    }>(`/api/contacts/check-exists?${query.toString()}`, { timeoutMs: 5_000 });
+
+    const recipientExists = result.exists ?? result.numberExists;
+    const resolvedChatId = typeof result.chatId === "string" ? result.chatId.trim() : "";
+    if (recipientExists === false || !resolvedChatId.includes("@")) {
+      throw new WahaClientError(
+        "WAHA_RECIPIENT_NOT_FOUND",
+        422,
+        "Destinatário não encontrado ou sem conversa WAHA válida.",
+      );
+    }
+
+    return resolvedChatId;
   }
 }
 

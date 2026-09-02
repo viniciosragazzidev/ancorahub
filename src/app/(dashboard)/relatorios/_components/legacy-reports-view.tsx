@@ -15,6 +15,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
@@ -28,11 +29,13 @@ import { ReportTrendCharts } from "./report-trend-charts";
 export const dynamic = "force-dynamic";
 
 export default async function LegacyReportsView({
+  context: initialContext,
   searchParams,
 }: {
+  context?: TenantContext;
   searchParams: Promise<{ period?: string }>;
 }) {
-  const context = await getRequiredTenantContext();
+  const context = initialContext ?? await getRequiredTenantContext();
   const db = getDatabase();
   const period = parsePeriod((await searchParams).period);
   const reportStart = periodStart(period);

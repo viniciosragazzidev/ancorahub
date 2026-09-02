@@ -151,6 +151,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       urgency: qualificationDetails?.urgenciaContratacao || null,
       city: qualificationDetails?.cidade || null,
       createdAt: lead.createdAt,
+      assignedAt: lead.assignedAt,
+      slaFirstContactMinutes: 15,
       isCurrentBroker: lead.corretorId === context.userId,
       tipo: lead.tipo,
       origem: lead.origem,

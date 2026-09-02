@@ -228,8 +228,13 @@ export default async function MinhaFilaPage() {
       status: l.status,
       createdAt: l.createdAt,
       updatedAt: l.stageEnteredAt,
+      isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
+      isOverdue:
+        (activeLeadStatuses as readonly string[]).includes(l.status) &&
+        l.stageEnteredAt != null &&
+        Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000,
     }));
-    return <LightLeadsList leads={lightLeads} />;
+    return <LightLeadsList leads={lightLeads} availabilityStatus={availabilityStatus} />;
   }
 
   const enrichedLeads = leads.map((lead) => ({

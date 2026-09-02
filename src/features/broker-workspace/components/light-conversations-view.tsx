@@ -41,6 +41,7 @@ import {
   type RealtimeSyncBrowserDetail,
 } from "@/components/providers/realtime-events";
 import { toast } from "sonner";
+import { LightBottomNav } from "@/features/broker-workspace/components/light-bottom-nav";
 
 export type LightConversationMessage = {
   id: string;
@@ -462,6 +463,11 @@ export function LightConversationsView({
           </p>
         </div>
       )}
+
+      {/* Navegação inferior em telas sem conversa ativa no mobile */}
+      <div className={cn(selected && "hidden lg:block")}>
+        <LightBottomNav />
+      </div>
     </section>
   );
 }
@@ -561,6 +567,52 @@ function ConnectionEmptyState({
   );
 }
 
+function getMessageDateGroup(dateStr: string) {
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+  if (isToday) return "Hoje";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+  if (isYesterday) return "Ontem";
+
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
+}
+
+function getContextualQuickReplies(status?: string) {
+  if (status === "quote_sent") {
+    return [
+      { label: "Acompanhar cotação", text: "Olá! Conseguiu dar uma olhada na cotação que enviei? Ficou alguma dúvida sobre os valores ou a rede?" },
+      { label: "Tirar dúvidas", text: "Estou à disposição para esclarecer qualquer dúvida sobre o plano e as coberturas." },
+      { label: "Apresentação", text: "Olá! Sou seu corretor responsável e estou por aqui para te auxiliar com o plano." },
+    ];
+  }
+  if (status === "documentation_pending") {
+    return [
+      { label: "Solicitar docs", text: "Para darmos andamento na contratação, por favor envie a foto do documento de identificação (RG/CNH) e comprovante de residência." },
+      { label: "Status da análise", text: "Seus documentos foram enviados e estão em análise. Te aviso assim que tivermos a confirmação!" },
+      { label: "Apresentação", text: "Olá! Sou seu corretor responsável e estou por aqui para te auxiliar." },
+    ];
+  }
+  if (status === "negotiation") {
+    return [
+      { label: "Confirmar proposta", text: "Podemos seguir com o fechamento da proposta conforme conversamos?" },
+      { label: "Tirar dúvidas", text: "Ficou alguma dúvida sobre as opções que comparamos?" },
+      { label: "Apresentação", text: "Olá! Sou seu corretor responsável e estou por aqui." },
+    ];
+  }
+  return QUICK_REPLIES;
+}
+
 function ConversationPanel({
   conversation,
   initialDraft,
@@ -634,6 +686,7 @@ function ConversationPanel({
       {/* DIGITAÇÃO E RESPOSTAS RÁPIDAS */}
       <ChatInput
         key={conversation.id}
+        status={conversation.status}
         initialText={initialDraft}
         target={conversation.sendTarget}
         onMessageSent={onMessageSent}
@@ -675,32 +728,48 @@ function ChatHistory({
   return (
     <ScrollArea className="min-h-0 flex-1 bg-muted/15 dark:bg-card/10">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-5 sm:px-6">
-        {sortedMessages.map((message) => {
+        {sortedMessages.map((message, idx) => {
           const outbound = isOutbound(message.direction);
+          const currentDateGroup = getMessageDateGroup(message.sentAt);
+          const prevDateGroup = idx > 0 ? getMessageDateGroup(sortedMessages[idx - 1].sentAt) : null;
+          const showDateDivider = currentDateGroup && currentDateGroup !== prevDateGroup;
+
           return (
-            <div
-              key={message.id}
-              className={cn("flex", outbound ? "justify-end" : "justify-start")}
-            >
-              <div
-                className={cn(
-                  "max-w-[82%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-2xs border transition-all",
-                  outbound
-                    ? "rounded-tr-xs bg-primary text-primary-foreground border-primary/20"
-                    : "rounded-tl-xs bg-card dark:bg-muted/80 text-foreground border-border/60",
-                )}
-              >
-                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+            <div key={message.id} className="space-y-3">
+              {showDateDivider && (
+                <div className="my-2 flex items-center justify-center">
+                  <span className="rounded-full bg-muted/70 px-2.5 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-2xs">
+                    {currentDateGroup}
+                  </span>
+                </div>
+              )}
+              <div className={cn("flex", outbound ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
-                    "mt-1.5 flex items-center justify-end gap-1 text-[10px]",
-                    outbound ? "text-primary-foreground/75" : "text-muted-foreground",
+                    "max-w-[82%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-2xs border transition-all",
+                    outbound
+                      ? "rounded-tr-xs bg-primary text-primary-foreground border-primary/20"
+                      : "rounded-tl-xs bg-card dark:bg-muted/80 text-foreground border-border/60",
                   )}
                 >
-                  <time dateTime={message.sentAt}>{formatTime(message.sentAt)}</time>
-                  {outbound && (
-                    <CheckCheck className="size-3 text-primary-foreground/90 shrink-0" />
-                  )}
+                  <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                  <div
+                    className={cn(
+                      "mt-1.5 flex items-center justify-end gap-1 text-[10px]",
+                      outbound ? "text-primary-foreground/75" : "text-muted-foreground",
+                    )}
+                  >
+                    <time dateTime={message.sentAt}>{formatTime(message.sentAt)}</time>
+                    {outbound && (
+                      message.providerStatus === "read" ? (
+                        <CheckCheck className="size-3 text-primary-foreground font-bold shrink-0" />
+                      ) : message.providerStatus === "failed" ? (
+                        <span className="text-[9px] font-bold text-destructive-foreground bg-destructive/30 px-1 rounded">!</span>
+                      ) : (
+                        <Check className="size-3 text-primary-foreground/80 shrink-0" />
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -714,16 +783,20 @@ function ChatHistory({
 
 function ChatInput({
   target,
+  status,
   initialText = "",
   onMessageSent,
 }: {
   target: LightConversationItem["sendTarget"];
+  status?: string;
   initialText?: string;
   onMessageSent: (message: LightConversationMessage) => void;
 }) {
   const [text, setText] = useState(initialText);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const quickReplies = useMemo(() => getContextualQuickReplies(status), [status]);
 
   async function handleSend(event: React.FormEvent) {
     event.preventDefault();
@@ -758,17 +831,17 @@ function ChatInput({
 
   return (
     <div className="border-t border-border/60 bg-card p-3 sm:px-5 max-lg:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-3 space-y-2.5">
-      {/* ATALHOS DE RESPOSTAS RÁPIDAS */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+      {/* ATALHOS DE RESPOSTAS RÁPIDAS CONTEXTUAIS */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] [scrollbar-width:none]">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1 pr-1 shrink-0">
           <Zap className="size-3 text-amber-500" /> Respostas Rápidas:
         </span>
-        {QUICK_REPLIES.map((reply, idx) => (
+        {quickReplies.map((reply, idx) => (
           <button
             key={idx}
             type="button"
             onClick={() => setText(reply.text)}
-            className="shrink-0 rounded-full border border-border/80 bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all"
+            className="shrink-0 rounded-full border border-border/80 bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
           >
             {reply.label}
           </button>

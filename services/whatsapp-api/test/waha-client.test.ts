@@ -110,6 +110,51 @@ test("health: JSON inválido no health não derruba o client", async () => {
   assert.ok(typeof result.ok === "boolean");
 });
 
+// ── WahaClient.sendText ───────────────────────────────────────────────
+
+test("sendText: resolve telefone para chatId @lid antes de enviar", async () => {
+  const requests: Array<{ url: string; body?: unknown }> = [];
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    requests.push({
+      url,
+      body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+    });
+
+    if (url.includes("/api/contacts/check-exists")) {
+      return new Response(JSON.stringify({ exists: true, chatId: "248309876846833@lid" }), { status: 200 });
+    }
+    if (url.endsWith("/api/sendText")) {
+      return new Response(JSON.stringify({ id: "message-123" }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  const result = await client.sendText("waha_test", "5521999999999", "Olá");
+
+  assert.equal(result.messageId, "message-123");
+  assert.match(requests[0]?.url ?? "", /phone=5521999999999/);
+  assert.deepEqual(requests[1]?.body, {
+    session: "waha_test",
+    chatId: "248309876846833@lid",
+    text: "Olá",
+  });
+});
+
+test("sendText: não envia para telefone quando o WAHA não resolve o destinatário", async () => {
+  const requests: string[] = [];
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    requests.push(url);
+    return new Response(JSON.stringify({ exists: false }), { status: 200 });
+  }));
+
+  await assert.rejects(
+    () => client.sendText("waha_test", "5521999999999", "Olá"),
+    (error: unknown) => error instanceof WahaClientError && error.code === "WAHA_RECIPIENT_NOT_FOUND",
+  );
+  assert.equal(requests.length, 1);
+  assert.match(requests[0] ?? "", /check-exists/);
+});
+
 // ── WahaClient.getSession ──────────────────────────────────────────────
 
 test("getSession: sessão existente → retorna WahaSession", async () => {

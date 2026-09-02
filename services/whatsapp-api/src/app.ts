@@ -879,7 +879,10 @@ export function buildApp() {
           });
         }
 
-        const result = await client.sendText(sessionName, `${chatId}@c.us`, text);
+        // O client resolve o telefone para o chatId canônico do WAHA (inclusive
+        // @lid) antes de enviar. Não force @c.us aqui: algumas contas WebJS
+        // recusam esse formato com "No LID for user".
+        const result = await client.sendText(sessionName, chatId, text);
         const durationMs = Date.now() - startedAt;
 
         request.log.info({
