@@ -199,10 +199,22 @@ export default async function BrokerConversationsPage({
     }
   }
 
+  function toIsoString(d: Date | string | null | undefined): string {
+    if (!d) return new Date().toISOString();
+    const parsed = d instanceof Date ? d : new Date(d);
+    return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+  }
+
+  function toTimestamp(d: Date | string | null | undefined): number {
+    if (!d) return 0;
+    const parsed = d instanceof Date ? d.getTime() : new Date(d).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
   // ── Montar conversas ──────────────────────────────────────────────────
   const conversations = lightLeads.map((lead) => {
     const msgs = (messagesByLead.get(lead.id) ?? [])
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+      .sort((a, b) => toTimestamp(a.sentAt) - toTimestamp(b.sentAt))
       .slice(-100);
     const latest = msgs.at(-1) ?? null;
     return {
@@ -216,14 +228,14 @@ export default async function BrokerConversationsPage({
         ? {
             body: latest.body,
             direction: latest.direction,
-            sentAt: latest.sentAt.toISOString(),
+            sentAt: toIsoString(latest.sentAt),
           }
         : null,
       messages: msgs.map((m) => ({
         id: m.id,
         body: m.body,
         direction: m.direction,
-        sentAt: m.sentAt.toISOString(),
+        sentAt: toIsoString(m.sentAt),
         senderRole: m.senderRole,
         providerStatus: m.providerStatus,
       })),
@@ -234,11 +246,11 @@ export default async function BrokerConversationsPage({
     const msgs = messageRows
       .filter(
         (message) =>
-          message.clientId === client.id ||
-          message.leadId === client.leadId ||
+          (message.clientId && message.clientId === client.id) ||
+          (message.leadId && message.leadId === client.leadId) ||
           samePhone(message.phone, client.telefone),
       )
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+      .sort((a, b) => toTimestamp(a.sentAt) - toTimestamp(b.sentAt))
       .slice(-100);
     const latest = msgs.at(-1) ?? null;
     return {
@@ -249,13 +261,13 @@ export default async function BrokerConversationsPage({
       telefone: client.telefone,
       status: "Cliente",
       latestMessage: latest
-        ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt.toISOString() }
+        ? { body: latest.body, direction: latest.direction, sentAt: toIsoString(latest.sentAt) }
         : null,
       messages: msgs.map((message) => ({
         id: message.id,
         body: message.body,
         direction: message.direction,
-        sentAt: message.sentAt.toISOString(),
+        sentAt: toIsoString(message.sentAt),
         senderRole: message.senderRole,
         providerStatus: message.providerStatus,
       })),
@@ -264,12 +276,14 @@ export default async function BrokerConversationsPage({
 
   const officialConversations = buildOfficialTenantConversations(
     [
-      ...tenantNumbers.map((number) => ({
-        id: number.id,
-        source: "number" as const,
-        name: number.label || "Número oficial do tenant",
-        phone: number.phone,
-      })),
+      ...tenantNumbers
+        .filter((number) => Boolean(number.phone))
+        .map((number) => ({
+          id: number.id,
+          source: "number" as const,
+          name: number.label || "Número oficial do tenant",
+          phone: number.phone!,
+        })),
       ...tenantChannels
         .filter((channel) => Boolean(channel.phone))
         .map((channel) => ({
@@ -285,7 +299,7 @@ export default async function BrokerConversationsPage({
         id: message.id,
         body: message.body,
         direction: message.direction,
-        sentAt: message.sentAt.toISOString(),
+        sentAt: toIsoString(message.sentAt),
         phone: message.phone,
         senderRole: message.senderRole,
         providerStatus: message.providerStatus,
@@ -296,8 +310,8 @@ export default async function BrokerConversationsPage({
   // Sort: conversas com mensagens recentes primeiro
   const scopedConversations = [...conversations, ...clientConversations, ...officialConversations];
   scopedConversations.sort((a, b) => {
-    const timeA = a.latestMessage ? new Date(a.latestMessage.sentAt).getTime() : 0;
-    const timeB = b.latestMessage ? new Date(b.latestMessage.sentAt).getTime() : 0;
+    const timeA = a.latestMessage ? toTimestamp(a.latestMessage.sentAt) : 0;
+    const timeB = b.latestMessage ? toTimestamp(b.latestMessage.sentAt) : 0;
     return timeB - timeA;
   });
 

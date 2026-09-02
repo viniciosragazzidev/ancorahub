@@ -65,7 +65,8 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
 import { normalizePhone } from "@/shared/utils/phone";
 export { normalizePhone };
 
-export function samePhone(left: string, right: string) {
+export function samePhone(left?: string | null, right?: string | null) {
+  if (!left || !right) return false;
   const a = normalizePhone(left);
   const b = normalizePhone(right);
   if (!a || !b) return false;
