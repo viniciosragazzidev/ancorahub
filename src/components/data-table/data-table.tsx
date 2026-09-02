@@ -20,6 +20,7 @@ interface DataTableProps<TData> extends React.HTMLAttributes<HTMLDivElement> {
   actionBar?: React.ReactNode;
   children?: React.ReactNode;
   containerClassName?: string;
+  headerClassName?: string;
   isPending?: boolean;
 }
 
@@ -29,16 +30,17 @@ export function DataTable<TData>({
   children,
   className,
   containerClassName,
+  headerClassName,
   isPending = false,
   ...props
 }: DataTableProps<TData>) {
   return (
     <div className={cn("w-full space-y-3", className)} {...props}>
       {children}
-      <div className={cn("relative rounded-xl border border-border/60 overflow-hidden bg-background/40 backdrop-blur-xs shadow-2xs", containerClassName)}>
+      <div className={cn("relative rounded-xl border border-border/60 overflow-hidden bg-transparent", containerClassName)}>
         <div className="overflow-x-auto">
           <Table className="w-full text-xs">
-            <TableHeader className="bg-muted/50 dark:bg-muted/20 border-b border-border/60">
+            <TableHeader className={cn("bg-muted/40 dark:bg-muted/20 border-b border-border/60", headerClassName)}>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent border-border/60">
                   {headerGroup.headers.map((header) => {

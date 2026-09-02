@@ -33,7 +33,7 @@ import {
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
-import { isAiPotentialSale } from "@/features/leads/change-lead-status";
+import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 
@@ -42,7 +42,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries-section";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
-import { AiConversationInsightCard } from "@/features/conversation-intelligence";
+import { AiConversationInsightCard } from "@/features/conversation-intelligence/components/ai-conversation-insight-card";
 
 type ConfirmationDocument = { id: string; filename: string; status: string };
 type CarrierOption = { id: string; name: string };

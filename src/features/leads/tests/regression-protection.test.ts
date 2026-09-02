@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect } from "vitest";
-import { isAiPotentialSale } from "../change-lead-status";
+import { isAiPotentialSale } from "../ai-potential-sale";
 
 describe("Protecao de Regressao da IA - isAiPotentialSale", () => {
   it("detects high purchase intent as potential sale", () => {

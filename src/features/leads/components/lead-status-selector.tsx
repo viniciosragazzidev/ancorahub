@@ -26,7 +26,7 @@ import {
   changeLeadStatusAction,
   type StatusChangeState,
 } from "@/app/(dashboard)/leads/status-actions";
-import { isAiPotentialSale } from "@/features/leads/change-lead-status";
+import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import {
   LEAD_STATUS_LABELS,
   MOTIVOS_PERDA,
