@@ -46,7 +46,6 @@ import { BeneficiariesSection } from "@/app/(dashboard)/leads/[id]/beneficiaries
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence/components/ai-conversation-insight-card";
-import { LightBottomNav } from "@/features/broker-workspace/components/light-bottom-nav";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 
 type ConfirmationDocument = { id: string; filename: string; status: string };
@@ -268,7 +267,6 @@ export function LightLeadDetail({
             </div>
           </Card>
         </div>
-        <LightBottomNav />
       </div>
     );
   }
@@ -1261,7 +1259,6 @@ export function LightLeadDetail({
         onOpenChange={setShowSaleConfirm}
       />
       </div>
-      <LightBottomNav />
     </div>
   );
 }

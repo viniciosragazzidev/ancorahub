@@ -41,7 +41,6 @@ import {
   type RealtimeSyncBrowserDetail,
 } from "@/components/providers/realtime-events";
 import { toast } from "sonner";
-import { LightBottomNav } from "@/features/broker-workspace/components/light-bottom-nav";
 
 export type LightConversationMessage = {
   id: string;
@@ -463,11 +462,6 @@ export function LightConversationsView({
           </p>
         </div>
       )}
-
-      {/* Navegação inferior em telas sem conversa ativa no mobile */}
-      <div className={cn(selected && "hidden lg:block")}>
-        <LightBottomNav />
-      </div>
     </section>
   );
 }

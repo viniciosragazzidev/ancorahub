@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -30,7 +30,6 @@ import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
 import { toast } from "sonner";
-import { LightBottomNav } from "@/features/broker-workspace/components/light-bottom-nav";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 
 function getGreeting() {
@@ -479,12 +478,6 @@ export function LightDashboard({
           </section>
         )}
       </div>
-
-      {/* Navegação fixa inferior */}
-      <LightBottomNav
-        awaitingResponse={awaitingResponse}
-        criticalLeads={pendingUpdate}
-      />
     </div>
   );
 }

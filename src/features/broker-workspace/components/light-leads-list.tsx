@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -14,7 +14,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 import { cn } from "@/lib/utils";
-import { LightBottomNav } from "@/features/broker-workspace/components/light-bottom-nav";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 
 export type LightLeadItem = {
@@ -415,12 +414,6 @@ export function LightLeadsList({
           )}
         </div>
       </div>
-
-      {/* Navegação fixa inferior */}
-      <LightBottomNav
-        awaitingResponse={awaitingResponseCount}
-        criticalLeads={criticalCount}
-      />
     </div>
   );
 }

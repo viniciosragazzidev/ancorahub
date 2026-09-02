@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -7,7 +7,6 @@ import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { LightBottomNav } from "@/components/light-bottom-nav";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 import { cn } from "@/lib/utils";
@@ -32,7 +31,6 @@ export function AppShell({
   children,
   branding,
   isLightBroker = false,
-  showLightConversations = true,
 }: {
   children: ReactNode;
   branding?: Branding;
@@ -101,16 +99,16 @@ export function AppShell({
         <SidebarInset
           className={cn(
             "app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]",
-            isLightBroker ? "pb-24 max-w-full" : "max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+            isLightBroker ? "max-w-full" : "max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
           )}
           style={{
             scrollPaddingTop: "var(--header-height)",
-            scrollPaddingBottom: isLightBroker ? "6rem" : "calc(7rem + env(safe-area-inset-bottom))",
+            scrollPaddingBottom: isLightBroker ? "0px" : "calc(7rem + env(safe-area-inset-bottom))",
           }}
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SidebarInset>
-        {isLightBroker ? <LightBottomNav showConversations={showLightConversations} /> : <MobileBottomNav />}
+        {isLightBroker ? null : <MobileBottomNav />}
         {!isLightBroker ? <OnboardingWelcomeDialog /> : null}
       </SidebarProvider>
     </OnboardingProvider>

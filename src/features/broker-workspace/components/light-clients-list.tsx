@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
-import { LightBottomNav } from "@/features/broker-workspace/components/light-bottom-nav";
 
 export type LightClientItem = {
   id: string;
@@ -142,8 +141,6 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
           )}
         </div>
       </div>
-
-      <LightBottomNav />
     </div>
   );
 }
