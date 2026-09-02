@@ -321,18 +321,13 @@ export default async function BrokerConversationsPage({
   const whatsappConnected = conn?.status === "ready" && conn?.chatInternoAtivo === true;
 
   return (
-    <>
-      <DashboardHeader breadcrumb="Atendimento" title="Conversas" />
-      <main className="min-h-0 w-full flex-1 bg-background p-0">
-        <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:min-h-0 w-full overflow-hidden bg-card">
-          <LightConversationsView
-            conversations={scopedConversations}
-            initialLeadId={leadId}
-            initialDraft={initialDraft}
-            whatsappConnected={whatsappConnected}
-          />
-        </div>
-      </main>
-    </>
+    <main className="h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-card p-0">
+      <LightConversationsView
+        conversations={scopedConversations}
+        initialLeadId={leadId}
+        initialDraft={initialDraft}
+        whatsappConnected={whatsappConnected}
+      />
+    </main>
   );
 }

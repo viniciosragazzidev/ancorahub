@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -84,17 +84,39 @@ export function AppShell({
 
   if (isLightBroker) {
     return (
-      <div className="flex min-h-dvh flex-col bg-background selection:bg-primary/20">
-        <LightTopNavBar
-          branding={branding}
-          user={user}
-          showConversations={showLightConversations}
-          initialAvailability={initialAvailability}
-        />
-        <main className="flex-1 min-h-0 overflow-y-auto">
-          {children}
-        </main>
-      </div>
+      <SidebarProvider
+        defaultOpen={false}
+        open={false}
+        className="min-h-dvh flex-col overflow-x-hidden"
+        style={
+          {
+            "--sidebar-width": "0px",
+            "--header-height": "3.5rem",
+            ...(branding?.brandColor
+              ? {
+                  "--primary": branding.brandColor,
+                  "--primary-foreground": readableBrandForeground,
+                  "--ring": branding.brandColor,
+                  "--sidebar-primary": branding.brandColor,
+                  "--sidebar-primary-foreground": readableBrandForeground,
+                  "--sidebar-ring": branding.brandColor,
+                }
+              : {}),
+          } as CSSProperties
+        }
+      >
+        <div className="flex min-h-dvh w-full flex-col bg-background selection:bg-primary/20">
+          <LightTopNavBar
+            branding={branding}
+            user={user}
+            showConversations={showLightConversations}
+            initialAvailability={initialAvailability}
+          />
+          <main className="flex-1 min-h-0 w-full overflow-y-auto">
+            {children}
+          </main>
+        </div>
+      </SidebarProvider>
     );
   }
 
