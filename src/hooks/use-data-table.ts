@@ -21,6 +21,7 @@ import {
   parseAsStringEnum,
   useQueryState,
 } from "nuqs";
+import { useRouter } from "next/navigation";
 
 import { dataTableConfig } from "@/config/data-table";
 import { getFiltersStateParser, getSortingStateParser } from "@/lib/parsers";
@@ -48,6 +49,8 @@ export function useDataTable<TData>({
   initialState,
   ...props
 }: UseDataTableProps<TData>) {
+  const router = useRouter();
+  const [isPending, startTransition] = React.useTransition();
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>(
     initialState?.rowSelection ?? {}
   );
@@ -56,32 +59,41 @@ export function useDataTable<TData>({
 
   const [page, setPage] = useQueryState(
     "page",
-    parseAsInteger.withOptions({ history: "push", shallow: false }).withDefault(1)
+    parseAsInteger.withOptions({ history: "push", shallow: false, startTransition }).withDefault(1)
   );
   const [pageSize, setPageSize] = useQueryState(
     "pageSize",
-    parseAsInteger.withOptions({ history: "push", shallow: false }).withDefault(10)
+    parseAsInteger.withOptions({ history: "push", shallow: false, startTransition }).withDefault(20)
   );
 
   const [sorting, setSorting] = useQueryState(
     "sort",
     getSortingStateParser<TData>()
-      .withOptions({ history: "push", shallow: false })
+      .withOptions({ history: "push", shallow: false, startTransition })
       .withDefault([])
   );
 
   const [filters, setFilters] = useQueryState(
     "filters",
     getFiltersStateParser<TData>()
-      .withOptions({ history: "push", shallow: false })
+      .withOptions({ history: "push", shallow: false, startTransition })
       .withDefault([])
   );
 
   const [joinOperator, setJoinOperator] = useQueryState(
     "joinOperator",
     parseAsStringEnum([...dataTableConfig.joinOperators])
-      .withOptions({ history: "push", shallow: false })
+      .withOptions({ history: "push", shallow: false, startTransition })
       .withDefault("and")
+  );
+
+  const refreshAfterUrlCommit = React.useCallback(
+    (updates: Array<Promise<URLSearchParams>>) => {
+      void Promise.all(updates)
+        .then(() => router.refresh())
+        .catch(() => undefined);
+    },
+    [router]
   );
 
   const pagination: PaginationState = React.useMemo(
@@ -96,26 +108,30 @@ export function useDataTable<TData>({
     (updaterOrValue: PaginationState | ((old: PaginationState) => PaginationState)) => {
       if (typeof updaterOrValue === "function") {
         const newPagination = updaterOrValue(pagination);
-        void setPage(newPagination.pageIndex + 1);
-        void setPageSize(newPagination.pageSize);
+        refreshAfterUrlCommit([
+          setPage(newPagination.pageIndex + 1),
+          setPageSize(newPagination.pageSize),
+        ]);
       } else {
-        void setPage(updaterOrValue.pageIndex + 1);
-        void setPageSize(updaterOrValue.pageSize);
+        refreshAfterUrlCommit([
+          setPage(updaterOrValue.pageIndex + 1),
+          setPageSize(updaterOrValue.pageSize),
+        ]);
       }
     },
-    [pagination, setPage, setPageSize]
+    [pagination, refreshAfterUrlCommit, setPage, setPageSize]
   );
 
   const onSortingChange = React.useCallback(
     (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
       if (typeof updaterOrValue === "function") {
         const newSorting = updaterOrValue(sorting as SortingState) as ExtendedColumnSort<TData>[];
-        void setSorting(newSorting);
+        refreshAfterUrlCommit([setPage(1), setSorting(newSorting)]);
       } else {
-        void setSorting(updaterOrValue as ExtendedColumnSort<TData>[]);
+        refreshAfterUrlCommit([setPage(1), setSorting(updaterOrValue as ExtendedColumnSort<TData>[])]);
       }
     },
-    [sorting, setSorting]
+    [refreshAfterUrlCommit, setPage, setSorting, sorting]
   );
 
   const table = useReactTable({
@@ -147,6 +163,7 @@ export function useDataTable<TData>({
 
   return {
     table,
+    isPending,
     page,
     pageSize,
     sorting,

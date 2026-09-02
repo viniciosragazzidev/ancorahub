@@ -12,15 +12,16 @@ import {
 export type WahaTransport = "relay" | "fastify";
 
 /**
- * A dedicated relay owns the /v1 contract. In its absence the VPS API is the
- * Fastify transport and must never receive a speculative /v1 request.
+ * The corporate-number connector shares the proven VPS/Fastify transport with
+ * the broker Lite connection. A legacy dedicated relay remains an explicit
+ * fallback only when no VPS endpoint is configured.
  */
 export function resolveWahaRelayBaseUrl(environment: Record<string, string | undefined> = process.env) {
   const value = (
-    environment.WAHA_RELAY_URL ||
     environment.VPS_API_URL ||
     environment.WAHA_API_URL ||
-    environment.NEXT_PUBLIC_VPS_API_URL
+    environment.NEXT_PUBLIC_VPS_API_URL ||
+    environment.WAHA_RELAY_URL
   )?.trim();
   if (!value) return null;
   try {
@@ -31,8 +32,8 @@ export function resolveWahaRelayBaseUrl(environment: Record<string, string | und
 }
 
 export function resolveWahaTransport(environment: Record<string, string | undefined> = process.env): WahaTransport | null {
-  if (environment.WAHA_RELAY_URL?.trim()) return "relay";
   if (environment.VPS_API_URL?.trim() || environment.WAHA_API_URL?.trim() || environment.NEXT_PUBLIC_VPS_API_URL?.trim()) return "fastify";
+  if (environment.WAHA_RELAY_URL?.trim()) return "relay";
   return null;
 }
 
@@ -133,6 +134,22 @@ export async function sendWahaRelayMessage(input: {
 
 export async function getWahaRelayHealth() {
   const config = relayConfig();
+
+  if (config.transport === "fastify") {
+    const response = await fetch(`${config.url}/internal/waha/health`, {
+      headers: getFastifyHeaders(config.secret, false),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => null);
+
+    if (response?.ok) {
+      const data = await response.json().catch(() => null);
+      return (data ?? { status: "ok", sessions: [] }) as { status: "ok"; sessions: Array<{ id: string; status: string }> };
+    }
+
+    throw new Error(`Serviço WAHA indisponível em ${config.url}.`);
+  }
+
   const timestamp = String(Date.now());
   const nonce = randomUUID();
   const rawBody = "";
@@ -185,26 +202,29 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
   let primaryResponse: Response | null = null;
   let primaryData: unknown = null;
 
-  try {
-    primaryResponse = await fetch(`${config.url}${path}`, {
-      method,
-      headers: primaryHeaders,
-      ...(rawBody ? { body: rawBody } : {}),
-      cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
-    });
+  if (config.transport === "relay") {
+    try {
+      primaryResponse = await fetch(`${config.url}${path}`, {
+        method,
+        headers: primaryHeaders,
+        ...(rawBody ? { body: rawBody } : {}),
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
 
-    if (primaryResponse.ok) {
-      primaryData = await primaryResponse.json().catch(() => null);
-      if (primaryData) {
-        return relaySessionStateSchema.parse(primaryData);
+      if (primaryResponse.ok) {
+        primaryData = await primaryResponse.json().catch(() => null);
+        if (primaryData) {
+          return relaySessionStateSchema.parse(primaryData);
+        }
       }
+    } catch {
+      // A rota do relay pode estar temporariamente indisponível; tente o adaptador Fastify.
     }
-  } catch {
-    // Se a rota /v1/sessions der erro de rede / timeout / DNS, cair no fallback do Fastify abaixo
   }
 
-  // Fallback para rotas Fastify /internal/waha/connections
+  // Fastify is the primary path when VPS_API_URL is configured, and a fallback
+  // for a legacy dedicated relay. Never probe /v1 on the Fastify endpoint.
   const fastifyHeaders = getFastifyHeaders(config.secret, Boolean(rawBody));
   const sessionId =
     (payload as { sessionId?: string })?.sessionId ||

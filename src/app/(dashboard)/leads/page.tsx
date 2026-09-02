@@ -7,7 +7,6 @@ import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
 import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
-import { LeadsPagination } from "./_components/leads-pagination";
 import { LeadsWorkspace } from "./leads-workspace";
 import { LeadsHeaderActions } from "./_components/leads-header-actions";
 import { WifiHigh, Plus, Target } from "@/components/huge-icons";
@@ -565,6 +564,21 @@ async function LeadsPageContent({
     filters.qualification ||
     eligibleCampaignsOnly
   );
+  const leadViewKey = [
+    page,
+    pageSize,
+    filters.search ?? "",
+    filters.status ?? "",
+    filters.branch ?? "",
+    filters.tipo ?? "",
+    filters.origem ?? "",
+    filters.qualification ?? "",
+    filters.corretor ?? "",
+    filters.eligibleCampaigns ?? "",
+    filters.filters ?? "",
+    filters.sort ?? "",
+    filters.joinOperator ?? "",
+  ].join(":");
 
   return (
     <>
@@ -614,6 +628,7 @@ async function LeadsPageContent({
 
         {/* Filters */}
         <LeadsFilters
+          key={leadViewKey}
           branches={branches}
           brokers={brokers}
           initialBranch={filters.branch}
@@ -632,6 +647,7 @@ async function LeadsPageContent({
         {leads.length || qualifyingLeads.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
+              key={leadViewKey}
               leads={leads.map((lead) => ({
                 ...lead,
                 createdAt: lead.createdAt.toISOString(),

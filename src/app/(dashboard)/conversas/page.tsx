@@ -697,15 +697,7 @@ export default async function ConversationsPage({
   );
 }
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
-function maskPhone(phone: string) {
-  const digits = normalizePhone(phone);
-  return digits.length > 4
-    ? `+${digits.slice(0, Math.max(0, digits.length - 8))} ****-${digits.slice(-4)}`
-    : "Número protegido";
-}
+import { normalizePhone, maskPhone } from "@/shared/utils/phone";
 function normalizeOutboundStatus(status: string): OfficialBrokerMessage["status"] {
   return ["pending", "queued", "sent", "delivered", "read", "failed"].includes(status)
     ? (status as OfficialBrokerMessage["status"])

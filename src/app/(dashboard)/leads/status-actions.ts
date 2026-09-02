@@ -139,6 +139,8 @@ export async function changeLeadStatusAction(
     leadId: (formData.get("leadId") ?? "") as string,
     newStatus: (formData.get("newStatus") ?? formData.get("status") ?? "") as string,
     motivoPerda: (formData.get("motivoPerda") ?? formData.get("lossReason")) as string | null,
+    justificativaRegressao: (formData.get("justificativaRegressao") ??
+      formData.get("regressionJustification")) as string | null,
   };
 
   try {

@@ -6,6 +6,7 @@ import { type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
 import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
+import { resolveCohortConversion } from "@/features/reports/metrics/metrics-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,8 +168,6 @@ async function getNocKpis(
     todayLeads,
     yesterdayLeads,
     activeNow,
-    monthMetrics,
-    lastMonthMetrics,
     contactTimeToday,
     contactTimeYesterday,
     ticketMonth,
@@ -197,24 +196,6 @@ async function getNocKpis(
           ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
         ),
       ),
-
-    // Period conversion metrics
-    db
-      .select({
-        total: count(),
-        converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
-      })
-      .from(schema.leads)
-      .where(baseLeadWhere(start, end)),
-
-    // Previous period conversion
-    db
-      .select({
-        total: count(),
-        converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
-      })
-      .from(schema.leads)
-      .where(baseLeadWhere(prevStart, start)),
 
     // Avg first contact time today (seconds)
     db
@@ -273,19 +254,20 @@ async function getNocKpis(
       ),
   ]);
 
+  const [currentConversion, previousConversion] = await Promise.all([
+    resolveCohortConversion(context, start, end),
+    resolveCohortConversion(context, prevStart, start),
+  ]);
+
   const leadsT = Number(todayLeads[0]?.cnt ?? 0);
   const leadsY = Number(yesterdayLeads[0]?.cnt ?? 0);
-  const convM = Number(monthMetrics[0]?.converted ?? 0);
-  const totalM = Number(monthMetrics[0]?.total ?? 0);
-  const convLM = Number(lastMonthMetrics[0]?.converted ?? 0);
-  const totalLM = Number(lastMonthMetrics[0]?.total ?? 0);
 
   return {
     leadsToday: leadsT,
     leadsTodayVsYesterday: leadsY === 0 ? 0 : Math.round(((leadsT - leadsY) / leadsY) * 100),
     activeAttendances: Number(activeNow[0]?.cnt ?? 0),
-    conversionRateMonth: totalM > 0 ? Math.round((convM / totalM) * 100) : 0,
-    conversionRateLastMonth: totalLM > 0 ? Math.round((convLM / totalLM) * 100) : 0,
+    conversionRateMonth: Math.round(currentConversion.rate),
+    conversionRateLastMonth: Math.round(previousConversion.rate),
     avgFirstContactSeconds: contactTimeToday[0]?.avg ? Number(contactTimeToday[0].avg) : null,
     avgFirstContactSecondsYesterday: contactTimeYesterday[0]?.avg ? Number(contactTimeYesterday[0].avg) : null,
     avgTicketMonth: Number(ticketMonth[0]?.avg ?? 0),

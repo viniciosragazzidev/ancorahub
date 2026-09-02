@@ -177,6 +177,17 @@ export async function updateWorkflowAutomationSettingsAction(formData: FormData)
   });
 }
 
+export async function updateReportingCenterSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("reportingCenterEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_reporting_center_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "reporting_center.global_feature_updated",
+    targetType: "system_settings", targetId: "reporting_center", metadata: { enabled }, createdAt: now,
+  });
+}
+
 export async function updateCleanUiOperationalSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("cleanUiOperationalEnabled") === "true" ? "true" : "false";

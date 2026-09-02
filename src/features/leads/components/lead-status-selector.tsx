@@ -26,6 +26,7 @@ import {
   changeLeadStatusAction,
   type StatusChangeState,
 } from "@/app/(dashboard)/leads/status-actions";
+import { isAiPotentialSale } from "@/features/leads/change-lead-status";
 import {
   LEAD_STATUS_LABELS,
   MOTIVOS_PERDA,
@@ -45,6 +46,7 @@ type LeadStatusSelectorProps = {
   role: string;
   isOwner: boolean;
   isSameBranch: boolean;
+  qualificationDetails?: unknown;
   documents?: ConfirmationDocument[];
   carriers?: CarrierOption[];
 };
@@ -59,6 +61,7 @@ export function LeadStatusSelector({
   role,
   isOwner,
   isSameBranch,
+  qualificationDetails,
   documents = [],
   carriers = [],
 }: LeadStatusSelectorProps) {
@@ -68,6 +71,8 @@ export function LeadStatusSelector({
   const [feedbackAfterStatus, setFeedbackAfterStatus] = useState(false);
   const [showSaleConfirm, setShowSaleConfirm] = useState(false);
   const [motivoPerda, setMotivoPerda] = useState("");
+  const [justificativaRegressao, setJustificativaRegressao] = useState("");
+  const potentialSaleCheck = isAiPotentialSale(qualificationDetails);
   const [state, dispatch, pending] = useActionState<StatusChangeState, FormData>(
     changeLeadStatusAction,
     {},
@@ -99,11 +104,12 @@ export function LeadStatusSelector({
     }
   }, [state, router]);
 
-  const submitChange = (status: string, motivo?: string) => {
+  const submitChange = (status: string, motivo?: string, justificativa?: string) => {
     const formData = new FormData();
     formData.set("leadId", leadId);
     formData.set("newStatus", status);
     if (motivo) formData.set("motivoPerda", motivo);
+    if (justificativa) formData.set("justificativaRegressao", justificativa);
     setFeedbackAfterStatus(role === "broker" && status !== "lost");
     startTransition(() => {
       addOptimisticStatus(status);
@@ -132,14 +138,22 @@ export function LeadStatusSelector({
       toast.error("Selecione um motivo de perda.");
       return;
     }
-    submitChange("lost", motivoPerda);
+    if (potentialSaleCheck.isPotentialSale && justificativaRegressao.trim().length < 15) {
+      toast.error(
+        "Proteção de Regressão IA: É obrigatório fornecer uma justificativa com no mínimo 15 caracteres.",
+      );
+      return;
+    }
+    submitChange("lost", motivoPerda, justificativaRegressao.trim());
     setShowLostConfirm(false);
     setMotivoPerda("");
+    setJustificativaRegressao("");
   };
 
   const cancelLost = () => {
     setShowLostConfirm(false);
     setMotivoPerda("");
+    setJustificativaRegressao("");
   };
 
   const availableStatuses = (() => {
@@ -202,6 +216,33 @@ export function LeadStatusSelector({
                 Informe o motivo para registrar o lead como perdido.
               </DialogDescription>
               <div className="mt-4 space-y-4">
+                {potentialSaleCheck.isPotentialSale && (
+                  <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+                    <p className="font-semibold text-amber-700 dark:text-amber-400">
+                      ⚠️ Proteção de Regressão IA
+                    </p>
+                    <p className="text-muted-foreground text-[11px] leading-normal">
+                      A IA diagnosticou este lead como potencial venda (
+                      <span className="font-medium text-amber-700 dark:text-amber-300">
+                        {potentialSaleCheck.reason}
+                      </span>
+                      ). Para registrar a perda, é obrigatório fornecer uma justificativa detalhada para a supervisão:
+                    </p>
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-md border border-input bg-background p-2 text-xs"
+                      placeholder="Explique detalhadamente por que este lead está sendo descartado (mínimo 15 caracteres)..."
+                      value={justificativaRegressao}
+                      onChange={(e) => setJustificativaRegressao(e.target.value)}
+                    />
+                    {justificativaRegressao.trim().length > 0 &&
+                      justificativaRegressao.trim().length < 15 && (
+                        <span className="text-[10px] text-amber-600 block font-medium">
+                          Faltam {15 - justificativaRegressao.trim().length} caracteres.
+                        </span>
+                      )}
+                  </div>
+                )}
                 <select
                   className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm"
                   defaultValue=""
@@ -221,7 +262,16 @@ export function LeadStatusSelector({
                   <Button variant="outline" onClick={cancelLost} disabled={pending}>
                     Cancelar
                   </Button>
-                  <Button variant="destructive" onClick={confirmLost} disabled={!motivoPerda || pending}>
+                  <Button
+                    variant="destructive"
+                    onClick={confirmLost}
+                    disabled={
+                      !motivoPerda ||
+                      pending ||
+                      (potentialSaleCheck.isPotentialSale &&
+                        justificativaRegressao.trim().length < 15)
+                    }
+                  >
                     {pending ? "Salvando..." : "Confirmar Perda"}
                   </Button>
                 </div>

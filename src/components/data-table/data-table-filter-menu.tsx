@@ -3,7 +3,8 @@
 import * as React from "react";
 import type { Table } from "@tanstack/react-table";
 import { Filter, Plus } from "lucide-react";
-import { useQueryState } from "nuqs";
+import { parseAsInteger, useQueryState } from "nuqs";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,9 +31,15 @@ interface DataTableFilterMenuProps<TData> {
 export function DataTableFilterMenu<TData>({
   table,
 }: DataTableFilterMenuProps<TData>) {
+  const router = useRouter();
+  const [, startTransition] = React.useTransition();
   const [filters, setFilters] = useQueryState(
     "filters",
-    filterItemParser.withOptions({ history: "push", shallow: false }).withDefault([])
+    filterItemParser.withOptions({ history: "push", shallow: false, startTransition }).withDefault([])
+  );
+  const [, setPage] = useQueryState(
+    "page",
+    parseAsInteger.withOptions({ history: "push", shallow: false, startTransition }).withDefault(1)
   );
 
   const [open, setOpen] = React.useState(false);
@@ -58,13 +65,16 @@ export function DataTableFilterMenu<TData>({
       operator,
     };
 
+    let nextFilters = [...filters, newFilter];
     if (existingIndex >= 0) {
       const updated = [...filters];
       updated[existingIndex] = newFilter;
-      setFilters(updated);
-    } else {
-      setFilters([...filters, newFilter]);
+      nextFilters = updated;
     }
+
+    void Promise.all([setFilters(nextFilters), setPage(1)])
+      .then(() => router.refresh())
+      .catch(() => undefined);
 
     setOpen(false);
     setValue("");

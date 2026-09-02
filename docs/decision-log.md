@@ -1,5 +1,42 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
+
+**Estado:** Aceita
+**Data:** 2026-09-01
+
+O `/relatorios` passa a ser a camada de inteligência operacional da corretora, com
+famílias de relatórios (Visão geral, Comercial, Equipe, Unidades, Financeiro) sobre um
+catálogo canônico de métricas versionado em `src/features/reports/metrics`. O catálogo
+é a única fonte de cálculo: nenhuma superfície nova pode recalcular métricas
+localmente. Na primeira entrega migram para o catálogo o próprio `/relatorios` e os
+consumidores de maior risco de divergência (NOC, `/clientes`, broker-summary); os
+demais migram por telas com dívida registrada no roadmap.
+
+A taxa de conversão canônica (`commercial.conversion_rate`) é **coorte de entrada**:
+leads recebidos no período que alcançaram `converted` ÷ leads recebidos no período
+(excluídos duplicados/descartados), garantindo que numerador e denominador resolvem
+para a mesma população no drill-down. O relatório de funil exibe exatamente os 8
+estágios da máquina de estados do ADR-001, sem agrupamento paralelo. O período segue a
+DEC-059 (presets 7/14/30/90) com comparação derivada da janela anterior equivalente;
+diferenças de taxa são apresentadas em pontos percentuais.
+
+O acesso por papel é conservador: Diretor vê todas as famílias; Gestor vê Visão geral,
+Comercial, Equipe e Unidades restritas à própria unidade, sem comparativo entre
+unidades; Supervisor vê Comercial e Equipe apenas dos supervisionados, sem valores;
+Corretor vê somente Comercial com dados próprios. Abas fora do escopo não são
+renderizadas e o seletor de unidade nunca amplia o escopo da sessão. A seção "O que
+exige atenção" reutiliza os parâmetros existentes do tenant (`slaFirstContactMinutes`,
+`slaStagnantDays`) em vez de criar configuração paralela.
+
+A atribuição histórica usa a titularidade persistida no registro no momento do evento;
+snapshot por evento (`broker_at_sale`, `unit_at_event`) fica como dívida documentada
+para a fase 2/3. A capacidade global `feature_reporting_center_enabled`, controlada e
+auditada pelo Super-admin, alterna entre a nova central e o layout legado sem perda de
+dados (padrão DEC-070). Cohorts, relatórios salvos/programados, aba Atendimento,
+Conversation Intelligence e AI Analyst permanecem fases futuras. Plano completo em
+`docs/product/reporting-root-plan.md`; decisão técnica em ADR-0040.
+
 ## DEC-089 — Número WAHA oficial para avisos internos ao corretor
 
 **Estado:** Aceita

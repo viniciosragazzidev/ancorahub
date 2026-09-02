@@ -68,7 +68,7 @@ export function LeadsDataTable({
 
   const pageCount = pagination?.totalPages ?? 1;
 
-  const { table } = useDataTable({
+  const { table, isPending } = useDataTable({
     data: tableData,
     columns,
     pageCount,
@@ -92,6 +92,7 @@ export function LeadsDataTable({
   return (
     <DataTable
       table={table}
+      isPending={isPending}
       actionBar={
         selectedRows.length > 0 ? (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-full animate-in fade-in slide-in-from-bottom-4">
@@ -168,7 +169,7 @@ export function QualifyingLeadsDataTable({
     [leads, onOpen]
   );
 
-  const { table } = useDataTable({
+  const { table, isPending } = useDataTable({
     data: tableData,
     columns,
     pageCount: 1,
@@ -187,7 +188,7 @@ export function QualifyingLeadsDataTable({
   });
 
   return (
-    <DataTable table={table}>
+    <DataTable table={table} isPending={isPending}>
       <DataTableAdvancedToolbar table={table} />
     </DataTable>
   );

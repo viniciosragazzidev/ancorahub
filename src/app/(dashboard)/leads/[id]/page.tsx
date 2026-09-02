@@ -301,7 +301,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {(lead.corretorId
                   ? (context.userId === lead.corretorId && lead.status !== "distributed")
                   : (context.role !== "broker")) ? (
-                  <LeadStatusSelector leadId={lead.id} currentStatus={lead.status} role={context.role} isOwner={context.userId === lead.corretorId} isSameBranch={context.branchId === lead.branchId} documents={leadDocs.map((document) => ({ id: document.id, filename: document.filename, status: document.status }))} carriers={carriers} />
+                  <LeadStatusSelector
+                    leadId={lead.id}
+                    currentStatus={lead.status}
+                    role={context.role}
+                    isOwner={context.userId === lead.corretorId}
+                    isSameBranch={context.branchId === lead.branchId}
+                    qualificationDetails={lead.qualificationDetails}
+                    documents={leadDocs.map((document) => ({
+                      id: document.id,
+                      filename: document.filename,
+                      status: document.status,
+                    }))}
+                    carriers={carriers}
+                  />
                 ) : null}
               </div>
             </div>

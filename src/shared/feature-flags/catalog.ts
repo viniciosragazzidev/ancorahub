@@ -176,6 +176,15 @@ export const FEATURE_FLAGS = {
       "Rascunho de abertura padrão para o modo corretor lite no chat.",
   },
 
+  REPORTING_CENTER: {
+    key: "feature_reporting_center_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Habilita a Central de Relatórios (Reporting 1): catálogo canônico de métricas, abas por papel, funil de 8 estágios, seção de atenção e drill-down explicável. Desativa = layout legado anterior.",
+  },
+
   BROKER_AVAILABILITY_ONBOARDING: {
     key: "feature_broker_availability_onboarding_enabled",
     scope: "global",

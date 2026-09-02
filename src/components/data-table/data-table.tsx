@@ -20,6 +20,7 @@ interface DataTableProps<TData> extends React.HTMLAttributes<HTMLDivElement> {
   actionBar?: React.ReactNode;
   children?: React.ReactNode;
   containerClassName?: string;
+  isPending?: boolean;
 }
 
 export function DataTable<TData>({
@@ -28,6 +29,7 @@ export function DataTable<TData>({
   children,
   className,
   containerClassName,
+  isPending = false,
   ...props
 }: DataTableProps<TData>) {
   return (
@@ -107,7 +109,7 @@ export function DataTable<TData>({
             </TableBody>
           </Table>
         </div>
-        <DataTablePagination table={table} />
+        <DataTablePagination table={table} isPending={isPending} />
       </div>
       {actionBar}
     </div>

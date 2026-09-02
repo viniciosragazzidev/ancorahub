@@ -62,9 +62,8 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
   return { messageId };
 }
 
-export function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
+import { normalizePhone } from "@/shared/utils/phone";
+export { normalizePhone };
 
 export function samePhone(left: string, right: string) {
   const a = normalizePhone(left);

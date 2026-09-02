@@ -249,9 +249,8 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
   };
 }
 
-export function normalizePhone(value: string) {
-  return value.replace(/\D/g, "");
-}
+import { normalizePhone } from "@/shared/utils/phone";
+export { normalizePhone };
 
 export function phoneHash(value: string) {
   return createHash("sha256").update(normalizePhone(value)).digest("hex");

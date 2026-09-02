@@ -2,27 +2,14 @@
 
 import * as React from "react";
 import type { Table } from "@tanstack/react-table";
-import { Filter, Plus, X } from "lucide-react";
-import { parseAsArrayOf, useQueryState } from "nuqs";
+import { X } from "lucide-react";
+import { parseAsInteger, useQueryState } from "nuqs";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { dataTableConfig } from "@/config/data-table";
 import { filterItemParser } from "@/lib/parsers";
-import type { ExtendedColumnFilter, FilterOperator } from "@/types/data-table";
 
 interface DataTableFilterListProps<TData> {
   table: Table<TData>;
@@ -31,21 +18,27 @@ interface DataTableFilterListProps<TData> {
 export function DataTableFilterList<TData>({
   table,
 }: DataTableFilterListProps<TData>) {
+  const router = useRouter();
+  const [, startTransition] = React.useTransition();
   const [filters, setFilters] = useQueryState(
     "filters",
-    filterItemParser.withOptions({ history: "push", shallow: false }).withDefault([])
+    filterItemParser.withOptions({ history: "push", shallow: false, startTransition }).withDefault([])
+  );
+  const [, setPage] = useQueryState(
+    "page",
+    parseAsInteger.withOptions({ history: "push", shallow: false, startTransition }).withDefault(1)
   );
 
-  const filterableColumns = table
-    .getAllColumns()
-    .filter((col) => col.getCanFilter());
-
   const removeFilter = (id: string) => {
-    setFilters(filters.filter((f) => f.id !== id));
+    void Promise.all([setFilters(filters.filter((f) => f.id !== id)), setPage(1)])
+      .then(() => router.refresh())
+      .catch(() => undefined);
   };
 
   const clearAllFilters = () => {
-    setFilters([]);
+    void Promise.all([setFilters([]), setPage(1)])
+      .then(() => router.refresh())
+      .catch(() => undefined);
   };
 
   return (

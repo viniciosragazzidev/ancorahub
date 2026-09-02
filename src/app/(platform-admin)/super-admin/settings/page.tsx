@@ -34,6 +34,7 @@ import {
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
   updateUserProfileSettingsAction,
+  updateReportingCenterSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
@@ -127,6 +128,7 @@ export default async function SuperAdminSettingsPage() {
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
+  const reportingCenterEnabled = settingMap.get("feature_reporting_center_enabled") !== "false";
   const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const realtimeSyncEnabled = settingMap.get("feature_realtime_sync_enabled") !== "false";
@@ -800,6 +802,46 @@ export default async function SuperAdminSettingsPage() {
                       {systemReportEnabled ? "Salvar controle" : "Ativar central de report"}
                     </Button>
                   </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Central de Relatórios (Reporting 1)</CardTitle>
+                <CardDescription>
+                  Ativa o catálogo canônico de métricas, abas por papel (Visão geral, Comercial,
+                  Equipe, Unidades, Financeiro), funil de 8 estágios, seção de atenção com
+                  parâmetros do tenant e drill-down explicável. Desativa para o layout legado
+                  anterior.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={updateReportingCenterSettingsAction}
+                  className="flex flex-wrap items-center justify-between gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="reportingCenterEnabled"
+                      value="true"
+                      defaultChecked={reportingCenterEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Central de relatórios habilitada</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Desativação restaura o layout legado e preserva auditoria.
+                      </span>
+                    </span>
+                  </label>
+                  <Button
+                    type="submit"
+                    variant={reportingCenterEnabled ? "outline" : "default"}
+                  >
+                    {reportingCenterEnabled ? "Salvar controle" : "Ativar central de relatórios"}
+                  </Button>
                 </form>
               </CardContent>
             </Card>
