@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -55,34 +55,72 @@ export function LightConversationsView({ insights, initialLeadId, whatsappConnec
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [connection, setConnection] = useState<Awaited<ReturnType<typeof getWhatsAppConnection>> | null>(null);
-  const selectedId = searchParams.get("leadId") ?? initialLeadId ?? insights[0]?.id ?? null;
-  const selected = insights.find((item) => item.id === selectedId) ?? insights[0] ?? null;
+
+  // Estado local para seleção instantânea (0ms) sem re-render do Server Component
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("leadId") ?? initialLeadId ?? insights[0]?.id ?? null);
+
+  useEffect(() => {
+    const urlLeadId = searchParams.get("leadId");
+    if (urlLeadId && urlLeadId !== selectedId) {
+      setSelectedId(urlLeadId);
+    }
+  }, [searchParams, selectedId]);
+
+  const selected = useMemo(() => {
+    return (selectedId ? insights.find((item) => item.id === selectedId) : null) ?? insights[0] ?? null;
+  }, [insights, selectedId]);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
     return term ? insights.filter((item) => `${item.name} ${item.phone} ${item.status}`.toLocaleLowerCase("pt-BR").includes(term)) : insights;
   }, [insights, query]);
+
   const refreshConnection = useCallback(async () => {
-    try { setConnection(await getWhatsAppConnection()); router.refresh(); } catch { /* server state remains usable */ }
-  }, [router]);
+    try {
+      const conn = await getWhatsAppConnection();
+      setConnection(conn);
+    } catch {
+      /* server state remains usable */
+    }
+  }, []);
+
   useEffect(() => {
     if (whatsappConnected) return;
     const initial = window.setTimeout(() => void refreshConnection(), 0);
-    const timer = window.setInterval(() => void getWhatsAppSessionStatus().then(refreshConnection).catch(() => undefined), 3_000);
+    const timer = window.setInterval(() => void getWhatsAppSessionStatus().then(refreshConnection).catch(() => undefined), 5_000);
     return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [refreshConnection, whatsappConnected]);
+
   useEffect(() => {
     const onRealtime = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.domain === "conversations" || detail?.domain === "whatsapp_connection") router.refresh();
+      if (detail?.domain === "conversations" || detail?.domain === "whatsapp_connection") {
+        router.refresh();
+      }
     };
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
     return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
   }, [router]);
+
   const select = (item: BrokerConversationInsight) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("leadId", item.id);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    setSelectedId(item.id);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("leadId", item.id);
+      window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    }
   };
+
+  const handleBack = () => {
+    setSelectedId(null);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("leadId");
+      const newQuery = params.toString() ? `?${params.toString()}` : "";
+      window.history.replaceState(null, "", `${pathname}${newQuery}`);
+    }
+  };
+
   return <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Central de insights do WhatsApp">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
       <div><div className="flex items-center gap-2"><Activity className="size-4 text-primary" /><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">WhatsApp sincronizado</p></div><h1 className="mt-0.5 text-base font-bold tracking-tight">Central de insights da carteira</h1><p className="mt-0.5 text-xs text-muted-foreground">Leia o contexto e responda diretamente pelo seu WhatsApp.</p></div>
@@ -90,7 +128,7 @@ export function LightConversationsView({ insights, initialLeadId, whatsappConnec
     </header>
     <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(17rem,0.75fr)_minmax(0,1.75fr)]">
       <aside className={cn("min-h-0 border-r border-border bg-card", selected ? "hidden lg:block" : "block")}><div className="border-b border-border p-3"><label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar na sua carteira" aria-label="Buscar lead ou cliente" /></label></div><ScrollArea className="h-[calc(100%-4.1rem)]"><div className="space-y-1.5 p-2">{filtered.map((item) => { const active = item.id === selected?.id; return <button key={item.id} type="button" onClick={() => select(item)} className={cn("w-full rounded-xl border px-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", active ? "border-primary/30 bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")} aria-current={active ? "page" : undefined}><div className="flex items-start justify-between gap-2"><span className="truncate text-sm font-semibold">{item.name}</span><Badge variant={healthVariant(item)} className="shrink-0 text-[10px]">{healthLabel(item)}</Badge></div><p className="mt-1 truncate text-xs text-muted-foreground">{item.latestMessage ? `${isOutbound(item.latestMessage.direction) ? "Você: " : "Cliente: "}${item.latestMessage.body}` : "Sem conversa sincronizada"}</p><p className="mt-2 text-[11px] text-muted-foreground">{item.latestMessage ? `Última interação ${formatDateTime(item.latestMessage.sentAt)}` : "Aguardando primeira interação"}</p></button>; })}{!filtered.length ? <EmptyPortfolioState /> : null}</div></ScrollArea></aside>
-      {selected ? <InsightDetail item={selected} onBack={() => router.replace(pathname, { scroll: false })} /> : <EmptyPortfolioState />}
+      {selected ? <InsightDetail item={selected} onBack={handleBack} /> : <EmptyPortfolioState />}
     </div>
   </section>;
 }
