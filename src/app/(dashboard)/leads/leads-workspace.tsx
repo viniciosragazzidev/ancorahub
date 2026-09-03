@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,8 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, SquaresFour, Target, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
@@ -115,6 +116,7 @@ export type LeadWorkspaceItem = {
   corretorNome: string | null;
   branchId: string | null;
   branchName: string | null;
+  qualificationDetails?: Record<string, unknown> | null;
 };
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
@@ -536,6 +538,11 @@ export function LeadsWorkspace({
               <span className="hidden sm:inline">Kanban do Funil</span>
               <span className="sm:hidden">Kanban</span>
             </TabsTrigger>
+            <TabsTrigger value="radar" className="text-xs gap-1.5">
+              <Sparkle className="size-4 text-primary" />
+              <span className="hidden sm:inline">Radar de Negociações (IA)</span>
+              <span className="sm:hidden">Radar IA</span>
+            </TabsTrigger>
           </TabsList>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
@@ -674,6 +681,16 @@ export function LeadsWorkspace({
           <p className="mt-3 text-xs text-muted-foreground">
             Arraste as colunas para reordenar. Use o botão "Colunas" para exibir/ocultar etapas.
           </p>
+        </TabsContent>
+
+        {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
+        <TabsContent value="radar" className="mt-4">
+          <NegotiationsRadarTab
+            leads={workspaceLeads}
+            branches={branches}
+            brokers={brokers}
+            contextRole={contextRole}
+          />
         </TabsContent>
       </Tabs>
 

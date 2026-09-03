@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+﻿import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -408,6 +408,7 @@ async function LeadsPageContent({
         corretorNome: schema.user.name,
         branchId: schema.leads.branchId,
         branchName: schema.branches.name,
+        qualificationDetails: schema.leads.qualificationDetails,
       })
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
@@ -655,6 +656,7 @@ async function LeadsPageContent({
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
                 serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
+                qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
               }))}
               qualifyingLeads={qualifyingLeads}
               queues={activeQueues}
