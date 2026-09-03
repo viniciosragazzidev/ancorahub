@@ -29,6 +29,7 @@ import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-pane
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
+import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,7 @@ export default async function LeadDistributionPage({
     routingRules,
     brokerSummary,
     dutyRoster,
+    tenantSlaSettings,
   ] = await Promise.all([
     db
       .select({
@@ -331,6 +333,15 @@ export default async function LeadDistributionPage({
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
     }),
     getDutyRosterSnapshot(context),
+    db
+      .select({
+        slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
+        autoRedistributeOnFeedbackTimeout: schema.tenants.autoRedistributeOnFeedbackTimeout,
+      })
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, context.tenantId))
+      .limit(1)
+      .then((r) => r[0] ?? { slaFirstContactMinutes: "15", autoRedistributeOnFeedbackTimeout: true }),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -460,6 +471,11 @@ export default async function LeadDistributionPage({
                 campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
                 adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
                 canEdit
+              />
+              <BrokerAcceptanceSlaPanel
+                initialMinutes={Number(tenantSlaSettings?.slaFirstContactMinutes) || 15}
+                initialAutoRedistribute={tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true}
+                canEdit={context.role === "director" || context.role === "manager"}
               />
               <DistributionPolicyPanel
                 canEdit={context.role === "director"}

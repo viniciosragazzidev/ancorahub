@@ -18,8 +18,8 @@ export type AiSettings = {
 export const defaultModels: Record<AiProvider, string> = {
   groq: "llama-3.3-70b-versatile",
   openai: "gpt-4o-mini",
-  google: "gemini-2.5-flash",
-  openrouter: "google/gemma-2-9b-it:free",
+  google: "gemini-2.0-flash",
+  openrouter: "meta-llama/llama-3.3-70b-instruct:free",
 };
 
 export type AiCompletionRequest = {

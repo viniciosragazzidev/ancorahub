@@ -56,7 +56,7 @@ const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
-export const DEFAULT_OPENROUTER_MODEL = "google/gemma-2-9b-it:free";
+export const DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 const LEGACY_OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet";
 
 type ProviderConfig = {

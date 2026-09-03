@@ -137,11 +137,27 @@ export async function analyzeLeadConversation(
     openrouterKey: aiSettings.openrouterApiKey,
   };
 
-  const modelInstance = getAiModelInstance(
-    aiSettings.primaryProvider,
-    aiSettings.primaryModel,
-    keys,
+  const candidateModels: Array<{ provider: any; model: string }> = [
+    { provider: aiSettings.primaryProvider, model: aiSettings.primaryModel },
+  ];
+
+  if (aiSettings.fallbackProvider && aiSettings.fallbackProvider !== "none" && aiSettings.fallbackModel) {
+    candidateModels.push({ provider: aiSettings.fallbackProvider, model: aiSettings.fallbackModel });
+  }
+
+  candidateModels.push(
+    { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "google", model: "gemini-2.0-flash" },
   );
+
+  const seenCandidates = new Set<string>();
+  const filteredCandidates = candidateModels.filter((c) => {
+    const key = `${c.provider}:${c.model}`;
+    if (seenCandidates.has(key)) return false;
+    seenCandidates.add(key);
+    return true;
+  });
 
   const systemPrompt = `Você é um analista sênior de inteligência comercial do CRM CorreTop / Âncora Saúde.
 Sua missão é analisar transcrições de conversas no WhatsApp entre clientes e corretores de planos de saúde/seguros e produzir um diagnóstico comercial acionável.
@@ -158,21 +174,34 @@ Orientações:
 
   const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}`;
 
-  let assessment: ConversationAssessment;
-  try {
-    const aiResult = await generateObject({
-      model: modelInstance,
-      schema: ConversationAssessmentSchema,
-      system: systemPrompt,
-      prompt: userPrompt,
-      temperature: 0.2,
-    });
-    assessment = aiResult.object;
-  } catch (error) {
-    console.error("[conversation-intelligence] Falha na chamada da IA:", error);
+  let assessment: ConversationAssessment | null = null;
+  let modelUsed = `${aiSettings.primaryProvider}/${aiSettings.primaryModel}`;
+  let lastError: unknown = null;
+
+  for (const candidate of filteredCandidates) {
+    try {
+      const modelInstance = getAiModelInstance(candidate.provider, candidate.model, keys);
+      const aiResult = await generateObject({
+        model: modelInstance,
+        schema: ConversationAssessmentSchema,
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.2,
+      });
+      assessment = aiResult.object;
+      modelUsed = `${candidate.provider}/${candidate.model}`;
+      break;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[conversation-intelligence] Fallback: falha com ${candidate.provider}/${candidate.model}, tentando próximo...`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  if (!assessment) {
+    console.error("[conversation-intelligence] Todas as tentativas de IA falharam:", lastError);
     return {
       analyzed: false,
-      reason: `Falha ao processar análise da IA: ${error instanceof Error ? error.message : "erro desconhecido"}`,
+      reason: `Falha ao processar análise da IA: ${lastError instanceof Error ? lastError.message : "erro desconhecido"}`,
     };
   }
 
@@ -191,7 +220,7 @@ Orientações:
     lastAnalyzedAt: now,
     lastAnalyzedMessageId: messages[0]?.id ?? null,
     conversationRevision: messages.length,
-    aiModel: `${aiSettings.primaryProvider}/${aiSettings.primaryModel}`,
+    aiModel: modelUsed,
   };
 
   // 7. Persistir o feedback e aplicar transição segura se autorizado
