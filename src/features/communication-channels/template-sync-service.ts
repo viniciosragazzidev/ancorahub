@@ -1,10 +1,9 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, notInArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, notInArray, isNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
-import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { META_CLOUD_PROVIDER } from "./types";
 import {
   createWabaMessageTemplate,
@@ -56,11 +55,12 @@ export async function resolveMetaChannelCredentials(tenantId: string) {
     .where(
       and(
         eq(schema.communicationChannels.tenantId, tenantId),
-        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
         eq(schema.communicationChannels.status, "active"),
+        isNull(schema.communicationChannels.branchId),
+        eq(schema.communicationChannels.isDefault, true),
       ),
     )
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
     .limit(1);
 
   if (!channel || !channel.wabaId || !channel.accessTokenCiphertext) {
@@ -69,8 +69,7 @@ export async function resolveMetaChannelCredentials(tenantId: string) {
 
   const encryptionKey =
     process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim() ||
-    process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim() ||
-    getMetaCloudServerConfig().tokenEncryptionKey;
+    process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim();
   if (!encryptionKey) {
     throw new Error("Chave de criptografia de tokens do WhatsApp não configurada.");
   }

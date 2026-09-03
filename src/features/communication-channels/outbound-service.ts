@@ -5,7 +5,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, ne, or } from "dri
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
-import { decryptChannelSecret, resolveTokenEncryptionKey } from "./secret-crypto";
+import { decryptChannelSecret } from "./secret-crypto";
 import { MetaCloudApiError, sendMetaCloudTemplate, sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables, type MetaWhatsAppTemplatePurpose } from "./templates";
@@ -499,7 +499,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       )).limit(1);
       if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
       const phoneNumberId = channel.phoneNumberId;
-      const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, resolveTokenEncryptionKey());
+      const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
 
       let metaResponse: { messages?: Array<{ id: string }> } = {};
       if (row.messageType === "text") {

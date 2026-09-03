@@ -1,12 +1,12 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
-import { decryptChannelSecret, resolveTokenEncryptionKey } from "./secret-crypto";
+import { decryptChannelSecret } from "./secret-crypto";
 import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { META_CLOUD_PROVIDER } from "./types";
@@ -31,17 +31,17 @@ export async function getPreferredMetaCloudChannel(input: { tenantId: string; br
     .where(
       and(
         eq(schema.communicationChannels.tenantId, input.tenantId),
-        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
         eq(schema.communicationChannels.status, "active"),
+        eq(schema.communicationChannels.registrationStatus, "registered"),
       ),
     )
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
     .limit(1);
   return channel ?? null;
 }
 
 export async function sendMetaCloudChannelText(input: { channel: typeof schema.communicationChannels.$inferSelect; to: string; body: string }) {
-  if (input.channel.registrationStatus && input.channel.registrationStatus !== "registered" && input.channel.registrationStatus !== "legacy_unverified") {
+  if (input.channel.registrationStatus !== "registered") {
     throw new Error("O número oficial ainda não foi ativado para a Cloud API.");
   }
   if (!input.channel.phoneNumberId || !input.channel.accessTokenCiphertext) {
@@ -49,7 +49,7 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
   }
   const accessToken = decryptChannelSecret(
     input.channel.accessTokenCiphertext,
-    resolveTokenEncryptionKey(),
+    getMetaCloudServerConfig().tokenEncryptionKey,
   );
   const response = await sendMetaCloudText({
     phoneNumberId: input.channel.phoneNumberId,
@@ -65,8 +65,7 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
 import { normalizePhone } from "@/shared/utils/phone";
 export { normalizePhone };
 
-export function samePhone(left?: string | null, right?: string | null) {
-  if (!left || !right) return false;
+export function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
   const b = normalizePhone(right);
   if (!a || !b) return false;
