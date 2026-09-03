@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -74,7 +74,11 @@ export async function getWhatsAppDiagnosticStatus(
     .where(
       and(
         eq(schema.communicationChannels.tenantId, tenantId),
-        eq(schema.communicationChannels.provider, "meta_cloud"),
+        inArray(schema.communicationChannels.provider, [
+          "meta_cloud_whatsapp",
+          "meta_cloud_api",
+          "meta_cloud",
+        ]),
       ),
     )
     .orderBy(
@@ -198,6 +202,8 @@ import {
   getPreferredMetaCloudChannel,
   sendMetaCloudChannelText,
 } from "@/features/communication-channels/service";
+import { sendMetaCloudTemplateTest } from "@/features/communication-channels/meta-graph-templates-client";
+import { decryptChannelSecret, resolveTokenEncryptionKey } from "@/features/communication-channels/secret-crypto";
 import { getOpenWaSessionStatus, sendOpenWaText } from "@/lib/integrations/openwa";
 
 export async function sendWhatsAppTestMessage(
@@ -223,20 +229,81 @@ export async function sendWhatsAppTestMessage(
   let initialStatus: "sent" | "delivered" | "read" | "failed" = "failed";
   let delivered = false;
   let errorReason: string | null = null;
+  let templateUsed: string | null = null;
 
   // 1. Tenta envio pelo canal oficial Meta Cloud API
   try {
     const officialChannel = await getPreferredMetaCloudChannel({ tenantId, userId: actorUserId });
-    if (officialChannel) {
-      const sent = await sendMetaCloudChannelText({
-        channel: officialChannel,
-        to: normalizedNumber,
-        body: data.messageText,
-      });
-      messageId = sent.messageId || messageId;
-      acceptedByMeta = true;
-      initialStatus = "sent";
-      delivered = true;
+    if (officialChannel && officialChannel.phoneNumberId && officialChannel.accessTokenCiphertext) {
+      const accessToken = decryptChannelSecret(officialChannel.accessTokenCiphertext, resolveTokenEncryptionKey());
+
+      if (data.messageType === "approved_template") {
+        const [firstTemplate] = await db
+          .select({ name: schema.metaWhatsAppTemplates.name, language: schema.metaWhatsAppTemplates.language })
+          .from(schema.metaWhatsAppTemplates)
+          .where(and(eq(schema.metaWhatsAppTemplates.tenantId, tenantId), eq(schema.metaWhatsAppTemplates.status, "APPROVED")))
+          .limit(1);
+
+        const templateName = data.templateId || firstTemplate?.name || "hello_world";
+        const language = firstTemplate?.language || "pt_BR";
+        templateUsed = templateName;
+
+        const sent = await sendMetaCloudTemplateTest(
+          officialChannel.phoneNumberId,
+          accessToken,
+          normalizedNumber,
+          templateName,
+          language,
+        );
+        messageId = sent.messages?.[0]?.id || messageId;
+        acceptedByMeta = true;
+        initialStatus = "sent";
+        delivered = true;
+      } else {
+        try {
+          const sent = await sendMetaCloudChannelText({
+            channel: officialChannel,
+            to: normalizedNumber,
+            body: data.messageText,
+          });
+          messageId = sent.messageId || messageId;
+          acceptedByMeta = true;
+          initialStatus = "sent";
+          delivered = true;
+        } catch (textErr) {
+          const providerCode =
+            textErr && typeof textErr === "object" && "code" in textErr && typeof textErr.code === "number"
+              ? textErr.code
+              : undefined;
+
+          // Se a Meta recusar texto livre por estar fora da janela de 24h (código 131047), tenta enviar o template oficial
+          if (providerCode === 131047 || (textErr instanceof Error && textErr.message.includes("24 hour"))) {
+            const [firstTemplate] = await db
+              .select({ name: schema.metaWhatsAppTemplates.name, language: schema.metaWhatsAppTemplates.language })
+              .from(schema.metaWhatsAppTemplates)
+              .where(and(eq(schema.metaWhatsAppTemplates.tenantId, tenantId), eq(schema.metaWhatsAppTemplates.status, "APPROVED")))
+              .limit(1);
+
+            const templateName = data.templateId || firstTemplate?.name || "hello_world";
+            const language = firstTemplate?.language || "pt_BR";
+            templateUsed = templateName;
+
+            const sent = await sendMetaCloudTemplateTest(
+              officialChannel.phoneNumberId,
+              accessToken,
+              normalizedNumber,
+              templateName,
+              language,
+            );
+            messageId = sent.messages?.[0]?.id || messageId;
+            acceptedByMeta = true;
+            initialStatus = "sent";
+            delivered = true;
+          } else {
+            throw textErr;
+          }
+        }
+      }
     } else {
       // 2. Se não houver Meta Cloud API, tenta conexão WAHA/OpenWA
       const [connection] = await db
@@ -268,7 +335,7 @@ export async function sendWhatsAppTestMessage(
       err && typeof err === "object" && "code" in err && typeof err.code === "number"
         ? err.code
         : undefined;
-    console.warn("[whatsapp-diagnostic] test_message.rejected", { providerCode });
+    console.warn("[whatsapp-diagnostic] test_message.rejected", { providerCode, message: err instanceof Error ? err.message : String(err) });
     errorReason = getWhatsAppTestFailureMessage(err);
   }
 
