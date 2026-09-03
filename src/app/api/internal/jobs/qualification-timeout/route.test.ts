@@ -1,12 +1,17 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { runQualificationTimeoutSweep } = vi.hoisted(() => ({
+const { runQualificationTimeoutSweep, runSlaSweep } = vi.hoisted(() => ({
   runQualificationTimeoutSweep: vi.fn(),
+  runSlaSweep: vi.fn(),
 }));
 
 vi.mock("@/features/ai-agent/qualification-timeout-sweep", () => ({
   runQualificationTimeoutSweep,
+}));
+
+vi.mock("@/features/leads/sla", () => ({
+  runSlaSweep,
 }));
 
 import { GET } from "./route";
@@ -26,6 +31,7 @@ describe("qualification timeout internal job", () => {
 
   it("runs the timeout sweep only after scheduler authentication", async () => {
     runQualificationTimeoutSweep.mockResolvedValue({ tenantsChecked: 1, timedOutLeads: 2, distributedLeads: 2 });
+    runSlaSweep.mockResolvedValue({ tenants: 1, unworked: 0, warnings: 0, stalled: 0, notifications: 0 });
 
     const response = await GET(new NextRequest("http://localhost/api/internal/jobs/qualification-timeout", {
       headers: { authorization: "Bearer test-cron-secret" },
@@ -35,6 +41,7 @@ describe("qualification timeout internal job", () => {
     expect(await response.json()).toEqual({
       success: true,
       result: { tenantsChecked: 1, timedOutLeads: 2, distributedLeads: 2 },
+      slaResult: { tenants: 1, unworked: 0, warnings: 0, stalled: 0, notifications: 0 },
     });
   });
 });

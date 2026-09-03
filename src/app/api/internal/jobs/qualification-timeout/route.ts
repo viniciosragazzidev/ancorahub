@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { runQualificationTimeoutSweep } from "@/features/ai-agent/qualification-timeout-sweep";
+import { runSlaSweep } from "@/features/leads/sla";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +14,11 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const result = await runQualificationTimeoutSweep();
-    return NextResponse.json({ success: true, result });
+    const [result, slaResult] = await Promise.all([
+      runQualificationTimeoutSweep(),
+      runSlaSweep(),
+    ]);
+    return NextResponse.json({ success: true, result, slaResult });
   } catch (error) {
     const message = error instanceof Error ? error.message.replace(/[\r\n]+/g, " ").slice(0, 180) : "unknown_error";
     console.error("[qualification-timeout-job] failed", { message });
