@@ -163,34 +163,28 @@ export async function setMetaCloudChannelStatusAction(channelId: string, active:
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: active ? "meta_cloud_channel_activated" : "meta_cloud_channel_deactivated" });
 }
 
-/** Disconnects the CRM while retaining auditable conversation history. */
+/** Disconnects the CRM and completely removes the channel so the user can log in a new number. */
 export async function disconnectMetaCloudChannelAction(channelId: string) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") {
-    throw new Error("Somente o Diretor ou Gestor pode desconectar canais oficiais.");
+    throw new Error("Somente o Diretor pode desconectar canais oficiais.");
   }
   const db = getDatabase();
-  const [channel] = await db
-    .select({ id: schema.communicationChannels.id })
-    .from(schema.communicationChannels)
-    .where(
+  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
+    or(
+      eq(schema.communicationChannels.id, channelId),
       and(
         eq(schema.communicationChannels.tenantId, context.tenantId),
-        or(
-          eq(schema.communicationChannels.id, channelId),
-          inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-        ),
-      ),
-    )
-    .limit(1);
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+      )
+    ),
+    eq(schema.communicationChannels.tenantId, context.tenantId),
+  )).limit(1);
   if (!channel) throw new Error("Canal oficial não encontrado.");
 
   const now = new Date();
   await db.transaction(async (tx) => {
-    await tx.update(schema.communicationChannels).set({
-      status: "inactive", isDefault: false, accessTokenCiphertext: null,
-      tokenKeyVersion: null, tokenExpiresAt: null, registrationPinCiphertext: null, updatedAt: now,
-    }).where(eq(schema.communicationChannels.id, channel.id));
+    await tx.delete(schema.communicationChannels).where(eq(schema.communicationChannels.id, channel.id));
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "communication_channel",
       entidadeId: channel.id, acao: "meta_cloud_channel_disconnected", createdAt: now,

@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -210,10 +210,13 @@ export async function disconnectManualMetaConnectionAction(): Promise<ManualMeta
     const context = await requireManualMetaAccess();
     const db = getDatabase();
     const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels)
-      .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER), eq(schema.communicationChannels.isDefault, true))).limit(1);
+      .where(and(
+        eq(schema.communicationChannels.tenantId, context.tenantId),
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+      )).limit(1);
     if (!channel) throw new Error("Nenhuma conta Meta conectada.");
     await db.transaction(async (tx) => {
-      await tx.update(schema.communicationChannels).set({ status: "inactive", isDefault: false, updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channel.id));
+      await tx.delete(schema.communicationChannels).where(eq(schema.communicationChannels.id, channel.id));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: channel.id, acao: "meta_manual.disconnected" });
     });
     return { success: true };
