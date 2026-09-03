@@ -12,6 +12,7 @@ const { refreshMock, disconnectMock, toastSuccessMock, toastErrorMock } = vi.hoi
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccessMock, error: toastErrorMock } }));
 vi.mock("../actions", () => ({ completeMetaCloudChannelRegistrationAction: vi.fn(), disconnectMetaCloudChannelAction: disconnectMock, setMetaCloudChannelStatusAction: vi.fn() }));
+vi.mock("../manual-meta-actions", () => ({ connectManualMetaConnectionAction: vi.fn() }));
 
 import { MetaCloudSetupCard } from "./meta-cloud-setup-card";
 

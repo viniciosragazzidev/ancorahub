@@ -4,12 +4,15 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { ArrowsClockwise, Pause, Trash } from "@/components/huge-icons";
+import { ArrowsClockwise, Key, Pause, Plus, Trash } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 import { completeMetaCloudChannelRegistrationAction, disconnectMetaCloudChannelAction, setMetaCloudChannelStatusAction } from "../actions";
+import { connectManualMetaConnectionAction } from "../manual-meta-actions";
 
 type Channel = {
   id: string;
@@ -48,6 +51,11 @@ export function MetaCloudSetupCard({ enabled, configured, missing, companyAccoun
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [businessId, setBusinessId] = useState("");
+  const [wabaId, setWabaId] = useState("");
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const status = accountStatus(companyAccount, enabled, configured);
 
   const changeStatus = (active: boolean) => {
@@ -69,10 +77,37 @@ export function MetaCloudSetupCard({ enabled, configured, missing, companyAccoun
       try {
         await disconnectMetaCloudChannelAction(companyAccount.id);
         setDisconnectOpen(false);
-        toast.success("Número desconectado do CRM.", { description: "O histórico foi preservado." });
+        toast.success("Número desconectado do CRM.", { description: "O canal foi liberado para nova conexão." });
         router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Não foi possível desconectar o número agora.");
+      }
+    });
+  };
+
+  const handleConnectManual = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessId.trim() || !wabaId.trim() || !phoneNumberId.trim() || !accessToken.trim()) {
+      toast.error("Preencha todos os campos obrigatórios para conectar o número.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("businessId", businessId.trim());
+        formData.set("wabaId", wabaId.trim());
+        formData.set("phoneNumberId", phoneNumberId.trim());
+        formData.set("accessToken", accessToken.trim());
+        const res = await connectManualMetaConnectionAction({}, formData);
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
+        setConnectOpen(false);
+        toast.success("Número oficial Meta conectado com sucesso!");
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Erro ao conectar número oficial.");
       }
     });
   };
@@ -96,9 +131,120 @@ export function MetaCloudSetupCard({ enabled, configured, missing, companyAccoun
       <div aria-live="polite" className={`rounded-lg border p-4 ${status.tone}`}><p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">Status operacional</p><p className="mt-1 text-primary text-lg font-semibold">{status.label}</p></div>
       {!enabled ? <p className="text-sm text-muted-foreground">A capacidade foi desativada globalmente pelo Super-admin.</p> : null}
       {enabled && !configured ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm"><p className="font-medium">Configuração técnica indisponível</p><p className="mt-1 text-muted-foreground">O suporte precisa concluir as variáveis seguras do servidor: {missing.join(", ")}.</p></div> : null}
-      {enabled && configured && !companyAccount ? <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-sm font-medium">Nenhum número oficial conectado</p><p className="mt-1 text-xs text-muted-foreground">Use o botão abaixo para escolher a conta WhatsApp Business e o número corporativo.</p></div> : null}
+      {enabled && configured && !companyAccount ? (
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Nenhum número oficial conectado</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Use o botão abaixo para escolher a conta WhatsApp Business e o número corporativo.
+              </p>
+            </div>
+            {canManage ? (
+              <Button onClick={() => setConnectOpen(true)} className="shrink-0">
+                <Plus className="size-4 mr-1.5" /> Conectar número oficial
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {companyAccount ? <>{companyAccount.registrationStatus === "failed" || companyAccount.registrationStatus === "legacy_unverified" ? <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm"><p className="font-medium">Este número ainda precisa de ativação técnica</p><p className="mt-1 text-muted-foreground">A confirmação do telefone acontece na Meta. O CRM só libera envios depois que concluir o registro seguro na Cloud API.</p></div> : null}<div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-3"><Detail label="Nome verificado" value={companyAccount.verifiedName ?? "Não informado"} /><Detail label="Número oficial" value={companyAccount.displayPhoneNumber ?? "Não informado"} /><Detail label="Qualidade" value={companyAccount.qualityRating ?? "Ainda não disponível"} /><Detail label="Limite de mensagens" value={companyAccount.messagingLimit ?? "Não informado"} /><Detail label="Último webhook" value={formatDate(companyAccount.lastWebhookAt)} /><Detail label="Registro Cloud API" value={!companyAccount.registrationStatus || companyAccount.registrationStatus === "registered" ? formatDate(companyAccount.registeredAt ?? null) : "Aguardando confirmação"} />{showTechnicalDetails ? <><Detail label="Business ID" value={companyAccount.businessId ?? "—"} mono /><Detail label="WABA ID" value={companyAccount.wabaId ?? "—"} mono /><Detail label="Phone Number ID" value={companyAccount.phoneNumberId ?? "—"} mono /></> : null}</div>{canManage && (companyAccount.registrationStatus === "failed" || companyAccount.registrationStatus === "legacy_unverified") ? <div className="flex flex-wrap gap-2"><Button disabled={pending} onClick={completeRegistration} size="sm"><ArrowsClockwise />Ativar número na Cloud API</Button><Button disabled={pending} onClick={() => setDisconnectOpen(true)} size="sm" variant="destructive"><Trash />Desconectar número</Button></div> : canManage && (!companyAccount.registrationStatus || companyAccount.registrationStatus === "registered") ? <div className="flex flex-wrap gap-2"><Button disabled={pending} onClick={() => changeStatus(companyAccount.status !== "active")} size="sm" variant="outline">{companyAccount.status === "active" ? <><Pause />Pausar</> : "Reativar"}</Button><Button disabled={pending} onClick={() => setDisconnectOpen(true)} size="sm" variant="destructive"><Trash />Desconectar número</Button></div> : canManage ? <Button disabled={pending} onClick={() => setDisconnectOpen(true)} size="sm" variant="destructive"><Trash />Desconectar número</Button> : null}</> : null}
-      <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}><DialogPopup className="sm:max-w-md"><DialogHeader><DialogTitle>Desconectar este número do CRM?</DialogTitle><DialogDescription>Novos envios e recebimentos oficiais serão interrompidos. O histórico, auditoria e campanhas permanecem preservados; você poderá reconectar depois.</DialogDescription></DialogHeader><DialogFooter><Button disabled={pending} onClick={() => setDisconnectOpen(false)} variant="outline">Cancelar</Button><Button disabled={pending} onClick={disconnect} variant="destructive">{pending ? "Desconectando…" : "Desconectar número"}</Button></DialogFooter></DialogPopup></Dialog>
+      
+      {/* Modal de Conexão do Número Oficial */}
+      <Dialog open={connectOpen} onOpenChange={setConnectOpen}>
+        <DialogPopup className="sm:max-w-lg">
+          <form onSubmit={handleConnectManual}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Key className="size-5 text-primary" /> Conectar WhatsApp Oficial (Meta Cloud)
+              </DialogTitle>
+              <DialogDescription>
+                Informe os dados da sua conta Meta Cloud API do WhatsApp Business para vincular o número ao CRM.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 py-4 text-sm">
+              <div className="space-y-1">
+                <Label htmlFor="businessId">Business ID (ID do Gerenciador de Negócios)</Label>
+                <Input
+                  id="businessId"
+                  placeholder="Ex: 123456789012345"
+                  value={businessId}
+                  onChange={(e) => setBusinessId(e.target.value)}
+                  disabled={pending}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="wabaId">WABA ID (Conta WhatsApp)</Label>
+                  <Input
+                    id="wabaId"
+                    placeholder="Ex: 123456789012345"
+                    value={wabaId}
+                    onChange={(e) => setWabaId(e.target.value)}
+                    disabled={pending}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="phoneNumberId">Phone Number ID (ID do Número)</Label>
+                  <Input
+                    id="phoneNumberId"
+                    placeholder="Ex: 123456789012345"
+                    value={phoneNumberId}
+                    onChange={(e) => setPhoneNumberId(e.target.value)}
+                    disabled={pending}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="accessToken">Token de Acesso Permanente da Meta</Label>
+                <Input
+                  id="accessToken"
+                  type="password"
+                  placeholder="EAAG..."
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  disabled={pending}
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Obtenha este token em <em>Meta Business Suite &gt; Usuários do Sistema &gt; Gerar Token</em> com as permissões <code>whatsapp_business_management</code> e <code>whatsapp_business_messaging</code>.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button disabled={pending} type="button" onClick={() => setConnectOpen(false)} variant="outline">
+                Cancelar
+              </Button>
+              <Button disabled={pending} type="submit">
+                {pending ? "Validando na Meta..." : "Validar e Conectar Número"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogPopup>
+      </Dialog>
+
+      {/* Modal de Desconexão */}
+      <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
+        <DialogPopup className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Desconectar este número do CRM?</DialogTitle>
+            <DialogDescription>
+              Novos envios e recebimentos oficiais serão interrompidos. O histórico, auditoria e campanhas permanecem preservados; você poderá reconectar depois.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button disabled={pending} onClick={() => setDisconnectOpen(false)} variant="outline">
+              Cancelar
+            </Button>
+            <Button disabled={pending} onClick={disconnect} variant="destructive">
+              {pending ? "Desconectando…" : "Desconectar número"}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </CardContent>
   </Card>;
 }
