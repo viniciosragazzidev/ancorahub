@@ -45,12 +45,17 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
   };
 
   const completeIfReady = async () => {
-    const result = finishRef.current;
     const code = codeRef.current;
-    if (!code || !result?.businessId || !result.wabaId || !result.phoneNumberId || completingRef.current) return;
+    if (!code || completingRef.current) return;
     completingRef.current = true;
+    const result = finishRef.current;
     try {
-      await completeMetaEmbeddedSignupAction({ code, businessId: result.businessId, wabaId: result.wabaId, phoneNumberId: result.phoneNumberId });
+      await completeMetaEmbeddedSignupAction({
+        code,
+        businessId: result?.businessId,
+        wabaId: result?.wabaId,
+        phoneNumberId: result?.phoneNumberId,
+      });
       setMessage("Cadastro concluído. O CRM confirmou a ativação do número na Cloud API.");
       window.location.assign("/integrations/whatsapp?channel=connected");
     } catch (error) {
@@ -64,11 +69,20 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const payload = parseMetaSignupMessage(event.data) as { type?: string; event?: string; data?: { business_id?: string; waba_id?: string; phone_number_id?: string } } | null;
+      const payload = parseMetaSignupMessage(event.data) as {
+        type?: string;
+        event?: string;
+        data?: { business_id?: string; waba_id?: string; phone_number_id?: string; code?: string };
+      } | null;
       if (!META_ORIGINS.has(event.origin) || payload?.type !== "WA_EMBEDDED_SIGNUP") return;
       if (payload.event === "FINISH") {
         const data = payload.data ?? {};
-        finishRef.current = { businessId: data.business_id, wabaId: data.waba_id, phoneNumberId: data.phone_number_id };
+        if (data.code) codeRef.current = data.code;
+        finishRef.current = {
+          businessId: data.business_id,
+          wabaId: data.waba_id,
+          phoneNumberId: data.phone_number_id,
+        };
         void completeIfReady();
       }
       if (payload.event === "CANCEL" || payload.event === "ERROR") {
@@ -102,17 +116,28 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
         setMessage("A conexão segura da Meta não ficou disponível. Atualize a página e tente novamente.");
         return;
       }
-      window.FB.init({ appId, cookie: true, xfbml: false, version: "v25.0" });
+      window.FB.init({ appId, cookie: true, xfbml: false, version: "v26.0" });
       window.FB.login((response) => {
-      codeRef.current = response.authResponse?.code ?? null;
-      if (!codeRef.current) {
-        clearSignupTimeout();
-        setLoading(false);
-        setMessage("A Meta não retornou uma autorização. Tente novamente.");
-        return;
-      }
-      void completeIfReady();
-      }, { config_id: configId, response_type: "code", override_default_response_type: true, extras: { version: "v4", sessionInfoVersion: "3" } });
+        codeRef.current = response.authResponse?.code ?? null;
+        if (!codeRef.current) {
+          clearSignupTimeout();
+          setLoading(false);
+          setMessage("A Meta não retornou uma autorização. Tente novamente.");
+          return;
+        }
+        setTimeout(() => {
+          void completeIfReady();
+        }, 100);
+      }, {
+        config_id: configId,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          feature: "whatsapp_embedded_signup",
+          version: "v4",
+          sessionInfoVersion: "3",
+        },
+      });
     };
     if (window.FB) {
       launch();
