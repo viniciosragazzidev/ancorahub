@@ -17,15 +17,9 @@ declare global {
   }
 }
 
-const META_ORIGINS = new Set([
-  "https://www.facebook.com",
-  "https://web.facebook.com",
-  "https://business.facebook.com",
-  "https://facebook.com",
-  "https://developers.facebook.com",
-]);
+const META_ORIGINS = new Set(["https://www.facebook.com", "https://web.facebook.com"]);
 type SignupResult = { businessId?: string; wabaId?: string; phoneNumberId?: string };
-const SIGNUP_TIMEOUT_MS = 180_000;
+const SIGNUP_TIMEOUT_MS = 90_000;
 
 function parseMetaSignupMessage(value: unknown) {
   if (typeof value !== "string") return value;
@@ -70,23 +64,11 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (!META_ORIGINS.has(event.origin)) return;
-      const payload = parseMetaSignupMessage(event.data) as {
-        type?: string;
-        event?: string;
-        data?: { business_id?: string; waba_id?: string; phone_number_id?: string; code?: string };
-      } | null;
-
-      if (payload?.type !== "WA_EMBEDDED_SIGNUP") return;
-
+      const payload = parseMetaSignupMessage(event.data) as { type?: string; event?: string; data?: { business_id?: string; waba_id?: string; phone_number_id?: string } } | null;
+      if (!META_ORIGINS.has(event.origin) || payload?.type !== "WA_EMBEDDED_SIGNUP") return;
       if (payload.event === "FINISH") {
         const data = payload.data ?? {};
-        if (data.code) codeRef.current = data.code;
-        finishRef.current = {
-          businessId: data.business_id,
-          wabaId: data.waba_id,
-          phoneNumberId: data.phone_number_id,
-        };
+        finishRef.current = { businessId: data.business_id, wabaId: data.waba_id, phoneNumberId: data.phone_number_id };
         void completeIfReady();
       }
       if (payload.event === "CANCEL" || payload.event === "ERROR") {
@@ -113,49 +95,39 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
       setLoading(false);
       setMessage("A Meta não concluiu o cadastro em tempo. Feche a janela, confira a conta e tente novamente.");
     }, SIGNUP_TIMEOUT_MS);
-
-    // Abre a URL oficial de Onboarding da Meta em popup
-    const extras = JSON.stringify({ sessionInfoVersion: "3", version: "v4" });
-    const popupUrl = `https://business.facebook.com/messaging/whatsapp/onboard/?app_id=${encodeURIComponent(appId)}&config_id=${encodeURIComponent(configId)}&extras=${encodeURIComponent(extras)}`;
-    
-    const width = 800;
-    const height = 750;
-    const left = Math.max(0, (window.innerWidth - width) / 2 + window.screenX);
-    const top = Math.max(0, (window.innerHeight - height) / 2 + window.screenY);
-    const popup = window.open(
-      popupUrl,
-      "meta_whatsapp_signup",
-      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`
-    );
-
-    // Fallback com SDK FB.login caso popups diretos sejam bloqueados ou se use o fluxo nativo
-    const launchSdk = () => {
-      if (!window.FB) return;
+    const launch = () => {
+      if (!window.FB) {
+        clearSignupTimeout();
+        setLoading(false);
+        setMessage("A conexão segura da Meta não ficou disponível. Atualize a página e tente novamente.");
+        return;
+      }
       window.FB.init({ appId, cookie: true, xfbml: false, version: "v25.0" });
       window.FB.login((response) => {
-        if (response.authResponse?.code) {
-          codeRef.current = response.authResponse.code;
-          void completeIfReady();
-        }
-      }, {
-        config_id: configId,
-        response_type: "code",
-        override_default_response_type: true,
-        extras: { version: "v4", sessionInfoVersion: "3" },
-      });
-    };
-
-    if (!popup || popup.closed) {
-      if (window.FB) {
-        launchSdk();
-      } else {
-        const script = document.createElement("script");
-        script.src = "https://connect.facebook.net/pt_BR/sdk.js";
-        script.async = true;
-        script.onload = launchSdk;
-        document.head.appendChild(script);
+      codeRef.current = response.authResponse?.code ?? null;
+      if (!codeRef.current) {
+        clearSignupTimeout();
+        setLoading(false);
+        setMessage("A Meta não retornou uma autorização. Tente novamente.");
+        return;
       }
+      void completeIfReady();
+      }, { config_id: configId, response_type: "code", override_default_response_type: true, extras: { version: "v4", sessionInfoVersion: "3" } });
+    };
+    if (window.FB) {
+      launch();
+      return;
     }
+    const script = document.createElement("script");
+    script.src = "https://connect.facebook.net/pt_BR/sdk.js";
+    script.async = true;
+    script.onload = launch;
+    script.onerror = () => {
+      clearSignupTimeout();
+      setLoading(false);
+      setMessage("Não foi possível carregar a conexão segura da Meta.");
+    };
+    document.head.appendChild(script);
   };
 
   return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Conectar número oficial</CardTitle><CardDescription>Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. A confirmação do telefone acontece dentro da Meta; o CRM conclui a ativação técnica após o término.</CardDescription></CardHeader><CardContent className="space-y-3"><Button onClick={start} disabled={disabled || loading} className="w-full">{loading ? "Conectando com a Meta…" : "Conectar número com Facebook"}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("concluído") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
