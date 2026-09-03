@@ -52,4 +52,11 @@ describe("MetaEmbeddedSignupCard", () => {
     expect(await screen.findByText("Cadastro concluído. O CRM confirmou a ativação do número na Cloud API.")).toBeInTheDocument();
     expect(assignMock).toHaveBeenCalledWith("/integrations/whatsapp?channel=connected");
   });
+
+  it("mantém a ação visível e explica o bloqueio quando a configuração do servidor está indisponível", () => {
+    render(<MetaEmbeddedSignupCard appId="" configId="" disabled unavailableReason="A configuração segura da Meta está incompleta: META_WHATSAPP_APP_ID." />);
+
+    expect(screen.getByRole("button", { name: "Conectar número com Facebook" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("META_WHATSAPP_APP_ID");
+  });
 });
