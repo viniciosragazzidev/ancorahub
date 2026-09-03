@@ -37,24 +37,21 @@ describe("broker WAHA workspace boundary", () => {
       shouldPersistBrokerConnectionMessage({
         hasLead: false,
         hasClient: false,
-        isTenantOfficialNumber: false,
       }),
     ).toBe(false);
   });
 
-  it("keeps only a linked lead/client or the tenant official number", () => {
+  it("keeps only a linked lead/client", () => {
     expect(
       shouldPersistBrokerConnectionMessage({
         hasLead: true,
         hasClient: false,
-        isTenantOfficialNumber: false,
       }),
     ).toBe(true);
     expect(
       shouldPersistBrokerConnectionMessage({
         hasLead: false,
-        hasClient: false,
-        isTenantOfficialNumber: true,
+        hasClient: true,
       }),
     ).toBe(true);
   });

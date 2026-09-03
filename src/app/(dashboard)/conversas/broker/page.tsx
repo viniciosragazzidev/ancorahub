@@ -1,333 +1,98 @@
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { desc, eq, and, isNull } from "drizzle-orm";
 
-import { DashboardHeader } from "@/components/dashboard-header";
-import { LightConversationsView } from "@/features/broker-workspace/components/light-conversations-view";
+import { LightConversationsView, type BrokerConversationInsight, type BrokerInsightMessage } from "@/features/broker-workspace/components/light-conversations-view";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { buildOfficialTenantConversations } from "@/features/broker-workspace/official-tenant-conversations";
-import { samePhone } from "@/features/communication-channels/service";
-import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { hasPermission } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { hasPermission } from "@/shared/auth/permissions";
 import { getSystemSetting } from "@/features/system-settings/queries";
 
-// Não gerar estaticamente — a página depende de sessão
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+function toIso(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function toTimestamp(value: Date | string | null | undefined) {
+  const iso = toIso(value);
+  return iso ? Date.parse(iso) : 0;
+}
+
+function readIntelligence(value: unknown) {
+  const details = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const assessment = details.aiIntelligence && typeof details.aiIntelligence === "object"
+    ? details.aiIntelligence as Record<string, unknown>
+    : {};
+  const read = (key: string) => typeof assessment[key] === "string" ? assessment[key] : null;
+  return {
+    summary: read("summary"),
+    nextBestAction: read("nextBestAction"),
+    pendingFrom: read("pendingFrom"),
+    sentiment: read("sentiment"),
+    customerIntent: read("customerIntent"),
+    risk: read("risk"),
+    lastAnalyzedAt: typeof details.aiLastAnalyzedAt === "string" ? details.aiLastAnalyzedAt : null,
+  };
+}
+
 /**
- * Rota do corretor (modo lite) — usa WAHA para WhatsApp.
- * Apenas corretores podem acessar. Diretores/gestores vão para /conversas.
+ * Corretor Lite: a conexão WAHA é um espelho operacional read-only.
+ * A resposta ocorre no WhatsApp do corretor; esta rota só revela a própria
+ * carteira e os insights já persistidos pelo CRM.
  */
-export default async function BrokerConversationsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ leadId?: string; draft?: string }>;
-}) {
-  const { leadId, draft } = await searchParams;
+export default async function BrokerConversationsPage({ searchParams }: { searchParams: Promise<{ leadId?: string }> }) {
+  const { leadId } = await searchParams;
   const context = await getRequiredTenantContext();
-
-  if (!hasPermission(context.role, "acessar_conversas")) {
-    redirect("/minha-fila");
-  }
-
-  // A superfície WAHA Lite é exclusiva do papel Corretor com o modo Lite ativo.
-  // Diretores, gestores e corretores no modo normal usam a central geral.
-  if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") {
-    redirect("/conversas");
-  }
-
-  // Pausa global reversível: não desconecta nem exclui a sessão do corretor,
-  // apenas bloqueia a superfície interna até a reativação pelo Super-admin.
-  if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
-    redirect("/minha-fila");
-  }
+  if (!hasPermission(context.role, "acessar_conversas")) redirect("/minha-fila");
+  if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") redirect("/conversas");
+  if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") redirect("/minha-fila");
 
   const db = getDatabase();
-
-  // These queries are isolated by the authenticated tenant/user context and
-  // do not depend on one another. Run them concurrently so the workspace can
-  // start rendering as soon as the slowest authorized read completes.
-  const lightLeadsPromise = db
-    .select({
-      id: schema.leads.id,
-      nome: schema.leads.nome,
-      telefone: schema.leads.telefone,
-      status: schema.leads.status,
-      createdAt: schema.leads.createdAt,
-      stageEnteredAt: schema.leads.stageEnteredAt,
-    })
-    .from(schema.leads)
-    .where(
-      and(
-        eq(schema.leads.tenantId, context.tenantId),
-        isNull(schema.leads.deletedAt),
-        eq(schema.leads.corretorId, context.userId),
-      ),
-    )
-    .orderBy(desc(schema.leads.stageEnteredAt))
-    .limit(100);
-  const lightClientsPromise = db
-    .select({
-      id: schema.clients.id,
-      leadId: schema.clients.leadId,
-      nome: schema.clients.nome,
-      telefone: schema.clients.telefone,
-    })
-    .from(schema.clients)
-    .where(
-      and(
-        eq(schema.clients.tenantId, context.tenantId),
-        eq(schema.clients.corretorId, context.userId),
-      ),
-    )
-    .limit(100);
-  const tenantNumbersPromise = db
-    .select({
-      id: schema.wahaNumbers.id,
-      label: schema.wahaNumbers.label,
-      phone: schema.wahaNumbers.displayPhoneNumber,
-    })
-    .from(schema.wahaNumbers)
-    .where(eq(schema.wahaNumbers.tenantId, context.tenantId));
-  const tenantChannelsPromise = db
-    .select({
-      id: schema.communicationChannels.id,
-      name: schema.communicationChannels.verifiedName,
-      phone: schema.communicationChannels.displayPhoneNumber,
-    })
-    .from(schema.communicationChannels)
-    .where(
-      and(
-        eq(schema.communicationChannels.tenantId, context.tenantId),
-        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
-        eq(schema.communicationChannels.status, "active"),
-      ),
-    );
-  const messageRowsPromise = db
-    .select({
-      id: schema.whatsappMessages.id,
-      leadId: schema.whatsappMessages.leadId,
-      clientId: schema.whatsappMessages.clientId,
-      phone: schema.whatsappMessages.phone,
-      body: schema.whatsappMessages.body,
-      direction: schema.whatsappMessages.direction,
-      senderRole: schema.whatsappMessages.senderRole,
-      providerStatus: schema.whatsappMessages.providerStatus,
-      sentAt: schema.whatsappMessages.sentAt,
-    })
-    .from(schema.whatsappMessages)
-    .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
-    .orderBy(desc(schema.whatsappMessages.sentAt))
-    .limit(500);
-  const connectionPromise = db
-    .select({
-      sessionName: schema.whatsappConnections.sessionName,
-      status: schema.whatsappConnections.status,
-      chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
-    })
-    .from(schema.whatsappConnections)
-    .where(
-      and(
-        eq(schema.whatsappConnections.tenantId, context.tenantId),
-        eq(schema.whatsappConnections.userId, context.userId),
-      ),
-    )
-    .limit(1);
-  const draftTemplatePromise =
-    draft === "broker_intro"
-      ? getSystemSetting("broker_lite_opening_draft")
-      : Promise.resolve(null);
-
-  const officialOutboundPromise = db
-    .select({
-      id: schema.whatsappOutboundMessages.id,
-      purpose: schema.whatsappOutboundMessages.purpose,
-      messageType: schema.whatsappOutboundMessages.messageType,
-      templateName: schema.whatsappOutboundMessages.templateName,
-      variables: schema.whatsappOutboundMessages.variables,
-      status: schema.whatsappOutboundMessages.status,
-      createdAt: schema.whatsappOutboundMessages.createdAt,
-      sentAt: schema.whatsappOutboundMessages.sentAt,
-      deliveredAt: schema.whatsappOutboundMessages.deliveredAt,
-      readAt: schema.whatsappOutboundMessages.readAt,
-      channelId: schema.whatsappOutboundMessages.channelId,
-      destinationPhone: schema.whatsappOutboundMessages.destinationPhone,
-    })
-    .from(schema.whatsappOutboundMessages)
-    .where(
-      and(
-        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
-        eq(schema.whatsappOutboundMessages.recipientType, "user"),
-        eq(schema.whatsappOutboundMessages.recipientId, context.userId),
-      ),
-    )
-    .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
-    .limit(100);
-
-  const [lightLeads, lightClients, tenantNumbers, tenantChannels, messageRows, connectionRows, draftTemplate, officialOutbounds] = await Promise.all([
-    lightLeadsPromise,
-    lightClientsPromise,
-    tenantNumbersPromise,
-    tenantChannelsPromise,
-    messageRowsPromise,
-    connectionPromise,
-    draftTemplatePromise,
-    officialOutboundPromise,
+  const [leads, clients, connectionRows] = await Promise.all([
+    db.select({ id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt)))
+      .orderBy(desc(schema.leads.stageEnteredAt)).limit(150),
+    db.select({ id: schema.clients.id, leadId: schema.clients.leadId, nome: schema.clients.nome, telefone: schema.clients.telefone, createdAt: schema.clients.createdAt })
+      .from(schema.clients)
+      .where(and(eq(schema.clients.tenantId, context.tenantId), eq(schema.clients.corretorId, context.userId))).limit(150),
+    db.select({ status: schema.whatsappConnections.status, chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo })
+      .from(schema.whatsappConnections)
+      .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId))).limit(1),
   ]);
 
-  const selectedLead = leadId ? lightLeads.find((lead) => lead.id === leadId) : null;
-  const initialDraft =
-    draft === "broker_intro" && selectedLead
-      ? (
-          draftTemplate?.trim() ||
-          "Olá, {nome}! Sou seu corretor e vou seguir com seu atendimento por aqui."
-        ).replaceAll("{nome}", selectedLead.nome.split(" ")[0] || selectedLead.nome)
-      : undefined;
-  const messagesByLead = new Map<string, typeof messageRows>();
-  for (const msg of messageRows) {
-    const matched = lightLeads.find(
-      (l) =>
-        l.id === msg.leadId ||
-        (Boolean(msg.phone && l.telefone) && samePhone(msg.phone, l.telefone)),
-    );
-    if (matched) {
-      const list = messagesByLead.get(matched.id) ?? [];
-      list.push(msg);
-      messagesByLead.set(matched.id, list);
-    }
+  const leadIds = leads.map((lead) => lead.id);
+  const clientIds = clients.map((client) => client.id);
+  const messageRows = leadIds.length || clientIds.length
+    ? await db.select({ id: schema.whatsappMessages.id, leadId: schema.whatsappMessages.leadId, clientId: schema.whatsappMessages.clientId, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, providerStatus: schema.whatsappMessages.providerStatus, sentAt: schema.whatsappMessages.sentAt })
+      .from(schema.whatsappMessages)
+      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), or(...(leadIds.length ? [inArray(schema.whatsappMessages.leadId, leadIds)] : []), ...(clientIds.length ? [inArray(schema.whatsappMessages.clientId, clientIds)] : []))))
+      .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1_000)
+    : [];
+
+  const byLead = new Map<string, BrokerInsightMessage[]>();
+  const byClient = new Map<string, BrokerInsightMessage[]>();
+  for (const message of messageRows) {
+    const mapped = { id: message.id, body: message.body, direction: message.direction, sentAt: toIso(message.sentAt) ?? new Date().toISOString(), providerStatus: message.providerStatus };
+    if (message.leadId) byLead.set(message.leadId, [...(byLead.get(message.leadId) ?? []), mapped]);
+    if (message.clientId) byClient.set(message.clientId, [...(byClient.get(message.clientId) ?? []), mapped]);
   }
 
-  function toIsoString(d: Date | string | null | undefined): string {
-    if (!d) return new Date().toISOString();
-    const parsed = d instanceof Date ? d : new Date(d);
-    return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
-  }
+  const insights: BrokerConversationInsight[] = [
+    ...leads.map((lead) => {
+      const messages = (byLead.get(lead.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
+      return { id: lead.id, kind: "lead" as const, name: lead.nome, phone: lead.telefone, status: lead.status, href: `/leads/${lead.id}`, firstContactAt: toIso(lead.firstContactAt), serviceStartedAt: toIso(lead.serviceStartedAt), latestMessage: messages.at(-1) ?? null, messages, intelligence: readIntelligence(lead.qualificationDetails) };
+    }),
+    ...clients.map((client) => {
+      const messages = (byClient.get(client.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
+      return { id: `client:${client.id}`, kind: "client" as const, name: client.nome, phone: client.telefone, status: "Cliente", href: client.leadId ? `/leads/${client.leadId}` : "/clientes", latestMessage: messages.at(-1) ?? null, messages, intelligence: null };
+    }),
+  ].sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
 
-  function toTimestamp(d: Date | string | null | undefined): number {
-    if (!d) return 0;
-    const parsed = d instanceof Date ? d.getTime() : new Date(d).getTime();
-    return isNaN(parsed) ? 0 : parsed;
-  }
-
-  // ── Montar conversas ──────────────────────────────────────────────────
-  const conversations = lightLeads.map((lead) => {
-    const msgs = (messagesByLead.get(lead.id) ?? [])
-      .sort((a, b) => toTimestamp(a.sentAt) - toTimestamp(b.sentAt))
-      .slice(-100);
-    const latest = msgs.at(-1) ?? null;
-    return {
-      id: lead.id,
-      kind: "lead" as const,
-      sendTarget: { kind: "lead" as const, leadId: lead.id },
-      nome: lead.nome,
-      telefone: lead.telefone,
-      status: lead.status,
-      latestMessage: latest
-        ? {
-            body: latest.body,
-            direction: latest.direction,
-            sentAt: toIsoString(latest.sentAt),
-          }
-        : null,
-      messages: msgs.map((m) => ({
-        id: m.id,
-        body: m.body,
-        direction: m.direction,
-        sentAt: toIsoString(m.sentAt),
-        senderRole: m.senderRole,
-        providerStatus: m.providerStatus,
-      })),
-    };
-  });
-
-  const clientConversations = lightClients.map((client) => {
-    const msgs = messageRows
-      .filter(
-        (message) =>
-          (message.clientId && message.clientId === client.id) ||
-          (message.leadId && message.leadId === client.leadId) ||
-          samePhone(message.phone, client.telefone),
-      )
-      .sort((a, b) => toTimestamp(a.sentAt) - toTimestamp(b.sentAt))
-      .slice(-100);
-    const latest = msgs.at(-1) ?? null;
-    return {
-      id: `client:${client.id}`,
-      kind: "client" as const,
-      sendTarget: { kind: "lead" as const, leadId: client.leadId },
-      nome: client.nome,
-      telefone: client.telefone,
-      status: "Cliente",
-      latestMessage: latest
-        ? { body: latest.body, direction: latest.direction, sentAt: toIsoString(latest.sentAt) }
-        : null,
-      messages: msgs.map((message) => ({
-        id: message.id,
-        body: message.body,
-        direction: message.direction,
-        sentAt: toIsoString(message.sentAt),
-        senderRole: message.senderRole,
-        providerStatus: message.providerStatus,
-      })),
-    };
-  });
-
-  const officialConversations = buildOfficialTenantConversations(
-    [
-      ...tenantNumbers
-        .filter((number) => Boolean(number.phone))
-        .map((number) => ({
-          id: number.id,
-          source: "number" as const,
-          name: number.label || "Número oficial do tenant",
-          phone: number.phone!,
-        })),
-      ...tenantChannels
-        .filter((channel) => Boolean(channel.phone))
-        .map((channel) => ({
-          id: channel.id,
-          source: "channel" as const,
-          name: channel.name || "Número oficial do tenant",
-          phone: channel.phone!,
-        })),
-    ],
-    messageRows
-      .filter((message) => !message.leadId && !message.clientId)
-      .map((message) => ({
-        id: message.id,
-        body: message.body,
-        direction: message.direction,
-        sentAt: toIsoString(message.sentAt),
-        phone: message.phone,
-        senderRole: message.senderRole,
-        providerStatus: message.providerStatus,
-      })),
-    officialOutbounds,
-  );
-
-  // Sort: conversas com mensagens recentes primeiro
-  const scopedConversations = [...conversations, ...clientConversations, ...officialConversations];
-  scopedConversations.sort((a, b) => {
-    const timeA = a.latestMessage ? toTimestamp(a.latestMessage.sentAt) : 0;
-    const timeB = b.latestMessage ? toTimestamp(b.latestMessage.sentAt) : 0;
-    return timeB - timeA;
-  });
-
-  // ── Status WhatsApp do corretor ───────────────────────────────────────
-  const [conn] = connectionRows;
-
-  const whatsappConnected = conn?.status === "ready" && conn?.chatInternoAtivo === true;
-
-  return (
-    <main className="h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-card p-0">
-      <LightConversationsView
-        conversations={scopedConversations}
-        initialLeadId={leadId}
-        initialDraft={initialDraft}
-        whatsappConnected={whatsappConnected}
-      />
-    </main>
-  );
+  const connection = connectionRows[0];
+  return <main className="h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-card p-0"><LightConversationsView insights={insights} initialLeadId={leadId} whatsappConnected={connection?.status === "ready"} connectionStatus={connection?.status ?? "disconnected"} /></main>;
 }

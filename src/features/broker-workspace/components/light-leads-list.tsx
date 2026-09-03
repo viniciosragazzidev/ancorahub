@@ -360,13 +360,13 @@ export function LightLeadsList({
                       </span>
                       <div className="flex gap-2">
                         <Link
-                          href={`/conversas/broker?leadId=${lead.id}&draft=broker_intro`}
+                          href={`/conversas/broker?leadId=${lead.id}`}
                           className={cn(
                             buttonVariants({ variant: "ghost", size: "sm" }),
                             "h-9 flex-1 gap-1.5 px-3 text-xs font-semibold sm:flex-none",
                           )}
                         >
-                          Chat
+                          Insights
                         </Link>
                         <Link
                           href={`/leads/${lead.id}`}

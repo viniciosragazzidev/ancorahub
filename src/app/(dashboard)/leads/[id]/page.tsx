@@ -110,18 +110,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       .where(eq(schema.user.id, context.userId))
       .limit(1);
 
-    const [userWahaConn, lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers] = await Promise.all([
-      db.select({
-        status: schema.whatsappConnections.status,
-        chatInternoAtivo: schema.whatsappConnections.chatInternoAtivo,
-      })
-      .from(schema.whatsappConnections)
-      .where(and(
-        eq(schema.whatsappConnections.tenantId, context.tenantId),
-        eq(schema.whatsappConnections.userId, context.userId),
-      ))
-      .limit(1)
-      .then((rows) => rows[0] ?? null),
+    const [lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers] = await Promise.all([
       getLeadBeneficiaries(id),
       getRequirementsForLead(id),
       getLeadDocuments(id),
@@ -130,8 +119,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active")))
         .orderBy(schema.carriers.name),
     ]);
-
-    const hasWahaConnected = userWahaConn?.status === "ready" && userWahaConn?.chatInternoAtivo === true;
 
     const lightFormData = readFormData(lead.formData);
 
@@ -174,7 +161,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <LightLeadDetail
         lead={lightLead}
         brokerName={brokerUser?.name || "Corretor"}
-        hasWahaConnected={Boolean(hasWahaConnected)}
         requirements={lightRequirements.map((req) => ({
           id: req.id,
           name: req.name,

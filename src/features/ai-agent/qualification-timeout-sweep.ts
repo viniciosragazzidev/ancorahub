@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, isNotNull, lt, notInArray, or } from "drizzle-orm";
+import { and, eq, isNotNull, lt, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -47,7 +47,9 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
     const timeoutMinutes = Math.max(5, config?.timeoutMinutes ?? 30); // Default 30 minutos (alinhado com aiQualificationConfigs)
     const cutoffDate = new Date(now - timeoutMinutes * 60 * 1000);
 
-    // Buscar leads em processo de qualificação sem resposta após o tempo limite
+    // Only conversations that are explicitly waiting for the customer's next
+    // answer qualify. Lead.updatedAt is deliberately not used here: a manager
+    // editing a lead must not postpone the configured conversation timeout.
     const pendingLeads = await db
       .select({
         id: schema.leads.id,
@@ -59,14 +61,21 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         branchId: schema.leads.branchId,
         metaCampaignId: schema.leads.metaCampaignId,
         sourceCampaign: schema.leads.sourceCampaign,
-        updatedAt: schema.leads.updatedAt,
+        conversationId: schema.aiConversations.id,
+        lastActivityAt: schema.aiConversations.lastActivityAt,
       })
-      .from(schema.leads)
+      .from(schema.aiConversations)
+      .innerJoin(schema.leads, and(
+        eq(schema.aiConversations.leadId, schema.leads.id),
+        eq(schema.aiConversations.tenantId, schema.leads.tenantId),
+      ))
       .where(
         and(
-          eq(schema.leads.tenantId, tenant.id),
+          eq(schema.aiConversations.tenantId, tenant.id),
+          eq(schema.aiConversations.status, "WAITING_CUSTOMER"),
+          eq(schema.aiConversations.automationState, "AI_ACTIVE"),
           eq(schema.leads.qualificationState, "IN_PROGRESS"),
-          lt(schema.leads.updatedAt, cutoffDate)
+          lt(schema.aiConversations.lastActivityAt, cutoffDate),
         )
       );
 
@@ -190,20 +199,12 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       });
 
       // 4. Encerrar Atendimento do Robô de IA para este Lead
-      const [conv] = await db
-        .select({ id: schema.aiConversations.id })
-        .from(schema.aiConversations)
-        .where(and(eq(schema.aiConversations.leadId, lead.id), eq(schema.aiConversations.tenantId, tenant.id)))
-        .limit(1);
-
-      if (conv) {
-        await transitionConversationState({
-          tenantId: tenant.id,
-          conversationId: conv.id,
-          newStatus: "CLOSED",
-          reason: `Estouro do tempo limite de qualificação (${timeoutMinutes} min sem resposta). IA encerrada.`,
-        });
-      }
+      await transitionConversationState({
+        tenantId: tenant.id,
+        conversationId: lead.conversationId,
+        newStatus: "CLOSED",
+        reason: `Estouro do tempo limite de qualificação (${timeoutMinutes} min sem resposta). IA encerrada.`,
+      });
 
       distributedLeadsCount += 1;
     }

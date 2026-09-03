@@ -4,13 +4,13 @@
 
 - A tabela `lead_distribution_jobs` persiste trabalhos de atribuição e impede jobs ativos duplicados por lead.
 - O executor interno trabalha em lotes, usa atualização condicional, lease recuperável, backoff e falha visível após o limite configurado.
-- A rota protegida `/api/internal/jobs/distribution` é executada pelo Vercel Cron a cada dois minutos; `CRON_SECRET` é obrigatório. A frequência é compatível com o ambiente Vercel pago e a fila continua preservada para nova tentativa se uma execução falhar.
+- A rota protegida `/api/internal/jobs/distribution` é executada por agendador a cada dois minutos; `CRON_SECRET` é obrigatório. A frequência é compatível com o ambiente de produção e a fila continua preservada para nova tentativa se uma execução falhar.
 - O Super-admin pode pausar, parametrizar e executar um ciclo manual com auditoria.
 - A tela de Distribuição informa pendências, processamento e exceções reais. A migration 0059 é pré-requisito para esta telemetria.
 
 ### Pendência obrigatória de infraestrutura
 
-Em qualquer mudança de ambiente, manter a chamada autenticada para `/api/internal/jobs/distribution` a cada **2 minutos** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
+Em qualquer mudança de ambiente, manter as chamadas autenticadas para `/api/internal/jobs/distribution` e `/api/internal/jobs/qualification-timeout` a cada **2 minutos** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
 
 ## Pendência urgente de infraestrutura
 

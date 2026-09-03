@@ -63,7 +63,7 @@ export function LightTopNavBar({
     { href: "/dashboard", label: "Início", icon: Home },
     { href: "/minha-fila", label: "Minha Fila", icon: ListChecks },
     ...(showConversations
-      ? [{ href: "/conversas/broker", label: "Conversas", icon: MessageSquare }]
+      ? [{ href: "/conversas/broker", label: "Insights", icon: MessageSquare }]
       : []),
     { href: "/clientes", label: "Clientes", icon: Users },
   ];

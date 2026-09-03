@@ -36,9 +36,9 @@ export const maxDuration = 300;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string; tab?: string; draft?: string }>;
+  searchParams: Promise<{ leadId?: string; tab?: string }>;
 }) {
-  const { leadId, tab, draft } = await searchParams;
+  const { leadId, tab } = await searchParams;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
@@ -53,7 +53,6 @@ export default async function ConversationsPage({
     }
     const params = new URLSearchParams();
     if (leadId) params.set("leadId", leadId);
-    if (draft === "broker_intro") params.set("draft", draft);
     redirect(params.size ? `/conversas/broker?${params}` : "/conversas/broker");
   }
 
@@ -355,6 +354,27 @@ export default async function ConversationsPage({
         : null,
     };
   });
+
+  // A abertura explícita de um histórico por gestão é uma leitura de dado
+  // operacional sensível. O registro contém somente ator e lead, sem texto ou
+  // telefone, para manter a auditoria útil sem replicar conteúdo pessoal.
+  if (
+    leadId &&
+    (context.role === "director" || context.role === "manager") &&
+    conversations.some((conversation) => conversation.id === leadId)
+  ) {
+    void db
+      .insert(schema.auditLogs)
+      .values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_conversation",
+        entidadeId: leadId,
+        acao: "conversation.read_by_management",
+        createdAt: new Date(),
+      })
+      .catch(() => undefined);
+  }
 
   // Deduplicate conversations by phone number so duplicate DB lead records render as 1 contact
   const uniqueConversationsByPhone = new Map<string, ConversationItem>();

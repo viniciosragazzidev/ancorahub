@@ -224,7 +224,7 @@ flowchart TD
 ### 6.2. WhatsApp Messaging (Meta Cloud API vs WAHA VPS)
 - **Meta Cloud API**: Gerenciada por `src/features/communication-channels/service.ts`, `meta-cloud-client.ts`, configurada via Embedded Signup ou credenciais manuais (`schema.metaCloudChannels`, `schema.metaCloudTokens`).
 - **WAHA VPS**: Gerenciada por `services/whatsapp-api` e `src/features/broker-workspace/whatsapp-connection.ts` (`schema.userWhatsappSessions`).
-- **Conflito de Superfície**: Em `/conversas`, corretores em modo `LIGHT` são redirecionados para `/conversas/broker` se `feature_waha_connections_enabled === "true"`, enquanto diretores e gestores operam a central geral multi-canal.
+- **Separação de Superfície**: Em `/conversas`, corretores em modo `LIGHT` são redirecionados para `/conversas/broker` se `feature_waha_connections_enabled === "true"`. Essa rota é uma Central de insights somente leitura para leads e clientes já atribuídos; diretores e gestores operam a central geral multi-canal e suas consultas de lead são auditadas.
 
 ### 6.3. Catálogo Global vs Catálogo Privado de Planos e Preços
 - **Autoridade**: `src/features/global-catalog/` e `src/features/catalog/`.
@@ -257,7 +257,7 @@ flowchart TD
 |---|---|---|---|
 | **Kanban Board** (`leads-workspace.tsx:123`) | Oculta deliberadamente o status `lost` da lista de colunas operacionais e armazena ordem no `localStorage`. | `src/features/leads/lead-status-constants.ts` | **HIGH**: O usuário pode achar que um lead perdido desapareceu do sistema se não souber aplicar o filtro de tabela. |
 | **Feedback SLA Sweep** (`feedback-sla.ts:43`) | Ignora o flag de redistribuição `tenants.auto_redistribute_on_feedback_timeout` e apenas emite warnings de interação. | `src/features/leads/feedback-sla.ts` | **HIGH**: Diretores configuram redistribuição automática na UI esperando que o lead troque de corretor, mas o worker não redistribui. |
-| **Conversas Lite Broker** (`conversas/page.tsx:48`) | Redireciona forçadamente corretores com modo `LIGHT` para `/conversas/broker` somente se a flag global de WAHA estiver ativa; caso contrário, joga para `/minha-fila`. | `src/features/conversations/` | **MEDIUM**: O corretor perde acesso visual ao histórico se o WAHA estiver desligado globalmente. |
+| **Insights Lite Broker** (`conversas/page.tsx:48`) | Redireciona corretores com modo `LIGHT` para `/conversas/broker` somente se a flag global de WAHA estiver ativa; a área é somente leitura e restrita aos próprios leads/clientes. Caso contrário, vai para `/minha-fila`. | `src/features/broker-workspace/` | **LOW**: A pausa global interrompe a sincronização, mas nunca desconecta a sessão nem perde dados. |
 | **Unidades Breadcrumb Back** (`unidades/[branchId]/page.tsx:53`) | Redireciona botão de voltar para rotas inexistentes `/gestor` e `/corretor`. | `src/features/branches/` | **LOW**: Causa erro 404 de navegação para gestores e corretores. |
 
 ---

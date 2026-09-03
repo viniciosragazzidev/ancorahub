@@ -37,6 +37,31 @@ dados (padrão DEC-070). Cohorts, relatórios salvos/programados, aba Atendiment
 Conversation Intelligence e AI Analyst permanecem fases futuras. Plano completo em
 `docs/product/reporting-root-plan.md`; decisão técnica em ADR-0040.
 
+## DEC-091 — Conexão pessoal do Corretor como sincronização somente leitura
+
+**Estado:** Aceita
+**Data:** 2026-09-03
+
+A conexão pessoal do WhatsApp do Corretor passa a ter finalidade exclusiva de
+sincronização operacional. O CRM não envia mensagens, cadências, respostas rápidas
+nem mensagens de IA por essa sessão. O Corretor responde somente no aplicativo
+WhatsApp de sua escolha e o CRM recebe, por webhook assinado, as mensagens já
+trocadas com leads ou clientes de sua própria carteira.
+
+O filtro de entrada é estrito: somente conversas que resolvem para um lead ou
+cliente atribuído ao dono da sessão podem ser persistidas. Conversas pessoais,
+internas, com números oficiais do tenant ou de contatos sem vínculo não entram no
+CRM, não criam leads e não chegam à IA. A rota Lite `/conversas/broker` é uma
+Central de Insights em modo somente leitura: mostra saúde do atendimento, marcos,
+histórico sincronizado e análise de IA, com ação explícita para abrir o WhatsApp
+fora do CRM.
+
+Diretor e Gestor continuam consultando no histórico operacional do lead apenas o
+escopo que sua autorização já permite. A abertura de uma conversa por gestão gera
+auditoria sem texto, telefone ou conteúdo da conversa. A flag global existente
+`feature_waha_connections_enabled` desativa ou reativa a sincronização sem apagar
+as conexões ou o histórico; ela não reativa envio pela sessão pessoal.
+
 ## DEC-089 — Número WAHA oficial para avisos internos ao corretor
 
 **Estado:** Aceita

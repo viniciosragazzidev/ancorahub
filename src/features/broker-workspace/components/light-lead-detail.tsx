@@ -134,7 +134,6 @@ const STEP_OPTIONS = [
 export function LightLeadDetail({
   lead,
   brokerName,
-  hasWahaConnected = false,
   requirements = [],
   documents = [],
   carriers = [],
@@ -142,7 +141,6 @@ export function LightLeadDetail({
 }: {
   lead: LightLeadDetailData;
   brokerName: string;
-  hasWahaConnected?: boolean;
   requirements?: LiteRequirement[];
   documents?: ConfirmationDocument[];
   carriers?: CarrierOption[];
@@ -298,9 +296,9 @@ export function LightLeadDetail({
       const firstName = lead.nome.split(" ")[0] || lead.nome;
       toast.success(`Lead aceito! Agora inicie o atendimento com ${firstName}.`, {
         action: {
-          label: "Abrir Chat",
+          label: "Ver insights",
           onClick: () => {
-            router.push(`/conversas/broker?leadId=${lead.id}&draft=broker_intro`);
+            router.push(`/conversas/broker?leadId=${lead.id}`);
           },
         },
       });
@@ -632,43 +630,22 @@ export function LightLeadDetail({
           ) : (
             /* State 2: EM ATENDIMENTO */
             <div className="pt-2 space-y-3 border-t border-border/50">
-              <Link
-                href={`/conversas/broker?leadId=${lead.id}&draft=broker_intro`}
-                onClick={(e) => {
+              <Button
+                render={externalWhatsAppUrl ? <a href={externalWhatsAppUrl} rel="noreferrer" target="_blank" /> : undefined}
+                disabled={!externalWhatsAppUrl}
+                onClick={() => {
                   const nowStr = new Date().toLocaleTimeString("pt-BR", {
                     hour: "2-digit",
                     minute: "2-digit",
                   });
                   setWhatsappOpenedAt(nowStr);
-
-                  const isMobile =
-                    typeof window !== "undefined" &&
-                    (window.matchMedia("(max-width: 768px)").matches ||
-                      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-                        navigator.userAgent,
-                      ));
-
-                  if (isMobile && !hasWahaConnected) {
-                    e.preventDefault();
-                    toast.info("Abrindo aplicativo do WhatsApp...", {
-                      duration: 3000,
-                    });
-
-                    if (externalWhatsAppUrl) {
-                      setTimeout(() => {
-                        window.location.href = externalWhatsAppUrl;
-                      }, 500);
-                    }
-                  }
                 }}
-                className={cn(
-                  buttonVariants({ size: "lg" }),
-                  "w-full h-12 text-sm font-bold gap-2.5 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-xl",
-                )}
+                size="lg"
+                className="w-full h-12 text-sm font-bold gap-2.5 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-xl"
               >
                 <WhatsappLogo className="size-5" />
-                ABRIR CHAT INTERNO
-              </Link>
+                ABRIR WHATSAPP
+              </Button>
 
               {externalWhatsAppUrl ? (
                 <Button

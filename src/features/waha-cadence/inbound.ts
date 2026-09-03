@@ -48,15 +48,14 @@ export function shouldCreateSyntheticLead(input: {
 
 /**
  * A broker connection is a restricted workspace, not a tenant intake channel.
- * Persist only CRM contacts (leads/clients) or the tenant's official
- * number; personal chats never enter the tenant database.
+ * Persist only CRM contacts (leads/clients); personal and internal chats never
+ * enter the tenant database through a broker's personal connection.
  */
 export function shouldPersistBrokerConnectionMessage(input: {
   hasLead: boolean;
   hasClient: boolean;
-  isTenantOfficialNumber: boolean;
 }) {
-  return input.hasLead || input.hasClient || input.isTenantOfficialNumber;
+  return input.hasLead || input.hasClient;
 }
 
 
@@ -247,16 +246,11 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   );
   metrics.leadResolveMs = Date.now() - leadResolveStart;
 
-  const isTenantOfficialNumber =
-    source.kind === "connection" &&
-    (await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone));
-
   if (
     source.kind === "connection" &&
     !shouldPersistBrokerConnectionMessage({
       hasLead: Boolean(leadId),
       hasClient: Boolean(clientId),
-      isTenantOfficialNumber,
     })
   ) {
     await markIgnored(db, registered.id, "connection_contact_not_authorized");
@@ -495,7 +489,7 @@ async function resolveContact(
     const lead = candidates.find(
       (candidate) =>
         samePhone(candidate.telefone, normalizedPhone) &&
-        (source.kind !== "connection" || candidate.corretorId === source.connection.userId || !candidate.corretorId),
+        (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
     );
     if (lead) leadId = lead.id;
   }
@@ -519,7 +513,7 @@ async function resolveContact(
     const client = candidates.find(
       (candidate) =>
         samePhone(candidate.telefone, normalizedPhone) &&
-        (source.kind !== "connection" || candidate.corretorId === source.connection.userId || !candidate.corretorId),
+        (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
     );
     if (client) clientId = client.id;
   }

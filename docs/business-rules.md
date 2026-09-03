@@ -122,7 +122,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 - Canal, aprovação e opt-out do reengajamento (DEC-006).
 
 | BR-062 | O Diretor pode consultar, em modo somente leitura, o histórico do número oficial com corretores do próprio tenant. | Mensagem oficial para/desde número de corretor → persiste no ledger autorizado; Diretor abre `/conversas?tab=corretores` → consulta convites, entregas e respostas sem enviar mensagens. | DEC-065 |
-| BR-062A | A conexão pessoal do Corretor só sincroniza conversas operacionais atribuídas a ele; conversas pessoais não entram no CRM nem na central do Diretor. | Webhook WAHA de sessão do corretor → resolve lead/cliente pelo tenant e pelo `corretorId` da sessão; contato sem vínculo é ignorado, número oficial do tenant fica em thread própria do Lite e lead/cliente vinculado é persistido pelo mesmo `leadId` da qualificação. | DEC-081 / DEC-070 |
+| BR-062A | A conexão pessoal do Corretor é somente leitura e sincroniza exclusivamente conversas operacionais atribuídas a ele; conversas pessoais e internas não entram no CRM. | Webhook WAHA de sessão do corretor → resolve lead/cliente pelo tenant e pelo `corretorId` da sessão; contato sem vínculo, número oficial do tenant e conversa interna são ignorados. O CRM nunca envia por essa sessão; lead/cliente vinculado é persistido pelo mesmo `leadId` da qualificação e aparece na Central de Insights. | DEC-091 |
 
 ## Feedback e lembretes
 

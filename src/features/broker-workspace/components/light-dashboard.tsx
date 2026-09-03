@@ -59,7 +59,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
         urgencyText: "💬 Cliente aguardando sua resposta",
         badgeVariant: "warning" as const,
         badgeLabel: "Responder",
-        btnLabel: "ABRIR CHAT",
+        btnLabel: "VER INSIGHTS",
         btnHref: `/conversas/broker?leadId=${nextAction.leadId}`,
       };
     case "sla_overdue":
