@@ -1,10 +1,8 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { ReportTabId } from "@/features/reports/metrics/metric-catalog";
-import { CircleNotch } from "@phosphor-icons/react";
 
 const TAB_LABELS: Record<ReportTabId, string> = {
   overview: "Visão geral",
@@ -21,43 +19,17 @@ interface ReportTabsProps {
 }
 
 export function ReportTabs({ tabs, active, period }: ReportTabsProps) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [optimisticTab, setOptimisticTab] = useState<ReportTabId>(active);
-
-  // Sincronizar quando a aba do servidor atualizar
-  useEffect(() => {
-    setOptimisticTab(active);
-  }, [active]);
-
-  // Prefetch de todas as abas permitidas para o período atual
-  useEffect(() => {
-    tabs.forEach((tab) => {
-      router.prefetch(`/relatorios?period=${period}&tab=${tab}`);
-    });
-  }, [tabs, period, router]);
-
-  const handleTabClick = (tab: ReportTabId) => {
-    if (tab === active) return;
-    setOptimisticTab(tab);
-    startTransition(() => {
-      router.push(`/relatorios?period=${period}&tab=${tab}`, { scroll: false });
-    });
-  };
-
   return (
     <nav aria-label="Abas de relatórios" className="flex flex-wrap items-center gap-1.5">
       {tabs.map((tab) => {
-        const isCurrent = optimisticTab === tab;
-        const isLoadingThisTab = isPending && isCurrent && active !== tab;
+        const isCurrent = active === tab;
 
         return (
-          <button
+          <Link
             key={tab}
-            type="button"
-            onClick={() => handleTabClick(tab)}
+            href={`/relatorios?period=${period}&tab=${tab}`}
             className={cn(
-              "relative flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-98",
+              "relative flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isCurrent
                 ? "bg-primary text-primary-foreground shadow-xs"
@@ -65,11 +37,8 @@ export function ReportTabs({ tabs, active, period }: ReportTabsProps) {
             )}
             aria-current={isCurrent ? "page" : undefined}
           >
-            {isLoadingThisTab && (
-              <CircleNotch className="size-3.5 animate-spin" />
-            )}
             <span>{TAB_LABELS[tab]}</span>
-          </button>
+          </Link>
         );
       })}
     </nav>
