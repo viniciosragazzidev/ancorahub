@@ -30,7 +30,7 @@ function parseMetaSignupMessage(value: unknown) {
   }
 }
 
-export function MetaEmbeddedSignupCard({ appId, configId, disabled, unavailableReason }: { appId: string; configId: string; disabled?: boolean; unavailableReason?: string }) {
+export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: string; configId: string; disabled?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const finishRef = useRef<SignupResult | null>(null);
@@ -130,5 +130,5 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled, unavailableR
     document.head.appendChild(script);
   };
 
-  return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Conectar número oficial</CardTitle><CardDescription>Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. A confirmação do telefone acontece dentro da Meta; o CRM conclui a ativação técnica após o término.</CardDescription></CardHeader><CardContent className="space-y-3">{unavailableReason ? <p id="meta-signup-unavailable-reason" role="status" className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">{unavailableReason}</p> : null}<Button onClick={start} disabled={disabled || loading} aria-describedby={unavailableReason ? "meta-signup-unavailable-reason" : undefined} className="w-full">{loading ? "Conectando com a Meta…" : "Conectar número com Facebook"}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("concluído") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
+  return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Conectar número oficial</CardTitle><CardDescription>Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. A confirmação do telefone acontece dentro da Meta; o CRM conclui a ativação técnica após o término.</CardDescription></CardHeader><CardContent className="space-y-3"><Button onClick={start} disabled={disabled || loading} className="w-full">{loading ? "Conectando com a Meta…" : "Conectar número com Facebook"}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("concluído") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
 }

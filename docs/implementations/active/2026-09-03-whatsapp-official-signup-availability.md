@@ -1,31 +1,26 @@
-# Disponibilidade do cadastro do WhatsApp oficial
+# Restauração do cadastro do WhatsApp oficial
 
-## Objetivo
+## Diagnóstico
 
-Garantir que o Diretor consiga iniciar o Embedded Signup em
-`/integrations/whatsapp` quando a capacidade Meta está ativa e os identificadores
-de abertura estão presentes, sem expor ou exigir segredos privados no navegador.
+O commit `877b2d1c` mudou a cadeia que disponibiliza o Embedded Signup. A
+comparação com `V1.5_02/09`, a última referência informada como funcional,
+identificou alterações na página de conexão, no card e na leitura do Config ID.
 
-## Alteração
+## Correção
 
-- a ação de conexão não é mais ocultada por falha no diagnóstico completo de
-  segredos do servidor;
-- ela permanece bloqueada e explica o motivo somente quando o kill switch está
-  desligado ou App ID/Config ID não estão disponíveis;
-- o Config ID aceita o nome server-side
-  `META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`, com compatibilidade para o nome
-  público existente;
-- a conclusão do cadastro continua validando e usando segredos apenas no servidor.
+Os arquivos foram restaurados à regra funcional: o Diretor vê a conexão apenas
+quando a Meta está configurada, não existe número oficial ativo e há App ID e
+Config ID. A abertura mantém o contrato WhatsApp v4 da Meta, incluindo a etapa
+de seleção de WABA e número.
 
-## Segurança e rollback
+## Operação
 
-O tenant e a permissão de Diretor continuam derivados da sessão. Nenhum token ou
-segredo é enviado ao navegador. Reverter os quatro arquivos da alteração restaura
-o bloqueio visual anterior; não há migration nem alteração de dados.
+`NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID` é uma variável de build
+no Dockerfile. O valor implantado deve ser o Config ID do produto WhatsApp,
+não uma configuração genérica de Login for Business. Não há migration, dados ou
+segredos alterados nesta restauração.
 
-## Verificações
+## Rollback
 
-- testes de interface do Embedded Signup e do status do canal oficial;
-- ESLint dirigido;
-- validação documental;
-- `git diff --check`.
+Reverter os arquivos desta entrega restaura o comportamento anterior à
+restauração.

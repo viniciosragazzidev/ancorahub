@@ -51,16 +51,13 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.companyAccount?.status === "active" &&
     official.companyAccount.registrationStatus === "registered";
 
-  const canStartEmbeddedSignup =
+  const canConnectNumber =
+    official.canConfigure &&
     official.enabled &&
-    Boolean(official.appId) &&
-    Boolean(official.embeddedSignupConfigId);
-
-  const connectionUnavailableReason = !official.enabled
-    ? "A conexão oficial está desativada pelo Super-admin."
-    : !official.appId || !official.embeddedSignupConfigId
-      ? "A configuração de cadastro seguro da Meta está indisponível."
-      : null;
+    official.configured &&
+    official.appId &&
+    official.embeddedSignupConfigId &&
+    official.companyAccount?.status !== "active";
 
   return (
     <main className="flex min-h-full flex-col gap-6 bg-background p-4 antialiased lg:p-6">
@@ -131,13 +128,8 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
                     missing={official.missing}
                     canManage={official.canConfigure}
                   />
-                  {official.canConfigure && !official.companyAccount ? (
-                    <MetaEmbeddedSignupCard
-                      appId={official.appId ?? ""}
-                      configId={official.embeddedSignupConfigId ?? ""}
-                      disabled={!canStartEmbeddedSignup}
-                      unavailableReason={connectionUnavailableReason ?? undefined}
-                    />
+                  {canConnectNumber ? (
+                    <MetaEmbeddedSignupCard appId={official.appId!} configId={official.embeddedSignupConfigId!} />
                   ) : null}
                 </CardContent>
               </Card>
