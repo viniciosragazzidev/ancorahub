@@ -184,6 +184,7 @@ export async function disconnectMetaCloudChannelAction(channelId: string) {
 
   const now = new Date();
   await db.transaction(async (tx) => {
+    await tx.update(schema.whatsappOutboundMessages).set({ channelId: null }).where(eq(schema.whatsappOutboundMessages.channelId, channel.id));
     await tx.delete(schema.communicationChannels).where(eq(schema.communicationChannels.id, channel.id));
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "communication_channel",

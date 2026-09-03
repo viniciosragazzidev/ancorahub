@@ -216,6 +216,7 @@ export async function disconnectManualMetaConnectionAction(): Promise<ManualMeta
       )).limit(1);
     if (!channel) throw new Error("Nenhuma conta Meta conectada.");
     await db.transaction(async (tx) => {
+      await tx.update(schema.whatsappOutboundMessages).set({ channelId: null }).where(eq(schema.whatsappOutboundMessages.channelId, channel.id));
       await tx.delete(schema.communicationChannels).where(eq(schema.communicationChannels.id, channel.id));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "meta_manual_integration", entidadeId: channel.id, acao: "meta_manual.disconnected" });
     });
