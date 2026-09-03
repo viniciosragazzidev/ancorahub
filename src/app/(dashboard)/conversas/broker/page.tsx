@@ -2,11 +2,13 @@ import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { LightConversationsView, type BrokerConversationInsight, type BrokerInsightMessage } from "@/features/broker-workspace/components/light-conversations-view";
+import { ConnectionBadge } from "@/features/broker-workspace/components/connection-badge";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { DashboardHeader } from "@/components/dashboard-header";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -94,5 +96,26 @@ export default async function BrokerConversationsPage({ searchParams }: { search
   ].sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
 
   const connection = connectionRows[0];
-  return <main className="h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-card p-0"><LightConversationsView insights={insights} initialLeadId={leadId} whatsappConnected={connection?.status === "ready"} connectionStatus={connection?.status ?? "disconnected"} /></main>;
+  return (
+    <>
+      <DashboardHeader
+        breadcrumb="Comunicação"
+        title="Conversas"
+        rightSlot={
+          <ConnectionBadge
+            connected={connection?.status === "ready"}
+            status={connection?.status ?? "disconnected"}
+          />
+        }
+      />
+      <main className="flex h-[calc(100dvh-var(--header-height))] min-h-0 w-full flex-col overflow-hidden bg-background">
+        <LightConversationsView
+          insights={insights}
+          initialLeadId={leadId}
+          whatsappConnected={connection?.status === "ready"}
+          connectionStatus={connection?.status ?? "disconnected"}
+        />
+      </main>
+    </>
+  );
 }
