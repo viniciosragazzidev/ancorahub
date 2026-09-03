@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
-import { formatE164Phone, MetaCloudApiError } from "./meta-cloud-client";
+import { formatE164Phone, getAlternateBrazilianPhone, MetaCloudApiError } from "./meta-cloud-client";
 
 export type MetaTemplateHeaderType = "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
 export type MetaTemplateCategory = "UTILITY" | "MARKETING" | "AUTHENTICATION";
@@ -126,25 +126,42 @@ export async function sendMetaCloudTemplateTest(
   language: string,
   components?: any[],
 ): Promise<{ messages?: Array<{ id: string }> }> {
-  const payload = {
+  const primaryPhone = formatE164Phone(destinationPhone);
+  const makePayload = (to: string) => ({
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: formatE164Phone(destinationPhone),
+    to,
     type: "template",
     template: {
       name: templateName,
       language: { code: language },
       ...(components && components.length > 0 ? { components } : {}),
     },
-  };
+  });
 
-  return graphRequest<{ messages?: Array<{ id: string }> }>(
-    `${encodeURIComponent(phoneNumberId)}/messages`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-    accessToken,
-  );
+  try {
+    return await graphRequest<{ messages?: Array<{ id: string }> }>(
+      `${encodeURIComponent(phoneNumberId)}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(makePayload(primaryPhone)),
+      },
+      accessToken,
+    );
+  } catch (error) {
+    const altPhone = getAlternateBrazilianPhone(destinationPhone);
+    if (altPhone && error instanceof MetaCloudApiError && (error.code === 100 || error.code === 131026 || error.status === 400)) {
+      return await graphRequest<{ messages?: Array<{ id: string }> }>(
+        `${encodeURIComponent(phoneNumberId)}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(makePayload(altPhone)),
+        },
+        accessToken,
+      );
+    }
+    throw error;
+  }
 }

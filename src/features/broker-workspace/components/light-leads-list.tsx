@@ -31,9 +31,11 @@ export type LightLeadItem = {
   dueAt?: Date | string | null;
   isOverdue?: boolean;
   isAwaitingResponse?: boolean;
+  isLost?: boolean;
+  lostReason?: string | null;
 };
 
-type FilterTab = "all" | "awaiting" | "active" | "finished";
+type FilterTab = "all" | "awaiting" | "active" | "finished" | "lost";
 
 function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "";
@@ -80,17 +82,22 @@ export function LightLeadsList({
 
     // Status filter
     if (filter === "awaiting") {
-      list = list.filter((l) => l.status === "distributed" || l.status === "new");
+      list = list.filter((l) => (l.status === "distributed" || l.status === "new") && !l.isLost);
     } else if (filter === "active") {
       list = list.filter(
         (l) =>
-          l.status === "in_contact" ||
+          !l.isLost &&
+          (l.status === "in_contact" ||
           l.status === "quote_sent" ||
           l.status === "negotiation" ||
-          l.status === "documentation_pending",
+          l.status === "documentation_pending"),
       );
     } else if (filter === "finished") {
-      list = list.filter((l) => l.status === "converted" || l.status === "lost");
+      list = list.filter((l) => l.status === "converted" && !l.isLost);
+    } else if (filter === "lost") {
+      list = list.filter((l) => l.status === "lost" || l.isLost);
+    } else if (filter === "all") {
+      list = list.filter((l) => !l.isLost && l.status !== "lost");
     }
 
     // Priority auto-sorting
@@ -127,7 +134,7 @@ export function LightLeadsList({
               Meus Leads
             </span>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Atendimentos ({leads.length})
+              Atendimentos ({leads.filter((l) => !l.isLost && l.status !== "lost").length})
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -162,7 +169,7 @@ export function LightLeadsList({
                 : "bg-muted text-muted-foreground hover:bg-muted/80",
             )}
           >
-            Todos ({leads.length})
+            Todos ({leads.filter((l) => !l.isLost && l.status !== "lost").length})
           </button>
 
           <button
@@ -179,7 +186,7 @@ export function LightLeadsList({
           >
             Aguardando aceite
             <Badge variant="warning" className="h-4 min-w-4 rounded-full px-1 text-[9px] font-bold">
-              {leads.filter((l) => l.status === "distributed" || l.status === "new").length}
+              {leads.filter((l) => (l.status === "distributed" || l.status === "new") && !l.isLost).length}
             </Badge>
           </button>
 
@@ -198,6 +205,7 @@ export function LightLeadsList({
             Em atendimento (
             {
               leads.filter((l) =>
+                !l.isLost &&
                 ["in_contact", "quote_sent", "negotiation", "documentation_pending"].includes(
                   l.status,
                 ),
@@ -218,8 +226,22 @@ export function LightLeadsList({
                 : "bg-muted text-muted-foreground hover:bg-muted/80",
             )}
           >
-            Finalizados ({leads.filter((l) => l.status === "converted" || l.status === "lost").length}
-            )
+            Ganhos ({leads.filter((l) => l.status === "converted" && !l.isLost).length})
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={filter === "lost"}
+            onClick={() => setFilter("lost")}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer",
+              filter === "lost"
+                ? "bg-destructive text-destructive-foreground font-semibold shadow-xs"
+                : "bg-muted text-muted-foreground hover:bg-muted/80",
+            )}
+          >
+            Perdidos ({leads.filter((l) => l.status === "lost" || l.isLost).length})
           </button>
         </div>
 
@@ -250,16 +272,16 @@ export function LightLeadsList({
         <div className="space-y-3">
           {filteredAndSortedLeads.length > 0 ? (
             filteredAndSortedLeads.map((lead) => {
-              const isDistributed = lead.status === "distributed" || lead.status === "new";
-              const isConverted = lead.status === "converted";
-              const isLost = lead.status === "lost";
+              const isDistributed = (lead.status === "distributed" || lead.status === "new") && !lead.isLost;
+              const isConverted = lead.status === "converted" && !lead.isLost;
+              const isLost = lead.status === "lost" || lead.isLost;
 
-              const statusBadge = isDistributed
-                ? { variant: "warning" as const, label: "Novo lead" }
-                : isConverted
-                  ? { variant: "success" as const, label: "Venda concluída" }
-                  : isLost
-                    ? { variant: "secondary" as const, label: "Finalizado" }
+              const statusBadge = isLost
+                ? { variant: "destructive" as const, label: "Perdido / Inativo" }
+                : isDistributed
+                  ? { variant: "warning" as const, label: "Novo lead" }
+                  : isConverted
+                    ? { variant: "success" as const, label: "Venda concluída" }
                     : lead.isAwaitingResponse
                       ? { variant: "warning" as const, label: "Nova mensagem" }
                       : lead.isOverdue
@@ -273,10 +295,11 @@ export function LightLeadsList({
                   aria-label={`Lead ${lead.name}`}
                   className={cn(
                     "bg-card/95 transition-colors hover:border-primary/30",
+                    isLost && "border-l-[3px] border-l-destructive/80 opacity-90",
                     isDistributed && "border-l-[3px] border-l-warning",
                     isConverted && "border-l-[3px] border-l-success",
-                    lead.isAwaitingResponse && "border-l-[3px] border-l-primary",
-                    lead.isOverdue && !isDistributed && !lead.isAwaitingResponse && "border-l-[3px] border-l-destructive",
+                    lead.isAwaitingResponse && !isLost && "border-l-[3px] border-l-primary",
+                    lead.isOverdue && !isDistributed && !lead.isAwaitingResponse && !isLost && "border-l-[3px] border-l-destructive",
                   )}
                 >
                   <div className="space-y-3 p-4 sm:p-5">
@@ -294,13 +317,16 @@ export function LightLeadsList({
                       <p
                         className={cn(
                           "mt-1 text-[11px] font-medium",
-                          lead.isAwaitingResponse && "text-primary font-semibold",
-                          !lead.isAwaitingResponse && lead.isOverdue && "text-destructive font-semibold",
-                          !lead.isAwaitingResponse && !lead.isOverdue && isDistributed && "text-warning font-semibold",
-                          !lead.isAwaitingResponse && !lead.isOverdue && !isDistributed && "text-muted-foreground",
+                          isLost && "text-destructive font-semibold",
+                          !isLost && lead.isAwaitingResponse && "text-primary font-semibold",
+                          !isLost && !lead.isAwaitingResponse && lead.isOverdue && "text-destructive font-semibold",
+                          !isLost && !lead.isAwaitingResponse && !lead.isOverdue && isDistributed && "text-warning font-semibold",
+                          !isLost && !lead.isAwaitingResponse && !lead.isOverdue && !isDistributed && "text-muted-foreground",
                         )}
                       >
-                        {lead.isAwaitingResponse
+                        {isLost
+                          ? lead.lostReason || "⚠️ Redistribuído por inatividade / tempo limite estourado"
+                          : lead.isAwaitingResponse
                           ? "💬 Cliente aguardando sua resposta"
                           : lead.isOverdue
                             ? "⚡ Atualização pendente necessária"

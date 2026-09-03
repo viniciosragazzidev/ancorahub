@@ -199,6 +199,48 @@ export default async function MinhaFilaPage() {
     )
     .limit(3);
 
+  // ─── Leads Perdidos / Redistribuídos ───
+  const lostLeadNotifications = await db
+    .select({
+      leadId: schema.notifications.leadId,
+      createdAt: schema.notifications.createdAt,
+      message: schema.notifications.message,
+    })
+    .from(schema.notifications)
+    .where(
+      and(
+        eq(schema.notifications.tenantId, context.tenantId),
+        eq(schema.notifications.recipientUserId, context.userId),
+        eq(schema.notifications.type, "lead_reassigned"),
+      ),
+    )
+    .orderBy(desc(schema.notifications.createdAt))
+    .limit(50);
+
+  const lostLeadIds = Array.from(new Set(lostLeadNotifications.map((n) => n.leadId).filter(Boolean))) as string[];
+
+  const lostLeadsFromDb = lostLeadIds.length
+    ? await db
+        .select({
+          id: schema.leads.id,
+          name: schema.leads.nome,
+          phone: schema.leads.telefone,
+          source: schema.leads.origem,
+          status: schema.leads.status,
+          createdAt: schema.leads.createdAt,
+          stageEnteredAt: schema.leads.stageEnteredAt,
+        })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.tenantId, context.tenantId),
+            inArray(schema.leads.id, lostLeadIds),
+          ),
+        )
+    : [];
+
+  const lostLeadsMap = new Map(lostLeadNotifications.map((n) => [n.leadId, n]));
+
   // Metric calculations
   const totalLeads = leads.length;
   const urgentLeads = leads.filter(
@@ -221,7 +263,7 @@ export default async function MinhaFilaPage() {
   ).length;
 
   if (experienceMode === "LIGHT") {
-    const lightLeads: LightLeadItem[] = leads.map((l) => ({
+    const activeLightLeads: LightLeadItem[] = leads.map((l) => ({
       id: l.id,
       name: l.name,
       phone: l.phone,
@@ -234,10 +276,22 @@ export default async function MinhaFilaPage() {
         l.stageEnteredAt != null &&
         Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000,
     }));
-    return <LightLeadsList leads={lightLeads} availabilityStatus={availabilityStatus} />;
+
+    const lostLightLeads: LightLeadItem[] = lostLeadsFromDb.map((l) => ({
+      id: l.id,
+      name: l.name,
+      phone: l.phone,
+      status: "lost",
+      isLost: true,
+      lostReason: "Redistribuído por inatividade / tempo limite estourado",
+      createdAt: l.createdAt,
+      updatedAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt,
+    }));
+
+    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} />;
   }
 
-  const enrichedLeads = leads.map((lead) => ({
+  const enrichedActiveLeads = leads.map((lead) => ({
     ...lead,
     lastInteractionAt: latestInteraction.get(lead.id) ?? null,
     taskCount: taskCount.get(lead.id) ?? 0,
@@ -245,6 +299,20 @@ export default async function MinhaFilaPage() {
       ? `••••${lead.phone.replace(/\D/g, "").slice(-4)}`
       : lead.phone,
   }));
+
+  const enrichedLostLeads = lostLeadsFromDb.map((lead) => ({
+    ...lead,
+    serviceStartedAt: null,
+    assignedAt: null,
+    status: "lost",
+    lastInteractionAt: lostLeadsMap.get(lead.id)?.createdAt ?? null,
+    taskCount: 0,
+    maskPhone: lead.phone.replace(/\D/g, "").length > 4
+      ? `••••${lead.phone.replace(/\D/g, "").slice(-4)}`
+      : lead.phone,
+  }));
+
+  const enrichedLeads = [...enrichedActiveLeads, ...enrichedLostLeads];
 
   const dailyTrend = Array.from({ length: 7 }, (_, index) => {
     const date = new Date();

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
 import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -543,6 +543,16 @@ export function LeadsWorkspace({
               <span className="hidden sm:inline">Radar de Negociações (IA)</span>
               <span className="sm:hidden">Radar IA</span>
             </TabsTrigger>
+            <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
+              <XCircle className="size-4 text-destructive" />
+              <span className="hidden sm:inline">Perdidos & Inativos</span>
+              <span className="sm:hidden">Perdidos</span>
+              {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
+                <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {workspaceLeads.filter((l) => l.status === "lost").length}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
           </TabsList>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
@@ -691,6 +701,28 @@ export function LeadsWorkspace({
             brokers={brokers}
             contextRole={contextRole}
           />
+        </TabsContent>
+
+        {/* ─── TAB 5: PERDIDOS & INATIVOS ─── */}
+        <TabsContent value="perdidos" className="mt-4">
+          <div className="space-y-4">
+            <div className="w-full">
+              <LeadsDataTable
+                leads={workspaceLeads.filter((l) => l.status === "lost")}
+                contextRole={contextRole}
+                shouldMask={shouldMask}
+                slaFirstContactMinutes={slaFirstContactMinutes}
+                slaStagnantDays={slaStagnantDays}
+                pageSize={pageSize}
+                pagination={pagination}
+                selectedIds={multiSelect.selectedIds}
+                isAllSelected={false}
+                onToggleRow={multiSelect.toggle}
+                onSelectAll={() => {}}
+                onRowClick={setSelectedLead}
+              />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

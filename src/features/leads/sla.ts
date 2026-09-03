@@ -7,6 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { chooseAvailableBroker } from "./assignment";
 import { notifyLeadReassigned, notifyNewLead, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -173,6 +174,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
 
           if (previousOwnerId) {
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
           }
         } else {
           // Dentro do limite: efetua a redistribuição e incrementa o contador
@@ -220,6 +222,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
 
           if (previousOwnerId && previousOwnerId !== nextBrokerId) {
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
           }
         }
 
