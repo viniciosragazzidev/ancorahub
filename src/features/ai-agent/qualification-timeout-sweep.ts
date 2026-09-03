@@ -1,6 +1,6 @@
-import "server-only";
+﻿import "server-only";
 
-import { and, eq, isNotNull, lt, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -35,7 +35,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
   let distributedLeadsCount = 0;
 
   for (const tenant of tenants) {
-    // Buscar timeout configurado para o tenant (padrão: 20 minutos)
+    // Buscar timeout configurado para o tenant (padrão: 15/20 minutos)
     const [config] = await db
       .select({
         timeoutMinutes: schema.aiQualificationConfigs.timeoutMinutes,
@@ -44,13 +44,11 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       .where(eq(schema.aiQualificationConfigs.tenantId, tenant.id))
       .limit(1);
 
-    const timeoutMinutes = Math.max(5, config?.timeoutMinutes ?? 30); // Default 30 minutos (alinhado com aiQualificationConfigs)
+    const timeoutMinutes = Math.max(1, config?.timeoutMinutes ?? 15);
     const cutoffDate = new Date(now - timeoutMinutes * 60 * 1000);
 
-    // Only conversations that are explicitly waiting for the customer's next
-    // answer qualify. Lead.updatedAt is deliberately not used here: a manager
-    // editing a lead must not postpone the configured conversation timeout.
-    const pendingLeads = await db
+    // Seleciona todos os leads em qualificação que não possuem corretor atribuído
+    const qualifyingLeads = await db
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
@@ -61,25 +59,34 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         branchId: schema.leads.branchId,
         metaCampaignId: schema.leads.metaCampaignId,
         sourceCampaign: schema.leads.sourceCampaign,
-        conversationId: schema.aiConversations.id,
-        lastActivityAt: schema.aiConversations.lastActivityAt,
+        createdAt: schema.leads.createdAt,
+        updatedAt: schema.leads.updatedAt,
       })
-      .from(schema.aiConversations)
-      .innerJoin(schema.leads, and(
-        eq(schema.aiConversations.leadId, schema.leads.id),
-        eq(schema.aiConversations.tenantId, schema.leads.tenantId),
-      ))
+      .from(schema.leads)
       .where(
         and(
-          eq(schema.aiConversations.tenantId, tenant.id),
-          eq(schema.aiConversations.status, "WAITING_CUSTOMER"),
-          eq(schema.aiConversations.automationState, "AI_ACTIVE"),
-          eq(schema.leads.qualificationState, "IN_PROGRESS"),
-          lt(schema.aiConversations.lastActivityAt, cutoffDate),
+          eq(schema.leads.tenantId, tenant.id),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.corretorId),
+          or(
+            eq(schema.leads.qualificationState, "IN_PROGRESS"),
+            eq(schema.leads.qualificationStatus, "qualifying"),
+            eq(schema.leads.qualificationStatus, "pending"),
+            isNull(schema.leads.qualificationStatus)
+          ),
+          notInArray(schema.leads.qualificationStatus, [
+            "qualified",
+            "hot",
+            "warm",
+            "cold",
+            "disqualified",
+            "not_qualified",
+            "waiting_human"
+          ])
         )
       );
 
-    if (!pendingLeads.length) continue;
+    if (!qualifyingLeads.length) continue;
 
     const [anyMember] = await db
       .select({ userId: schema.tenantMemberships.userId })
@@ -87,13 +94,65 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active")))
       .limit(1);
 
-    const systemUserId = anyMember?.userId || await resolveSystemUserId(tenant.id);
+    const systemUserId = anyMember?.userId || (await resolveSystemUserId(tenant.id));
 
-    for (const lead of pendingLeads) {
+    for (const lead of qualifyingLeads) {
+      // 1. Localizar conversa de IA ativa (se houver)
+      const [aiConv] = await db
+        .select({
+          id: schema.aiConversations.id,
+          status: schema.aiConversations.status,
+          automationState: schema.aiConversations.automationState,
+          lastActivityAt: schema.aiConversations.lastActivityAt,
+          updatedAt: schema.aiConversations.updatedAt,
+        })
+        .from(schema.aiConversations)
+        .where(
+          and(
+            eq(schema.aiConversations.tenantId, tenant.id),
+            eq(schema.aiConversations.leadId, lead.id)
+          )
+        )
+        .orderBy(desc(schema.aiConversations.updatedAt))
+        .limit(1);
+
+      // 2. Localizar última mensagem de WhatsApp trocada
+      const [latestMsg] = await db
+        .select({
+          id: schema.whatsappMessages.id,
+          sentAt: schema.whatsappMessages.sentAt,
+          direction: schema.whatsappMessages.direction,
+        })
+        .from(schema.whatsappMessages)
+        .where(
+          and(
+            eq(schema.whatsappMessages.tenantId, tenant.id),
+            or(
+              eq(schema.whatsappMessages.leadId, lead.id),
+              and(isNotNull(schema.whatsappMessages.phone), eq(schema.whatsappMessages.phone, lead.telefone ?? ""))
+            )
+          )
+        )
+        .orderBy(desc(schema.whatsappMessages.sentAt))
+        .limit(1);
+
+      // 3. Determinar a data da última atividade real
+      const lastActivityAt: Date =
+        latestMsg?.sentAt ??
+        aiConv?.lastActivityAt ??
+        aiConv?.updatedAt ??
+        lead.createdAt ??
+        new Date();
+
+      // Se a última atividade ainda estiver dentro da janela de tolerância, não expirar
+      if (lastActivityAt >= cutoffDate) {
+        continue;
+      }
+
       timedOutLeadsCount += 1;
       const updateTime = new Date();
 
-      // Check if lead replied at least once to the virtual agent / CRM
+      // Verificar se o lead interagiu (respondeu ao menos uma mensagem)
       const [incomingMessage] = await db
         .select({ id: schema.whatsappMessages.id })
         .from(schema.whatsappMessages)
@@ -115,29 +174,42 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       const campaignId = lead.metaCampaignId || lead.sourceCampaign;
       const [configuredRoute] = campaignId
         ? await db
-          .select({
-            queueId: schema.leadQueues.id,
-            branchId: schema.leadQueues.branchId,
-          })
-          .from(schema.metaCampaignQueueRoutes)
-          .innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
-          .where(and(
-            eq(schema.metaCampaignQueueRoutes.tenantId, tenant.id),
-            eq(schema.metaCampaignQueueRoutes.campaignId, campaignId),
-            eq(schema.metaCampaignQueueRoutes.enabled, true),
-            eq(schema.leadQueues.tenantId, tenant.id),
-            eq(schema.leadQueues.status, "active"),
-          ))
-          .limit(1)
+            .select({
+              queueId: schema.leadQueues.id,
+              branchId: schema.leadQueues.branchId,
+            })
+            .from(schema.metaCampaignQueueRoutes)
+            .innerJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+            .where(
+              and(
+                eq(schema.metaCampaignQueueRoutes.tenantId, tenant.id),
+                eq(schema.metaCampaignQueueRoutes.campaignId, campaignId),
+                eq(schema.metaCampaignQueueRoutes.enabled, true),
+                eq(schema.leadQueues.tenantId, tenant.id),
+                eq(schema.leadQueues.status, "active")
+              )
+            )
+            .limit(1)
         : [];
+
       const targetRoute = resolveQualificationTimeoutRoute({
         currentQueueId: lead.queueId,
         currentBranchId: lead.branchId,
         configuredRoute,
       });
 
+      let resolvedBranchId = targetRoute.branchId;
+      if (!resolvedBranchId) {
+        const [defaultBranch] = await db
+          .select({ id: schema.branches.id })
+          .from(schema.branches)
+          .where(and(eq(schema.branches.tenantId, tenant.id), eq(schema.branches.status, "active")))
+          .limit(1);
+        resolvedBranchId = defaultBranch?.id ?? null;
+      }
+
       await db.transaction(async (tx) => {
-        // 1. Atualizar Lead: Status Morno/Frio conforme interação + Finalizar Qualificação + Mover p/ Fila de Distribuição
+        // 1. Atualizar Lead: Status Morno/Frio + Finalizar Qualificação + Mover p/ Fila de Distribuição
         await tx
           .update(schema.leads)
           .set({
@@ -145,7 +217,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
             qualificationState: "QUALIFIED",
             qualificationCompletedAt: updateTime,
             queueId: targetRoute.queueId || null,
-            branchId: targetRoute.branchId,
+            branchId: resolvedBranchId,
             status: "new",
             distributionStatus: "queued",
             distributionUpdatedAt: updateTime,
@@ -169,7 +241,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           tenantId: tenant.id,
           leadId: lead.id,
           fromBranchId: lead.branchId,
-          toBranchId: targetRoute.branchId,
+          toBranchId: resolvedBranchId,
           toQueueId: targetRoute.queueId || null,
           action: "qualification_timeout_queued",
           source: "qualification_timeout",
@@ -187,23 +259,34 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           entidadeId: lead.id,
           acao: "qualification.timeout_auto_distributed",
         });
+
+        // 4. Encerrar Sessão legada de qualificação se existir
+        await tx
+          .update(schema.aiQualificationSessions)
+          .set({ status: "expired", updatedAt: updateTime })
+          .where(
+            and(
+              eq(schema.aiQualificationSessions.tenantId, tenant.id),
+              eq(schema.aiQualificationSessions.leadId, lead.id)
+            )
+          );
       });
 
-      // The durable job is created only after the queue/branch transition commits.
-      // The same worker is then attempted immediately, so the handoff does not
-      // wait for the periodic scheduler during commercial hours.
+      // 5. Encerrar Atendimento do Robô de IA para este Lead (se houver conversa)
+      if (aiConv?.id) {
+        await transitionConversationState({
+          tenantId: tenant.id,
+          conversationId: aiConv.id,
+          newStatus: "CLOSED",
+          reason: `Estouro do tempo limite de qualificação (${timeoutMinutes} min sem resposta). IA encerrada.`,
+        }).catch(() => undefined);
+      }
+
+      // 6. Tentativa imediata de distribuição para corretor da unidade
       await enqueueAndProcessLeadDistribution({
         tenantId: tenant.id,
         leadId: lead.id,
         source: "qualification_timeout",
-      });
-
-      // 4. Encerrar Atendimento do Robô de IA para este Lead
-      await transitionConversationState({
-        tenantId: tenant.id,
-        conversationId: lead.conversationId,
-        newStatus: "CLOSED",
-        reason: `Estouro do tempo limite de qualificação (${timeoutMinutes} min sem resposta). IA encerrada.`,
       });
 
       distributedLeadsCount += 1;
