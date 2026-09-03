@@ -4,7 +4,7 @@ import { and, eq, inArray, isNotNull, lt, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { transitionConversationState } from "./conversation-state-machine";
 import { resolveQualificationTimeoutRoute } from "./qualification-timeout-routing";
 
@@ -181,7 +181,13 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       });
 
       // The durable job is created only after the queue/branch transition commits.
-      await enqueueLeadDistributionJob({ tenantId: tenant.id, leadId: lead.id });
+      // The same worker is then attempted immediately, so the handoff does not
+      // wait for the periodic scheduler during commercial hours.
+      await enqueueAndProcessLeadDistribution({
+        tenantId: tenant.id,
+        leadId: lead.id,
+        source: "qualification_timeout",
+      });
 
       // 4. Encerrar Atendimento do Robô de IA para este Lead
       const [conv] = await db

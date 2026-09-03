@@ -77,6 +77,49 @@ export async function enqueueLeadDistributionJob(input: { tenantId: string; lead
   }).onConflictDoNothing();
 }
 
+/**
+ * Persists the distribution intent before attempting the immediate path.
+ *
+ * A handoff must never depend exclusively on the scheduler: during business
+ * hours we try the same durable job immediately, while the pending job remains
+ * the recovery mechanism if the processor cannot finish this attempt.
+ */
+export async function enqueueAndProcessLeadDistribution(input: {
+  tenantId: string;
+  leadId: string;
+  source: "qualification_timeout" | "human_handoff" | "agent_trigger";
+}) {
+  await enqueueLeadDistributionJob({ tenantId: input.tenantId, leadId: input.leadId });
+
+  try {
+    const result = await runLeadDistributionProcessor({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      limit: 1,
+    });
+    console.info("[lead-distribution] immediate_attempt", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      source: input.source,
+      assigned: result.assigned,
+      deferred: result.deferred,
+      failed: result.failed,
+    });
+    return result;
+  } catch (error) {
+    const message = sanitizeError(error);
+    console.error("[lead-distribution] immediate_attempt_failed", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      source: input.source,
+      message,
+    });
+    // The job was persisted before this best-effort attempt and will be
+    // recovered by the processor/scheduler without losing the handoff.
+    return null;
+  }
+}
+
 async function deferJobsUntilBusinessHours(now: Date, tenantId?: string, leadId?: string) {
   const runAfter = scheduleForBusinessHours(now);
   const deferred = await getDatabase().update(schema.leadDistributionJobs).set({

@@ -24,10 +24,11 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
+import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 
 
 export type ConversationStatus =
@@ -1329,12 +1330,10 @@ export async function processInboundAiResponse({
         newStatus: "WAITING_HUMAN",
         reason: "Solicitação explícita de atendimento humano",
       });
-      await db.update(schema.leads).set({
-        qualificationStatus: "waiting_human",
-        status: "distributed",
-        updatedAt: now,
-      }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
-      await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
+      await db.update(schema.leads)
+        .set(buildHumanHandoffLeadUpdate(now))
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+      await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" });
     } else if (quickReply.intent === "OPT_OUT" || quickReply.intent === "NO_LONGER_INTERESTED" || quickReply.intent === "WRONG_NUMBER") {
       await db.update(schema.leads).set({
         qualificationStatus: "cold",
@@ -1894,6 +1893,11 @@ export async function processInboundAiResponse({
   }
 
   if (aiResult.shouldTransferToHuman && !qualificationCompleted) {
+    const handoffAt = new Date();
+    await db.update(schema.leads)
+      .set(buildHumanHandoffLeadUpdate(handoffAt))
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+    await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" });
     await transitionConversationState({
       tenantId,
       conversationId: conversation.id,

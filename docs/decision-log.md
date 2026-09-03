@@ -212,10 +212,12 @@ consolidado. Detalhes e alternativas rejeitadas em ADR-0039.
 **Estado:** Aceita
 **Data:** 2026-08-17
 
-Ao exceder o tempo de resposta da qualificação, o lead é mantido na fila ativa
-configurada para sua campanha/tipo de entrada; se não houver regra ativa, preserva
-a fila já definida no intake. O job persistente é criado após o commit desta
-transição. Fila vinculada a uma unidade seleciona somente corretores daquela unidade;
+Ao exceder o tempo de resposta da qualificação, ou quando o contato solicita uma
+transferência humana, o lead é mantido na fila ativa configurada para sua
+campanha/tipo de entrada; se não houver regra ativa, preserva a fila já definida no
+intake. O job persistente é criado após o commit da transição e é tentado imediatamente
+durante o horário comercial; ele permanece como recuperação auditável caso não exista
+elegível ou ocorra falha transitória. Fila vinculada a uma unidade seleciona somente corretores daquela unidade;
 fila geral seleciona somente unidades explicitamente permitidas em sua política e
 nunca usa a Matriz como destino. A Matriz é ponto administrativo de entrada. Sem
 corretor ou unidade elegível, o lead permanece em fila e o trabalho é repetido com
