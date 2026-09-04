@@ -46,10 +46,53 @@ autorizações, distribuição, SLA, webhooks, processamento de Meta/WAHA ou dad
 - Dashboard: poucos indicadores acionáveis; nenhum card decorativo, métrica fixa ou
   duplicação de dashboard.
 
+### Regra adicional para perspectivas analíticas
+
+Uma aba analítica só pode existir quando possuir, antes da composição visual: métrica
+nomeada no catálogo, resolvedor server-side, escopo autorizado (tenant, papel,
+unidade/equipe quando aplicável), estados operacionais e destino de drill-down
+compatível. Uma perspectiva ainda sem esses elementos é um **gap registrado**, nunca
+uma aba vazia, calculada no cliente ou preenchida com números aproximados.
+
+## Contrato de simplicidade máxima
+
+Uma tela só pode exibir algo se responder a uma decisão, ação ou contexto ativo do
+usuário. O padrão é remover, agrupar ou revelar sob demanda — nunca adicionar mais
+um card para acomodar uma exceção.
+
+- Uma única ação primária por contexto; as demais ficam em ações secundárias,
+  contexto de linha ou menu `•••`.
+- Uma informação tem uma única representação principal por aba. Previews devem levar
+  à análise correspondente na mesma rota, sem repetir uma tabela ou painel inteiro.
+- Cards são reservados para agrupamentos independentes e acionáveis; seções de leitura
+  contínua usam estrutura leve, sem borda e fundo redundantes.
+- Métricas são limitadas ao que muda uma decisão. Uma métrica sem comparação, ação ou
+  explicação pertence a um detalhe sob demanda ou deve ser removida.
+- Abas são domínios mutuamente exclusivos. Não usar aba como link disfarçado para outra
+  rota; estado de aba e período permanecem na URL.
+- Tabelas priorizam as colunas necessárias para decidir. Ações raras, exportação e
+  dimensões adicionais ficam em controles contextuais ou disclosure progressivo.
+- Cor, ícone, animação e destaque não substituem texto, estado semântico ou foco.
+
+## Gate de conclusão para uma migração de tela
+
+Uma implementação visual só é concluída quando comprova, por código e validação, que:
+
+1. há uma Home canônica e nenhum caminho concorrente para o mesmo trabalho;
+2. componentes e métricas compartilhados foram reutilizados, sem cópia entre rotas;
+3. permissões, tenant, unidade e carteira são derivados no servidor;
+4. URL, carregamento, vazio, erro, indisponibilidade, sucesso e acesso negado estão
+   cobertos quando aplicáveis;
+5. o layout é utilizável em desktop, viewport estreito, teclado, zoom e reduced motion;
+6. a rota anterior permanece compatível ou possui migração reversível controlada por
+   feature flag e auditoria;
+7. testes, typecheck, build e revisão visual são registrados no Controle de Execução.
+
 ## Qualidade obrigatória
 
 - Usar componentes compartilhados existentes em `src/components/ui/` e
-  `src/components/unlumen-ui/` quando cobrirem a necessidade.
+  `src/components/unlumen-ui/` e `src/components/foundations/` quando cobrirem a
+  necessidade.
 - Não institucionalizar novos tokens, primitives ou variantes sem justificar o gap
   no registro da etapa atual.
 - Cobrir carregamento, vazio, erro, sucesso, indisponibilidade e permissão quando

@@ -738,7 +738,7 @@ export default async function ConversationsPage({
   }
 
   return (
-    <>
+    <div className="flex h-dvh min-h-0 w-full flex-1 flex-col overflow-hidden">
       <DashboardHeader
         breadcrumb="Atendimento"
         title="Conversas"
@@ -754,8 +754,8 @@ export default async function ConversationsPage({
           ) : undefined
         }
       />
-      <main className="min-h-0 w-full flex-1 bg-background p-0">
-        <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:min-h-0 w-full overflow-hidden bg-card">
+      <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0">
+        <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
           {officialBrokerTab ? (
             <OfficialBrokerConversations
               enabled={officialBrokerMessagesEnabled}
@@ -774,7 +774,7 @@ export default async function ConversationsPage({
           )}
         </div>
       </main>
-    </>
+    </div>
   );
 }
 

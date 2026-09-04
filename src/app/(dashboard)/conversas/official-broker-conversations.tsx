@@ -306,8 +306,8 @@ export function OfficialBrokerConversations({
 
   return (
     <section
-      aria-label="Conversas oficiais com corretores"
-      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
+      aria-label="Central de mensagens oficiais com corretores"
+      className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       {/* Header com Ações de Disparo */}
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-6">

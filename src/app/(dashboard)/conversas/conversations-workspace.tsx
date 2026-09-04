@@ -251,7 +251,7 @@ export function ConversationsWorkspace({
   return (
     <section
       aria-label="Central de conversas"
-      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:h-full w-full flex-col overflow-hidden bg-card"
+      className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       <FilterToolbar
         aria-label="Filtros dos atendimentos"

@@ -23,11 +23,8 @@ import {
   ShieldCheck,
   Buildings,
   Megaphone,
-  Plug,
-  WifiHigh,
 } from "@phosphor-icons/react";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
-import { AncoraLogo } from "@/components/ancora-logo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -239,16 +236,16 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
     <Sidebar
       variant="sidebar"
       collapsible="none"
-      className="w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-sidebar-border/50 bg-[#0A1415] text-sidebar-foreground shadow-xs select-none"
+      className="w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-[#16292B] bg-[#0A1517] text-slate-100 shadow-xl select-none"
     >
       {/* Header: Logo & SuperAdmin Switcher */}
-      <SidebarHeader className="flex flex-col items-center justify-center p-2 pt-3 pb-2 gap-2 border-b border-sidebar-border/30">
+      <SidebarHeader className="flex flex-col items-center justify-center p-2 pt-3 pb-2 gap-2 border-b border-white/[0.08]">
         <Link
           href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
-          className="flex size-10 items-center justify-center rounded-2xl bg-sidebar-accent/40 p-1.5 transition-transform hover:scale-105"
+          className="flex size-11 items-center justify-center rounded-2xl bg-white/[0.06] border border-white/[0.12] p-1.5 transition-all duration-200 hover:scale-105 hover:bg-white/[0.10] hover:border-emerald-500/40"
           title="Âncora CRM"
         >
-          <img src="/icon.png" alt="Ancora" className="size-7 object-contain drop-shadow-sm" />
+          <img src="/icon.png" alt="Ancora" className="size-7 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]" />
         </Link>
 
         {user?.isPlatformAdmin && (
@@ -267,18 +264,18 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     href="/distribuicao?view=plantao"
                     onClick={() => isMobile && setOpenMobile(false)}
                     className={cn(
-                      "relative flex size-9 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 transition-colors hover:bg-emerald-500/20",
-                      isPlantaoActive && "border-emerald-500 bg-emerald-500/25 ring-2 ring-emerald-500/40"
+                      "relative flex size-9 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 transition-colors hover:bg-emerald-500/25",
+                      isPlantaoActive && "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400/50"
                     )}
                   />
                 }
               >
-                <span className="relative flex size-2">
+                <span className="relative flex size-2.5">
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs font-semibold">
+              <TooltipContent side="right" className="text-xs font-semibold bg-[#0E1E20] text-slate-100 border-[#1E3639]">
                 Plantão ao vivo ativo
               </TooltipContent>
             </Tooltip>
@@ -290,7 +287,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       <SidebarContent className="flex-1 overflow-y-auto px-1 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <TooltipProvider delay={150}>
           <nav aria-label="Menu principal" className="flex flex-col items-center gap-1.5 w-full">
-            {visibleItems.map((item, index) => {
+            {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive =
                 pathname === item.url ||
@@ -310,13 +307,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                         href={itemTargetUrl}
                         prefetch={priorityNavigationPaths.has(itemTargetUrl)}
                         onClick={() => isMobile && setOpenMobile(false)}
-                        className="group relative flex w-full flex-col items-center justify-center gap-0.5 py-1 text-center outline-none select-none transition-transform active:scale-95"
+                        className="group relative flex w-full flex-col items-center justify-center gap-1 py-1 text-center outline-none select-none transition-transform active:scale-95"
                       />
                     }
                   >
                     {/* BETA badge floating on top */}
                     {item.beta && (
-                      <span className="absolute -top-1 right-2 z-20 rounded bg-indigo-600 px-1 py-0.2 text-[8px] font-bold text-white tracking-wide shadow-xs uppercase">
+                      <span className="absolute -top-1.5 z-20 rounded-full bg-[#6366F1] px-1.5 py-0.5 text-[8px] font-extrabold text-white tracking-wider shadow-md uppercase">
                         BETA
                       </span>
                     )}
@@ -325,17 +322,19 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     <div
                       className={cn(
                         "relative flex size-11 items-center justify-center rounded-2xl transition-all duration-200",
-                        isActive
-                          ? "bg-primary/20 text-primary border border-primary/30 shadow-xs dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30"
-                          : "text-muted-foreground/80 hover:bg-sidebar-accent/70 hover:text-foreground",
+                        // Inactive state: crisp light icons on dark slate
+                        !isActive && !item.isWhatsApp && "bg-transparent text-slate-300 hover:bg-white/[0.08] hover:text-white",
+                        // Active state: glowing emerald container
+                        isActive && !item.isWhatsApp && "bg-[#183134] text-emerald-300 border border-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.15)] ring-1 ring-emerald-400/20",
+                        // WhatsApp special styling
                         item.isWhatsApp && (
                           isActive
-                            ? "border-2 border-emerald-500 bg-emerald-500/20 text-emerald-400"
-                            : "border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/20"
+                            ? "border-[1.5px] border-emerald-400 bg-emerald-950/70 text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.3)] ring-1 ring-emerald-400/30"
+                            : "border-[1.5px] border-emerald-500/60 bg-emerald-950/40 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-950/70 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
                         )
                       )}
                     >
-                      {isActive && (
+                      {isActive && !item.isWhatsApp && (
                         <motion.div
                           layoutId="sidebar-rail-active"
                           className="absolute inset-0 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 pointer-events-none"
@@ -346,16 +345,17 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       <Icon
                         weight={isActive ? "fill" : "regular"}
                         className={cn(
-                          "size-5.5 shrink-0 transition-transform duration-200 group-hover:scale-110",
-                          isActive ? "text-primary dark:text-emerald-400" : "text-sidebar-foreground/75"
+                          "size-6 shrink-0 transition-transform duration-200 group-hover:scale-110",
+                          isActive ? "text-emerald-300" : "text-slate-200 group-hover:text-white",
+                          item.isWhatsApp && "text-emerald-300"
                         )}
                       />
 
                       {/* Green Status Dot (like WhatsApp) */}
                       {item.statusDot && (
-                        <span className="absolute top-1 right-1 flex size-2">
+                        <span className="absolute top-0.5 right-0.5 flex size-2.5">
                           <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex size-2 rounded-full bg-emerald-500 ring-2 ring-background" />
+                          <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0A1517] shadow-[0_0_8px_#34d399]" />
                         </span>
                       )}
                     </div>
@@ -365,8 +365,9 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       className={cn(
                         "max-w-[70px] truncate text-[10px] font-medium leading-tight tracking-tight transition-colors",
                         isActive
-                          ? "font-semibold text-foreground dark:text-emerald-400"
-                          : "text-sidebar-foreground/60 group-hover:text-foreground"
+                          ? "font-semibold text-emerald-300"
+                          : "text-slate-400 group-hover:text-slate-100",
+                        item.isWhatsApp && (isActive ? "text-emerald-300 font-semibold" : "text-emerald-300/90")
                       )}
                     >
                       {item.label}
@@ -374,10 +375,10 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
 
                     {/* Active Chevron Indicator */}
                     {isActive && (
-                      <CaretDown className="size-2.5 text-primary/70 dark:text-emerald-400/70 -mt-0.5" />
+                      <CaretDown className="size-2.5 text-emerald-400 -mt-0.5" />
                     )}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium text-xs">
+                  <TooltipContent side="right" className="font-medium text-xs bg-[#0E1E20] text-slate-100 border-[#1E3639]">
                     {item.fullLabel || item.label}
                   </TooltipContent>
                 </Tooltip>
@@ -388,7 +389,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarContent>
 
       {/* Footer: AI Agent & User Profile */}
-      <SidebarFooter className="flex flex-col items-center justify-center p-2 pb-3 gap-2 border-t border-sidebar-border/30">
+      <SidebarFooter className="flex flex-col items-center justify-center p-2 pb-3 gap-2 border-t border-white/[0.08]">
         <TooltipProvider delay={150}>
           {/* AI Agent Trigger */}
           <Tooltip>
@@ -400,13 +401,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     const event = new CustomEvent("open-agent-drawer");
                     window.dispatchEvent(event);
                   }}
-                  className="group relative flex size-11 flex-col items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary transition-all duration-200 hover:scale-105 hover:bg-primary/20 hover:border-primary/40 cursor-pointer"
+                  className="group relative flex size-11 flex-col items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 transition-all duration-200 hover:scale-105 hover:bg-emerald-500/25 hover:border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer"
                 />
               }
             >
-              <Sparkle weight="fill" className="size-5.5 text-primary animate-pulse" />
+              <Sparkle weight="fill" className="size-6 text-emerald-400 animate-pulse" />
             </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs font-semibold">
+            <TooltipContent side="right" className="text-xs font-semibold bg-[#0E1E20] text-slate-100 border-[#1E3639]">
               Agente IA (Ctrl+J)
             </TooltipContent>
           </Tooltip>
@@ -425,14 +426,14 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 seed={userName}
                 name={userName}
                 size="sm"
-                className="size-9 rounded-xl ring-2 ring-border/80 hover:ring-primary/40 transition-all"
+                className="size-9 rounded-xl ring-2 ring-emerald-500/40 hover:ring-emerald-400 transition-all"
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               side="right"
               align="end"
               sideOffset={12}
-              className="w-64 p-2.5 rounded-2xl border border-border/80 bg-card/95 backdrop-blur-md shadow-xl"
+              className="w-64 p-2.5 rounded-2xl border border-[#1E3639] bg-[#0E1E20] text-slate-100 shadow-2xl backdrop-blur-md"
             >
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="p-2">
@@ -441,18 +442,18 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       seed={userName}
                       name={userName}
                       size="sm"
-                      className="size-10 shrink-0 rounded-xl ring-2 ring-primary/20 shadow-xs"
+                      className="size-10 shrink-0 rounded-xl ring-2 ring-emerald-500/40 shadow-xs"
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+                      <span className="truncate text-sm font-semibold tracking-tight text-white">
                         {userName}
                       </span>
                       <div className="flex items-center gap-1.5">
                         <Badge
                           variant="secondary"
-                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20"
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         >
-                          <ShieldCheck className="size-3 text-primary" />
+                          <ShieldCheck className="size-3 text-emerald-400" />
                           {userRole}
                         </Badge>
                       </div>
@@ -460,10 +461,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   </div>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-white/10" />
               {user?.userProfileEnabled ? (
-                <DropdownMenuItem render={<Link href="/settings?tab=conta" />}>
-                  <UserCircle className="size-4" />
+                <DropdownMenuItem
+                  render={<Link href="/settings?tab=conta" />}
+                  className="text-slate-200 focus:bg-white/10 focus:text-white"
+                >
+                  <UserCircle className="size-4 text-emerald-400" />
                   Meu perfil
                 </DropdownMenuItem>
               ) : null}
@@ -471,21 +475,28 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
               (user?.permissions?.includes("acessar_configuracoes") ||
                 user?.permissions?.includes("acessar_configuracoes_pessoais") ||
                 roleKey === "broker") ? (
-                <DropdownMenuItem render={<Link href="/settings" />}>
-                  <SlidersHorizontal className="size-4" />
+                <DropdownMenuItem
+                  render={<Link href="/settings" />}
+                  className="text-slate-200 focus:bg-white/10 focus:text-white"
+                >
+                  <SlidersHorizontal className="size-4 text-emerald-400" />
                   Configurações
                 </DropdownMenuItem>
               ) : null}
               {userRole === "broker" || roleKey === "broker" || user?.jobTitle === "broker" ? (
                 <>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="bg-white/10" />
                   <div className="px-1 py-1">
                     <ExperienceModeToggle variant="menu-item" />
                   </div>
                 </>
               ) : null}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={handleLogout}
+                className="text-red-400 focus:bg-red-500/15 focus:text-red-300"
+              >
                 <SignOut className="size-4" />
                 Sair
               </DropdownMenuItem>
