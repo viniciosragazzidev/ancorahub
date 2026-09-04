@@ -5,15 +5,15 @@ import type { FunnelStage } from "@/features/reports/metrics/metrics-math";
 import { TrendUp } from "@/components/huge-icons";
 
 const STAGE_COLORS: Record<FunnelStage | "lost", string> = {
-  new: "bg-sky-100 text-sky-700",
-  distributed: "bg-indigo-100 text-indigo-700",
-  in_contact: "bg-violet-100 text-violet-700",
-  quote_sent: "bg-purple-100 text-purple-700",
-  negotiation: "bg-fuchsia-100 text-fuchsia-700",
-  documentation_pending: "bg-amber-100 text-amber-700",
-  under_analysis: "bg-orange-100 text-orange-700",
-  converted: "bg-emerald-100 text-emerald-700",
-  lost: "bg-red-100 text-red-700",
+  new: "bg-sky-500/20 text-sky-700 dark:text-sky-300",
+  distributed: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300",
+  in_contact: "bg-violet-500/20 text-violet-700 dark:text-violet-300",
+  quote_sent: "bg-purple-500/20 text-purple-700 dark:text-purple-300",
+  negotiation: "bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300",
+  documentation_pending: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+  under_analysis: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
+  converted: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
+  lost: "bg-red-500/20 text-red-700 dark:text-red-300",
 };
 
 const MAX_BAR_WIDTH = 100;

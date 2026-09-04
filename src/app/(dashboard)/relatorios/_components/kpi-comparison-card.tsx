@@ -43,8 +43,8 @@ function DeltaBadge({ delta, unit }: { delta: ComparisonDelta; unit: "pp" | "cur
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 text-xs font-medium",
-        isPositive ? "text-emerald-600" : "text-red-600",
+        "inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums",
+        isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
       )}
     >
       {isPositive ? <TrendUp className="size-3" aria-hidden="true" /> : <TrendDown className="size-3" aria-hidden="true" />}

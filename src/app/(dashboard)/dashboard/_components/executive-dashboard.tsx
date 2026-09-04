@@ -91,10 +91,11 @@ export function ExecutiveDashboard({
   role: "director" | "manager" | "supervisor";
 }) {
   const roleCopy = {
-    director: { title: "Visão executiva", subtitle: "Decisão e acompanhamento da operação" },
-    manager: { title: "Painel da unidade", subtitle: "Acompanhamento da sua unidade e equipe" },
-    supervisor: { title: "Painel da equipe", subtitle: "Acompanhamento dos corretores supervisionados" },
+    director: { title: "Visão Executiva", subtitle: "Decisão e acompanhamento de ponta a ponta da operação comercial" },
+    manager: { title: "Painel da Unidade", subtitle: "Acompanhamento de metas, corretores e resultados da sua unidade" },
+    supervisor: { title: "Painel da Equipe", subtitle: "Acompanhamento operacional e conversão dos corretores supervisionados" },
   }[role];
+
   const tabs: PageTabItem[] = data.tabs.map((tab) => ({
     id: tab,
     label: REPORT_TAB_LABELS[tab],
@@ -108,31 +109,49 @@ export function ExecutiveDashboard({
         title={roleCopy.title}
         rightSlot={<PeriodSelect value={period} label="Período do painel" />}
       />
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 lg:p-6">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
         <section aria-labelledby="executive-dashboard-title" className="space-y-4">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">{roleCopy.subtitle}</p>
-            <h1 id="executive-dashboard-title" className="mt-1 text-2xl font-semibold tracking-tight">
-              {REPORT_TAB_LABELS[data.activeTab]}
-            </h1>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 id="executive-dashboard-title" className="text-2xl font-bold tracking-tight text-foreground">
+                {REPORT_TAB_LABELS[data.activeTab]}
+              </h1>
+              <p className="text-sm text-muted-foreground">{roleCopy.subtitle}</p>
+            </div>
           </div>
-          <PageTabs tabs={tabs} active={data.activeTab} hrefBuilder={(tab) => `/dashboard?tab=${tab}&period=${period}`} />
+          <PageTabs
+            tabs={tabs}
+            active={data.activeTab}
+            hrefBuilder={(tab) => `/dashboard?tab=${tab}&period=${period}`}
+          />
         </section>
 
         {data.activeTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data && (
-          <div className="space-y-6">
+          <div className="space-y-6 sm:space-y-8">
             <ExecutiveTimeline data={[...data.timeline]} period={period} />
             <OverviewTab period={period} commercial={data.commercial} funnel={data.funnel} attention={data.attention} />
           </div>
         )}
         {data.activeTab === "commercial" && "commercial" in data && "funnel" in data && "attention" in data && "sourcePerformance" in data && (
-          <CommercialTab period={period} overview={data.commercial} funnel={data.funnel} attention={data.attention} sourcePerformance={data.sourcePerformance} />
+          <div className="space-y-6 sm:space-y-8">
+            <CommercialTab period={period} overview={data.commercial} funnel={data.funnel} attention={data.attention} sourcePerformance={data.sourcePerformance} />
+          </div>
         )}
         {data.activeTab === "team" && "teamPerformance" in data && (
-          <TeamTab period={period} teamPerformance={data.teamPerformance} />
+          <div className="space-y-6 sm:space-y-8">
+            <TeamTab period={period} teamPerformance={data.teamPerformance} />
+          </div>
         )}
-        {data.activeTab === "units" && "units" in data && <UnitsTab period={period} units={data.units} />}
-        {data.activeTab === "financial" && "financial" in data && <FinancialTab period={period} financial={data.financial} />}
+        {data.activeTab === "units" && "units" in data && (
+          <div className="space-y-6 sm:space-y-8">
+            <UnitsTab period={period} units={data.units} />
+          </div>
+        )}
+        {data.activeTab === "financial" && "financial" in data && (
+          <div className="space-y-6 sm:space-y-8">
+            <FinancialTab period={period} financial={data.financial} />
+          </div>
+        )}
       </main>
     </>
   );

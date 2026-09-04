@@ -94,3 +94,56 @@ Validar a biblioteca canônica de `src/components/foundations/` em uma página p
 ### Visual QA
 - [x] Espaçamento vertical e padding de tabela padronizados.
 - [x] Status visualmente coerentes com os 5 tons semânticos.
+
+---
+
+## 2026-09-04 — /dashboard (UX-1D — Dashboard Unificado)
+
+### Problema
+1. Dispersão de métricas operacionais e gerenciais entre dashboards com inconsistência de padding e escalas visuais.
+2. Necessidade de unificar os modos de visualização (Executivo/Diretoria, Marketing, Corretor Full, Corretor Lite) respeitando a governança UX-GOV-1 sem criar monólitos de rota nem calcular métricas no cliente.
+
+### Objetivo
+1. Alinhar o `ExecutiveDashboard` com a escala canônica de espaçamento (`p-4 sm:p-6 lg:p-8`, `space-y-6 sm:space-y-8`), tipografia (`text-2xl font-bold tracking-tight`) e abas canônicas via `<PageTabs />`.
+2. Assegurar contraste aperfeiçoado nos cards de KPI (`KpiComparisonCard`), funil de 8 estágios (`FunnelSection`) e blocos de atenção (`AttentionSection`).
+3. Garantir 100% de integridade com o catálogo canônico de métricas no servidor (`features/reports/metrics/metric-catalog.ts` e `metrics-service.ts`).
+
+### Antes
+- Paddings divergentes em breakpoints (`p-4 lg:p-6`).
+- Badges de delta com contraste reduzido no dark mode.
+- Barras de funil com cores estáticas sem adaptação a temas.
+
+### Depois
+- Layout unificado com escala de espaçamento canônica (`p-4 sm:p-6 lg:p-8`), ritmo vertical consistente e `<PageTabs />` animados com sincronização `?tab=`.
+- `DeltaBadge` com contraste nítido em light (`text-emerald-600` / `text-red-600`) e dark (`dark:text-emerald-400` / `dark:text-red-400`) com tipografia `tabular-nums font-semibold`.
+- `FunnelSection` com fundos semitransparentes adaptáveis e suporte total a temas claro e escuro.
+
+### Componentes reutilizados
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<PageTabs />` de `src/components/foundations/page-tabs`.
+- `<PeriodSelect />` de `@/components/period-select`.
+- `<KpiComparisonCard />`, `<FunnelSection />`, `<AttentionSection />` de `src/app/(dashboard)/relatorios/_components/`.
+- `<OverviewTab />`, `<CommercialTab />`, `<TeamTab />`, `<UnitsTab />`, `<FinancialTab />`.
+
+### Componentes alterados
+- `src/app/(dashboard)/dashboard/_components/executive-dashboard.tsx`: Alinhamento canônico de layout, padding, tipografia e ritmo vertical.
+- `src/app/(dashboard)/relatorios/_components/kpi-comparison-card.tsx`: Contraste e acessibilidade de badges e deltas aprimorados.
+- `src/app/(dashboard)/relatorios/_components/funnel-section.tsx`: Paleta de estágios adaptativa a temas claro e escuro.
+
+### Funcionalidades preservadas
+- 100% das métricas do catálogo canônico: funil de conversão de 8 estágios, coorte diária de entradas/conversões, atenção operacional com links profundos filtrados, detalhamento por canal, equipe, unidade e financeiro (sob controle de permissão `ver_relatorios_financeiros`).
+
+### Responsive
+- Testado e visualmente consistente em 1366×768, 1440×900, 1920×1080 e dispositivos móveis (<560px).
+
+### Accessibility
+- Conformidade WCAG 2.2 AA: contraste de texto tabular, foco visível, rótulos ARIA para gráficos de coorte e tabelas com tags semânticas `<th scope="...">` e `tabular-nums`.
+
+### Visual QA
+- [x] Page padding consistente (p-4 sm:p-6 lg:p-8)? Sim.
+- [x] Título no tamanho correto (text-2xl font-bold)? Sim.
+- [x] Ritmo cabeçalho → abas → conteúdo (space-y-6 sm:space-y-8)? Sim.
+- [x] Contraste de texto secundário e delta badges? Sim.
+- [x] Sem aninhamento inválido e foco por teclado visível? Sim.
+- [x] 0 erros no TypeScript (tsc --noEmit) e 100% de testes passando? Sim.
+
