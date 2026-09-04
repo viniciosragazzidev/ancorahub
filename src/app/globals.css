@@ -883,7 +883,7 @@ body {
   }
 }
 
-/* Sonner: feedback compacto, adaptado para light e dark theme de acordo com DESIGN.md */
+/* Sonner: feedback compacto, adaptado aos temas claro e escuro pelo Contrato de Redesign. */
 .ct-toaster {
   --ct-toast-warning: var(--success);
   pointer-events: none;

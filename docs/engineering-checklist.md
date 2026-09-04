@@ -22,7 +22,9 @@
 - [ ] Logica critica testavel de modo deterministico e testes adequados incluidos.
 - [ ] Interface possui estados de carregamento, vazio, erro e permissao quando aplicavel.
 - [ ] Controles e estilos repetiveis usam componentes/tokens shadcn/Unlumen compartilhados.
-- [ ] Interface segue `DESIGN.md`, e navegavel por teclado e nao usa apenas cor para estado.
+- [ ] Interface segue `docs/ux/UX_REDESIGN_CONTRACT.md`, respeita a etapa vigente
+  em `docs/ux/UX_REDESIGN_CONTROL.md`, é navegável por teclado e não usa apenas cor
+  para estado.
 - [ ] Regras, decisoes e ADRs atualizados quando comportamento/arquitetura mudou.
 - [ ] Codigo passa por lint, type-check, testes e build disponiveis.
 - [ ] `npm run build` foi executado e passou antes da entrega.

@@ -37,7 +37,8 @@ Ancora Corretora usa uma identidade oceânica discreta, profissional e confiáve
 ## Evidence on Hand
 
 - Funcionalidades e regras: `docs/business-rules.md`, `docs/decision-log.md` e `docs/information-architecture/`.
-- Sistema visual atual: `DESIGN.md`, `src/app/globals.css` e `src/components/ui/`.
+- Contrato visual atual: `docs/ux/UX_REDESIGN_CONTRACT.md`, `src/app/globals.css`
+  e `src/components/ui/`.
 - Fluxos principais: dashboard, leads, conversas, tarefas, gestão, integrações e Super-admin.
 
 ## Product Principles

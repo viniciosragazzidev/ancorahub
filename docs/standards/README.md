@@ -14,7 +14,7 @@ Este diretório é o índice operacional para qualquer implementação nova ou r
 2. `docs/decision-log.md` para decisões aprovadas e pendências bloqueantes.
 3. `docs/business-rules.md` e `CONTEXT.md` para regras e vocabulário do domínio.
 4. `AI_RULES.md` e `AGENTS.md` para o processo de execução.
-5. `DESIGN.md` e `docs/ui-foundation.md` para a interface.
+5. `docs/ux/UX_REDESIGN_CONTRACT.md` e `docs/ux/UX_REDESIGN_CONTROL.md` para a interface.
 6. Os padrões deste diretório para execução técnica.
 7. Documentos históricos, planos e logs apenas como contexto.
 
@@ -28,7 +28,7 @@ Se houver conflito, não escolha silenciosamente: registre a divergência, prese
 | [domain-contracts.md](./domain-contracts.md) | Vocabulário, invariantes e estados | Antes de alterar regra ou fluxo |
 | [security.md](./security.md) | Multi-tenant, autenticação, autorização, LGPD, segredos e auditoria | Toda leitura, mutação ou integração |
 | [accessibility.md](./accessibility.md) | Semântica, teclado, foco, contraste, zoom e leitores de tela | Toda superfície de UI |
-| [design-system.md](./design-system.md) | Tokens, componentes, densidade, responsividade e motion | Toda alteração visual |
+| [../ux/UX_REDESIGN_CONTRACT.md](../ux/UX_REDESIGN_CONTRACT.md) | Hierarquia, disclosure, componentes, responsividade e acessibilidade | Toda alteração visual |
 | [performance-compatibility.md](./performance-compatibility.md) | Web Vitals, banco, cache, browsers e mobile | Toda rota, query ou dependência |
 | [testing-observability.md](./testing-observability.md) | Testes, logs, métricas, alertas e recuperação | Toda mudança de risco operacional |
 | [delivery-governance.md](./delivery-governance.md) | Definition of Done, migrations, revisão e deploy | Antes de concluir ou publicar |

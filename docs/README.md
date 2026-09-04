@@ -6,8 +6,8 @@
 |---|---|---|
 | `product/CorreTop_Documento_Requisitos.md` | Requisitos, escopo e pesquisa de produto | Fonte de referência v1.0 |
 | `architecture/CorreTop_Arquitetura_Desenvolvimento.md` | Arquitetura e processo de engenharia | Fonte de referência |
-| `../DESIGN.md` | Sistema de design e UX | Norma visual vigente |
-| `ui-foundation.md` | Uso obrigatório de shadcn, Unlumen e motion | Norma de UI vigente |
+| `ux/UX_REDESIGN_CONTRACT.md` | Filosofia e regras de UX/redesign | Norma visual vigente |
+| `ux/UX_REDESIGN_CONTROL.md` | Etapa atual e próxima ação permitida | Controle obrigatório de UX |
 | `../AI_RULES.md` | Instruções operacionais para IA | Norma de execução vigente |
 | `business-rules.md` | Regras de domínio consolidadas e rastreáveis | Norma de comportamento vigente |
 | `product/resume-dashboard-plan.md` | Conteúdo e prioridades da home executiva `/resume` | Plano de produto vigente |
@@ -39,10 +39,10 @@
 
 O arquivo de requisitos preserva o contexto completo. O catálogo de regras não o
 substitui: ele torna o que é implementável, testável e auditável mais fácil de localizar.
-# Referencia de UX
+# Referência de UX
 
-Consulte `ux-audit-2026-07-13.md` para a auditoria heuristica, hipoteses de pesquisa
-e backlog prioritario de clareza e reducao de carga cognitiva. As regras obrigatorias
-correspondentes estao em `../AI_RULES.md` e no pre-flight de `engineering-checklist.md`.
-Referencia adicional: `architecture/system_design.md` documenta a implementacao,
-beneficios e operacao da infraestrutura de escala.
+Comece por `ux/README.md`. O Controle de Execução define a etapa permitida e deve ser
+atualizado antes de iniciar qualquer novo lote de redesign. As regras obrigatórias
+complementares estão em `../AI_RULES.md` e no pre-flight de
+`engineering-checklist.md`. A referência de infraestrutura continua em
+`architecture/system_design.md`.

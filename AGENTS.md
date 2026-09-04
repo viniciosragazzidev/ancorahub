@@ -22,10 +22,9 @@ Regras inegociáveis:
   que envolvam dados pessoais, sensíveis, exportações ou permissões.
 - Não implemente uma regra marcada como pendente em `docs/decision-log.md` sem
   registrar a decisão aprovada.
-- Para trabalho de interface, siga `docs/ui-foundation.md`: consulte primeiro o MCP
-  do shadcn e a documentação do Unlumen. O shadcn é obrigatório, com
-  `dashboard-01` como fundação para superfícies de dashboard; use `transitions-dev`
-  para qualquer transição ou animação nova.
+- Para trabalho de interface, siga `docs/ux/UX_REDESIGN_CONTRACT.md` e o estado em
+  `docs/ux/UX_REDESIGN_CONTROL.md`. Reutilize componentes compartilhados; use
+  `transitions-dev` para qualquer transição ou animação nova.
 - Sempre reutilize componentes e tokens existentes em `src/components/ui/` e
   `src/components/unlumen-ui/`. Não crie variações locais de
   botões, campos, cards, tipografia, espaçamento ou estados que já tenham equivalente
@@ -46,13 +45,16 @@ e desempenho começam diagnósticas. Uma nova regressão crítica deve ser corri
 justificada no registro da implementação; não use o diagnóstico para ignorar dívida
 preexistente nem para bloquear indiscriminadamente o trabalho em produção.
 
-## DESIGN SYSTEM CONTRACT RULES
+## UX REDESIGN CONTRACT RULES
 
-- A fonte de verdade do design system é `docs/design-system/DESIGN_CONTRACT.md`.
-- Antes de qualquer mudança de UI, consulte o contrato, foundations/tokens, regras de componentes e o padrão aplicável.
-- Não invente token, primitive ou variante: registre e resolva um gap em `docs/design-system/DESIGN_GAPS.md` antes de institucionalizar a regra.
-- Documente qualquer divergência entre contrato e implementação, com motivo, impacto e plano de convergência.
-- O design system não contém regras de negócio; estados, permissões, tenant e fluxos pertencem às features e à documentação de domínio.
-- Estados relevantes, responsividade e acessibilidade são obrigatórios em toda mudança de interface.
-- Toda página nova ou refatorada deve declarar e seguir um Pattern Blueprint de `docs/design-system/patterns/`; não componha uma página do zero sem exceção documentada ou gap aprovado.
+- A fonte de verdade visual é `docs/ux/UX_REDESIGN_CONTRACT.md`; o próximo passo
+  permitido está em `docs/ux/UX_REDESIGN_CONTROL.md`.
+- Antes de uma mudança de UI, confirmar a etapa atual, o papel, a ação principal,
+  os estados e a estratégia de disclosure da rota.
+- Não criar token, primitive ou variante sem registrar o gap e a decisão no controle
+  da etapa atual.
+- O redesign não contém regras de negócio; tenant, permissões, estados e fluxos
+  pertencem às features e à documentação de domínio.
+- Estados relevantes, responsividade e acessibilidade são obrigatórios em toda
+  mudança de interface.
 
