@@ -138,10 +138,10 @@ export function ExecutiveDashboard({
                 <Link
                   key={tab.label}
                   href={href}
-                  aria-current={tab.active ? "page" : undefined}
+                  aria-current={"active" in tab && tab.active ? "page" : undefined}
                   className={cn(
                     "inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors",
-                    tab.active
+                    "active" in tab && tab.active
                       ? "border-primary text-foreground"
                       : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
                   )}
