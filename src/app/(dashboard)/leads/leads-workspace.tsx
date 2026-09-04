@@ -38,6 +38,7 @@ import { LeadDrawerManagementActions } from "./_components/lead-drawer-managemen
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
@@ -1061,14 +1062,15 @@ function KanbanLeadCard({
 }) {
   const selected = isSelected(lead.id);
   const sla = useMemo(() => computeSlaInfo(lead, slaFirstContactMinutes, slaStagnantDays), [lead, slaFirstContactMinutes, slaStagnantDays]);
+  const phoneDigits = lead.telefone ? lead.telefone.replace(/\D/g, "") : "";
 
   return (
     <Card
       variant="kanban"
-      className={`group w-full text-left outline-none ${
+      className={`group w-full text-left outline-none transition-all duration-200 ${
         selected
           ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
-          : "border-border hover:border-primary/30 hover:bg-muted/30"
+          : "border-border/80 hover:border-primary/40 hover:shadow-xs hover:bg-card/80"
       }`}
     >
       {/* Checkbox row */}
@@ -1079,7 +1081,21 @@ function KanbanLeadCard({
           onCheckedChange={() => onToggle(lead.id)}
           onClick={(event) => event.stopPropagation()}
         />
-        <ArrowUpRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        <div className="flex items-center gap-1.5">
+          {phoneDigits && (
+            <a
+              href={`https://wa.me/55${phoneDigits}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Abrir WhatsApp"
+              className="text-muted-foreground hover:text-emerald-500 transition-colors"
+            >
+              <WhatsappLogo className="size-3.5" weight="fill" />
+            </a>
+          )}
+          <ArrowUpRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </div>
       </div>
 
       {/* SLA bar */}
@@ -1087,29 +1103,39 @@ function KanbanLeadCard({
 
       {/* Card body */}
       <button
-        className="w-full p-4 pt-3 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
+        className="w-full p-3.5 pt-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
         onClick={() => onOpen(lead)}
         type="button"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="line-clamp-2 break-words font-medium leading-5 text-foreground">
+        <div className="flex items-center gap-2.5">
+          <UserAvatar
+            seed={lead.nome}
+            name={lead.nome}
+            className="size-7 rounded-lg shrink-0 border border-border/60 text-[10px] font-bold"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-xs text-foreground group-hover:text-primary transition-colors">
               {lead.nome}
             </p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-xs" />
+            <p className="truncate text-[11px] text-muted-foreground font-mono tabular-nums">
+              {lead.telefone}
             </p>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+
+        <p className="mt-2 truncate text-[11px] text-muted-foreground">
+          <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-[11px]" />
+        </p>
+
+        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/50 pt-2 text-[11px]">
           <div className="flex items-center gap-1.5 flex-wrap">
             <LeadStatusBadge status={lead.status} />
-            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+            <span className={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
               {lead.tipo}
             </span>
             <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
           </div>
-          <span className="shrink-0 text-xs text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
         </div>
       </button>
     </Card>

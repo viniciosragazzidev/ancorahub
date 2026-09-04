@@ -256,4 +256,25 @@ Validar a biblioteca canônica de `src/components/foundations/` em uma página p
 - [x] DetailDrawer com L1 e L2 ergonômicos? Sim.
 - [x] 0 erros no TypeScript (tsc --noEmit) e 100% de testes passando? Sim.
 
+---
+
+## 2026-09-04 — /leads & /dashboard (UX Polish & Dashboard Instant Tabs)
+
+### Problema
+1. As abas do `/dashboard` apresentavam latência perceptível ao clicar devido a roundtrip de navegação no servidor sem feedback de transição imediato.
+2. O gráfico de "Entradas e conversões" no dashboard executivo ocupava uma altura vertical excessiva (`h-72`), desproporcional ao restante do grid.
+3. A listagem de `/leads` e o Kanban podiam ter um visual ainda mais moderno, leve e distinto no estilo "Linear/CRM Simples" (pills horizontais de status com dots luminosos, avatar com iniciais para leads, atalhos diretos de WhatsApp na linha e cartões de Kanban aprimorados).
+
+### Objetivo
+1. Tornar a troca de abas no `/dashboard` instantânea através de estado otimista com `useTransition`.
+2. Compactar a altura do gráfico de linha temporal para `h-44 sm:h-48` (~180px), mantendo legibilidade total.
+3. Modernizar os filtros rápidos de status em `/leads` com pills roláveis e dot badges brilhantes (`shadow-[0_0_8px_...]`).
+4. Adicionar avatar com iniciais coloridas, botão de ação rápida de WhatsApp e visualização clara de contato na tabela e no Kanban de `/leads`.
+
+### Componentes alterados
+- `src/app/(dashboard)/dashboard/_components/executive-dashboard.tsx`: Otimização instantânea de abas com `useTransition` e redimensionamento do gráfico de entradas/conversões.
+- `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Pills de status rápidos com dots luminosos e integração de chips de filtros.
+- `src/app/(dashboard)/leads/leads-table-columns.tsx`: Linhas com avatar de iniciais, botão direto do WhatsApp, badge luminoso e menu de ações expandido.
+- `src/app/(dashboard)/leads/leads-workspace.tsx`: Cartões de Kanban com avatar, telefone e atalho direto para WhatsApp.
+
 

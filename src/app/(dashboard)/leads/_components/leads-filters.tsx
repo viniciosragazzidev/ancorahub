@@ -13,6 +13,7 @@ import { AppSelect } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "@/components/huge-icons";
 import { FilterBar } from "@/components/foundations/filter-bar";
 import { ActiveFilterChips, type FilterChipItem } from "@/components/foundations/active-filter-chips";
+import { cn } from "@/lib/utils";
 import {
   hasLeadFilterQuery,
   parseLeadFilterPreferences,
@@ -212,6 +213,48 @@ export function LeadsFilters({
         hasActiveFilters={hasAnyFilter}
         onClearFilters={handleReset}
       />
+
+      {/* Quick Filter Status Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+        {[
+          { id: "", label: "Todos os leads" },
+          { id: "new", label: "Novos", dot: "bg-sky-400 shadow-[0_0_6px_#38bdf8]" },
+          { id: "in_contact", label: "Em Atendimento", dot: "bg-amber-400 shadow-[0_0_6px_#fbbf24]" },
+          { id: "quote_sent", label: "Cotação Enviada", dot: "bg-purple-400 shadow-[0_0_6px_#c084fc]" },
+          { id: "negotiation", label: "Em Negociação", dot: "bg-orange-400 shadow-[0_0_6px_#fb923c]" },
+          { id: "converted", label: "Convertidos", dot: "bg-emerald-400 shadow-[0_0_6px_#34d399]" },
+          { id: "lost", label: "Perdidos", dot: "bg-red-400 shadow-[0_0_6px_#f87171]" },
+        ].map((pill) => {
+          const isSelected = status === pill.id;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => {
+                setStatus(pill.id);
+                applyFilters({ ...currentPreferences(), status: pill.id });
+              }}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all select-none cursor-pointer",
+                isSelected
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+              )}
+            >
+              {pill.dot && <span className={cn("size-1.5 rounded-full shrink-0", pill.dot)} />}
+              <span>{pill.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {chips.length > 0 && (
+        <ActiveFilterChips
+          chips={chips}
+          onRemoveChip={handleRemoveChip}
+          onClearAll={handleReset}
+        />
+      )}
 
       {/* Advanced Filters Popover */}
       <Popover open={open} onOpenChange={setOpen}>

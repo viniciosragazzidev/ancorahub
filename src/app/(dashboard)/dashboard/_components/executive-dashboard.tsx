@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Area,
   AreaChart,
@@ -48,13 +50,13 @@ function ExecutiveTimeline({
   period: PeriodValue;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Entradas e conversões</CardTitle>
-        <CardDescription>Coorte criada nos últimos {period} dias.</CardDescription>
+    <Card className="shadow-none border-border/60">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold">Entradas e conversões</CardTitle>
+        <CardDescription className="text-xs">Coorte criada nos últimos {period} dias.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-72" aria-label="Gráfico de entradas e conversões por dia">
+        <div className="h-44 sm:h-48" aria-label="Gráfico de entradas e conversões por dia">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
               <defs>
@@ -90,6 +92,22 @@ export function ExecutiveDashboard({
   period: PeriodValue;
   role: "director" | "manager" | "supervisor";
 }) {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<ReportTabId>(data.activeTab);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setActiveTab(data.activeTab);
+  }, [data.activeTab]);
+
+  const handleTabChange = (tabId: string) => {
+    const nextTab = tabId as ReportTabId;
+    setActiveTab(nextTab);
+    startTransition(() => {
+      router.replace(`/dashboard?tab=${nextTab}&period=${period}`, { scroll: false });
+    });
+  };
+
   const roleCopy = {
     director: { title: "Visão Executiva", subtitle: "Decisão e acompanhamento de ponta a ponta da operação comercial" },
     manager: { title: "Painel da Unidade", subtitle: "Acompanhamento de metas, corretores e resultados da sua unidade" },
@@ -101,6 +119,8 @@ export function ExecutiveDashboard({
     label: REPORT_TAB_LABELS[tab],
     icon: TAB_ICONS[tab],
   }));
+
+  const effectiveTab = activeTab;
 
   return (
     <>
@@ -114,44 +134,46 @@ export function ExecutiveDashboard({
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 id="executive-dashboard-title" className="text-2xl font-bold tracking-tight text-foreground">
-                {REPORT_TAB_LABELS[data.activeTab]}
+                {REPORT_TAB_LABELS[effectiveTab]}
               </h1>
               <p className="text-sm text-muted-foreground">{roleCopy.subtitle}</p>
             </div>
           </div>
           <PageTabs
             tabs={tabs}
-            active={data.activeTab}
-            hrefBuilder={(tab) => `/dashboard?tab=${tab}&period=${period}`}
+            active={effectiveTab}
+            onTabChange={handleTabChange}
           />
         </section>
 
-        {data.activeTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data && (
-          <div className="space-y-6 sm:space-y-8">
-            <ExecutiveTimeline data={[...data.timeline]} period={period} />
-            <OverviewTab period={period} commercial={data.commercial} funnel={data.funnel} attention={data.attention} />
-          </div>
-        )}
-        {data.activeTab === "commercial" && "commercial" in data && "funnel" in data && "attention" in data && "sourcePerformance" in data && (
-          <div className="space-y-6 sm:space-y-8">
-            <CommercialTab period={period} overview={data.commercial} funnel={data.funnel} attention={data.attention} sourcePerformance={data.sourcePerformance} />
-          </div>
-        )}
-        {data.activeTab === "team" && "teamPerformance" in data && (
-          <div className="space-y-6 sm:space-y-8">
-            <TeamTab period={period} teamPerformance={data.teamPerformance} />
-          </div>
-        )}
-        {data.activeTab === "units" && "units" in data && (
-          <div className="space-y-6 sm:space-y-8">
-            <UnitsTab period={period} units={data.units} />
-          </div>
-        )}
-        {data.activeTab === "financial" && "financial" in data && (
-          <div className="space-y-6 sm:space-y-8">
-            <FinancialTab period={period} financial={data.financial} />
-          </div>
-        )}
+        <div className={isPending ? "opacity-70 transition-opacity duration-150 pointer-events-none" : ""}>
+          {effectiveTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data && (
+            <div className="space-y-6 sm:space-y-8">
+              <ExecutiveTimeline data={[...data.timeline]} period={period} />
+              <OverviewTab period={period} commercial={data.commercial} funnel={data.funnel} attention={data.attention} />
+            </div>
+          )}
+          {effectiveTab === "commercial" && "commercial" in data && "funnel" in data && "attention" in data && "sourcePerformance" in data && (
+            <div className="space-y-6 sm:space-y-8">
+              <CommercialTab period={period} overview={data.commercial} funnel={data.funnel} attention={data.attention} sourcePerformance={data.sourcePerformance} />
+            </div>
+          )}
+          {effectiveTab === "team" && "teamPerformance" in data && (
+            <div className="space-y-6 sm:space-y-8">
+              <TeamTab period={period} teamPerformance={data.teamPerformance} />
+            </div>
+          )}
+          {effectiveTab === "units" && "units" in data && (
+            <div className="space-y-6 sm:space-y-8">
+              <UnitsTab period={period} units={data.units} />
+            </div>
+          )}
+          {effectiveTab === "financial" && "financial" in data && (
+            <div className="space-y-6 sm:space-y-8">
+              <FinancialTab period={period} financial={data.financial} />
+            </div>
+          )}
+        </div>
       </main>
     </>
   );

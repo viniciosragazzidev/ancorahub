@@ -26,118 +26,122 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import type { LeadRow } from "./leads-table-config";
 
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { WhatsappLogo } from "@/components/huge-icons";
+import Link from "next/link";
+
 const STATUS_CONFIG: Record<
   string,
   { label: string; dotColor: string; className: string }
 > = {
   new: {
     label: "Novo Lead",
-    dotColor: "bg-sky-500 animate-pulse",
+    dotColor: "bg-sky-400 shadow-[0_0_8px_#38bdf8] animate-pulse",
     className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
   },
   novo: {
     label: "Novo Lead",
-    dotColor: "bg-sky-500 animate-pulse",
+    dotColor: "bg-sky-400 shadow-[0_0_8px_#38bdf8] animate-pulse",
     className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
   },
   distributed: {
     label: "Distribuído",
-    dotColor: "bg-blue-500",
+    dotColor: "bg-blue-400 shadow-[0_0_8px_#60a5fa]",
     className: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
   },
   distribuido: {
     label: "Distribuído",
-    dotColor: "bg-blue-500",
+    dotColor: "bg-blue-400 shadow-[0_0_8px_#60a5fa]",
     className: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
   },
   in_contact: {
     label: "Em Atendimento",
-    dotColor: "bg-amber-500",
+    dotColor: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",
     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   in_service: {
     label: "Em Atendimento",
-    dotColor: "bg-amber-500",
+    dotColor: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",
     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   em_atendimento: {
     label: "Em Atendimento",
-    dotColor: "bg-amber-500",
+    dotColor: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",
     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   quote_sent: {
     label: "Cotação Enviada",
-    dotColor: "bg-purple-500",
+    dotColor: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
     className: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
   },
   cotacao_enviada: {
     label: "Cotação Enviada",
-    dotColor: "bg-purple-500",
+    dotColor: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
     className: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
   },
   negotiation: {
     label: "Em Negociação",
-    dotColor: "bg-orange-500",
+    dotColor: "bg-orange-400 shadow-[0_0_8px_#fb923c]",
     className: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30",
   },
   negociacao: {
     label: "Em Negociação",
-    dotColor: "bg-orange-500",
+    dotColor: "bg-orange-400 shadow-[0_0_8px_#fb923c]",
     className: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30",
   },
   documentation_pending: {
     label: "Pend. Documentos",
-    dotColor: "bg-pink-500",
+    dotColor: "bg-pink-400 shadow-[0_0_8px_#f472b6]",
     className: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/30",
   },
   pendente_documentacao: {
     label: "Pend. Documentos",
-    dotColor: "bg-pink-500",
+    dotColor: "bg-pink-400 shadow-[0_0_8px_#f472b6]",
     className: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/30",
   },
   under_analysis: {
     label: "Em Análise",
-    dotColor: "bg-cyan-500",
+    dotColor: "bg-cyan-400 shadow-[0_0_8px_#22d3ee]",
     className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
   },
   em_analise: {
     label: "Em Análise",
-    dotColor: "bg-cyan-500",
+    dotColor: "bg-cyan-400 shadow-[0_0_8px_#22d3ee]",
     className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
   },
   qualified: {
     label: "Qualificado",
-    dotColor: "bg-emerald-500",
+    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
     className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   },
   qualificado: {
     label: "Qualificado",
-    dotColor: "bg-emerald-500",
+    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
     className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   },
   converted: {
     label: "Venda Realizada",
-    dotColor: "bg-white",
-    className: "bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs",
+    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    className: "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/40",
   },
   venda_realizada: {
     label: "Venda Realizada",
-    dotColor: "bg-white",
-    className: "bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs",
+    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    className: "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/40",
   },
   ganho: {
     label: "Venda Realizada",
-    dotColor: "bg-white",
-    className: "bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs",
+    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    className: "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/40",
   },
   lost: {
     label: "Perdido",
-    dotColor: "bg-red-500",
+    dotColor: "bg-red-400 shadow-[0_0_8px_#f87171]",
     className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
   },
   perdido: {
     label: "Perdido",
-    dotColor: "bg-red-500",
+    dotColor: "bg-red-400 shadow-[0_0_8px_#f87171]",
     className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
   },
 };
@@ -231,15 +235,41 @@ export const getLeadsColumns = (
     header: ({ column }) => <DataTableColumnHeader column={column} title="Lead / Contato" />,
     cell: ({ row }) => {
       const lead = row.original;
+      const phoneDigits = lead.phone ? lead.phone.replace(/\D/g, "") : "";
       return (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-xs text-foreground hover:text-primary transition-colors">
-            {lead.name}
-          </span>
-          <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
-            <Phone className="h-3 w-3 opacity-60 shrink-0" />
-            {lead.phone}
-          </span>
+        <div className="flex items-center gap-3 py-0.5">
+          <UserAvatar
+            seed={lead.email || lead.name}
+            name={lead.name}
+            className="size-8 rounded-lg shrink-0 border border-border/60 text-[11px] font-bold"
+          />
+          <div className="min-w-0 flex flex-col gap-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDrawer(lead);
+              }}
+              className="text-left font-semibold text-xs text-foreground hover:text-primary transition-colors truncate"
+            >
+              {lead.name}
+            </button>
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="font-mono tabular-nums">{lead.phone}</span>
+              {phoneDigits && (
+                <a
+                  href={`https://wa.me/55${phoneDigits}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Conversar no WhatsApp"
+                  className="text-emerald-500 hover:text-emerald-400 transition-colors"
+                >
+                  <WhatsappLogo className="size-3" weight="fill" />
+                </a>
+              )}
+            </div>
+          </div>
         </div>
       );
     },
@@ -266,7 +296,7 @@ export const getLeadsColumns = (
       return (
         <Badge
           variant="outline"
-          className={`gap-1.5 px-2.5 py-0.5 text-[11px] rounded-full inline-flex items-center font-semibold transition-all ${config.className}`}
+          className={`gap-1.5 px-2.5 py-0.5 text-[11px] rounded-full inline-flex items-center font-medium transition-all ${config.className}`}
         >
           <span className={`size-1.5 rounded-full shrink-0 ${config.dotColor}`} />
           {config.label}
@@ -334,7 +364,7 @@ export const getLeadsColumns = (
     cell: ({ row }) => {
       const plan = row.getValue("planType") as string;
       return (
-        <span className="inline-flex text-[11px] font-semibold text-foreground bg-muted/30 px-2 py-0.5 rounded-md border border-border/40">
+        <span className="inline-flex text-[11px] font-medium text-foreground bg-muted/40 px-2 py-0.5 rounded-md border border-border/40">
           {plan || "Não informado"}
         </span>
       );
@@ -358,7 +388,7 @@ export const getLeadsColumns = (
     cell: ({ row }) => {
       const lives = row.getValue("lives") as number;
       return (
-        <span className="inline-flex items-center gap-1 font-bold text-xs tabular-nums text-foreground">
+        <span className="inline-flex items-center gap-1 font-semibold text-xs tabular-nums text-foreground">
           <Users className="size-3 text-muted-foreground shrink-0" />
           {lives} {lives === 1 ? "vida" : "vidas"}
         </span>
@@ -415,33 +445,59 @@ export const getLeadsColumns = (
     id: "actions",
     cell: ({ row }) => {
       const lead = row.original;
+      const phoneDigits = lead.phone ? lead.phone.replace(/\D/g, "") : "";
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" className="h-7 w-7 p-0 hover:bg-muted/60">
-                <span className="sr-only">Abrir menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-xs">Ações do Lead</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => onOpenDrawer(lead)} className="text-xs font-medium">
-              Ver Detalhes do Lead
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                const phoneDigits = lead.phone.replace(/\D/g, "");
-                window.open(`https://wa.me/55${phoneDigits}`, "_blank");
-              }}
-              className="text-xs text-emerald-600 dark:text-emerald-400 font-bold"
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          {phoneDigits && (
+            <a
+              href={`https://wa.me/55${phoneDigits}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Abrir WhatsApp"
+              className="inline-flex size-7 items-center justify-center rounded-lg border border-border/60 bg-card hover:bg-emerald-500/10 hover:border-emerald-500/40 text-muted-foreground hover:text-emerald-500 transition-colors"
             >
-              Abrir no WhatsApp
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <WhatsappLogo className="size-3.5 text-emerald-500" weight="fill" />
+            </a>
+          )}
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => onOpenDrawer(lead)}
+            className="h-7 px-2 text-xs font-medium"
+          >
+            Ver Detalhes
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" className="h-7 w-7 p-0 hover:bg-muted/60">
+                  <span className="sr-only">Mais opções</span>
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel className="text-xs">Opções do Lead</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onOpenDrawer(lead)} className="text-xs font-medium">
+                Abrir Drawer de Gestão
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href={`/leads/${lead.id}`} />} className="text-xs font-medium">
+                Abrir Página Completa
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {phoneDigits && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    window.open(`https://wa.me/55${phoneDigits}`, "_blank");
+                  }}
+                  className="text-xs text-emerald-600 dark:text-emerald-400 font-bold"
+                >
+                  Abrir no WhatsApp
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       );
     },
     enableSorting: false,
