@@ -8,6 +8,53 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-04 — /leads/[id] (UX-1F — Detalhe do Lead)
+
+### Problema
+1. O detalhe do lead continha blocos legados duplicados escondidos (`<div className="hidden">`), inflando o DOM e criando inconsistências de manutenção.
+2. O espaçamento e a tipografia das abas operacionais (`<TabsList>`) possuíam classes fora de padrão (`h-30`, `py-8`), dificultando a visualização e navegabilidade em telas médias.
+3. A densidade da coluna lateral e os cartões operacionais precisavam de alinhamento com a arquitetura canônica de 2 colunas responsivas do design system.
+
+### Objetivo
+1. Estruturar `/leads/[id]` em um layout canônico de 2 colunas (`max-w-[1400px]`, área operacional principal + sticky sidebar de identidade e contexto).
+2. Otimizar as abas operacionais (Atendimento, Documentos, Histórico, Tarefas) com cabeçalhos e badges informativos compactos.
+3. Eliminar código morto e duplicações ocultas no DOM mantendo 100% da integridade multi-tenant, autorizações de cargo e integrações (Meta Ads, IA Insight, Documentos, Tarefas, Histórico).
+
+### Antes
+- Container `max-w-[1200px]` com padding rígido.
+- Bloco escondido de ~100 linhas duplicando dados de contato e beneficiários.
+- Altura ad-hoc nas abas de navegação.
+
+### Depois
+- Container canônico `max-w-[1400px]` com padding responsivo (`p-4 sm:p-6 lg:p-8`).
+- Header card ergonômico com avatar, status semântico, metadados de contato e ações contextuais rápidas.
+- Tabs segmentadas e limpas para Atendimento, Documentos (com contagem), Histórico e Tarefas (com contagem de pendências).
+- Sticky sidebar direita persistente para consulta rápida de dados de contato e unidade sem poluição visual.
+
+### Componentes reutilizados
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<UserAvatar />` de `@/components/ui/user-avatar`.
+- `<Badge />` de `@/components/ui/badge`.
+- `<Button />` de `@/components/ui/button`.
+- `<Card />`, `<CardHeader />`, `<CardTitle />`, `<CardDescription />`, `<CardContent />` de `@/components/ui/card`.
+- `<Tabs />`, `<TabsList />`, `<TabsTrigger />`, `<TabsContent />` de `@/components/ui/tabs`.
+- `<NextBestActionCard />` de `@/features/next-best-action`.
+- `<SupervisionPanel />`, `<LeadActionHub />`, `<LeadStatusSelector />`, `<AiConversationInsightCard />`, `<LeadTimeline />`, `<LeadTasks />`, `<LeadChat />`, `<LeadDocumentsSection />`, `<PersonRecordDetails />`, `<BeneficiariesSection />`.
+
+### Funcionalidades preservadas
+- 100% das regras multi-tenant (`getRequiredTenantContext()`, `buildLeadScopeWhere()`), permissões de visualização e mascaramento (LGPD), alternância de modo Light do Corretor, SLAs e histórico de auditoria.
+
+### Responsive
+- Desktop/Ultrawide (>= 1280px): Grid de 2 colunas com sticky sidebar à direita.
+- Tablet/Mobile (< 1280px): Layout empilhado fluído com abas deslizantes sem scroll horizontal quebrado.
+
+### Visual QA
+- [x] Hierarquia visual limpa e alinhada ao lema "Complexidade disponível, não complexidade exposta".
+- [x] Zero código legado oculto no DOM.
+- [x] 100% dos testes passando (652/652).
+
+---
+
 ## 2026-09-04 — / (Global) & /conversas
 
 ### Problema
