@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { ArrowsDownUp, ChartBar, ChartLineUp, ClipboardText, CurrencyCircleDollar, FileArrowDown, Gear, PiggyBank, SignOut, Target, TrendDown, TrendUp } from "@/components/huge-icons";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";

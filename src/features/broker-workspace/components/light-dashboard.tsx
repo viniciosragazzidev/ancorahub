@@ -29,7 +29,7 @@ import { AncoraLogo } from "@/components/ancora-logo";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 
 function getGreeting() {

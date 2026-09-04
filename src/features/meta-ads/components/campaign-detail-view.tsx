@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { ArrowRight, CheckCircle, Clock, Lightning, MagicWand, Phone, Target, UserList, Users } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { ArrowsClockwise, Lightning, ShieldCheck } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { setSuperAdminRoleOverrideAction } from "@/features/super-admin/role-impersonation-actions";

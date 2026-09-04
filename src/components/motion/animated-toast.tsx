@@ -19,6 +19,10 @@ export interface AnimatedToastProps {
     label: string;
     onClick: () => void;
   };
+  cancel?: {
+    label: string;
+    onClick: () => void;
+  };
   onClose?: () => void;
   className?: string;
 }
@@ -38,6 +42,7 @@ export function AnimatedToast({
   description,
   badgeLabel,
   action,
+  cancel,
   onClose,
   className,
 }: AnimatedToastProps) {
@@ -84,15 +89,26 @@ export function AnimatedToast({
             {description}
           </div>
         ) : null}
-        {action ? (
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={action.onClick}
-              className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer"
-            >
-              {action.label}
-            </button>
+        {(action || cancel) ? (
+          <div className="flex items-center gap-2 pt-1">
+            {action ? (
+              <button
+                type="button"
+                onClick={action.onClick}
+                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer"
+              >
+                {action.label}
+              </button>
+            ) : null}
+            {cancel ? (
+              <button
+                type="button"
+                onClick={cancel.onClick}
+                className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:outline-none cursor-pointer"
+              >
+                {cancel.label}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

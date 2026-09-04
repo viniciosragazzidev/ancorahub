@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { ArrowRight, CheckCircle, WhatsappLogo } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

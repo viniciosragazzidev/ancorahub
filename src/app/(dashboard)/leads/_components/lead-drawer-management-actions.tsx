@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { ArrowRight, Buildings, ChatCircleText, RotateCcw, Sparkle } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";

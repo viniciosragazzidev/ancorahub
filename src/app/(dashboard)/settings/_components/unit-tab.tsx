@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Buildings, CheckCircle, XCircle, WifiHigh } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";

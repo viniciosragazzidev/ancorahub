@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarCollapsibleGroup } from "@/components/sidebar-collapsible-group";
 import { useSession, signOut } from "@/shared/auth/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { AncoraLogo } from "@/components/ancora-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
 

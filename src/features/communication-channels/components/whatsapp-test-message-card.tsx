@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { AlertTriangle, Check, Send } from "lucide-react";
 
 import { cn } from "@/lib/utils";

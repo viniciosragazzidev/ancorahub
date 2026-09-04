@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import {
   PlatformAdminHeader
 } from "@/components/platform-admin-header";

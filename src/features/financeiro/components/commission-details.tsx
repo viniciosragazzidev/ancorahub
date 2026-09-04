@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import {
   ArrowRight,
   ArrowsDownUp,

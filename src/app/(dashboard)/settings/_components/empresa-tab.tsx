@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { updateTenantBrandingAction } from "../actions";
 import { ColorPicker } from "./color-picker";
 import { LogoUpload } from "./logo-upload";

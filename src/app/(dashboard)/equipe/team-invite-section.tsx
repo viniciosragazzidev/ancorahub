@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { UserPlus, WhatsappLogo } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";

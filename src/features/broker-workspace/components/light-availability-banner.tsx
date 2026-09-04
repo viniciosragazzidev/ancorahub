@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { updateBrokerAvailabilityAction } from "@/features/leads/availability-action";
 
 type Status = "available" | "paused" | "offline";

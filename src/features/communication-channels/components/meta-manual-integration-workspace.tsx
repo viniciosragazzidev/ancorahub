@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { ArrowSquareOut, CheckCircle, Copy, Warning } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";

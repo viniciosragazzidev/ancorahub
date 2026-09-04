@@ -933,13 +933,7 @@ body {
   box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 0.42);
 }
 
-.ct-toaster [data-sonner-toast].ct-toast[data-mounted="true"][data-y-position="top"] {
-  animation: ct-toast-enter-right var(--duration-fast) var(--ease-smooth-out) both;
-}
-
-.ct-toaster [data-sonner-toast].ct-toast[data-mounted="true"][data-y-position="bottom"] {
-  animation: ct-toast-enter-bottom var(--duration-fast) var(--ease-smooth-out) both;
-}
+/* NOTE: CSS entrance animations removed — AnimatedToast uses motion/react */
 
 .ct-toaster .ct-toast__icon {
   width: 0.875rem;
@@ -1089,29 +1083,7 @@ body {
   content: "Atualização";
 }
 
-@keyframes ct-toast-enter-right {
-  from {
-    opacity: 0;
-    transform: translateX(1.875rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: var(--y);
-  }
-}
-
-@keyframes ct-toast-enter-bottom {
-  from {
-    opacity: 0;
-    transform: translateY(1.875rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: var(--y);
-  }
-}
+/* NOTE: ct-toast-enter-right/bottom keyframes removed — AnimatedToast uses motion/react */
 
 @media (prefers-reduced-motion: reduce) {
   .ct-toaster [data-sonner-toast].ct-toast {
@@ -1460,27 +1432,9 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 
 /* ── 7. Toast / Sonner slide-in ─────────────────────────────────────────── */
 
-[data-sonner-toast] {
-  animation: ct-toast-in var(--duration-medium) var(--ease-smooth-out) both;
-}
-
-[data-sonner-toast][data-removed="true"] {
-  animation: ct-toast-out var(--duration-fast) var(--ease-smooth-out) both;
-}
-
-@keyframes ct-toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-    filter: blur(2px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
+/* NOTE: Generic [data-sonner-toast] animations were removed.
+   All toasts now use AnimatedToast (motion/react) for entrance/exit.
+   See src/components/motion/animated-toast.tsx. */
 
 @keyframes ct-toast-out {
   from {

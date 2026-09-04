@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useRef, useState, type ChangeEvent } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Camera01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { ArrowSquareOut, PencilSimple, Plus, Power, WifiHigh, XCircle } from "@/components/huge-icons";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

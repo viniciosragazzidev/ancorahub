@@ -4,7 +4,7 @@ import { startTransition, useActionState, useEffect, useRef, useState } from "re
 import { useOptimistic } from "react";
 import { ArrowsClockwise, BellRinging, ChatCircleText, ClipboardText, FileText, Note, Quotes } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";

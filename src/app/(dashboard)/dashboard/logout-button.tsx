@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/shared/auth/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export function LogoutButton() {
   async function handleLogout() {

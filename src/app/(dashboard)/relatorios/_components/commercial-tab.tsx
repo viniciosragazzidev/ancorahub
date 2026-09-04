@@ -1,6 +1,6 @@
 import type { PeriodValue } from "@/shared/period";
-import type { CommercialOverview, FunnelSnapshot, AttentionSnapshot, SourcePerformanceRow } from "@/features/reports/metrics/metrics-service";
-import { sourceLabel } from "@/features/reports/metrics/metrics-service";
+import type { CommercialOverview, FunnelSnapshot, AttentionSnapshot, SourcePerformanceRow } from "@/features/reports/metrics/metrics-types";
+import { sourceLabel } from "@/features/reports/metrics/metrics-types";
 import { KpiComparisonCard } from "./kpi-comparison-card";
 import { FunnelSection } from "./funnel-section";
 import { AttentionSection } from "./attention-section";

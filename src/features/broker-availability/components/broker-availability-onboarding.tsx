@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { CheckCircle, Monitor, WhatsappLogo } from "@/components/huge-icons";
 import { X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogPopup, DialogTitle } from "@/components/ui/dialog";

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import {
   REALTIME_SYNC_BROWSER_EVENT,

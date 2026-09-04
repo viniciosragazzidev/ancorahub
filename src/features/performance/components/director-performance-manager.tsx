@@ -3,7 +3,7 @@
 import { useActionState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowsClockwise, CalendarBlank, Flag, Target } from "@/components/huge-icons";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

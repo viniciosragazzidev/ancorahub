@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 import { updateSession } from "@/utils/supabase/middleware";
-import { getDatabase, schema } from "@/shared/db";
+import { getDatabase, schema } from "@/shared/db/client";
 import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
 import { startMiddlewareTiming, endMiddlewareTiming, logMiddlewareSpan } from "@/shared/observability/middleware-timing";
 

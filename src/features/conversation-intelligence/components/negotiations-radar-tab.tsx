@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   ChatCircleDots
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";

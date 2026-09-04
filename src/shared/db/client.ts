@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
-import { recordIssuedDatabaseQuery } from "@/shared/observability/request-timing";
+import { callDbQueryHook } from "@/shared/observability/db-hook";
 
 type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
@@ -101,7 +101,7 @@ function createPostgresDatabase(databaseUrl: string): Database {
       // postgres.js offers an issue-time debug hook, not a completion hook.
       // It is used only to count/hash query shapes inside an opt-in request
       // trace; raw SQL and parameters are discarded before logging.
-      debug: (_connection, query) => recordIssuedDatabaseQuery(query),
+      debug: (_connection, query) => callDbQueryHook(query),
       connection: {
         statement_timeout: statementTimeoutMs(),
         idle_in_transaction_session_timeout: 60_000,

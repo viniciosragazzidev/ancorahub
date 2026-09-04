@@ -4,7 +4,7 @@ import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { CheckCircle, XCircle } from "@/components/huge-icons";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toggleAutoDistributeAction, type BranchActionState } from "@/features/branches/actions";

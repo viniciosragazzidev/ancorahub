@@ -1,114 +1,155 @@
-﻿# UX-1B — Canonical Foundations & Grammar Specification
+# UX Foundations & Design System Canonical Specification (UX-GOV-1)
 
-> **Status**: APPROVED & IMPLEMENTED  
-> **Location**: src/components/foundations/  
-> **Source of Truth**: docs/ux/UX_REDESIGN_CONTRACT.md  
-> **Control Gate**: docs/ux/UX_REDESIGN_CONTROL.md (UX-1B)  
-> **Production URL**: https://crm.ancorasaude.cloud  
+> **Status**: APPROVED & ACTIVE  
+> **Location**: `src/components/foundations/` & `src/styles/`  
+> **Source of Truth**: `docs/ux/UX_REDESIGN_CONTRACT.md`  
+> **Control Gate**: `docs/ux/UX_REDESIGN_CONTROL.md`  
+> **Production URL**: `https://crm.ancorasaude.cloud`  
 
 ---
 
-## 1. Visão Geral e Princípios Fundamentais
+## 1. Princípios Inegociáveis de Design & Governança
 
-A fundação visual e estrutural do CRM Âncora padroniza a interface em torno da regra inegociável de **Progressive Disclosure**:
+Toda alteração de interface no CRM Âncora deve seguir a hierarquia fundamental de **Progressive Disclosure**:
 
-`	ext
-ESSENCIAL (Visível imediatamente: métrica chave, ação principal, estado atual)
+```text
+L1 — IMMEDIATE (Visível imediatamente: métrica chave, ação primária, estado operacional)
     ↓
-CONTEXTO (Secundário: filtros ativos, abas de agrupamento, status)
+L2 — CONTEXTUAL (Um clique / Aba ativa: filtros rápidos, abas de domínio, notas)
     ↓
-DETALHES SOB DEMANDA (Drawers, sheets, menus de ações, confirmações)
-`
+L3 — DEEP / ADVANCED (Sob demanda: Sheets de filtros avançados, Drawers de inspeção, Modais de confirmação)
+```
 
-### Regras de Ouro:
-1. **Sem Card-Soup**: Nem todo agrupamento de dados deve ser colocado dentro de um card com borda pesada e sombra. O padrão padrão (Section) é limpo, com separadores sutis ou fundo neutro.
-2. **Hierarquia Estrita de Ações**: Máximo de **1 ação primária** por contexto de página. Ações secundárias agrupadas em <PageActions moreActions={[...]} /> ou <RowActions />.
-3. **Preservação Integral de Funcionalidades**: Nenhuma funcionalidade é removida; tudo é organizado em níveis canônicos.
-4. **Sem bypass de multi-tenancy e segurança**: Componentes de fundação são estritamente visuais e operam como apresentação agnóstica de dados.
+### Regras Fundamentais:
+1. **Design System First (REUSE → REFINE → EXTEND → CREATE)**: Antes de criar qualquer estilo ou componente, procure tokens e variantes existentes. Criações novas exigem justificativa formal.
+2. **Proibição Estrita de "Magic Visual Values"**: É proibido o uso de classes arbitrárias (ex: `mt-[13px]`, `text-[15.3px]`, `rounded-[11px]`, `bg-[#f7f8fa]`) sem decisão documentada em `UX_DECISIONS.md`.
+3. **Sem "Card-Soup"**: Nem todo agrupamento de dados deve ser colocado dentro de um card com borda e sombra. O padrão estrutural padrão é `<Section variant="plain" />`, que utiliza ritmo de espaçamento vertical e tipografia.
+4. **Hierarquia Estrita de Ações**: Máximo de **1 ação primária** (`variant="default"`) por contexto de página. Ações secundárias ficam em `PageActions moreActions={[...]}`.
+5. **Preservação Integral de Funcionalidades**: Nenhuma funcionalidade é removida; simplificar significa organizar em camadas adequadas.
+6. **Multi-tenancy e Segurança no Servidor**: Componentes visuais nunca dependem de `tenant_id` ou de permissões manipuladas no cliente.
 
 ---
 
-## 2. Gramática dos Componentes Canônicos
+## 2. Escala Canônica de Espaçamento e Ritmo Vertical
 
-Todos os componentes canônicos estão centralizados em src/components/foundations/:
+O ritmo vertical é a base da harmonia visual. É proibido escolher paddings e gaps aleatoriamente por tela.
 
-| Componente | Arquivo | Finalidade Canônica |
+| Nível | Token / Classe | Valor | Uso Obrigatório |
+|---|---|---|---|
+| **INLINE** | `gap-1` a `gap-1.5` | 4px – 6px | Ícone + texto, badges com dot, chips internos |
+| **ITEM** | `gap-2` a `gap-3` | 8px – 12px | Label + Input, avatar + nome, botões de ação adjacentes |
+| **GROUP** | `gap-4` a `gap-5` | 16px – 20px | Elementos do mesmo formulário, grid de KPIs, cards de métricas |
+| **SECTION** | `gap-6` ou `space-y-6` | 24px | Distância entre seções estruturais independentes |
+| **MAJOR SECTION** | `gap-8` ou `space-y-8` | 32px | Separação entre blocos de cabeçalho e corpo principal |
+| **PAGE PADDING** | `p-4 sm:p-6 lg:p-8` | 16px / 24px / 32px | Padding externo padrão de todas as páginas |
+
+---
+
+## 3. Escala Canônica de Tipografia e Hierarquia
+
+A hierarquia de informação deve ser estabelecida prioritariamente por tipografia e peso, e não por caixas coloridas.
+
+| Nível | Classe / Token | Peso | Uso Obrigatório |
+|---|---|---|---|
+| **Page Title** | `text-2xl font-bold tracking-tight text-foreground` | 700 | Título principal da página no `PageHeader` |
+| **Section Title** | `text-base sm:text-lg font-semibold tracking-tight text-foreground` | 600 | Título de seções e tabelas em `Section` |
+| **KPI Value** | `text-2xl sm:text-3xl font-bold tracking-tight text-foreground` | 700 | Valores numéricos em cards de métricas |
+| **Body Primary** | `text-sm font-medium text-foreground` | 500 | Nomes de leads, textos de formulário, itens de tabela |
+| **Body Muted** | `text-sm text-muted-foreground` | 400 | Descrições de cabeçalho, explicações contextuais |
+| **Metadata / Sub** | `text-xs text-muted-foreground` | 400 | Telefones, emails, datas, horários de mensagem |
+| **Caption / Badge** | `text-[10px] sm:text-xs font-semibold tracking-wide uppercase` | 600 | Status de roleta, badges semânticos, contadores |
+
+---
+
+## 4. Matriz Semântica de Cores (Cores com Propósito)
+
+A cor não é decorativa; toda cor comunica um estado do sistema.
+
+| Tom (`tone`) | Variáveis CSS | Significado | Onde Utilizar |
+|---|---|---|---|
+| **Primary** | `--primary`, `--primary-foreground` | Ação principal, foco ativo, identidade | 1 Botão primário por tela, tab ativa |
+| **Success** | `--success`, `text-emerald-500` | Concluído, aprovado, ativo, saudável | Status "Convertido", Filial ativa, Template Meta aprovado |
+| **Warning** | `--warning`, `text-amber-500` | Atenção, pendência, pausa temporária | Fila pausada, SLA próximo do limite, documento pendente |
+| **Danger** | `--destructive`, `text-red-500` | Erro, crítico, rejeição, destrutivo | SLA vencido, webhook com falha, ação de excluir |
+| **Info** | `--accent`, `text-sky-500` | Em andamento, processo operacional ativo | Lead em atendimento, sincronização ativa |
+| **Neutral** | `--muted-foreground`, `text-slate-400` | Estado neutro, rascunho, arquivado | Inativo, metadados, separadores |
+
+---
+
+## 5. Biblioteca de Componentes Canônicos (`src/components/foundations/`)
+
+| Componente | Arquivo | Finalidade & API |
 |---|---|---|
-| <PageHeader /> | page-header.tsx | Cabeçalho canônico unificado com título, descrição, breadcrumbs, tags de contexto e slot de ações. |
-| <PageActions /> | page-actions.tsx | Barra de ações no topo com 1 ação primária destacada e menu dropdown para ações secundárias e perigosas. |
-| <PageTabs /> | page-tabs.tsx | Navegação horizontal por abas com sincronização de URL (?tab=), indicador animado e atalhos de teclado. |
-| <FilterBar /> | ilter-bar.tsx | Barra de busca rápida com chips de filtros ágeis e gatilho para sheet de filtros avançados. |
-| <ActiveFilterChips /> | ctive-filter-chips.tsx | Barra de filtros ativos com botões individuais de remoção e Limpar todos. |
-| <RowActions /> | ow-actions.tsx | Menu de 3 pontos para tabelas e listas com agrupamento semântico (primary, management, danger). |
-| <Section /> | section.tsx | Seção estrutural de layout com cabeçalho, contadores, ações e variante opcional card ou collapsible. |
-| <CollapsibleSection /> | section.tsx | Seção expansível para configurações avançadas ou blocos densos. |
-| <SettingsSection /> | settings-section.tsx | Layout para páginas de ajustes com linhas padronizadas de toggle (SettingsToggleRow). |
-| <DetailDrawer /> | detail-drawer.tsx | Drawer lateral direito (Sheet) para inspeção de lead, filial, usuário ou webhook. |
-| <ConfirmDialog /> | confirm-dialog.tsx | Modal de confirmação para ações destrutivas com indicação clara de impacto e botão perigo. |
-| <StatusBadge /> & <StatusDot /> | status-badge.tsx | Indicadores de status com 5 tons semânticos padronizados (
-eutral, info, success, warning, danger). |
-| <EmptyState /> | empty-state.tsx | Estados vazios com 5 categorias semânticas e ações orientadas ao próximo passo. |
-| Skeletons | skeletons.tsx | Telas de carregamento padronizadas: TableSkeleton, PageSkeleton, MetricSkeleton, DetailSkeleton. |
+| `<PageHeader />` | `page-header.tsx` | Cabeçalho canônico com `title`, `description`, `breadcrumb`, `context` tags e slot `actions`. |
+| `<PageActions />` | `page-actions.tsx` | Barra de ações no topo com `primaryAction` (destacada) e `moreActions` (menu dropdown). |
+| `<PageTabs />` | `page-tabs.tsx` | Abas de navegação sincronizadas com a URL (`?tab=`), indicador animado via Motion e suporte total a teclado. |
+| `<FilterBar />` | `filter-bar.tsx` | Barra de busca rápida com debounce, chips ágeis, contadores de resultados e botão de sheet avançado. |
+| `<ActiveFilterChips />` | `active-filter-chips.tsx` | Exibição de filtros aplicados com remoção individual e botão "Limpar todos". |
+| `<RowActions />` | `row-actions.tsx` | Menu de 3 pontos para tabelas e listas com agrupamento semântico (`primary`, `management`, `danger`). |
+| `<Section />` | `section.tsx` | Bloco estrutural limpo (não-card por padrão) com cabeçalho, contadores e ações. Suporta `variant="plain" \| "card" \| "bordered"`. |
+| `<CollapsibleSection />` | `section.tsx` | Seção expansível para blocos densos ou configurações avançadas sob demanda. |
+| `<SettingsSection />` | `settings-section.tsx` | Padrão visual para páginas de ajustes e controles operacionais (`SettingsToggleRow`). |
+| `<DetailDrawer />` | `detail-drawer.tsx` | Drawer lateral direito padronizado com cabeçalho fixo, corpo rolável e rodapé de ações. |
+| `<ConfirmDialog />` | `confirm-dialog.tsx` | Modal canônico para confirmação de ações destrutivas ou de impacto com indicação clara. |
+| `<StatusBadge />` & `<StatusDot />` | `status-badge.tsx` | Indicadores de status com os 5 tons semânticos padronizados. |
+| `<EmptyState />` | `empty-state.tsx` | Estados vazios com 5 categorias semânticas (`EMPTY_DATA`, `EMPTY_SEARCH`, `EMPTY_FILTER`, `NO_PERMISSION`, `OPTIONAL_FEATURE`). |
+| Skeletons | `skeletons.tsx` | Estados de carregamento padronizados (`TableSkeleton`, `PageSkeleton`, `MetricSkeleton`, `DetailSkeleton`). |
 
 ---
 
-## 3. Matriz Semântica de Status (StatusBadge)
+## 6. Checklist Obrigatório de Visual QA (30 Pontos)
 
-Para eliminar divergências visuais em diferentes telas, o StatusBadge padroniza os 5 tons do sistema:
+Antes de considerar qualquer tela concluída, validar obrigatoriamente:
 
-| Tom (	one) | Significado | Exemplo de Uso |
-|---|---|---|
-| 
-eutral | Estado inativo, rascunho, neutro | Filial inativa, template rascunho, usuário suspenso |
-| info | Em andamento, processo ativo | Lead em atendimento, sincronização ativa, webhook configurado |
-| success | Concluído, aprovado, ativo | Filial ativa, venda convertida, template aprovado pela Meta |
-| warning | Atenção, pendência, pausa | Fila pausada, SLA próximo do limite, documento pendente |
-| danger | Erro, crítico, rejeitado | SLA vencido, falha de webhook, template rejeitado |
-
----
-
-## 4. Matriz Semântica de Estados Vazios (EmptyState)
-
-| Tipo Semântico | Contexto | Comportamento Recomendado |
-|---|---|---|
-| EMPTY_DATA | Entidade sem registros cadastrados | Exibir ação primária para criar o primeiro registro. |
-| EMPTY_SEARCH | Nenhum resultado retornado na busca | Exibir botão Limpar busca com foco de volta no input. |
-| EMPTY_FILTER | Filtros combinados não retornaram dados | Exibir botão Limpar filtros aplicados. |
-| NO_PERMISSION | Usuário sem perfil/acesso à seção | Explicar o motivo e apontar para solicitação ao administrador. |
-| OPTIONAL_FEATURE | Recurso opcional ainda não ativado | Exibir resumo do benefício e botão para ativação. |
-
----
-
-## 5. Hierarquia de Ações
-
-### Nível de Página
-- **1 Ação Primária**: Botão destacado à direita no <PageHeader /> (ex: Novo lead, Nova filial, Criar campanha).
-- **Ações Secundárias / Exportação / Configuração**: Agrupadas no dropdown do <PageActions moreActions={[...]} />.
-- **Ações Destrutivas de Lote**: Destacadas com confirmação explícita via <ConfirmDialog />.
-
-### Nível de Linha / Tabela
-- **Clique na Linha ou Título**: Abre o drawer de detalhes ou a página de visualização.
-- **Ações Rápidas**: Ícone de ação primária (ex: Abrir chat, Ver perfil).
-- **Ações de Gestão & Perigo**: Agrupadas em <RowActions /> com separador visual antes de ações destrutivas.
+```markdown
+- [ ] 1. Page padding consistente (p-4 sm:p-6 lg:p-8)?
+- [ ] 2. Título no tamanho correto (text-2xl font-bold)?
+- [ ] 3. Descrição não compete com o título (text-sm text-muted-foreground)?
+- [ ] 4. Espaçamento cabeçalho → conteúdo correto (space-y-6 a space-y-8)?
+- [ ] 5. Controles e inputs possuem a mesma altura (h-9 ou h-10)?
+- [ ] 6. Ícones possuem tamanho e alinhamento consistentes (size-4 a size-6)?
+- [ ] 7. Texto secundário e metadados estão legíveis com contraste suficiente?
+- [ ] 8. Existe no máximo 1 botão Primary destacado no cabeçalho?
+- [ ] 9. Não há excesso de cards aninhados ("card-soup")?
+- [ ] 10. Não há bordas ou caixas redundantes ao redor de tudo?
+- [ ] 11. Não há badges coloridos desnecessários para dados secundários?
+- [ ] 12. Todas as cores utilizadas possuem significado funcional claro?
+- [ ] 13. Tabela possui densidade confortável e leitura desobstruída?
+- [ ] 14. Conteúdo essencial é visível na primeira dobra sem rolagem excessiva?
+- [ ] 15. Empty state possui título, explicação e ação de próximo passo?
+- [ ] 16. Skeletons de carregamento respeitam as dimensões reais do conteúdo?
+- [ ] 17. Mensagens de erro são contidas e explicativas?
+- [ ] 18. Layout se adapta confortavelmente em 1366×768, 1440×900 e 1920×1080?
+- [ ] 19. Mobile mantém a hierarquia essencial e oculta colunas secundárias?
+- [ ] 20. Drawer lateral abre suavemente sem travar o scroll da página?
+- [ ] 21. Abas e filtros sincronizam o estado com a URL (?tab=, ?status=)?
+- [ ] 22. Foco visível por teclado (focus-visible) em todos os elementos interativos?
+- [ ] 23. Botões e links possuem aria-label e título descritivo?
+- [ ] 24. Sem aninhamento inválido de tags HTML (ex: button dentro de button)?
+- [ ] 25. Nenhum magic value sem justificativa registrada em UX_DECISIONS.md?
+- [ ] 26. Formulários usam useActionState com feedback por toast consistente?
+- [ ] 27. Ações destrutivas exigem confirmação via ConfirmDialog?
+- [ ] 28. Dados e permissões validados exclusivamente no servidor (multi-tenant seguro)?
+- [ ] 29. 100% de funcionalidades anteriores preservadas e mapeadas?
+- [ ] 30. Testes automatizados e checagem de tipos (tsc) passam com 0 erros?
+```
 
 ---
 
-## 6. Caso Piloto Implementado (Pilot 1: BranchesManager)
+## 7. Declarações Obrigatórias de Gate
 
-O componente src/features/branches/components/branches-manager.tsx serviu como caso de validação e migração piloto da gramática:
+Toda entrega de etapa deve formalizar os seguintes gates:
 
-1. **Antes**:
-   - Tabela isolada sem estados vazios padronizados.
-   - Badges manuais com cores customizadas para status e central.
-   - Falta de hierarquia visual entre métricas de equipe e filiais.
-2. **Depois**:
-   - Encapsulado em <Section title=Filiais da corretora description=... actions={<CreateBranchSheet />} />.
-   - Status unificados com <StatusBadge label=Ativa tone=success dot />.
-   - <EmptyState type=EMPTY_DATA /> caso não existam filiais cadastradas.
-   - Preservação 100% de forms server actions (useActionState), feedbacks por toast e métricas StatCard.
-
----
-
-## 7. Próximos Passos (Transição para UX-1C)
-
-Com as fundações canônicas e testes 100% aprovados, o próximo passo autorizado em docs/ux/UX_REDESIGN_CONTROL.md é a **Etapa UX-1C: Sidebar & Navigation Restructure**.
+```text
+DOCUMENTATION_UPDATED = YES
+FUNCTIONALITY_MATRIX_UPDATED = YES
+DESIGN_SYSTEM_FOLLOWED = YES
+NEW_VISUAL_MAGIC_VALUES = NO
+SPACING_VISUALLY_VALIDATED = YES
+TYPOGRAPHY_VISUALLY_VALIDATED = YES
+COLORS_VISUALLY_VALIDATED = YES
+RESPONSIVE_VISUALLY_VALIDATED = YES
+ACCESSIBILITY_VALIDATED = YES
+VALID_FUNCTIONALITY_REMOVED = NO
+BUSINESS_RULE_CHANGED = NO
+```

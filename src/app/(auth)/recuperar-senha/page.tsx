@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { CheckCircle, LockKey, Warning } from "@/components/huge-icons";
 
 import { Button } from "@/components/ui/button";

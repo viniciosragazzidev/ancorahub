@@ -6,6 +6,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { setDbQueryHook } from "./db-hook";
 
 type TimingEntry = { startMs: number; endMs?: number };
 type RequestTiming = {
@@ -113,6 +114,11 @@ export function recordIssuedDatabaseQuery(query: string): void {
   timing.queryCount += 1;
   timing.queryFingerprints.add(createHash("sha256").update(query).digest("hex").slice(0, 12));
 }
+
+// Wire up the real hook so db/client.ts (which imports db-hook.ts, not this file)
+// still counts queries in the full server context. db-hook.ts defaults to a no-op;
+// this call replaces it when the server loads request-timing.ts.
+setDbQueryHook(recordIssuedDatabaseQuery);
 
 /** Get the current request timing from ALS context. */
 export function getRequestTiming(): RequestTiming | undefined {

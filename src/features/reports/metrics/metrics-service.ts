@@ -5,11 +5,38 @@ import { and, count, eq, gte, inArray, isNotNull, isNull, lt, ne, sql, type SQL 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import type { PeriodValue } from "@/shared/period";
-import { fillTrendDays, periodStart } from "@/shared/period";
+import { fillTrendDays } from "@/shared/period";
 
 import type { FunnelStage } from "./metrics-math";
-import { buildFunnelRows, percentage, previousWindowStart, safeRate } from "./metrics-math";
+import { buildFunnelRows, percentage, safeRate } from "./metrics-math";
 import { resolveReportDataScope, type ReportDataScope } from "./metric-scope";
+import {
+  type CohortConversion,
+  type PeriodWindows,
+  type CommercialOverview,
+  type TenantSlaParams,
+  type AttentionItem,
+  type AttentionSnapshot,
+  type SourcePerformanceRow,
+  type FunnelSnapshot,
+  type LeadTimelinePoint,
+  resolveWindows,
+  sourceLabel,
+} from "./metrics-types";
+
+// Re-export all public types so existing callers of metrics-service keep working
+export type {
+  CohortConversion,
+  PeriodWindows,
+  CommercialOverview,
+  TenantSlaParams,
+  AttentionItem,
+  AttentionSnapshot,
+  SourcePerformanceRow,
+  FunnelSnapshot,
+  LeadTimelinePoint,
+};
+export { resolveWindows, sourceLabel };
 
 /** Estágios ativos (não terminais) do funil canônico. */
 const ACTIVE_LEAD_STATUSES = [
@@ -25,28 +52,7 @@ const ACTIVE_LEAD_STATUSES = [
 /** Estágios considerados "negociação avançada" para o item de atenção. */
 const NEGOTIATION_STAGES = ["negotiation", "documentation_pending", "under_analysis"] as const;
 
-export interface CohortConversion {
-  readonly received: number;
-  readonly converted: number;
-  readonly lost: number;
-  /** Percentual 0–100. */
-  readonly rate: number;
-}
 
-export interface PeriodWindows {
-  readonly currentStart: Date;
-  readonly previousStart: Date;
-  readonly days: number;
-}
-
-export function resolveWindows(period: PeriodValue): PeriodWindows {
-  const currentStart = periodStart(period);
-  return {
-    currentStart,
-    previousStart: previousWindowStart(currentStart, period),
-    days: period,
-  };
-}
 
 function cohortWhere(scope: ReportDataScope, start: Date, end?: Date): SQL | undefined {
   return and(
@@ -74,11 +80,7 @@ function salesJoinedWhere(scope: ReportDataScope, start: Date, end?: Date): SQL 
   );
 }
 
-/** SLA operacional do tenant (parâmetros existentes, DEC-090 §7). */
-export interface TenantSlaParams {
-  readonly firstContactMinutes: number;
-  readonly stagnantDays: number;
-}
+
 
 export async function getTenantSlaParams(tenantId: string): Promise<TenantSlaParams> {
   const rows = await getDatabase()
@@ -125,16 +127,7 @@ export async function resolveCohortConversion(
   return { received, converted, lost, rate: percentage(converted, received) };
 }
 
-export interface CommercialOverview {
-  readonly conversion: CohortConversion;
-  readonly previousConversion: CohortConversion;
-  readonly sales: number;
-  readonly previousSales: number;
-  readonly revenue: number | null;
-  readonly previousRevenue: number | null;
-  readonly avgTicket: number | null;
-  readonly previousAvgTicket: number | null;
-}
+
 
 export async function getCommercialOverview(
   context: TenantContext,
@@ -196,17 +189,7 @@ export async function getCommercialOverview(
   };
 }
 
-export interface FunnelSnapshot {
-  readonly rows: readonly {
-    stage: FunnelStage;
-    inStage: number;
-    reached: number;
-    progressionToNext: number | null;
-  }[];
-  readonly lost: number;
-  readonly biggestBottleneck: number | null;
-  readonly received: number;
-}
+
 
 export async function getFunnelSnapshot(
   context: TenantContext,
@@ -237,15 +220,7 @@ export async function getFunnelSnapshot(
   };
 }
 
-/**
- * Série diária para superfícies executivas. Mantém a mesma coorte, período e
- * escopo das métricas comerciais; a interface não deve agregá-la localmente.
- */
-export interface LeadTimelinePoint {
-  readonly date: string;
-  readonly received: number;
-  readonly converted: number;
-}
+
 
 export async function getLeadTimeline(
   context: TenantContext,
@@ -274,25 +249,7 @@ export async function getLeadTimeline(
   return fillTrendDays(period, byDate);
 }
 
-export interface SourcePerformanceRow {
-  readonly source: string;
-  readonly leads: number;
-  readonly converted: number;
-  readonly sales: number;
-  readonly revenue: number | null;
-}
 
-const SOURCE_LABELS: Record<string, string> = {
-  landing_page: "Landing Page",
-  meta_lead_ads: "Meta Lead Ads",
-  manual: "Cadastro manual",
-  webhook: "Webhook",
-  extension: "Extensão de navegador",
-};
-
-export function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? source;
-}
 
 export async function getCommercialBySource(
   context: TenantContext,
@@ -343,19 +300,7 @@ export async function getCommercialBySource(
     .sort((a, b) => b.leads - a.leads);
 }
 
-export interface AttentionItem {
-  readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly count: number;
-  /** Rota de drill-down com a população exata. */
-  readonly href: string;
-}
 
-export interface AttentionSnapshot {
-  readonly items: readonly AttentionItem[];
-  readonly sla: TenantSlaParams;
-}
 
 export async function getAttentionSnapshot(
   context: TenantContext,

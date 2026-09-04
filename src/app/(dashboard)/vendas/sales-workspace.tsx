@@ -4,7 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowRight } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { FileArrowDown } from "@/components/huge-icons";
 
 import { SaleStatusBadge } from "@/components/status-badges";

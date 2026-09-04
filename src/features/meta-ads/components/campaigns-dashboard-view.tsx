@@ -13,7 +13,7 @@ import { formatCurrency } from "@/features/quotes/utils";
 import type { MetaCampaignItem } from "../types";
 
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { toggleMetaCampaignCaptureEligibilityAction } from "../actions";
 
 export function CampaignsDashboardView({

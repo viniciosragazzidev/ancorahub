@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

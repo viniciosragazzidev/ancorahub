@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { CheckCircle, Fingerprint, LockKey, PencilSimple, Plus, Trash, WarningCircle } from "@/components/huge-icons";
 
 import { formatDate } from "@/features/quotes/utils";

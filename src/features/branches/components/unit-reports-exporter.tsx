@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { reportRegistry, type ReportFormat } from "@/features/reports/report-registry";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { TenantRole } from "@/shared/db/schema";
 
 type RangePreset = "30" | "90" | "custom";

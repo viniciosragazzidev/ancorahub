@@ -6,7 +6,7 @@ import { X } from "@/components/huge-icons"
 
 import { Dialog, DialogPopup, DialogClose } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
-import { toast } from "sonner"
+import { toast } from "@/components/ui/sonner"
 import type { TenantOnboarding } from "../types/onboarding.types"
 import { dismissTenantOnboarding } from "../actions/dismiss-tenant-onboarding"
 import { OnboardingHero } from "./onboarding-hero"

@@ -27,7 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
 import { updateBrokerAvailabilityAction } from "@/features/leads/availability-action";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export type LightTopNavProps = {
   branding?: {

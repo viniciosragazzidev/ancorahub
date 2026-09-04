@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Check, X, Loader2, Eye, Ban } from "lucide-react";
 import { RecoveryStatusBadge } from "@/components/status-badges";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";

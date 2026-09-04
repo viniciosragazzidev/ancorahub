@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, XCircle } from "lucide-react";
 import { CalendarBlank } from "@/components/huge-icons";

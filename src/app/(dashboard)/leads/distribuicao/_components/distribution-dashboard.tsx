@@ -14,7 +14,7 @@ import {
   MagnifyingGlass,
   ArrowRight,
 } from "@/components/huge-icons";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";

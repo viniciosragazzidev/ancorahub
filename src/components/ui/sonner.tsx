@@ -27,99 +27,48 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
+/** Internal helper to render AnimatedToast via sonnerToast.custom */
+function renderToast(
+  status: "info" | "success" | "danger" | "warning" | "loading" | "neutral",
+  defaultBadge: string,
+  message: React.ReactNode,
+  options?: any,
+) {
+  return sonnerToast.custom(
+    (t) => (
+      <AnimatedToast
+        id={t}
+        status={status}
+        title={message}
+        description={options?.description}
+        badgeLabel={options?.badgeLabel ?? defaultBadge}
+        action={options?.action}
+        cancel={options?.cancel}
+        onClose={() => sonnerToast.dismiss(t)}
+      />
+    ),
+    options,
+  );
+}
+
 export const toast = Object.assign(
   (message: React.ReactNode, options?: any) =>
-    sonnerToast.custom(
-      (t) => (
-        <AnimatedToast
-          id={t}
-          status="info"
-          title={message}
-          description={options?.description}
-          badgeLabel={options?.badgeLabel ?? "Notificação"}
-          action={options?.action}
-          onClose={() => sonnerToast.dismiss(t)}
-        />
-      ),
-      options,
-    ),
+    renderToast("info", "Notificação", message, options),
   {
     ...sonnerToast,
     success: (message: React.ReactNode, options?: any) =>
-      sonnerToast.custom(
-        (t) => (
-          <AnimatedToast
-            id={t}
-            status="success"
-            title={message}
-            description={options?.description}
-            badgeLabel={options?.badgeLabel ?? "Sucesso"}
-            action={options?.action}
-            onClose={() => sonnerToast.dismiss(t)}
-          />
-        ),
-        options,
-      ),
+      renderToast("success", "Sucesso", message, options),
     error: (message: React.ReactNode, options?: any) =>
-      sonnerToast.custom(
-        (t) => (
-          <AnimatedToast
-            id={t}
-            status="danger"
-            title={message}
-            description={options?.description}
-            badgeLabel={options?.badgeLabel ?? "Erro"}
-            action={options?.action}
-            onClose={() => sonnerToast.dismiss(t)}
-          />
-        ),
-        options,
-      ),
+      renderToast("danger", "Erro", message, options),
     warning: (message: React.ReactNode, options?: any) =>
-      sonnerToast.custom(
-        (t) => (
-          <AnimatedToast
-            id={t}
-            status="warning"
-            title={message}
-            description={options?.description}
-            badgeLabel={options?.badgeLabel ?? "Aviso"}
-            action={options?.action}
-            onClose={() => sonnerToast.dismiss(t)}
-          />
-        ),
-        options,
-      ),
+      renderToast("warning", "Aviso", message, options),
     info: (message: React.ReactNode, options?: any) =>
-      sonnerToast.custom(
-        (t) => (
-          <AnimatedToast
-            id={t}
-            status="info"
-            title={message}
-            description={options?.description}
-            badgeLabel={options?.badgeLabel ?? "Info"}
-            action={options?.action}
-            onClose={() => sonnerToast.dismiss(t)}
-          />
-        ),
-        options,
-      ),
+      renderToast("info", "Info", message, options),
     loading: (message: React.ReactNode, options?: any) =>
-      sonnerToast.custom(
-        (t) => (
-          <AnimatedToast
-            id={t}
-            status="loading"
-            title={message}
-            description={options?.description}
-            badgeLabel={options?.badgeLabel ?? "Carregando"}
-            action={options?.action}
-            onClose={() => sonnerToast.dismiss(t)}
-          />
-        ),
-        options,
-      ),
+      renderToast("loading", "Carregando", message, options),
+    /** Alias for generic messages without strong semantic status */
+    message: (message: React.ReactNode, options?: any) =>
+      renderToast("neutral", "Notificação", message, options),
   },
 );
 

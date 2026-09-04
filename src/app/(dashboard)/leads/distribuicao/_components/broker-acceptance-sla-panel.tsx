@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Clock, ShieldCheck, ArrowsClockwise, Warning, Check } from "@phosphor-icons/react";
 
 import { Badge } from "@/components/ui/badge";

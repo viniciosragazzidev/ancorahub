@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useActionState, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { CheckCircle, Clock, ListChecks, Plus, Users } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";

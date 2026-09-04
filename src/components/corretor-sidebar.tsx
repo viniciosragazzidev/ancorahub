@@ -28,7 +28,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { signOut } from "@/shared/auth/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 import { getPendingFeedbackCountAction } from "@/features/leads/feedback-queries";

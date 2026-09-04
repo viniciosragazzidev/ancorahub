@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, WarningCircle } from "@/components/huge-icons";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { createManualLeadAction, type LeadCreateState } from "../actions";
 import { Button } from "@/components/ui/button";

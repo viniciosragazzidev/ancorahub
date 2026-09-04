@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CheckCircle, MagnifyingGlass, UsersThree, XCircle } from "@/components/huge-icons";

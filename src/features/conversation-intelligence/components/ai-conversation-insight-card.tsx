@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Sparkle, CheckCircle, Warning, ChatCircleText, ArrowRight, Lightbulb } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
