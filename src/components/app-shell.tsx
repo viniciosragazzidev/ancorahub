@@ -123,7 +123,7 @@ export function AppShell({
         className="min-h-dvh overflow-hidden"
         style={
           {
-            "--sidebar-width": "16rem",
+            "--sidebar-width": isFinanceiro ? "16rem" : "5rem",
             "--header-height": "4rem",
             ...(branding?.brandColor
               ? {

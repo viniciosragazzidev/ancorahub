@@ -7,29 +7,25 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 
 import {
-  BookOpen,
-  Buildings,
-  ChartBar,
-  ChatCircleText,
-  ClipboardText,
+  SquaresFour,
+  ChatCircleDots,
+  Lightbulb,
+  PresentationChart,
   CurrencyCircleDollar,
-  FileArrowDown,
-  FolderSimple,
-  Handshake,
-  House,
-  Megaphone,
-  Monitor,
-  Note,
-  Plug,
-  Redistribute,
-  ShieldCheck,
+  UsersThree,
+  Clock,
+  WhatsappLogo,
+  Sparkle,
+  CaretDown,
   SignOut,
   SlidersHorizontal,
-  Target,
-  Users,
   UserCircle,
+  ShieldCheck,
+  Buildings,
+  Megaphone,
+  Plug,
   WifiHigh,
-} from "@/components/huge-icons";
+} from "@phosphor-icons/react";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import { AncoraLogo } from "@/components/ancora-logo";
 import {
@@ -46,79 +42,116 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
+import { cn } from "@/lib/utils";
 
-import { Sparkle } from "@phosphor-icons/react";
+type NavItemConfig = {
+  label: string;
+  fullLabel: string;
+  icon: typeof SquaresFour;
+  url: string;
+  permission: PermissionKey;
+  isWhatsApp?: boolean;
+  beta?: boolean;
+  statusDot?: boolean;
+};
 
-type SidebarItem = { label: string; icon: typeof House | typeof Sparkle; url: string; permission: PermissionKey };
-type SidebarSection = { label: string; items: SidebarItem[] };
-
-const navSections: SidebarSection[] = [
+const navigationItems: NavItemConfig[] = [
   {
-    label: "Visão Geral",
-    items: [
-      { label: "Dashboard", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
-      { label: "Relatórios", icon: ChartBar, url: "/relatorios", permission: "acessar_relatorios" },
-    ],
+    label: "Painel",
+    fullLabel: "Dashboard & Visão Geral",
+    icon: SquaresFour,
+    url: "/dashboard",
+    permission: "acessar_dashboard",
   },
   {
-    label: "Operação Comercial",
-    items: [
-      { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
-      { label: "Leads", icon: Users, url: "/leads", permission: "acessar_leads" },
-      { label: "Vendas", icon: CurrencyCircleDollar, url: "/vendas", permission: "acessar_vendas" },
-      { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
-    ],
+    label: "Atendim...",
+    fullLabel: "Atendimento & WhatsApp",
+    icon: ChatCircleDots,
+    url: "/conversas",
+    permission: "acessar_conversas",
   },
   {
-    label: "Roteamento & Inteligência",
-    items: [
-      { label: "Campanhas de Marketing", icon: Megaphone, url: "/marketing/campanhas", permission: "acessar_campanhas_meta" },
-      { label: "Distribuição & Desempenho", icon: Redistribute, url: "/distribuicao", permission: "acessar_qualificacao_ia" },
-      { label: "Robô de Qualificação IA", icon: Target, url: "/qualificacao", permission: "acessar_qualificacao_ia" },
-    ],
+    label: "Leads",
+    fullLabel: "Leads & Oportunidades",
+    icon: Lightbulb,
+    url: "/leads",
+    permission: "acessar_leads",
   },
   {
-    label: "Estrutura & Conexões",
-    items: [
-      { label: "Equipe", icon: Users, url: "/equipe", permission: "convidar_corretor" },
-      { label: "Unidades", icon: Buildings, url: "/filiais", permission: "acessar_configuracoes_unidade" },
-      { label: "Entrada & Integrações", icon: Plug, url: "/integrations", permission: "acessar_integracao_meta" },
-      { label: "Configurações", icon: SlidersHorizontal, url: "/settings", permission: "acessar_configuracoes_pessoais" },
-    ],
+    label: "Atividades",
+    fullLabel: "Distribuição & Roletas",
+    icon: PresentationChart,
+    url: "/distribuicao",
+    permission: "acessar_qualificacao_ia",
+  },
+  {
+    label: "Negocia...",
+    fullLabel: "Vendas & Propostas",
+    icon: CurrencyCircleDollar,
+    url: "/vendas",
+    permission: "acessar_vendas",
+  },
+  {
+    label: "Contatos",
+    fullLabel: "Equipe & Colaboradores",
+    icon: UsersThree,
+    url: "/equipe",
+    permission: "convidar_corretor",
+  },
+  {
+    label: "Tarefas",
+    fullLabel: "Relatórios & Métricas",
+    icon: Clock,
+    url: "/relatorios",
+    permission: "acessar_relatorios",
+  },
+  {
+    label: "WhatsApp",
+    fullLabel: "Conexões WhatsApp",
+    icon: WhatsappLogo,
+    url: "/settings/whatsapp",
+    permission: "acessar_configuracoes_pessoais",
+    isWhatsApp: true,
+    beta: true,
+    statusDot: true,
+  },
+  {
+    label: "Campanhas",
+    fullLabel: "Campanhas de Marketing",
+    icon: Megaphone,
+    url: "/marketing/campanhas",
+    permission: "acessar_campanhas_meta",
+  },
+  {
+    label: "Unidades",
+    fullLabel: "Filiais & Unidades",
+    icon: Buildings,
+    url: "/filiais",
+    permission: "acessar_configuracoes_unidade",
+  },
+  {
+    label: "Ajustes",
+    fullLabel: "Configurações do Sistema",
+    icon: SlidersHorizontal,
+    url: "/settings",
+    permission: "acessar_configuracoes_pessoais",
   },
 ];
-
-function getItemLabel(item: SidebarItem, roleKey?: UserDisplayInfo["roleKey"] | null): string {
-  if (item.url === "/filiais") {
-    return roleKey === "director" ? "Unidades" : "Minha unidade";
-  }
-  if (item.url === "/equipe") {
-    return roleKey === "manager" ? "Equipe da Unidade" : "Equipe";
-  }
-  if (item.url === "/metas") {
-    return roleKey === "manager" ? "Metas da Unidade" : "Metas";
-  }
-  if (item.url === "/relatorios") {
-    return roleKey === "manager" ? "Relatórios da Unidade" : "Relatórios";
-  }
-  if (item.url === "/financeiro") {
-    return roleKey === "manager" ? "Financeiro da Unidade" : "Financeiro & Comissões";
-  }
-  return item.label;
-}
 
 const marketingHiddenPaths = [
   "/conversas",
@@ -139,7 +172,7 @@ const marketingHiddenPaths = [
   "/diretor",
 ];
 
-const brokerHiddenPaths = ["/cotacao", "/automacoes"];
+const brokerHiddenPaths = ["/cotacao", "/automacoes", "/filiais", "/unidades"];
 const priorityNavigationPaths = new Set(["/dashboard", "/leads", "/conversas", "/clientes"]);
 const managerHiddenPaths = [
   "/marketing",
@@ -150,7 +183,7 @@ const managerHiddenPaths = [
   "/automacoes",
 ];
 
-function canShowItem(item: SidebarItem, user: UserDisplayInfo | null, roleKey: UserDisplayInfo["roleKey"]) {
+function canShowItem(item: NavItemConfig, user: UserDisplayInfo | null, roleKey: UserDisplayInfo["roleKey"]) {
   if (!roleKey) return false;
   if (user?.jobTitle === "marketing" && marketingHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
     return false;
@@ -179,25 +212,11 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
   const userName = user?.name ?? "Usuário";
   const userRole = user?.role ?? "";
   const roleKey = user?.roleKey ?? null;
-  const isPlantaoActive = pathname.startsWith("/distribuicao") && pathname.includes("view=plantao") || pathname.startsWith("/leads/distribuicao/plantao");
-  const visibleSections = navSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => canShowItem(item, user, roleKey)),
-    }))
-    .filter((section) => section.items.length > 0);
+  const isPlantaoActive =
+    (pathname.startsWith("/distribuicao") && pathname.includes("view=plantao")) ||
+    pathname.startsWith("/leads/distribuicao/plantao");
 
-  // Cascata de entrada dos itens do menu: atraso progressivo conforme o item visível.
-  const itemEntranceDelays = new Map<string, number>();
-  {
-    let index = 0;
-    for (const section of visibleSections) {
-      for (const item of section.items) {
-        itemEntranceDelays.set(`${section.label}:${item.label}`, Math.min(index * 40, 520));
-        index += 1;
-      }
-    }
-  }
+  const visibleItems = navigationItems.filter((item) => canShowItem(item, user, roleKey));
 
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");
@@ -210,180 +229,269 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
         },
       });
     } catch {
-      // signOut may fail if server is unreachable
+      // signOut fallback
     } finally {
       window.location.href = "/login";
     }
   }
 
   return (
-    <Sidebar variant="sidebar">
-      <SidebarHeader className="space-y-3 border-b border-sidebar-border/50 p-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3">
-        <Link href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"} className="flex h-8 min-w-0 items-center group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center">
-          <AncoraLogo src={logoUrl} className="h-8 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
-          <img src="/icon.png" alt="Ancora" className="hidden size-5 object-contain group-data-[collapsible=icon]:block" />
+    <Sidebar
+      variant="sidebar"
+      collapsible="none"
+      className="w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-sidebar-border/50 bg-[#0A1415] text-sidebar-foreground shadow-xs select-none"
+    >
+      {/* Header: Logo & SuperAdmin Switcher */}
+      <SidebarHeader className="flex flex-col items-center justify-center p-2 pt-3 pb-2 gap-2 border-b border-sidebar-border/30">
+        <Link
+          href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
+          className="flex size-10 items-center justify-center rounded-2xl bg-sidebar-accent/40 p-1.5 transition-transform hover:scale-105"
+          title="Âncora CRM"
+        >
+          <img src="/icon.png" alt="Ancora" className="size-7 object-contain drop-shadow-sm" />
         </Link>
 
         {user?.isPlatformAdmin && (
-          <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
+          <div className="w-full flex justify-center">
+            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
+          </div>
         )}
 
-        {onDuty && roleKey !== "manager" ? (
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                isActive={isPlantaoActive}
-                render={<Link href="/distribuicao?view=plantao" onClick={() => isMobile && setOpenMobile(false)} />}
-                tooltip="Plantão ao vivo"
-                className="group/plantao relative h-9 justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[11px] font-semibold uppercase text-emerald-700 transition-[background-color,border-color,color] hover:border-emerald-500/40 hover:bg-emerald-500/15 dark:text-emerald-400 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:border-emerald-500/25 group-data-[collapsible=icon]:bg-emerald-500/12 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
+        {/* Live Duty Pulse Indicator */}
+        {onDuty && roleKey !== "manager" && (
+          <TooltipProvider delay={150}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    href="/distribuicao?view=plantao"
+                    onClick={() => isMobile && setOpenMobile(false)}
+                    className={cn(
+                      "relative flex size-9 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 transition-colors hover:bg-emerald-500/20",
+                      isPlantaoActive && "border-emerald-500 bg-emerald-500/25 ring-2 ring-emerald-500/40"
+                    )}
+                  />
+                }
               >
-                <div className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:hidden">
-                  <span className="relative flex size-2 shrink-0">
-                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-                  </span>
-                  <span className="truncate tracking-wide">Plantão ao vivo</span>
-                </div>
-                <WifiHigh className="size-4 shrink-0 text-emerald-500 transition-transform duration-[var(--duration-quick)] group-hover/plantao:scale-105 motion-reduce:transition-none" />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        ) : null}
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs font-semibold">
+                Plantão ao vivo ativo
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </SidebarHeader>
 
-      <SidebarContent className="pl-3 pr-1.5 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
-        <div className="flex flex-col gap-4 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:gap-2">
-          {visibleSections.map((section, sectionIndex) => (
-            <div key={section.label} className="w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-              {sectionIndex > 0 ? <div className="mb-3 h-px w-full bg-sidebar-border/55 group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:w-5" /> : null}
-              <p className="mb-1.5 px-2 font-mono text-[10px] font-medium tracking-wider text-sidebar-foreground/50 group-data-[collapsible=icon]:sr-only">
-                {section.label}
-              </p>
-              <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive =
-                    pathname === item.url ||
-                    (item.url !== "/dashboard" && pathname.startsWith(item.url + "/")) ||
-                    (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
-                  const displayLabel = getItemLabel(item, user?.roleKey);
-                  const entranceDelay = itemEntranceDelays.get(`${section.label}:${item.label}`) ?? 0;
-                  const itemTargetUrl = item.url === "/filiais" && user?.roleKey === "manager" && user?.branchId
-                    ? `/unidades/${user.branchId}`
-                    : item.url;
+      {/* Navigation Rail Content */}
+      <SidebarContent className="flex-1 overflow-y-auto px-1 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <TooltipProvider delay={150}>
+          <nav aria-label="Menu principal" className="flex flex-col items-center gap-1.5 w-full">
+            {visibleItems.map((item, index) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.url ||
+                (item.url !== "/dashboard" && pathname.startsWith(item.url + "/")) ||
+                (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
 
-                  return (
-                    <SidebarMenuItem
-                      key={item.label}
-                      className="ct-reveal relative group-data-[collapsible=icon]:w-full"
-                      style={{ animationDelay: `${entranceDelay}ms` }}
+              const itemTargetUrl =
+                item.url === "/filiais" && user?.roleKey === "manager" && user?.branchId
+                  ? `/unidades/${user.branchId}`
+                  : item.url;
+
+              return (
+                <Tooltip key={item.url}>
+                  <TooltipTrigger
+                    render={
+                      <Link
+                        href={itemTargetUrl}
+                        prefetch={priorityNavigationPaths.has(itemTargetUrl)}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                        className="group relative flex w-full flex-col items-center justify-center gap-0.5 py-1 text-center outline-none select-none transition-transform active:scale-95"
+                      />
+                    }
+                  >
+                    {/* BETA badge floating on top */}
+                    {item.beta && (
+                      <span className="absolute -top-1 right-2 z-20 rounded bg-indigo-600 px-1 py-0.2 text-[8px] font-bold text-white tracking-wide shadow-xs uppercase">
+                        BETA
+                      </span>
+                    )}
+
+                    {/* Icon Tile */}
+                    <div
+                      className={cn(
+                        "relative flex size-11 items-center justify-center rounded-2xl transition-all duration-200",
+                        isActive
+                          ? "bg-primary/20 text-primary border border-primary/30 shadow-xs dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30"
+                          : "text-muted-foreground/80 hover:bg-sidebar-accent/70 hover:text-foreground",
+                        item.isWhatsApp && (
+                          isActive
+                            ? "border-2 border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                            : "border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:border-emerald-500 hover:bg-emerald-500/20"
+                        )
+                      )}
                     >
                       {isActive && (
                         <motion.div
-                          layoutId="sidebar-active-item"
-                          className="absolute inset-0 rounded-lg bg-primary/10 dark:bg-primary/15 border border-primary/20 pointer-events-none"
-                          transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                          layoutId="sidebar-rail-active"
+                          className="absolute inset-0 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 pointer-events-none"
+                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
                         />
                       )}
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        render={
-                          <Link
-                            href={itemTargetUrl}
-                            prefetch={priorityNavigationPaths.has(itemTargetUrl)}
-                            onClick={() => isMobile && setOpenMobile(false)}
-                          />
-                        }
-                        tooltip={displayLabel}
-                        className="relative z-10 h-9 px-3 text-[13px] font-medium leading-none group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
-                      >
-                        <Icon weight={isActive ? "fill" : "regular"} className="size-4 shrink-0 text-primary" />
-                        <span className="truncate">{displayLabel}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </div>
-          ))}
-        </div>
-      </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border/50 p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3 space-y-2">
-        <SidebarMenu>
-          <SidebarMenuItem className="group-data-[collapsible=icon]:w-full">
-            <SidebarMenuButton
-              onClick={() => {
-                const event = new CustomEvent("open-agent-drawer");
-                window.dispatchEvent(event);
-              }}
-              tooltip="Agente IA (Ctrl+J)"
-              className="w-full h-9 px-3 text-[13px] font-semibold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors rounded-xl group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:px-0"
-            >
-              <Sparkle weight="fill" className="size-4 shrink-0 text-primary animate-pulse" />
-              <span className="truncate">Agente IA</span>
-              <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/15 text-primary group-data-[collapsible=icon]:hidden">
-                Ctrl+J
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
 
-          <SidebarMenuItem className="group-data-[collapsible=icon]:w-full">
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<SidebarMenuButton size="lg" tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0!" />}>
-                <UserAvatar seed={userName} name={userName} size="sm" className="size-8 shrink-0 rounded-lg ring-1 ring-border/80" />
-                <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-semibold tracking-tight text-foreground">{userName}</span>
-                  <span className="truncate text-[11px] font-medium text-muted-foreground">{userRole}</span>
-                </span>
-                <SignOut className="ml-auto size-4 shrink-0 text-sidebar-foreground/55 group-data-[collapsible=icon]:hidden" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-64 p-2.5 rounded-2xl border border-border/80 bg-card/95 backdrop-blur-md shadow-xl">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="p-2">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar seed={userName} name={userName} size="sm" className="size-10 shrink-0 rounded-xl ring-2 ring-primary/20 shadow-xs" />
-                      <div className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="truncate text-sm font-semibold tracking-tight text-foreground">{userName}</span>
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="secondary" className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                            <ShieldCheck className="size-3 text-primary" />
-                            {userRole}
-                          </Badge>
-                        </div>
+                      <Icon
+                        weight={isActive ? "fill" : "regular"}
+                        className={cn(
+                          "size-5.5 shrink-0 transition-transform duration-200 group-hover:scale-110",
+                          isActive ? "text-primary dark:text-emerald-400" : "text-sidebar-foreground/75"
+                        )}
+                      />
+
+                      {/* Green Status Dot (like WhatsApp) */}
+                      {item.statusDot && (
+                        <span className="absolute top-1 right-1 flex size-2">
+                          <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex size-2 rounded-full bg-emerald-500 ring-2 ring-background" />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Label Text Underneath */}
+                    <span
+                      className={cn(
+                        "max-w-[70px] truncate text-[10px] font-medium leading-tight tracking-tight transition-colors",
+                        isActive
+                          ? "font-semibold text-foreground dark:text-emerald-400"
+                          : "text-sidebar-foreground/60 group-hover:text-foreground"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+
+                    {/* Active Chevron Indicator */}
+                    {isActive && (
+                      <CaretDown className="size-2.5 text-primary/70 dark:text-emerald-400/70 -mt-0.5" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="font-medium text-xs">
+                    {item.fullLabel || item.label}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </nav>
+        </TooltipProvider>
+      </SidebarContent>
+
+      {/* Footer: AI Agent & User Profile */}
+      <SidebarFooter className="flex flex-col items-center justify-center p-2 pb-3 gap-2 border-t border-sidebar-border/30">
+        <TooltipProvider delay={150}>
+          {/* AI Agent Trigger */}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => {
+                    const event = new CustomEvent("open-agent-drawer");
+                    window.dispatchEvent(event);
+                  }}
+                  className="group relative flex size-11 flex-col items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary transition-all duration-200 hover:scale-105 hover:bg-primary/20 hover:border-primary/40 cursor-pointer"
+                />
+              }
+            >
+              <Sparkle weight="fill" className="size-5.5 text-primary animate-pulse" />
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs font-semibold">
+              Agente IA (Ctrl+J)
+            </TooltipContent>
+          </Tooltip>
+
+          {/* User Profile Avatar */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="relative flex size-10 items-center justify-center rounded-2xl transition-transform hover:scale-105 outline-none cursor-pointer"
+                />
+              }
+            >
+              <UserAvatar
+                seed={userName}
+                name={userName}
+                size="sm"
+                className="size-9 rounded-xl ring-2 ring-border/80 hover:ring-primary/40 transition-all"
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="right"
+              align="end"
+              sideOffset={12}
+              className="w-64 p-2.5 rounded-2xl border border-border/80 bg-card/95 backdrop-blur-md shadow-xl"
+            >
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="p-2">
+                  <div className="flex items-center gap-3">
+                    <UserAvatar
+                      seed={userName}
+                      name={userName}
+                      size="sm"
+                      className="size-10 shrink-0 rounded-xl ring-2 ring-primary/20 shadow-xs"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="truncate text-sm font-semibold tracking-tight text-foreground">
+                        {userName}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant="secondary"
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20"
+                        >
+                          <ShieldCheck className="size-3 text-primary" />
+                          {userRole}
+                        </Badge>
                       </div>
                     </div>
-                  </DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                {user?.userProfileEnabled ? (
-                  <DropdownMenuItem render={<Link href="/settings?tab=conta" />}>
-                    <UserCircle className="size-4" />
-                    Meu perfil
-                  </DropdownMenuItem>
-                ) : null}
-                {roleKey && (user?.permissions?.includes("acessar_configuracoes") || user?.permissions?.includes("acessar_configuracoes_pessoais") || roleKey === "broker") ? (
-                  <DropdownMenuItem render={<Link href="/settings" />}>
-                    <SlidersHorizontal className="size-4" />
-                    Configurações
-                  </DropdownMenuItem>
-                ) : null}
-                {(userRole === "broker" || roleKey === "broker" || user?.jobTitle === "broker") ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <div className="px-1 py-1">
-                      <ExperienceModeToggle variant="menu-item" />
-                    </div>
-                  </>
-                ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onClick={handleLogout}>
-                  <SignOut className="size-4" />
-                  Sair
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              {user?.userProfileEnabled ? (
+                <DropdownMenuItem render={<Link href="/settings?tab=conta" />}>
+                  <UserCircle className="size-4" />
+                  Meu perfil
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+              ) : null}
+              {roleKey &&
+              (user?.permissions?.includes("acessar_configuracoes") ||
+                user?.permissions?.includes("acessar_configuracoes_pessoais") ||
+                roleKey === "broker") ? (
+                <DropdownMenuItem render={<Link href="/settings" />}>
+                  <SlidersHorizontal className="size-4" />
+                  Configurações
+                </DropdownMenuItem>
+              ) : null}
+              {userRole === "broker" || roleKey === "broker" || user?.jobTitle === "broker" ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-1 py-1">
+                    <ExperienceModeToggle variant="menu-item" />
+                  </div>
+                </>
+              ) : null}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                <SignOut className="size-4" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TooltipProvider>
       </SidebarFooter>
     </Sidebar>
   );

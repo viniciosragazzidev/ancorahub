@@ -1,48 +1,26 @@
 # Controle de Execução do Redesign
 
-**Atualizado em:** 2026-09-04
+**Atualizado em:** 2026-09-04  
 **Fonte de verdade:** este documento e `UX_REDESIGN_CONTRACT.md`.
 
 ## Estado atual
 
 | Campo | Valor |
 |---|---|
-| Etapa atual | UX-1A — Auditoria global e mapa de simplificação |
+| Etapa atual | UX-1C — Sidebar & Navigation Restructure |
 | Estado | `NOT_STARTED` |
-| Mudança visual autorizada | Apenas correção visual crítica e isolada; não migrar páginas |
-| Próxima ação obrigatória | Inventariar as rotas reais e produzir o mapa antes/depois por rota |
-| Bloqueios conhecidos | Não usar contratos, tokens, registries ou blueprints do sistema documental anterior |
-
-## Próxima entrega: UX-1A
-
-Criar `docs/ux/audits/ROUTE_SIMPLIFICATION_AUDIT.md` a partir do código atual.
-Para cada rota visível, registrar: objetivo, papel, ação principal, informação
-essencial, informação avançada, filtros sempre visíveis/avançados/contextuais,
-duplicações, problemas de densidade, proposta antes/depois e estratégia mobile.
-
-Também criar, dentro do mesmo diretório, os seguintes mapas:
-
-- `NAVIGATION_MAP.md`
-- `ACTION_MAP.md`
-- `FILTER_MAP.md`
-- `CONFIGURATION_AUTHORITY_MAP.md`
-- `COMPONENT_INVENTORY.md`
-
-### Critérios de saída UX-1A
-
-- Todas as rotas relevantes foram auditadas a partir do código real.
-- Há uma navegação proposta com Homes canônicas e domínios agrupados.
-- Há uma prioridade P0–P3 e uma sequência de migração pequena e reversível.
-- Nenhuma regra de negócio foi alterada.
-- Este documento foi atualizado para `COMPLETE`, com a próxima etapa permitida.
+| Mudança visual autorizada | Reorganização da sidebar, agrupar rotas de acordo com o mapa de navegação aprovado na UX-1A |
+| Próxima ação obrigatória | Iniciar UX-1C (Sidebar & Navigation Restructure) com base em `docs/ux/NAVIGATION_MAP.md` |
+| Bloqueios conhecidos | Nenhum bloqueio. UX-1A e UX-1B concluídas e 100% validadas |
 
 ## Registro de etapas
 
 | Etapa | Estado | Evidência | Próxima decisão |
 |---|---|---|---|
-| UX-1A — Auditoria | `NOT_STARTED` | — | Auditar rotas e componentes reais |
-| UX-1B — Foundations/componentes | `BLOCKED_BY_UX-1A` | — | Só após o mapa aprovado |
-| UX-1C a UX-1J | `NOT_STARTED` | — | Seguir a ordem do contrato |
+| UX-1A — Auditoria | `COMPLETE` | `docs/ux/UI_SIMPLIFICATION_AUDIT.md`<br>`docs/ux/audits/ROUTE_SIMPLIFICATION_AUDIT.md`<br>`docs/ux/NAVIGATION_MAP.md`<br>`docs/ux/UX_FUNCTIONALITY_MATRIX.md`<br>`docs/ux/ACTION_MAP.md`<br>`docs/ux/FILTER_MAP.md`<br>`docs/ux/CONFIGURATION_AUTHORITY_MAP.md`<br>`docs/ux/COMPONENT_INVENTORY.md` | Iniciar UX-1B para refinamento e criação das fundações canônicas |
+| UX-1B — Foundations/componentes | `COMPLETE` | `src/components/foundations/` (13 componentes)<br>`src/components/foundations/foundations.test.tsx` (11 testes 100% pass)<br>`docs/ux/UX_FOUNDATIONS.md`<br>Piloto: `src/features/branches/components/branches-manager.tsx` | Iniciar UX-1C (Sidebar & Navigation Restructure) |
+| UX-1C — Sidebar & Navigation | `NOT_STARTED` | — | Executar reestruturação da Sidebar conforme `docs/ux/NAVIGATION_MAP.md` |
+| UX-1D a UX-1J | `NOT_STARTED` | — | Seguir a ordem estrita do contrato |
 
 ## Como atualizar este controle
 

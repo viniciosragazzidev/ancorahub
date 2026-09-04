@@ -9,43 +9,56 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Section, StatusBadge, EmptyState } from "@/components/foundations";
 import { createBranchAction, toggleBranchAction, toggleAcceptingLeadsAction, toggleDistributionHubAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
 
 type Branch = { id: string; name: string; externalId: string | null; status: "active" | "inactive"; memberCount: number; acceptingLeads: boolean; isDistributionHub: boolean };
 
-function ActionFeedback({ state }: { state: BranchActionState }) {
+function ActionFeedback({ state }: { state?: BranchActionState }) {
   const router = useRouter();
+
   useEffect(() => {
-    if (state.success) {
-      toast.success("Filial atualizada com sucesso.");
+    if (!state?.message) return;
+    if (state.error) {
+      toast.error(state.message);
+    } else {
+      toast.success(state.message);
       router.refresh();
     }
-    if (state.error) toast.error(state.error);
   }, [state, router]);
+
   return null;
 }
 
-function CreateBranchForm({ onSuccess }: { onSuccess: () => void }) {
+function CreateBranchForm({ onSuccess }: { onSuccess?: () => void }) {
   const [state, action, pending] = useActionState<BranchActionState, FormData>(createBranchAction, {});
   const formRef = useRef<HTMLFormElement>(null);
+
   useEffect(() => {
-    if (state.success) {
+    if (state?.message && !state.error) {
       formRef.current?.reset();
-      onSuccess();
+      onSuccess?.();
     }
   }, [state, onSuccess]);
 
   return (
     <form ref={formRef} action={action} className="space-y-4">
-      <div className="space-y-2"><Label htmlFor="branch-name">Nome da filial</Label><Input id="branch-name" name="name" placeholder="Ex.: Unidade Centro" required /></div>
-      <div className="space-y-2"><Label htmlFor="branch-external-id">Identificador externo <span className="text-muted-foreground">(opcional)</span></Label><Input id="branch-external-id" name="externalId" placeholder="Ex.: centro-01" /></div>
-      <Button className="w-full" type="submit" disabled={pending}>{pending ? "Criando..." : "Criar filial"}</Button>
+      <div className="space-y-2">
+        <Label htmlFor="branch-name">Nome da filial</Label>
+        <Input id="branch-name" name="name" placeholder="Ex: Filial Centro" required />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="branch-external-id">Identificador externo</Label>
+        <Input id="branch-external-id" name="externalId" placeholder="Ex: FIL-01" />
+      </div>
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? "Criando filial..." : "Salvar filial"}
+      </Button>
       <ActionFeedback state={state} />
     </form>
   );
@@ -53,12 +66,30 @@ function CreateBranchForm({ onSuccess }: { onSuccess: () => void }) {
 
 function CreateBranchSheet() {
   const [open, setOpen] = useState(false);
-  return <Sheet open={open} onOpenChange={setOpen}><SheetTrigger render={<Button><Plus weight="bold" /> Nova filial</Button>} /><SheetContent><SheetHeader><SheetTitle>Nova filial</SheetTitle><SheetDescription>Crie uma unidade para organizar equipe e leads.</SheetDescription></SheetHeader><SheetBody><CreateBranchForm onSuccess={() => setOpen(false)} /></SheetBody></SheetContent></Sheet>;
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger render={<Button size="sm" className="gap-2" />}>
+        <Plus size={16} />
+        Nova filial
+      </SheetTrigger>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>Cadastrar filial</SheetTitle>
+          <SheetDescription>Adicione uma nova unidade da corretora para organizar sua equipe.</SheetDescription>
+        </SheetHeader>
+        <SheetBody className="pt-4">
+          <CreateBranchForm onSuccess={() => setOpen(false)} />
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 function AcceptingLeadsToggle({ branch }: { branch: Branch }) {
   const [state, action, pending] = useActionState<BranchActionState, FormData>(toggleAcceptingLeadsAction, {});
   const accepting = branch.acceptingLeads;
+
   return (
     <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="branchId" value={branch.id} />
@@ -90,16 +121,25 @@ function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
       <TableCell className="min-w-56 pl-5"><form id={updateFormId} action={updateAction} className="flex items-center gap-2"><input type="hidden" name="branchId" value={branch.id} /><Input aria-label={`Nome da filial ${branch.name}`} name="name" defaultValue={branch.name} required /><Button aria-label={`Salvar ${branch.name}`} type="submit" variant="ghost" size="icon-sm" disabled={updatePending}><PencilSimple size={15} /></Button></form><ActionFeedback state={updateState} /></TableCell>
       <TableCell className="min-w-40"><Input form={updateFormId} aria-label={`Identificador de ${branch.name}`} name="externalId" defaultValue={branch.externalId ?? ""} placeholder="Sem ID" /></TableCell>
       <TableCell><span className="text-sm">{branch.memberCount}</span><span className="ml-1 text-xs text-muted-foreground">membro(s)</span></TableCell>
-      <TableCell><div className="flex flex-wrap gap-1"><Badge variant="outline" className={branch.status === "active" ? "border-emerald-500/40 text-emerald-500" : "text-muted-foreground"}>{branch.status === "active" ? "Ativa" : "Inativa"}</Badge>{branch.isDistributionHub ? <Badge variant="secondary">Central</Badge> : null}</div></TableCell>
+      <TableCell>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge
+            label={branch.status === "active" ? "Ativa" : "Inativa"}
+            tone={branch.status === "active" ? "success" : "neutral"}
+            dot
+          />
+          {branch.isDistributionHub ? <Badge variant="secondary">Central</Badge> : null}
+        </div>
+      </TableCell>
       <TableCell><AcceptingLeadsToggle branch={branch} /></TableCell>
       <TableCell className="pr-5 text-right">
         <div className="flex items-center justify-end gap-1">
-          <Button render={<Link href={`/unidades/${branch.id}`} />} size="sm" variant="ghost" className="gap-1.5">
+          <Button render={<Link href={`/unidades/${branch.id}`} />} size="sm" variant="ghost" className="gap-1.5 text-xs">
             <ArrowSquareOut size={14} aria-hidden="true" />
             Ver perfil
           </Button>
-          <form action={toggleAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" disabled={togglePending}><Power size={15} />{branch.status === "active" ? "Desativar" : "Ativar"}</Button></form>
-          <form action={hubAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" disabled={hubPending}>{branch.isDistributionHub ? "Remover central" : "Definir central"}</Button></form>
+          <form action={toggleAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" className="text-xs" disabled={togglePending}><Power size={14} />{branch.status === "active" ? "Desativar" : "Ativar"}</Button></form>
+          <form action={hubAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" className="text-xs" disabled={hubPending}>{branch.isDistributionHub ? "Remover central" : "Definir central"}</Button></form>
           <ActionFeedback state={toggleState} />
           <ActionFeedback state={hubState} />
         </div>
@@ -181,20 +221,23 @@ export function BranchesManager({
           animationDelay={0.18}
         />
       </div>
-      <Card className="border-transparent bg-transparent shadow-none">
-        <CardHeader className="flex flex-col gap-3 border-b border-border sm:flex-row sm:items-end sm:justify-between"><div><CardTitle>Filiais da corretora</CardTitle><CardDescription>Edite dados, acompanhe a equipe vinculada e controle quais filiais recebem leads.</CardDescription></div><CreateBranchSheet /></CardHeader>
-        <CardContent className="p-0">
-          {branches.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
-              className="flex flex-col items-center gap-2 p-12 text-center"
-            >
-              <p className="text-sm font-medium">Nenhuma filial por enquanto</p>
-              <p className="text-xs text-muted-foreground">Crie a primeira unidade para começar a organizar sua operação.</p>
-            </motion.div>
-          ) : (
+
+      <Section
+        title="Filiais da corretora"
+        description="Edite dados, acompanhe a equipe vinculada e controle quais filiais recebem leads."
+        actions={<CreateBranchSheet />}
+        variant="card"
+        className="p-0 overflow-hidden"
+      >
+        {branches.length === 0 ? (
+          <EmptyState
+            type="EMPTY_DATA"
+            title="Nenhuma filial cadastrada"
+            description="Crie a primeira unidade para começar a organizar sua equipe e recebimento de leads."
+            className="border-none bg-transparent"
+          />
+        ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -215,9 +258,9 @@ export function BranchesManager({
                 ))}
               </motion.tbody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </Section>
     </>
   );
 }
