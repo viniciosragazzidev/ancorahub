@@ -4,11 +4,6 @@
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import {
-  buildMetaTemplateComponents,
-  recreateMetaTemplateInputSchema,
-  type RecreateMetaTemplateInput,
-} from "@/features/communication-channels/template-recreation";
-import {
   getQualificationTenantSettings,
   updateQualificationTenantSettings,
   setQualificationEnabled,
@@ -365,56 +360,6 @@ export async function syncMetaTemplatesAction() {
       success: false as const,
       error: error instanceof Error ? error.message : "Não foi possível sincronizar os modelos com a Meta.",
     };
-  }
-}
-
-export type { RecreateMetaTemplateInput } from "@/features/communication-channels/template-recreation";
-
-export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInput): Promise<{
-  success: boolean;
-  id?: string;
-  metaTemplateId?: string;
-  name?: string;
-  status?: string;
-  synced?: boolean;
-  error?: string;
-}> {
-  try {
-    const context = await getRequiredTenantContext();
-    assertAdminRole(context.role);
-    const parsedInput = recreateMetaTemplateInputSchema.safeParse(input);
-    if (!parsedInput.success) {
-      return { success: false, error: parsedInput.error.issues[0]?.message ?? "Dados inválidos para recriar o modelo." };
-    }
-    const validatedInput = parsedInput.data;
-
-    const { createTenantTemplateInMeta, syncTenantTemplates } = await import(
-      "@/features/communication-channels/template-sync-service"
-    );
-
-    const formattedName = validatedInput.name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
-    if (!formattedName) return { success: false, error: "Informe um nome válido para o modelo (apenas letras minúsculas e _)." };
-
-    const language = validatedInput.language || "pt_BR";
-    const category = validatedInput.category || "MARKETING";
-    const components = buildMetaTemplateComponents(validatedInput);
-
-    const result = await createTenantTemplateInMeta(context.tenantId, context.userId, {
-      name: formattedName,
-      language,
-      category,
-      components,
-    });
-
-    const synced = await syncTenantTemplates(context.tenantId).then(() => true).catch(() => false);
-
-    return { success: true, id: result.id, metaTemplateId: result.metaTemplateId, name: result.name, status: result.status, synced };
-  } catch (error) {
-    console.error("[recreateMetaTemplateAction] template creation failed", {
-      message: error instanceof Error ? error.message : "unknown",
-    });
-    const message = error instanceof Error ? error.message : "A Meta rejeitou a criação do modelo.";
-    return { success: false, error: message };
   }
 }
 

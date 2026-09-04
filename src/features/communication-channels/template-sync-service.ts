@@ -6,8 +6,6 @@ import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { META_CLOUD_PROVIDER } from "./types";
 import {
-  createWabaMessageTemplate,
-  deleteWabaMessageTemplateByName,
   fetchWabaMessageTemplates,
   sendMetaCloudTemplateTest,
   type MetaGraphTemplateComponent,
@@ -204,8 +202,10 @@ export async function listTenantTemplates(
   filters?: { status?: string; category?: string; search?: string },
 ) {
   const db = getDatabase();
+  const credentials = await resolveMetaChannelCredentials(tenantId);
   const conditions = [
     eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+    eq(schema.metaWhatsAppTemplates.wabaId, credentials.wabaId),
     isNull(schema.metaWhatsAppTemplates.deletedAt),
   ];
 
@@ -232,162 +232,6 @@ export async function listTenantTemplates(
   }
 
   return templates;
-}
-
-export async function createTenantTemplateInMeta(
-  tenantId: string,
-  userId: string,
-  input: {
-    name: string;
-    language: string;
-    category: MetaTemplateCategory;
-    components: MetaGraphTemplateComponent[];
-  },
-) {
-  const db = getDatabase();
-  const credentials = await resolveMetaChannelCredentials(tenantId);
-  const formattedName = input.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
-
-  if (!formattedName) throw new Error("Nome de template inválido. Use caracteres alfanuméricos e _.");
-
-  const metaResult = await createWabaMessageTemplate(
-    credentials.wabaId,
-    credentials.accessToken,
-    {
-      name: formattedName,
-      language: input.language || "pt_BR",
-      category: input.category,
-      components: input.components,
-    },
-  );
-
-  const parsed = parseComponents(input.components);
-  const now = new Date();
-
-  const [existing] = await db
-    .select({ id: schema.metaWhatsAppTemplates.id })
-    .from(schema.metaWhatsAppTemplates)
-    .where(
-      and(
-        eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
-        eq(schema.metaWhatsAppTemplates.wabaId, credentials.wabaId),
-        eq(schema.metaWhatsAppTemplates.name, formattedName),
-        eq(schema.metaWhatsAppTemplates.language, input.language || "pt_BR"),
-      ),
-    )
-    .limit(1);
-
-  const id = existing?.id || randomUUID();
-
-  if (existing) {
-    await db
-      .update(schema.metaWhatsAppTemplates)
-      .set({
-        metaTemplateId: metaResult.id,
-        category: input.category,
-        status: metaResult.status || "PENDING",
-        componentsJson: input.components as any,
-        headerType: parsed.headerType,
-        bodyText: parsed.bodyText,
-        footerText: parsed.footerText,
-        variablesJson: parsed.variables,
-        buttonsJson: parsed.buttons,
-        origin: "CRM",
-        rejectedReason: null,
-        deletedAt: null,
-        lastSyncedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(schema.metaWhatsAppTemplates.id, existing.id));
-  } else {
-    await db.insert(schema.metaWhatsAppTemplates).values({
-      id,
-      tenantId,
-      wabaId: credentials.wabaId,
-      metaTemplateId: metaResult.id,
-      name: formattedName,
-      language: input.language || "pt_BR",
-      category: input.category,
-      status: metaResult.status || "PENDING",
-      componentsJson: input.components as any,
-      headerType: parsed.headerType,
-      bodyText: parsed.bodyText,
-      footerText: parsed.footerText,
-      variablesJson: parsed.variables,
-      buttonsJson: parsed.buttons,
-      origin: "CRM",
-      lastSyncedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
-  await db.insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId,
-    entidade: "meta_whatsapp_template",
-    entidadeId: id,
-    acao: existing ? "recriou_template_meta" : "criou_template_meta",
-  });
-
-  return { id, metaTemplateId: metaResult.id, name: formattedName, status: metaResult.status || "PENDING" };
-}
-
-export async function deleteTenantTemplateFromMeta(
-  tenantId: string,
-  userId: string,
-  templateId: string,
-) {
-  const db = getDatabase();
-  const [template] = await db
-    .select()
-    .from(schema.metaWhatsAppTemplates)
-    .where(
-      and(
-        eq(schema.metaWhatsAppTemplates.id, templateId),
-        eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
-      ),
-    )
-    .limit(1);
-
-  if (!template) throw new Error("Template não encontrado.");
-
-  // Check active usage bindings before deleting
-  const [activeUsage] = await db
-    .select({ id: schema.metaWhatsAppTemplateUsages.id, eventKey: schema.metaWhatsAppTemplateUsages.eventKey })
-    .from(schema.metaWhatsAppTemplateUsages)
-    .where(
-      and(
-        eq(schema.metaWhatsAppTemplateUsages.templateId, templateId),
-        eq(schema.metaWhatsAppTemplateUsages.tenantId, tenantId),
-        eq(schema.metaWhatsAppTemplateUsages.active, true),
-      ),
-    )
-    .limit(1);
-
-  if (activeUsage) {
-    const eventName = CRM_EVENT_LABEL_MAP[activeUsage.eventKey as EventKey] || activeUsage.eventKey;
-    throw new Error(`Não é possível excluir o template pois ele está ativo no evento '${eventName}'. Remova o vínculo primeiro.`);
-  }
-
-  const credentials = await resolveMetaChannelCredentials(tenantId);
-  await deleteWabaMessageTemplateByName(credentials.wabaId, credentials.accessToken, template.name);
-
-  const now = new Date();
-  await db
-    .update(schema.metaWhatsAppTemplates)
-    .set({ deletedAt: now, status: "DELETED", updatedAt: now })
-    .where(eq(schema.metaWhatsAppTemplates.id, templateId));
-
-  await db.insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId,
-    entidade: "meta_whatsapp_template",
-    entidadeId: templateId,
-    acao: "excluiu_template_meta",
-  });
-
-  return { success: true };
 }
 
 export async function sendTenantTemplateTestMessage(
