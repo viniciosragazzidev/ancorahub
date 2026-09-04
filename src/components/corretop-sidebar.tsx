@@ -284,7 +284,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarHeader>
 
       {/* Navigation Rail Content */}
-      <SidebarContent className="flex-1 overflow-y-auto px-1 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <SidebarContent className="flex-1 px-1 py-2">
         <TooltipProvider delay={150}>
           <nav aria-label="Menu principal" className="flex flex-col items-center gap-1.5 w-full">
             {visibleItems.map((item) => {

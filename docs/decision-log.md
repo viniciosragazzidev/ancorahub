@@ -37,6 +37,14 @@ dados (padrão DEC-070). Cohorts, relatórios salvos/programados, aba Atendiment
 Conversation Intelligence e AI Analyst permanecem fases futuras. Plano completo em
 `docs/product/reporting-root-plan.md`; decisão técnica em ADR-0040.
 
+**Emenda UX-1D — 2026-09-04.** Por decisão de produto, o `/dashboard` dos
+papéis executivos passa a consumir as mesmas famílias canônicas como abas internas
+recuperáveis por URL. Isso não cria uma nova métrica, não remove `/relatorios` e não
+altera a matriz de acesso: a rota de relatórios continua disponível para compatibilidade
+e para seus documentos internos enquanto a paridade é validada. O carregamento deve
+ser por aba ativa e escopo derivado do servidor. Atendimento e Metas seguem fora do
+dashboard até possuírem definições versionadas, resolvedores e drill-downs aprovados.
+
 ## DEC-091 — Conexão pessoal do Corretor como sincronização somente leitura
 
 **Estado:** Aceita

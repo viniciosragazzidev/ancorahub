@@ -692,7 +692,7 @@ function FilterChip({ active, count, label, onClick }: { active: boolean; count:
 }
 
 function ConversationHistory({ client }: { client: ConversationItem }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   // Chronological order: oldest first, newest at bottom ("o mais recente no fim")
   const sortedMessages = useMemo(() => {
@@ -714,7 +714,8 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
   }, [sortedMessages]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const viewport = viewportRef.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [sortedMessages.length, client.id]);
 
   if (!sortedMessages.length) {
@@ -726,7 +727,7 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
   };
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
         {messagesByDate.map(([dateLabel, msgs], dateIdx) => {
           const grouped = msgs.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
@@ -770,7 +771,6 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
             </div>
           );
         })}
-        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   );

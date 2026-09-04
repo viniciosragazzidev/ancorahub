@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-04  
 **Etapa:** UX-1D — Dashboard unificado  
-**Status:** PLANEJADO  
+**Status:** PARCIAL — abas internas aplicadas; rollout, extração estrutural e validação visual pendentes
 **Objetivo:** Eliminar a duplicação entre `/dashboard` e `/relatorios` tornando o dashboard a única home de inteligência operacional
 
 ---

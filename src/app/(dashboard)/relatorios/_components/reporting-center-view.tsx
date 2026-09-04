@@ -47,16 +47,21 @@ export default async function ReportingCenterView({
     if (tab === "financial") return hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
     return true;
   });
-  const currentTab = tabs.includes(activeTab) ? activeTab : "overview";
+  const currentTab = tabs.includes(activeTab) ? activeTab : (tabs[0] ?? "commercial");
 
   const canViewFinancial = hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
 
+  const needsCommercialContext = currentTab === "overview" || currentTab === "commercial";
   const [commercialOverview, funnel, attention, sourcePerformance, financial, teamPerformance, units] =
     await Promise.all([
-      getCommercialOverview(context, period, { includeFinancial: canViewFinancial }),
-      getFunnelSnapshot(context, period),
-      getAttentionSnapshot(context, period),
-      getCommercialBySource(context, period, { includeFinancial: canViewFinancial }),
+      needsCommercialContext
+        ? getCommercialOverview(context, period, { includeFinancial: canViewFinancial })
+        : Promise.resolve(null),
+      needsCommercialContext ? getFunnelSnapshot(context, period) : Promise.resolve(null),
+      needsCommercialContext ? getAttentionSnapshot(context, period) : Promise.resolve(null),
+      currentTab === "commercial"
+        ? getCommercialBySource(context, period, { includeFinancial: canViewFinancial })
+        : Promise.resolve(null),
       currentTab === "financial" ? getFinancialOverview(context, period) : Promise.resolve(null),
       currentTab === "team"
         ? getTeamPerformance(context, period, { includeFinancial: canViewFinancial })
@@ -76,7 +81,7 @@ export default async function ReportingCenterView({
 
         <ReportTabs tabs={tabs} active={currentTab} period={period} />
 
-        {currentTab === "overview" && (
+        {currentTab === "overview" && commercialOverview && funnel && attention && (
           <OverviewTab
             period={period}
             commercial={commercialOverview}
@@ -84,7 +89,7 @@ export default async function ReportingCenterView({
             attention={attention}
           />
         )}
-        {currentTab === "commercial" && (
+        {currentTab === "commercial" && commercialOverview && funnel && attention && sourcePerformance && (
           <CommercialTab
             period={period}
             overview={commercialOverview}

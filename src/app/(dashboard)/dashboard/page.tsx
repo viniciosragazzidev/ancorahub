@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
   const context = await getRequiredTenantContext();
   return (
@@ -36,9 +36,10 @@ async function DashboardContent({
   searchParams,
 }: {
   context: Awaited<ReturnType<typeof getRequiredTenantContext>>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
-  const period = parsePeriod((await searchParams).period);
+  const resolvedSearchParams = await searchParams;
+  const period = parsePeriod(resolvedSearchParams.period);
 
   if (context.jobTitle === "marketing") {
     const data = await getMarketingDashboardData(period);
@@ -46,7 +47,7 @@ async function DashboardContent({
   }
 
   if (context.role === "director" || context.role === "manager" || context.role === "supervisor") {
-    const data = await getExecutiveDashboardData(context, period);
+    const data = await getExecutiveDashboardData(context, period, resolvedSearchParams.tab);
     return <ExecutiveDashboard data={data} period={period} role={context.role} />;
   }
 
