@@ -52,8 +52,24 @@ const adQueueRouteInput = z.object({
 });
 
 function assertManager(context: TenantContext, branchId?: string | null) {
-  if (context.role !== "director" && context.role !== "manager") throw new AuthorizationError("Sem permissão para administrar filas.");
-  if (context.role === "manager" && branchId && context.branchId !== branchId) throw new AuthorizationError("Você só pode administrar filas da sua unidade.");
+  if (context.role !== "director" && context.role !== "manager") {
+    throw new AuthorizationError("Sem permissão para administrar filas.");
+  }
+  if (context.role === "manager") {
+    const authorizedUnitIds: readonly string[] =
+      "allowedUnitIds" in context && Array.isArray((context as { allowedUnitIds?: string[] }).allowedUnitIds)
+        ? (context as { allowedUnitIds: string[] }).allowedUnitIds
+        : context.branchId
+          ? [context.branchId]
+          : [];
+
+    if (!branchId) {
+      throw new AuthorizationError("Gestores não podem administrar filas globais do tenant.");
+    }
+    if (!authorizedUnitIds.includes(branchId)) {
+      throw new AuthorizationError("Você só pode administrar filas das suas unidades autorizadas.");
+    }
+  }
 }
 
 function slugify(text: string): string {

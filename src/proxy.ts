@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { updateSession } from "@/utils/supabase/middleware";
 import { getDatabase, schema } from "@/shared/db";
 import { isNavigationPrefetch } from "@/shared/http/navigation-prefetch";
-import { startMiddlewareTiming, endMiddlewareTiming } from "@/shared/observability/middleware-timing";
+import { startMiddlewareTiming, endMiddlewareTiming, logMiddlewareSpan } from "@/shared/observability/middleware-timing";
 
 const protectedPathPrefixes = [
   "/welcome", "/dashboard", "/equipe", "/leads", "/roadmap", "/documentos",
@@ -113,7 +113,9 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
+  const supabaseStartMs = performance.now();
   const supabaseResponse = await getSafeSupabaseResponse(request);
+  logMiddlewareSpan(timing, "middleware.supabase_session", supabaseStartMs);
   const session = request.cookies.get("better-auth.session_token")
     ?? request.cookies.get("__Secure-better-auth.session_token")
     ?? request.cookies.get("better-auth.session_token.value");
@@ -123,7 +125,9 @@ export async function proxy(request: NextRequest) {
 
   if (session?.value) {
     try {
+      const sessionLookupStartMs = performance.now();
       const dbSession = await lookupSession(session.value);
+      logMiddlewareSpan(timing, "middleware.session_lookup", sessionLookupStartMs);
 
       if (dbSession) {
         userId = dbSession.userId;

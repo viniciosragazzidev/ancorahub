@@ -14,7 +14,7 @@ import {
   dispatchRealtimeSyncEvent,
   type RealtimeSyncBrowserDetail,
 } from "@/components/providers/realtime-events";
-import { createClient } from "@/utils/supabase/client";
+import { createClient, logSupabaseRealtimeDiagnostic } from "@/utils/supabase/client";
 
 interface RealtimeSyncProviderProps {
   children: React.ReactNode;
@@ -184,8 +184,14 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [scheduleServerRefresh]);
 
   useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
+    const onOnline = () => {
+      logSupabaseRealtimeDiagnostic({ event: "network_status", status: "ONLINE" });
+      setIsOnline(true);
+    };
+    const onOffline = () => {
+      logSupabaseRealtimeDiagnostic({ event: "network_status", status: "OFFLINE" });
+      setIsOnline(false);
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     return () => {
@@ -238,7 +244,12 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
         setIsOnline(true);
         handleRemoteSignal({ kind: signal.kind, notificationId: signal.notificationId });
       })
-      .subscribe((status) => {
+      .subscribe((status, error) => {
+        logSupabaseRealtimeDiagnostic({
+          event: "subscription_status",
+          status,
+          errorPresent: Boolean(error),
+        });
         if (shouldDelayRealtimeUnavailable(status)) scheduleRealtimeUnavailable();
         if (status === "SUBSCRIBED") {
           clearRealtimeFailureTimer();
@@ -246,6 +257,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
           setLastSyncedAt(Date.now());
         }
       });
+    logSupabaseRealtimeDiagnostic({ event: "subscribe_requested" });
     return () => {
       clearRealtimeFailureTimer();
       void supabase.removeChannel(channel);

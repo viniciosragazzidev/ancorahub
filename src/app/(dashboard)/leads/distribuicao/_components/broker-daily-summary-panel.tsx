@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { AvailabilityToggle } from "@/components/availability-toggle";
 import { getBrokerDailySummaryAction } from "@/features/lead-distribution/broker-summary-actions";
 import type { BrokerDailySummaryAggregate, BrokerDailySummaryItem } from "@/features/lead-distribution/broker-summary-service";
 
@@ -359,7 +360,13 @@ export function BrokerDailySummaryPanel({
                       </div>
                     </td>
                     <td className="py-3 px-3 text-muted-foreground">{item.branchName || "Matriz"}</td>
-                    <td className="py-3 px-3 text-center">{getStatusBadge(item.availabilityStatus)}</td>
+                    <td className="py-3 px-3 text-center">
+                      {canFilterBranch ? (
+                        <AvailabilityToggle initialStatus={item.availabilityStatus as "available" | "paused" | "offline"} />
+                      ) : (
+                        getStatusBadge(item.availabilityStatus)
+                      )}
+                    </td>
                     <td className="py-3 px-3 text-right font-semibold tabular-nums text-sm">{item.leadsReceived}</td>
                     <td className="py-3 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-medium">
                       {item.activeAttending}
@@ -383,7 +390,7 @@ export function BrokerDailySummaryPanel({
                       <Button
                         render={
                           <Link
-                            href={`/leads?corretorId=${item.brokerId}`}
+                            href={`/leads?corretor=${item.brokerId}`}
                             className="inline-flex items-center gap-1"
                           />
                         }

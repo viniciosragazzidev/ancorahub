@@ -28,9 +28,9 @@ describe("OpenRouter WhatsApp AI integration", () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.modelUsed).toBe("google/gemma-2-9b-it:free");
+    expect(result.modelUsed).toBe("meta-llama/llama-3.3-70b-instruct:free");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).model).toBe("google/gemma-2-9b-it:free");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).model).toBe("meta-llama/llama-3.3-70b-instruct:free");
   });
 
   it.each(["Atendente", "Falar com atendente", "quero falar com uma pessoa"]) (

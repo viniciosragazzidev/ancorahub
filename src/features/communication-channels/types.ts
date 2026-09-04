@@ -2,9 +2,9 @@ export const META_CLOUD_PROVIDER = "meta_cloud" as const;
 
 export type MetaEmbeddedSignupPayload = {
   code: string;
-  businessId: string;
-  wabaId: string;
-  phoneNumberId: string;
+  businessId?: string;
+  wabaId?: string;
+  phoneNumberId?: string;
   branchId?: string;
 };
 

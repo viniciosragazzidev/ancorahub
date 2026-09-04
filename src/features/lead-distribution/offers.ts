@@ -8,9 +8,7 @@ import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features
 import { buildLeadAssignmentConfirmedVariables } from "@/features/communication-channels/templates";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
+import { normalizePhone } from "@/shared/utils/phone";
 
 function samePhone(left: string, right: string) {
   const a = normalizePhone(left);

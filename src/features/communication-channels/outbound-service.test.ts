@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, whatsappOutboundStatusValues } from "./outbound-service";
+import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS, scheduleBrokerLeadNotification } from "@/features/notifications/broker-lead-cadence";
 
 vi.mock("server-only", () => ({}));
@@ -23,6 +23,29 @@ describe("outboundService", () => {
     });
   });
 
+  it("uses only the selected WAHA number in direct mode and Meta in every other mode", () => {
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: true,
+      deliveryMode: "waha_direct",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: null,
+    })).toEqual({ route: "waha_direct", wahaNumberId: "selected-waha" });
+
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: true,
+      deliveryMode: "meta_then_waha",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: "selected-waha",
+    })).toEqual({ route: "meta_then_waha", wahaNumberId: "selected-waha" });
+
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: false,
+      deliveryMode: "waha_direct",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: "selected-waha",
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
+  });
+
   it("spaces broker lead notifications by the configured interval", () => {
     const now = new Date("2026-08-24T12:00:00.000Z");
     expect(scheduleBrokerLeadNotification({ now }).toISOString()).toBe(now.toISOString());
@@ -34,13 +57,13 @@ describe("outboundService", () => {
     const inviteText = resolveTemplateTextBody("brokerInvitation", ["Carlos", "Âncora Seguros"], "token-123");
     expect(inviteText).toContain("Olá *Carlos*!");
     expect(inviteText).toContain("Âncora Seguros");
-    expect(inviteText).toContain("https://ancorahub.com.br/convite/token-123");
+    expect(inviteText).toContain("https://crm.ancorasaude.cloud/convite/token-123");
 
     const leadNotifText = resolveTemplateTextBody("brokerLeadNotification", ["Corretor", "João Silva", "Maria Souza", "Plano de Saúde PME"], "lead-999");
     expect(leadNotifText).toContain("⚡ *Novo Lead Atribuído!*");
     expect(leadNotifText).toContain("Maria Souza");
     expect(leadNotifText).toContain("Plano de Saúde PME");
-    expect(leadNotifText).toContain("https://ancorahub.com.br/conversas?lead=lead-999");
+    expect(leadNotifText).toContain("https://crm.ancorasaude.cloud/conversas?lead=lead-999");
 
     const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "lead-999"]);
     expect(confirmedText).toContain("✅ *Atribuição Confirmada*");

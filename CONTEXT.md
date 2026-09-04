@@ -24,6 +24,7 @@
 - **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.
 - **Decisão de distribuição**: resultado explicável de uma tentativa de roteamento, contendo fila, candidatos elegíveis, estratégia, corretor selecionado — quando houver — e os motivos de exclusão ou fallback.
 - **Fila de espera**: estado recuperável de um lead sem corretor elegível. O lead permanece visível para ação humana e nunca é descartado silenciosamente.
+- **Agenda pessoal do corretor**: janelas semanais declaradas pelo próprio corretor, no fuso operacional. Elas determinam quando ele entra na distribuição automática e não revogam a possibilidade de atribuição manual assistida.
 
 ## Canais de comunicação
 
@@ -50,6 +51,12 @@
 
 - **Relatório operacional supervisionado**: exportação de leads, qualificação, tarefas, distribuição, conversão e desempenho restrita aos corretores ativos vinculados ao Supervisor. Nunca contém valores ou comissões.
 - **Relatório consolidado**: exportação autorizada no escopo do Diretor (tenant) ou Gestor (filial atual), com as limitações da permissão do relatório.
+- **Métrica canônica**: definição versionada de um indicador (identificador estável, numerador, denominador e dimensões permitidas) mantida no catálogo de métricas. Toda superfície consome a mesma definição; nenhuma tela recalcula o indicador localmente.
+- **Taxa de conversão (coorte de entrada)**: leads recebidos em um período que alcançaram o estágio `converted` divididos pelos leads recebidos no mesmo período, excluídos duplicados e descartados. Numerador e denominador pertencem à mesma população de leads.
+- **Família de relatórios**: agrupamento de análises sobre o mesmo recorte do negócio (Visão geral, Comercial, Equipe, Unidades, Financeiro) dentro da rota única de relatórios. Não é uma rota nem uma regra de negócio própria.
+- **Drill-down**: caminho de um número agregado até a população exata de registros que o compõe, respeitando o escopo da sessão. Todo número de relatório precisa ter um drill-down explicável.
+- **Item de atenção**: contagem derivada de fatos persistidos (não de opinião) que aponta uma pendência operacional atual, com threshold configurável pelo Diretor e população recuperável por drill-down.
+- **Janela anterior equivalente**: período imediatamente anterior ao selecionado, com a mesma duração, usado para comparação. Diferenças entre taxas são apresentadas em pontos percentuais, nunca como variação percentual.
 
 ## Engenharia
 

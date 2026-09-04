@@ -3,13 +3,13 @@
 import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Building06Icon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
+import { Building06Icon, CalendarCheckIcon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-export type TabId = "conta" | "empresa" | "unidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
+export type TabId = "conta" | "empresa" | "unidade" | "disponibilidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
 type Tab = { id: TabId; label: string; icon: typeof UserIcon };
 
-export function SettingsTabs({ account, company, unit, whatsapp, integrations, security, atendimento, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
+export function SettingsTabs({ account, company, unit, availability, whatsapp, integrations, security, atendimento, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; availability?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -17,6 +17,7 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
     { id: "conta", label: "Minha conta", icon: UserIcon },
     { id: "empresa", label: "Empresa", icon: Building06Icon },
     { id: "unidade", label: "Unidade", icon: Store01Icon },
+    { id: "disponibilidade", label: "Disponibilidade", icon: CalendarCheckIcon },
     { id: "atendimento", label: "Atendimento", icon: Message01Icon },
     { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
     { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
@@ -97,6 +98,7 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
         {active === "conta" ? account : null}
         {active === "empresa" ? company : null}
         {active === "unidade" ? unit : null}
+        {active === "disponibilidade" ? availability : null}
         {active === "whatsapp" ? whatsapp : null}
         {active === "integracoes" ? integrations : null}
         {active === "atendimento" ? atendimento : null}

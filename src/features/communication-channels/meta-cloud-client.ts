@@ -87,6 +87,57 @@ export async function registerMetaPhoneNumber(phoneNumberId: string, accessToken
   }, accessToken);
 }
 
+export async function discoverMetaWabaAndPhone(accessToken: string): Promise<{ wabaId: string; phoneNumberId: string; businessId: string }> {
+  const config = getMetaCloudServerConfig();
+  let wabaId = "";
+  let businessId = "";
+
+  try {
+    const debugRes = await fetch(
+      `https://graph.facebook.com/${config.graphVersion}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(`${config.appId}|${config.appSecret}`)}`,
+      { cache: "no-store" }
+    );
+    const debugData = await debugRes.json();
+    const scopes = debugData?.data?.granular_scopes as Array<{ scope: string; target_ids?: string[] }> | undefined;
+    const whatsappScope = scopes?.find((s) => s.scope === "whatsapp_business_management" || s.scope === "whatsapp_business_messaging");
+    if (whatsappScope?.target_ids?.[0]) {
+      wabaId = whatsappScope.target_ids[0];
+    }
+    if (debugData?.data?.business_id) {
+      businessId = String(debugData.data.business_id);
+    }
+  } catch {}
+
+  if (!wabaId) {
+    try {
+      const res = await graphRequest<{ data?: Array<{ id: string; name?: string }> }>("me/whatsapp_business_accounts", { method: "GET" }, accessToken);
+      if (res.data?.[0]?.id) {
+        wabaId = res.data[0].id;
+      }
+    } catch {}
+  }
+
+  if (!wabaId) {
+    throw new Error("A Meta não retornou nenhuma conta do WhatsApp Business associada a esta autorização.");
+  }
+
+  const wabaInfo = await graphRequest<{ id: string; owner_business_info?: { id?: string } }>(`${encodeURIComponent(wabaId)}?fields=id,owner_business_info`, { method: "GET" }, accessToken).catch(() => null);
+  if (!businessId && wabaInfo?.owner_business_info?.id) {
+    businessId = wabaInfo.owner_business_info.id;
+  }
+  if (!businessId) {
+    businessId = wabaId;
+  }
+
+  const phones = await getMetaWabaPhoneNumbers(wabaId, accessToken);
+  const phoneNumberId = phones.data?.[0]?.id;
+  if (!phoneNumberId) {
+    throw new Error("Nenhum número de WhatsApp encontrado na conta selecionada.");
+  }
+
+  return { wabaId, phoneNumberId, businessId };
+}
+
 type MetaAsset = { id: string; name?: string };
 export type MetaLeadAdsAssets = { pages: MetaAsset[]; adAccounts: MetaAsset[]; pixels: MetaAsset[]; datasets: MetaAsset[] };
 

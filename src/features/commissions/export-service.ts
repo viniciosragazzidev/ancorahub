@@ -81,7 +81,7 @@ export async function getCommissionExportData(params: ExportParams): Promise<Com
 }
 
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(date);
 }
 
 export function generateCsv(rows: CommissionExportRow[]): string {

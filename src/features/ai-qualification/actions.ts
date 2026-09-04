@@ -349,8 +349,18 @@ export async function syncMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
-  await syncTenantTemplates(context.tenantId).catch(() => undefined);
-  return { success: true };
+  try {
+    const result = await syncTenantTemplates(context.tenantId);
+    return { success: true as const, syncedCount: result.syncedCount };
+  } catch (error) {
+    console.warn("[syncMetaTemplatesAction] Meta template sync failed", {
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Não foi possível sincronizar os modelos com a Meta.",
+    };
+  }
 }
 
 /* ─── Modelos Livres (Janela de 24 Horas / Sem Aprovação) ─── */
@@ -506,3 +516,57 @@ export async function deleteFreeMessageTemplateAction(templateId: string) {
 
   return { success: true };
 }
+
+export async function fetchSituationalPlaybooksAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { getTenantPlaybooks } = await import("./playbooks-storage");
+  return getTenantPlaybooks(context.tenantId);
+}
+
+export async function saveSituationalPlaybooksAction(playbooks: any[]) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { saveTenantPlaybooks } = await import("./playbooks-storage");
+  const { SituationalPlaybookItemSchema } = await import("./situations-catalog");
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { randomUUID } = await import("node:crypto");
+
+  const validated = playbooks.map((p) => SituationalPlaybookItemSchema.parse(p));
+  await saveTenantPlaybooks(context.tenantId, validated);
+
+  const db = getDatabase();
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "ai_qualification_configs",
+    entidadeId: context.tenantId,
+    acao: "atualizou_roteiros_situacionais_ia",
+  });
+
+  return { success: true };
+}
+
+export async function resetSituationalPlaybooksAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { saveTenantPlaybooks } = await import("./playbooks-storage");
+  const { getDefaultPlaybooks } = await import("./situations-catalog");
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { randomUUID } = await import("node:crypto");
+
+  const defaults = getDefaultPlaybooks();
+  await saveTenantPlaybooks(context.tenantId, defaults);
+
+  const db = getDatabase();
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "ai_qualification_configs",
+    entidadeId: context.tenantId,
+    acao: "restaurou_roteiros_situacionais_ia_padrao",
+  });
+
+  return { success: true, playbooks: defaults };
+}
+

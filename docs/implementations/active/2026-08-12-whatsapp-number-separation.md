@@ -56,3 +56,12 @@ histórico não é apagado.
   falhas da entrega.
 - O retorno do Embedded Signup v4 aceita o evento seguro `WA_EMBEDDED_SIGNUP` tanto como objeto quanto como JSON serializado, formato usado pelo pop-up hospedado da Meta. O fluxo encerra o estado de carregamento ao concluir, cancelar, falhar ou exceder 90 segundos e evita dupla conclusão quando código e dados chegam em eventos distintos.
 - A configuração pública de produção usa o `config_id` v4 `2285077245657163`, exclusivo do canal WhatsApp e sem relação com os ativos de Marketing Meta.
+
+## Restauração do cadastro oficial — 2026-09-03
+
+A disponibilidade e os parâmetros do Embedded Signup foram restaurados ao
+contrato da branch `V1.5_02/09`. O cadastro só é oferecido ao Diretor quando a
+integração está configurada, não há número oficial ativo e o App ID/Config ID
+estão disponíveis. O fluxo enviado à Meta continua usando `config_id`, retorno
+`code` e `extras.version = v4`, que permite à Meta apresentar a WABA e o número
+corporativo para seleção.

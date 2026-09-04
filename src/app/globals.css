@@ -57,7 +57,7 @@
   /* Lvl 0: Base Canvas (#f5f5f3) */
   --surface-card: oklch(1 0 0);
   /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: #f7fafc;
+  --surface-secondary: #f7f8f9;
   /* Lvl 2: Recessed / Input (#eeeee9) */
   --surface-elevated: oklch(1.000 0 0);
   /* Lvl 3: Elevated Popover (#ffffff) */
@@ -366,6 +366,7 @@ html {
      elementos position:fixed/sticky, ao contrário do zoom.       */
   font-size: 97%;
   min-height: 100%;
+
 }
 
 body {

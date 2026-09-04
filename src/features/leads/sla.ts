@@ -7,6 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { chooseAvailableBroker } from "./assignment";
 import { notifyLeadReassigned, notifyNewLead, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -17,7 +18,12 @@ export type SlaSweepResult = { tenants: number; unworked: number; warnings: numb
 export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
   if (!(await isNotificationCapabilityEnabled("lead_sla"))) return { tenants: 0, unworked: 0, warnings: 0, stalled: 0, notifications: 0 };
   const db = getDatabase();
-  const tenants = await db.select({ id: schema.tenants.id, firstContactMinutes: schema.tenants.slaFirstContactMinutes, stagnantDays: schema.tenants.slaStagnantDays })
+  const tenants = await db.select({
+    id: schema.tenants.id,
+    firstContactMinutes: schema.tenants.slaFirstContactMinutes,
+    stagnantDays: schema.tenants.slaStagnantDays,
+    autoRedistribute: schema.tenants.autoRedistributeOnFeedbackTimeout,
+  })
     .from(schema.tenants).where(tenantId ? eq(schema.tenants.id, tenantId) : eq(schema.tenants.status, "active"));
   let unworked = 0;
   let warnings = 0;
@@ -87,6 +93,25 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       if (kind === "lead_unworked") {
         unworked += 1;
 
+        if (tenant.autoRedistribute === false) {
+          for (const recipient of recipients) {
+            await publishNotification({
+              capability: "lead_assignment",
+              tenantId: tenant.id,
+              recipientUserId: recipient.userId,
+              leadId: lead.id,
+              type: "lead_unworked",
+              title: "Lead aguardando início de atendimento ⚠️",
+              message: `O lead "${lead.nome}" ultrapassou o tempo limite de ${firstContactMinutes} minutos sem início de atendimento.`,
+              pushTitle: "Alerta de SLA ⚠️",
+              pushBody: `"${lead.nome}" ultrapassou ${firstContactMinutes} minutos sem primeiro contato.`,
+              url: `/leads/${lead.id}`,
+              tag: "corretop-leads",
+            }).catch(console.error);
+          }
+          continue;
+        }
+
         // Save previous owner to notify them later
         const previousOwnerId = lead.corretorId;
         const currentRedistributions = lead.redistributionCount ?? 0;
@@ -149,6 +174,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
 
           if (previousOwnerId) {
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
           }
         } else {
           // Dentro do limite: efetua a redistribuição e incrementa o contador
@@ -196,6 +222,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
 
           if (previousOwnerId && previousOwnerId !== nextBrokerId) {
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
           }
         }
 

@@ -10,7 +10,6 @@ import {
 } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
-import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -69,8 +68,15 @@ export async function sendTenantOfficialNumberMessageAction(
     return { success: false, error: "A mensagem deve ter entre 1 e 4.000 caracteres." };
   try {
     const context = await getRequiredTenantContext();
-    if (context.role !== "broker")
-      return { success: false, error: "Apenas o corretor pode usar esta conversa." };
+    // A conexão pessoal do corretor é estritamente de sincronização. Nunca
+    // permita que uma chamada antiga, bookmark ou UI desatualizada envie pela
+    // sessão WAHA do corretor; a resposta deve acontecer no aplicativo dele.
+    if (context.role === "broker") {
+      return {
+        success: false,
+        error: "A conexão do seu WhatsApp é somente para sincronização. Responda pelo WhatsApp no seu aparelho.",
+      };
+    }
     if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
       return { success: false, error: "O atendimento interno por WhatsApp está temporariamente pausado." };
     }
@@ -166,8 +172,12 @@ export async function sendTenantOfficialChannelMessageAction(
     return { success: false, error: "A mensagem deve ter entre 1 e 4.000 caracteres." };
   try {
     const context = await getRequiredTenantContext();
-    if (context.role !== "broker")
-      return { success: false, error: "Apenas o corretor pode usar esta conversa." };
+    if (context.role === "broker") {
+      return {
+        success: false,
+        error: "A conexão do seu WhatsApp é somente para sincronização. Responda pelo WhatsApp no seu aparelho.",
+      };
+    }
     if ((await getSystemSetting("feature_waha_connections_enabled")) === "false") {
       return { success: false, error: "O atendimento interno por WhatsApp está temporariamente pausado." };
     }
@@ -264,11 +274,11 @@ export async function sendTenantOfficialChannelMessageAction(
 }
 
 /**
- * Send a text message from the broker to a lead via the best available provider.
+ * Send a text message from an authorized management channel to a lead.
  *
  * Provider priority:
  * 1. Meta Cloud (official channel) — if tenant has an active channel
- * 2. WAHA (broker connection) — if broker has a connected session
+ * 2. Existing configured fallback when the management transport requires it
  *
  * All messages are persisted in `whatsapp_messages` with dedup by (tenantId, messageId).
  * The browser never contacts WAHA directly.
@@ -285,18 +295,12 @@ export async function sendLeadMessageAction(
 
   try {
     const context = await getRequiredTenantContext();
-    const brokerUsesLite =
-      context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
-    if (
-      brokerUsesLite &&
-      (await getSystemSetting("feature_waha_connections_enabled")) === "false"
-    ) {
+    if (context.role === "broker") {
       return {
         success: false,
-        error: "O atendimento interno por WhatsApp está temporariamente pausado. Use Abrir no WhatsApp.",
+        error: "A conexão do seu WhatsApp é somente para sincronização. Responda pelo WhatsApp no seu aparelho.",
       };
     }
-
     const db = getDatabase();
     const [lead] = await db
       .select({
@@ -312,21 +316,6 @@ export async function sendLeadMessageAction(
       .limit(1);
     if (!lead) return { success: false, error: "Lead não encontrado." };
     const isManagement = context.role === "director" || context.role === "manager";
-    if (lead.status === "distributed" && context.role === "broker" && lead.corretorId === context.userId) {
-      // DEC-027: a primeira mensagem do corretor dono também é forma válida de
-      // iniciar o atendimento. A transição é condicional (status/corretorId) e
-      // idempotente; falhas aqui não impedem o envio da mensagem.
-      const started = await startServiceOnFirstMessage({
-        tenantId: context.tenantId,
-        leadId: lead.id,
-        brokerId: context.userId,
-        branchId: lead.branchId,
-      });
-      if (started) {
-        lead.status = "in_contact";
-        void notifyServiceStarted(context, lead).catch(() => { /* non-blocking */ });
-      }
-    }
     if (lead.corretorId && lead.corretorId !== context.userId && !isManagement)
       return {
         success: false,
@@ -344,16 +333,13 @@ export async function sendLeadMessageAction(
     if (suppression)
       return { success: false, error: "Este contato não pode receber novas mensagens." };
 
-    // Corretores no modo Lite atendem pelo próprio WhatsApp conectado. O canal
-    // oficial continua sendo exclusivo das conversas do tenant e da gestão.
+    // Gestão atende pelo canal oficial da corretora.
     // ── 1. Try Meta Cloud channel for the tenant workspace ────────────────
-    const officialChannel = brokerUsesLite
-      ? null
-      : await getPreferredMetaCloudChannel({
-          tenantId: context.tenantId,
-          branchId: lead.branchId,
-          userId: context.userId,
-        });
+    const officialChannel = await getPreferredMetaCloudChannel({
+      tenantId: context.tenantId,
+      branchId: lead.branchId,
+      userId: context.userId,
+    });
     if (officialChannel) {
       const sent = await sendMetaCloudChannelText({
         channel: officialChannel,

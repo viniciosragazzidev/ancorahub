@@ -4,6 +4,9 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { assertTenantAccess } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import { getDatabase, schema } from "@/shared/db";
 
 export async function getLeadTimeline(leadId: string) {
@@ -24,8 +27,25 @@ export async function getLeadTimeline(leadId: string) {
   if (!lead) return null;
   assertTenantAccess(context, lead.tenantId);
 
-  if (context.role === "broker" && lead.corretorId !== context.userId) return null;
-  if (context.role === "manager" && (!context.branchId || lead.branchId !== context.branchId)) return null;
+  const resourceScope = buildLeadResourceScope(lead);
+  const legacyAllowed =
+    context.role === "director" ||
+    (context.role === "broker" && lead.corretorId === context.userId) ||
+    (context.role === "manager" && Boolean(context.branchId) && lead.branchId === context.branchId);
+
+  const accessContext = toEffectiveLeadAccessContext(context);
+
+  await evaluateShadowAuthorization({
+    operationKey: "lead.timeline.read",
+    legacyAllowed,
+    context: accessContext,
+    capability: "acessar_leads",
+    resource: resourceScope,
+  });
+
+  if (!AuthorizationService.can(accessContext, "acessar_leads", resourceScope)) {
+    return null;
+  }
 
   return db
     .select({

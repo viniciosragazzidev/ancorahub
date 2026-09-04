@@ -188,10 +188,24 @@ export class WahaClient {
      */
     async createSession(name) {
         try {
+            const webhookUrl = process.env.WHATSAPP_HOOK_URL?.trim() ||
+                (process.env.INTERNAL_API_URL
+                    ? `${process.env.INTERNAL_API_URL}/internal/webhooks/waha`
+                    : "http://api:3000/internal/webhooks/waha");
             await this.request(`/api/sessions/`, {
                 method: "POST",
                 timeoutMs: 8_000,
-                body: { name },
+                body: {
+                    name,
+                    config: {
+                        webhooks: [
+                            {
+                                url: webhookUrl,
+                                events: ["message", "message.any", "session.status", "message.ack"],
+                            },
+                        ],
+                    },
+                },
                 headers: { "content-type": "application/json" },
             });
         }
@@ -268,7 +282,7 @@ export class WahaClient {
             return { operation: "stop", outcome: "completed" };
         }
         catch (error) {
-            if (isExpectedCleanupError(error)) {
+            if (isExpectedCleanupError(error, "stop")) {
                 return cleanupIgnored("stop", error);
             }
             throw error;
@@ -289,7 +303,7 @@ export class WahaClient {
             cleanup.push({ operation: "logout", outcome: "completed" });
         }
         catch (error) {
-            if (!isExpectedCleanupError(error))
+            if (!isExpectedCleanupError(error, "logout"))
                 throw error;
             cleanup.push(cleanupIgnored("logout", error));
         }
@@ -301,7 +315,7 @@ export class WahaClient {
             cleanup.push({ operation: "delete", outcome: "completed" });
         }
         catch (error) {
-            if (!isExpectedCleanupError(error))
+            if (!isExpectedCleanupError(error, "delete"))
                 throw error;
             cleanup.push(cleanupIgnored("delete", error));
         }
@@ -347,10 +361,11 @@ export class WahaClient {
      * Retorna o providerMessageId se sucesso.
      */
     async sendText(sessionName, chatId, text) {
+        const resolvedChatId = await this.resolveChatId(sessionName, chatId);
         const result = await this.request("/api/sendText", {
             method: "POST",
             timeoutMs: 10_000,
-            body: { session: sessionName, chatId, text },
+            body: { session: sessionName, chatId: resolvedChatId, text },
             headers: { "content-type": "application/json" },
         });
         // Normalize message ID from different WAHA response formats
@@ -366,6 +381,30 @@ export class WahaClient {
         }
         return { messageId };
     }
+    /**
+     * Resolve um telefone para o identificador de conversa que o WAHA/WebJS
+     * reconhece. Em algumas contas o WhatsApp usa @lid, não <telefone>@c.us;
+     * enviar diretamente para o telefone causa "No LID for user".
+     *
+     * Não há fallback para o telefone quando a resolução falha: isso apenas
+     * repetiria o envio inválido e esconderia a causa do erro.
+     */
+    async resolveChatId(sessionName, chatId) {
+        if (chatId.includes("@"))
+            return chatId;
+        const phone = chatId.replace(/\D/g, "");
+        if (!/^\d{10,15}$/.test(phone)) {
+            throw new WahaClientError("WAHA_RECIPIENT_NOT_FOUND", 400, "Destinatário WAHA inválido.");
+        }
+        const query = new URLSearchParams({ session: sessionName, phone });
+        const result = await this.request(`/api/contacts/check-exists?${query.toString()}`, { timeoutMs: 5_000 });
+        const recipientExists = result.exists ?? result.numberExists;
+        const resolvedChatId = typeof result.chatId === "string" ? result.chatId.trim() : "";
+        if (recipientExists === false || !resolvedChatId.includes("@")) {
+            throw new WahaClientError("WAHA_RECIPIENT_NOT_FOUND", 422, "Destinatário não encontrado ou sem conversa WAHA válida.");
+        }
+        return resolvedChatId;
+    }
 }
 /**
  * Verifica se um erro é de timeout.
@@ -373,8 +412,16 @@ export class WahaClient {
 function isTimeoutError(error) {
     return error instanceof DOMException && error.name === "TimeoutError";
 }
-function isExpectedCleanupError(error) {
-    return error instanceof WahaClientError && (error.providerStatusCode === 400 || error.providerStatusCode === 404);
+function isExpectedCleanupError(error, operation) {
+    if (!(error instanceof WahaClientError))
+        return false;
+    // WAHA pode sinalizar que stop/logout já não se aplicam à sessão com 400,
+    // 404, 422 ou 425 (not in valid state — ex.: logout em sessão que não está
+    // WORKING). Isso é seguro para o cleanup: a remoção ainda é tentada.
+    // Não toleramos 422/425 no DELETE, pois a sessão pode continuar ativa.
+    if (operation === "delete")
+        return error.providerStatusCode === 404;
+    return [400, 404, 422, 425].includes(error.providerStatusCode ?? 0);
 }
 function cleanupIgnored(operation, error) {
     return { operation, outcome: "ignored", providerStatusCode: error.providerStatusCode, normalizedError: error.code };

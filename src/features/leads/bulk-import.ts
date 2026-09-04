@@ -53,10 +53,7 @@ function parseCsv(text: string) {
   });
 }
 
-function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return digits.startsWith("55") ? digits : `55${digits}`;
-}
+import { ensureBrazilPhone as normalizePhone } from "@/shared/utils/phone";
 
 export async function importLeadsFromCsvAction(formData: FormData) {
   try {

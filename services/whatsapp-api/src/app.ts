@@ -731,12 +731,14 @@ export function buildApp() {
           timestamp: new Date().toISOString(),
         });
       } catch (error) {
+        const normalizedError = error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR";
         request.log.warn({
           operation: "waha.connection.disconnect",
           session: sessionName,
-          errorCode: error instanceof Error ? error.message : "unknown",
+          normalizedError,
+          providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
         });
-        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: normalizedError });
       }
     },
   );
@@ -877,7 +879,10 @@ export function buildApp() {
           });
         }
 
-        const result = await client.sendText(sessionName, `${chatId}@c.us`, text);
+        // O client resolve o telefone para o chatId canônico do WAHA (inclusive
+        // @lid) antes de enviar. Não force @c.us aqui: algumas contas WebJS
+        // recusam esse formato com "No LID for user".
+        const result = await client.sendText(sessionName, chatId, text);
         const durationMs = Date.now() - startedAt;
 
         request.log.info({

@@ -64,7 +64,7 @@ export function AnimatedToast({
       exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.95, filter: "blur(4px)" }}
       transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
       className={cn(
-        "group relative flex w-full max-w-sm items-start gap-3 rounded-xl border bg-card/95 p-3.5 shadow-lg backdrop-blur-md transition-all select-none dark:bg-card/90",
+        "group relative flex w-full max-w-sm items-start gap-3 rounded-xl border p-3.5 transition-all select-none bg-card text-card-foreground shadow-2xl border-border/90",
         STATUS_BORDER[status],
         className
       )}

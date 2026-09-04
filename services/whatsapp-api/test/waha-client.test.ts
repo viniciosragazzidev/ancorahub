@@ -110,6 +110,51 @@ test("health: JSON inválido no health não derruba o client", async () => {
   assert.ok(typeof result.ok === "boolean");
 });
 
+// ── WahaClient.sendText ───────────────────────────────────────────────
+
+test("sendText: resolve telefone para chatId @lid antes de enviar", async () => {
+  const requests: Array<{ url: string; body?: unknown }> = [];
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    requests.push({
+      url,
+      body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+    });
+
+    if (url.includes("/api/contacts/check-exists")) {
+      return new Response(JSON.stringify({ exists: true, chatId: "248309876846833@lid" }), { status: 200 });
+    }
+    if (url.endsWith("/api/sendText")) {
+      return new Response(JSON.stringify({ id: "message-123" }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  const result = await client.sendText("waha_test", "5521999999999", "Olá");
+
+  assert.equal(result.messageId, "message-123");
+  assert.match(requests[0]?.url ?? "", /phone=5521999999999/);
+  assert.deepEqual(requests[1]?.body, {
+    session: "waha_test",
+    chatId: "248309876846833@lid",
+    text: "Olá",
+  });
+});
+
+test("sendText: não envia para telefone quando o WAHA não resolve o destinatário", async () => {
+  const requests: string[] = [];
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    requests.push(url);
+    return new Response(JSON.stringify({ exists: false }), { status: 200 });
+  }));
+
+  await assert.rejects(
+    () => client.sendText("waha_test", "5521999999999", "Olá"),
+    (error: unknown) => error instanceof WahaClientError && error.code === "WAHA_RECIPIENT_NOT_FOUND",
+  );
+  assert.equal(requests.length, 1);
+  assert.match(requests[0] ?? "", /check-exists/);
+});
+
 // ── WahaClient.getSession ──────────────────────────────────────────────
 
 test("getSession: sessão existente → retorna WahaSession", async () => {
@@ -231,6 +276,69 @@ test("recoverFailedSession: delete 404 considera sessão ausente e recria", asyn
   assert.equal(getCreateCalls(), 1);
   assert.equal(result.cleanup.at(-1)?.outcome, "ignored");
   assert.equal(result.cleanup.at(-1)?.providerStatusCode, 404);
+});
+
+test("disconnect cleanup: stop e logout 422 não impedem a remoção da sessão", async () => {
+  const calls: string[] = [];
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${target}`);
+    if (target.endsWith("/stop") || target.endsWith("/logout")) {
+      return new Response(JSON.stringify({ error: "invalid state" }), { status: 422 });
+    }
+    if (target.endsWith("/api/sessions/disconnect-me") && method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  const stop = await client.stopSession("disconnect-me");
+  const deletion = await client.deleteSession("disconnect-me");
+
+  assert.deepEqual(stop, { operation: "stop", outcome: "ignored", providerStatusCode: 422, normalizedError: "WAHA_INTERNAL_ERROR" });
+  assert.deepEqual(deletion.map((item) => item.outcome), ["ignored", "completed"]);
+  assert.equal(calls.length, 3);
+});
+
+test("disconnect cleanup: stop e logout 425 (not in valid state) não impedem a remoção da sessão", async () => {
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    if (target.endsWith("/stop") || target.endsWith("/logout")) {
+      // WAHA responde 425 quando logout é chamado em sessão que não está WORKING.
+      return new Response(JSON.stringify({ error: "not in valid state" }), { status: 425 });
+    }
+    if (target.endsWith("/api/sessions/disconnect-425") && method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  const stop = await client.stopSession("disconnect-425");
+  const deletion = await client.deleteSession("disconnect-425");
+
+  assert.deepEqual(stop, { operation: "stop", outcome: "ignored", providerStatusCode: 425, normalizedError: "WAHA_INTERNAL_ERROR" });
+  assert.deepEqual(deletion.map((item) => item.outcome), ["ignored", "completed"]);
+});
+
+test("disconnect cleanup: delete 425/422 continua sendo falha observável", async () => {
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    if (target.endsWith("/stop") || target.endsWith("/logout")) {
+      return new Response(null, { status: 204 });
+    }
+    if (method === "DELETE") {
+      return new Response(JSON.stringify({ error: "not in valid state" }), { status: 425 });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }));
+
+  await assert.rejects(
+    () => client.deleteSession("delete-425"),
+    (err: unknown) => err instanceof WahaClientError && err.providerStatusCode === 425,
+  );
 });
 
 // ── WahaClient.getQr ──────────────────────────────────────────────────

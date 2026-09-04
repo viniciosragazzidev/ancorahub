@@ -1,614 +1,218 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCircle, PaperPlaneTilt, WhatsappLogo } from "@/components/huge-icons";
-import { WhatsAppConnectDialog } from "@/components/whatsapp/whatsapp-connect-dialog";
+import { Activity, ArrowLeft, ArrowUpRight, Bot, CheckCircle2, Clock3, ExternalLink, MessageSquareText, Search, Smartphone } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  getWhatsAppConnection,
-  getWhatsAppSessionStatus,
-} from "@/app/(dashboard)/settings/whatsapp-actions";
-import {
-  sendLeadMessageAction,
-  sendTenantOfficialChannelMessageAction,
-  sendTenantOfficialNumberMessageAction,
-} from "@/features/leads/actions/send-lead-message";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
-import {
-  REALTIME_SYNC_BROWSER_EVENT,
-  type RealtimeSyncBrowserDetail,
-} from "@/components/providers/realtime-events";
-import { toast } from "sonner";
+import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 
-export type LightConversationMessage = {
-  id: string;
-  body: string;
-  direction: string;
-  sentAt: string;
-  senderRole?: string | null;
-  providerStatus?: string | null;
-};
-export type LightConversationItem = {
-  id: string;
-  kind: "lead" | "client" | "tenant_number";
-  sendTarget:
-    | { kind: "lead"; leadId: string }
-    | { kind: "tenant_number"; numberId: string }
-    | { kind: "tenant_channel"; channelId: string };
-  nome: string;
-  telefone: string;
-  status: string;
-  latestMessage: { body: string; direction: string; sentAt: string } | null;
-  messages: LightConversationMessage[];
+export type BrokerInsightMessage = { id: string; body: string; direction: string; sentAt: string; providerStatus?: string | null };
+export type BrokerConversationInsight = {
+  id: string; kind: "lead" | "client"; name: string; phone: string; status: string; href: string;
+  firstContactAt?: string | null; serviceStartedAt?: string | null;
+  latestMessage: BrokerInsightMessage | null; messages: BrokerInsightMessage[];
+  intelligence?: { summary?: string | null; nextBestAction?: string | null; pendingFrom?: string | null; sentiment?: string | null; customerIntent?: string | null; risk?: string | null; lastAnalyzedAt?: string | null } | null;
 };
 
-function formatTime(value: string) {
+function formatDateTime(value?: string | null) {
+  if (!value) return "Ainda não registrado";
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
+  if (Number.isNaN(date.getTime())) return "Ainda não registrado";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
 }
-function formatDay(value: string) {
+function formatTime(value?: string | null) {
+  if (!value) return "";
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
-function isOutbound(direction: string) {
-  return direction === "outgoing" || direction === "outbound";
+function isOutbound(direction: string) { return direction === "outgoing" || direction === "outbound"; }
+function pendingLabel(value?: string | null) {
+  return ({ BROKER: "Você precisa responder", CUSTOMER: "Aguardando o cliente", INTERNAL: "Há uma pendência interna", NONE: "Sem pendência identificada" } as Record<string, string>)[value ?? ""] ?? "Análise pendente";
+}
+function healthVariant(item: BrokerConversationInsight): "success" | "warning" | "destructive" | "secondary" {
+  if (item.intelligence?.risk || item.intelligence?.sentiment === "NEGATIVE") return "destructive";
+  if (item.intelligence?.pendingFrom === "BROKER") return "warning";
+  if (item.intelligence?.sentiment === "POSITIVE" || ["HIGH", "VERY_HIGH"].includes(item.intelligence?.customerIntent ?? "")) return "success";
+  return "secondary";
+}
+function healthLabel(item: BrokerConversationInsight) {
+  return ({ destructive: "Exige atenção", warning: "Sua ação", success: "Bom avanço", secondary: "Acompanhar" } as const)[healthVariant(item)];
 }
 
-export function LightConversationsView({
-  conversations: serverConversations,
-  initialLeadId,
-  initialDraft,
-  whatsappConnected,
-}: {
-  conversations: LightConversationItem[];
-  initialLeadId?: string;
-  initialDraft?: string;
-  whatsappConnected: boolean;
-}) {
+export function LightConversationsView({ insights, initialLeadId, whatsappConnected, connectionStatus }: { insights: BrokerConversationInsight[]; initialLeadId?: string; whatsappConnected: boolean; connectionStatus: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [conversations, setConversations] = useState(serverConversations);
-  const [selectedId, setSelectedId] = useState<string | null>(initialLeadId ?? null);
   const [query, setQuery] = useState("");
-  const [connection, setConnection] = useState<Awaited<
-    ReturnType<typeof getWhatsAppConnection>
-  > | null>(null);
-  const connectionPollInFlight = useRef(false);
-  const connectionReadyRef = useRef(whatsappConnected);
-  const refreshConversations = useCallback(() => router.refresh(), [router]);
-  useEffect(() => setConversations(serverConversations), [serverConversations]);
-  useEffect(
-    () =>
-      setSelectedId(
-        initialLeadId && serverConversations.some((item) => item.id === initialLeadId)
-          ? initialLeadId
-          : null,
-      ),
-    [initialLeadId, serverConversations],
-  );
-  const refreshConnection = useCallback(async ({ announce = false }: { announce?: boolean } = {}) => {
-    const next = await getWhatsAppConnection();
-    const wasReady = connectionReadyRef.current;
-    const isReady = next.status === "ready" && next.chatInternoAtivo;
-    connectionReadyRef.current = isReady;
-    setConnection(next);
-    if (announce && isReady && !wasReady) {
-      toast.success("WhatsApp conectado. Sua carteira está pronta para atendimento.");
+
+  // Estado local para seleção instantânea (0ms) sem re-render do Server Component
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("leadId") ?? initialLeadId ?? insights[0]?.id ?? null);
+
+  useEffect(() => {
+    const urlLeadId = searchParams.get("leadId");
+    if (urlLeadId && urlLeadId !== selectedId) {
+      setSelectedId(urlLeadId);
     }
-    return next;
-  }, []);
-  useEffect(() => {
-    void refreshConnection().catch(() => undefined);
-  }, [refreshConnection]);
-  useEffect(() => {
-    const onConversationInvalidated = (event: Event) => {
-      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.kind !== "domain.invalidated") return;
-      if (detail.domain === "whatsapp_connection") {
-        void refreshConnection({ announce: true })
-          .then(() => refreshConversations())
-          .catch(() => refreshConversations());
-        return;
-      }
-      if (detail.domain === "conversations") {
-        refreshConversations();
-      }
-    };
-    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
-    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
-  }, [refreshConnection, refreshConversations]);
-  useEffect(() => {
-    if (!connection?.sessionId || connection.status !== "initializing") return;
-    const reconcile = async () => {
-      if (document.visibilityState !== "visible" || connectionPollInFlight.current) return;
-      connectionPollInFlight.current = true;
-      try {
-        const result = await getWhatsAppSessionStatus();
-        if (result.success) await refreshConnection({ announce: true });
-      } catch {
-        // O webhook continua sendo a via principal; falha transitória não bloqueia a tela.
-      } finally {
-        connectionPollInFlight.current = false;
-      }
-    };
-    void reconcile();
-    const interval = window.setInterval(() => void reconcile(), 2_000);
-    return () => window.clearInterval(interval);
-  }, [connection?.sessionId, connection?.status, refreshConnection]);
-  const selected = conversations.find((item) => item.id === selectedId) ?? null;
+  }, [searchParams, selectedId]);
+
+  const selected = useMemo(() => {
+    return (selectedId ? insights.find((item) => item.id === selectedId) : null) ?? insights[0] ?? null;
+  }, [insights, selectedId]);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("pt-BR");
-    return conversations.filter(
-      (item) =>
-        !term ||
-        item.nome.toLocaleLowerCase("pt-BR").includes(term) ||
-        item.telefone.includes(term),
-    );
-  }, [conversations, query]);
-  function selectConversation(leadId: string | null) {
-    setSelectedId(leadId);
-    const params = new URLSearchParams(searchParams.toString());
-    if (leadId) params.set("leadId", leadId);
-    else params.delete("leadId");
-    router.replace(params.size ? `${pathname}?${params}` : pathname, { scroll: false });
-  }
-  function appendMessage(leadId: string, message: LightConversationMessage) {
-    setConversations((current) =>
-      current
-        .map((conversation) =>
-          conversation.id !== leadId || conversation.messages.some((item) => item.id === message.id)
-            ? conversation
-            : {
-                ...conversation,
-                messages: [...conversation.messages, message],
-                latestMessage: {
-                  body: message.body,
-                  direction: message.direction,
-                  sentAt: message.sentAt,
-                },
-              },
-        )
-        .sort(
-          (a, b) =>
-            Date.parse(b.latestMessage?.sentAt ?? "") - Date.parse(a.latestMessage?.sentAt ?? ""),
-        ),
-    );
-  }
-  const hasActiveConnection =
-    whatsappConnected || (connection?.status === "ready" && connection.chatInternoAtivo);
-  if (!hasActiveConnection) {
-    return <ConnectionEmptyState connection={connection} onConnectionChanged={() => refreshConnection({ announce: true })} />;
-  }
-  return (
-    <section className="flex h-[calc(100dvh-var(--header-height,3.5rem))] min-h-[38rem] max-lg:min-h-0 overflow-hidden border-y border-border/70 bg-background lg:border">
-      <aside
-        className={cn(
-          "flex min-w-0 flex-1 flex-col border-r border-border/70 bg-card lg:max-w-[23rem] lg:flex-none",
-          selected && "max-lg:hidden",
-        )}
-        aria-label="Lista de conversas"
-      >
-        <div className="space-y-4 border-b border-border/70 bg-primary/[0.04] px-4 py-5 sm:px-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                Atendimento Lite
-              </p>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
-                Sua carteira
-              </h1>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {conversations.length} conversa{conversations.length === 1 ? "" : "s"} autorizada
-                {conversations.length === 1 ? "" : "s"}
-              </p>
-            </div>
-            {connection ? (
-              <WhatsAppConnectDialog
-                initial={connection}
-                triggerLabel="WhatsApp"
-                connectedLabel="WhatsApp"
-                onConnectionChanged={() => refreshConnection({ announce: true })}
-              />
-            ) : (
-              <Button size="sm" variant="outline" disabled>
-                WhatsApp
-              </Button>
-            )}
-          </div>
-          <Input
-            aria-label="Buscar conversas"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar nome ou telefone"
-          />
+    return term ? insights.filter((item) => `${item.name} ${item.phone} ${item.status}`.toLocaleLowerCase("pt-BR").includes(term)) : insights;
+  }, [insights, query]);
+
+  useEffect(() => {
+    const onRealtime = (event: Event) => {
+      const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
+      if (detail?.domain === "conversations" || detail?.domain === "whatsapp_connection") {
+        router.refresh();
+      }
+    };
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+  }, [router]);
+
+  const select = (item: BrokerConversationInsight) => {
+    setSelectedId(item.id);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("leadId", item.id);
+      window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedId(null);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("leadId");
+      const newQuery = params.toString() ? `?${params.toString()}` : "";
+      window.history.replaceState(null, "", `${pathname}${newQuery}`);
+    }
+  };
+
+  return <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Central de insights do WhatsApp">
+    <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(17rem,0.75fr)_minmax(0,1.75fr)]">
+      <aside className={cn("min-h-0 border-r border-border bg-card", selected ? "hidden lg:block" : "block")}>
+        <div className="border-b border-border p-3">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar na sua carteira" aria-label="Buscar lead ou cliente" />
+          </label>
         </div>
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="h-[calc(100%-4.1rem)]">
           <div className="space-y-1 p-2">
-            {filtered.map((conversation) => {
-              const active = conversation.id === selectedId;
-              return (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  onClick={() => selectConversation(conversation.id)}
-                  className={cn(
-                    "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                    active && "bg-primary/10",
-                  )}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span
-                    className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
-                    aria-hidden="true"
-                  >
-                    {conversation.nome.trim().slice(0, 1).toLocaleUpperCase("pt-BR")}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-foreground">
-                        {conversation.nome}
-                      </span>
-                      {conversation.latestMessage ? (
-                        <time
-                          className="shrink-0 text-[11px] text-muted-foreground"
-                          dateTime={conversation.latestMessage.sentAt}
-                        >
-                          {formatTime(conversation.latestMessage.sentAt)}
-                        </time>
-                      ) : null}
-                    </span>
-                    <span className="mt-1 block truncate text-xs text-muted-foreground">
-                      {conversation.latestMessage
-                        ? `${isOutbound(conversation.latestMessage.direction) ? "Você: " : ""}${conversation.latestMessage.body}`
-                        : "Sem mensagens ainda"}
-                    </span>
-                  </span>
-                </button>
-              );
+            {filtered.map((item) => {
+              const active = item.id === selected?.id;
+              return <button key={item.id} type="button" onClick={() => select(item)} className={cn("w-full rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", active ? "border-primary/30 bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")} aria-current={active ? "page" : undefined}>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="truncate text-sm font-semibold">{item.name}</span>
+                  <Badge variant={healthVariant(item)} className="shrink-0 text-[10px]">{healthLabel(item)}</Badge>
+                </div>
+                <p className="mt-1 truncate text-xs text-muted-foreground">{item.latestMessage ? `${isOutbound(item.latestMessage.direction) ? "Você: " : "Cliente: "}${item.latestMessage.body}` : "Sem conversa sincronizada"}</p>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">{item.latestMessage ? `Última interação ${formatDateTime(item.latestMessage.sentAt)}` : "Aguardando primeira interação"}</p>
+              </button>;
             })}
-            {!filtered.length ? (
-              <Card variant="subtle" className="m-2 border-dashed p-5 text-center">
-                <p className="text-sm font-medium">Nenhuma conversa encontrada</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Altere a busca ou aguarde uma nova mensagem.
-                </p>
-              </Card>
-            ) : null}
+            {!filtered.length ? <EmptyPortfolioView /> : null}
           </div>
         </ScrollArea>
       </aside>
-      {selected ? (
-        <ConversationPanel
-          conversation={selected}
-          initialDraft={selected.id === initialLeadId ? initialDraft : undefined}
-          onBack={() => selectConversation(null)}
-          onMessageSent={(message) => appendMessage(selected.id, message)}
-        />
-      ) : (
-        <div className="hidden flex-1 flex-col items-center justify-center bg-muted/20 px-6 text-center lg:flex">
-          <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
-            <WhatsappLogo className="size-6" />
-          </span>
-          <h2 className="mt-4 text-lg font-semibold">Escolha uma conversa</h2>
-          <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-            Selecione um contato da sua carteira para ver o histórico e responder.
-          </p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ConnectionEmptyState({
-  connection,
-  onConnectionChanged,
-}: {
-  connection: Awaited<ReturnType<typeof getWhatsAppConnection>> | null;
-  onConnectionChanged: () => void;
-}) {
-  const [pairingActive, setPairingActive] = useState(false);
-  const pollRef = useRef(false);
-
-  // Live polling: when a session is pairing, check status every 2s outside dialog
-  useEffect(() => {
-    if (!connection?.sessionId || connection.status === "ready") {
-      setPairingActive(false);
-      return;
-    }
-    setPairingActive(true);
-    const check = async () => {
-      if (pollRef.current) return;
-      pollRef.current = true;
-      try {
-        await getWhatsAppSessionStatus();
-        // Notificar o parent — ele faz fetch do server e atualiza tudo
-        onConnectionChanged();
-      } catch {
-        // Silent — webhook is the primary path
-      } finally {
-        pollRef.current = false;
-      }
-    };
-    void check();
-    const timer = window.setInterval(check, 2_000);
-    return () => window.clearInterval(timer);
-  }, [connection?.sessionId, connection?.status]);
-
-  const isPairing = pairingActive && connection?.sessionId && connection.status !== "ready";
-
-  return (
-    <div className="mx-auto flex min-h-[32rem] w-full max-w-md flex-col items-center justify-center px-5 text-center">
-      {/* Status icon with animated states */}
-      <div className="relative">
-        <span
-          className={cn(
-            "grid size-16 place-items-center rounded-2xl transition-all duration-500",
-            connection?.status === "ready"
-              ? "bg-emerald-100 text-emerald-600 scale-110"
-              : isPairing
-                ? "bg-primary/10 text-primary"
-                : "bg-primary/10 text-primary",
-          )}
-        >
-          {connection?.status === "ready" ? (
-            <CheckCircle className="size-8 ct-qr-enter" />
-          ) : (
-            <WhatsappLogo className={cn("size-8", isPairing && "ct-waiting-breathe")} />
-          )}
-        </span>
-        {/* Pairing pulse ring */}
-        {isPairing && (
-          <span className="absolute inset-0 rounded-2xl border-2 border-primary/30 ct-pulse-ring" />
-        )}
-      </div>
-
-      {connection?.status === "ready" ? (
-        <>
-          <h1 className="mt-5 text-xl font-semibold tracking-tight ct-qr-enter">WhatsApp conectado!</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground ct-qr-enter">
-            Sua carteira está pronta para atendimento.
-          </p>
-        </>
-      ) : isPairing ? (
-        <>
-          <h1 className="mt-5 text-xl font-semibold tracking-tight">Pareando WhatsApp…</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Escaneie o QR Code no seu celular. Assim que conectar, esta tela será atualizada automaticamente.
-          </p>
-          <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-            Verificando conexão a cada 2 segundos
-          </div>
-        </>
-      ) : (
-        <>
-          <h1 className="mt-5 text-xl font-semibold tracking-tight">Conecte seu WhatsApp</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            O WhatsApp é necessário para enviar e receber mensagens no atendimento Lite.
-          </p>
-        </>
-      )}
-
-      {connection ? (
-        <div className="mt-6">
-          <WhatsAppConnectDialog
-            initial={connection}
-            triggerLabel="Conectar WhatsApp"
-            connectedLabel="Gerenciar conexão"
-            onConnectionChanged={onConnectionChanged}
-          />
-        </div>
-      ) : (
-        <Button className="mt-6" disabled>
-          Carregando conexão…
-        </Button>
-      )}
+      {selected ? <InsightDetail item={selected} onBack={handleBack} /> : <EmptyPortfolioView />}
     </div>
-  );
+  </section>;
 }
-function ConversationPanel({
-  conversation,
-  initialDraft,
-  onBack,
-  onMessageSent,
-}: {
-  conversation: LightConversationItem;
-  initialDraft?: string;
-  onBack: () => void;
-  onMessageSent: (message: LightConversationMessage) => void;
-}) {
-  return (
-    <article
-      className="flex min-w-0 flex-1 flex-col bg-card"
-      aria-label={`Conversa com ${conversation.nome}`}
-    >
-      <header className="flex items-center gap-3 border-b border-border/70 px-4 py-3 sm:px-5">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="lg:hidden"
-          onClick={onBack}
-          aria-label="Voltar para conversas"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-        <span
-          className="grid size-10 place-items-center rounded-xl bg-primary/10 text-sm font-semibold text-primary"
-          aria-hidden="true"
-        >
-          {conversation.nome.trim().slice(0, 1).toLocaleUpperCase("pt-BR")}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">{conversation.nome}</h2>
-          <p className="truncate text-xs text-muted-foreground">
-            {conversation.status} · {conversation.telefone}
-          </p>
+
+function InsightDetail({ item, onBack }: { item: BrokerConversationInsight; onBack: () => void }) {
+  const messages = [...item.messages].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
+  const whatsappUrl = buildWhatsAppUrl(item.phone);
+  return <article className="flex min-h-0 flex-1 flex-col bg-muted/15">
+    <header className="flex items-start justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-3">
+        <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onBack} aria-label="Voltar para carteira"><ArrowLeft className="size-4" /></Button>
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{item.name.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-bold">{item.name}</h2>
+          <p className="truncate text-xs text-muted-foreground">{item.kind === "lead" ? "Lead da sua carteira" : "Cliente da sua carteira"}</p>
         </div>
-        {conversation.sendTarget.kind === "lead" ? (
-          <Link
-            href={`/leads/${conversation.sendTarget.leadId}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}
-          >
-            Ver lead
-          </Link>
-        ) : (
-          <span className="text-xs text-muted-foreground">Número oficial</span>
-        )}
-      </header>
-      <ChatHistory messages={conversation.messages} clientName={conversation.nome} />
-      <ChatInput
-        key={conversation.id}
-        initialText={initialDraft}
-        target={conversation.sendTarget}
-        onMessageSent={onMessageSent}
-      />
-    </article>
-  );
-}
-function ChatHistory({
-  messages,
-  clientName,
-}: {
-  messages: LightConversationMessage[];
-  clientName: string;
-}) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const sortedMessages = useMemo(
-    () => [...messages].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)),
-    [messages],
-  );
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [sortedMessages.length]);
-  if (!sortedMessages.length)
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="text-sm font-medium">Sem mensagens com {clientName}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Envie a primeira mensagem para iniciar o atendimento.
-        </p>
       </div>
-    );
-  return (
-    <ScrollArea className="min-h-0 flex-1 bg-muted/20">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-5 sm:px-6">
-        {sortedMessages.map((message) => (
-          <div
-            key={message.id}
-            className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}
-          >
-            <div
-              className={cn(
-                "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-5 shadow-xs",
-                isOutbound(message.direction)
-                  ? "rounded-br-md bg-primary text-primary-foreground"
-                  : "rounded-bl-md bg-card text-foreground",
-              )}
-            >
-              <p className="whitespace-pre-wrap break-words">{message.body}</p>
-              <p
-                className={cn(
-                  "mt-1 text-right text-[10px]",
-                  isOutbound(message.direction)
-                    ? "text-primary-foreground/70"
-                    : "text-muted-foreground",
-                )}
-              >
-                {formatDay(message.sentAt)} · {formatTime(message.sentAt)}
-              </p>
+      <Link href={item.href} className={cn(buttonVariants({ variant: "outline", size: "xs" }), "gap-1.5")}><span>Ver ficha</span><ExternalLink className="size-3" /></Link>
+    </header>
+    <ScrollArea className="min-h-0 flex-1">
+      <div className="mx-auto w-full max-w-4xl space-y-4 p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric label="Último contato" value={formatDateTime(item.latestMessage?.sentAt)} icon={<Clock3 className="size-4" />} />
+          <Metric label="Início do atendimento" value={formatDateTime(item.serviceStartedAt ?? item.firstContactAt)} icon={<CheckCircle2 className="size-4" />} />
+          <Metric label="Quem deve agir" value={pendingLabel(item.intelligence?.pendingFrom)} icon={<Activity className="size-4" />} />
+        </div>
+        <Card className="border-border/60">
+          <CardHeader className="flex-row items-start gap-3 space-y-0 p-4 pb-2">
+            <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary"><Bot className="size-4" /></span>
+            <div>
+              <CardTitle className="text-sm">Leitura da IA</CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">Análise baseada apenas nas mensagens sincronizadas desta conversa.</p>
             </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
+          </CardHeader>
+          <CardContent className="space-y-3 p-4 pt-2">
+            <p className="text-sm leading-relaxed">{item.intelligence?.summary || "Ainda não há análise suficiente. Continue atendendo pelo WhatsApp; quando houver mensagens vinculadas a este lead, os insights serão atualizados."}</p>
+            {item.intelligence?.nextBestAction ? <div className="rounded-lg border border-primary/20 bg-primary/[0.06] p-3 text-sm"><span className="font-semibold text-primary">Próxima melhor ação: </span>{item.intelligence.nextBestAction}</div> : null}
+            {item.intelligence?.risk ? <div className="rounded-lg border border-destructive/20 bg-destructive/[0.06] p-3 text-sm text-destructive"><span className="font-semibold">Atenção: </span>{item.intelligence.risk}</div> : null}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0 p-4 pb-2">
+            <div>
+              <CardTitle className="text-sm">Histórico sincronizado</CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">Somente leitura. Conversas pessoais não são trazidas para o CRM.</p>
+            </div>
+            <Badge variant="outline">{messages.length} mensagens</Badge>
+          </CardHeader>
+          <CardContent className="space-y-2 p-4 pt-2">
+            {messages.length ? messages.map((message) => <div key={message.id} className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}><div className={cn("max-w-[85%] rounded-lg border px-3 py-2 text-sm", isOutbound(message.direction) ? "border-primary/20 bg-primary text-primary-foreground" : "border-border bg-card")}><p className="whitespace-pre-wrap break-words">{message.body}</p><time className={cn("mt-1 block text-right text-[10px]", isOutbound(message.direction) ? "text-primary-foreground/75" : "text-muted-foreground")} dateTime={message.sentAt}>{formatTime(message.sentAt)}</time></div></div>) : <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhuma mensagem vinculada a este contato foi sincronizada ainda.</p>}
+          </CardContent>
+        </Card>
       </div>
     </ScrollArea>
+    <footer className="border-t border-border bg-card p-3 sm:px-5">
+      <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="size-4 text-primary" />Para responder, use o WhatsApp no seu aparelho.</p>
+        {whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}><MessageSquareText className="size-4" />Abrir WhatsApp<ArrowUpRight className="size-3.5" /></a> : <Button size="sm" disabled>Telefone indisponível</Button>}
+      </div>
+    </footer>
+  </article>;
+}
+
+function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
+  return (
+    <Card className="p-3">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        {icon}
+        <span className="text-xs">{label}</span>
+      </div>
+      <p className="mt-1.5 text-sm font-semibold leading-snug text-foreground">{value}</p>
+    </Card>
   );
 }
-function ChatInput({
-  target,
-  initialText = "",
-  onMessageSent,
-}: {
-  target: LightConversationItem["sendTarget"];
-  initialText?: string;
-  onMessageSent: (message: LightConversationMessage) => void;
-}) {
-  const [text, setText] = useState(initialText);
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function handleSend(event: React.FormEvent) {
-    event.preventDefault();
-    const body = text.trim();
-    if (!body || isPending) return;
-    setIsPending(true);
-    setError(null);
-    try {
-      const result =
-        target.kind === "lead"
-          ? await sendLeadMessageAction(target.leadId, body)
-          : target.kind === "tenant_channel"
-            ? await sendTenantOfficialChannelMessageAction(target.channelId, body)
-            : await sendTenantOfficialNumberMessageAction(target.numberId, body);
-      if (!result.success || !result.message) {
-        setError(result.error ?? "Não foi possível enviar a mensagem.");
-        return;
-      }
-      setText("");
-      onMessageSent({
-        id: result.message.id,
-        body: result.message.body,
-        direction: result.message.direction,
-        sentAt: result.message.sentAt.toISOString(),
-      });
-    } catch {
-      setError("Não foi possível enviar a mensagem. Tente novamente.");
-    } finally {
-      setIsPending(false);
-    }
-  }
-
+function EmptyPortfolioView() {
   return (
-    <div className="border-t border-border/70 bg-card px-4 py-3 sm:px-5 max-lg:pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-3">
-      {initialText ? (
-        <p className="mb-2 text-xs text-muted-foreground">
-          Mensagem inicial pronta para você revisar antes do envio.
-        </p>
-      ) : null}
-      <form onSubmit={handleSend} className="flex items-end gap-2">
-        <div className="min-w-0 flex-1">
-          <Input
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="Digite uma mensagem"
-            disabled={isPending}
-            aria-describedby={error ? "message-error" : undefined}
-          />
-          {error ? (
-            <p id="message-error" role="alert" className="mt-1 text-xs text-destructive">
-              {error}
-            </p>
-          ) : null}
-        </div>
-        <Button
-          type="submit"
-          size="icon-sm"
-          disabled={isPending || !text.trim()}
-          aria-label="Enviar mensagem"
-        >
-          <PaperPlaneTilt className={cn("size-4", isPending && "animate-pulse")} />
-        </Button>
-      </form>
+    <div className="flex min-h-64 flex-1 items-center justify-center p-6">
+      <EmptyState
+        icon={MessageSquareText}
+        title="Nenhum insight disponível"
+        description="Assim que houver uma conversa vinculada a um lead ou cliente da sua carteira, ela aparecerá aqui."
+      />
     </div>
   );
 }

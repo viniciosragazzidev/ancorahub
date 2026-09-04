@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -15,6 +15,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { samePhone } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence";
 import {
   phoneHash,
   normalizePhone,
@@ -33,28 +34,31 @@ export function shouldCreateSyntheticLead(input: {
   hasLead: boolean;
   hasClient: boolean;
   isTenantOfficialNumber: boolean;
+  isBrokerOrTeam?: boolean;
 }) {
   return (
     input.sourceKind === "number" &&
     !input.isOutgoing &&
     !input.hasLead &&
     !input.hasClient &&
-    !input.isTenantOfficialNumber
+    !input.isTenantOfficialNumber &&
+    !input.isBrokerOrTeam
   );
 }
 
 /**
  * A broker connection is a restricted workspace, not a tenant intake channel.
- * Persist only CRM contacts assigned to that broker or the tenant's official
- * number; personal chats never enter the tenant database.
+ * Persist only CRM contacts (leads/clients); personal and internal chats never
+ * enter the tenant database through a broker's personal connection.
  */
 export function shouldPersistBrokerConnectionMessage(input: {
   hasLead: boolean;
   hasClient: boolean;
-  isTenantOfficialNumber: boolean;
 }) {
-  return input.hasLead || input.hasClient || input.isTenantOfficialNumber;
+  return input.hasLead || input.hasClient;
 }
+
+
 
 /**
  * SQL pre-filter for tolerant phone matching. Generates LIKE conditions on the
@@ -66,12 +70,13 @@ function phoneSuffixConditions(
   column: AnyPgColumn,
   normalizedPhone: string,
 ) {
-  const suffix = normalizedPhone.slice(-8);
+  const last4 = normalizedPhone.slice(-4);
   return or(
     eq(column, normalizedPhone),
-    like(column, `%${suffix}`),
+    like(column, `%${last4}`),
   );
 }
+
 
 /** Observability counters for webhook processing */
 interface WebhookMetrics {
@@ -226,7 +231,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // Determine direction based on fromMe flag
   const isOutgoing = event.message.fromMe === true;
-  const normalizedPhone = normalizePhone(event.message.from);
+  const contactPhoneRaw = isOutgoing && event.message.to ? event.message.to : event.message.from;
+  const normalizedPhone = normalizePhone(contactPhoneRaw);
+
 
   // ── 6. Resolve lead/client (race-safe) ─────────────────────────────────
   const leadResolveStart = Date.now();
@@ -239,16 +246,11 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   );
   metrics.leadResolveMs = Date.now() - leadResolveStart;
 
-  const isTenantOfficialNumber =
-    source.kind === "connection" &&
-    (await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone));
-
   if (
     source.kind === "connection" &&
     !shouldPersistBrokerConnectionMessage({
       hasLead: Boolean(leadId),
       hasClient: Boolean(clientId),
-      isTenantOfficialNumber,
     })
   ) {
     await markIgnored(db, registered.id, "connection_contact_not_authorized");
@@ -269,7 +271,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         leadId,
         clientId,
         provider: "waha",
-        providerStatus: "received",
+        providerStatus: isOutgoing ? "sent" : "received",
         messageId: providerMessageId,
         phone: normalizedPhone,
         direction: isOutgoing ? "outgoing" : "incoming",
@@ -281,7 +283,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       });
 
     // Update cadence run if applicable
-    if (runId) {
+    if (runId && !isOutgoing) {
       await tx
         .update(schema.wahaCadenceRuns)
         .set({ inboundAt: new Date(event.occurredAt), status: "active", updatedAt: new Date() })
@@ -298,25 +300,32 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   });
   metrics.persistMs = Date.now() - persistStart;
 
-  // Only an opaque invalidation is broadcast. Each browser re-fetches its own
-  // server-authorized scope, so a personal broker chat cannot reach Directors.
-  if (source.kind === "connection") {
-    try {
-      revalidatePath("/conversas");
-      revalidatePath("/conversas/broker");
-    } catch {
-      // Cache invalidation is best-effort outside a render request.
-    }
-    if (source.connection.tenantId && source.connection.userId) {
-      void publishConversationInvalidation({
-        tenantId: source.connection.tenantId,
-        participantUserIds: [source.connection.userId],
-      }).catch(() => undefined);
-    }
+  // Invalidate cache and push realtime sync
+  try {
+    revalidatePath("/conversas");
+    revalidatePath("/conversas/broker");
+  } catch {
+    // Cache invalidation is best-effort outside a render request.
+  }
+  if (source.kind === "connection" && source.connection.tenantId && source.connection.userId) {
+    void publishConversationInvalidation({
+      tenantId: source.connection.tenantId,
+      participantUserIds: [source.connection.userId],
+    }).catch(() => undefined);
+  } else if (tenantId) {
+    void publishConversationInvalidation({
+      tenantId,
+      participantUserIds: [],
+    }).catch(() => undefined);
   }
 
-  // ── 8. AI processing (optional, background, only for inbound) ──────────
-  if (!isOutgoing && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
+  // ── 7.1 Agendar análise de inteligência conversacional com debounce de 45s ──
+  if (leadId && tenantId) {
+    scheduleLeadConversationAnalysis(leadId, tenantId);
+  }
+
+  // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────
+  if (!isOutgoing && source.kind === "number" && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
     const { processInboundAiResponse } =
       await import("@/features/ai-agent/conversation-state-machine");
     const aiPromise = processInboundAiResponse({
@@ -338,7 +347,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   // Log metrics (no PII)
   console.info("[waha/inbound] processed", {
     eventType: event.type,
+    eventId: event.eventId,
+    sessionId: event.sessionId,
+    messageId: event.message.id,
     direction: isOutgoing ? "outgoing" : "incoming",
+    source: event.message.source ?? null,
+    remotePhoneHash: phoneHash(normalizedPhone).slice(0, 16),
+    conversationId: null,
     hasLead: Boolean(leadId),
     hasClient: Boolean(clientId),
     eventDedupMs: metrics.eventDedupMs,
@@ -357,24 +372,55 @@ async function resolveSession(
   db: ReturnType<typeof getDatabase>,
   sessionId: string,
 ): Promise<SessionSource | null> {
-  // Try platform/tenant numbers first (relay sessions)
+  if (!sessionId) return null;
+
+  // 1. Try platform/tenant numbers first (relay sessions)
   const [number] = await db
     .select()
     .from(schema.wahaNumbers)
-    .where(eq(schema.wahaNumbers.relaySessionId, sessionId))
+    .where(
+      or(
+        eq(schema.wahaNumbers.relaySessionId, sessionId),
+        eq(schema.wahaNumbers.id, sessionId),
+      ),
+    )
     .limit(1);
   if (number) return { kind: "number", number };
 
-  // Fallback: broker-level connections (direct WAHA sessions)
+  // 2. Broker-level connections (direct WAHA sessions)
   const [connection] = await db
     .select()
     .from(schema.whatsappConnections)
-    .where(eq(schema.whatsappConnections.sessionName, sessionId))
+    .where(
+      or(
+        eq(schema.whatsappConnections.sessionName, sessionId),
+        eq(schema.whatsappConnections.sessionId, sessionId),
+        eq(schema.whatsappConnections.id, sessionId),
+      ),
+    )
     .limit(1);
   if (connection) return { kind: "connection", connection };
 
+  // 3. Fallback for "default" or single-active session
+  if (sessionId === "default" || sessionId === "session_default") {
+    const [singleNumber] = await db
+      .select()
+      .from(schema.wahaNumbers)
+      .where(eq(schema.wahaNumbers.status, "ready"))
+      .limit(2);
+    if (singleNumber) return { kind: "number", number: singleNumber };
+
+    const [singleConnection] = await db
+      .select()
+      .from(schema.whatsappConnections)
+      .where(eq(schema.whatsappConnections.status, "ready"))
+      .limit(2);
+    if (singleConnection) return { kind: "connection", connection: singleConnection };
+  }
+
   return null;
 }
+
 
 /**
  * Resolve lead/client from phone number. Race-safe: uses transaction with
@@ -390,6 +436,15 @@ async function resolveContact(
   let leadId: string | null = null;
   let clientId: string | null = null;
   let runId: string | null = null;
+
+  // 0. Comunicação interna com Corretores, Equipe ou Números da Empresa:
+  // NUNCA deve virar lead nem acionar IA de qualificação.
+  const isBrokerOrTeam = await isBrokerOrTeamPhone(db, tenantId, normalizedPhone);
+  const isTenantOfficial = await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone);
+
+  if (isBrokerOrTeam || isTenantOfficial) {
+    return { leadId: null, clientId: null, runId: null };
+  }
 
   // For number-based flow, check cadence runs first
   if (source.kind === "number") {
@@ -463,12 +518,6 @@ async function resolveContact(
     if (client) clientId = client.id;
   }
 
-  // The tenant's own official WAHA number is an internal Lite contact, never a
-  // synthetic lead. It is rendered separately and may be answered by the broker.
-  const isTenantOfficialNumber =
-    source.kind === "connection" &&
-    (await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone));
-
   // Only the tenant-owned relay flow may create a new lead from an unknown
   // contact. A broker's personal WhatsApp is a restricted Lite workspace: an
   // unrelated inbound message must never enter tenant intake or AI qualification.
@@ -478,13 +527,15 @@ async function resolveContact(
       isOutgoing,
       hasLead: Boolean(leadId),
       hasClient: Boolean(clientId),
-      isTenantOfficialNumber,
+      isTenantOfficialNumber: isTenantOfficial,
+      isBrokerOrTeam,
     })
   ) {
     const newLeadId = randomUUID();
     await db.insert(schema.leads).values({
       id: newLeadId,
       tenantId,
+      corretorId: source.kind === "connection" ? source.connection.userId : undefined,
       nome: `Lead WhatsApp (${normalizedPhone.slice(-4)})`,
       telefone: normalizedPhone,
       origem: "webhook",
@@ -513,6 +564,23 @@ async function markIgnored(db: ReturnType<typeof getDatabase>, eventId: string, 
 }
 
 /**
+ * Whether the phone belongs to a broker or team member in the tenant.
+ */
+export async function isBrokerOrTeamPhone(
+  db: ReturnType<typeof getDatabase>,
+  tenantId: string,
+  normalizedPhone: string,
+): Promise<boolean> {
+  const brokers = await db
+    .select({ phone: schema.brokerProfiles.phone })
+    .from(schema.brokerProfiles)
+    .where(eq(schema.brokerProfiles.tenantId, tenantId));
+
+  return brokers
+    .some((entry) => Boolean(entry.phone) && samePhone(entry.phone!, normalizedPhone));
+}
+
+/**
  * Whether the phone belongs to the tenant's own official WhatsApp presence:
  * relay numbers (wahaNumbers) or an active Meta Cloud channel. Used both to
  * suppress synthetic leads and to allow broker outgoing messages to persist
@@ -527,14 +595,18 @@ async function isTenantOfficialNumberPhone(
     db
       .select({ phone: schema.wahaNumbers.displayPhoneNumber })
       .from(schema.wahaNumbers)
-      .where(eq(schema.wahaNumbers.tenantId, tenantId)),
+      .where(
+        or(
+          eq(schema.wahaNumbers.tenantId, tenantId),
+          isNull(schema.wahaNumbers.tenantId),
+        ),
+      ),
     db
       .select({ phone: schema.communicationChannels.displayPhoneNumber })
       .from(schema.communicationChannels)
       .where(
         and(
           eq(schema.communicationChannels.tenantId, tenantId),
-          eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
           eq(schema.communicationChannels.status, "active"),
         ),
       ),
@@ -542,3 +614,4 @@ async function isTenantOfficialNumberPhone(
   return [...numbers, ...channels]
     .some((entry) => Boolean(entry.phone) && samePhone(entry.phone!, normalizedPhone));
 }
+

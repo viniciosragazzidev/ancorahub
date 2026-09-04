@@ -23,7 +23,8 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, SquaresFour, Target, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
+import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
@@ -49,6 +50,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetSection,
+  SheetSectionHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -114,6 +116,7 @@ export type LeadWorkspaceItem = {
   corretorNome: string | null;
   branchId: string | null;
   branchName: string | null;
+  qualificationDetails?: Record<string, unknown> | null;
 };
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
@@ -535,6 +538,21 @@ export function LeadsWorkspace({
               <span className="hidden sm:inline">Kanban do Funil</span>
               <span className="sm:hidden">Kanban</span>
             </TabsTrigger>
+            <TabsTrigger value="radar" className="text-xs gap-1.5">
+              <Sparkle className="size-4 text-primary" />
+              <span className="hidden sm:inline">Radar de Negociações (IA)</span>
+              <span className="sm:hidden">Radar IA</span>
+            </TabsTrigger>
+            <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
+              <XCircle className="size-4 text-destructive" />
+              <span className="hidden sm:inline">Perdidos & Inativos</span>
+              <span className="sm:hidden">Perdidos</span>
+              {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
+                <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {workspaceLeads.filter((l) => l.status === "lost").length}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
           </TabsList>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
@@ -568,27 +586,14 @@ export function LeadsWorkspace({
               description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
             />
           ) : (
-            <Card className="border-transparent bg-transparent shadow-none">
-              <CardHeader className="border-b border-border/50 p-4">
-                <div className="flex flex-col gap-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Target size={17} />
-                    Leads em qualificação por IA
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {qualifyingLeads.length} lead(s) em triagem · o robô qualifica e encaminha para a fila de distribuição.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <QualifyingLeadsDataTable
-                  leads={qualifyingLeads}
-                  queues={queues}
-                  pageSize={pageSize}
-                  onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                />
-              </CardContent>
-            </Card>
+            <div className="w-full">
+              <QualifyingLeadsDataTable
+                leads={qualifyingLeads}
+                queues={queues}
+                pageSize={pageSize}
+                onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+              />
+            </div>
           )}
         </TabsContent>
 
@@ -602,38 +607,25 @@ export function LeadsWorkspace({
             >
               {selectionActions}
             </SelectionToolbar>
-            <Card className="border-transparent bg-transparent shadow-none">
-              <CardHeader className="border-b border-border/50 p-4">
-                <div className="flex flex-col gap-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <UserList size={17} />
-                    Leads qualificados & distribuídos
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {workspaceLeads.length} lead(s) no total · ordenados pela entrada mais recente.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <LeadsDataTable
-                  leads={workspaceLeads}
-                  contextRole={contextRole}
-                  shouldMask={shouldMask}
-                  slaFirstContactMinutes={slaFirstContactMinutes}
-                  slaStagnantDays={slaStagnantDays}
-                  pageSize={pageSize}
-                  pagination={pagination}
-                  selectedIds={multiSelect.selectedIds}
-                  isAllSelected={multiSelect.isAllSelected}
-                  onToggleRow={multiSelect.toggle}
-                  onSelectAll={(checked) => {
-                    if (checked) multiSelect.setSelected(leadsIds);
-                    else multiSelect.clear();
-                  }}
-                  onRowClick={setSelectedLead}
-                />
-              </CardContent>
-            </Card>
+            <div className="w-full">
+              <LeadsDataTable
+                leads={workspaceLeads}
+                contextRole={contextRole}
+                shouldMask={shouldMask}
+                slaFirstContactMinutes={slaFirstContactMinutes}
+                slaStagnantDays={slaStagnantDays}
+                pageSize={pageSize}
+                pagination={pagination}
+                selectedIds={multiSelect.selectedIds}
+                isAllSelected={multiSelect.isAllSelected}
+                onToggleRow={multiSelect.toggle}
+                onSelectAll={(checked: boolean) => {
+                  if (checked) multiSelect.setSelected(leadsIds);
+                  else multiSelect.clear();
+                }}
+                onRowClick={setSelectedLead}
+              />
+            </div>
           </div>
         </TabsContent>
 
@@ -700,21 +692,53 @@ export function LeadsWorkspace({
             Arraste as colunas para reordenar. Use o botão "Colunas" para exibir/ocultar etapas.
           </p>
         </TabsContent>
+
+        {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
+        <TabsContent value="radar" className="mt-4">
+          <NegotiationsRadarTab
+            leads={workspaceLeads}
+            branches={branches}
+            brokers={brokers}
+            contextRole={contextRole}
+          />
+        </TabsContent>
+
+        {/* ─── TAB 5: PERDIDOS & INATIVOS ─── */}
+        <TabsContent value="perdidos" className="mt-4">
+          <div className="space-y-4">
+            <div className="w-full">
+              <LeadsDataTable
+                leads={workspaceLeads.filter((l) => l.status === "lost")}
+                contextRole={contextRole}
+                shouldMask={shouldMask}
+                slaFirstContactMinutes={slaFirstContactMinutes}
+                slaStagnantDays={slaStagnantDays}
+                pageSize={pageSize}
+                pagination={pagination}
+                selectedIds={multiSelect.selectedIds}
+                isAllSelected={false}
+                onToggleRow={multiSelect.toggle}
+                onSelectAll={() => {}}
+                onRowClick={setSelectedLead}
+              />
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
 
       <Sheet open={Boolean(selectedLead)} onOpenChange={(open) => !open && setSelectedLead(null)}>
         <SheetContent className="w-full sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>Detalhes do lead</SheetTitle>
+            <SheetTitle>Operação do lead</SheetTitle>
             <SheetDescription>
-              Contexto rápido para decidir o próximo passo sem sair da fila.
+              Situação, responsável e intervenções de gestão em um só lugar.
             </SheetDescription>
           </SheetHeader>
           {selectedLead ? (
             <SheetBody>
               <div className="space-y-5">
                 <SheetSection>
-                  <div className="space-y-4 p-4">
+                  <div className="p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className={`truncate text-lg font-semibold tracking-tight ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
@@ -724,12 +748,10 @@ export function LeadsWorkspace({
                           {shouldMask(selectedLead) ? "••••-••••" : (contextRole === "broker" && selectedLead.status === "distributed" ? maskPhone(selectedLead.telefone) : selectedLead.telefone)}
                         </p>
                       </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <div className="flex max-w-[11rem] shrink-0 flex-wrap justify-end gap-1.5">
                           <LeadStatusBadge status={selectedLead.status} />
                           <LeadQualificationBadge status={selectedLead.qualificationStatus} />
-                          <LeadHealthBadge
-                          health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
-                        />
+                          <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
                       </div>
                     </div>
                   </div>
@@ -749,6 +771,78 @@ export function LeadsWorkspace({
                     </p>
                   </div>
                 )}
+                {contextRole === "manager" || contextRole === "director" ? (
+                  <>
+                    <SheetSection>
+                      <SheetSectionHeader>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">Resumo operacional</p>
+                          <p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p>
+                        </div>
+                        <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
+                      </SheetSectionHeader>
+                      <dl className="grid overflow-hidden rounded-b-xl sm:grid-cols-2">
+                        <OperationalDetail label="Responsável" value={selectedLead.corretorNome ?? "Aguardando distribuição"} />
+                        <OperationalDetail label="Unidade" value={selectedLead.branchName ?? "Sem unidade"} />
+                        <OperationalDetail label="Recebeu o lead" value={formatDate(selectedLead.assignedAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <OperationalDetail label="Primeiro contato" value={formatDate(selectedLead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <OperationalDetail label="Atendimento iniciado" value={formatDate(selectedLead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} />
+                        <OperationalDetail label="Etapa atual desde" value={formatDate(selectedLead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} />
+                      </dl>
+                    </SheetSection>
+
+                    <SheetSection>
+                      <SheetSectionHeader>
+                        <div>
+                          <p className="text-sm font-semibold">Ações rápidas</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Acesse o atendimento ou o cadastro completo.</p>
+                        </div>
+                      </SheetSectionHeader>
+                      <div className="grid gap-2 p-4 sm:grid-cols-2">
+                        <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />}>
+                          <ChatCircleText />
+                          Abrir conversa
+                        </Button>
+                        <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
+                          Ver cadastro
+                          <ArrowUpRight />
+                        </Button>
+                      </div>
+                    </SheetSection>
+
+                    <SheetSection>
+                      <SheetSectionHeader>
+                        <div>
+                          <p className="text-sm font-semibold">Intervir na operação</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p>
+                        </div>
+                      </SheetSectionHeader>
+                      <div className="p-4">
+                        <LeadDrawerManagementActions
+                          leadId={selectedLead.id}
+                          leadName={selectedLead.nome}
+                          brokers={filteredBrokers}
+                          branches={branches}
+                          leadBranchId={selectedLead.branchId}
+                          contextRole={contextRole}
+                          currentStatus={selectedLead.status}
+                          qualificationStatus={selectedLead.qualificationStatus}
+                          qualificationState={selectedLead.qualificationState}
+                          currentOwner={selectedLead.corretorNome}
+                          onSuccess={handleDrawerManagementCommitted}
+                          onReassignOptimistic={handleDrawerReassignOptimistic}
+                          onReassignRollback={handleDrawerReassignRollback}
+                        />
+                      </div>
+                    </SheetSection>
+
+                    <LeadAssignmentHistory
+                      leadId={selectedLead.id}
+                      assignedAt={selectedLead.assignedAt}
+                      corretorNome={selectedLead.corretorNome}
+                    />
+                  </>
+                ) : (
                 <Tabs defaultValue="summary" variant="underline" className="min-h-0">
                   <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start">
                     <TabsTrigger value="summary">Resumo</TabsTrigger>
@@ -804,24 +898,7 @@ export function LeadsWorkspace({
                         <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
                       </div>
                     )}
-                    {contextRole === "manager" || contextRole === "director" ? (
-                      <LeadDrawerManagementActions
-                        leadId={selectedLead.id}
-                        leadName={selectedLead.nome}
-                        brokers={filteredBrokers}
-                        branches={branches}
-                        leadBranchId={selectedLead.branchId}
-                        contextRole={contextRole}
-                        currentStatus={selectedLead.status}
-                        qualificationStatus={selectedLead.qualificationStatus}
-                        qualificationState={selectedLead.qualificationState}
-                        currentOwner={selectedLead.corretorNome}
-                        onSuccess={handleDrawerManagementCommitted}
-                        onReassignOptimistic={handleDrawerReassignOptimistic}
-                        onReassignRollback={handleDrawerReassignRollback}
-                      />
-                    ) : (
-                      <>
+                    <>
                         <div className={cn("grid gap-2", hasPermission(contextRole, "acessar_conversas") ? "grid-cols-2" : "grid-cols-1")}>
                           <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />}>
                             <ArrowUpRight />
@@ -864,10 +941,10 @@ export function LeadsWorkspace({
                           <LeadQuickNote leadId={selectedLead.id} />
                           <LeadReminder leadId={selectedLead.id} />
                         </div>
-                      </>
-                    )}
+                    </>
                   </TabsContent>
                 </Tabs>
+                )}
               </div>
             </SheetBody>
           ) : null}
@@ -1190,6 +1267,15 @@ function DetailRow({ label, value }: { label: string; value: string | ReactNode 
       <div className="min-w-0 text-right font-medium break-words">
         {value}
       </div>
+    </div>
+  );
+}
+
+function OperationalDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-b border-border/70 px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(odd)]:border-border/70">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-sm font-medium text-foreground" title={value}>{value}</dd>
     </div>
   );
 }

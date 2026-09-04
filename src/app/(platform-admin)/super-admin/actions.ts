@@ -145,6 +145,22 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
   });
 }
 
+export async function updateBrokerAvailabilityOnboardingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("brokerAvailabilityOnboardingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_broker_availability_onboarding_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_availability_onboarding.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "broker_availability_onboarding",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateWorkflowAutomationSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("workflowAutomationEnabled") === "true" ? "true" : "false";
@@ -158,6 +174,17 @@ export async function updateWorkflowAutomationSettingsAction(formData: FormData)
     targetId: "workflow_automation",
     metadata: { enabled },
     createdAt: now,
+  });
+}
+
+export async function updateReportingCenterSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("reportingCenterEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_reporting_center_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "reporting_center.global_feature_updated",
+    targetType: "system_settings", targetId: "reporting_center", metadata: { enabled }, createdAt: now,
   });
 }
 
@@ -348,6 +375,7 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   const values = {
     enabled: formData.get("enabled") === "true" ? "true" : "false",
     aiEnabled: formData.get("aiEnabled") === "true" ? "true" : "false",
+    internalBrokerNotificationsEnabled: formData.get("internalBrokerNotificationsEnabled") === "true" ? "true" : "false",
     maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 5, 1, 10),
     retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
     leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
@@ -355,6 +383,7 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   await Promise.all([
     setSystemSetting("feature_waha_cadence_enabled", values.enabled, now),
     setSystemSetting("feature_waha_ai_enabled", values.aiEnabled, now),
+    setSystemSetting("feature_waha_internal_broker_notifications_enabled", values.internalBrokerNotificationsEnabled, now),
     setSystemSetting("waha_cadence_max_attempts", values.maxAttempts, now),
     setSystemSetting("waha_cadence_retry_base_seconds", values.retryBaseSeconds, now),
     setSystemSetting("waha_cadence_lease_seconds", values.leaseSeconds, now),

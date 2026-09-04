@@ -66,58 +66,6 @@ export async function fetchWabaMessageTemplates(
   );
 }
 
-export async function createWabaMessageTemplate(
-  wabaId: string,
-  accessToken: string,
-  payload: {
-    name: string;
-    language: string;
-    category: MetaTemplateCategory;
-    components: MetaGraphTemplateComponent[];
-  },
-): Promise<{ id: string; status?: string }> {
-  return graphRequest<{ id: string; status?: string }>(
-    `${encodeURIComponent(wabaId)}/message_templates`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-    accessToken,
-  );
-}
-
-export async function editWabaMessageTemplate(
-  templateId: string,
-  accessToken: string,
-  payload: {
-    category?: MetaTemplateCategory;
-    components: MetaGraphTemplateComponent[];
-  },
-): Promise<{ success: boolean }> {
-  return graphRequest<{ success: boolean }>(
-    `${encodeURIComponent(templateId)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-    accessToken,
-  );
-}
-
-export async function deleteWabaMessageTemplateByName(
-  wabaId: string,
-  accessToken: string,
-  name: string,
-): Promise<{ success: boolean }> {
-  return graphRequest<{ success: boolean }>(
-    `${encodeURIComponent(wabaId)}/message_templates?name=${encodeURIComponent(name)}`,
-    { method: "DELETE" },
-    accessToken,
-  );
-}
-
 export async function sendMetaCloudTemplateTest(
   phoneNumberId: string,
   accessToken: string,

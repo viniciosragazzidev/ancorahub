@@ -15,6 +15,7 @@ import {
   markDbEnd,
   withTimeout,
   getRequestTiming,
+  withPerfSpan,
 } from "@/shared/observability/request-timing";
 
 export type { TenantContext };
@@ -29,7 +30,7 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
   markDbStart();
 
   try {
-    const memberships = await withTimeout(
+    const memberships = await withPerfSpan("tenant.resolve", () => withTimeout(
       getDatabase()
         .select({
           userActive: schema.user.active,
@@ -61,7 +62,7 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
         .where(eq(schema.tenantMemberships.userId, sessionUser.id)),
       TENANT_QUERY_TIMEOUT_MS,
       "getRequiredTenantContext",
-    );
+    ));
 
     markDbEnd();
     markTenantEnd();
