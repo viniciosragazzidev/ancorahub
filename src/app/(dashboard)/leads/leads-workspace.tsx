@@ -42,16 +42,11 @@ import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/dashboard/metric-card";
+import { DetailDrawer } from "@/components/foundations/detail-drawer";
 import {
-  Sheet,
   SheetBody,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
   SheetSection,
   SheetSectionHeader,
-  SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -489,54 +484,35 @@ export function LeadsWorkspace({
   }
 
   return (
-    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-5">
-
-        <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Sem responsável"
-          value={unassignedCount}
-          sublabel="Aguardando distribuição"
-          sparklineData={leadsTrend.map((day) => day.unassigned)}
-          sparklineColor="var(--chart-1)"
-        />
-        <StatCard
-          label="Em atendimento"
-          value={activeCount}
-          sublabel="Contatos em negociação"
-          sparklineData={leadsTrend.map((day) => day.active)}
-          sparklineColor="var(--chart-3)"
-        />
-        <StatCard
-          label="Finalizados"
-          value={convertedCount}
-          sublabel="Vendas convertidas"
-          sparklineData={leadsTrend.map((day) => day.converted)}
-          sparklineColor="var(--chart-5)"
-        />
-      </div>
-
+    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs defaultValue={qualifyingLeads.length > 0 ? "qualificacoes" : "list"} className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+        <div className="flex items-center gap-2 border-b border-border/60 pb-2">
           <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
-            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
-              <Target className="size-4 text-primary" />
-              Qualificações
-              {qualifyingLeads.length > 0 ? (
-                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {qualifyingLeads.length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
             <TabsTrigger value="list" className="text-xs gap-1.5">
               <UserList className="size-4" />
-              <span className="hidden sm:inline">Leads Qualificados & Distribuídos</span>
-              <span className="sm:hidden">Distribuídos</span>
+              <span className="hidden sm:inline">Todos os Leads</span>
+              <span className="sm:hidden">Lista</span>
+              {workspaceLeads.length > 0 ? (
+                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {workspaceLeads.length}
+                </Badge>
+              ) : null}
             </TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs gap-1.5">
               <SquaresFour className="size-4" />
               <span className="hidden sm:inline">Kanban do Funil</span>
               <span className="sm:hidden">Kanban</span>
+            </TabsTrigger>
+            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
+              <Target className="size-4 text-primary" />
+              <span className="hidden sm:inline">Qualificação IA</span>
+              <span className="sm:hidden">Qualificação</span>
+              {qualifyingLeads.length > 0 ? (
+                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {qualifyingLeads.length}
+                </Badge>
+              ) : null}
             </TabsTrigger>
             <TabsTrigger value="radar" className="text-xs gap-1.5">
               <Sparkle className="size-4 text-primary" />
@@ -576,28 +552,7 @@ export function LeadsWorkspace({
           </DropdownMenu>
         </div>
 
-        {/* ─── TAB 1: QUALIFICAÇÕES ─── */}
-        <TabsContent value="qualificacoes" className="mt-4">
-          {qualifyingLeads.length === 0 ? (
-            <EmptyState
-              variant="ghost"
-              icon={Target}
-              title="Nenhum lead em qualificação no momento"
-              description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
-            />
-          ) : (
-            <div className="w-full">
-              <QualifyingLeadsDataTable
-                leads={qualifyingLeads}
-                queues={queues}
-                pageSize={pageSize}
-                onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-              />
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
+        {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}
         <TabsContent value="list" className="mt-4">
           <div className="space-y-4">
             <SelectionToolbar
@@ -629,6 +584,7 @@ export function LeadsWorkspace({
           </div>
         </TabsContent>
 
+        {/* ─── TAB 2: KANBAN DO FUNIL ─── */}
         <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
           <SelectionToolbar
             selectedCount={multiSelect.count}
@@ -689,8 +645,29 @@ export function LeadsWorkspace({
             </button>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            Arraste as colunas para reordenar. Use o botão "Colunas" para exibir/ocultar etapas.
+            Arraste as colunas para reordenar. Use o botão &quot;Colunas&quot; para exibir/ocultar etapas.
           </p>
+        </TabsContent>
+
+        {/* ─── TAB 3: QUALIFICAÇÃO IA ─── */}
+        <TabsContent value="qualificacoes" className="mt-4">
+          {qualifyingLeads.length === 0 ? (
+            <EmptyState
+              variant="ghost"
+              icon={Target}
+              title="Nenhum lead em qualificação no momento"
+              description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
+            />
+          ) : (
+            <div className="w-full">
+              <QualifyingLeadsDataTable
+                leads={qualifyingLeads}
+                queues={queues}
+                pageSize={pageSize}
+                onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+              />
+            </div>
+          )}
         </TabsContent>
 
         {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
@@ -726,230 +703,248 @@ export function LeadsWorkspace({
         </TabsContent>
       </Tabs>
 
-      <Sheet open={Boolean(selectedLead)} onOpenChange={(open) => !open && setSelectedLead(null)}>
-        <SheetContent className="w-full sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Operação do lead</SheetTitle>
-            <SheetDescription>
-              Situação, responsável e intervenções de gestão em um só lugar.
-            </SheetDescription>
-          </SheetHeader>
-          {selectedLead ? (
-            <SheetBody>
-              <div className="space-y-5">
+      {/* ─── QUICK VIEW DETAIL DRAWER ─── */}
+      <DetailDrawer
+        open={Boolean(selectedLead)}
+        onOpenChange={(open) => !open && setSelectedLead(null)}
+        size="lg"
+        title={
+          selectedLead ? (
+            <span className={shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}>
+              {shouldMask(selectedLead) ? maskName(selectedLead.nome) : selectedLead.nome}
+            </span>
+          ) : null
+        }
+        description={
+          selectedLead ? (
+            <div className="flex flex-col gap-0.5">
+              <span className={`font-mono text-xs ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
+                {shouldMask(selectedLead)
+                  ? "••••-••••"
+                  : contextRole === "broker" && selectedLead.status === "distributed"
+                    ? maskPhone(selectedLead.telefone)
+                    : selectedLead.telefone}
+              </span>
+              <OwnershipContext
+                brokerName={selectedLead.corretorNome}
+                branchName={selectedLead.branchName}
+                className="text-xs text-muted-foreground"
+              />
+            </div>
+          ) : null
+        }
+        summary={
+          selectedLead ? (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <LeadStatusBadge status={selectedLead.status} />
+              <LeadQualificationBadge status={selectedLead.qualificationStatus} />
+              <LeadHealthBadge
+                health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
+              />
+            </div>
+          ) : null
+        }
+        footer={
+          selectedLead ? (
+            <Button
+              className="w-full justify-center gap-2 font-medium"
+              render={<Link href={`/leads/${selectedLead.id}`} />}
+            >
+              Abrir atendimento completo
+              <ArrowUpRight className="size-4" />
+            </Button>
+          ) : null
+        }
+      >
+        {selectedLead ? (
+          <div className="space-y-5">
+            {/* ── Alerta de corretor excluído ─────────────────────────── */}
+            {(contextRole === "director" || contextRole === "manager") && !selectedLead.corretorId && selectedLead.distributionStatus === "returned_to_queue" && (
+              <div className="rounded-lg border border-warning/20 bg-warning/5 px-4 py-3">
+                <p className="flex items-center gap-2 text-xs font-semibold text-warning">
+                  <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                  Lead aguardando reatribuição
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  O corretor responsável por este lead foi excluído. O lead foi devolvido à fila da unidade e precisa ser reatribuído manualmente por um gestor ou diretor.
+                </p>
+              </div>
+            )}
+
+            {contextRole === "manager" || contextRole === "director" ? (
+              <>
                 <SheetSection>
-                  <div className="p-4 sm:p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className={`truncate text-lg font-semibold tracking-tight ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(selectedLead) ? maskName(selectedLead.nome) : selectedLead.nome}
-                        </p>
-                        <p className={`mt-1 truncate text-sm text-muted-foreground ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(selectedLead) ? "••••-••••" : (contextRole === "broker" && selectedLead.status === "distributed" ? maskPhone(selectedLead.telefone) : selectedLead.telefone)}
-                        </p>
-                      </div>
-                      <div className="flex max-w-[11rem] shrink-0 flex-wrap justify-end gap-1.5">
-                          <LeadStatusBadge status={selectedLead.status} />
-                          <LeadQualificationBadge status={selectedLead.qualificationStatus} />
-                          <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
-                      </div>
+                  <SheetSectionHeader>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">Resumo operacional</p>
+                      <p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p>
                     </div>
+                  </SheetSectionHeader>
+                  <dl className="grid overflow-hidden rounded-b-xl sm:grid-cols-2">
+                    <OperationalDetail label="Responsável" value={selectedLead.corretorNome ?? "Aguardando distribuição"} />
+                    <OperationalDetail label="Unidade" value={selectedLead.branchName ?? "Sem unidade"} />
+                    <OperationalDetail label="Recebeu o lead" value={formatDate(selectedLead.assignedAt, { dateStyle: "short", timeStyle: "short" })} />
+                    <OperationalDetail label="Primeiro contato" value={formatDate(selectedLead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} />
+                    <OperationalDetail label="Atendimento iniciado" value={formatDate(selectedLead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} />
+                    <OperationalDetail label="Etapa atual desde" value={formatDate(selectedLead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} />
+                  </dl>
+                </SheetSection>
+
+                <SheetSection>
+                  <SheetSectionHeader>
+                    <div>
+                      <p className="text-sm font-semibold">Ações rápidas</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Acesse o atendimento ou o cadastro completo.</p>
+                    </div>
+                  </SheetSectionHeader>
+                  <div className="grid gap-2 p-4 sm:grid-cols-2">
+                    <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />}>
+                      <ChatCircleText />
+                      Abrir conversa
+                    </Button>
+                    <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
+                      Ver cadastro
+                      <ArrowUpRight />
+                    </Button>
                   </div>
                 </SheetSection>
 
-                {/* ── Alerta de corretor excluído ─────────────────────────── */}
-                {(contextRole === "director" || contextRole === "manager") && !selectedLead.corretorId && selectedLead.distributionStatus === "returned_to_queue" && (
-                  <div className="mx-4 rounded-lg border border-warning/20 bg-warning/5 px-4 py-3">
-                    <p className="flex items-center gap-2 text-xs font-semibold text-warning">
-                      <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                      </svg>
-                      Lead aguardando reatribuição
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      O corretor responsável por este lead foi excluído. O lead foi devolvido à fila da unidade e precisa ser reatribuído manualmente por um gestor ou diretor.
-                    </p>
+                <SheetSection>
+                  <SheetSectionHeader>
+                    <div>
+                      <p className="text-sm font-semibold">Intervir na operação</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p>
+                    </div>
+                  </SheetSectionHeader>
+                  <div className="p-4">
+                    <LeadDrawerManagementActions
+                      leadId={selectedLead.id}
+                      leadName={selectedLead.nome}
+                      brokers={filteredBrokers}
+                      branches={branches}
+                      leadBranchId={selectedLead.branchId}
+                      contextRole={contextRole}
+                      currentStatus={selectedLead.status}
+                      qualificationStatus={selectedLead.qualificationStatus}
+                      qualificationState={selectedLead.qualificationState}
+                      currentOwner={selectedLead.corretorNome}
+                      onSuccess={handleDrawerManagementCommitted}
+                      onReassignOptimistic={handleDrawerReassignOptimistic}
+                      onReassignRollback={handleDrawerReassignRollback}
+                    />
                   </div>
-                )}
-                {contextRole === "manager" || contextRole === "director" ? (
-                  <>
-                    <SheetSection>
-                      <SheetSectionHeader>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold">Resumo operacional</p>
-                          <p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p>
-                        </div>
-                        <LeadHealthBadge health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)} />
-                      </SheetSectionHeader>
-                      <dl className="grid overflow-hidden rounded-b-xl sm:grid-cols-2">
-                        <OperationalDetail label="Responsável" value={selectedLead.corretorNome ?? "Aguardando distribuição"} />
-                        <OperationalDetail label="Unidade" value={selectedLead.branchName ?? "Sem unidade"} />
-                        <OperationalDetail label="Recebeu o lead" value={formatDate(selectedLead.assignedAt, { dateStyle: "short", timeStyle: "short" })} />
-                        <OperationalDetail label="Primeiro contato" value={formatDate(selectedLead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} />
-                        <OperationalDetail label="Atendimento iniciado" value={formatDate(selectedLead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} />
-                        <OperationalDetail label="Etapa atual desde" value={formatDate(selectedLead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} />
-                      </dl>
-                    </SheetSection>
+                </SheetSection>
 
-                    <SheetSection>
-                      <SheetSectionHeader>
-                        <div>
-                          <p className="text-sm font-semibold">Ações rápidas</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Acesse o atendimento ou o cadastro completo.</p>
-                        </div>
-                      </SheetSectionHeader>
-                      <div className="grid gap-2 p-4 sm:grid-cols-2">
-                        <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />}>
-                          <ChatCircleText />
-                          Abrir conversa
-                        </Button>
-                        <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
-                          Ver cadastro
-                          <ArrowUpRight />
-                        </Button>
-                      </div>
-                    </SheetSection>
-
-                    <SheetSection>
-                      <SheetSectionHeader>
-                        <div>
-                          <p className="text-sm font-semibold">Intervir na operação</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p>
-                        </div>
-                      </SheetSectionHeader>
-                      <div className="p-4">
-                        <LeadDrawerManagementActions
-                          leadId={selectedLead.id}
-                          leadName={selectedLead.nome}
-                          brokers={filteredBrokers}
-                          branches={branches}
-                          leadBranchId={selectedLead.branchId}
-                          contextRole={contextRole}
-                          currentStatus={selectedLead.status}
-                          qualificationStatus={selectedLead.qualificationStatus}
-                          qualificationState={selectedLead.qualificationState}
-                          currentOwner={selectedLead.corretorNome}
-                          onSuccess={handleDrawerManagementCommitted}
-                          onReassignOptimistic={handleDrawerReassignOptimistic}
-                          onReassignRollback={handleDrawerReassignRollback}
-                        />
-                      </div>
-                    </SheetSection>
-
-                    <LeadAssignmentHistory
-                      leadId={selectedLead.id}
-                      assignedAt={selectedLead.assignedAt}
-                      corretorNome={selectedLead.corretorNome}
-                    />
-                  </>
-                ) : (
-                <Tabs defaultValue="summary" variant="underline" className="min-h-0">
-                  <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start">
-                    <TabsTrigger value="summary">Resumo</TabsTrigger>
-                    {!shouldMask(selectedLead) && <TabsTrigger value="actions">Ações</TabsTrigger>}
-                  </TabsList>
-                  <TabsContent value="summary" className="mt-4 space-y-4">
-                    <SheetSection className="p-4">
+                <LeadAssignmentHistory
+                  leadId={selectedLead.id}
+                  assignedAt={selectedLead.assignedAt}
+                  corretorNome={selectedLead.corretorNome}
+                />
+              </>
+            ) : (
+              <Tabs defaultValue="summary" variant="underline" className="min-h-0">
+                <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start">
+                  <TabsTrigger value="summary">Resumo</TabsTrigger>
+                  {!shouldMask(selectedLead) && <TabsTrigger value="actions">Ações</TabsTrigger>}
+                </TabsList>
+                <TabsContent value="summary" className="mt-4 space-y-4">
+                  <SheetSection className="p-4">
+                    <div>
                       <div>
-                        <div>
-                          <p className="text-sm font-semibold">Dados do atendimento</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Contexto essencial para continuar o lead.</p>
-                        </div>
+                        <p className="text-sm font-semibold">Dados do atendimento</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Contexto essencial para continuar o lead.</p>
                       </div>
-                      <dl className="mt-4 space-y-3">
-                        <DetailRow
-                          label="Saúde"
-                          value={
-                            <LeadHealthBadge
-                              health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
-                            />
-                          }
-                        />
-                        <DetailRow label="Responsável" value={[selectedLead.corretorNome ?? "Aguardando distribuição", selectedLead.branchName ?? "Sem unidade"].join(" · ")} />
-                        <DetailRow label="Tipo" value={
-                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${selectedLead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
-                            {selectedLead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
-                          </span>
-                        } />
-                        <DetailRow label="Origem" value={selectedLead.sourceCampaign || (selectedLead.origem === "manual" ? "Manual" : "Webhook")} />
-                        <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
-                      </dl>
-                    </SheetSection>
-                    <LeadAssignmentHistory
-                      leadId={selectedLead.id}
-                      assignedAt={selectedLead.assignedAt}
-                      corretorNome={selectedLead.corretorNome}
-                    />
-                    <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
-                      Ver detalhe completo
-                      <ArrowUpRight />
-                    </Button>
-                  </TabsContent>
-                  <TabsContent value="actions" className="mt-4 space-y-3">
-                    {!(
-                      selectedLead.status === "distributed" ||
-                      ["in_contact", "quote_sent", "negotiation", "converted", "lost"].includes(selectedLead.status) ||
-                      selectedLead.qualificationState === "QUALIFIED" ||
-                      selectedLead.qualificationState === "COMPLETED" ||
-                      (Boolean(selectedLead.qualificationStatus) && ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified"].includes(selectedLead.qualificationStatus))
-                    ) && (
-                      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                        <p className="text-xs font-semibold text-foreground mb-1.5">Qualificação Manual por IA</p>
-                        <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
+                    </div>
+                    <dl className="mt-4 space-y-3">
+                      <DetailRow
+                        label="Saúde"
+                        value={
+                          <LeadHealthBadge
+                            health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
+                          />
+                        }
+                      />
+                      <DetailRow label="Responsável" value={[selectedLead.corretorNome ?? "Aguardando distribuição", selectedLead.branchName ?? "Sem unidade"].join(" · ")} />
+                      <DetailRow label="Tipo" value={
+                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${selectedLead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+                          {selectedLead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
+                        </span>
+                      } />
+                      <DetailRow label="Origem" value={selectedLead.sourceCampaign || (selectedLead.origem === "manual" ? "Manual" : "Webhook")} />
+                      <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
+                    </dl>
+                  </SheetSection>
+                  <LeadAssignmentHistory
+                    leadId={selectedLead.id}
+                    assignedAt={selectedLead.assignedAt}
+                    corretorNome={selectedLead.corretorNome}
+                  />
+                </TabsContent>
+                <TabsContent value="actions" className="mt-4 space-y-3">
+                  {!(
+                    selectedLead.status === "distributed" ||
+                    ["in_contact", "quote_sent", "negotiation", "converted", "lost"].includes(selectedLead.status) ||
+                    selectedLead.qualificationState === "QUALIFIED" ||
+                    selectedLead.qualificationState === "COMPLETED" ||
+                    (Boolean(selectedLead.qualificationStatus) && ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified"].includes(selectedLead.qualificationStatus))
+                  ) && (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                      <p className="text-xs font-semibold text-foreground mb-1.5">Qualificação Manual por IA</p>
+                      <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
+                    </div>
+                  )}
+                  <>
+                    <div className={cn("grid gap-2", hasPermission(contextRole, "acessar_conversas") ? "grid-cols-2" : "grid-cols-1")}>
+                      <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />}>
+                        <ArrowUpRight />
+                        Abrir atendimento
+                      </Button>
+                      {hasPermission(contextRole, "acessar_conversas") ? (
+                        <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />} variant="outline">
+                          <ChatCircleText />
+                          Conversas
+                        </Button>
+                      ) : null}
+                    </div>
+                    {canCall ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button className="w-full" render={<a href={`tel:${selectedLead.telefone}`} />} variant="outline">
+                          <Phone />
+                          Ligar
+                        </Button>
+                        <Button className="w-full" render={<a href={`https://wa.me/${selectedLead.telefone.replace(/\D/g, "")}`} rel="noreferrer" target="_blank" />} variant="outline">
+                          <WhatsappLogo />
+                          WhatsApp
+                        </Button>
                       </div>
+                    ) : (
+                      <p className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-muted-foreground">
+                        Os dados de contato serão liberados quando você iniciar este atendimento.
+                      </p>
                     )}
-                    <>
-                        <div className={cn("grid gap-2", hasPermission(contextRole, "acessar_conversas") ? "grid-cols-2" : "grid-cols-1")}>
-                          <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />}>
-                            <ArrowUpRight />
-                            Abrir atendimento
-                          </Button>
-                          {hasPermission(contextRole, "acessar_conversas") ? (
-                            <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />} variant="outline">
-                              <ChatCircleText />
-                              Conversas
-                            </Button>
-                          ) : null}
-                        </div>
-                        {canCall ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button className="w-full" render={<a href={`tel:${selectedLead.telefone}`} />} variant="outline">
-                              <Phone />
-                              Ligar
-                            </Button>
-                            <Button className="w-full" render={<a href={`https://wa.me/${selectedLead.telefone.replace(/\D/g, "")}`} rel="noreferrer" target="_blank" />} variant="outline">
-                              <WhatsappLogo />
-                              WhatsApp
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-muted-foreground">
-                            Os dados de contato serão liberados quando você iniciar este atendimento.
-                          </p>
-                        )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button className="w-full" render={<Link href={`/tarefas?leadId=${selectedLead.id}`} />} variant="outline">
-                            <ListChecks />
-                            Tarefas
-                          </Button>
-                          <Button className="w-full" render={<Link href="#documentos" />} variant="outline">
-                            <FileText />
-                            Documentos
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-                          <LeadQuickNote leadId={selectedLead.id} />
-                          <LeadReminder leadId={selectedLead.id} />
-                        </div>
-                    </>
-                  </TabsContent>
-                </Tabs>
-                )}
-              </div>
-            </SheetBody>
-          ) : null}
-        </SheetContent>
-      </Sheet>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button className="w-full" render={<Link href={`/tarefas?leadId=${selectedLead.id}`} />} variant="outline">
+                        <ListChecks />
+                        Tarefas
+                      </Button>
+                      <Button className="w-full" render={<Link href="#documentos" />} variant="outline">
+                        <FileText />
+                        Documentos
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                      <LeadQuickNote leadId={selectedLead.id} />
+                      <LeadReminder leadId={selectedLead.id} />
+                    </div>
+                  </>
+                </TabsContent>
+              </Tabs>
+            )}
+          </div>
+        ) : null}
+      </DetailDrawer>
     </div>
   );
 }

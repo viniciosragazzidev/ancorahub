@@ -1,4 +1,4 @@
-﻿import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -603,7 +603,7 @@ async function LeadsPageContent({
         }
       />
       <LeadsLiveSync />
-      <main className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col gap-5 bg-background p-4 pb-28 lg:gap-6 lg:p-6 lg:pb-8">
+      <main className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-5 bg-background p-4 pb-28 sm:p-6 lg:gap-6 lg:p-8 lg:pb-8">
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}
 

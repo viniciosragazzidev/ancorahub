@@ -147,3 +147,66 @@ Validar a biblioteca canônica de `src/components/foundations/` em uma página p
 - [x] Sem aninhamento inválido e foco por teclado visível? Sim.
 - [x] 0 erros no TypeScript (tsc --noEmit) e 100% de testes passando? Sim.
 
+---
+
+## 2026-09-04 — /leads (UX-1E — Leads Workspace & List Restructure)
+
+### Problema
+1. Dispersão de filtros ad-hoc com componentes customizados despadronizados.
+2. Três cards de métricas (StatCards) fixos no topo de `/leads` consumindo altura útil da visualização em telas de notebook (1366×768 / 1440×900).
+3. Painel de detalhes legado em `<Sheet>` básico sem diferenciação entre resumo operacional (L1) e seções colapsáveis/detalhadas (L2).
+4. Necessidade de alinhar a experiência de listagem com a filosofia de *"Complexidade disponível, não complexidade exposta"*.
+
+### Objetivo
+1. Unificar a barra de filtros utilizando a `<FilterBar>` canônica e chips de filtros ativos com remoção atômica via `<ActiveFilterChips>`.
+2. Remover o card-soup do topo de `/leads` para que o catálogo de oportunidades e funil dominem a viewport.
+3. Integrar o `<DetailDrawer>` canônico (L1 visível, L2 sob demanda, ações de WhatsApp, ligação e links profundos).
+4. Preservar 100% das regras de negócio, segurança multi-tenant no servidor, ações em lote, importação/exportação e qualificação IA.
+
+### Antes
+- Filtros em container com inputs desacoplados e chips manuais.
+- 3 StatCards empurrando o Kanban e a lista para baixo.
+- Sheet lateral padrão sem cabeçalho contextual de saúde do lead e atalhos rápidos.
+
+### Depois
+- `<FilterBar>` canônica com busca rápida, atalho para limpar, trigger com badge de contagem de filtros ativos e `<ActiveFilterChips>` com remoção individual.
+- Tabela e Kanban ocupando 100% da viewport útil com ritmo vertical limpo (`p-4 sm:p-6 lg:p-8`, `max-w-[1400px]`).
+- Quick View Drawer utilizando `<DetailDrawer>` com resumo L1, ações imediatas (Ligar, WhatsApp, Chat, Tarefas, Notas) e seções de gestão e qualificação L2.
+- Ações em lote contextuais flutuantes (`SelectionToolbar`) ativadas somente sob seleção de linhas.
+
+### Componentes reutilizados
+- `<FilterBar />` de `src/components/foundations/filter-bar`.
+- `<ActiveFilterChips />` de `src/components/foundations/active-filter-chips`.
+- `<DetailDrawer />` de `src/components/foundations/detail-drawer`.
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<SelectionToolbar />` de `@/components/ui/selection-toolbar`.
+- `<LeadsDataTable />`, `<QualifyingLeadsDataTable />` de `src/app/(dashboard)/leads/leads-data-table`.
+- `<NegotiationsRadarTab />` de `src/features/conversation-intelligence/components/negotiations-radar-tab`.
+- `<LeadStatusBadge />`, `<LeadQualificationBadge />`, `<LeadHealthBadge />`.
+
+### Componentes alterados
+- `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Integrado com `<FilterBar />` e `<ActiveFilterChips />`.
+- `src/app/(dashboard)/leads/leads-workspace.tsx`: Removido card-soup do topo, integrado `<DetailDrawer />` e atualizadas abas de perspectiva.
+- `src/app/(dashboard)/leads/page.tsx`: Ajustada escala de padding canônica e container `max-w-[1400px]`.
+- `docs/ux/UX_REDESIGN_CONTROL.md`: Etapa `UX-1E` atualizada para `COMPLETE`.
+
+### Funcionalidades preservadas
+- 100% de integridade com autorização multi-tenant no servidor (`getRequiredTenantContext`, `buildLeadScopeWhere`).
+- Distribuição de filas, reatribuição de corretores, alteração de filiais, exportação CSV, importação em lote, qualificação IA e manual.
+- Modo Lite do corretor intacto e preservado.
+
+### Responsive
+- Testado e perfeitamente ajustado em 1366×768, 1440×900, 1920×1080 e mobile (<560px).
+
+### Accessibility
+- Suporte a navegação por teclado (`Tab`, `Enter`, `Escape`), conformidade WCAG 2.2 AA, botões de ação com `aria-label`, foco visível e contraste adequado em todos os badges de status.
+
+### Visual QA
+- [x] Page padding consistente (p-4 sm:p-6 lg:p-8)? Sim.
+- [x] Título no tamanho correto (text-2xl font-bold)? Sim.
+- [x] Sem card-soup poluindo o topo da página? Sim.
+- [x] Filtros canônicos e chips ativos funcionais? Sim.
+- [x] DetailDrawer com L1 e L2 ergonômicos? Sim.
+- [x] 0 erros no TypeScript (tsc --noEmit) e 100% de testes passando? Sim.
+
+
