@@ -51,3 +51,10 @@ Garantir que uma falha da Graph API nunca materialize um lead fictício, que um 
 - Só a resposta bem-sucedida marca o canal `active`. Uma falha deixa envio bloqueado, registra o resultado sem segredo e permite ao Diretor repetir somente a ativação técnica de uma conexão anterior, sem reconectar nem repetir OTP.
 
 Reverter o registro do número preserva histórico, WABA e telefone, mas o canal permanece bloqueado até que uma ativação válida volte a ser confirmada pela Meta. A migration não expõe credenciais e o rollback não remove dados de conversa.
+
+## Recriação de templates após troca de portfólio Meta
+
+- O Embedded Signup persiste o `businessId`, `wabaId`, `phoneNumberId` e o token retornados pela Meta no canal oficial ativo do tenant. A recriação consulta exclusivamente esse canal; não aceita WABA, número ou token do navegador.
+- O formulário de recriação valida o payload no servidor, preserva botões de resposta rápida, URL e telefone do template armazenado e converte variáveis nomeadas para a numeração exigida pela Graph API. Variáveis repetidas preservam a mesma posição, e variáveis numéricas não sequenciais ou misturadas são bloqueadas antes do POST.
+- URLs legadas de convite em `ancorahub.com.br` são atualizadas para `https://crm.ancorasaude.cloud` sem codificar placeholders dinâmicos como `{{1}}`. URLs externas não são modificadas.
+- A interface não informa sincronização concluída se a leitura posterior da Meta falhar. A submissão bem-sucedida é registrada como `PENDING`, cuja aprovação continua sendo decisão exclusiva da Meta.

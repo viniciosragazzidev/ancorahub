@@ -3,7 +3,11 @@
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
-import type { MetaGraphTemplateComponent } from "@/features/communication-channels/meta-graph-templates-client";
+import {
+  buildMetaTemplateComponents,
+  recreateMetaTemplateInputSchema,
+  type RecreateMetaTemplateInput,
+} from "@/features/communication-channels/template-recreation";
 import {
   getQualificationTenantSettings,
   updateQualificationTenantSettings,
@@ -350,26 +354,21 @@ export async function syncMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
-  await syncTenantTemplates(context.tenantId).catch(() => undefined);
-  return { success: true };
+  try {
+    const result = await syncTenantTemplates(context.tenantId);
+    return { success: true as const, syncedCount: result.syncedCount };
+  } catch (error) {
+    console.warn("[syncMetaTemplatesAction] Meta template sync failed", {
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Não foi possível sincronizar os modelos com a Meta.",
+    };
+  }
 }
 
-export type RecreateMetaTemplateInput = {
-  templateId?: string;
-  name: string;
-  language?: string;
-  category?: "MARKETING" | "UTILITY" | "AUTHENTICATION";
-  headerType?: "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
-  headerText?: string;
-  bodyText: string;
-  footerText?: string;
-  buttons?: Array<{
-    type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
-    text: string;
-    url?: string;
-    phone_number?: string;
-  }>;
-};
+export type { RecreateMetaTemplateInput } from "@/features/communication-channels/template-recreation";
 
 export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInput): Promise<{
   success: boolean;
@@ -377,95 +376,28 @@ export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInpu
   metaTemplateId?: string;
   name?: string;
   status?: string;
+  synced?: boolean;
   error?: string;
 }> {
   try {
     const context = await getRequiredTenantContext();
     assertAdminRole(context.role);
+    const parsedInput = recreateMetaTemplateInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      return { success: false, error: parsedInput.error.issues[0]?.message ?? "Dados inválidos para recriar o modelo." };
+    }
+    const validatedInput = parsedInput.data;
 
     const { createTenantTemplateInMeta, syncTenantTemplates } = await import(
       "@/features/communication-channels/template-sync-service"
     );
 
-    const formattedName = input.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    const formattedName = validatedInput.name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
     if (!formattedName) return { success: false, error: "Informe um nome válido para o modelo (apenas letras minúsculas e _)." };
-    if (!input.bodyText?.trim()) return { success: false, error: "O corpo da mensagem é obrigatório." };
 
-    const language = input.language?.trim() || "pt_BR";
-    const category = input.category || "MARKETING";
-
-    const components: MetaGraphTemplateComponent[] = [];
-
-    // 1. Header
-    if (input.headerType === "TEXT" && input.headerText?.trim()) {
-      components.push({
-        type: "HEADER",
-        format: "TEXT",
-        text: input.headerText.trim(),
-      });
-    }
-
-    // 2. Body & Example variables (Meta requires {{1}}, {{2}} positional placeholders)
-    const rawBody = input.bodyText.trim();
-    let counter = 1;
-    const sampleValues: string[] = [];
-
-    const metaBodyText = rawBody.replace(/\{\{(\d+|[a-zA-Z0-9_]+)\}\}/g, (_match, varName) => {
-      const v = String(varName).toLowerCase();
-      if (v === "nome" || v === "1" || v === "nome_cliente" || v === "corretor_nome") sampleValues.push("João Silva");
-      else if (v === "empresa" || v === "2") sampleValues.push("Âncora Saúde");
-      else if (v === "cargo" || v === "3") sampleValues.push("Corretor(a)");
-      else if (v === "nome_bot") sampleValues.push("Assistente Âncora");
-      else if (v === "produto_interesse" || v === "interesse" || v === "plano") sampleValues.push("Plano de Saúde");
-      else if (v === "telefone_cliente") sampleValues.push("11999999999");
-      else if (v === "tipo") sampleValues.push("Individual");
-      else if (v === "n_dependentes") sampleValues.push("1");
-      else sampleValues.push(`Valor_${counter}`);
-
-      const placeholder = `{{${counter}}}`;
-      counter++;
-      return placeholder;
-    });
-
-    const bodyComponent: MetaGraphTemplateComponent = {
-      type: "BODY",
-      text: metaBodyText,
-      ...(sampleValues.length > 0 ? { example: { body_text: [sampleValues] } } : {}),
-    };
-    components.push(bodyComponent);
-
-    // 3. Footer
-    if (input.footerText?.trim()) {
-      components.push({
-        type: "FOOTER",
-        text: input.footerText.trim(),
-      });
-    }
-
-    // 4. Buttons
-    if (input.buttons && input.buttons.length > 0) {
-      components.push({
-        type: "BUTTONS",
-        buttons: input.buttons.map((b) => ({
-          type: b.type,
-          text: b.text,
-          ...(b.url ? { url: b.url, example: b.url.includes("{{") ? ["https://ancorahub.com.br/convite/token123"] : undefined } : {}),
-          ...(b.phone_number ? { phone_number: b.phone_number } : {}),
-        })),
-      });
-    } else if (formattedName === "broker_first_access" || rawBody.toLowerCase().includes("botão abaixo")) {
-      components.push({
-        type: "BUTTONS",
-        buttons: [
-          {
-            type: "URL",
-            text: "Concluir Cadastro",
-            url: "https://ancorahub.com.br/convite/{{1}}",
-            example: ["https://ancorahub.com.br/convite/token123"],
-          },
-        ],
-      });
-    }
+    const language = validatedInput.language || "pt_BR";
+    const category = validatedInput.category || "MARKETING";
+    const components = buildMetaTemplateComponents(validatedInput);
 
     const result = await createTenantTemplateInMeta(context.tenantId, context.userId, {
       name: formattedName,
@@ -474,11 +406,13 @@ export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInpu
       components,
     });
 
-    await syncTenantTemplates(context.tenantId).catch(() => undefined);
+    const synced = await syncTenantTemplates(context.tenantId).then(() => true).catch(() => false);
 
-    return { success: true, id: result.id, metaTemplateId: result.metaTemplateId, name: result.name, status: result.status };
+    return { success: true, id: result.id, metaTemplateId: result.metaTemplateId, name: result.name, status: result.status, synced };
   } catch (error) {
-    console.error("[recreateMetaTemplateAction] Error:", error);
+    console.error("[recreateMetaTemplateAction] template creation failed", {
+      message: error instanceof Error ? error.message : "unknown",
+    });
     const message = error instanceof Error ? error.message : "A Meta rejeitou a criação do modelo.";
     return { success: false, error: message };
   }

@@ -96,11 +96,49 @@ type MetaTemplateItem = {
   bodyText?: string | null;
   headerText?: string | null;
   footerText?: string | null;
-  componentsJson?: any;
+  componentsJson?: unknown;
+  buttonsJson?: unknown;
   syncedAt?: Date | string | null;
   isDefault?: boolean;
   assignedSituations?: string[];
 };
+
+type RecreateButton = {
+  type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
+  text: string;
+  url?: string;
+  phone_number?: string;
+};
+
+function getTemplateButtons(template: MetaTemplateItem | null): RecreateButton[] | undefined {
+  if (!template) return undefined;
+  const directButtons = Array.isArray(template.buttonsJson) ? template.buttonsJson : null;
+  const componentButtons = Array.isArray(template.componentsJson)
+    ? template.componentsJson.find(
+        (component): component is { type?: unknown; buttons?: unknown } =>
+          typeof component === "object" && component !== null && "type" in component &&
+          String(component.type).toUpperCase() === "BUTTONS",
+      )?.buttons
+    : null;
+  const source = directButtons ?? componentButtons;
+  if (!Array.isArray(source)) return undefined;
+
+  const supportedTypes = new Set<RecreateButton["type"]>(["QUICK_REPLY", "URL", "PHONE_NUMBER"]);
+  const buttons = source.flatMap((button): RecreateButton[] => {
+    if (typeof button !== "object" || button === null) return [];
+    const record = button as Record<string, unknown>;
+    const type = typeof record.type === "string" ? record.type.toUpperCase() : "";
+    const text = typeof record.text === "string" ? record.text : "";
+    if (!supportedTypes.has(type as RecreateButton["type"]) || !text) return [];
+    return [{
+      type: type as RecreateButton["type"],
+      text,
+      ...(typeof record.url === "string" ? { url: record.url } : {}),
+      ...(typeof record.phone_number === "string" ? { phone_number: record.phone_number } : {}),
+    }];
+  });
+  return buttons.length > 0 ? buttons : undefined;
+}
 
 type FreeTemplateItem = {
   id: string;
@@ -195,6 +233,7 @@ export function MetaTemplatesPanel() {
         headerText: recreateHeaderText.trim() || undefined,
         bodyText: recreateBodyText.trim(),
         footerText: recreateFooterText.trim() || undefined,
+        buttons: getTemplateButtons(recreatingTemplate),
       });
 
       if (!result.success) {
@@ -202,7 +241,11 @@ export function MetaTemplatesPanel() {
         return;
       }
 
-      toast.success(`Modelo "${formattedName}" enviado com sucesso para a Meta! A nova empresa já registrou o modelo.`);
+      toast.success(
+        result.synced === false
+          ? `Modelo "${formattedName}" enviado à Meta. A sincronização local será tentada novamente ao atualizar a lista.`
+          : `Modelo "${formattedName}" enviado com sucesso para a Meta! A nova empresa já registrou o modelo.`,
+      );
       setRecreateModalOpen(false);
       await loadTemplates();
     } catch (err) {
@@ -251,8 +294,12 @@ export function MetaTemplatesPanel() {
   async function handleSync() {
     setSyncing(true);
     try {
-      await syncMetaTemplatesAction();
-      toast.success("Sincronização com a Meta concluída!");
+      const result = await syncMetaTemplatesAction();
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`${result.syncedCount} modelo(s) sincronizado(s) com a Meta.`);
       await loadTemplates();
     } catch (err) {
       toast.error("Erro ao sincronizar com a Meta API.");
@@ -1041,6 +1088,11 @@ export function MetaTemplatesPanel() {
                 {recreateFooterText && <p className="text-[10px] text-muted-foreground italic">{recreateFooterText}</p>}
               </div>
             </div>
+            {getTemplateButtons(recreatingTemplate) ? (
+              <p className="text-[11px] text-muted-foreground">
+                {getTemplateButtons(recreatingTemplate)?.length} botão(ões) do modelo original serão preservados ao recriar.
+              </p>
+            ) : null}
           </div>
 
           <DialogFooter className="gap-2">
