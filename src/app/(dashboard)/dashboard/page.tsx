@@ -5,7 +5,7 @@ import { getBrokerWorkspaceData, isBrokerWorkspaceEnabled } from "@/features/bro
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
-import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardData, getMarketingDashboardData } from "./data";
+import { getBrokerDashboardData, getMarketingDashboardData } from "./data";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
@@ -13,6 +13,8 @@ import { eq } from "drizzle-orm";
 import { Suspense } from "react";
 import { getDatabase, schema } from "@/shared/db";
 import DashboardLoading from "./loading";
+import { ExecutiveDashboard } from "./_components/executive-dashboard";
+import { getExecutiveDashboardData } from "./executive-dashboard-data";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +45,9 @@ async function DashboardContent({
     return <MarketingDashboardContent data={data} period={period} />;
   }
 
-  if (context.role === "director") {
-    const data = await getDirectorDashboardData(period);
-    return <NocDashboardContent role="director" data={data} period={period} />;
-  }
-  if (context.role === "manager") {
-    return <NocDashboardContent role="manager" data={await getManagerDashboardData(period)} period={period} />;
+  if (context.role === "director" || context.role === "manager" || context.role === "supervisor") {
+    const data = await getExecutiveDashboardData(context, period);
+    return <ExecutiveDashboard data={data} period={period} role={context.role} />;
   }
 
   const mode = await getExperienceMode(context);

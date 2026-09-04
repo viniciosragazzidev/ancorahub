@@ -5,7 +5,7 @@ import { and, count, eq, gte, inArray, isNotNull, isNull, lt, ne, sql, type SQL 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import type { PeriodValue } from "@/shared/period";
-import { periodStart } from "@/shared/period";
+import { fillTrendDays, periodStart } from "@/shared/period";
 
 import type { FunnelStage } from "./metrics-math";
 import { buildFunnelRows, percentage, previousWindowStart, safeRate } from "./metrics-math";
@@ -235,6 +235,43 @@ export async function getFunnelSnapshot(
     biggestBottleneck: funnel.biggestBottleneck,
     received,
   };
+}
+
+/**
+ * Série diária para superfícies executivas. Mantém a mesma coorte, período e
+ * escopo das métricas comerciais; a interface não deve agregá-la localmente.
+ */
+export interface LeadTimelinePoint {
+  readonly date: string;
+  readonly received: number;
+  readonly converted: number;
+}
+
+export async function getLeadTimeline(
+  context: TenantContext,
+  period: PeriodValue,
+): Promise<LeadTimelinePoint[]> {
+  const scope = await resolveReportDataScope(context);
+  const { currentStart } = resolveWindows(period);
+  const rows = await getDatabase()
+    .select({
+      date: sql<string>`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`,
+      received: count(),
+      converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
+    })
+    .from(schema.leads)
+    .where(cohortWhere(scope, currentStart))
+    .groupBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`)
+    .orderBy(sql`to_char(${schema.leads.createdAt}, 'YYYY-MM-DD')`);
+
+  const byDate = new Map(
+    rows.map((row) => [
+      row.date,
+      { date: row.date, received: Number(row.received), converted: Number(row.converted) },
+    ]),
+  );
+
+  return fillTrendDays(period, byDate);
 }
 
 export interface SourcePerformanceRow {
