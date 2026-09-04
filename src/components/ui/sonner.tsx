@@ -14,12 +14,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
       visibleToasts={4}
       className="ct-toaster"
       toastOptions={{
-        className: "group toast font-sans",
+        className: "ct-toast group font-sans pointer-events-auto",
         style: {
           border: "none",
           boxShadow: "none",
           padding: 0,
           width: "auto",
+          background: "transparent",
         },
       }}
       {...props}
@@ -34,21 +35,39 @@ function renderToast(
   message: React.ReactNode,
   options?: any,
 ) {
-  return sonnerToast.custom(
-    (t) => (
-      <AnimatedToast
-        id={t}
-        status={status}
-        title={message}
-        description={options?.description}
-        badgeLabel={options?.badgeLabel ?? defaultBadge}
-        action={options?.action}
-        cancel={options?.cancel}
-        onClose={() => sonnerToast.dismiss(t)}
-      />
-    ),
-    options,
-  );
+  if (typeof sonnerToast?.custom === "function") {
+    return sonnerToast.custom(
+      (t) => (
+        <AnimatedToast
+          id={t}
+          status={status}
+          title={message}
+          description={options?.description}
+          badgeLabel={options?.badgeLabel ?? defaultBadge}
+          action={options?.action}
+          cancel={options?.cancel}
+          onClose={() => sonnerToast.dismiss(t)}
+        />
+      ),
+      options,
+    );
+  }
+
+  // Fallback for environments / test runners where sonner is partially mocked without .custom
+  const fallbackFn =
+    status === "success"
+      ? sonnerToast?.success
+      : status === "danger"
+        ? sonnerToast?.error
+        : status === "warning"
+          ? sonnerToast?.warning
+          : status === "loading"
+            ? sonnerToast?.loading
+            : sonnerToast?.info ?? sonnerToast?.message ?? (typeof sonnerToast === "function" ? sonnerToast : undefined);
+
+  if (typeof fallbackFn === "function") {
+    return options !== undefined ? fallbackFn(message, options) : fallbackFn(message);
+  }
 }
 
 export const toast = Object.assign(

@@ -28,12 +28,12 @@ export interface AnimatedToastProps {
 }
 
 const STATUS_BORDER: Record<AnimatedBadgeStatus, string> = {
-  neutral: "border-border/80",
-  info: "border-primary/30",
-  success: "border-emerald-500/30",
-  warning: "border-amber-500/30",
-  danger: "border-destructive/30",
-  loading: "border-primary/30",
+  neutral: "border-border/90",
+  info: "border-blue-500/40 dark:border-blue-400/40 ring-1 ring-blue-500/10",
+  success: "border-emerald-500/40 dark:border-emerald-400/40 ring-1 ring-emerald-500/10",
+  warning: "border-amber-500/40 dark:border-amber-400/40 ring-1 ring-amber-500/10",
+  danger: "border-red-500/40 dark:border-red-400/40 ring-1 ring-red-500/10",
+  loading: "border-blue-500/40 dark:border-blue-400/40 ring-1 ring-blue-500/10",
 };
 
 export function AnimatedToast({
@@ -68,8 +68,14 @@ export function AnimatedToast({
       animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
       exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.95, filter: "blur(4px)" }}
       transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
+      style={{
+        backgroundColor: "var(--popover, #ffffff)",
+        color: "var(--popover-foreground, #1e1e1e)",
+        boxShadow:
+          "0 12px 36px -4px rgba(0, 0, 0, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)",
+      }}
       className={cn(
-        "group relative flex w-full max-w-sm items-start gap-3 rounded-xl border p-3.5 transition-all select-none bg-card text-card-foreground shadow-2xl border-border/90",
+        "group pointer-events-auto relative flex w-[360px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border p-3.5 transition-all select-none shadow-2xl backdrop-blur-md",
         STATUS_BORDER[status],
         className
       )}
@@ -95,7 +101,7 @@ export function AnimatedToast({
               <button
                 type="button"
                 onClick={action.onClick}
-                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer"
+                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer pointer-events-auto"
               >
                 {action.label}
               </button>
@@ -104,7 +110,7 @@ export function AnimatedToast({
               <button
                 type="button"
                 onClick={cancel.onClick}
-                className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:outline-none cursor-pointer"
+                className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:outline-none cursor-pointer pointer-events-auto"
               >
                 {cancel.label}
               </button>
@@ -116,11 +122,15 @@ export function AnimatedToast({
       {onClose ? (
         <button
           type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+          className="relative z-30 shrink-0 -mr-1 -mt-1 flex size-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pointer-events-auto"
           aria-label="Fechar notificação"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-4 w-4" />
         </button>
       ) : null}
     </motion.div>

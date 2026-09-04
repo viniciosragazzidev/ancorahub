@@ -284,9 +284,9 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarHeader>
 
       {/* Navigation Rail Content */}
-      <SidebarContent className="flex-1 px-1 py-2">
+      <SidebarContent className="flex-1 min-h-0 px-1 py-1">
         <TooltipProvider delay={150}>
-          <nav aria-label="Menu principal" className="flex flex-col items-center gap-1.5 w-full">
+          <nav aria-label="Menu principal" className="flex flex-col items-center gap-1.5 w-full pb-4">
             {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive =

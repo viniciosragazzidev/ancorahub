@@ -889,6 +889,10 @@ body {
   pointer-events: none;
 }
 
+.ct-toaster [data-sonner-toast] {
+  pointer-events: auto !important;
+}
+
 /* Elevated notification surface: keep the popover opaque and distinct from the canvas. */
 .ct-notification-popover {
   isolation: isolate;
