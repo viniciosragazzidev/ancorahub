@@ -41,10 +41,12 @@ import {
   setDefaultMetaTemplateAction,
   deleteMetaTemplateAction,
   setMetaTemplateSituationsAction,
+  recreateMetaTemplateAction,
   fetchFreeMessageTemplatesAction,
   saveFreeMessageTemplateAction,
   deleteFreeMessageTemplateAction,
 } from "@/features/ai-qualification/actions";
+import { UploadCloud } from "lucide-react";
 
 export const CRM_SITUATIONS = [
   {
@@ -138,6 +140,77 @@ export function MetaTemplatesPanel() {
   const [freeName, setFreeName] = useState("");
   const [freeCategory, setFreeCategory] = useState("Primeiro Atendimento");
   const [freeContent, setFreeContent] = useState("");
+
+  // Recreate & Edit Meta Template State
+  const [recreateModalOpen, setRecreateModalOpen] = useState<boolean>(false);
+  const [recreatingTemplate, setRecreatingTemplate] = useState<MetaTemplateItem | null>(null);
+  const [recreateName, setRecreateName] = useState<string>("");
+  const [recreateLanguage, setRecreateLanguage] = useState<string>("pt_BR");
+  const [recreateCategory, setRecreateCategory] = useState<"MARKETING" | "UTILITY">("MARKETING");
+  const [recreateBodyText, setRecreateBodyText] = useState<string>("");
+  const [recreateHeaderText, setRecreateHeaderText] = useState<string>("");
+  const [recreateFooterText, setRecreateFooterText] = useState<string>("");
+  const [submittingRecreate, setSubmittingRecreate] = useState<boolean>(false);
+
+  function handleOpenRecreateModal(item?: MetaTemplateItem) {
+    if (item) {
+      setRecreatingTemplate(item);
+      setRecreateName(item.name || "");
+      setRecreateLanguage(item.language === "en" ? "pt_BR" : (item.language || "pt_BR"));
+      setRecreateCategory((item.category as "MARKETING" | "UTILITY") || "MARKETING");
+      setRecreateBodyText(item.bodyText || "");
+      setRecreateHeaderText(item.headerText || "");
+      setRecreateFooterText(item.footerText || "");
+    } else {
+      setRecreatingTemplate(null);
+      setRecreateName("lead_first_contact");
+      setRecreateLanguage("pt_BR");
+      setRecreateCategory("MARKETING");
+      setRecreateBodyText("Olá {{nome}}! Me chamo {{nome_bot}} da Âncora Saúde. Como podemos te ajudar com a sua cotação hoje?");
+      setRecreateHeaderText("");
+      setRecreateFooterText("");
+    }
+    setRecreateModalOpen(true);
+  }
+
+  async function handleExecuteRecreate() {
+    const formattedName = recreateName.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    if (!formattedName) {
+      toast.error("Informe um nome válido para o modelo (apenas letras minúsculas e sublinhados).");
+      return;
+    }
+    if (!recreateBodyText.trim()) {
+      toast.error("O corpo da mensagem é obrigatório.");
+      return;
+    }
+
+    setSubmittingRecreate(true);
+    try {
+      await recreateMetaTemplateAction({
+        templateId: recreatingTemplate?.id,
+        name: formattedName,
+        language: recreateLanguage,
+        category: recreateCategory,
+        headerType: recreateHeaderText.trim() ? "TEXT" : "NONE",
+        headerText: recreateHeaderText.trim() || undefined,
+        bodyText: recreateBodyText.trim(),
+        footerText: recreateFooterText.trim() || undefined,
+      });
+
+      toast.success(`Modelo "${formattedName}" enviado com sucesso para a Meta! A nova empresa já registrou o modelo.`);
+      setRecreateModalOpen(false);
+      await loadTemplates();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao enviar modelo para a Meta.";
+      toast.error(msg);
+    } finally {
+      setSubmittingRecreate(false);
+    }
+  }
+
+  function handleInsertRecreateVariable(variable: string) {
+    setRecreateBodyText((prev) => `${prev} {{${variable}}}`);
+  }
 
   useEffect(() => {
     loadTemplates();
@@ -346,7 +419,7 @@ export function MetaTemplatesPanel() {
               <RefreshCw className={`size-3.5 ${syncing ? "animate-spin" : ""}`} />
               {syncing ? "Sincronizando…" : "Sincronizar com Meta"}
             </Button>
-            <Button size="sm" onClick={() => setNewModalOpen(true)} className="h-9 gap-2 text-xs">
+            <Button size="sm" onClick={() => handleOpenRecreateModal()} className="h-9 gap-2 text-xs">
               <Plus className="size-3.5" />
               Novo Modelo Meta
             </Button>
@@ -370,7 +443,7 @@ export function MetaTemplatesPanel() {
                   Modelos de Mensagem Meta (WhatsApp Templates)
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
-                  Clique em um modelo para vincular a situações do CRM (Primeiro atendimento, Lead Aceito, Follow-up, etc.). Modelos Meta requerem aprovação prévia para envio fora da janela de 24h.
+                  Clique em "Editar & Recriar" para enviar um modelo diretamente para a nova empresa/WABA na Meta, ou em "Situações" para vincular aos eventos automáticos do CRM.
                 </CardDescription>
               </div>
             </CardHeader>
@@ -434,18 +507,32 @@ export function MetaTemplatesPanel() {
                         </div>
                       </div>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenSituationModal(item);
-                        }}
-                        className="h-8 text-xs text-primary gap-1 px-2.5 shrink-0 bg-primary/5 hover:bg-primary/10"
-                      >
-                        <SlidersHorizontal className="size-3.5" />
-                        Situações
-                      </Button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenRecreateModal(item);
+                          }}
+                          className="h-8 text-xs text-primary border-primary/30 bg-primary/5 hover:bg-primary/10 gap-1.5 px-2.5 font-semibold"
+                        >
+                          <UploadCloud className="size-3.5" />
+                          Editar & Recriar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenSituationModal(item);
+                          }}
+                          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1 px-2"
+                        >
+                          <SlidersHorizontal className="size-3.5" />
+                          Situações
+                        </Button>
+                      </div>
                     </CardHeader>
 
                     <CardContent className="space-y-3 text-xs">
@@ -677,17 +764,33 @@ export function MetaTemplatesPanel() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <DialogClose render={<Button variant="ghost" size="sm">Cancelar</Button>} />
+          <DialogFooter className="gap-2 flex items-center justify-between sm:justify-between w-full">
             <Button
+              type="button"
+              variant="outline"
               size="sm"
-              onClick={handleSaveSituations}
-              disabled={savingSituations}
-              className="gap-2"
+              onClick={() => {
+                const target = bindingTemplate;
+                setBindingTemplate(null);
+                if (target) handleOpenRecreateModal(target);
+              }}
+              className="text-xs gap-1.5 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10 mr-auto"
             >
-              {savingSituations && <RefreshCw className="size-3.5 animate-spin" />}
-              Salvar Situações
+              <UploadCloud className="size-3.5" />
+              Editar & Recriar na Meta
             </Button>
+            <div className="flex items-center gap-2">
+              <DialogClose render={<Button variant="ghost" size="sm">Cancelar</Button>} />
+              <Button
+                size="sm"
+                onClick={handleSaveSituations}
+                disabled={savingSituations}
+                className="gap-2"
+              >
+                {savingSituations && <RefreshCw className="size-3.5 animate-spin" />}
+                Salvar Situações
+              </Button>
+            </div>
           </DialogFooter>
         </DialogPopup>
       </Dialog>
@@ -781,52 +884,157 @@ export function MetaTemplatesPanel() {
         </DialogPopup>
       </Dialog>
 
-      {/* ─── MODAL DE NOVO MODELO META (JÁ EXISTENTE) ─── */}
-      <Dialog open={newModalOpen} onOpenChange={setNewModalOpen}>
-        <DialogPopup className="sm:max-w-lg">
+      {/* ─── MODAL: EDITAR & RECRIAR MODELO NA META ─── */}
+      <Dialog open={recreateModalOpen} onOpenChange={setRecreateModalOpen}>
+        <DialogPopup className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <FileText className="size-5 text-primary" />
-              Novo Modelo de Mensagem Meta
+              <UploadCloud className="size-5 text-primary" />
+              {recreatingTemplate ? "Editar & Recriar Modelo na Meta" : "Novo Modelo de Mensagem Meta"}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Cadastre um modelo de mensagem aprovado pela Meta para uso no disparo de primeiro atendimento.
+              Este modelo será enviado e registrado diretamente na <strong>conta WhatsApp (WABA) atualmente conectada na Meta</strong>. Assim que aprovado pela Meta, o CRM o utilizará automaticamente nos disparos.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-2 text-xs">
+            {/* Template Name & Category */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="rec-name" className="text-xs font-semibold">Nome do Modelo (na Meta)</Label>
+                <Input
+                  id="rec-name"
+                  value={recreateName}
+                  onChange={(e) => setRecreateName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))}
+                  placeholder="ex.: lead_first_contact"
+                  className="h-9 text-xs font-mono"
+                />
+                <span className="text-[10px] text-muted-foreground">Apenas letras minúsculas e sublinhados (_).</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="rec-lang" className="text-xs font-semibold">Idioma</Label>
+                  <select
+                    id="rec-lang"
+                    value={recreateLanguage}
+                    onChange={(e) => setRecreateLanguage(e.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  >
+                    <option value="pt_BR">Português (BR) - pt_BR</option>
+                    <option value="en">Inglês - en</option>
+                    <option value="es">Espanhol - es</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label htmlFor="rec-cat" className="text-xs font-semibold">Categoria</Label>
+                  <select
+                    id="rec-cat"
+                    value={recreateCategory}
+                    onChange={(e) => setRecreateCategory(e.target.value as "MARKETING" | "UTILITY")}
+                    className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  >
+                    <option value="MARKETING">MARKETING</option>
+                    <option value="UTILITY">UTILITY (Serviço)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Header Text (Optional) */}
             <div className="grid gap-1.5">
-              <Label htmlFor="tpl-name" className="text-xs font-semibold">Nome do Modelo</Label>
+              <Label htmlFor="rec-header" className="text-xs font-semibold flex items-center justify-between">
+                <span>Cabeçalho (Opcional)</span>
+                <span className="text-[10px] text-muted-foreground">Texto em negrito no topo da mensagem</span>
+              </Label>
               <Input
-                id="tpl-name"
-                defaultValue="lead_first_contact"
-                className="h-9 text-xs font-mono"
-                placeholder="ex.: lead_first_contact"
+                id="rec-header"
+                value={recreateHeaderText}
+                onChange={(e) => setRecreateHeaderText(e.target.value)}
+                placeholder="ex.: Âncora Saúde ou Lead Atribuído!"
+                className="h-9 text-xs"
               />
-              <span className="text-[10px] text-muted-foreground">Use apenas letras minúsculas e sublinhados (_).</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label className="text-xs font-semibold">Idioma</Label>
-                <Input value="Portuguese (BR) - pt_BR" readOnly className="h-9 text-xs bg-muted/40" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs font-semibold">Categoria Meta</Label>
-                <Input value="MARKETING" readOnly className="h-9 text-xs bg-muted/40" />
-              </div>
-            </div>
-
+            {/* Body Text (Required) */}
             <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold">Corpo da Mensagem (Body)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rec-body" className="text-xs font-semibold">Corpo da Mensagem (Body)</Label>
+                <span className="text-[10px] text-primary font-medium">Obrigatório</span>
+              </div>
               <textarea
-                rows={4}
-                defaultValue="Olá {{nome}}! Me chamo {{nome_bot}}. Recebemos sua solicitação de atendimento sobre planos de saúde pela Âncora Saúde. Para encaminhar você ao especialista mais adequado, gostaríamos de fazer algumas perguntas rápidas por aqui. Como deseja continuar?"
+                id="rec-body"
+                rows={5}
+                value={recreateBodyText}
+                onChange={(e) => setRecreateBodyText(e.target.value)}
+                placeholder="Digite o texto da mensagem. Use {{nome}}, {{corretor_nome}}, {{empresa}} etc..."
                 className="w-full rounded-md border border-border bg-background p-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
-              <span className="text-[10px] text-muted-foreground">
-                Variáveis suportadas: {"{{nome}}"} (nome do cliente), {"{{nome_bot}}"} (nome do atendente/corretora).
+            </div>
+
+            {/* Quick Insertion Chips for Variables */}
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                <Sparkles className="size-3 text-primary" />
+                Variáveis Dinâmicas Rápidas (Clique para inserir no texto):
+              </Label>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  "nome",
+                  "nome_bot",
+                  "empresa",
+                  "corretor_nome",
+                  "cargo",
+                  "lead_nome",
+                  "produto_interesse",
+                  "telefone_cliente",
+                  "interesse",
+                  "tipo",
+                  "n_dependentes",
+                ].map((v) => (
+                  <Button
+                    key={v}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleInsertRecreateVariable(v)}
+                    className="h-6 text-[10px] font-mono gap-1 border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary"
+                  >
+                    + {`{{${v}}}`}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer Text (Optional) */}
+            <div className="grid gap-1.5">
+              <Label htmlFor="rec-footer" className="text-xs font-semibold flex items-center justify-between">
+                <span>Rodapé (Opcional)</span>
+                <span className="text-[10px] text-muted-foreground">Texto em cinza discreto no fim</span>
+              </Label>
+              <Input
+                id="rec-footer"
+                value={recreateFooterText}
+                onChange={(e) => setRecreateFooterText(e.target.value)}
+                placeholder="ex.: Responda PARAR para sair."
+                className="h-9 text-xs"
+              />
+            </div>
+
+            {/* Live Preview Card */}
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                <MessageSquare className="size-3 text-primary" />
+                Prévia da Mensagem no WhatsApp:
               </span>
+              <div className="rounded-lg border bg-background p-3 shadow-sm max-w-md font-sans text-xs space-y-1.5 text-foreground">
+                {recreateHeaderText && <p className="font-bold text-xs text-foreground">{recreateHeaderText}</p>}
+                <p className="whitespace-pre-wrap leading-relaxed text-xs text-foreground/90 font-mono">
+                  {recreateBodyText || "O texto do modelo aparecerá aqui..."}
+                </p>
+                {recreateFooterText && <p className="text-[10px] text-muted-foreground italic">{recreateFooterText}</p>}
+              </div>
             </div>
           </div>
 
@@ -834,13 +1042,21 @@ export function MetaTemplatesPanel() {
             <DialogClose render={<Button variant="ghost" size="sm">Cancelar</Button>} />
             <Button
               size="sm"
-              onClick={() => {
-                toast.success("Modelo salvo com sucesso!");
-                loadTemplates();
-                setNewModalOpen(false);
-              }}
+              onClick={handleExecuteRecreate}
+              disabled={submittingRecreate}
+              className="gap-2 bg-primary text-primary-foreground font-semibold"
             >
-              Salvar Modelo
+              {submittingRecreate ? (
+                <>
+                  <RefreshCw className="size-3.5 animate-spin" />
+                  Enviando para a Meta...
+                </>
+              ) : (
+                <>
+                  <UploadCloud className="size-3.5" />
+                  Recriar e Enviar para a Meta
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogPopup>

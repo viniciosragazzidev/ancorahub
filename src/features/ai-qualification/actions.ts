@@ -3,6 +3,7 @@
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
+import type { MetaGraphTemplateComponent } from "@/features/communication-channels/meta-graph-templates-client";
 import {
   getQualificationTenantSettings,
   updateQualificationTenantSettings,
@@ -351,6 +352,110 @@ export async function syncMetaTemplatesAction() {
   const { syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
   await syncTenantTemplates(context.tenantId).catch(() => undefined);
   return { success: true };
+}
+
+export type RecreateMetaTemplateInput = {
+  templateId?: string;
+  name: string;
+  language?: string;
+  category?: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+  headerType?: "NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT";
+  headerText?: string;
+  bodyText: string;
+  footerText?: string;
+  buttons?: Array<{
+    type: "QUICK_REPLY" | "URL" | "PHONE_NUMBER";
+    text: string;
+    url?: string;
+    phone_number?: string;
+  }>;
+};
+
+export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInput) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+
+  const { createTenantTemplateInMeta, syncTenantTemplates } = await import(
+    "@/features/communication-channels/template-sync-service"
+  );
+
+  const formattedName = input.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  if (!formattedName) throw new Error("Informe um nome válido para o modelo (apenas letras minúsculas e _).");
+  if (!input.bodyText?.trim()) throw new Error("O corpo da mensagem é obrigatório.");
+
+  const language = input.language?.trim() || "pt_BR";
+  const category = input.category || "MARKETING";
+
+  const components: MetaGraphTemplateComponent[] = [];
+
+  // 1. Header
+  if (input.headerType === "TEXT" && input.headerText?.trim()) {
+    components.push({
+      type: "HEADER",
+      format: "TEXT",
+      text: input.headerText.trim(),
+    });
+  }
+
+  // 2. Body & Example variables
+  const bodyText = input.bodyText.trim();
+  const varMatches = bodyText.match(/\{\{(\d+|[a-zA-Z0-9_]+)\}\}/g);
+  let bodyExample: { body_text?: string[][] } | undefined = undefined;
+
+  if (varMatches && varMatches.length > 0) {
+    const sampleValues = varMatches.map((m, idx) => {
+      const v = m.replace(/[\{\}]/g, "").toLowerCase();
+      if (v === "nome" || v === "1" || v === "nome_cliente" || v === "corretor_nome") return "João Silva";
+      if (v === "empresa" || v === "2") return "Âncora Saúde";
+      if (v === "cargo") return "Corretor(a)";
+      if (v === "nome_bot") return "Assistente Âncora";
+      if (v === "produto_interesse" || v === "interesse" || v === "plano") return "Plano de Saúde";
+      if (v === "telefone_cliente") return "11999999999";
+      if (v === "tipo") return "Individual";
+      if (v === "n_dependentes") return "1";
+      return `Exemplo_${idx + 1}`;
+    });
+    bodyExample = { body_text: [sampleValues] };
+  }
+
+  components.push({
+    type: "BODY",
+    text: bodyText,
+    ...(bodyExample ? { example: bodyExample } : {}),
+  });
+
+  // 3. Footer
+  if (input.footerText?.trim()) {
+    components.push({
+      type: "FOOTER",
+      text: input.footerText.trim(),
+    });
+  }
+
+  // 4. Buttons
+  if (input.buttons && input.buttons.length > 0) {
+    components.push({
+      type: "BUTTONS",
+      buttons: input.buttons.map((b) => ({
+        type: b.type,
+        text: b.text,
+        ...(b.url ? { url: b.url } : {}),
+        ...(b.phone_number ? { phone_number: b.phone_number } : {}),
+      })),
+    });
+  }
+
+  const result = await createTenantTemplateInMeta(context.tenantId, context.userId, {
+    name: formattedName,
+    language,
+    category,
+    components,
+  });
+
+  // Automatically sync with Meta
+  await syncTenantTemplates(context.tenantId).catch(() => undefined);
+
+  return result;
 }
 
 /* ─── Modelos Livres (Janela de 24 Horas / Sem Aprovação) ─── */

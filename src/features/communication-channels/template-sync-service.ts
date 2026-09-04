@@ -262,36 +262,72 @@ export async function createTenantTemplateInMeta(
   );
 
   const parsed = parseComponents(input.components);
-  const id = randomUUID();
   const now = new Date();
 
-  await db.insert(schema.metaWhatsAppTemplates).values({
-    id,
-    tenantId,
-    wabaId: credentials.wabaId,
-    metaTemplateId: metaResult.id,
-    name: formattedName,
-    language: input.language || "pt_BR",
-    category: input.category,
-    status: metaResult.status || "PENDING",
-    componentsJson: input.components as any,
-    headerType: parsed.headerType,
-    bodyText: parsed.bodyText,
-    footerText: parsed.footerText,
-    variablesJson: parsed.variables,
-    buttonsJson: parsed.buttons,
-    origin: "CRM",
-    lastSyncedAt: now,
-    createdAt: now,
-    updatedAt: now,
-  });
+  const [existing] = await db
+    .select({ id: schema.metaWhatsAppTemplates.id })
+    .from(schema.metaWhatsAppTemplates)
+    .where(
+      and(
+        eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+        eq(schema.metaWhatsAppTemplates.wabaId, credentials.wabaId),
+        eq(schema.metaWhatsAppTemplates.name, formattedName),
+        eq(schema.metaWhatsAppTemplates.language, input.language || "pt_BR"),
+      ),
+    )
+    .limit(1);
+
+  const id = existing?.id || randomUUID();
+
+  if (existing) {
+    await db
+      .update(schema.metaWhatsAppTemplates)
+      .set({
+        metaTemplateId: metaResult.id,
+        category: input.category,
+        status: metaResult.status || "PENDING",
+        componentsJson: input.components as any,
+        headerType: parsed.headerType,
+        bodyText: parsed.bodyText,
+        footerText: parsed.footerText,
+        variablesJson: parsed.variables,
+        buttonsJson: parsed.buttons,
+        origin: "CRM",
+        rejectedReason: null,
+        deletedAt: null,
+        lastSyncedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(schema.metaWhatsAppTemplates.id, existing.id));
+  } else {
+    await db.insert(schema.metaWhatsAppTemplates).values({
+      id,
+      tenantId,
+      wabaId: credentials.wabaId,
+      metaTemplateId: metaResult.id,
+      name: formattedName,
+      language: input.language || "pt_BR",
+      category: input.category,
+      status: metaResult.status || "PENDING",
+      componentsJson: input.components as any,
+      headerType: parsed.headerType,
+      bodyText: parsed.bodyText,
+      footerText: parsed.footerText,
+      variablesJson: parsed.variables,
+      buttonsJson: parsed.buttons,
+      origin: "CRM",
+      lastSyncedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
 
   await db.insert(schema.auditLogs).values({
     id: randomUUID(),
     userId,
     entidade: "meta_whatsapp_template",
     entidadeId: id,
-    acao: "criou_template_meta",
+    acao: existing ? "recriou_template_meta" : "criou_template_meta",
   });
 
   return { id, metaTemplateId: metaResult.id, name: formattedName, status: metaResult.status || "PENDING" };
