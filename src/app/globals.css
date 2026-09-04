@@ -366,12 +366,7 @@ html {
      elementos position:fixed/sticky, ao contrário do zoom.       */
   font-size: 97%;
   min-height: 100%;
-  zoom: 1.1;
-  /* Alternativa para navegadores compatíveis */
-  transform: scale(1.1);
-  transform-origin: 0 0;
-  /* Define o ponto inicial do zoom no canto superior esquerdo */
-  width: 90.9%;
+
 }
 
 body {
