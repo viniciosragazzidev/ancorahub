@@ -236,7 +236,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
     <Sidebar
       variant="sidebar"
       collapsible="none"
-      className="w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-[#16292B] bg-[#0A1517] text-slate-100 shadow-xl select-none"
+      className="sticky top-0 h-dvh max-h-dvh w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-[#16292B] bg-[#0A1517] text-slate-100 shadow-xl select-none overflow-hidden"
     >
       {/* Header: Logo & SuperAdmin Switcher */}
       <SidebarHeader className="flex flex-col items-center justify-center p-2 pt-3 pb-2 gap-2 border-b border-white/[0.08]">
