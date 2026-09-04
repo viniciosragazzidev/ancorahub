@@ -16,7 +16,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         className: "group toast font-sans",
         style: {
-          background: "transparent",
           border: "none",
           boxShadow: "none",
           padding: 0,

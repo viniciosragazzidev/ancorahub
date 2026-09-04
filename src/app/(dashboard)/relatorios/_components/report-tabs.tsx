@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { ReportTabId } from "@/features/reports/metrics/metric-catalog";

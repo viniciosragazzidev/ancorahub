@@ -44,10 +44,13 @@ function currency(value: number) {
   }).format(value);
 }
 
-function shortDate(date: string) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(
-    new Date(`${date}T12:00:00`),
-  );
+function shortDate(date: unknown) {
+  if (typeof date !== "string" && typeof date !== "number") return "";
+  const str = String(date);
+  if (!str) return "";
+  const d = new Date(`${str}T12:00:00`);
+  if (isNaN(d.getTime())) return str;
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(d);
 }
 
 export function ExecutiveDashboard({

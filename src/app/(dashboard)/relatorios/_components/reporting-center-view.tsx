@@ -1,5 +1,3 @@
-import { unstable_noStore as noStore } from "next/cache";
-
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
 import { ViewScopeContext } from "@/components/ownership-context";
@@ -23,9 +21,6 @@ import { CommercialTab } from "./commercial-tab";
 import { TeamTab } from "./team-tab";
 import { UnitsTab } from "./units-tab";
 import { FinancialTab } from "./financial-tab";
-import { withPerfSpan } from "@/shared/observability/request-timing";
-
-export const dynamic = "force-dynamic";
 
 export default async function ReportingCenterView({
   context,
@@ -34,14 +29,18 @@ export default async function ReportingCenterView({
   context: TenantContext;
   searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
-  noStore();
-  const params = await searchParams;
-  const period = parsePeriod(params.period);
-  const activeTab: ReportTabId = params.tab === "commercial" ? "commercial"
-    : params.tab === "team" ? "team"
-    : params.tab === "units" ? "units"
-    : params.tab === "financial" ? "financial"
-    : "overview";
+  const resolvedParams = await searchParams;
+  const period = parsePeriod(resolvedParams.period);
+  const activeTab: ReportTabId =
+    resolvedParams.tab === "commercial"
+      ? "commercial"
+      : resolvedParams.tab === "team"
+        ? "team"
+        : resolvedParams.tab === "units"
+          ? "units"
+          : resolvedParams.tab === "financial"
+            ? "financial"
+            : "overview";
 
   const allowedTabs = reportTabsForRole(context.role);
   const tabs = allowedTabs.filter((tab) => {
@@ -52,42 +51,18 @@ export default async function ReportingCenterView({
 
   const canViewFinancial = hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
 
-  const tabContent = await withPerfSpan("reports.active_tab", async () => {
-    switch (currentTab) {
-      case "commercial": {
-        const [overview, funnel, attention, sourcePerformance] = await Promise.all([
-          withPerfSpan("reports.commercial.overview", () => getCommercialOverview(context, period, { includeFinancial: canViewFinancial })),
-          withPerfSpan("reports.commercial.funnel", () => getFunnelSnapshot(context, period)),
-          withPerfSpan("reports.commercial.attention", () => getAttentionSnapshot(context, period)),
-          withPerfSpan("reports.commercial.sources", () => getCommercialBySource(context, period, { includeFinancial: canViewFinancial })),
-        ]);
-        return <CommercialTab period={period} overview={overview} funnel={funnel} attention={attention} sourcePerformance={sourcePerformance} />;
-      }
-      case "team": {
-        const teamPerformance = await withPerfSpan(
-          "reports.team",
-          () => getTeamPerformance(context, period, { includeFinancial: canViewFinancial }),
-        );
-        return <TeamTab period={period} teamPerformance={teamPerformance} />;
-      }
-      case "units": {
-        const units = await withPerfSpan("reports.units", () => getUnitPerformance(context, period));
-        return <UnitsTab period={period} units={units} />;
-      }
-      case "financial": {
-        const financial = await withPerfSpan("reports.financial", () => getFinancialOverview(context, period));
-        return <FinancialTab period={period} financial={financial} />;
-      }
-      case "overview": {
-        const [commercial, funnel, attention] = await Promise.all([
-          withPerfSpan("reports.overview.commercial", () => getCommercialOverview(context, period, { includeFinancial: canViewFinancial })),
-          withPerfSpan("reports.overview.funnel", () => getFunnelSnapshot(context, period)),
-          withPerfSpan("reports.overview.attention", () => getAttentionSnapshot(context, period)),
-        ]);
-        return <OverviewTab period={period} commercial={commercial} funnel={funnel} attention={attention} />;
-      }
-    }
-  }, { tab: currentTab });
+  const [commercialOverview, funnel, attention, sourcePerformance, financial, teamPerformance, units] =
+    await Promise.all([
+      getCommercialOverview(context, period, { includeFinancial: canViewFinancial }),
+      getFunnelSnapshot(context, period),
+      getAttentionSnapshot(context, period),
+      getCommercialBySource(context, period, { includeFinancial: canViewFinancial }),
+      currentTab === "financial" ? getFinancialOverview(context, period) : Promise.resolve(null),
+      currentTab === "team"
+        ? getTeamPerformance(context, period, { includeFinancial: canViewFinancial })
+        : Promise.resolve(null),
+      currentTab === "units" ? getUnitPerformance(context, period) : Promise.resolve(null),
+    ]);
 
   return (
     <>
@@ -101,7 +76,32 @@ export default async function ReportingCenterView({
 
         <ReportTabs tabs={tabs} active={currentTab} period={period} />
 
-        {tabContent}
+        {currentTab === "overview" && (
+          <OverviewTab
+            period={period}
+            commercial={commercialOverview}
+            funnel={funnel}
+            attention={attention}
+          />
+        )}
+        {currentTab === "commercial" && (
+          <CommercialTab
+            period={period}
+            overview={commercialOverview}
+            funnel={funnel}
+            attention={attention}
+            sourcePerformance={sourcePerformance}
+          />
+        )}
+        {currentTab === "team" && teamPerformance && (
+          <TeamTab period={period} teamPerformance={teamPerformance} />
+        )}
+        {currentTab === "units" && (
+          <UnitsTab period={period} units={units ?? []} />
+        )}
+        {currentTab === "financial" && canViewFinancial && financial && (
+          <FinancialTab period={period} financial={financial} />
+        )}
       </main>
     </>
   );
