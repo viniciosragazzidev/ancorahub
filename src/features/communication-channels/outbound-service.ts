@@ -213,12 +213,14 @@ export async function enqueueMetaTextMessage(input: {
 }
 
 export function resolveTemplateTextBody(purpose: string, rawVariables: string[], urlButtonParameter?: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "https://crm.ancorasaude.cloud";
+
   if (purpose === "brokerInvitation") {
     const nome = rawVariables[0]?.trim() || "Corretor(a)";
     const empresa = rawVariables[1]?.trim() || "Âncora";
     const link = urlButtonParameter
-      ? (urlButtonParameter.startsWith("http") ? urlButtonParameter : `https://ancorahub.com.br/convite/${urlButtonParameter}`)
-      : "https://ancorahub.com.br";
+      ? (urlButtonParameter.startsWith("http") ? urlButtonParameter : `${baseUrl}/convite/${urlButtonParameter}`)
+      : baseUrl;
     return `Olá *${nome}*! 👋\n\nVocê recebeu um convite para criar seu acesso no sistema *${empresa}*.\n\nAcesse o link abaixo para definir sua senha e entrar no sistema:\n${link}\n\n_Este link é individual e seguro._`;
   }
 
@@ -228,7 +230,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
     const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
     const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Acesse no CRM:* https://ancorahub.com.br/conversas?lead=${leadId}` : "";
+    const link = leadId ? `\n\n👉 *Acesse no CRM:* ${baseUrl}/conversas?lead=${leadId}` : "";
     return `⚡ *Novo Lead Atribuído!*\n\nOlá *${corretorNome}*, um novo lead foi atribuído a você:\n\n👤 *Cliente:* ${leadNome}\n🏥 *Interesse:* ${produto}${link}`;
   }
 
@@ -241,7 +243,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const leadType = split.bodyVariables[4] || rawVariables[4] || "Individual";
     const dependentes = split.bodyVariables[5] || rawVariables[5] || "0";
     const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Abrir conversa:* https://ancorahub.com.br/conversas?lead=${leadId}` : "";
+    const link = leadId ? `\n\n👉 *Abrir conversa:* ${baseUrl}/conversas?lead=${leadId}` : "";
     return `✅ *Atribuição Confirmada*\n\nOlá *${brokerName}*, você assumiu o atendimento de *${leadNome}*.\n\n📞 *Telefone:* ${leadPhone}\n📋 *Tipo:* ${leadType}\n🏥 *Interesse:* ${interesse}\n👥 *Dependentes:* ${dependentes}${link}`;
   }
 
@@ -252,7 +254,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const branchName = split.bodyVariables[3] || rawVariables[3] || "Unidade";
     const timeout = split.bodyVariables[4] || rawVariables[4] || "15";
     const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Aceitar Lead:* https://ancorahub.com.br/conversas?lead=${leadId}` : "";
+    const link = leadId ? `\n\n👉 *Aceitar Lead:* ${baseUrl}/conversas?lead=${leadId}` : "";
     return `🚨 *Novo Lead Disponível!*\n\nOlá *${brokerName}*, há um lead de *${leadType}* disponível em *${branchName}*.\n\n⏱️ Você tem *${timeout} minutos* para aceitar o atendimento.${link}`;
   }
 

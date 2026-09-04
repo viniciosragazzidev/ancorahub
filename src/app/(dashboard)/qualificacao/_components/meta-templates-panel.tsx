@@ -186,7 +186,7 @@ export function MetaTemplatesPanel() {
 
     setSubmittingRecreate(true);
     try {
-      await recreateMetaTemplateAction({
+      const result = await recreateMetaTemplateAction({
         templateId: recreatingTemplate?.id,
         name: formattedName,
         language: recreateLanguage,
@@ -196,6 +196,11 @@ export function MetaTemplatesPanel() {
         bodyText: recreateBodyText.trim(),
         footerText: recreateFooterText.trim() || undefined,
       });
+
+      if (!result.success) {
+        toast.error(result.error || "Erro ao enviar modelo para a Meta.");
+        return;
+      }
 
       toast.success(`Modelo "${formattedName}" enviado com sucesso para a Meta! A nova empresa já registrou o modelo.`);
       setRecreateModalOpen(false);

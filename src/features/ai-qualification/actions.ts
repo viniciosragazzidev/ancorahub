@@ -371,91 +371,117 @@ export type RecreateMetaTemplateInput = {
   }>;
 };
 
-export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInput) {
-  const context = await getRequiredTenantContext();
-  assertAdminRole(context.role);
+export async function recreateMetaTemplateAction(input: RecreateMetaTemplateInput): Promise<{
+  success: boolean;
+  id?: string;
+  metaTemplateId?: string;
+  name?: string;
+  status?: string;
+  error?: string;
+}> {
+  try {
+    const context = await getRequiredTenantContext();
+    assertAdminRole(context.role);
 
-  const { createTenantTemplateInMeta, syncTenantTemplates } = await import(
-    "@/features/communication-channels/template-sync-service"
-  );
+    const { createTenantTemplateInMeta, syncTenantTemplates } = await import(
+      "@/features/communication-channels/template-sync-service"
+    );
 
-  const formattedName = input.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
-  if (!formattedName) throw new Error("Informe um nome válido para o modelo (apenas letras minúsculas e _).");
-  if (!input.bodyText?.trim()) throw new Error("O corpo da mensagem é obrigatório.");
+    const formattedName = input.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    if (!formattedName) return { success: false, error: "Informe um nome válido para o modelo (apenas letras minúsculas e _)." };
+    if (!input.bodyText?.trim()) return { success: false, error: "O corpo da mensagem é obrigatório." };
 
-  const language = input.language?.trim() || "pt_BR";
-  const category = input.category || "MARKETING";
+    const language = input.language?.trim() || "pt_BR";
+    const category = input.category || "MARKETING";
 
-  const components: MetaGraphTemplateComponent[] = [];
+    const components: MetaGraphTemplateComponent[] = [];
 
-  // 1. Header
-  if (input.headerType === "TEXT" && input.headerText?.trim()) {
-    components.push({
-      type: "HEADER",
-      format: "TEXT",
-      text: input.headerText.trim(),
+    // 1. Header
+    if (input.headerType === "TEXT" && input.headerText?.trim()) {
+      components.push({
+        type: "HEADER",
+        format: "TEXT",
+        text: input.headerText.trim(),
+      });
+    }
+
+    // 2. Body & Example variables (Meta requires {{1}}, {{2}} positional placeholders)
+    const rawBody = input.bodyText.trim();
+    let counter = 1;
+    const sampleValues: string[] = [];
+
+    const metaBodyText = rawBody.replace(/\{\{(\d+|[a-zA-Z0-9_]+)\}\}/g, (_match, varName) => {
+      const v = String(varName).toLowerCase();
+      if (v === "nome" || v === "1" || v === "nome_cliente" || v === "corretor_nome") sampleValues.push("João Silva");
+      else if (v === "empresa" || v === "2") sampleValues.push("Âncora Saúde");
+      else if (v === "cargo" || v === "3") sampleValues.push("Corretor(a)");
+      else if (v === "nome_bot") sampleValues.push("Assistente Âncora");
+      else if (v === "produto_interesse" || v === "interesse" || v === "plano") sampleValues.push("Plano de Saúde");
+      else if (v === "telefone_cliente") sampleValues.push("11999999999");
+      else if (v === "tipo") sampleValues.push("Individual");
+      else if (v === "n_dependentes") sampleValues.push("1");
+      else sampleValues.push(`Valor_${counter}`);
+
+      const placeholder = `{{${counter}}}`;
+      counter++;
+      return placeholder;
     });
-  }
 
-  // 2. Body & Example variables
-  const bodyText = input.bodyText.trim();
-  const varMatches = bodyText.match(/\{\{(\d+|[a-zA-Z0-9_]+)\}\}/g);
-  let bodyExample: { body_text?: string[][] } | undefined = undefined;
+    const bodyComponent: MetaGraphTemplateComponent = {
+      type: "BODY",
+      text: metaBodyText,
+      ...(sampleValues.length > 0 ? { example: { body_text: [sampleValues] } } : {}),
+    };
+    components.push(bodyComponent);
 
-  if (varMatches && varMatches.length > 0) {
-    const sampleValues = varMatches.map((m, idx) => {
-      const v = m.replace(/[\{\}]/g, "").toLowerCase();
-      if (v === "nome" || v === "1" || v === "nome_cliente" || v === "corretor_nome") return "João Silva";
-      if (v === "empresa" || v === "2") return "Âncora Saúde";
-      if (v === "cargo") return "Corretor(a)";
-      if (v === "nome_bot") return "Assistente Âncora";
-      if (v === "produto_interesse" || v === "interesse" || v === "plano") return "Plano de Saúde";
-      if (v === "telefone_cliente") return "11999999999";
-      if (v === "tipo") return "Individual";
-      if (v === "n_dependentes") return "1";
-      return `Exemplo_${idx + 1}`;
+    // 3. Footer
+    if (input.footerText?.trim()) {
+      components.push({
+        type: "FOOTER",
+        text: input.footerText.trim(),
+      });
+    }
+
+    // 4. Buttons
+    if (input.buttons && input.buttons.length > 0) {
+      components.push({
+        type: "BUTTONS",
+        buttons: input.buttons.map((b) => ({
+          type: b.type,
+          text: b.text,
+          ...(b.url ? { url: b.url, example: b.url.includes("{{") ? ["https://ancorahub.com.br/convite/token123"] : undefined } : {}),
+          ...(b.phone_number ? { phone_number: b.phone_number } : {}),
+        })),
+      });
+    } else if (formattedName === "broker_first_access" || rawBody.toLowerCase().includes("botão abaixo")) {
+      components.push({
+        type: "BUTTONS",
+        buttons: [
+          {
+            type: "URL",
+            text: "Concluir Cadastro",
+            url: "https://ancorahub.com.br/convite/{{1}}",
+            example: ["https://ancorahub.com.br/convite/token123"],
+          },
+        ],
+      });
+    }
+
+    const result = await createTenantTemplateInMeta(context.tenantId, context.userId, {
+      name: formattedName,
+      language,
+      category,
+      components,
     });
-    bodyExample = { body_text: [sampleValues] };
+
+    await syncTenantTemplates(context.tenantId).catch(() => undefined);
+
+    return { success: true, id: result.id, metaTemplateId: result.metaTemplateId, name: result.name, status: result.status };
+  } catch (error) {
+    console.error("[recreateMetaTemplateAction] Error:", error);
+    const message = error instanceof Error ? error.message : "A Meta rejeitou a criação do modelo.";
+    return { success: false, error: message };
   }
-
-  components.push({
-    type: "BODY",
-    text: bodyText,
-    ...(bodyExample ? { example: bodyExample } : {}),
-  });
-
-  // 3. Footer
-  if (input.footerText?.trim()) {
-    components.push({
-      type: "FOOTER",
-      text: input.footerText.trim(),
-    });
-  }
-
-  // 4. Buttons
-  if (input.buttons && input.buttons.length > 0) {
-    components.push({
-      type: "BUTTONS",
-      buttons: input.buttons.map((b) => ({
-        type: b.type,
-        text: b.text,
-        ...(b.url ? { url: b.url } : {}),
-        ...(b.phone_number ? { phone_number: b.phone_number } : {}),
-      })),
-    });
-  }
-
-  const result = await createTenantTemplateInMeta(context.tenantId, context.userId, {
-    name: formattedName,
-    language,
-    category,
-    components,
-  });
-
-  // Automatically sync with Meta
-  await syncTenantTemplates(context.tenantId).catch(() => undefined);
-
-  return result;
 }
 
 /* ─── Modelos Livres (Janela de 24 Horas / Sem Aprovação) ─── */

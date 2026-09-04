@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, notInArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray, isNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { META_CLOUD_PROVIDER } from "./types";
@@ -55,12 +55,12 @@ export async function resolveMetaChannelCredentials(tenantId: string) {
     .where(
       and(
         eq(schema.communicationChannels.tenantId, tenantId),
-        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
         eq(schema.communicationChannels.status, "active"),
         isNull(schema.communicationChannels.branchId),
-        eq(schema.communicationChannels.isDefault, true),
       ),
     )
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.updatedAt))
     .limit(1);
 
   if (!channel || !channel.wabaId || !channel.accessTokenCiphertext) {

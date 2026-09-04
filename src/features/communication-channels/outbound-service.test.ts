@@ -57,13 +57,13 @@ describe("outboundService", () => {
     const inviteText = resolveTemplateTextBody("brokerInvitation", ["Carlos", "Âncora Seguros"], "token-123");
     expect(inviteText).toContain("Olá *Carlos*!");
     expect(inviteText).toContain("Âncora Seguros");
-    expect(inviteText).toContain("https://ancorahub.com.br/convite/token-123");
+    expect(inviteText).toContain("https://crm.ancorasaude.cloud/convite/token-123");
 
     const leadNotifText = resolveTemplateTextBody("brokerLeadNotification", ["Corretor", "João Silva", "Maria Souza", "Plano de Saúde PME"], "lead-999");
     expect(leadNotifText).toContain("⚡ *Novo Lead Atribuído!*");
     expect(leadNotifText).toContain("Maria Souza");
     expect(leadNotifText).toContain("Plano de Saúde PME");
-    expect(leadNotifText).toContain("https://ancorahub.com.br/conversas?lead=lead-999");
+    expect(leadNotifText).toContain("https://crm.ancorasaude.cloud/conversas?lead=lead-999");
 
     const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "lead-999"]);
     expect(confirmedText).toContain("✅ *Atribuição Confirmada*");
