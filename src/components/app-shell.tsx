@@ -22,6 +22,7 @@ type UserInfo = {
   name: string | null;
   email: string | null;
   role?: string;
+  jobTitle?: string | null;
 };
 
 function getReadableForeground(hex: string) {
@@ -160,18 +161,19 @@ export function AppShell({
         )}
         <SidebarInset
           ref={canvasRef}
+          data-slot="app-scroll-frame"
           className={cn(
             "app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]",
-            "max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
+            "max-[559px]:pb-[calc(var(--mobile-bottom-nav-height)+var(--mobile-safe-bottom))]"
           )}
           style={{
             scrollPaddingTop: "var(--header-height)",
-            scrollPaddingBottom: "calc(7rem + env(safe-area-inset-bottom))",
+            scrollPaddingBottom: "calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom))",
           }}
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SidebarInset>
-        <MobileBottomNav />
+        <MobileBottomNav role={user?.role} jobTitle={user?.jobTitle} />
         <OnboardingWelcomeDialog />
       </SidebarProvider>
     </OnboardingProvider>

@@ -52,9 +52,9 @@ export function FilterBar({
         className,
       )}
     >
-      <div className="flex flex-1 flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-[559px]:w-full">
         {onSearchChange !== undefined && (
-          <div className="relative min-w-[12rem] max-w-sm flex-1">
+          <div className="relative min-w-[12rem] max-w-sm flex-1 max-[559px]:max-w-none">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
@@ -62,14 +62,14 @@ export function FilterBar({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
               aria-label={searchLabel}
-              className="pl-8.5 pr-8 bg-background"
+              className="bg-background pl-8.5 pr-8 max-[559px]:h-(--mobile-touch-target)"
             />
             {searchValue && (
               <button
                 type="button"
                 onClick={() => onSearchChange("")}
                 aria-label="Limpar campo de busca"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-1 top-1/2 grid size-(--mobile-touch-target) -translate-y-1/2 place-items-center text-muted-foreground hover:text-foreground sm:right-2.5 sm:size-auto"
               >
                 <X className="size-3.5" />
               </button>
@@ -90,7 +90,7 @@ export function FilterBar({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 font-medium"
+                  className="gap-1.5 font-medium max-[559px]:min-h-(--mobile-touch-target)"
                 />
               }
             >
@@ -123,7 +123,7 @@ export function FilterBar({
             variant="outline"
             size="sm"
             onClick={advancedFiltersTrigger.onClick}
-            className="gap-1.5 font-medium"
+            className="gap-1.5 font-medium max-[559px]:min-h-(--mobile-touch-target)"
           >
             <SlidersHorizontal className="size-3.5 text-muted-foreground" />
             <span>Filtros</span>
@@ -151,7 +151,7 @@ export function FilterBar({
         )}
       </div>
 
-      {children && <div className="flex shrink-0 items-center gap-2">{children}</div>}
+      {children && <div className="flex shrink-0 items-center gap-2 max-[559px]:w-full max-[559px]:overflow-x-auto max-[559px]:pb-0.5 max-[559px]:[scrollbar-width:none]">{children}</div>}
     </div>
   );
 }

@@ -203,6 +203,18 @@
   --size-spacing-11: 96px;
   --size-spacing-12: 160px;
 
+  /* UX-M1 — shared mobile geometry. Components consume these tokens instead
+   * of introducing route-specific viewport, safe-area or touch constants. */
+  --mobile-page-padding: 1rem;
+  --mobile-section-gap: 1rem;
+  --mobile-touch-target: 2.75rem;
+  --mobile-header-height: 3.5rem;
+  --mobile-bottom-nav-height: 4.5rem;
+  --mobile-safe-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-right: env(safe-area-inset-right, 0px);
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-safe-left: env(safe-area-inset-left, 0px);
+
   --text-xxl-font-size: 36px;
   --text-xl-font-size: 28px;
   --text-lg-font-size: 20px;

@@ -61,7 +61,7 @@ export function PeriodSelect({
         }
       }}
     >
-      <SelectTrigger className="w-32 text-xs bg-card" aria-label={label}>
+      <SelectTrigger className="w-32 bg-card text-xs max-[559px]:h-(--mobile-touch-target)" aria-label={label}>
         <SelectValue placeholder="Selecione o período" />
       </SelectTrigger>
       <SelectContent>

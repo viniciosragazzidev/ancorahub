@@ -54,7 +54,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-        "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border border-border/80 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity] duration-[var(--dialog-content-duration)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-2xl data-[side=bottom]:data-ending-style:translate-y-6 data-[side=bottom]:data-starting-style:translate-y-6 sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-2xl data-[side=left]:data-ending-style:translate-x-6 data-[side=left]:data-starting-style:translate-x-6 sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-2xl data-[side=right]:data-ending-style:translate-x-6 data-[side=right]:data-starting-style:translate-x-6 sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-2xl data-[side=top]:data-ending-style:translate-y-6 data-[side=top]:data-starting-style:translate-y-6 sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-x-0 max-[559px]:data-[side=left]:bottom-0 max-[559px]:data-[side=left]:top-auto max-[559px]:data-[side=left]:h-[min(92dvh,48rem)] max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-t-2xl max-[559px]:data-[side=left]:rounded-b-none max-[559px]:data-[side=left]:data-starting-style:translate-x-0 max-[559px]:data-[side=left]:data-starting-style:translate-y-6 max-[559px]:data-[side=right]:inset-x-0 max-[559px]:data-[side=right]:bottom-0 max-[559px]:data-[side=right]:top-auto max-[559px]:data-[side=right]:h-[min(92dvh,48rem)] max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-t-2xl max-[559px]:data-[side=right]:rounded-b-none max-[559px]:data-[side=right]:data-starting-style:translate-x-0 max-[559px]:data-[side=right]:data-starting-style:translate-y-6",
+        "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border border-border/80 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity] duration-[var(--dialog-content-duration)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-2xl data-[side=bottom]:data-ending-style:translate-y-6 data-[side=bottom]:data-starting-style:translate-y-6 sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-2xl data-[side=left]:data-ending-style:translate-x-6 data-[side=left]:data-starting-style:translate-x-6 sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-2xl data-[side=right]:data-ending-style:translate-x-6 data-[side=right]:data-starting-style:translate-x-6 sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-2xl data-[side=top]:data-ending-style:translate-y-6 data-[side=top]:data-starting-style:translate-y-6 sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-0 max-[559px]:data-[side=left]:h-dvh max-[559px]:data-[side=left]:max-h-dvh max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-none max-[559px]:data-[side=left]:data-starting-style:translate-x-0 max-[559px]:data-[side=left]:data-starting-style:translate-y-6 max-[559px]:data-[side=right]:inset-0 max-[559px]:data-[side=right]:h-dvh max-[559px]:data-[side=right]:max-h-dvh max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-none max-[559px]:data-[side=right]:data-starting-style:translate-x-0 max-[559px]:data-[side=right]:data-starting-style:translate-y-6",
           className,
         )}
         {...props}
@@ -67,7 +67,7 @@ function SheetContent({
               <Button
                 variant="ghost"
                 aria-label="Fechar painel"
-                className="absolute top-4 right-4 z-10 size-8 rounded-md border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:ring-2"
+                className="absolute top-[calc(1rem+var(--mobile-safe-top))] right-[max(1rem,var(--mobile-safe-right))] z-10 size-8 rounded-md border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:ring-2 sm:top-4 sm:right-4"
                 size="icon"
               />
             }
@@ -86,7 +86,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-header"
       className={cn(
-        "flex shrink-0 flex-col gap-1.5 border-b border-border/80 bg-card/70 px-5 py-4 pr-14 sm:px-6 sm:py-5",
+        "flex shrink-0 flex-col gap-1.5 border-b border-border/80 bg-card/70 px-5 pt-[calc(1rem+var(--mobile-safe-top))] pr-14 pb-4 sm:px-6 sm:py-5",
         className,
       )}
       {...props}
@@ -121,7 +121,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-footer"
       className={cn(
-        "mt-auto flex shrink-0 flex-col gap-2 border-t border-border/80 bg-card/80 px-5 py-3.5 supports-backdrop-filter:bg-card/70 sm:flex-row sm:items-center sm:justify-end sm:px-6",
+        "mt-auto flex shrink-0 flex-col gap-2 border-t border-border/80 bg-card/80 px-5 pt-3.5 pb-[max(0.875rem,var(--mobile-safe-bottom))] supports-backdrop-filter:bg-card/70 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-3.5",
         className,
       )}
       {...props}

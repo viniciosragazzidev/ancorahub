@@ -218,6 +218,32 @@
   display: none;
 }
 
+/* UX-M1 — the authenticated shell owns one vertical scroll frame. The mobile
+ * safe area is consumed by the shell primitives, not recreated by each route. */
+@media (max-width: 559px) {
+  :root:has([data-ui-refinement="clean"]) [data-slot="app-scroll-frame"] {
+    scrollbar-gutter: auto;
+  }
+
+  :root:has([data-ui-refinement="clean"]) [data-slot="app-content"] {
+    min-height: 100%;
+  }
+
+  :root:has([data-ui-refinement="clean"]) [data-mobile-touch="true"] {
+    min-height: var(--mobile-touch-target);
+    min-width: var(--mobile-touch-target);
+  }
+
+  :root:has([data-mobile-conversation-active="true"]) [data-slot="mobile-bottom-nav"] {
+    display: none;
+  }
+
+  :root:has([data-mobile-conversation-active="true"]) [data-slot="app-scroll-frame"] {
+    padding-bottom: 0;
+    scroll-padding-bottom: 0;
+  }
+}
+
 /* Reusable report composition. CSS grid only; metric calculations stay server-side. */
 .report-overview { display: flex; flex-direction: column; gap: var(--size-spacing-05); }
 .report-overview-detail { display: grid; gap: var(--size-spacing-05); }

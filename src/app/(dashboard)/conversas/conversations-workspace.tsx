@@ -162,6 +162,9 @@ export function ConversationsWorkspace({
       ? initialLeadId
       : initialConversations.find((item) => item.messages.length > 0)?.id ?? initialConversations[0]?.id ?? null,
   );
+  const [mobileView, setMobileView] = useState<"list" | "chat">(
+    initialLeadId ? "chat" : "list",
+  );
 
   // Server data becomes authoritative after the authenticated shell refreshes.
   // Conversation content is never streamed as raw database rows to the browser.
@@ -232,11 +235,13 @@ export function ConversationsWorkspace({
 
   function selectConversation(id: string) {
     setSelectedId(id);
+    setMobileView("chat");
     updateSelectedLeadInUrl(id);
   }
 
   function returnToList() {
     setSelectedId(null);
+    setMobileView("list");
     updateSelectedLeadInUrl(null);
   }
 
@@ -257,6 +262,7 @@ export function ConversationsWorkspace({
   return (
     <section
       aria-label="Central de conversas"
+      data-mobile-conversation-active={mobileView === "chat" && selected ? "true" : undefined}
       className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       <FilterToolbar
@@ -304,7 +310,7 @@ export function ConversationsWorkspace({
       >
         <section
           aria-label="Lista de atendimentos"
-          className={cn("flex min-h-0 flex-col border-r border-border bg-card", selected && "max-lg:hidden")}
+          className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
           <div className="border-b border-border px-3 py-2.5">
             <div className="relative">
@@ -334,7 +340,7 @@ export function ConversationsWorkspace({
           </ScrollArea>
         </section>
 
-        <section aria-live="polite" className={cn("flex min-h-0 flex-col bg-muted/15", !selected && "max-lg:hidden")}>
+        <section aria-live="polite" className={cn("flex min-h-0 flex-col bg-muted/15", (mobileView !== "chat" || !selected) && "max-lg:hidden")}>
           {selected ? (
             <>
               <ConversationHeader

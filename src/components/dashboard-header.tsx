@@ -26,7 +26,8 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   return (
     <header
-      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-14 max-[559px]:gap-2 max-[559px]:px-3"
+      data-slot="dashboard-header"
+      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-[calc(var(--mobile-header-height)+var(--mobile-safe-top))] max-[559px]:gap-2 max-[559px]:pt-(--mobile-safe-top) max-[559px]:pl-[max(var(--mobile-page-padding),var(--mobile-safe-left))] max-[559px]:pr-[max(var(--mobile-page-padding),var(--mobile-safe-right))]"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
       {showSidebarTrigger ? (
@@ -53,7 +54,7 @@ export function DashboardHeader({
           onClick={() => window.dispatchEvent(new CustomEvent("open-system-feedback"))}
           size="icon"
           variant="ghost"
-          className="size-8 rounded-lg transition-colors hover:bg-muted/60"
+          className="size-8 rounded-lg transition-colors hover:bg-muted/60 max-[559px]:hidden"
         >
           <HelpCircle className="size-4 text-muted-foreground" />
         </Button>
