@@ -27,7 +27,7 @@ export function Section({
       data-slot="canonical-section"
       className={cn(
         "space-y-4",
-        variant === "card" && "rounded-xl border border-border/80 bg-card p-5 shadow-xs",
+        variant === "card" && "rounded-2xl border border-border/60 bg-card/40 p-5 shadow-none",
         variant === "bordered" && "rounded-xl border border-border/70 p-4",
         className,
       )}

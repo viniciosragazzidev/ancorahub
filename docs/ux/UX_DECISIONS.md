@@ -158,3 +158,15 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
   operacional; uma única entrada reduz ambiguidade e custo cognitivo.
 - **IMPACT**: dashboard, links de drill-down, onboarding e sidebar. Não altera
   cálculos, permissões ou escopo de tenant.
+
+## DEC-012 — Primitives visuais como ponto único de refinamento
+
+- **DECISION**: o refinamento de cards e tabelas deve acontecer nos primitives
+  compartilhados (`Section`, `Card`, `Table`, `DataTable` e `StatCard`) antes de
+  receber classes específicas em uma rota.
+- **WHY**: `/filiais`, `/equipe`, `/vendas`, `/unidades` e `/leads` passam a
+  compartilhar a mesma superfície, hierarquia e estados da experiência
+  canônica sem duplicar CSS ou introduzir drift por feature.
+- **GUARDRAIL**: estados semânticos (warning, success, destructive), ações e
+  regras de negócio permanecem definidos pela feature e não são sobrescritos
+  pelo tratamento visual comum.

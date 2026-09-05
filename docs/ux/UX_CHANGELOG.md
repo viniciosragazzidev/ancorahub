@@ -349,3 +349,11 @@ de métricas entre tenants.
 - O item de sidebar “Tarefas” (que apontava incorretamente para relatórios)
   foi removido e `/qualificacao` foi adicionado como entrada explícita de
   Qualificação IA.
+
+## 2026-09-05 — primitives compartilhados alinhados ao dashboard
+
+- `Section` (`variant="card"`) passou a usar a mesma superfície leve e sem
+  sombra do dashboard canônico.
+- `Table` e `DataTable` passaram a compartilhar cabeçalho recuado, bordas
+  discretas e hover de linha suave; `/filiais` e `/leads` herdam o padrão sem
+  lógica específica de rota.
