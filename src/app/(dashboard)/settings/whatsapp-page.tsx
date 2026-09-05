@@ -60,7 +60,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.companyAccount?.status !== "active";
 
   return (
-    <main className="flex min-h-full flex-col gap-6 bg-background p-4 antialiased lg:p-6">
+    <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">
       <header className="max-w-3xl">
         <p className="text-xs font-medium text-primary">CANAIS DE ATENDIMENTO</p>
         <h1 className="mt-1 text-balance text-2xl font-semibold tracking-tight">
@@ -72,10 +72,10 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
       </header>
 
       <Tabs defaultValue="connection" variant="segment" className="w-full space-y-6">
-        <TabsList className="max-w-md">
-          <TabsTrigger value="connection">Número & Conexão</TabsTrigger>
-          <TabsTrigger value="templates">Templates Meta</TabsTrigger>
-          <TabsTrigger value="usages">Eventos & Usos</TabsTrigger>
+        <TabsList className="w-full max-w-md snap-x snap-mandatory flex-nowrap justify-start overflow-x-auto">
+          <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="connection">Número & Conexão</TabsTrigger>
+          <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="templates">Templates Meta</TabsTrigger>
+          <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="usages">Eventos & Usos</TabsTrigger>
         </TabsList>
 
         {/* ABA 1: CONEXÃO */}

@@ -157,7 +157,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         breadcrumb="Pós-venda"
         title={client.name}
       />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         {/* Profile Cover & Header Card */}
         <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="h-28 bg-gradient-to-r from-chart-2/10 via-chart-2/5 to-transparent border-b border-border/40" />
@@ -374,18 +374,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <Tabs defaultValue="sales" className="min-h-0">
               <TabsList
                 aria-label="Seções do cliente"
-                className="w-full justify-start overflow-x-auto border-b border-border/40 pb-px"
+                className="w-full snap-x snap-mandatory flex-nowrap justify-start overflow-x-auto border-b border-border/40 pb-px"
                 variant="line"
               >
-                <TabsTrigger value="sales">
+                <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="sales">
                   <CurrencyCircleDollar className="size-3.5" />
                   Vendas ({sales.length})
                 </TabsTrigger>
-                <TabsTrigger value="documents">
+                <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="documents">
                   <FileText className="size-3.5" />
                   Documentos
                 </TabsTrigger>
-                <TabsTrigger value="timeline">
+                <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="timeline">
                   Linha do Tempo
                 </TabsTrigger>
               </TabsList>

@@ -158,7 +158,7 @@ export default async function CustomersPage({
           </div>
         }
       />
-      <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <ClientesList clients={clients} metrics={metrics} period={period} />
       </main>
     </>

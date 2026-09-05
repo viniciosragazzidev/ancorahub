@@ -23,7 +23,7 @@ export default async function MetaIntegrationPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Integrações" title="Marketing Meta" />
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 lg:p-6">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <MetaIntegrationHub
           marketing={{ connection: marketing.connection, assets: marketing.assets, logs: marketing.logs }}
           canConfigure={canConfigure}

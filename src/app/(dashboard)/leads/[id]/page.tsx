@@ -236,7 +236,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   return (
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Perfil do Lead" />
-      <main className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-6 bg-background p-4 sm:p-6 lg:p-8">
+      <main className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 sm:p-6 lg:p-8">
 
         {/* Profile Cover & Header Card */}
         <Card variant="overview" className="border-border/60 bg-card/80 p-5 shadow-none dark:border-border/80 dark:bg-card sm:p-6" data-onboarding="lead-profile">
@@ -378,27 +378,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             })()}
 
             <Tabs defaultValue={defaultLeadTab} variant="segment" className="min-h-0 min-w-0 gap-5 overflow-hidden">
-              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="h-auto w-full p-1.5 rounded-xl border border-border/60 bg-muted/20 flex flex-wrap sm:flex-nowrap gap-1 overflow-x-auto">
-                <TabsTrigger value="service" className="flex-1 justify-start px-3 py-2 text-left min-w-[130px]">
+              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="flex h-auto w-full snap-x snap-mandatory flex-nowrap gap-1 overflow-x-auto rounded-xl border border-border/60 bg-muted/20 p-1.5">
+                <TabsTrigger value="service" className="min-h-(--mobile-touch-target) min-w-[130px] shrink-0 snap-start justify-start px-3 py-2 text-left sm:flex-1">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className="font-semibold text-xs">Atendimento</span>
                     <span className="text-[11px] font-normal text-muted-foreground">Contato & Operação</span>
                   </span>
                 </TabsTrigger>
-                <TabsTrigger value="documents" disabled={stageRank < 5} className="flex-1 justify-start px-3 py-2 text-left min-w-[130px]">
+                <TabsTrigger value="documents" disabled={stageRank < 5} className="min-h-(--mobile-touch-target) min-w-[130px] shrink-0 snap-start justify-start px-3 py-2 text-left sm:flex-1">
                   {stageRank < 5 ? <LockKey className="size-3.5 text-muted-foreground mr-1 shrink-0" /> : null}
                   <span className="flex flex-col items-start gap-0.5">
                     <span className="font-semibold text-xs">Documentos {leadDocs.length > 0 ? `(${leadDocs.length})` : ""}</span>
                     <span className="text-[11px] font-normal text-muted-foreground">Análise cadastral</span>
                   </span>
                 </TabsTrigger>
-                <TabsTrigger value="history" className="flex-1 justify-start px-3 py-2 text-left min-w-[130px]">
+                <TabsTrigger value="history" className="min-h-(--mobile-touch-target) min-w-[130px] shrink-0 snap-start justify-start px-3 py-2 text-left sm:flex-1">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className="font-semibold text-xs">Histórico</span>
                     <span className="text-[11px] font-normal text-muted-foreground">Linha do tempo</span>
                   </span>
                 </TabsTrigger>
-                <TabsTrigger value="tasks" className="flex-1 justify-start px-3 py-2 text-left min-w-[130px]">
+                <TabsTrigger value="tasks" className="min-h-(--mobile-touch-target) min-w-[130px] shrink-0 snap-start justify-start px-3 py-2 text-left sm:flex-1">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className="font-semibold text-xs">Tarefas ({tasks.filter(t => !t.completedAt).length})</span>
                     <span className="text-[11px] font-normal text-muted-foreground">Próximas ações</span>
