@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { FileArrowDown } from "@/components/huge-icons";
 
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppSelect } from "@/components/ui/select";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { useMultiSelect } from "@/hooks/use-multi-select";
@@ -48,11 +50,20 @@ export function SalesWorkspace({
   period: PeriodValue;
 }) {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "cancelled">("all");
+  const [mobileQuery, setMobileQuery] = useState("");
 
   const filteredSales = useMemo(() => {
     if (statusFilter === "all") return sales;
     return sales.filter((s) => s.status === statusFilter);
   }, [sales, statusFilter]);
+  const mobileSales = useMemo(() => {
+    const query = mobileQuery.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return filteredSales;
+    return filteredSales.filter((sale) =>
+      [sale.leadName, sale.clientName ?? "", sale.brokerName ?? "", sale.planName ?? ""]
+        .some((value) => value.toLocaleLowerCase("pt-BR").includes(query)),
+    );
+  }, [filteredSales, mobileQuery]);
 
   const saleIds = useMemo(() => filteredSales.map((s) => s.id), [filteredSales]);
   const multiSelect = useMultiSelect(saleIds);
@@ -220,7 +231,7 @@ export function SalesWorkspace({
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4">
         <StatCard
           label="Total de vendas"
           value={sales.length}
@@ -283,8 +294,45 @@ export function SalesWorkspace({
         )}
       </SelectionToolbar>
 
-      {/* Data Table */}
-      <DataTable
+      <div className="space-y-2.5 sm:hidden">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            aria-label="Buscar vendas"
+            className="h-(--mobile-touch-target) pl-9"
+            onChange={(event) => setMobileQuery(event.target.value)}
+            placeholder="Buscar por lead, corretor ou plano"
+            value={mobileQuery}
+          />
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+          <AppSelect
+            aria-label="Filtrar por status"
+            className="w-40 shrink-0"
+            value={statusFilter}
+            onValueChange={(val) => setStatusFilter(val as "all" | "active" | "cancelled")}
+            options={[
+              { value: "all", label: "Todas as vendas" },
+              { value: "active", label: "Ativas" },
+              { value: "cancelled", label: "Canceladas" },
+            ]}
+          />
+          <Button
+            className="min-h-(--mobile-touch-target) shrink-0"
+            onClick={() => {
+              const now = new Date();
+              const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+              window.open(`/api/internal/export/commissions?startMonth=${month}&endMonth=${month}&format=csv`, "_blank");
+            }}
+            variant="outline"
+          >
+            <FileArrowDown className="size-3.5" /> Exportar CSV
+          </Button>
+        </div>
+      </div>
+
+      <ResponsiveDataView
+        desktop={<DataTable
         columns={columns}
         data={filteredSales}
         searchKey="leadName"
@@ -341,6 +389,51 @@ export function SalesWorkspace({
               <FileArrowDown className="size-3.5" /> Exportar CSV
             </Button>
           </div>
+        }
+        />}
+        mobile={
+          mobileSales.length ? (
+            <MobileDataList>
+              {mobileSales.map((sale) => (
+                <MobileDataListItem key={sale.id}>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      aria-label={`Selecionar venda ${sale.leadName}`}
+                      checked={multiSelect.isSelected(sale.id)}
+                      className="mt-0.5"
+                      onCheckedChange={() => multiSelect.toggle(sale.id)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-semibold text-foreground">{sale.leadName}</h3>
+                          <p className="truncate text-xs text-muted-foreground">{sale.planName ?? "Plano não informado"}{sale.carrierName ? ` · ${sale.carrierName}` : ""}</p>
+                        </div>
+                        <SaleStatusBadge status={sale.status} />
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        <MobileDataRow label="Valor" value={formatCurrency(sale.saleValue)} />
+                        <MobileDataRow label="Data" value={formatDate(sale.saleDate)} />
+                        <MobileDataRow label="Corretor" value={sale.brokerName ?? "—"} />
+                      </div>
+                      <Button
+                        className="mt-3 w-full min-h-(--mobile-touch-target)"
+                        render={<Link href={`/vendas/${sale.id}`} />}
+                        variant="outline"
+                      >
+                        Ver detalhes <ArrowRight className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </MobileDataListItem>
+              ))}
+            </MobileDataList>
+          ) : (
+            <div className="rounded-[var(--radius-card)] border border-border bg-card px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-foreground">Nenhuma venda encontrada</p>
+              <p className="mt-1 text-xs text-muted-foreground">Ajuste a busca ou o filtro de status.</p>
+            </div>
+          )
         }
       />
     </div>

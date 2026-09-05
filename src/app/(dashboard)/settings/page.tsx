@@ -68,7 +68,7 @@ export default async function SettingsPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Administração" title="Parâmetros do Sistema" />
-      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <div className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <SettingsTabs
           account={account}
           company={context.role === "director" ? company : undefined}

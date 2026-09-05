@@ -10,24 +10,25 @@ import { Button } from "@/components/ui/button";
 export type TabId = "conta" | "empresa" | "unidade" | "disponibilidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
 type Tab = { id: TabId; label: string; icon: typeof UserIcon };
 
+const ALL_TABS: Tab[] = [
+  { id: "conta", label: "Minha conta", icon: UserIcon },
+  { id: "empresa", label: "Empresa", icon: Building06Icon },
+  { id: "unidade", label: "Unidade", icon: Store01Icon },
+  { id: "disponibilidade", label: "Disponibilidade", icon: CalendarCheckIcon },
+  { id: "atendimento", label: "Atendimento", icon: Message01Icon },
+  { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
+  { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
+  { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },
+  { id: "extensao", label: "Extensão", icon: PuzzleIcon },
+];
+
 export function SettingsTabs({ account, company, unit, availability, whatsapp, integrations, security, atendimento, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; availability?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const allTabs: Tab[] = [
-    { id: "conta", label: "Minha conta", icon: UserIcon },
-    { id: "empresa", label: "Empresa", icon: Building06Icon },
-    { id: "unidade", label: "Unidade", icon: Store01Icon },
-    { id: "disponibilidade", label: "Disponibilidade", icon: CalendarCheckIcon },
-    { id: "atendimento", label: "Atendimento", icon: Message01Icon },
-    { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
-    { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
-    { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },
-    { id: "extensao", label: "Extensão", icon: PuzzleIcon },
-  ];
   const tabs = useMemo(() => {
-    return allTabs.filter((tab) => tabIds.includes(tab.id));
-  }, [tabIds, allTabs]);
+    return ALL_TABS.filter((tab) => tabIds.includes(tab.id));
+  }, [tabIds]);
 
   const requested = searchParams.get("tab") as string | null;
   const isPasskeyRequested = requested === "passkey";
@@ -66,13 +67,13 @@ export function SettingsTabs({ account, company, unit, availability, whatsapp, i
   return (
     <div className="grid gap-4 lg:grid-cols-[13.5rem_1fr]">
       <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
-        <nav className="flex gap-1 pb-1">
+        <nav className="flex snap-x snap-mandatory gap-1 pb-1">
           {tabs.map((tab) => (
             <Button
               key={tab.id}
               type="button"
               onClick={() => selectTab(tab.id)}
-              className={`h-auto shrink-0 justify-start gap-2.5 px-3 py-2.5 text-sm ${active === tab.id ? "bg-secondary font-semibold text-foreground" : "text-muted-foreground"}`}
+              className={`h-auto min-h-(--mobile-touch-target) shrink-0 snap-start justify-start gap-2.5 px-3 py-2.5 text-sm ${active === tab.id ? "bg-secondary font-semibold text-foreground" : "text-muted-foreground"}`}
               variant="ghost"
             >
               <HugeiconsIcon icon={tab.icon} size={16} />

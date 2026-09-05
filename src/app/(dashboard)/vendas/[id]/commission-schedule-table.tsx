@@ -10,6 +10,7 @@ import { ScheduleStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   markCommissionPaidAction,
   markCommissionUnpaidAction,
@@ -193,11 +194,39 @@ export function CommissionScheduleTable({
   }
 
   return (
-    <DataTable
-      columns={columns}
-      data={schedule}
-      showColumnToggle={false}
-      showPagination={false}
+    <ResponsiveDataView
+      desktop={
+        <DataTable
+          columns={columns}
+          data={schedule}
+          showColumnToggle={false}
+          showPagination={false}
+        />
+      }
+      mobile={
+        <MobileDataList>
+          {schedule.map((item) => (
+            <MobileDataListItem key={item.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">{item.monthNumber}º mês</h3>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">{item.referenceMonth}</p>
+                </div>
+                <ScheduleStatusBadge status={item.status} />
+              </div>
+              <div className="mt-3 space-y-2">
+                <MobileDataRow label="Vencimento" value={formatDate(item.dueDate)} />
+                <MobileDataRow label="Percentual" value={`${item.percentage}%`} />
+                <MobileDataRow label="Valor" value={formatCurrency(item.amount)} />
+                {item.status === "paid" ? (
+                  <MobileDataRow label="Pagamento" value={`${item.paidByName?.split(" ")[0] ?? "Confirmado"} em ${formatDate(item.paidAt)}`} />
+                ) : null}
+              </div>
+              {canManage ? <div className="mt-3 border-t border-border pt-2"><ActionCell item={item} canManage /></div> : null}
+            </MobileDataListItem>
+          ))}
+        </MobileDataList>
+      }
     />
   );
 }

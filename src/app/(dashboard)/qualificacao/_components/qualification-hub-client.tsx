@@ -537,9 +537,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         }
       />
 
-      <main data-ui-surface="qualification" className="flex flex-1 flex-col gap-6 bg-background p-4 lg:p-6">
+      <main data-ui-surface="qualification" className="flex flex-1 flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         {/* TOP METRICS SUMMARY */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
           <StatCard label="Leads atendidos" value={initialStats.operation.startedToday} sublabel={`${initialStats.operation.active} ativos | ${initialStats.operation.transferredToHuman} trans. humano`} icon={Activity} iconClassName="bg-primary/10 text-primary" />
           <StatCard label="Taxa de qualificação" value={initialStats.qualification.totalQualified} sublabel={`${initialStats.qualification.hotLeads} quentes | ${initialStats.qualification.completionRatePct}% conclusão`} icon={Sparkles} iconClassName="bg-amber-500/10 text-amber-600" />
           <StatCard label="Fila de espera" value={initialStats.distribution.waitingQueue} sublabel={`${initialStats.distribution.waitingQueue} em fila | SLA méd. 45s`} icon={Clock} iconClassName="bg-violet-500/10 text-violet-600" />
@@ -551,7 +551,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         <div className="grid gap-6 lg:grid-cols-[16.5rem_1fr] items-start">
           {/* MOBILE HORIZONTAL SUBNAV */}
           <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
-            <nav data-slot="qualification-tabs" className="flex gap-1.5 rounded-[var(--radius-card)] border bg-card p-1 pb-2">
+            <nav data-slot="qualification-tabs" className="flex snap-x snap-mandatory gap-1.5 rounded-[var(--radius-card)] border bg-card p-1">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -562,7 +562,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                     onClick={() => handleSelectTab(tab.id)}
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
-                      "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all",
+                      "flex min-h-(--mobile-touch-target) shrink-0 snap-start items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all",
                       isActive
                         ? "bg-primary text-primary-foreground font-semibold shadow-xs"
                         : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
