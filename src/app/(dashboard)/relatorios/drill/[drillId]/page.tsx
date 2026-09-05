@@ -30,7 +30,7 @@ export default async function DrilldownPage({
         title={drilldown.title}
         rightSlot={
           <Link
-            href={`/relatorios?period=${period}&tab=overview`}
+            href={`/dashboard?period=${period}&tab=overview`}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />

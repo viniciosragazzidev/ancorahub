@@ -339,3 +339,13 @@ exibia um skeleton imediatamente, tornando todo o roundtrip visível.
 `router.prefetch` para aquecer a próxima resposta RSC e agenda o restante em
 idle. A seleção visual continua imediata, sem reset de scroll e sem cache global
 de métricas entre tenants.
+
+## 2026-09-05 — Dashboard canônico e navegação sem “Tarefas” duplicada
+
+- `/dashboard` passou a usar o Reporting Center, mantendo abas, filtros de
+  período, escopo por papel e estados da rota de relatórios.
+- `/relatorios` agora é um redirecionamento de compatibilidade para
+  `/dashboard`, incluindo `period` e `tab`.
+- O item de sidebar “Tarefas” (que apontava incorretamente para relatórios)
+  foi removido e `/qualificacao` foi adicionado como entrada explícita de
+  Qualificação IA.

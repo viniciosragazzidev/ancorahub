@@ -106,6 +106,57 @@
   box-shadow: none;
 }
 
+/* Shared KPI composition: the campaign metric card is the cross-route
+ * baseline for compact operational metrics. Keep the semantic color on the
+ * value/icon supplied by the feature; this layer standardizes only geometry,
+ * hierarchy and surface treatment. */
+:root:has([data-ui-refinement="clean"]) .ui-metric-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: none;
+}
+
+:root:has([data-ui-refinement="clean"]) .ui-metric-card-icon {
+  border-radius: var(--radius-control);
+}
+
+:root:has([data-ui-refinement="clean"]) .ui-metric-card-source {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+:root:has([data-ui-refinement="clean"]) .ui-metric-card-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+:root:has([data-ui-refinement="clean"]) .ui-metric-card-label {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+/* DataTable follows the same surface grammar as the campaign table. The
+ * component remains behavior-only; sorting, filtering and pagination stay in
+ * the caller/composition. */
+:root:has([data-ui-refinement="clean"]) [data-slot="data-table-surface"] {
+  border-radius: var(--radius-card);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--card) 40%, transparent);
+  box-shadow: none;
+}
+
+:root.dark:has([data-ui-refinement="clean"]) [data-slot="data-table-surface"] {
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+}
+
 /* Rail keeps its approved silhouette; emphasis communicates location. */
 :root:has([data-ui-refinement="clean"]) [data-slot="navigation-rail"] {
   background: var(--sidebar);

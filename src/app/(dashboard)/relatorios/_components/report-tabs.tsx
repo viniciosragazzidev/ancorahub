@@ -25,7 +25,7 @@ export function ReportTabs({ tabs, active, period }: ReportTabsProps) {
         return (
           <Link
             key={tab}
-            href={`/relatorios?period=${period}&tab=${tab}`}
+            href={`/dashboard?period=${period}&tab=${tab}`}
             className={cn(
               "relative flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

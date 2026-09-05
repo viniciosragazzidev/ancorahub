@@ -110,7 +110,7 @@ export default async function SalesPage({
             { label: "Ver Base de Clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
             { label: "Tabela de Comissões", href: "/settings?tab=comissoes", description: "Regras de comissionamento por produto" },
             { label: "Anexar Documentos de Propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
-            { label: "Relatório de Desempenho", href: "/relatorios", description: "Métricas de fechamento por corretor" },
+            { label: "Relatório de Desempenho", href: "/dashboard?tab=commercial", description: "Métricas de fechamento por corretor" },
           ]}
         />
       </main>

@@ -113,7 +113,7 @@ export function StatCard({
     <Card
       variant={variant === "overview" ? "overview" : "compact"}
       className={cn(
-        "group/card h-full min-w-0",
+        "ui-metric-card group/card h-full min-w-0",
         variant === "overview" ? "rounded-none border-0 border-r border-border last:border-r-0" : "hover:bg-card/95",
         className,
       )}
@@ -123,14 +123,14 @@ export function StatCard({
           {Icon && (
             <div
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-foreground/80 transition-[background-color,color] duration-150 ease-out group-hover/card:bg-foreground/10 group-hover/card:text-foreground motion-reduce:transition-none",
+                "ui-metric-card-icon flex size-8 shrink-0 items-center justify-center bg-muted text-foreground/80 transition-[background-color,color] duration-150 ease-out group-hover/card:bg-foreground/10 group-hover/card:text-foreground motion-reduce:transition-none",
                 iconClassName,
               )}
             >
               <Icon className="size-4" />
             </div>
           )}
-          <span className="truncate text-xs font-medium text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground motion-reduce:transition-none">
+          <span className="ui-metric-card-label truncate transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground motion-reduce:transition-none">
             {label}
           </span>
         </div>
@@ -150,14 +150,14 @@ export function StatCard({
         <div className="min-w-0">
           <p
             className={cn(
-              "text-xl font-semibold tracking-tight tabular-nums text-foreground",
+              "ui-metric-card-value text-xl font-semibold text-foreground",
               valueClassName,
             )}
           >
             {value}
           </p>
           {sublabel && (
-            <p className="mt-1 text-xs leading-tight text-muted-foreground transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">
+            <p className="ui-metric-card-label mt-1 leading-tight transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">
               {sublabel}
             </p>
           )}

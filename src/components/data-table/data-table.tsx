@@ -35,9 +35,9 @@ export function DataTable<TData>({
   ...props
 }: DataTableProps<TData>) {
   return (
-    <div className={cn("w-full space-y-3", className)} {...props}>
+    <div data-slot="data-table" className={cn("w-full space-y-3", className)} {...props}>
       {children}
-      <div className={cn("relative rounded-xl border border-border/60 overflow-hidden bg-transparent", containerClassName)}>
+      <div data-slot="data-table-surface" className={cn("relative overflow-hidden rounded-2xl border-0 bg-card/40 dark:bg-card/60", containerClassName)}>
         {isPending && (
           <div className="absolute top-0 left-0 right-0 z-20 h-0.5 overflow-hidden bg-primary/20">
             <div className="h-full w-full animate-pulse bg-primary" />
@@ -45,9 +45,9 @@ export function DataTable<TData>({
         )}
         <div className="overflow-x-auto">
           <Table className="w-full text-xs">
-            <TableHeader className={cn("bg-muted/40 dark:bg-muted/20 border-b border-border/60", headerClassName)}>
+            <TableHeader className={cn("border-b border-border/30 bg-muted/10", headerClassName)}>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="hover:bg-transparent border-border/60">
+                <TableRow key={headerGroup.id} className="border-border/30 hover:bg-transparent">
                   {headerGroup.headers.map((header) => {
                     return (
                       <TableHead
@@ -56,7 +56,7 @@ export function DataTable<TData>({
                         style={{
                           ...getCommonPinningStyles({ column: header.column }),
                         }}
-                        className="h-9 px-3 py-2 text-left align-middle text-xs font-bold text-muted-foreground select-none tracking-tight"
+                        className="h-9 px-3 py-2 text-left align-middle text-xs font-semibold text-muted-foreground select-none tracking-tight"
                       >
                         {header.isPlaceholder
                           ? null
@@ -76,7 +76,7 @@ export function DataTable<TData>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="hover:bg-muted/40 dark:hover:bg-muted/20 transition-all border-b border-border/40 cursor-pointer"
+                    className="cursor-pointer border-b border-border/30 transition-colors hover:bg-muted/30 dark:hover:bg-muted/30"
                     onClick={() => {
                       table.options.meta?.onRowClick?.(row.original);
                     }}

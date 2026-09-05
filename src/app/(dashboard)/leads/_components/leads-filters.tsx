@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "@/components/huge-icons";
@@ -213,8 +212,243 @@ export function LeadsFilters({
         }
         advancedFiltersTrigger={{
           activeCount,
-          onClick: () => setOpen(true),
         }}
+        isAdvancedFiltersOpen={open}
+        onAdvancedFiltersOpenChange={setOpen}
+        advancedFiltersContent={
+          <>
+            <div className="flex items-center justify-between border-b border-border/70 p-3.5">
+              <div className="flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
+                  <SlidersHorizontal className="size-3.5 text-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-foreground">Filtros da Fila</h3>
+                  <p className="text-[11px] text-muted-foreground">Refine os resultados do Kanban e da lista</p>
+                </div>
+              </div>
+              {activeCount > 0 ? (
+                <Badge variant="secondary" className="text-[10px] font-mono">
+                  {activeCount} ativo(s)
+                </Badge>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
+                  <span className="flex size-1.5 rounded-full bg-primary" />
+                  Ajustar
+                </span>
+              )}
+            </div>
+
+            <ScrollArea className="h-[min(65dvh,32rem)]">
+              <div className="space-y-4 p-4 pb-6">
+                {/* Tipo (PF / PJ) */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Tipo de Lead
+                  </label>
+                  <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
+                    {[
+                      { label: "Todos", val: "" },
+                      { label: "PF", val: "PF" },
+                      { label: "PJ", val: "PJ" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => setTipo(opt.val)}
+                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
+                          tipo === opt.val
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Origem */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Origem da Oportunidade
+                  </label>
+                  <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
+                    {[
+                      { label: "Todas", val: "" },
+                      { label: "Manual", val: "manual" },
+                      { label: "Webhook", val: "webhook" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => setOrigem(opt.val)}
+                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
+                          origem === opt.val
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Campanhas Meta */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Campanhas Meta
+                  </label>
+                  <AppSelect
+                    aria-label="Campanhas Meta"
+                    className="h-8.5"
+                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                    onValueChange={(value) => setEligibleCampaigns(value === "1")}
+                    options={[
+                      { value: "", label: "Todas as campanhas" },
+                      { value: "1", label: "Somente elegíveis agora" },
+                    ]}
+                    value={eligibleCampaigns ? "1" : ""}
+                  />
+                </div>
+
+                {/* Status / Etapa */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Etapa / Status
+                  </label>
+                  <AppSelect
+                    aria-label="Status"
+                    className="h-8.5"
+                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                    onValueChange={setStatus}
+                    options={[
+                      { value: "", label: "Todos os status" },
+                      { value: "new", label: "Novos" },
+                      { value: "distributed", label: "Distribuídos" },
+                      { value: "in_contact", label: "Em atendimento" },
+                      { value: "quote_sent", label: "Cotação enviada" },
+                      { value: "negotiation", label: "Negociação" },
+                      { value: "documentation_pending", label: "Documento pendente" },
+                      { value: "under_analysis", label: "Em análise" },
+                      { value: "converted", label: "Convertidos" },
+                      { value: "lost", label: "Perdidos" },
+                    ]}
+                    value={status}
+                  />
+                </div>
+
+                {/* Qualificação */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Status de Qualificação
+                  </label>
+                  <AppSelect
+                    aria-label="Qualificação"
+                    className="h-8.5"
+                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                    onValueChange={setQualification}
+                    options={[
+                      { value: "", label: "Todas as qualificações" },
+                      { value: "unqualified", label: "Sem qualificação" },
+                      { value: "warm", label: "Morna (em qualificação)" },
+                      { value: "hot", label: "Quente (alta prioridade)" },
+                      { value: "disqualified", label: "Desqualificado" },
+                    ]}
+                    value={qualification}
+                  />
+                </div>
+
+                {/* Filial */}
+                {branches.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Filial / Unidade
+                    </label>
+                    <AppSelect
+                      aria-label="Filial"
+                      className="h-8.5"
+                      triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                      onValueChange={setBranch}
+                      options={[
+                        { value: "", label: "Todas as filiais" },
+                        ...branches.map((item) => ({ value: item.id, label: item.name })),
+                      ]}
+                      value={branch}
+                    />
+                  </div>
+                )}
+
+                {/* Corretor */}
+                {brokers.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Corretor Responsável
+                    </label>
+                    <AppSelect
+                      aria-label="Corretor"
+                      className="h-8.5"
+                      triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                      onValueChange={setCorretor}
+                      options={[
+                        { value: "", label: "Todos os corretores" },
+                        ...brokers.map((item) => ({ value: item.id, label: item.name })),
+                      ]}
+                      value={corretor}
+                    />
+                  </div>
+                )}
+
+                {/* Itens por página */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Itens por Página
+                  </label>
+                  <div className="grid grid-cols-4 rounded-lg bg-muted/50 p-0.5 border border-border/40">
+                    {["10", "20", "50", "100"].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setPageSize(size)}
+                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
+                          pageSize === size
+                            ? "bg-background text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+
+            <div className="flex items-center justify-between border-t border-border/70 bg-muted/20 p-3">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+                Limpar
+              </Button>
+
+              <StatefulButton
+                state="idle"
+                onClick={() => applyFilters()}
+                size="sm"
+                className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
+                icon={<SlidersHorizontal className="size-3.5" />}
+              >
+                Aplicar
+              </StatefulButton>
+            </div>
+          </>
+        }
         hasActiveFilters={hasAnyFilter}
         onClearFilters={handleReset}
       />
@@ -260,248 +494,6 @@ export function LeadsFilters({
           onClearAll={handleReset}
         />
       )}
-
-      {/* Advanced Filters Popover */}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger render={<span className="hidden" />} />
-        <PopoverContent
-          align="start"
-          side="bottom"
-          sideOffset={8}
-          className="w-84 rounded-xl border border-border bg-popover p-0 shadow-lg sm:w-96"
-        >
-          <div className="flex items-center justify-between border-b border-border/70 p-3.5">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
-                <SlidersHorizontal className="size-3.5 text-foreground" />
-              </div>
-              <div>
-                <h3 className="text-xs font-bold text-foreground">Filtros da Fila</h3>
-                <p className="text-[11px] text-muted-foreground">Refine os resultados do Kanban e da lista</p>
-              </div>
-            </div>
-            {activeCount > 0 ? (
-              <Badge variant="secondary" className="text-[10px] font-mono">
-                {activeCount} ativo(s)
-              </Badge>
-            ) : (
-              <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary">
-                <span className="flex size-1.5 rounded-full bg-primary" />
-                Ajustar
-              </span>
-            )}
-          </div>
-
-          <ScrollArea className="h-[min(65dvh,32rem)]">
-            <div className="space-y-4 p-4 pb-6">
-              {/* Tipo (PF / PJ) */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Tipo de Lead
-                </label>
-                <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
-                  {[
-                    { label: "Todos", val: "" },
-                    { label: "PF", val: "PF" },
-                    { label: "PJ", val: "PJ" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => setTipo(opt.val)}
-                      className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
-                        tipo === opt.val
-                          ? "bg-background text-foreground shadow-xs font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Origem */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Origem da Oportunidade
-                </label>
-                <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
-                  {[
-                    { label: "Todas", val: "" },
-                    { label: "Manual", val: "manual" },
-                    { label: "Webhook", val: "webhook" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => setOrigem(opt.val)}
-                      className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
-                        origem === opt.val
-                          ? "bg-background text-foreground shadow-xs font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Campanhas Meta */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Campanhas Meta
-                </label>
-                <AppSelect
-                  aria-label="Campanhas Meta"
-                  className="h-8.5"
-                  triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
-                  onValueChange={(value) => setEligibleCampaigns(value === "1")}
-                  options={[
-                    { value: "", label: "Todas as campanhas" },
-                    { value: "1", label: "Somente elegíveis agora" },
-                  ]}
-                  value={eligibleCampaigns ? "1" : ""}
-                />
-              </div>
-
-              {/* Status / Etapa */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Etapa / Status
-                </label>
-                <AppSelect
-                  aria-label="Status"
-                  className="h-8.5"
-                  triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
-                  onValueChange={setStatus}
-                  options={[
-                    { value: "", label: "Todos os status" },
-                    { value: "new", label: "Novos" },
-                    { value: "distributed", label: "Distribuídos" },
-                    { value: "in_contact", label: "Em atendimento" },
-                    { value: "quote_sent", label: "Cotação enviada" },
-                    { value: "negotiation", label: "Negociação" },
-                    { value: "documentation_pending", label: "Documento pendente" },
-                    { value: "under_analysis", label: "Em análise" },
-                    { value: "converted", label: "Convertidos" },
-                    { value: "lost", label: "Perdidos" },
-                  ]}
-                  value={status}
-                />
-              </div>
-
-              {/* Qualificação */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Status de Qualificação
-                </label>
-                <AppSelect
-                  aria-label="Qualificação"
-                  className="h-8.5"
-                  triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
-                  onValueChange={setQualification}
-                  options={[
-                    { value: "", label: "Todas as qualificações" },
-                    { value: "unqualified", label: "Sem qualificação" },
-                    { value: "warm", label: "Morna (em qualificação)" },
-                    { value: "hot", label: "Quente (alta prioridade)" },
-                    { value: "disqualified", label: "Desqualificado" },
-                  ]}
-                  value={qualification}
-                />
-              </div>
-
-              {/* Filial */}
-              {branches.length > 0 && (
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Filial / Unidade
-                  </label>
-                  <AppSelect
-                    aria-label="Filial"
-                    className="h-8.5"
-                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
-                    onValueChange={setBranch}
-                    options={[
-                      { value: "", label: "Todas as filiais" },
-                      ...branches.map((item) => ({ value: item.id, label: item.name })),
-                    ]}
-                    value={branch}
-                  />
-                </div>
-              )}
-
-              {/* Corretor */}
-              {brokers.length > 0 && (
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                    Corretor Responsável
-                  </label>
-                  <AppSelect
-                    aria-label="Corretor"
-                    className="h-8.5"
-                    triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
-                    onValueChange={setCorretor}
-                    options={[
-                      { value: "", label: "Todos os corretores" },
-                      ...brokers.map((item) => ({ value: item.id, label: item.name })),
-                    ]}
-                    value={corretor}
-                  />
-                </div>
-              )}
-
-              {/* Itens por página */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Itens por Página
-                </label>
-                <div className="grid grid-cols-4 rounded-lg bg-muted/50 p-0.5 border border-border/40">
-                  {["10", "20", "50", "100"].map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setPageSize(size)}
-                      className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
-                        pageSize === size
-                          ? "bg-background text-foreground shadow-xs font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-
-          <div className="flex items-center justify-between border-t border-border/70 bg-muted/20 p-3">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3.5" />
-              Limpar
-            </Button>
-
-            <StatefulButton
-              state="idle"
-              onClick={() => applyFilters()}
-              size="sm"
-              className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
-              icon={<SlidersHorizontal className="size-3.5" />}
-            >
-              Aplicar
-            </StatefulButton>
-          </div>
-        </PopoverContent>
-      </Popover>
     </div>
   );
 }

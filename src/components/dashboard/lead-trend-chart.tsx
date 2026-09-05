@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/chart";
 import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
 
-import type { LeadTrend } from "@/app/(dashboard)/dashboard/data";
+type LeadTrend = Array<{ date: string; leads: number; converted: number }>;
 
 const chartConfig = {
   leads: {

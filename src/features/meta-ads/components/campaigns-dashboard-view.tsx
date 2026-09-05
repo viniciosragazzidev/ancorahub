@@ -100,16 +100,16 @@ export function CampaignsDashboardView({
         ].map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-xl border border-border/60 bg-card p-4 text-left shadow-none">
+            <div key={item.label} className="ui-metric-card text-left">
               <div className="flex items-center justify-between gap-2">
-                <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${item.bg} ${item.color}`}>
+                <span className={`ui-metric-card-icon flex size-8 shrink-0 items-center justify-center ${item.bg} ${item.color}`}>
                   <Icon className="size-4" />
                 </span>
-                <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">Meta Ads</span>
+                <span className="ui-metric-card-source">Meta Ads</span>
               </div>
               <div className="mt-3 space-y-1">
-                <p className={`text-xl font-bold tabular-nums tracking-tight ${item.color}`}>{item.value}</p>
-                <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+                <p className={`ui-metric-card-value text-xl font-bold ${item.color}`}>{item.value}</p>
+                <p className="ui-metric-card-label">{item.label}</p>
               </div>
             </div>
           );

@@ -127,3 +127,34 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
   como rollback por tenant.
 - **VALIDATION**: cada rota continua sujeita ao gate visual e funcional próprio;
   nenhuma aprovação é inferida apenas pela existência dos tokens.
+
+## DEC-010 — Cards de métrica e tabelas compartilham o baseline de Campanhas
+
+- **DECISION**: o cartão de métrica de `/campanhas` é o baseline visual para
+  indicadores compactos em todas as rotas. A composição compartilhada usa
+  superfície neutra, borda discreta, raio de card, tile tonal de ícone,
+  rótulo de origem monoespaçado e valor tabular.
+- **TABLES**: `DataTable` adota a mesma superfície e a mesma gramática de
+  cabeçalho/linhas da tabela de campanhas; a composição continua responsável
+  por sorting, filtering, pagination, selection e ações.
+- **OPTIONS**: estilos locais por rota; novo componente por feature; classe
+  compartilhada governada pelo contrato visual existente.
+- **CHOSEN**: classe compartilhada (`ui-metric-card`) e slots semânticos no
+  `DataTable`, preservando `Card`, `Table` e tokens existentes.
+- **WHY**: reduz drift visual sem transformar a camada de apresentação em
+  regra de negócio e permite rollout/rollback pelo flag Clean UI.
+- **IMPACT**: `/campanhas`, `StatCard`/`MetricCard`, KPIs de relatórios,
+  `DataTable` e `/leads`.
+
+## DEC-011 — Relatórios como dashboard canônico
+
+- **DECISION**: `/dashboard` passa a renderizar o Reporting Center de
+  `/relatorios`, com abas, período e escopo por papel. `/relatorios` permanece
+  apenas como redirecionamento de compatibilidade para evitar duas experiências
+  concorrentes.
+- **NAVIGATION**: o item incorreto “Tarefas” que apontava para relatórios é
+  removido; “Qualificação IA” passa a aparecer explicitamente em `/qualificacao`.
+- **WHY**: o painel de gestão e o centro de relatórios eram a mesma intenção
+  operacional; uma única entrada reduz ambiguidade e custo cognitivo.
+- **IMPACT**: dashboard, links de drill-down, onboarding e sidebar. Não altera
+  cálculos, permissões ou escopo de tenant.

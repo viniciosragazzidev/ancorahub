@@ -1,31 +1,21 @@
-import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { withRequestTiming } from "@/shared/observability/request-timing";
-import { getFeatureFlag } from "@/features/system-settings/queries";
-import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
-import LegacyReportsView from "./_components/legacy-reports-view";
-import ReportingCenterView from "./_components/reporting-center-view";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReportsPage({
+/**
+ * Compatibility route for saved links. Reports now live at `/dashboard`;
+ * preserving this redirect prevents old bookmarks and integrations from
+ * landing on a second, competing dashboard.
+ */
+export default async function ReportsCompatibilityPage({
   searchParams,
 }: {
   searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
-  const { result } = await withRequestTiming("/relatorios", async () => {
-    const [context, reportingCenterEnabled] = await Promise.all([
-      getRequiredTenantContext(),
-      getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER),
-    ]);
-
-    const useNewLayout = reportingCenterEnabled !== "false";
-
-    if (useNewLayout) {
-      return <ReportingCenterView context={context} searchParams={searchParams} />;
-    }
-
-    return <LegacyReportsView context={context} searchParams={searchParams} />;
-  });
-
-  return result;
+  const params = await searchParams;
+  const query = new URLSearchParams();
+  if (params.period) query.set("period", params.period);
+  if (params.tab) query.set("tab", params.tab);
+  const suffix = query.toString();
+  redirect(suffix ? `/dashboard?${suffix}` : "/dashboard");
 }

@@ -5,6 +5,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export interface FilterBarProps {
@@ -15,8 +16,12 @@ export interface FilterBarProps {
   quickFilters?: React.ReactNode;
   advancedFiltersTrigger?: {
     activeCount?: number;
-    onClick: () => void;
+    onClick?: () => void;
   };
+  advancedFiltersContent?: React.ReactNode;
+  isAdvancedFiltersOpen?: boolean;
+  onAdvancedFiltersOpenChange?: (open: boolean) => void;
+  popoverContentClassName?: string;
   onClearFilters?: () => void;
   hasActiveFilters?: boolean;
   children?: React.ReactNode;
@@ -30,6 +35,10 @@ export function FilterBar({
   searchLabel = "Buscar",
   quickFilters,
   advancedFiltersTrigger,
+  advancedFiltersContent,
+  isAdvancedFiltersOpen,
+  onAdvancedFiltersOpenChange,
+  popoverContentClassName,
   onClearFilters,
   hasActiveFilters,
   children,
@@ -70,7 +79,45 @@ export function FilterBar({
 
         {quickFilters}
 
-        {advancedFiltersTrigger && (
+        {advancedFiltersContent ? (
+          <Popover
+            open={isAdvancedFiltersOpen}
+            onOpenChange={onAdvancedFiltersOpenChange}
+          >
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 font-medium"
+                />
+              }
+            >
+              <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+              <span>Filtros</span>
+              {Boolean(advancedFiltersTrigger?.activeCount && advancedFiltersTrigger.activeCount > 0) && (
+                <Badge
+                  variant="secondary"
+                  className="ml-0.5 px-1.5 py-0 text-[10px] font-bold"
+                >
+                  {advancedFiltersTrigger?.activeCount}
+                </Badge>
+              )}
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              side="bottom"
+              sideOffset={8}
+              className={cn(
+                "w-84 rounded-xl border border-border bg-popover p-0 shadow-lg sm:w-96",
+                popoverContentClassName,
+              )}
+            >
+              {advancedFiltersContent}
+            </PopoverContent>
+          </Popover>
+        ) : advancedFiltersTrigger ? (
           <Button
             type="button"
             variant="outline"
@@ -89,7 +136,7 @@ export function FilterBar({
               </Badge>
             )}
           </Button>
-        )}
+        ) : null}
 
         {hasActiveFilters && onClearFilters && (
           <Button

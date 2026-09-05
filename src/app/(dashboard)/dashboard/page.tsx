@@ -1,21 +1,15 @@
-import NocDashboardContent from "./_components/noc-dashboard-content";
-import MarketingDashboardContent from "./_components/marketing-dashboard-content";
-import { BrokerWorkspace } from "./_components/broker-workspace";
-import { getBrokerWorkspaceData, isBrokerWorkspaceEnabled } from "@/features/broker-workspace/queries";
-import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { parsePeriod } from "@/shared/period";
-import { getBrokerDashboardData, getMarketingDashboardData } from "./data";
+import { withRequestTiming } from "@/shared/observability/request-timing";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import LegacyReportsView from "../relatorios/_components/legacy-reports-view";
+import ReportingCenterView from "../relatorios/_components/reporting-center-view";
 
-import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
-import { eq } from "drizzle-orm";
-import { Suspense } from "react";
-import { getDatabase, schema } from "@/shared/db";
-import DashboardLoading from "./loading";
-import { ExecutiveDashboard } from "./_components/executive-dashboard";
-import { getExecutiveDashboardData } from "./executive-dashboard-data";
-
+/**
+ * The reporting center is the canonical operational dashboard. The old
+ * dashboard variants were split across several surfaces and made the primary
+ * route unpredictable; role-aware report tabs are now the single entry point.
+ */
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
@@ -23,53 +17,18 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
-  const context = await getRequiredTenantContext();
-  return (
-    <Suspense fallback={<DashboardLoading />}>
-      <DashboardContent context={context} searchParams={searchParams} />
-    </Suspense>
-  );
-}
-
-async function DashboardContent({
-  context,
-  searchParams,
-}: {
-  context: Awaited<ReturnType<typeof getRequiredTenantContext>>;
-  searchParams: Promise<{ period?: string; tab?: string }>;
-}) {
-  const resolvedSearchParams = await searchParams;
-  const period = parsePeriod(resolvedSearchParams.period);
-
-  if (context.jobTitle === "marketing") {
-    const data = await getMarketingDashboardData(period);
-    return <MarketingDashboardContent data={data} period={period} />;
-  }
-
-  if (context.role === "director" || context.role === "manager" || context.role === "supervisor") {
-    const data = await getExecutiveDashboardData(context, period, resolvedSearchParams.tab);
-    return <ExecutiveDashboard data={data} period={period} role={context.role} />;
-  }
-
-  const mode = await getExperienceMode(context);
-  if (mode === "LIGHT") {
-    const [tenantRows, data] = await Promise.all([
-      getDatabase()
-        .select({ logoUrl: schema.tenants.logoUrl })
-        .from(schema.tenants)
-        .where(eq(schema.tenants.id, context.tenantId))
-        .limit(1),
-      getBrokerWorkspaceData(),
+  const { result } = await withRequestTiming("/dashboard", async () => {
+    const [context, reportingCenterEnabled] = await Promise.all([
+      getRequiredTenantContext(),
+      getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER),
     ]);
-    return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
-  }
 
-  const [brokerWorkspaceEnabled, cleanUiEnabled] = await Promise.all([
-    isBrokerWorkspaceEnabled(),
-    isCleanUiOperationalEnabled(context.tenantId),
-  ]);
-  if (brokerWorkspaceEnabled && cleanUiEnabled) {
-    return <BrokerWorkspace data={await getBrokerWorkspaceData()} />;
-  }
-  return <NocDashboardContent role="broker" data={await getBrokerDashboardData(period)} period={period} />;
+    if (reportingCenterEnabled !== "false") {
+      return <ReportingCenterView context={context} searchParams={searchParams} />;
+    }
+
+    return <LegacyReportsView context={context} searchParams={searchParams} />;
+  });
+
+  return result;
 }
