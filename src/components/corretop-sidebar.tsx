@@ -104,7 +104,7 @@ const navigationItems: NavItemConfig[] = [
     permission: "acessar_vendas",
   },
   {
-    label: "Contatos",
+    label: "Equipe",
     fullLabel: "Equipe & Colaboradores",
     icon: UsersThree,
     url: "/equipe",

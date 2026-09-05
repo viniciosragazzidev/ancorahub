@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,7 @@ export function LeadsFilters({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
 
   // States
@@ -136,7 +137,9 @@ export function LeadsFilters({
     const preferences = overridePrefs ?? currentPreferences();
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
     setOpen(false);
-    router.push(buildUrl(preferences));
+    startTransition(() => {
+      router.push(buildUrl(preferences));
+    });
   }
 
   function handleReset() {
@@ -151,13 +154,14 @@ export function LeadsFilters({
     setPageSize("20");
 
     window.localStorage.removeItem(storageKey);
-    router.push("/leads");
+    startTransition(() => {
+      router.push("/leads");
+    });
   }
 
-  // Active filter chips
+  // Active filter chips (status is displayed in the quick pills bar above, so omitted here to avoid duplication)
   const chips: FilterChipItem[] = [];
   if (search) chips.push({ id: "search", label: "Busca", value: `"${search}"` });
-  if (status) chips.push({ id: "status", label: "Status", value: statusLabels[status] ?? status });
   if (tipo) chips.push({ id: "tipo", label: "Tipo", value: tipo === "PME" ? "PJ" : tipo });
   if (origem) chips.push({ id: "origem", label: "Origem", value: origem === "manual" ? "Manual" : "Webhook" });
   if (eligibleCampaigns) chips.push({ id: "eligibleCampaigns", label: "Meta", value: "Elegíveis agora" });
@@ -169,7 +173,6 @@ export function LeadsFilters({
   function handleRemoveChip(chipId: string) {
     const updated = { ...currentPreferences() };
     if (chipId === "search") { setSearch(""); updated.search = ""; }
-    if (chipId === "status") { setStatus(""); updated.status = ""; }
     if (chipId === "tipo") { setTipo(""); updated.tipo = ""; }
     if (chipId === "origem") { setOrigem(""); updated.origem = ""; }
     if (chipId === "eligibleCampaigns") { setEligibleCampaigns(false); updated.eligibleCampaigns = false; }
@@ -179,7 +182,9 @@ export function LeadsFilters({
     if (chipId === "pageSize") { setPageSize("20"); updated.pageSize = "20"; }
 
     window.localStorage.setItem(storageKey, JSON.stringify(updated));
-    router.push(buildUrl(updated));
+    startTransition(() => {
+      router.push(buildUrl(updated));
+    });
   }
 
   return (
@@ -497,13 +502,6 @@ export function LeadsFilters({
           </div>
         </PopoverContent>
       </Popover>
-
-      {/* Canonical Active Filter Chips */}
-      <ActiveFilterChips
-        chips={chips}
-        onRemoveChip={handleRemoveChip}
-        onClearAll={handleReset}
-      />
     </div>
   );
 }

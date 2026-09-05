@@ -277,4 +277,31 @@ Validar a biblioteca canônica de `src/components/foundations/` em uma página p
 - `src/app/(dashboard)/leads/leads-table-columns.tsx`: Linhas com avatar de iniciais, botão direto do WhatsApp, badge luminoso e menu de ações expandido.
 - `src/app/(dashboard)/leads/leads-workspace.tsx`: Cartões de Kanban com avatar, telefone e atalho direto para WhatsApp.
 
+---
+
+## 2026-09-04 — Refinamento Visual e Feedback de Estado (Sonner Toast, Loading Skeletons & Filtros)
+
+### Problema
+1. O toast do Sonner apresentava layout com botões espremidos e texto quebrado, além de vazar um texto duplicado sem background abaixo do componente.
+2. A troca de abas no `/dashboard` exibia área em branco antes do carregamento completo dos dados.
+3. A tabela de `/leads` e os filtros não apresentavam indicador visual de loading ao filtrar e paginar.
+4. O status de filtro em `/leads` aparecia duplicado tanto nas pílulas rápidas de status quanto nos chips de filtros ativos abaixo.
+5. O link de equipe na barra lateral exibia o rótulo "Contatos".
+
+### Objetivo
+1. Corrigir e refinar a estrutura do toast (Sonner) e remover o leak de texto duplicado.
+2. Adicionar skeleton e barra de pulso na troca de abas do dashboard.
+3. Adicionar barra de loading e transição de opacidade na tabela durante filtragem/paginação.
+4. Remover a duplicação do status nos chips de filtro e no DOM.
+5. Atualizar o rótulo da barra lateral para "Equipe".
+
+### Componentes alterados
+- `src/components/ui/sonner.tsx`: Sanitização das opções para impedir duplicação no container nativo do Sonner.
+- `src/components/motion/animated-toast.tsx`: Novo layout com header dedicado (badge + close), corpo e botões inferiores com `whitespace-nowrap shrink-0`.
+- `src/app/globals.css`: Limpeza de CSS legado do toast.
+- `src/app/(dashboard)/dashboard/_components/executive-dashboard.tsx`: Inclusão de `DashboardTabLoadingSkeleton`.
+- `src/components/data-table/data-table.tsx`: Adição de barra de progresso no topo e opacidade transitória no corpo da tabela.
+- `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Omissão do status em `chips` e remoção da chamada duplicada de `<ActiveFilterChips>`.
+- `src/components/corretop-sidebar.tsx`: Atualização do label de navegação para "Equipe".
+
 

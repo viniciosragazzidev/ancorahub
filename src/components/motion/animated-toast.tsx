@@ -27,13 +27,13 @@ export interface AnimatedToastProps {
   className?: string;
 }
 
-const STATUS_BORDER: Record<AnimatedBadgeStatus, string> = {
-  neutral: "border-border/90",
-  info: "border-blue-500/40 dark:border-blue-400/40 ring-1 ring-blue-500/10",
-  success: "border-emerald-500/40 dark:border-emerald-400/40 ring-1 ring-emerald-500/10",
-  warning: "border-amber-500/40 dark:border-amber-400/40 ring-1 ring-amber-500/10",
-  danger: "border-red-500/40 dark:border-red-400/40 ring-1 ring-red-500/10",
-  loading: "border-blue-500/40 dark:border-blue-400/40 ring-1 ring-blue-500/10",
+const STATUS_ACCENTS: Record<AnimatedBadgeStatus, string> = {
+  neutral: "border-border/80",
+  info: "border-blue-500/35 dark:border-blue-400/35 ring-1 ring-blue-500/10",
+  success: "border-emerald-500/35 dark:border-emerald-400/35 ring-1 ring-emerald-500/10",
+  warning: "border-amber-500/35 dark:border-amber-400/35 ring-1 ring-amber-500/10",
+  danger: "border-red-500/35 dark:border-red-400/35 ring-1 ring-red-500/10",
+  loading: "border-blue-500/35 dark:border-blue-400/35 ring-1 ring-blue-500/10",
 };
 
 export function AnimatedToast({
@@ -64,74 +64,74 @@ export function AnimatedToast({
 
   return (
     <motion.div
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.95, filter: "blur(4px)" }}
+      data-slot="animated-toast"
+      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.96, filter: "blur(4px)" }}
       animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.95, filter: "blur(4px)" }}
+      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" }}
       transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
-      style={{
-        backgroundColor: "var(--popover, #ffffff)",
-        color: "var(--popover-foreground, #1e1e1e)",
-        boxShadow:
-          "0 12px 36px -4px rgba(0, 0, 0, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)",
-      }}
       className={cn(
-        "group pointer-events-auto relative flex w-[360px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border p-3.5 transition-all select-none shadow-2xl backdrop-blur-md",
-        STATUS_BORDER[status],
+        "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl transition-all select-none",
+        "shadow-[0_12px_36px_-4px_rgba(0,0,0,0.16),0_4px_12px_-2px_rgba(0,0,0,0.08)] dark:shadow-[0_16px_40px_-6px_rgba(0,0,0,0.55)]",
+        STATUS_ACCENTS[status],
         className
       )}
     >
-      <div className="shrink-0 pt-0.5">
+      {/* Top row: Status Badge + Close Button */}
+      <div className="flex items-center justify-between gap-2">
         <AnimatedBadge status={status} size="sm" pulse={status === "loading"}>
           {label}
         </AnimatedBadge>
+
+        {onClose ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            className="flex size-6 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pointer-events-auto"
+            aria-label="Fechar notificação"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
       </div>
 
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="text-xs font-semibold leading-relaxed text-foreground">
+      {/* Main Content: Title & Description */}
+      <div className="space-y-1">
+        <div className="text-xs font-semibold leading-snug text-foreground">
           {title}
         </div>
         {description ? (
-          <div className="text-[11px] leading-normal text-muted-foreground">
+          <div className="text-[11px] leading-relaxed text-muted-foreground">
             {description}
-          </div>
-        ) : null}
-        {(action || cancel) ? (
-          <div className="flex items-center gap-2 pt-1">
-            {action ? (
-              <button
-                type="button"
-                onClick={action.onClick}
-                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer pointer-events-auto"
-              >
-                {action.label}
-              </button>
-            ) : null}
-            {cancel ? (
-              <button
-                type="button"
-                onClick={cancel.onClick}
-                className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:outline-none cursor-pointer pointer-events-auto"
-              >
-                {cancel.label}
-              </button>
-            ) : null}
           </div>
         ) : null}
       </div>
 
-      {onClose ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose();
-          }}
-          className="relative z-30 shrink-0 -mr-1 -mt-1 flex size-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pointer-events-auto"
-          aria-label="Fechar notificação"
-        >
-          <X className="h-4 w-4" />
-        </button>
+      {/* Action Buttons Row */}
+      {(action || cancel) ? (
+        <div className="flex items-center gap-2 pt-1">
+          {action ? (
+            <button
+              type="button"
+              onClick={action.onClick}
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
+            >
+              {action.label}
+            </button>
+          ) : null}
+          {cancel ? (
+            <button
+              type="button"
+              onClick={cancel.onClick}
+              className="inline-flex items-center justify-center rounded-lg border border-border/80 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted hover:text-foreground active:scale-[0.98] focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
+            >
+              {cancel.label}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </motion.div>
   );

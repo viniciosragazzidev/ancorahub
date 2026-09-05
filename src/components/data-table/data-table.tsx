@@ -38,6 +38,11 @@ export function DataTable<TData>({
     <div className={cn("w-full space-y-3", className)} {...props}>
       {children}
       <div className={cn("relative rounded-xl border border-border/60 overflow-hidden bg-transparent", containerClassName)}>
+        {isPending && (
+          <div className="absolute top-0 left-0 right-0 z-20 h-0.5 overflow-hidden bg-primary/20">
+            <div className="h-full w-full animate-pulse bg-primary" />
+          </div>
+        )}
         <div className="overflow-x-auto">
           <Table className="w-full text-xs">
             <TableHeader className={cn("bg-muted/40 dark:bg-muted/20 border-b border-border/60", headerClassName)}>
@@ -65,7 +70,7 @@ export function DataTable<TData>({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody>
+            <TableBody className={cn("transition-opacity duration-200", isPending && "opacity-50 pointer-events-none")}>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow

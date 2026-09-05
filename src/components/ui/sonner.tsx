@@ -36,20 +36,23 @@ function renderToast(
   options?: any,
 ) {
   if (typeof sonnerToast?.custom === "function") {
+    // Strip properties that AnimatedToast renders internally so Sonner does not duplicate them outside
+    const { description, badgeLabel, action, cancel, ...sonnerOptions } = options || {};
+
     return sonnerToast.custom(
       (t) => (
         <AnimatedToast
           id={t}
           status={status}
           title={message}
-          description={options?.description}
-          badgeLabel={options?.badgeLabel ?? defaultBadge}
-          action={options?.action}
-          cancel={options?.cancel}
+          description={description}
+          badgeLabel={badgeLabel ?? defaultBadge}
+          action={action}
+          cancel={cancel}
           onClose={() => sonnerToast.dismiss(t)}
         />
       ),
-      options,
+      sonnerOptions,
     );
   }
 

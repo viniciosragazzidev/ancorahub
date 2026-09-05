@@ -83,6 +83,54 @@ function ExecutiveTimeline({
   );
 }
 
+import { Skeleton } from "@/components/ui/skeleton";
+
+function DashboardTabLoadingSkeleton() {
+  return (
+    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
+      {/* KPI Grid Skeleton */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-2.5">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-7 w-28" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        ))}
+      </div>
+
+      {/* Main Chart/Section Skeleton */}
+      <div className="rounded-xl border border-border/50 bg-card/60 p-5 sm:p-6 space-y-4">
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-3 w-64" />
+        </div>
+        <Skeleton className="h-44 sm:h-52 w-full rounded-lg" />
+      </div>
+
+      {/* Secondary Split Grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="rounded-xl border border-border/50 bg-card/60 p-5 sm:p-6 space-y-4">
+          <Skeleton className="h-4 w-32" />
+          <div className="space-y-2.5">
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        </div>
+        <div className="rounded-xl border border-border/50 bg-card/60 p-5 sm:p-6 space-y-4">
+          <Skeleton className="h-4 w-32" />
+          <div className="space-y-2.5">
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ExecutiveDashboard({
   data,
   period,
@@ -122,6 +170,13 @@ export function ExecutiveDashboard({
 
   const effectiveTab = activeTab;
 
+  const isTabReady =
+    (effectiveTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data) ||
+    (effectiveTab === "commercial" && "commercial" in data && "funnel" in data && "attention" in data && "sourcePerformance" in data) ||
+    (effectiveTab === "team" && "teamPerformance" in data) ||
+    (effectiveTab === "units" && "units" in data) ||
+    (effectiveTab === "financial" && "financial" in data);
+
   return (
     <>
       <DashboardHeader
@@ -139,39 +194,52 @@ export function ExecutiveDashboard({
               <p className="text-sm text-muted-foreground">{roleCopy.subtitle}</p>
             </div>
           </div>
-          <PageTabs
-            tabs={tabs}
-            active={effectiveTab}
-            onTabChange={handleTabChange}
-          />
+          <div className="space-y-2">
+            <PageTabs
+              tabs={tabs}
+              active={effectiveTab}
+              onTabChange={handleTabChange}
+            />
+            {isPending && (
+              <div className="h-0.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-full animate-pulse bg-primary/70" />
+              </div>
+            )}
+          </div>
         </section>
 
-        <div className={isPending ? "opacity-70 transition-opacity duration-150 pointer-events-none" : ""}>
-          {effectiveTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data && (
-            <div className="space-y-6 sm:space-y-8">
-              <ExecutiveTimeline data={[...data.timeline]} period={period} />
-              <OverviewTab period={period} commercial={data.commercial} funnel={data.funnel} attention={data.attention} />
-            </div>
-          )}
-          {effectiveTab === "commercial" && "commercial" in data && "funnel" in data && "attention" in data && "sourcePerformance" in data && (
-            <div className="space-y-6 sm:space-y-8">
-              <CommercialTab period={period} overview={data.commercial} funnel={data.funnel} attention={data.attention} sourcePerformance={data.sourcePerformance} />
-            </div>
-          )}
-          {effectiveTab === "team" && "teamPerformance" in data && (
-            <div className="space-y-6 sm:space-y-8">
-              <TeamTab period={period} teamPerformance={data.teamPerformance} />
-            </div>
-          )}
-          {effectiveTab === "units" && "units" in data && (
-            <div className="space-y-6 sm:space-y-8">
-              <UnitsTab period={period} units={data.units} />
-            </div>
-          )}
-          {effectiveTab === "financial" && "financial" in data && (
-            <div className="space-y-6 sm:space-y-8">
-              <FinancialTab period={period} financial={data.financial} />
-            </div>
+        <div className={isPending && isTabReady ? "opacity-75 transition-opacity duration-150 pointer-events-none" : ""}>
+          {!isTabReady ? (
+            <DashboardTabLoadingSkeleton />
+          ) : (
+            <>
+              {effectiveTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data && (
+                <div className="space-y-6 sm:space-y-8">
+                  <ExecutiveTimeline data={[...data.timeline]} period={period} />
+                  <OverviewTab period={period} commercial={data.commercial} funnel={data.funnel} attention={data.attention} />
+                </div>
+              )}
+              {effectiveTab === "commercial" && "commercial" in data && "funnel" in data && "attention" in data && "sourcePerformance" in data && (
+                <div className="space-y-6 sm:space-y-8">
+                  <CommercialTab period={period} overview={data.commercial} funnel={data.funnel} attention={data.attention} sourcePerformance={data.sourcePerformance} />
+                </div>
+              )}
+              {effectiveTab === "team" && "teamPerformance" in data && (
+                <div className="space-y-6 sm:space-y-8">
+                  <TeamTab period={period} teamPerformance={data.teamPerformance} />
+                </div>
+              )}
+              {effectiveTab === "units" && "units" in data && (
+                <div className="space-y-6 sm:space-y-8">
+                  <UnitsTab period={period} units={data.units} />
+                </div>
+              )}
+              {effectiveTab === "financial" && "financial" in data && (
+                <div className="space-y-6 sm:space-y-8">
+                  <FinancialTab period={period} financial={data.financial} />
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
