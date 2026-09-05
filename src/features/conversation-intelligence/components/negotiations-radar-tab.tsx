@@ -60,7 +60,7 @@ const intentColorMap: Record<string, "success" | "warning" | "destructive" | "se
 };
 
 const intentLabelMap: Record<string, string> = {
-  VERY_HIGH: "🔥 Fechamento Iminente",
+  VERY_HIGH: "Fechamento iminente",
   HIGH: "Alta Intenção",
   MEDIUM: "Intenção Média",
   LOW: "Baixa Intenção",
@@ -433,7 +433,7 @@ export function NegotiationsRadarTab({
                     {lead.isBrokerPending ? (
                       <span className="font-semibold text-amber-600 dark:text-amber-400">⏳ Corretor precisa agir</span>
                     ) : (
-                      <span>💬 Aguardando retorno do cliente</span>
+                  <span>Aguardando retorno do cliente</span>
                     )}
                   </div>
 

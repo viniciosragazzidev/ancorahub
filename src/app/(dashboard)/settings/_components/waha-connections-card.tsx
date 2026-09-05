@@ -261,17 +261,19 @@ export function WahaConnectionsCard({
 
         {(activeConnectingId || qrCode) ? (
           <div className="relative rounded-xl border border-primary/30 bg-primary/5 p-6 text-center shadow-sm">
-            <button
+            <Button
               onClick={() => {
                 setActiveConnectingId(null);
                 setQrCode(null);
               }}
+              variant="ghost"
+              size="icon-sm"
               className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:bg-muted"
               title="Fechar QR Code"
               type="button"
             >
               <X className="size-4" />
-            </button>
+            </Button>
 
             <p className="mb-1 text-base font-semibold text-foreground">
               Escaneie o QR Code no WhatsApp

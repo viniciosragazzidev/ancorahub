@@ -141,6 +141,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
     }
   }
 
+  // ui-audit-ignore-start — HTML exportado para sites externos.
   const snippet = useMemo(() => {
     if (!selected) return "";
     const origin = typeof window !== "undefined" ? window.location.origin : "https://crm.ancorasaude.cloud";
@@ -162,11 +163,12 @@ export function IntegrationsTab({ integrations, branches }: Props) {
   src="${origin}/embed/lead-form.js"
   data-token="${token}"></script>`;
   }, [revealedToken, selected]);
+  // ui-audit-ignore-end
 
   async function copySnippet() { await navigator.clipboard.writeText(snippet); setCopied(true); window.setTimeout(() => setCopied(false), 1400); }
 
   return <div className="space-y-5">
-    <Card className="border-transparent bg-transparent shadow-none">
+    <Card>
       <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Catálogo de integrações</p><p className="mt-1 text-sm text-muted-foreground">Escolha Meta, WhatsApp, fontes de site e os próximos conectores da operação.</p></div><Button render={<Link href="/integrations" />}>Abrir integrações</Button></CardContent>
     </Card>
   <Tabs className="gap-5" defaultValue="sources" variant="underline">
@@ -174,20 +176,21 @@ export function IntegrationsTab({ integrations, branches }: Props) {
       <TabsTrigger value="sources"><LinkSimple /> Webhooks & Pixels</TabsTrigger>
     </TabsList>
     <TabsContent value="sources" className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-      <Card className="border-transparent bg-transparent shadow-none">
-        <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border"><div className="flex items-center gap-2"><CardTitle>Fontes de captura</CardTitle><button type="button" onClick={() => setHelpOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors" title="Como integrar em um site externo?"><HelpCircle className="size-4" /></button></div><Button onClick={() => setCreateOpen(true)} size="sm"><Plus /> Nova fonte</Button></CardHeader>
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border"><div className="flex items-center gap-2"><CardTitle>Fontes de captura</CardTitle><Button aria-label="Como integrar em um site externo?" type="button" onClick={() => setHelpOpen(true)} className="text-muted-foreground" size="icon-sm" variant="ghost"><HelpCircle className="size-4" /></Button></div><Button onClick={() => setCreateOpen(true)} size="sm"><Plus /> Nova fonte</Button></CardHeader>
         <CardContent className="p-0"><div className="divide-y divide-border">
-          {data.integrations.map((item) => <button className={`grid w-full grid-cols-[1fr_auto] gap-3 px-5 py-4 text-left transition-colors hover:bg-muted/40 ${selected?.id === item.id ? "bg-muted/30" : ""}`} key={item.id} onClick={() => setSelectedId(item.id)} type="button"><span className="min-w-0"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{item.name}</span>{item.id.startsWith("temp-") ? <Badge variant="secondary">Sincronizando</Badge> : null}</span><span className="mt-1 block text-xs text-muted-foreground">{sourceLabel[item.source] ?? item.source} · {item.branchName ?? "Primeira filial ativa"}</span></span><span className="flex items-center gap-3"><span className={`size-2 rounded-full ${item.status === "active" ? "bg-emerald-400" : "bg-muted-foreground"}`} /><span className="text-xs text-muted-foreground">{item.status === "active" ? "Ativo" : "Inativo"}</span></span></button>)}
+          {data.integrations.map((item) => <Button className={`h-auto w-full justify-between rounded-none px-5 py-4 text-left ${selected?.id === item.id ? "bg-muted/30" : ""}`} key={item.id} onClick={() => setSelectedId(item.id)} type="button" variant="ghost"><span className="min-w-0"><span className="flex items-center gap-2"><span className="truncate text-sm font-medium">{item.name}</span>{item.id.startsWith("temp-") ? <Badge variant="secondary">Sincronizando</Badge> : null}</span><span className="mt-1 block text-xs text-muted-foreground">{sourceLabel[item.source] ?? item.source} · {item.branchName ?? "Primeira filial ativa"}</span></span><span className="flex items-center gap-3"><span className={`size-2 rounded-full ${item.status === "active" ? "bg-success" : "bg-muted-foreground"}`} /><span className="text-xs text-muted-foreground">{item.status === "active" ? "Ativo" : "Inativo"}</span></span></Button>)}
           {!data.integrations.length ? <div className="p-10 text-center"><ShieldCheck className="mx-auto size-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Nenhuma fonte configurada</p><p className="mt-1 text-xs text-muted-foreground">Crie um token para começar a receber leads automaticamente.</p></div> : null}
         </div></CardContent>
       </Card>
-      {selected ? <Card className="h-fit border-transparent bg-transparent shadow-none"><CardHeader><CardTitle className="text-base">Configuração da fonte</CardTitle><CardDescription>{selected.name}</CardDescription></CardHeader><CardContent className="grid gap-4"><div className="grid gap-1"><span className="text-xs text-muted-foreground">Token</span><code className="rounded-md bg-muted px-2.5 py-2 text-xs">{selected.tokenPrefix}⬢⬢⬢⬢⬢⬢⬢⬢</code><span className="text-[11px] text-muted-foreground">O token completo só é exibido uma vez após a criação.</span></div><div className="flex items-center justify-between rounded-lg border border-border p-3"><div><p className="text-sm font-medium">Recebimento</p><p className="text-xs text-muted-foreground">{selected.status === "active" ? "Aceitando novos leads" : "Bloqueado"}</p></div><Button aria-label="Alternar status" disabled={togglePendingId === selected.id} onClick={() => handleToggle(selected.id)} size="sm" variant="outline">{selected.status === "active" ? "Desativar" : "Ativar"}</Button></div><div className="grid gap-2"><div className="flex items-center justify-between"><span className="flex items-center gap-1 text-xs font-medium">Snippet de integração <button type="button" onClick={() => setHelpOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors" title="Como integrar em um site externo?"><HelpCircle className="size-3.5" /></button></span><Button onClick={copySnippet} size="sm" variant="ghost">{copied ? <Check /> : <Copy />} {copied ? "Copiado" : "Copiar"}</Button></div><pre className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-muted-foreground">{snippet}</pre></div>
+      {selected ? <Card className="h-fit"><CardHeader><CardTitle className="text-base">Configuração da fonte</CardTitle><CardDescription>{selected.name}</CardDescription></CardHeader><CardContent className="grid gap-4"><div className="grid gap-1"><span className="text-xs text-muted-foreground">Token</span><code className="rounded-md bg-muted px-2.5 py-2 text-xs">{selected.tokenPrefix}⬢⬢⬢⬢⬢⬢⬢⬢</code><span className="text-[11px] text-muted-foreground">O token completo só é exibido uma vez após a criação.</span></div><div className="flex items-center justify-between rounded-lg border border-border p-3"><div><p className="text-sm font-medium">Recebimento</p><p className="text-xs text-muted-foreground">{selected.status === "active" ? "Aceitando novos leads" : "Bloqueado"}</p></div><Button aria-label="Alternar status" disabled={togglePendingId === selected.id} onClick={() => handleToggle(selected.id)} size="sm" variant="outline">{selected.status === "active" ? "Desativar" : "Ativar"}</Button></div><div className="grid gap-2"><div className="flex items-center justify-between"><span className="flex items-center gap-1 text-xs font-medium">Snippet de integração <Button aria-label="Como integrar em um site externo?" type="button" onClick={() => setHelpOpen(true)} className="text-muted-foreground" size="icon-sm" variant="ghost"><HelpCircle className="size-3.5" /></Button></span><Button onClick={copySnippet} size="sm" variant="ghost">{copied ? <Check /> : <Copy />} {copied ? "Copiado" : "Copiar"}</Button></div><pre className="max-h-64 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-muted-foreground">{snippet}</pre></div>
 
         {/* Painel de Teste */}
         <div className="rounded-lg border border-border">
-          <button
+          <Button
             type="button"
-            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/40"
+            className="h-auto w-full justify-between rounded-none px-4 py-3 text-left"
+            variant="ghost"
             onClick={() => { setTestOpen((v) => !v); setTestStatus("idle"); setTestResult(null); }}
           >
             <span className="flex items-center gap-2 text-sm font-medium">
@@ -195,7 +198,7 @@ export function IntegrationsTab({ integrations, branches }: Props) {
               Testar integração
             </span>
             <span className="text-xs text-muted-foreground">{testOpen ? "Fechar" : "Abrir"}</span>
-          </button>
+          </Button>
 
           {testOpen && (
             <div className="border-t border-border p-4">
@@ -277,6 +280,7 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
               <div><code className="rounded bg-muted px-1 py-0.5 text-[11px]">name="plano_interesse"</code> <span className="text-muted-foreground">— plano desejado (opcional)</span></div>
             </div>
             <p className="mt-2">Se os campos da sua LP já usam nomes diferentes, mapeie com <code>data-ancora-field="nome"</code> em cada input:</p>
+            {/* ui-audit-ignore-start — exemplos HTML exibidos como código. */}
             <pre className="rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-5 text-foreground overflow-x-auto">
 {`<form data-ancora-form>
   <input data-ancora-field="nome" name="full_name" required>
@@ -326,6 +330,7 @@ function HelpIntegrationDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   autocomplete="off">`}
             </pre>
           </div>
+          {/* ui-audit-ignore-end */}
 
           {/* Segurança */}
           <div className="rounded-xl border border-border p-4">

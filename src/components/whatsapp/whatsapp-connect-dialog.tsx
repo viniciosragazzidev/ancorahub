@@ -56,7 +56,7 @@ function ConnectionSteps({ status, hasQr }: { status: string; hasQr: boolean }) 
                   : "bg-muted text-muted-foreground",
             )}
           >
-            {step.done ? "✓" : i + 1}
+            {step.done ? <CheckCircle className="size-3" aria-hidden="true" /> : i + 1}
           </span>
           <span className={cn(
             "text-[11px] font-medium transition-colors duration-300",

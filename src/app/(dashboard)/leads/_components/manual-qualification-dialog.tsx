@@ -102,8 +102,8 @@ export function ManualQualificationDialog({
                     : "border-border/70 hover:bg-muted/40"
                 }`}
               >
-                <Flame className="size-4 text-rose-500" />
-                <span>Quente (Urgente 🔥)</span>
+                <Flame aria-hidden="true" className="size-4 text-rose-500" />
+                <span>Quente (Urgente)</span>
               </button>
 
               <button

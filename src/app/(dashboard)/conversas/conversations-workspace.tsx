@@ -40,8 +40,11 @@ import {
   ArrowLeft,
   ArrowSquareOut,
   ChatCircleText,
+  Check,
+  CheckCircle,
   Clock,
   FileText,
+  Flame,
   LinkSimple,
   MagnifyingGlass,
   PanelLeftIcon,
@@ -51,6 +54,9 @@ import {
   PaperPlaneTilt,
   RotateCcw,
   Sparkle,
+  SunDim,
+  ThermometerCold,
+  WarningCircle,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -899,14 +905,20 @@ function MessageStatusIndicator({
     case "read":
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success" title="Mensagem lida pelo cliente (WhatsApp)">
-          <span aria-hidden="true" className="text-xs font-extrabold leading-none">✓✓</span>
+          <span aria-hidden="true" className="inline-flex -space-x-1">
+            <Check className="size-3" />
+            <Check className="size-3" />
+          </span>
           Lida
         </span>
       );
     case "delivered":
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Entregue no WhatsApp do cliente">
-          <span aria-hidden="true" className="text-xs font-bold leading-none">✓✓</span>
+          <span aria-hidden="true" className="inline-flex -space-x-1">
+            <Check className="size-3" />
+            <Check className="size-3" />
+          </span>
           Entregue
         </span>
       );
@@ -916,7 +928,7 @@ function MessageStatusIndicator({
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive"
           title={failure ? `${failure.title} (${failure.code})` : "Falha ao entregar mensagem"}
         >
-          <span aria-hidden="true" className="grid size-3 shrink-0 place-items-center rounded-full bg-destructive/15 text-destructive text-[9px] font-bold">!</span>
+          <WarningCircle aria-hidden="true" className="size-3 shrink-0" />
           {failure ? `Falha: ${failure.title}` : "Falha"}
         </span>
       );
@@ -934,7 +946,7 @@ function MessageStatusIndicator({
     default:
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Enviada ao servidor Meta">
-          <span aria-hidden="true" className="text-xs font-bold leading-none">✓</span>
+          <Check aria-hidden="true" className="size-3" />
           Enviada
         </span>
       );
@@ -1154,22 +1166,25 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
     const targetStatus = qualStatus || leadStatus;
     if (targetStatus.includes("hot") || targetStatus.includes("quente")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
-          Quente 🔥
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
+          <Flame aria-hidden="true" className="size-3 shrink-0" />
+          Quente
         </Badge>
       );
     }
     if (targetStatus.includes("warm") || targetStatus.includes("morno")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
-          Morno ☀️
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+          <SunDim aria-hidden="true" className="size-3 shrink-0" />
+          Morno
         </Badge>
       );
     }
     if (targetStatus.includes("cold") || targetStatus.includes("frio")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
-          Frio ❄️
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
+          <ThermometerCold aria-hidden="true" className="size-3 shrink-0" />
+          Frio
         </Badge>
       );
     }
@@ -1181,8 +1196,9 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
       );
     }
     return (
-      <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
-        Qualificado ✓
+      <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
+        <CheckCircle aria-hidden="true" className="size-3 shrink-0" />
+        Qualificado
       </Badge>
     );
   }
@@ -1251,21 +1267,24 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   if (norm.includes("hot") || norm.includes("quente")) {
     return (
       <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-xs gap-1">
-        🔥 Quente (Alta Prioridade)
+        <Flame aria-hidden="true" className="size-3.5 shrink-0" />
+        Quente (Alta Prioridade)
       </Badge>
     );
   }
   if (norm.includes("warm") || norm.includes("morno")) {
     return (
       <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs gap-1">
-        ☀️ Morno (Interessado)
+        <SunDim aria-hidden="true" className="size-3.5 shrink-0" />
+        Morno (Interessado)
       </Badge>
     );
   }
   if (norm.includes("cold") || norm.includes("frio")) {
     return (
       <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium text-xs gap-1">
-        ❄️ Frio / Sem Resposta
+        <ThermometerCold aria-hidden="true" className="size-3.5 shrink-0" />
+        Frio / Sem Resposta
       </Badge>
     );
   }
@@ -1278,7 +1297,8 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   }
   return (
     <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs gap-1">
-      ✓ Lead Qualificado
+      <CheckCircle aria-hidden="true" className="size-3.5 shrink-0" />
+      Lead Qualificado
     </Badge>
   );
 }
@@ -1594,7 +1614,12 @@ function LeadNotesSection({ leadId }: { leadId: string }) {
 
   return (
     <ProfileSection
-      action={saved ? <span className="text-[10px] text-emerald-500 font-semibold">Salvo ✓</span> : undefined}
+      action={saved ? (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-500">
+          <CheckCircle aria-hidden="true" className="size-3" />
+          Salvo
+        </span>
+      ) : undefined}
       title="Anotações Privadas"
     >
       <textarea

@@ -300,15 +300,15 @@ function MetaMasterCaptureControl({
           <div>
             {currentMode === "disabled" ? (
               <Badge variant="destructive" className="px-3 py-1 text-xs font-semibold">
-                🚫 CAPTURA GERAL DESATIVADA (PAUSADA)
+                Captura geral desativada
               </Badge>
             ) : currentMode === "all" ? (
               <Badge variant="success" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 px-3 py-1 text-xs font-semibold">
-                🟢 CAPTURA GLOBAL ATIVA (TODAS)
+                Captura global ativa
               </Badge>
             ) : (
               <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 px-3 py-1 text-xs font-semibold">
-                🟡 MODO SELETIVO (APENAS MARCADAS)
+                Modo seletivo
               </Badge>
             )}
           </div>
@@ -325,15 +325,15 @@ function MetaMasterCaptureControl({
               options={[
                 {
                   value: "selective",
-                  label: "🟡 Capturar Apenas Selecionados (Recomendado - Filtre por campanhas/anúncios)",
+                  label: "Capturar apenas selecionados (recomendado)",
                 },
                 {
                   value: "all",
-                  label: "🟢 Ativar Todos (Captura Global de todas as campanhas e anúncios)",
+                  label: "Ativar todos os ativos",
                 },
                 {
                   value: "disabled",
-                  label: "🔴 Desativar Todos (Pausar Captura Geral - Bloqueia 100% dos leads Meta)",
+                  label: "Desativar toda a captura",
                 },
               ]}
             />
@@ -600,11 +600,11 @@ function SelectableAssetList({
                             variant="success"
                             className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold border-emerald-500/40"
                           >
-                            ✓ Elegível p/ Captura
+                            Elegível para captura
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                            ✕ Captura Desativada
+                            Captura desativada
                           </Badge>
                         )}
                       </div>

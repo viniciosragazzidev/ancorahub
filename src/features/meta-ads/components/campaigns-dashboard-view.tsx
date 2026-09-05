@@ -202,11 +202,11 @@ export function CampaignsDashboardView({
                                 )}
                                 {camp.isEligibleForCapture ? (
                                   <Badge variant="success" className="text-[9px] h-4 px-1.5 font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40">
-                                    ✓ Captura Ativa
+                              Captura ativa
                                   </Badge>
                                 ) : (
                                   <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-muted-foreground">
-                                    ✕ Ignorar Leads
+                              Ignorar leads
                                   </Badge>
                                 )}
                               </div>

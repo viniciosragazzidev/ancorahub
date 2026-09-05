@@ -473,10 +473,11 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                   {PRESET_COMMANDS.map((cmd) => {
                     const IconComp = cmd.icon;
                     return (
-                      <button
+                      <Button
                         key={cmd.command}
                         onClick={() => handleSelectCommand(cmd)}
-                        className="group flex flex-col justify-between rounded-xl border border-border/80 bg-card p-3.5 text-left transition-all hover:border-sky-500/50 hover:bg-sky-500/5 hover:shadow-sm active:scale-[0.98] active:translate-y-[0.5px] duration-150"
+                        className="group h-auto flex-col items-start justify-between p-3.5 text-left hover:border-primary/40 hover:bg-primary/5"
+                        variant="outline"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:bg-sky-500/10 group-hover:text-sky-500">
@@ -488,7 +489,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                           <h3 className="text-xs font-semibold text-foreground group-hover:text-sky-500">{cmd.label}</h3>
                           <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{cmd.description}</p>
                         </div>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -625,10 +626,11 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                           Comandos de Atalho MCP
                         </div>
                         {PRESET_COMMANDS.map((cmd) => (
-                          <button
+                          <Button
                             key={cmd.command}
                             onClick={() => handleSelectCommand(cmd)}
-                            className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-all hover:bg-muted active:scale-[0.98] active:translate-y-[0.5px]"
+                            className="h-auto w-full justify-between px-2.5 py-2 text-left text-xs"
+                            variant="ghost"
                           >
                             <div className="flex items-center gap-2">
                               <cmd.icon size={16} className="text-sky-500" />
@@ -636,7 +638,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                               <span className="text-[11px] text-muted-foreground">{cmd.description}</span>
                             </div>
                             <span className="font-mono text-[10px] text-muted-foreground">{cmd.command}</span>
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </ScrollArea>
@@ -648,13 +650,15 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase shrink-0">Atalhos:</span>
                 {PRESET_COMMANDS.slice(0, 4).map((cmd) => (
-                  <button
+                  <Button
                     key={cmd.command}
                     onClick={() => handleSelectCommand(cmd)}
-                    className="shrink-0 rounded-full border border-border/80 bg-card px-2.5 py-0.5 text-[11px] text-muted-foreground transition-all hover:border-sky-500/40 hover:text-sky-500 active:scale-[0.95] active:translate-y-[0.5px]"
+                    className="h-6 shrink-0 rounded-full px-2.5 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+                    size="xs"
+                    variant="outline"
                   >
                     {cmd.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 

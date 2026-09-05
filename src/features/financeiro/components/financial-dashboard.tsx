@@ -8,8 +8,6 @@ import {
   CurrencyCircleDollar,
   PiggyBank,
   Target,
-  TrendDown,
-  TrendUp,
   WarningCircle,
 } from "@/components/huge-icons";
 import {
@@ -24,6 +22,9 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/dashboard/metric-card";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import {
   Card,
@@ -103,46 +104,15 @@ function SummaryCard({
   delay: number;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0, 0, 0.2, 1], delay }}
-      whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
-      whileTap={{ scale: 0.995 }}
-    >
-      <Card className="group/card border-transparent bg-transparent shadow-none transition-all duration-200 hover:border-primary/25 hover:shadow-none">
-        <CardHeader className="pb-1">
-          <div className="flex items-center justify-between">
-            <CardDescription className="transition-colors duration-200 group-hover/card:text-foreground">
-              {label}
-            </CardDescription>
-            <Icon className="size-4 text-muted-foreground transition-colors duration-200 group-hover/card:text-primary" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-semibold tabular-nums tracking-tight">
-            {value}
-          </p>
-          {trend && (
-            <div className="mt-1 flex items-center gap-1">
-              {trend.isUp ? (
-                <TrendUp className="size-3 text-emerald-500" weight="fill" />
-              ) : (
-                <TrendDown className="size-3 text-rose-500" weight="fill" />
-              )}
-              <span
-                className={`text-xs ${trend.isUp
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-rose-600 dark:text-rose-400"
-                  }`}
-              >
-                {trend.value}
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </motion.div>
+    <StatCard
+      label={label}
+      value={value}
+      icon={Icon}
+      trend={trend ? (trend.isUp ? "up" : "down") : undefined}
+      change={trend?.value}
+      animated
+      animationDelay={delay}
+    />
   );
 }
 
@@ -210,7 +180,7 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.08 }}
           className="lg:col-span-4"
         >
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -305,7 +275,7 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.16 }}
           className="lg:col-span-3"
         >
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card>
             <CardHeader>
               <CardTitle>Resumo do período</CardTitle>
               <CardDescription>
@@ -401,7 +371,7 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.24 }}
           className="lg:col-span-4"
         >
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -517,7 +487,7 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.32 }}
           className="lg:col-span-3"
         >
-          <Card className="border-transparent bg-transparent shadow-none">
+          <Card>
             <CardHeader>
               <CardTitle>Próximos Repasses</CardTitle>
               <CardDescription>
@@ -584,7 +554,7 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, ease: [0, 0, 0.2, 1], delay: 0.4 }}
       >
-        <Card className="border-transparent bg-transparent shadow-none">
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -604,59 +574,50 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
           </CardHeader>
           <CardContent className="p-0">
             {recentSales.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <DataTableFrame className="rounded-none border-x-0 border-b-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
                         Lead
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      </TableHead>
+                      <TableHead>
                         Corretor
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      </TableHead>
+                      <TableHead>
                         Data
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      </TableHead>
+                      <TableHead className="text-right">
                         Valor
-                      </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      </TableHead>
+                      <TableHead className="text-center">
                         Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {recentSales.map((sale, i) => (
-                      <motion.tr
-                        key={sale.id}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{
-                          duration: 0.12,
-                          delay: Math.min(i * 0.03, 0.3),
-                        }}
-                        className="transition-colors hover:bg-muted/30"
-                      >
-                        <td className="px-6 py-3">
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentSales.map((sale) => (
+                      <TableRow key={sale.id}>
+                        <TableCell>
                           <Link
                             href={`/vendas/${sale.id}`}
                             className="font-medium text-foreground hover:text-primary transition-colors"
                           >
                             {sale.leadName}
                           </Link>
-                        </td>
-                        <td className="px-6 py-3 text-muted-foreground">
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
                           {sale.brokerName ?? "—"}
-                        </td>
-                        <td className="px-6 py-3 text-muted-foreground tabular-nums">
+                        </TableCell>
+                        <TableCell className="text-muted-foreground tabular-nums">
                           {new Intl.DateTimeFormat("pt-BR", {
                             dateStyle: "short",
                           }).format(new Date(sale.saleDate))}
-                        </td>
-                        <td className="px-6 py-3 text-right font-medium tabular-nums">
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
                           {formatCurrency(sale.saleValue)}
-                        </td>
-                        <td className="px-6 py-3 text-center">
+                        </TableCell>
+                        <TableCell className="text-center">
                           <Badge
                             variant={
                               sale.status === "active" ? "success" : "outline"
@@ -667,12 +628,12 @@ export function FinancialDashboard({ data, role, period = 30 }: Props) {
                               ? "Ativa"
                               : "Cancelada"}
                           </Badge>
-                        </td>
-                      </motion.tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </DataTableFrame>
             ) : (
               <div className="flex flex-col items-center py-12 text-center">
                 <PiggyBank className="size-10 text-muted-foreground/40" />

@@ -325,23 +325,23 @@ export function LightLeadsList({
                         )}
                       >
                         {isLost
-                          ? lead.lostReason || "⚠️ Redistribuído por inatividade / tempo limite estourado"
+                          ? lead.lostReason || "Redistribuído por inatividade ou tempo limite"
                           : lead.isAwaitingResponse
-                          ? "💬 Cliente aguardando sua resposta"
+                          ? "Cliente aguardando sua resposta"
                           : lead.isOverdue
-                            ? "⚡ Atualização pendente necessária"
+                            ? "Atualização pendente necessária"
                             : isDistributed
                               ? "🆕 Aguardando seu aceite inicial"
                               : lead.status === "quote_sent"
-                                ? "📄 Cotação enviada — acompanhe"
+                                ? "Cotação enviada — acompanhe"
                                 : lead.status === "documentation_pending"
-                                  ? "📁 Documentação pendente"
+                                  ? "Documentação pendente"
                                   : lead.status === "negotiation"
-                                    ? "🔵 Em negociação"
+                                    ? "Em negociação"
                                     : lead.status === "in_contact"
-                                      ? "✅ Em atendimento ativo"
+                                      ? "Em atendimento ativo"
                                       : lead.status === "converted"
-                                        ? "✓ Venda concluída"
+                                        ? "Venda concluída"
                                         : "Em andamento"}
                       </p>
                     </div>

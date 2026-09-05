@@ -155,7 +155,7 @@ export function RegisterSalePanel({
                     )}
                     {documents.map((doc) => (
                       <option key={doc.id} value={doc.id} disabled={doc.status !== "approved"}>
-                        {doc.filename}{doc.status === "pending" ? " (aguardando aprovação)" : doc.status === "rejected" ? " (rejeitado)" : " ✓"}
+                    {doc.filename}{doc.status === "pending" ? " (aguardando aprovação)" : doc.status === "rejected" ? " (rejeitado)" : " (aprovado)"}
                       </option>
                     ))}
                   </select>

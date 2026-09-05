@@ -89,7 +89,7 @@ export function CampaignDetailView({
         <div>
           <div className="flex items-center gap-2">
             <Badge variant={campaign.status === "ACTIVE" || campaign.status === "active" ? "success" : "outline"} className="text-[10px]">
-              {campaign.status === "ACTIVE" || campaign.status === "active" ? "🟢 Ativa" : "⚪ Pausada"}
+            {campaign.status === "ACTIVE" || campaign.status === "active" ? "Ativa" : "Pausada"}
             </Badge>
             <span className="font-mono text-xs text-muted-foreground">ID: {campaign.campaignId}</span>
           </div>
@@ -230,7 +230,7 @@ export function CampaignDetailView({
                       variant={ad.status === "ACTIVE" || ad.status === "active" ? "success" : "outline"}
                       className="text-[10px]"
                     >
-                      {ad.status === "ACTIVE" || ad.status === "active" ? "🟢 Ativo" : "⚪ Pausado"}
+                      {ad.status === "ACTIVE" || ad.status === "active" ? "Ativo" : "Pausado"}
                     </Badge>
                   </TableCell>
                   <TableCell className="pr-4 text-right font-mono text-xs font-bold text-foreground tabular-nums py-2.5">

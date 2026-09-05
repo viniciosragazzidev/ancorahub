@@ -821,7 +821,7 @@ function WorkflowNodeCard({
       className={cn(
         "absolute w-[14.5rem] touch-none select-none rounded-2xl border bg-card p-3 shadow-sm transition-[box-shadow,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
         selected
-          ? "border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]"
+          ? "border-primary ring-2 ring-primary/15"
           : "border-border hover:border-primary/45 hover:shadow-md",
         pending && "border-primary",
       )}

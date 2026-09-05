@@ -1,6 +1,7 @@
 import { AnimatedBadge, type AnimatedBadgeStatus } from "@/components/motion/animated-badge";
 import { normalizeTeamMemberStatus } from "@/features/team/status";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
+import { Fire, Snowflake, Sun } from "@phosphor-icons/react";
 
 export function LeadQualificationBadge({ status }: { status: string }) {
   const norm = (status || "").trim().toLowerCase();
@@ -8,21 +9,24 @@ export function LeadQualificationBadge({ status }: { status: string }) {
   if (norm === "hot" || norm.includes("quente")) {
     return (
       <AnimatedBadge status="danger" size="sm">
-        🔥 Quente
+        <Fire aria-hidden="true" className="size-3" weight="fill" />
+        Quente
       </AnimatedBadge>
     );
   }
   if (norm === "warm" || norm.includes("morno")) {
     return (
       <AnimatedBadge status="warning" size="sm">
-        ☀️ Morno
+        <Sun aria-hidden="true" className="size-3" weight="fill" />
+        Morno
       </AnimatedBadge>
     );
   }
   if (norm === "cold" || norm.includes("frio")) {
     return (
       <AnimatedBadge status="info" size="sm">
-        ❄️ Frio
+        <Snowflake aria-hidden="true" className="size-3" weight="bold" />
+        Frio
       </AnimatedBadge>
     );
   }

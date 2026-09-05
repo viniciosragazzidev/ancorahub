@@ -104,11 +104,12 @@ function FeedbackBody() {
             >
               <p className="pb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Qual é o assunto?</p>
               {SYSTEM_REPORT_TRIGGERS.map((item) => (
-                <button
+                <Button
                   key={item.id}
                   type="button"
                   onClick={() => setTriggerId(item.id)}
-                  className="group flex w-full items-center gap-3 rounded-xl border border-border/80 bg-card p-3.5 text-left shadow-2xs transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="group h-auto w-full justify-start gap-3 p-3.5 text-left hover:border-primary/40"
+                  variant="outline"
                 >
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition-transform duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover:scale-105 motion-reduce:transition-none">
                     <MessageSquareWarning className="size-4" />
@@ -117,7 +118,7 @@ function FeedbackBody() {
                     <span className="block text-sm font-medium text-foreground">{item.label}</span>
                     <span className="block text-[11px] text-muted-foreground">Toque para descrever o problema</span>
                   </span>
-                </button>
+                </Button>
               ))}
             </motion.div>
           )}

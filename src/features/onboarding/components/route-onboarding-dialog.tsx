@@ -113,15 +113,15 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup
         className="border-0 bg-transparent p-0 shadow-none max-w-[380px] w-full select-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-        overlayClassName="bg-slate-950/60 backdrop-blur-md dark:bg-black/80"
+        overlayClassName="bg-foreground/45 backdrop-blur-sm"
       >
-        <div className="relative flex min-h-[280px] max-h-[calc(100dvh-2rem)] w-full flex-col justify-between overflow-hidden rounded-xl border border-white/40 bg-background p-6 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.12)] focus:outline-none focus-visible:outline-none dark:border-white/10 dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] sm:p-7">
+        <div className="relative flex min-h-[280px] max-h-[calc(100dvh-2rem)] w-full flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 shadow-lg focus:outline-none focus-visible:outline-none sm:p-7">
 
           {/* Close button */}
           <DialogClose render={
             <Button
               aria-label="Fechar apresentação"
-              className="absolute right-5 top-5 z-10 flex size-8 items-center justify-center rounded-full bg-white/70 dark:bg-slate-800/80 text-muted-foreground/75 border border-white/40 dark:border-white/10 hover:bg-white dark:hover:bg-slate-850 hover:text-foreground transition-colors focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+              className="absolute right-5 top-5 z-10 rounded-full border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
               size="icon"
               variant="ghost"
             >
@@ -142,7 +142,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                   exit="exit"
                   className="flex flex-col items-start gap-5"
                 >
-                  <div className="flex size-14 items-center justify-center rounded-[1.25rem] bg-white dark:bg-slate-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] dark:border-white/5">
+                  <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-muted/40">
                     <Icon className="size-7 text-foreground" />
                   </div>
                   <div>
@@ -170,10 +170,10 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                   className="flex flex-col items-start gap-5"
                 >
                   <div className="flex gap-3">
-                    <div className="flex size-14 items-center justify-center rounded-[1.25rem] bg-white dark:bg-slate-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] dark:border-white/5">
+                    <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-muted/40">
                       <Target className="size-7 text-foreground" />
                     </div>
-                    <div className="flex size-14 items-center justify-center rounded-[1.25rem] bg-white dark:bg-slate-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] dark:border-white/5">
+                    <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-muted/40">
                       <LockKey className="size-7 text-foreground" />
                     </div>
                   </div>
@@ -201,7 +201,7 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
                   exit="exit"
                   className="flex flex-col items-start gap-5"
                 >
-                  <div className="flex size-14 items-center justify-center rounded-[1.25rem] bg-white dark:bg-slate-800 shadow-[0_8px_16px_rgba(0,0,0,0.04)] border border-black/[0.03] dark:border-white/5">
+                  <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-muted/40">
                     <RocketLaunch className="size-7 text-foreground" />
                   </div>
                   <div>

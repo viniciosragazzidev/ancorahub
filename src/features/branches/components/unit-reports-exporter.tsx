@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
 import { reportRegistry, type ReportFormat } from "@/features/reports/report-registry";
 import { toast } from "@/components/ui/sonner";
 import type { TenantRole } from "@/shared/db/schema";
@@ -124,32 +125,29 @@ export function UnitReportsExporter({ branchId, branchName, currentRole }: UnitR
             <div className="grid gap-4" aria-busy={isGenerating}>
               <label className="grid gap-1.5 text-sm font-medium">
                 Tipo de Relatório
-                <select
+                <AppSelect
                   value={reportId}
-                  onChange={(e) => setReportId(e.target.value)}
+                  onValueChange={setReportId}
                   disabled={isGenerating}
-                  className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none"
-                >
-                  {reportRegistry.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title} ({r.category})
-                    </option>
-                  ))}
-                </select>
+                  options={reportRegistry.map((report) => ({
+                    value: report.id,
+                    label: `${report.title} (${report.category})`,
+                  }))}
+                />
               </label>
 
               <label className="grid gap-1.5 text-sm font-medium">
                 Período
-                <select
+                <AppSelect
                   value={preset}
-                  onChange={(e) => changePreset(e.target.value as RangePreset)}
+                  onValueChange={(value) => changePreset(value as RangePreset)}
                   disabled={isGenerating}
-                  className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none"
-                >
-                  <option value="30">Últimos 30 dias</option>
-                  <option value="90">Últimos 90 dias</option>
-                  <option value="custom">Personalizado</option>
-                </select>
+                  options={[
+                    { value: "30", label: "Últimos 30 dias" },
+                    { value: "90", label: "Últimos 90 dias" },
+                    { value: "custom", label: "Personalizado" },
+                  ]}
+                />
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -181,15 +179,15 @@ export function UnitReportsExporter({ branchId, branchName, currentRole }: UnitR
 
               <label className="grid gap-1.5 text-sm font-medium">
                 Formato
-                <select
+                <AppSelect
                   value={format}
-                  onChange={(e) => setFormat(e.target.value as ReportFormat)}
+                  onValueChange={(value) => setFormat(value as ReportFormat)}
                   disabled={isGenerating}
-                  className="h-9 rounded-[10px] border border-input bg-card px-3 text-sm outline-none transition-colors duration-[var(--duration-quick)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 motion-reduce:transition-none"
-                >
-                  <option value="xlsx">XLSX (Planilha Excel)</option>
-                  <option value="csv">CSV (Valores separados por ponto-e-vírgula)</option>
-                </select>
+                  options={[
+                    { value: "xlsx", label: "XLSX (Planilha Excel)" },
+                    { value: "csv", label: "CSV (Valores separados por ponto-e-vírgula)" },
+                  ]}
+                />
               </label>
             </div>
 

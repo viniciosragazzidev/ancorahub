@@ -6,44 +6,336 @@ import { ArrowsClockwise, CalendarBlank, Flag, Target } from "@/components/huge-
 import { toast } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppSelect } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createAwardAction, createSeasonAction, activateSeasonAction, resetRankingAction } from "../actions";
+import {
+  createAwardAction,
+  createSeasonAction,
+  activateSeasonAction,
+  resetRankingAction,
+} from "../actions";
 import type { PerformanceAwardRecord, PerformanceSeasonRecord } from "../queries";
 import type { PerformanceActionState } from "../schema";
 
 function Feedback({ state }: { state: PerformanceActionState }) {
-  useEffect(() => { if (state.success) toast.success(state.success); if (state.error) toast.error(state.error); }, [state]);
+  useEffect(() => {
+    if (state.success) toast.success(state.success);
+    if (state.error) toast.error(state.error);
+  }, [state]);
   return null;
 }
 
-const statusLabel: Record<PerformanceSeasonRecord["status"], string> = { draft: "Rascunho", active: "Ativa", closed: "Encerrada", archived: "Arquivada" };
-const statusVariant: Record<PerformanceSeasonRecord["status"], "success" | "secondary" | "outline"> = { active: "success", draft: "secondary", closed: "outline", archived: "outline" };
-const awardTypeLabel: Record<PerformanceAwardRecord["rewardType"], string> = { recognition: "Reconhecimento", bonus: "Bônus", gift: "Presente", other: "Outro" };
+const statusLabel: Record<PerformanceSeasonRecord["status"], string> = {
+  draft: "Rascunho",
+  active: "Ativa",
+  closed: "Encerrada",
+  archived: "Arquivada",
+};
+const statusVariant: Record<
+  PerformanceSeasonRecord["status"],
+  "success" | "secondary" | "outline"
+> = { active: "success", draft: "secondary", closed: "outline", archived: "outline" };
+const awardTypeLabel: Record<PerformanceAwardRecord["rewardType"], string> = {
+  recognition: "Reconhecimento",
+  bonus: "Bônus",
+  gift: "Presente",
+  other: "Outro",
+};
 
-export function DirectorPerformanceManager({ seasons, awards }: { seasons: PerformanceSeasonRecord[]; awards: PerformanceAwardRecord[] }) {
+export function DirectorPerformanceManager({
+  seasons,
+  awards,
+}: {
+  seasons: PerformanceSeasonRecord[];
+  awards: PerformanceAwardRecord[];
+}) {
   const activeSeason = seasons.find((season) => season.status === "active") ?? null;
-  const [seasonState, seasonAction, seasonPending] = useActionState<PerformanceActionState, FormData>(createSeasonAction, {});
-  const [resetState, resetAction, resetPending] = useActionState<PerformanceActionState, FormData>(resetRankingAction, {});
-  const [awardState, awardAction, awardPending] = useActionState<PerformanceActionState, FormData>(createAwardAction, {});
-  const [activationState, activationAction, activationPending] = useActionState<PerformanceActionState, FormData>(activateSeasonAction, {});
+  const [seasonState, seasonAction, seasonPending] = useActionState<
+    PerformanceActionState,
+    FormData
+  >(createSeasonAction, {});
+  const [resetState, resetAction, resetPending] = useActionState<PerformanceActionState, FormData>(
+    resetRankingAction,
+    {},
+  );
+  const [awardState, awardAction, awardPending] = useActionState<PerformanceActionState, FormData>(
+    createAwardAction,
+    {},
+  );
+  const [activationState, activationAction, activationPending] = useActionState<
+    PerformanceActionState,
+    FormData
+  >(activateSeasonAction, {});
 
-  return <Tabs defaultValue="season">
-    <TabsList className="overflow-x-auto"><TabsTrigger value="season"><CalendarBlank className="size-4" /> Temporadas</TabsTrigger><TabsTrigger value="goals"><Target className="size-4" /> Metas</TabsTrigger><TabsTrigger value="awards"><Flag className="size-4" /> Premiações</TabsTrigger><TabsTrigger value="history"><Target className="size-4" /> Histórico</TabsTrigger></TabsList>
-    <TabsContent value="season" className="pt-5" data-onboarding="director-overview">
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
-        <Card><CardHeader><CardTitle>Temporada do ranking</CardTitle><CardDescription>Uma temporada define o período de comparação. Reiniciar fecha a atual e inicia outra — nenhum resultado antigo é apagado.</CardDescription></CardHeader><CardContent>
-          {activeSeason ? <div className="rounded-lg border border-primary/20 bg-primary/5 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{activeSeason.name}</p><p className="mt-1 text-sm text-muted-foreground">Iniciada em {new Date(activeSeason.startsAt).toLocaleDateString("pt-BR")}. O ranking e as premiações desta temporada usam somente este período.</p></div><Badge variant="success">Em andamento</Badge></div></div> : <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Ainda não há uma temporada ativa. Crie e ative a primeira antes de divulgar o ranking.</div>}
-          <form action={resetAction} className="mt-5 grid gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-4"><div className="flex items-center gap-2 font-medium"><ArrowsClockwise className="size-4 text-amber-600" /> Reiniciar ranking com nova temporada</div><p className="text-xs text-muted-foreground">Fecha a temporada atual, preserva histórico e passa a considerar apenas eventos futuros no novo ciclo.</p><Input name="name" placeholder="Ex.: Agosto 2026" required /><Input name="reason" placeholder="Motivo do reinício (opcional)" /><Button type="submit" variant="outline" disabled={resetPending}>{resetPending ? "Reiniciando…" : "Fechar ciclo e iniciar novo"}</Button></form>
-        </CardContent></Card>
-        <Card><CardHeader><CardTitle>Nova temporada</CardTitle><CardDescription>Prepare um rascunho ou ative-o imediatamente.</CardDescription></CardHeader><CardContent><form action={seasonAction} className="grid gap-3"><div className="grid gap-1.5"><Label htmlFor="season-name">Nome</Label><Input id="season-name" name="name" placeholder="Ex.: Campanha Primavera" required /></div><div className="grid gap-1.5"><Label htmlFor="season-start">Início</Label><Input id="season-start" name="startsAt" type="date" required /></div><div className="grid gap-1.5"><Label htmlFor="season-end">Término planejado</Label><Input id="season-end" name="endsAt" type="date" /></div><label className="flex items-center gap-2 text-sm"><input name="activate" type="checkbox" /> Ativar agora e encerrar a temporada atual</label><Button type="submit" disabled={seasonPending}>{seasonPending ? "Salvando…" : "Criar temporada"}</Button></form></CardContent></Card>
-      </div><Feedback state={seasonState} /><Feedback state={resetState} />
-    </TabsContent>
-    <TabsContent value="goals" className="pt-5" data-onboarding="director-branches"><Card><CardHeader><CardTitle>Metas comerciais</CardTitle><CardDescription>As metas já configuradas em Metas continuam sendo a fonte oficial de objetivos por corretor, unidade ou empresa.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Crie metas mensuráveis e acompanhe o progresso com dados reais de vendas e atendimentos.</p><Button render={<Link href="/metas" />} variant="outline">Gerenciar metas</Button></CardContent></Card></TabsContent>
-    <TabsContent value="awards" className="pt-5" data-onboarding="director-commissions"><div className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]"><Card><CardHeader><CardTitle>Premiações da temporada</CardTitle><CardDescription>Defina o que cada colocação recebe. O sistema registra a regra; entrega e pagamento continuam sob responsabilidade da empresa.</CardDescription></CardHeader><CardContent className="space-y-3">{activeSeason ? awards.filter((award) => award.seasonId === activeSeason.id).length ? awards.filter((award) => award.seasonId === activeSeason.id).map((award) => <div className="flex items-center justify-between gap-3 rounded-lg border p-3" key={award.id}><div><p className="font-medium">{award.rankPosition}º lugar · {award.title}</p><p className="text-xs text-muted-foreground">{awardTypeLabel[award.rewardType]}{award.rewardValue ? ` · ${award.rewardValue}` : ""}</p></div><Badge variant="secondary">Ativa</Badge></div>) : <p className="text-sm text-muted-foreground">Nenhuma premiação definida para a temporada ativa.</p> : <p className="text-sm text-muted-foreground">Ative uma temporada antes de configurar premiações.</p>}</CardContent></Card><Card><CardHeader><CardTitle>Adicionar premiação</CardTitle><CardDescription>Configure a regra antes da divulgação.</CardDescription></CardHeader><CardContent>{activeSeason ? <form action={awardAction} className="grid gap-3"><input name="seasonId" type="hidden" value={activeSeason.id} /><Input name="title" placeholder="Ex.: Vale-presente" required /><Input name="rankPosition" min="1" placeholder="Colocação" type="number" required /><AppSelect name="rewardType" defaultValue="recognition" options={[{ value: "recognition", label: "Reconhecimento" }, { value: "bonus", label: "Bônus" }, { value: "gift", label: "Presente" }, { value: "other", label: "Outro" }]} /><Input name="rewardValue" placeholder="Valor ou descrição (opcional)" /><Button type="submit" disabled={awardPending}>{awardPending ? "Adicionando…" : "Adicionar premiação"}</Button></form> : <p className="text-sm text-muted-foreground">Crie uma temporada ativa para liberar este formulário.</p>}</CardContent></Card></div><Feedback state={awardState} /></TabsContent>
-    <TabsContent value="history" className="pt-5" data-onboarding="director-audit"><Card><CardHeader><CardTitle>Histórico de temporadas</CardTitle><CardDescription>Ciclos encerrados ficam disponíveis para consulta e auditoria. Rascunhos podem ser ativados quando estiverem prontos.</CardDescription></CardHeader><CardContent className="space-y-3">{seasons.length ? seasons.map((season) => <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3" key={season.id}><div><p className="font-medium">{season.name}</p><p className="text-xs text-muted-foreground">{new Date(season.startsAt).toLocaleDateString("pt-BR")} {season.endsAt ? `— ${new Date(season.endsAt).toLocaleDateString("pt-BR")}` : "— sem término"}{season.resetReason ? ` · ${season.resetReason}` : ""}</p></div><div className="flex items-center gap-2"><Badge variant={statusVariant[season.status]}>{statusLabel[season.status]}</Badge>{season.status === "draft" ? <form action={activationAction}><input name="seasonId" type="hidden" value={season.id} /><Button size="sm" type="submit" variant="outline" disabled={activationPending}>{activationPending ? "Ativando…" : "Ativar"}</Button></form> : null}</div></div>) : <p className="text-sm text-muted-foreground">O histórico aparecerá quando a primeira temporada for criada.</p>}<Feedback state={activationState} /></CardContent></Card></TabsContent>
-  </Tabs>;
+  return (
+    <Tabs defaultValue="season">
+      <TabsList className="overflow-x-auto">
+        <TabsTrigger value="season">
+          <CalendarBlank className="size-4" /> Temporadas
+        </TabsTrigger>
+        <TabsTrigger value="goals">
+          <Target className="size-4" /> Metas
+        </TabsTrigger>
+        <TabsTrigger value="awards">
+          <Flag className="size-4" /> Premiações
+        </TabsTrigger>
+        <TabsTrigger value="history">
+          <Target className="size-4" /> Histórico
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="season" className="pt-5" data-onboarding="director-overview">
+        <div className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Temporada do ranking</CardTitle>
+              <CardDescription>
+                Uma temporada define o período de comparação. Reiniciar fecha a atual e inicia outra
+                — nenhum resultado antigo é apagado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activeSeason ? (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{activeSeason.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Iniciada em {new Date(activeSeason.startsAt).toLocaleDateString("pt-BR")}. O
+                        ranking e as premiações desta temporada usam somente este período.
+                      </p>
+                    </div>
+                    <Badge variant="success">Em andamento</Badge>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  Ainda não há uma temporada ativa. Crie e ative a primeira antes de divulgar o
+                  ranking.
+                </div>
+              )}
+              <form
+                action={resetAction}
+                className="mt-5 grid gap-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-4"
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  <ArrowsClockwise className="size-4 text-amber-600" /> Reiniciar ranking com nova
+                  temporada
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Fecha a temporada atual, preserva histórico e passa a considerar apenas eventos
+                  futuros no novo ciclo.
+                </p>
+                <Input name="name" placeholder="Ex.: Agosto 2026" required />
+                <Input name="reason" placeholder="Motivo do reinício (opcional)" />
+                <Button type="submit" variant="outline" disabled={resetPending}>
+                  {resetPending ? "Reiniciando…" : "Fechar ciclo e iniciar novo"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Nova temporada</CardTitle>
+              <CardDescription>Prepare um rascunho ou ative-o imediatamente.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={seasonAction} className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="season-name">Nome</Label>
+                  <Input
+                    id="season-name"
+                    name="name"
+                    placeholder="Ex.: Campanha Primavera"
+                    required
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="season-start">Início</Label>
+                  <Input id="season-start" name="startsAt" type="date" required />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="season-end">Término planejado</Label>
+                  <Input id="season-end" name="endsAt" type="date" />
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox name="activate" value="true" /> Ativar agora e encerrar a temporada
+                  atual
+                </label>
+                <Button type="submit" disabled={seasonPending}>
+                  {seasonPending ? "Salvando…" : "Criar temporada"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+        <Feedback state={seasonState} />
+        <Feedback state={resetState} />
+      </TabsContent>
+      <TabsContent value="goals" className="pt-5" data-onboarding="director-branches">
+        <Card>
+          <CardHeader>
+            <CardTitle>Metas comerciais</CardTitle>
+            <CardDescription>
+              As metas já configuradas em Metas continuam sendo a fonte oficial de objetivos por
+              corretor, unidade ou empresa.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Crie metas mensuráveis e acompanhe o progresso com dados reais de vendas e
+              atendimentos.
+            </p>
+            <Button render={<Link href="/metas" />} variant="outline">
+              Gerenciar metas
+            </Button>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      <TabsContent value="awards" className="pt-5" data-onboarding="director-commissions">
+        <div className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Premiações da temporada</CardTitle>
+              <CardDescription>
+                Defina o que cada colocação recebe. O sistema registra a regra; entrega e pagamento
+                continuam sob responsabilidade da empresa.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {activeSeason ? (
+                awards.filter((award) => award.seasonId === activeSeason.id).length ? (
+                  awards
+                    .filter((award) => award.seasonId === activeSeason.id)
+                    .map((award) => (
+                      <div
+                        className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                        key={award.id}
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {award.rankPosition}º lugar · {award.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {awardTypeLabel[award.rewardType]}
+                            {award.rewardValue ? ` · ${award.rewardValue}` : ""}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Ativa</Badge>
+                      </div>
+                    ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma premiação definida para a temporada ativa.
+                  </p>
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Ative uma temporada antes de configurar premiações.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Adicionar premiação</CardTitle>
+              <CardDescription>Configure a regra antes da divulgação.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activeSeason ? (
+                <form action={awardAction} className="grid gap-3">
+                  <input name="seasonId" type="hidden" value={activeSeason.id} />
+                  <Input name="title" placeholder="Ex.: Vale-presente" required />
+                  <Input
+                    name="rankPosition"
+                    min="1"
+                    placeholder="Colocação"
+                    type="number"
+                    required
+                  />
+                  <AppSelect
+                    name="rewardType"
+                    defaultValue="recognition"
+                    options={[
+                      { value: "recognition", label: "Reconhecimento" },
+                      { value: "bonus", label: "Bônus" },
+                      { value: "gift", label: "Presente" },
+                      { value: "other", label: "Outro" },
+                    ]}
+                  />
+                  <Input name="rewardValue" placeholder="Valor ou descrição (opcional)" />
+                  <Button type="submit" disabled={awardPending}>
+                    {awardPending ? "Adicionando…" : "Adicionar premiação"}
+                  </Button>
+                </form>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Crie uma temporada ativa para liberar este formulário.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        <Feedback state={awardState} />
+      </TabsContent>
+      <TabsContent value="history" className="pt-5" data-onboarding="director-audit">
+        <Card>
+          <CardHeader>
+            <CardTitle>Histórico de temporadas</CardTitle>
+            <CardDescription>
+              Ciclos encerrados ficam disponíveis para consulta e auditoria. Rascunhos podem ser
+              ativados quando estiverem prontos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {seasons.length ? (
+              seasons.map((season) => (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                  key={season.id}
+                >
+                  <div>
+                    <p className="font-medium">{season.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(season.startsAt).toLocaleDateString("pt-BR")}{" "}
+                      {season.endsAt
+                        ? `— ${new Date(season.endsAt).toLocaleDateString("pt-BR")}`
+                        : "— sem término"}
+                      {season.resetReason ? ` · ${season.resetReason}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={statusVariant[season.status]}>
+                      {statusLabel[season.status]}
+                    </Badge>
+                    {season.status === "draft" ? (
+                      <form action={activationAction}>
+                        <input name="seasonId" type="hidden" value={season.id} />
+                        <Button
+                          size="sm"
+                          type="submit"
+                          variant="outline"
+                          disabled={activationPending}
+                        >
+                          {activationPending ? "Ativando…" : "Ativar"}
+                        </Button>
+                      </form>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                O histórico aparecerá quando a primeira temporada for criada.
+              </p>
+            )}
+            <Feedback state={activationState} />
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
+  );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, MagnifyingGlass, UserCheck, WhatsappLogo, X } from "@/components/huge-icons";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
@@ -44,23 +45,25 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
         {/* Search Input */}
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
+          <Input
             type="text"
             aria-label="Buscar cliente por nome ou telefone"
             placeholder="Buscar cliente por nome ou telefone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-border bg-card py-2 pl-9 pr-9 text-xs shadow-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full pl-9 pr-9 text-xs"
           />
           {searchQuery && (
-            <button
+            <Button
               type="button"
               onClick={() => setSearchQuery("")}
               aria-label="Limpar busca"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              size="icon-sm"
+              variant="ghost"
             >
               <X className="size-3.5" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -129,13 +132,14 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
                   : "Você ainda não tem clientes cadastrados."}
               </p>
               {searchQuery.trim() && (
-                <button
+                <Button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="mt-3 text-xs font-semibold text-primary hover:underline cursor-pointer"
+                  className="mt-3 h-auto p-0 text-xs"
+                  variant="link"
                 >
                   Limpar busca
-                </button>
+                </Button>
               )}
             </Card>
           )}

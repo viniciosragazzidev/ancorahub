@@ -6,6 +6,8 @@ import { FunnelSection } from "./funnel-section";
 import { AttentionSection } from "./attention-section";
 import { comparisonDelta } from "@/features/reports/metrics/metrics-math";
 import { TrendUp, Target, Users, ChartBar, CurrencyCircleDollar } from "@/components/huge-icons";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CommercialTabProps {
   readonly period: PeriodValue;
@@ -92,33 +94,33 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
           <ChartBar className="size-3.5" aria-hidden="true" />
           <h2 id="source-performance-title" className="font-medium text-foreground">Desempenho por canal</h2>
         </div>
-        <div className="rounded-lg border border-border bg-card shadow-sm overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-                <th className="px-4 py-3">Canal</th>
-                <th className="px-4 py-3 text-right">Leads</th>
-                <th className="px-4 py-3 text-right">Convertidos</th>
-                <th className="px-4 py-3 text-right">Conversão</th>
-                <th className="px-4 py-3 text-right">Vendas</th>
-              </tr>
-            </thead>
-            <tbody>
+        <DataTableFrame>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Canal</TableHead>
+                <TableHead className="text-right">Leads</TableHead>
+                <TableHead className="text-right">Convertidos</TableHead>
+                <TableHead className="text-right">Conversão</TableHead>
+                <TableHead className="text-right">Vendas</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sourcePerformance.map((row) => {
                 const convRate = row.leads > 0 ? ((row.converted / row.leads) * 100).toFixed(1) : "0,0";
                 return (
-                  <tr key={row.source} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2.5 font-medium">{sourceLabel(row.source)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.leads}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.converted}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{convRate}%</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.sales}</td>
-                  </tr>
+                  <TableRow key={row.source}>
+                    <TableCell className="font-medium">{sourceLabel(row.source)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.leads}</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.converted}</TableCell>
+                    <TableCell className="text-right tabular-nums">{convRate}%</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.sales}</TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </DataTableFrame>
       </section>
     </>
   );

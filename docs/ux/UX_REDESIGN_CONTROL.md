@@ -1,6 +1,6 @@
 # Controle de Execução do Redesign
 
-**Atualizado em:** 2026-09-04  
+**Atualizado em:** 2026-09-05
 **Fonte de verdade:** este documento e `UX_REDESIGN_CONTRACT.md`.
 
 ## Estado atual
@@ -10,8 +10,8 @@
 | Etapa atual | UX-1G — Documentos (`/documentos`) |
 | Estado | `READY_TO_START` |
 | Protocolo de Governança | UX-GOV-1 (`UX_FOUNDATIONS.md`, `UX_DECISIONS.md`, `UX_CHANGELOG.md`, `UX_FUNCTIONALITY_MATRIX.md`) |
-| Mudança visual autorizada | Iniciar UX-1G conforme especificação de contrato e matriz de funcionalidades |
-| Próxima ação obrigatória | Executar UX-1G estruturando a central de documentos |
+| Mudança visual autorizada | Hardening transversal UX-H1 aprovado pelo usuário: biblioteca única, sidebar preta, tabelas claras e auditoria por rota |
+| Próxima ação obrigatória | QA visual e funcional do CRM por papel/viewport; depois retomar UX-1G. Super Admin e dev permanecem fora desta rodada |
 | Bloqueios conhecidos | Nenhum bloqueio. UX-1A, UX-1B, UX-1C, UX-1D, UX-1E e UX-1F concluídas e 100% validadas |
 
 ## Registro de etapas
@@ -25,3 +25,4 @@
 | UX-1E — Leads workspace | `COMPLETE` | `src/app/(dashboard)/leads/`<br>`src/app/(dashboard)/leads/_components/leads-filters.tsx`<br>`src/app/(dashboard)/leads/leads-workspace.tsx`<br>`docs/ux/UX_CHANGELOG.md` | Iniciar UX-1F (Detalhe do Lead) |
 | UX-1F — Detalhe do lead | `COMPLETE` | `src/app/(dashboard)/leads/[id]/page.tsx`<br>`docs/ux/UX_CHANGELOG.md` | Iniciar UX-1G (Documentos) |
 | UX-1G a UX-1J | `NOT_STARTED` | — | Seguir a ordem estrita do contrato |
+| UX-H1 — Padronização transversal | `CRM_CODE_COMPLETE` | `docs/ux/DESIGN_SYSTEM_MANUAL.md`<br>`docs/ux/COMPONENT_STANDARDIZATION_PLAN.md`<br>`docs/ux/audits/ROUTE_COMPONENT_CATALOG.json`<br>`scripts/ui/audit-ui-components.ts`<br>`npm run ui:audit:strict` com zero divergências no CRM | Executar QA visual/funcional autenticado; abrir ondas separadas para Super Admin, dev, auth e público |

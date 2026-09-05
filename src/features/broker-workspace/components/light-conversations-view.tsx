@@ -116,14 +116,14 @@ export function LightConversationsView({ insights, initialLeadId, whatsappConnec
           <div className="space-y-1 p-2">
             {filtered.map((item) => {
               const active = item.id === selected?.id;
-              return <button key={item.id} type="button" onClick={() => select(item)} className={cn("w-full rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", active ? "border-primary/30 bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")} aria-current={active ? "page" : undefined}>
+              return <Button key={item.id} type="button" onClick={() => select(item)} className={cn("h-auto w-full justify-start px-3 py-2.5 text-left", active ? "border-primary/30 bg-primary/5" : "border-transparent")} variant="outline" aria-current={active ? "page" : undefined}>
                 <div className="flex items-start justify-between gap-2">
                   <span className="truncate text-sm font-semibold">{item.name}</span>
                   <Badge variant={healthVariant(item)} className="shrink-0 text-[10px]">{healthLabel(item)}</Badge>
                 </div>
                 <p className="mt-1 truncate text-xs text-muted-foreground">{item.latestMessage ? `${isOutbound(item.latestMessage.direction) ? "Você: " : "Cliente: "}${item.latestMessage.body}` : "Sem conversa sincronizada"}</p>
                 <p className="mt-1.5 text-[11px] text-muted-foreground">{item.latestMessage ? `Última interação ${formatDateTime(item.latestMessage.sentAt)}` : "Aguardando primeira interação"}</p>
-              </button>;
+              </Button>;
             })}
             {!filtered.length ? <EmptyPortfolioView /> : null}
           </div>

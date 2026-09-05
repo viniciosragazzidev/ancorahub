@@ -1,6 +1,8 @@
 import type { PeriodValue } from "@/shared/period";
 import type { UnitPerformanceRow } from "@/features/reports/metrics/metrics-service";
 import { Buildings } from "@/components/huge-icons";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface UnitsTabProps {
   readonly period: PeriodValue;
@@ -23,32 +25,32 @@ export function UnitsTab({ period, units }: UnitsTabProps) {
           <p className="text-sm font-medium text-muted-foreground">Nenhum dado de unidade disponível para este período.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border bg-card shadow-sm overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-                <th className="px-4 py-3">Unidade</th>
-                <th className="px-4 py-3 text-right">Leads</th>
-                <th className="px-4 py-3 text-right">Convertidos</th>
-                <th className="px-4 py-3 text-right">Conversão</th>
-                <th className="px-4 py-3 text-right">Vendas</th>
-                <th className="px-4 py-3 text-right">SLA 1º contato</th>
-              </tr>
-            </thead>
-            <tbody>
+        <DataTableFrame>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Unidade</TableHead>
+                <TableHead className="text-right">Leads</TableHead>
+                <TableHead className="text-right">Convertidos</TableHead>
+                <TableHead className="text-right">Conversão</TableHead>
+                <TableHead className="text-right">Vendas</TableHead>
+                <TableHead className="text-right">SLA 1º contato</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {units.map((row) => (
-                <tr key={row.branchId} className="border-b border-border last:border-0">
-                  <td className="px-4 py-2.5 font-medium">{row.branchName}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{row.leads}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{row.converted}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{row.conversionRate.toFixed(1)}%</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{row.sales}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{row.slaRate.toFixed(1)}%</td>
-                </tr>
+                <TableRow key={row.branchId}>
+                  <TableCell className="font-medium">{row.branchName}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.leads}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.converted}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.conversionRate.toFixed(1)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.sales}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.slaRate.toFixed(1)}%</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </DataTableFrame>
       )}
     </section>
   );

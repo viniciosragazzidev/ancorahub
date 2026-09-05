@@ -219,7 +219,7 @@ export function LeadStatusSelector({
                 {potentialSaleCheck.isPotentialSale && (
                   <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
                     <p className="font-semibold text-amber-700 dark:text-amber-400">
-                      ⚠️ Proteção de Regressão IA
+              Proteção contra regressão da IA
                     </p>
                     <p className="text-muted-foreground text-[11px] leading-normal">
                       A IA diagnosticou este lead como potencial venda (

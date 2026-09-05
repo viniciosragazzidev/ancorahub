@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   importSpreadsheetAction,
   type SpreadsheetActionState,
@@ -332,42 +334,40 @@ export function SpreadsheetUploader({
                 </div>
 
                 {/* Mini table */}
-                <div className="overflow-x-auto rounded-lg border border-border max-h-64 overflow-y-auto">
-                  <table className="w-full">
-                    <thead className="sticky top-0 bg-muted/90 z-10">
-                      <tr className="border-b border-border">
+                <DataTableFrame density="compact" className="max-h-64 overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10">
+                      <TableRow>
                         {preview.columns.map((col) => (
-                          <th
+                          <TableHead
                             key={col}
-                            className="px-3 py-1.5 text-left text-[11px] font-semibold text-muted-foreground whitespace-nowrap"
+                            className="whitespace-nowrap text-[11px]"
                           >
                             {col}
-                          </th>
+                          </TableHead>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {preview.rows.map((row, i) => (
-                        <tr
+                        <TableRow
                           key={i}
-                          className={`border-b border-border ${
-                            i % 2 === 0 ? "bg-background" : "bg-muted/10"
-                          }`}
+                          className={i % 2 === 0 ? undefined : "bg-muted/15"}
                         >
                           {preview.columns.map((col) => (
-                            <td key={col} className="px-3 py-1 text-xs truncate max-w-48">
+                            <TableCell key={col} className="max-w-48 truncate text-xs">
                               {row[col] != null && row[col] !== "" ? (
                                 String(row[col])
                               ) : (
                                 <span className="text-muted-foreground/50">—</span>
                               )}
-                            </td>
+                            </TableCell>
                           ))}
-                        </tr>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                </DataTableFrame>
 
                 {/* Name + import button */}
                 <div className="flex items-end gap-3">

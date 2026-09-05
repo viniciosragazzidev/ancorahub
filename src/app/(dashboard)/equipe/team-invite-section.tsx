@@ -97,7 +97,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Mensagem pronta para WhatsApp:</label>
               <div className="rounded-lg border border-border bg-muted/60 p-3 text-xs whitespace-pre-wrap select-all font-sans leading-relaxed text-foreground">
-                {`Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`}
+              {`Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`}
               </div>
             </div>
 
@@ -105,7 +105,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
               <Button
                 className="w-full gap-2"
                 onClick={async () => {
-                  const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
+    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
                   await navigator.clipboard.writeText(msg);
                   toast.success("Mensagem completa de convite copiada!");
                 }}
@@ -129,7 +129,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                   variant="secondary"
                   className="flex-1 gap-2 text-xs"
                   onClick={() => {
-                    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
+    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
                   }}
                 >

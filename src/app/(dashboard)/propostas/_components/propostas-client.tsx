@@ -40,6 +40,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   createProposalAction,
   updateProposalStatusAction,
@@ -419,58 +421,58 @@ export function PropostasClient({
               <TabsContent key={tab} value={tab} className="mt-4">
                 <Card className="border border-border/60 shadow-sm bg-card">
                   <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-border/40 bg-muted/20 text-muted-foreground uppercase tracking-wider font-semibold">
-                            <th className="p-3">Titulo</th>
-                            <th className="p-3">Lead / Cliente</th>
-                            <th className="p-3 text-center">Status</th>
-                            <th className="p-3 text-right">Valor Mensal</th>
-                            <th className="p-3">Validade</th>
-                            <th className="p-3 text-right">Acoes</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/30">
+                    <DataTableFrame className="rounded-none border-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Título</TableHead>
+                            <TableHead>Lead / Cliente</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
+                            <TableHead className="text-right">Valor mensal</TableHead>
+                            <TableHead>Validade</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {list.length === 0 ? (
-                            <tr>
-                              <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                            <TableRow>
+                              <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
                                 Nenhuma proposta encontrada.
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ) : (
                             list.map((proposal) => (
-                              <tr key={proposal.id} className="hover:bg-muted/10 transition-colors">
-                                <td className="p-3 font-semibold text-foreground">
+                              <TableRow key={proposal.id}>
+                                <TableCell className="font-semibold text-foreground">
                                   {proposal.title}
                                   <div className="text-[10px] text-muted-foreground font-normal">
                                     Versao {proposal.version}
                                   </div>
-                                </td>
-                                <td className="p-3">
+                                </TableCell>
+                                <TableCell>
                                   <div className="font-medium text-foreground">{proposal.leadName}</div>
                                   <div className="flex items-center gap-1 mt-0.5 text-muted-foreground text-[10px]">
                                     <Phone className="h-3 w-3" />
                                     {proposal.leadPhone ?? "Sem telefone"}
                                   </div>
-                                </td>
-                                <td className="p-3 text-center">
+                                </TableCell>
+                                <TableCell className="text-center">
                                   <Badge className={statusBadgeStyles[proposal.status]} variant="outline">
                                     {statusLabel[proposal.status] ?? proposal.status}
                                   </Badge>
-                                </td>
-                                <td className="p-3 text-right font-medium text-foreground">
+                                </TableCell>
+                                <TableCell className="text-right font-medium text-foreground">
                                   {new Intl.NumberFormat("pt-BR", {
                                     style: "currency",
                                     currency: "BRL",
                                   }).format(Number(proposal.totalMonthly))}
-                                </td>
-                                <td className="p-3 text-muted-foreground">
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
                                   {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(
                                     new Date(proposal.validUntil)
                                   )}
-                                </td>
-                                <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                                </TableCell>
+                                <TableCell className="space-x-1.5 whitespace-nowrap text-right">
                                   <Button
                                     variant="outline"
                                     size="icon"
@@ -506,13 +508,13 @@ export function PropostasClient({
                                       <ShieldCheck className="h-3.5 w-3.5" /> Venda fechada
                                     </Badge>
                                   )}
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             ))
                           )}
-                        </tbody>
-                      </table>
-                    </div>
+                        </TableBody>
+                      </Table>
+                    </DataTableFrame>
                   </CardContent>
                 </Card>
               </TabsContent>

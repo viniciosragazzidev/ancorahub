@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Building06Icon, CalendarCheckIcon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
 export type TabId = "conta" | "empresa" | "unidade" | "disponibilidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
 type Tab = { id: TabId; label: string; icon: typeof UserIcon };
@@ -67,30 +68,32 @@ export function SettingsTabs({ account, company, unit, availability, whatsapp, i
       <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
         <nav className="flex gap-1 pb-1">
           {tabs.map((tab) => (
-            <button
+            <Button
               key={tab.id}
               type="button"
               onClick={() => selectTab(tab.id)}
-              className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors ${active === tab.id ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}
+              className={`h-auto shrink-0 justify-start gap-2.5 px-3 py-2.5 text-sm ${active === tab.id ? "bg-secondary font-semibold text-foreground" : "text-muted-foreground"}`}
+              variant="ghost"
             >
               <HugeiconsIcon icon={tab.icon} size={16} />
               {tab.label}
-            </button>
+            </Button>
           ))}
         </nav>
       </ScrollArea>
 
       <nav className="hidden gap-1 lg:flex lg:flex-col">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
             type="button"
             onClick={() => selectTab(tab.id)}
-            className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors ${active === tab.id ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}
+            className={`h-auto shrink-0 justify-start gap-2.5 px-3 py-2.5 text-sm ${active === tab.id ? "bg-secondary font-semibold text-foreground" : "text-muted-foreground"}`}
+            variant="ghost"
           >
             <HugeiconsIcon icon={tab.icon} size={16} />
             {tab.label}
-          </button>
+          </Button>
         ))}
       </nav>
 

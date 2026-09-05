@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/sonner";
 
 import { createManualLeadAction, type LeadCreateState } from "../actions";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,11 +21,14 @@ type PlanOption = { id: string; name: string; carrierName: string };
 export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(createManualLeadAction, initialState);
-  const handleSuccess = useCallback((result: LeadCreateState) => {
-    if (!result.leadId) return;
-    toast.success("Lead criado com sucesso.");
-    router.push(`/leads/${result.leadId}`);
-  }, [router]);
+  const handleSuccess = useCallback(
+    (result: LeadCreateState) => {
+      if (!result.leadId) return;
+      toast.success("Lead criado com sucesso.");
+      router.push(`/leads/${result.leadId}`);
+    },
+    [router],
+  );
   const handleError = useCallback((result: LeadCreateState) => {
     if (result.error) toast.error(result.error);
   }, []);
@@ -53,14 +57,24 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="lead-phone">Celular</Label>
-        <Input id="lead-phone" inputMode="tel" name="telefone" placeholder="(11) 99999-9999" required />
+        <Input
+          id="lead-phone"
+          inputMode="tel"
+          name="telefone"
+          placeholder="(11) 99999-9999"
+          required
+        />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="lead-email">E-mail <span className="text-muted-foreground">(opcional)</span></Label>
+        <Label htmlFor="lead-email">
+          E-mail <span className="text-muted-foreground">(opcional)</span>
+        </Label>
         <Input id="lead-email" name="email" type="email" />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="lead-plan">Plano de interesse <span className="text-muted-foreground">(opcional)</span></Label>
+        <Label htmlFor="lead-plan">
+          Plano de interesse <span className="text-muted-foreground">(opcional)</span>
+        </Label>
         <AppSelect
           id="lead-plan"
           name="planoInteresseId"
@@ -88,7 +102,9 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
         <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold">Dados para PF</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Informações sobre os dependentes do titular.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Informações sobre os dependentes do titular.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -126,7 +142,9 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
         <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold">Dados da empresa</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Informações sobre a pessoa jurídica contratante.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Informações sobre a pessoa jurídica contratante.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5 col-span-2">
@@ -167,10 +185,17 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       )}
 
       <label className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
-        <input className="mt-0.5 size-4 warning-primary" name="consentimentoLgpd" type="checkbox" value="true" required />
+        <Checkbox
+          className="mt-0.5"
+          name="consentimentoLgpd"
+          value="true"
+          required
+        />
         <span>
           <span className="block font-medium">Consentimento LGPD</span>
-          <span className="mt-1 block text-xs leading-5 text-muted-foreground">O cliente autorizou o tratamento dos dados para fins de contratação de plano de saúde.</span>
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+            O cliente autorizou o tratamento dos dados para fins de contratação de plano de saúde.
+          </span>
         </span>
       </label>
 
@@ -178,11 +203,15 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
         <div className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm">
           <div className="flex gap-2 text-amber-100">
             <WarningCircle className="mt-0.5 shrink-0" />
-            <span>Já existe um lead chamado <strong>{state.duplicate.nome}</strong> com este telefone.</span>
+            <span>
+              Já existe um lead chamado <strong>{state.duplicate.nome}</strong> com este telefone.
+            </span>
           </div>
-          <p className="mt-2 text-xs text-amber-100/70">Confirme abaixo para criar um novo registro.</p>
+          <p className="mt-2 text-xs text-amber-100/70">
+            Confirme abaixo para criar um novo registro.
+          </p>
           <label className="mt-3 flex items-center gap-2 text-xs">
-            <input name="duplicateConfirmed" type="checkbox" value="true" required />
+            <Checkbox name="duplicateConfirmed" value="true" required />
             <span>Confirmo que é um novo contato</span>
           </label>
         </div>
@@ -191,18 +220,30 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
       <Button className="w-full" disabled={pending} type="submit">
-        {pending ? "Salvando..." : <><Check /> Criar lead</>}
+        {pending ? (
+          "Salvando..."
+        ) : (
+          <>
+            <Check /> Criar lead
+          </>
+        )}
       </Button>
-      <CardDescription>Tenant, filial, origem e atribuição são definidos com segurança no servidor.</CardDescription>
+      <CardDescription>
+        Tenant, filial, origem e atribuição são definidos com segurança no servidor.
+      </CardDescription>
 
       {/* Hidden fields to pass form_data as JSON */}
-      <input type="hidden" name="formData" value={JSON.stringify({
-        dependentes: dependentes || null,
-        mediaIdades: mediaIdades || null,
-        razaoSocial: razaoSocial || null,
-        cnpj: cnpj || null,
-        funcionarios: funcionarios || null,
-      })} />
+      <input
+        type="hidden"
+        name="formData"
+        value={JSON.stringify({
+          dependentes: dependentes || null,
+          mediaIdades: mediaIdades || null,
+          razaoSocial: razaoSocial || null,
+          cnpj: cnpj || null,
+          funcionarios: funcionarios || null,
+        })}
+      />
     </form>
   );
 }

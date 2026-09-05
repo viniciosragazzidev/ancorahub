@@ -367,3 +367,38 @@ de métricas entre tenants.
 - Os indicadores de `/qualificacao` foram compostos com `StatCard`, os mesmos
   tokens de métrica do `/dashboard`; a subnavegação recebeu slot semântico,
   borda leve e `aria-current` para o estado ativo.
+
+## 2026-09-05 — UX-H1: biblioteca única e fiscalização por rota
+
+- A sidebar passou a usar fundo preto e tokens semânticos, removendo cores,
+  brilho e Motion fixos do rail.
+- `Button` deixou de carregar Motion obrigatoriamente; `Table` e `Field` são
+  primitives estruturais server-safe.
+- As duas APIs TanStack passaram a compartilhar `DataTableFrame` e o mesmo
+  contrato de cabeçalho, corpo, linha e célula. `/leads` deixou de sobrescrever
+  a superfície e agora herda o mesmo fundo claro de `/equipe`.
+- O auditor passou a catalogar controles nativos, emoji de interface e magic
+  values, com baseline de não regressão e modo strict; o catálogo transitive
+  cobre todos os `page.tsx`.
+- O manual e o plano de conversão deixam explícito que dívida catalogada não
+  equivale a padronização concluída.
+
+## 2026-09-05 — UX-H1: conversão do CRM operacional
+
+- Escopo formalizado: somente páginas autenticadas do CRM; Super Admin,
+  desenvolvimento/diagnóstico, autenticação e páginas públicas foram excluídos
+  desta rodada sem receber aprovação implícita.
+- Botões, checkboxes, inputs, selects, textareas e tabelas visíveis do CRM
+  passaram a usar os primitives compartilhados de `src/components/ui`.
+- Tabelas interativas convergiram para `DataTableFrame`; `/leads` herda a mesma
+  superfície clara e o mesmo cabeçalho de `/equipe`.
+- Emojis de chrome foram substituídos por ícones, e sombras/raios/cores
+  arbitrárias detectadas no escopo foram removidas.
+- `MetricCard` deixou gráficos em um client island pequeno e `Button` deixou de
+  carregar Motion por padrão, reduzindo JavaScript de interação comum.
+- `npm run ui:audit:strict` agora exige zero divergência no CRM. Próximo passo:
+  QA visual e funcional por papel nos viewports definidos no contrato.
+- Validação técnica: build direto do Next.js 16.2.10 concluído, type-check sem
+  erros, 652 testes globais e 19 testes focados aprovados. O `prebuild` do
+  pacote de extensão permanece bloqueado localmente por permissão de leitura do
+  diretório, e o lint global mantém dívida preexistente registrada pelo harness.

@@ -103,15 +103,15 @@
   --input: #ffffff;
   --ring: #0098f2;
 
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.220 0.012 260);
+  --sidebar: #050505;
+  --sidebar-foreground: #f5f5f5;
   --sidebar-primary: #0d111b;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef6fb;
-  --sidebar-accent-foreground: #1e1e1e;
+  --sidebar-accent: #171717;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-warning: oklch(0.965 0.003 260);
   --sidebar-warning-foreground: oklch(0.220 0.012 260);
-  --sidebar-border: oklch(0.890 0.004 260);
+  --sidebar-border: #262626;
   --sidebar-ring: #0098f2;
 
   --ct-blue: #0098f2;

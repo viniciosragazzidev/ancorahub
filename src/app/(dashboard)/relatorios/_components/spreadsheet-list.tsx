@@ -174,18 +174,22 @@ export function SpreadsheetList({
                   ) : null}
 
                   {/* View */}
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => setViewingId(viewingId === s.id ? null : s.id)}
                     className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     title="Visualizar"
                   >
                     <Eye className="size-4" />
-                  </button>
+                  </Button>
 
                   {/* Rename */}
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => {
                       setEditingId(s.id);
                       setEditName(s.name);
@@ -194,22 +198,26 @@ export function SpreadsheetList({
                     title="Renomear"
                   >
                     <PencilSimple className="size-4" />
-                  </button>
+                  </Button>
 
                   {/* Share */}
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => setSharingId(sharingId === s.id ? null : s.id)}
                     className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     title="Compartilhar"
                   >
                     <Copy className="size-4" />
-                  </button>
+                  </Button>
 
                   {/* Copy public link */}
                   {s.publicToken && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       onClick={() => {
                         navigator.clipboard.writeText(
                           `${window.location.origin}/compartilhado/${s.publicToken}`,
@@ -220,31 +228,35 @@ export function SpreadsheetList({
                       title="Copiar link"
                     >
                       <LinkSimple className="size-4" />
-                    </button>
+                    </Button>
                   )}
 
                   {/* Revoke public link */}
                   {s.publicToken && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon-sm"
                       onClick={() => handleRevokeLink(s.id)}
                       className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
                       title="Revogar link"
                     >
                       <X className="size-4" />
-                    </button>
+                    </Button>
                   )}
 
                   {/* Delete */}
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
                     onClick={() => handleDelete(s.id)}
                     disabled={deletingId === s.id}
                     className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
                     title="Excluir"
                   >
                     <Trash className="size-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 

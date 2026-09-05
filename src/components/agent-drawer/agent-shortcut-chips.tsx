@@ -16,11 +16,12 @@ export function AgentShortcutChips({ shortcuts, onSelectShortcut }: Props) {
   return (
     <div className="space-y-2.5">
       {shortcuts.map((shortcut) => (
-        <button
+        <Button
           key={shortcut.key}
           type="button"
           onClick={() => onSelectShortcut(shortcut.prompt)}
-          className="w-full text-left flex items-center justify-between gap-3 p-3.5 rounded-xl border border-border/70 bg-card hover:bg-accent/60 transition-colors shadow-2xs group cursor-pointer"
+          className="group h-auto w-full justify-between gap-3 p-3.5 text-left"
+          variant="outline"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <Sparkles className="size-4 text-primary shrink-0 transition-transform group-hover:scale-110" />
@@ -29,7 +30,7 @@ export function AgentShortcutChips({ shortcuts, onSelectShortcut }: Props) {
           <span className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/90 bg-muted px-2 py-0.5 rounded-md border border-border/80">
             {shortcut.key}
           </span>
-        </button>
+        </Button>
       ))}
     </div>
   );

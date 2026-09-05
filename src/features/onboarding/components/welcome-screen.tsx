@@ -34,9 +34,9 @@ type WelcomeScreenProps = {
 
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return { text: "Bom dia", emoji: "☀️" };
-  if (hour >= 12 && hour < 18) return { text: "Boa tarde", emoji: "🌤️" };
-  return { text: "Boa noite", emoji: "🌙" };
+  if (hour >= 5 && hour < 12) return "Bom dia";
+  if (hour >= 12 && hour < 18) return "Boa tarde";
+  return "Boa noite";
 }
 
 // ─── Role configuration ─────────────────────────────────────────────────────
@@ -401,7 +401,7 @@ export function WelcomeScreen({
                 transition={{ duration: 0.4, delay: 0.2, ease: [0, 0, 0.2, 1] }}
                 className="text-sm font-medium text-muted-foreground"
               >
-                {greeting.text} <span className="inline-block">{greeting.emoji}</span>
+                {greeting}
               </motion.p>
               <motion.h1
                 initial={{ opacity: 0, y: 10 }}

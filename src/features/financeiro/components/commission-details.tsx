@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -361,69 +362,66 @@ export function CommissionDetails({ data }: Props) {
 
                       {/* Schedule Items */}
                       {sale.scheduleItems.length > 0 ? (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-border/60 bg-muted/20">
-                                <th className="px-5 py-2 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        <DataTableFrame density="compact" className="rounded-none border-x-0 border-b-0">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="pl-5 text-[10px] uppercase tracking-wider">
                                   Parcela
-                                </th>
-                                <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                </TableHead>
+                                <TableHead className="text-[10px] uppercase tracking-wider">
                                   Mês ref.
-                                </th>
-                                <th className="px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                </TableHead>
+                                <TableHead className="text-[10px] uppercase tracking-wider">
                                   Vencimento
-                                </th>
-                                <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                </TableHead>
+                                <TableHead className="text-right text-[10px] uppercase tracking-wider">
                                   %
-                                </th>
-                                <th className="px-3 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                </TableHead>
+                                <TableHead className="text-right text-[10px] uppercase tracking-wider">
                                   Valor
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                </TableHead>
+                                <TableHead className="text-center text-[10px] uppercase tracking-wider">
                                   Status
-                                </th>
-                                <th className="pr-5 py-2 text-right text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                                </TableHead>
+                                <TableHead className="pr-5 text-right text-[10px] uppercase tracking-wider">
                                   Pago em
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/40">
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
                               {sale.scheduleItems.map((item) => (
-                                <tr
-                                  key={item.id}
-                                  className="transition-colors hover:bg-muted/20"
-                                >
-                                  <td className="px-5 py-2 tabular-nums">
+                                <TableRow key={item.id}>
+                                  <TableCell className="pl-5 tabular-nums">
                                     {item.monthNumber}ª
-                                  </td>
-                                  <td className="px-3 py-2 text-muted-foreground">
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
                                     {item.referenceMonth}
-                                  </td>
-                                  <td className="px-3 py-2 text-muted-foreground tabular-nums">
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground tabular-nums">
                                     {item.dueDate
                                       ? formatDate(item.dueDate)
                                       : "—"}
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums text-muted-foreground">
                                     {item.percentage}%
-                                  </td>
-                                  <td className="px-3 py-2 text-right font-mono text-sm font-medium tabular-nums">
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
                                     {formatCurrency(item.amount)}
-                                  </td>
-                                  <td className="px-3 py-2 text-center">
+                                  </TableCell>
+                                  <TableCell className="text-center">
                                     <ScheduleStatusBadge status={item.status} />
-                                  </td>
-                                  <td className="pr-5 py-2 text-right text-xs text-muted-foreground tabular-nums">
+                                  </TableCell>
+                                  <TableCell className="pr-5 text-right text-xs text-muted-foreground tabular-nums">
                                     {item.paidAt
                                       ? `${formatDate(item.paidAt)}${item.paidByName ? ` · ${item.paidByName}` : ""}`
                                       : "—"}
-                                  </td>
-                                </tr>
+                                  </TableCell>
+                                </TableRow>
                               ))}
-                            </tbody>
-                          </table>
-                        </div>
+                            </TableBody>
+                          </Table>
+                        </DataTableFrame>
                       ) : (
                         <div className="px-5 py-4 text-center text-xs text-muted-foreground">
                           Nenhuma parcela de comissão gerada para esta venda.
@@ -459,4 +457,3 @@ export function CommissionDetails({ data }: Props) {
     </div>
   );
 }
-

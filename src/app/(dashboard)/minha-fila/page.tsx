@@ -413,7 +413,7 @@ export default async function MinhaFilaPage() {
               <div
                 key={stat.label}
                 className={cn(
-                  "group flex flex-col justify-between rounded-2xl border border-border/70 bg-card p-5 text-left shadow-[0_1px_2px_rgb(15_23_42/0.025)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_10px_24px_rgb(15_23_42/0.05)] motion-reduce:transform-none motion-reduce:transition-none",
+                  "group flex flex-col justify-between rounded-xl border border-border/70 bg-card p-5 text-left shadow-sm transition-[border-color,box-shadow] duration-[var(--duration-quick)] hover:border-primary/25 hover:shadow-md motion-reduce:transition-none",
                   stat.cardClassName,
                 )}
               >

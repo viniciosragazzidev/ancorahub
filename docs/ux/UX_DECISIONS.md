@@ -186,3 +186,21 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
   IA e regras de tenant permanecem inalterados.
 - **ROLLBACK**: a flag Clean UI continua sendo a fronteira de ativação dos
   tokens claros; não há migração de dados nem dependência nova.
+
+## DEC-014 — Biblioteca única e conversão transversal auditável
+
+- **DECISION**: `src/components/ui` é a fonte única de primitives e
+  `src/components/foundations` é a fonte única de composições de página.
+  Componentes de feature podem compor essas bases, mas não redefinir sua
+  aparência. DataTables com modelos de estado diferentes compartilham
+  `DataTableFrame` enquanto os adapters são migrados.
+- **ICONOGRAPHY**: emoji é proibido como chrome, status ou decoração; conteúdo
+  do cliente e corpos de mensagem permanecem dados do domínio.
+- **PERFORMANCE**: Motion é opt-in. Primitives estruturais devem ser
+  server-safe e o rollout continua resolvido no servidor.
+- **GOVERNANCE**: `ui:audit` impede regressão sobre baseline e
+  `ui:audit:strict` define o estado-alvo zero. Nenhuma etapa global será
+  marcada completa antes de o catálogo por rota e os gates confirmarem.
+- **WHY**: uma biblioteca declarada sem adoção verificável não impede drift.
+  Catálogo, baseline e adapters permitem conversão gradual com rollback e sem
+  misturar redesign com regras de domínio.

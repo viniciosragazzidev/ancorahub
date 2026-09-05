@@ -86,13 +86,15 @@ export function ShareDialog({
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-8 pr-8 text-sm"
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {showPassword ? <EyeSlash className="size-3.5" /> : <Eye className="size-3.5" />}
-              </button>
+              </Button>
             </div>
             <p className="text-[10px] text-muted-foreground">
               Se definida, o visitante precisará da senha para acessar.

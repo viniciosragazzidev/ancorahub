@@ -192,7 +192,7 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
                   {item.required && <span className="ml-0.5 text-destructive">*</span>}
                 </Label>
                 {answers[item.id] !== undefined && (
-                  <span className="text-[9px] text-success">✓</span>
+                  <CheckCircle className="size-3 text-success" aria-hidden="true" />
                 )}
               </div>
 

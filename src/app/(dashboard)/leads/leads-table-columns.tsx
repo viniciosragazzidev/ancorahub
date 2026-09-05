@@ -36,112 +36,112 @@ const STATUS_CONFIG: Record<
 > = {
   new: {
     label: "Novo Lead",
-    dotColor: "bg-sky-400 shadow-[0_0_8px_#38bdf8] animate-pulse",
+    dotColor: "bg-sky-500",
     className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
   },
   novo: {
     label: "Novo Lead",
-    dotColor: "bg-sky-400 shadow-[0_0_8px_#38bdf8] animate-pulse",
+    dotColor: "bg-sky-500",
     className: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30",
   },
   distributed: {
     label: "Distribuído",
-    dotColor: "bg-blue-400 shadow-[0_0_8px_#60a5fa]",
+    dotColor: "bg-blue-500",
     className: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
   },
   distribuido: {
     label: "Distribuído",
-    dotColor: "bg-blue-400 shadow-[0_0_8px_#60a5fa]",
+    dotColor: "bg-blue-500",
     className: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
   },
   in_contact: {
     label: "Em Atendimento",
-    dotColor: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",
+    dotColor: "bg-amber-500",
     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   in_service: {
     label: "Em Atendimento",
-    dotColor: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",
+    dotColor: "bg-amber-500",
     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   em_atendimento: {
     label: "Em Atendimento",
-    dotColor: "bg-amber-400 shadow-[0_0_8px_#fbbf24]",
+    dotColor: "bg-amber-500",
     className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   quote_sent: {
     label: "Cotação Enviada",
-    dotColor: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
+    dotColor: "bg-purple-500",
     className: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
   },
   cotacao_enviada: {
     label: "Cotação Enviada",
-    dotColor: "bg-purple-400 shadow-[0_0_8px_#c084fc]",
+    dotColor: "bg-purple-500",
     className: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
   },
   negotiation: {
     label: "Em Negociação",
-    dotColor: "bg-orange-400 shadow-[0_0_8px_#fb923c]",
+    dotColor: "bg-orange-500",
     className: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30",
   },
   negociacao: {
     label: "Em Negociação",
-    dotColor: "bg-orange-400 shadow-[0_0_8px_#fb923c]",
+    dotColor: "bg-orange-500",
     className: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30",
   },
   documentation_pending: {
     label: "Pend. Documentos",
-    dotColor: "bg-pink-400 shadow-[0_0_8px_#f472b6]",
+    dotColor: "bg-pink-500",
     className: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/30",
   },
   pendente_documentacao: {
     label: "Pend. Documentos",
-    dotColor: "bg-pink-400 shadow-[0_0_8px_#f472b6]",
+    dotColor: "bg-pink-500",
     className: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/30",
   },
   under_analysis: {
     label: "Em Análise",
-    dotColor: "bg-cyan-400 shadow-[0_0_8px_#22d3ee]",
+    dotColor: "bg-cyan-500",
     className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
   },
   em_analise: {
     label: "Em Análise",
-    dotColor: "bg-cyan-400 shadow-[0_0_8px_#22d3ee]",
+    dotColor: "bg-cyan-500",
     className: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/30",
   },
   qualified: {
     label: "Qualificado",
-    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    dotColor: "bg-emerald-500",
     className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   },
   qualificado: {
     label: "Qualificado",
-    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    dotColor: "bg-emerald-500",
     className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
   },
   converted: {
     label: "Venda Realizada",
-    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    dotColor: "bg-emerald-500",
     className: "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/40",
   },
   venda_realizada: {
     label: "Venda Realizada",
-    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    dotColor: "bg-emerald-500",
     className: "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/40",
   },
   ganho: {
     label: "Venda Realizada",
-    dotColor: "bg-emerald-400 shadow-[0_0_8px_#34d399]",
+    dotColor: "bg-emerald-500",
     className: "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/40",
   },
   lost: {
     label: "Perdido",
-    dotColor: "bg-red-400 shadow-[0_0_8px_#f87171]",
+    dotColor: "bg-red-500",
     className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
   },
   perdido: {
     label: "Perdido",
-    dotColor: "bg-red-400 shadow-[0_0_8px_#f87171]",
+    dotColor: "bg-red-500",
     className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
   },
 };
@@ -244,16 +244,17 @@ export const getLeadsColumns = (
             className="size-8 rounded-lg shrink-0 border border-border/60 text-[11px] font-bold"
           />
           <div className="min-w-0 flex flex-col gap-0.5">
-            <button
+            <Button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenDrawer(lead);
               }}
-              className="text-left font-semibold text-xs text-foreground hover:text-primary transition-colors truncate"
+              className="h-auto max-w-full justify-start truncate p-0 text-left text-xs font-semibold text-foreground"
+              variant="link"
             >
               {lead.name}
-            </button>
+            </Button>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-mono tabular-nums">{lead.phone}</span>
               {phoneDigits && (

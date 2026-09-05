@@ -3,24 +3,237 @@
 import { useActionState, useState } from "react";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createAgentBehaviorDraftFromFormAction, publishAgentBehaviorVersionAction, rollbackAgentBehaviorVersionAction, validateAgentBehaviorVersionAction } from "@/features/agent-training/actions";
+import {
+  createAgentBehaviorDraftFromFormAction,
+  publishAgentBehaviorVersionAction,
+  rollbackAgentBehaviorVersionAction,
+  validateAgentBehaviorVersionAction,
+} from "@/features/agent-training/actions";
 
-type Version = { id: string; versionNumber: number; status: string; summary: string | null; validation: unknown; publishedAt: Date | null };
+type Version = {
+  id: string;
+  versionNumber: number;
+  status: string;
+  summary: string | null;
+  validation: unknown;
+  publishedAt: Date | null;
+};
 
-export function AgentTrainingTab({ enabled, canEdit, versions }: { enabled: boolean; canEdit: boolean; versions: Version[] }) {
+export function AgentTrainingTab({
+  enabled,
+  canEdit,
+  versions,
+}: {
+  enabled: boolean;
+  canEdit: boolean;
+  versions: Version[];
+}) {
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [state, formAction, pending] = useActionState(createAgentBehaviorDraftFromFormAction, { success: false, error: undefined, id: undefined });
+  const [state, formAction, pending] = useActionState(createAgentBehaviorDraftFromFormAction, {
+    success: false,
+    error: undefined,
+    id: undefined,
+  });
   const run = async (id: string, kind: "validate" | "publish" | "rollback") => {
     setBusyId(id);
-    const result = kind === "validate" ? await validateAgentBehaviorVersionAction(id) : kind === "publish" ? await publishAgentBehaviorVersionAction(id) : await rollbackAgentBehaviorVersionAction(id);
-    if (result.success) toast.success(kind === "validate" ? "Cenários críticos aprovados." : kind === "publish" ? "Versão publicada." : "Versão restaurada."); else toast.error(result.error ?? "Não foi possível concluir a ação.");
+    const result =
+      kind === "validate"
+        ? await validateAgentBehaviorVersionAction(id)
+        : kind === "publish"
+          ? await publishAgentBehaviorVersionAction(id)
+          : await rollbackAgentBehaviorVersionAction(id);
+    if (result.success)
+      toast.success(
+        kind === "validate"
+          ? "Cenários críticos aprovados."
+          : kind === "publish"
+            ? "Versão publicada."
+            : "Versão restaurada.",
+      );
+    else toast.error(result.error ?? "Não foi possível concluir a ação.");
     setBusyId(null);
   };
-  if (!enabled) return <Card><CardHeader><CardTitle>Centro de Treinamento do Agente</CardTitle><CardDescription>Este recurso está aguardando liberação do piloto pela plataforma.</CardDescription></CardHeader></Card>;
-  return <div className="grid gap-6"><Card><CardHeader><CardTitle>Centro de Treinamento do Agente</CardTitle><CardDescription>Prepare uma versão, valide cenários críticos e publique apenas quando estiver pronta. O agente qualifica e encaminha; não informa condições comerciais sem fonte validada.</CardDescription></CardHeader><CardContent><form action={formAction} className="grid gap-4"><div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel>Nome do agente</FieldLabel><Input name="assistantName" defaultValue="Assistente AncoraHub" disabled={!canEdit} /></Field><Field><FieldLabel>Tom</FieldLabel><AppSelect name="tone" defaultValue="friendly" disabled={!canEdit} options={[{ value: "friendly", label: "Cordial e próximo" }, { value: "professional", label: "Profissional" }, { value: "direct", label: "Objetivo" }]} /></Field></div><div className="grid gap-4 md:grid-cols-2"><Field><FieldLabel>Tratamento</FieldLabel><AppSelect name="formOfAddress" defaultValue="voce" disabled={!canEdit} options={[{ value: "voce", label: "Você" }, { value: "primeiro_nome", label: "Primeiro nome" }, { value: "senhor_senhora", label: "Senhor(a)" }]} /></Field><Field><FieldLabel>Máximo de perguntas</FieldLabel><Input name="maxQuestions" type="number" min={1} max={6} defaultValue={6} disabled={!canEdit} /></Field></div><Field><FieldLabel>Mensagem de transferência</FieldLabel><Textarea name="handoffMessage" defaultValue="Vou encaminhar você para um corretor da equipe agora." disabled={!canEdit} /></Field><Field><FieldLabel>Campos obrigatórios</FieldLabel><div className="grid gap-2 sm:grid-cols-2">{[["customerName","Nome"],["planType","Tipo"],["numberOfLives","Vidas"],["age","Idades"],["city","Cidade"],["email","E-mail"]].map(([key,label]) => <label key={key} className="flex gap-2 text-sm"><input name="requiredFields" value={key} type="checkbox" defaultChecked disabled={!canEdit}/>{label}</label>)}</div></Field><div className="grid gap-4 md:grid-cols-2"><Input name="businessHoursStart" placeholder="08:00" disabled={!canEdit}/><Input name="businessHoursEnd" placeholder="18:00" disabled={!canEdit}/></div><Input name="businessDays" defaultValue="1,2,3,4,5" disabled={!canEdit}/>{state.error && <p className="text-sm text-destructive">{state.error}</p>}{canEdit && <Button type="submit" disabled={pending}>{pending ? "Criando…" : "Salvar rascunho"}</Button>}</form></CardContent></Card><Card><CardHeader><CardTitle>Versões e simulações</CardTitle><CardDescription>Publicar exige todos os cenários críticos aprovados.</CardDescription></CardHeader><CardContent className="grid gap-3">{versions.length === 0 ? <p className="text-sm text-muted-foreground">Ainda não há versões. Crie o primeiro rascunho.</p> : versions.map((version) => <div key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"><div><p className="font-medium">Versão {version.versionNumber} · {version.status}</p><p className="text-xs text-muted-foreground">{version.summary ?? "Sem resumo"}</p></div>{canEdit && <div className="flex gap-2"><Button size="sm" variant="outline" disabled={busyId === version.id || version.status === "PUBLISHED"} onClick={() => run(version.id, "validate")}>Validar</Button>{version.status === "READY_TO_PUBLISH" && <Button size="sm" disabled={busyId === version.id} onClick={() => run(version.id, "publish")}>Publicar</Button>}{["ARCHIVED", "ROLLED_BACK"].includes(version.status) && <Button size="sm" variant="outline" disabled={busyId === version.id} onClick={() => run(version.id, "rollback")}>Restaurar</Button>}</div>}</div>)}</CardContent></Card></div>;
+  if (!enabled)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Centro de Treinamento do Agente</CardTitle>
+          <CardDescription>
+            Este recurso está aguardando liberação do piloto pela plataforma.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  return (
+    <div className="grid gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Centro de Treinamento do Agente</CardTitle>
+          <CardDescription>
+            Prepare uma versão, valide cenários críticos e publique apenas quando estiver pronta. O
+            agente qualifica e encaminha; não informa condições comerciais sem fonte validada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={formAction} className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field>
+                <FieldLabel>Nome do agente</FieldLabel>
+                <Input
+                  name="assistantName"
+                  defaultValue="Assistente AncoraHub"
+                  disabled={!canEdit}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>Tom</FieldLabel>
+                <AppSelect
+                  name="tone"
+                  defaultValue="friendly"
+                  disabled={!canEdit}
+                  options={[
+                    { value: "friendly", label: "Cordial e próximo" },
+                    { value: "professional", label: "Profissional" },
+                    { value: "direct", label: "Objetivo" },
+                  ]}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field>
+                <FieldLabel>Tratamento</FieldLabel>
+                <AppSelect
+                  name="formOfAddress"
+                  defaultValue="voce"
+                  disabled={!canEdit}
+                  options={[
+                    { value: "voce", label: "Você" },
+                    { value: "primeiro_nome", label: "Primeiro nome" },
+                    { value: "senhor_senhora", label: "Senhor(a)" },
+                  ]}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>Máximo de perguntas</FieldLabel>
+                <Input
+                  name="maxQuestions"
+                  type="number"
+                  min={1}
+                  max={6}
+                  defaultValue={6}
+                  disabled={!canEdit}
+                />
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel>Mensagem de transferência</FieldLabel>
+              <Textarea
+                name="handoffMessage"
+                defaultValue="Vou encaminhar você para um corretor da equipe agora."
+                disabled={!canEdit}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Campos obrigatórios</FieldLabel>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  ["customerName", "Nome"],
+                  ["planType", "Tipo"],
+                  ["numberOfLives", "Vidas"],
+                  ["age", "Idades"],
+                  ["city", "Cidade"],
+                  ["email", "E-mail"],
+                ].map(([key, label]) => (
+                  <label key={key} className="flex gap-2 text-sm">
+                    <Checkbox
+                      name="requiredFields"
+                      value={key}
+                      defaultChecked
+                      disabled={!canEdit}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input name="businessHoursStart" placeholder="08:00" disabled={!canEdit} />
+              <Input name="businessHoursEnd" placeholder="18:00" disabled={!canEdit} />
+            </div>
+            <Input name="businessDays" defaultValue="1,2,3,4,5" disabled={!canEdit} />
+            {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+            {canEdit && (
+              <Button type="submit" disabled={pending}>
+                {pending ? "Criando…" : "Salvar rascunho"}
+              </Button>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Versões e simulações</CardTitle>
+          <CardDescription>Publicar exige todos os cenários críticos aprovados.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {versions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Ainda não há versões. Crie o primeiro rascunho.
+            </p>
+          ) : (
+            versions.map((version) => (
+              <div
+                key={version.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+              >
+                <div>
+                  <p className="font-medium">
+                    Versão {version.versionNumber} · {version.status}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{version.summary ?? "Sem resumo"}</p>
+                </div>
+                {canEdit && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busyId === version.id || version.status === "PUBLISHED"}
+                      onClick={() => run(version.id, "validate")}
+                    >
+                      Validar
+                    </Button>
+                    {version.status === "READY_TO_PUBLISH" && (
+                      <Button
+                        size="sm"
+                        disabled={busyId === version.id}
+                        onClick={() => run(version.id, "publish")}
+                      >
+                        Publicar
+                      </Button>
+                    )}
+                    {["ARCHIVED", "ROLLED_BACK"].includes(version.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === version.id}
+                        onClick={() => run(version.id, "rollback")}
+                      >
+                        Restaurar
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

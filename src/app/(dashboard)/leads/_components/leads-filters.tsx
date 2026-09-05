@@ -252,18 +252,20 @@ export function LeadsFilters({
                       { label: "PF", val: "PF" },
                       { label: "PJ", val: "PJ" },
                     ].map((opt) => (
-                      <button
+                      <Button
                         key={opt.label}
+                        size="sm"
                         type="button"
+                        variant="ghost"
                         onClick={() => setTipo(opt.val)}
-                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
+                        className={`h-7 rounded-md border-0 text-xs font-medium ${
                           tipo === opt.val
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {opt.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -279,18 +281,20 @@ export function LeadsFilters({
                       { label: "Manual", val: "manual" },
                       { label: "Webhook", val: "webhook" },
                     ].map((opt) => (
-                      <button
+                      <Button
                         key={opt.label}
+                        size="sm"
                         type="button"
+                        variant="ghost"
                         onClick={() => setOrigem(opt.val)}
-                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
+                        className={`h-7 rounded-md border-0 text-xs font-medium ${
                           origem === opt.val
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {opt.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -407,18 +411,20 @@ export function LeadsFilters({
                   </label>
                   <div className="grid grid-cols-4 rounded-lg bg-muted/50 p-0.5 border border-border/40">
                     {["10", "20", "50", "100"].map((size) => (
-                      <button
+                      <Button
                         key={size}
+                        size="sm"
                         type="button"
+                        variant="ghost"
                         onClick={() => setPageSize(size)}
-                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-150 ${
+                        className={`h-7 rounded-md border-0 text-xs font-medium ${
                           pageSize === size
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {size}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -457,24 +463,26 @@ export function LeadsFilters({
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
         {[
           { id: "", label: "Todos os leads" },
-          { id: "new", label: "Novos", dot: "bg-sky-400 shadow-[0_0_6px_#38bdf8]" },
-          { id: "in_contact", label: "Em Atendimento", dot: "bg-amber-400 shadow-[0_0_6px_#fbbf24]" },
-          { id: "quote_sent", label: "Cotação Enviada", dot: "bg-purple-400 shadow-[0_0_6px_#c084fc]" },
-          { id: "negotiation", label: "Em Negociação", dot: "bg-orange-400 shadow-[0_0_6px_#fb923c]" },
-          { id: "converted", label: "Convertidos", dot: "bg-emerald-400 shadow-[0_0_6px_#34d399]" },
-          { id: "lost", label: "Perdidos", dot: "bg-red-400 shadow-[0_0_6px_#f87171]" },
+          { id: "new", label: "Novos", dot: "bg-info" },
+          { id: "in_contact", label: "Em Atendimento", dot: "bg-warning" },
+          { id: "quote_sent", label: "Cotação Enviada", dot: "bg-primary" },
+          { id: "negotiation", label: "Em Negociação", dot: "bg-warning" },
+          { id: "converted", label: "Convertidos", dot: "bg-success" },
+          { id: "lost", label: "Perdidos", dot: "bg-destructive" },
         ].map((pill) => {
           const isSelected = status === pill.id;
           return (
-            <button
+            <Button
               key={pill.id}
+              size="sm"
               type="button"
+              variant="ghost"
               onClick={() => {
                 setStatus(pill.id);
                 applyFilters({ ...currentPreferences(), status: pill.id });
               }}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all select-none cursor-pointer",
+                "h-7 shrink-0 gap-1.5 rounded-full px-3 text-xs font-medium",
                 isSelected
                   ? "bg-primary text-primary-foreground font-semibold shadow-xs"
                   : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
@@ -482,7 +490,7 @@ export function LeadsFilters({
             >
               {pill.dot && <span className={cn("size-1.5 rounded-full shrink-0", pill.dot)} />}
               <span>{pill.label}</span>
-            </button>
+            </Button>
           );
         })}
       </div>

@@ -16,6 +16,7 @@ import {
 } from "@/components/huge-icons";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
 import {
@@ -164,7 +165,7 @@ export function CorretorSidebar() {
       <SidebarFooter className="border-t border-sidebar-border/50 p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<button type="button" onClick={handleLogout} />} tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
+            <SidebarMenuButton size="lg" render={<Button type="button" variant="ghost" onClick={handleLogout} />} tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
               <span className="grid size-7 place-items-center rounded-full bg-secondary text-foreground border border-border/80 text-xs font-semibold shrink-0">{initials}</span>
               <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-medium">{userName}</span>

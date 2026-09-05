@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -47,6 +46,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
@@ -236,16 +236,16 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       data-slot="navigation-rail"
       variant="sidebar"
       collapsible="none"
-      className="sticky top-0 h-dvh max-h-dvh w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-[#16292B] bg-[#0A1517] text-slate-100 shadow-xl select-none overflow-hidden"
+      className="sticky top-0 h-dvh max-h-dvh w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-none select-none"
     >
       {/* Header: Logo & SuperAdmin Switcher */}
       <SidebarHeader className="flex flex-col items-center justify-center p-2 pt-3 pb-2 gap-2 border-b border-white/[0.08]">
         <Link
           href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
-          className="flex size-11 items-center justify-center rounded-2xl bg-white/[0.06] border border-white/[0.12] p-1.5 transition-all duration-200 hover:scale-105 hover:bg-white/[0.10] hover:border-emerald-500/40"
+          className="flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent p-1.5 transition-colors hover:border-emerald-500/40 hover:bg-sidebar-accent/80"
           title="Âncora CRM"
         >
-          <img src="/icon.png" alt="Ancora" className="size-7 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]" />
+          <img src="/icon.png" alt="Ancora" className="size-7 object-contain" />
         </Link>
 
         {user?.isPlatformAdmin && (
@@ -271,11 +271,10 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 }
               >
                 <span className="relative flex size-2.5">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs font-semibold bg-[#0E1E20] text-slate-100 border-[#1E3639]">
+              <TooltipContent side="right" className="border-sidebar-border bg-sidebar text-xs font-semibold text-sidebar-foreground">
                 Plantão ao vivo ativo
               </TooltipContent>
             </Tooltip>
@@ -315,7 +314,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   >
                     {/* BETA badge floating on top */}
                     {item.beta && (
-                      <span className="absolute -top-1.5 z-20 rounded-full bg-[#6366F1] px-1.5 py-0.5 text-[8px] font-extrabold text-white tracking-wider shadow-md uppercase">
+                      <span className="absolute -top-1.5 z-20 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-extrabold tracking-wider text-primary-foreground uppercase">
                         BETA
                       </span>
                     )}
@@ -324,32 +323,23 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     <div
                       data-slot="rail-tile"
                       className={cn(
-                        "relative flex size-11 items-center justify-center rounded-2xl transition-all duration-200",
+                        "relative flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-transparent transition-colors duration-[var(--duration-quick)]",
                         // Inactive state: crisp light icons on dark slate
                         !isActive && !item.isWhatsApp && "bg-transparent text-slate-300 hover:bg-white/[0.08] hover:text-white",
                         // Active state: glowing emerald container
-                        isActive && !item.isWhatsApp && "bg-[#183134] text-emerald-300 border border-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.15)] ring-1 ring-emerald-400/20",
+                        isActive && !item.isWhatsApp && "border-emerald-400/40 bg-sidebar-accent text-emerald-300",
                         // WhatsApp special styling
                         item.isWhatsApp && (
                           isActive
-                            ? "border-[1.5px] border-emerald-400 bg-emerald-950/70 text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.3)] ring-1 ring-emerald-400/30"
-                            : "border-[1.5px] border-emerald-500/60 bg-emerald-950/40 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-950/70 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
+                            ? "border-emerald-400 bg-emerald-950/70 text-emerald-300"
+                            : "border-emerald-500/60 bg-emerald-950/40 text-emerald-300 hover:border-emerald-400 hover:bg-emerald-950/70"
                         )
                       )}
                     >
-                      {isActive && !item.isWhatsApp && (
-                        <motion.div
-                          layoutId="sidebar-rail-active"
-                          data-slot="rail-decoration"
-                          className="absolute inset-0 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 pointer-events-none"
-                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                        />
-                      )}
-
                       <Icon
                         weight={isActive ? "fill" : "regular"}
                         className={cn(
-                          "size-6 shrink-0 transition-transform duration-200 group-hover:scale-110",
+                          "size-6 shrink-0",
                           isActive ? "text-emerald-300" : "text-slate-200 group-hover:text-white",
                           item.isWhatsApp && "text-emerald-300"
                         )}
@@ -358,8 +348,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       {/* Green Status Dot (like WhatsApp) */}
                       {item.statusDot && (
                         <span className="absolute top-0.5 right-0.5 flex size-2.5">
-                          <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0A1517] shadow-[0_0_8px_#34d399]" />
+                          <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400 ring-2 ring-sidebar" />
                         </span>
                       )}
                     </div>
@@ -383,7 +372,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       <CaretDown className="size-2.5 text-emerald-400 -mt-0.5" />
                     )}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium text-xs bg-[#0E1E20] text-slate-100 border-[#1E3639]">
+                  <TooltipContent side="right" className="border-sidebar-border bg-sidebar text-xs font-medium text-sidebar-foreground">
                     {item.fullLabel || item.label}
                   </TooltipContent>
                 </Tooltip>
@@ -400,19 +389,22 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <Tooltip>
             <TooltipTrigger
               render={
-                <button
+                <Button
                   type="button"
+                  size="icon-lg"
+                  variant="ghost"
+                  aria-label="Abrir Agente IA"
                   onClick={() => {
                     const event = new CustomEvent("open-agent-drawer");
                     window.dispatchEvent(event);
                   }}
-                  className="group relative flex size-11 flex-col items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 transition-all duration-200 hover:scale-105 hover:bg-emerald-500/25 hover:border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)] cursor-pointer"
+                  className="size-11 rounded-[var(--radius-control)] border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:border-emerald-400 hover:bg-emerald-500/25"
                 />
               }
             >
-              <Sparkle weight="fill" className="size-6 text-emerald-400 animate-pulse" />
+              <Sparkle weight="fill" className="size-6 text-emerald-400" />
             </TooltipTrigger>
-            <TooltipContent side="right" className="text-xs font-semibold bg-[#0E1E20] text-slate-100 border-[#1E3639]">
+            <TooltipContent side="right" className="border-sidebar-border bg-sidebar text-xs font-semibold text-sidebar-foreground">
               Agente IA (Ctrl+J)
             </TooltipContent>
           </Tooltip>
@@ -421,9 +413,12 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <button
+                <Button
                   type="button"
-                  className="relative flex size-10 items-center justify-center rounded-2xl transition-transform hover:scale-105 outline-none cursor-pointer"
+                  size="icon-lg"
+                  variant="ghost"
+                  aria-label="Abrir menu do perfil"
+                  className="size-10 rounded-[var(--radius-control)] text-sidebar-foreground hover:bg-sidebar-accent"
                 />
               }
             >
@@ -431,14 +426,14 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 seed={userName}
                 name={userName}
                 size="sm"
-                className="size-9 rounded-xl ring-2 ring-emerald-500/40 hover:ring-emerald-400 transition-all"
+                className="size-9 rounded-[var(--radius-control)] ring-1 ring-emerald-500/40"
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               side="right"
               align="end"
               sideOffset={12}
-              className="w-64 p-2.5 rounded-2xl border border-[#1E3639] bg-[#0E1E20] text-slate-100 shadow-2xl backdrop-blur-md"
+              className="w-64 rounded-[var(--radius-card)] border border-sidebar-border bg-sidebar p-2.5 text-sidebar-foreground shadow-[var(--shadow-dialog)]"
             >
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="p-2">

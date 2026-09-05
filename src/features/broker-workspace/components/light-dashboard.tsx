@@ -56,7 +56,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
   switch (kind) {
     case "awaiting_response":
       return {
-        urgencyText: "💬 Cliente aguardando sua resposta",
+        urgencyText: "Cliente aguardando sua resposta",
         badgeVariant: "warning" as const,
         badgeLabel: "Responder",
         btnLabel: "VER INSIGHTS",
@@ -64,7 +64,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
       };
     case "sla_overdue":
       return {
-        urgencyText: "⚡ SLA vencido — faça o primeiro contato",
+        urgencyText: "SLA vencido — faça o primeiro contato",
         badgeVariant: "destructive" as const,
         badgeLabel: "SLA Vencido",
         btnLabel: "ATENDER AGORA",
@@ -88,7 +88,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
       };
     case "task_overdue":
       return {
-        urgencyText: "📋 Tarefa pendente atrasada",
+        urgencyText: "Tarefa pendente atrasada",
         badgeVariant: "destructive" as const,
         badgeLabel: "Atrasado",
         btnLabel: "VER TAREFA",
@@ -96,7 +96,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
       };
     case "return_due":
       return {
-        urgencyText: "🗓 Retorno agendado para hoje",
+        urgencyText: "Retorno agendado para hoje",
         badgeVariant: "warning" as const,
         badgeLabel: "Retorno",
         btnLabel: "VER RETORNO",
@@ -104,7 +104,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
       };
     case "proposal_pending":
       return {
-        urgencyText: "📄 Cotação aguardando acompanhamento",
+        urgencyText: "Cotação aguardando acompanhamento",
         badgeVariant: "secondary" as const,
         badgeLabel: "Cotação",
         btnLabel: "RETOMAR COTAÇÃO",
@@ -112,7 +112,7 @@ function getPriorityDetails(nextAction: BrokerWorkspaceData["nextAction"]) {
       };
     case "document_pending":
       return {
-        urgencyText: "📁 Documentação pendente para envio",
+        urgencyText: "Documentação pendente para envio",
         badgeVariant: "warning" as const,
         badgeLabel: "Documentos",
         btnLabel: "VER DOCUMENTOS",

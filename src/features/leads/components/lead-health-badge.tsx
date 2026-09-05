@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Circle } from "@/components/huge-icons";
 import {
   Tooltip,
   TooltipContent,
@@ -27,16 +28,6 @@ const HEALTH_VARIANT: Record<
   "muted-unassigned": "secondary",
   "success-healthy": "success",
   "info-new": "info",
-};
-
-const HEALTH_ICON: Record<LeadHealth["type"], string> = {
-  "critical-unworked": "🔴",
-  "warning-at-risk": "🟡",
-  "warning-stalled": "🟠",
-  "muted-no-broker": "⚪",
-  "muted-unassigned": "⚪",
-  "success-healthy": "🟢",
-  "info-new": "🟦",
 };
 
 const HEALTH_TOOLTIP: Record<LeadHealth["type"], string> = {
@@ -155,9 +146,7 @@ export function LeadHealthBadge({
             variant={HEALTH_VARIANT[health.type]}
             className="gap-1 px-1.5 py-0 text-[10px] leading-tight"
           >
-            <span className="text-[11px]" aria-hidden="true">
-              {HEALTH_ICON[health.type]}
-            </span>
+            <Circle className="size-2 fill-current" aria-hidden="true" />
             {health.label}
           </Badge>
         }

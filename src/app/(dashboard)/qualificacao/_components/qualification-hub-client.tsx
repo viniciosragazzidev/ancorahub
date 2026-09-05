@@ -47,6 +47,8 @@ import { AgentTriggersPanel } from "./agent-triggers-panel";
 import { MetaTemplatesPanel } from "./meta-templates-panel";
 import { SituationalPlaybooksPanel } from "./situational-playbooks-panel";
 import { StatCard } from "@/components/dashboard/metric-card";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import {
   updateQualificationSettingsAction,
@@ -833,21 +835,21 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                 </p>
               </div>
 
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-muted/50 font-semibold border-b">
-                    <tr>
-                      <th className="p-3">Ferramenta / Tool</th>
-                      <th className="p-3">Categoria</th>
-                      <th className="p-3">Descrição</th>
-                      <th className="p-3">Permissão</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+              <DataTableFrame density="compact">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ferramenta / Tool</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Permissão</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {toolPermissions.map((tool) => (
-                      <tr key={tool.toolName} className={tool.isCritical ? "bg-rose-500/5" : ""}>
-                        <td className="p-3 font-semibold">{tool.displayName}</td>
-                        <td className="p-3">
+                      <TableRow key={tool.toolName} className={tool.isCritical ? "bg-destructive/5" : ""}>
+                        <TableCell className="font-semibold">{tool.displayName}</TableCell>
+                        <TableCell>
                           <Badge
                             variant={
                               tool.category === "critical"
@@ -860,9 +862,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                           >
                             {tool.category}
                           </Badge>
-                        </td>
-                        <td className="p-3 text-muted-foreground">{tool.description}</td>
-                        <td className="p-3">
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{tool.description}</TableCell>
+                        <TableCell>
                           {tool.isCritical ? (
                             <Badge variant="destructive" className="gap-1 text-[10px]">
                               <Lock className="size-3" /> Bloqueado (Crítico)
@@ -877,12 +879,12 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                               {tool.permission === "allowed" ? "Permitido" : "Bloqueado"}
                             </Button>
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </DataTableFrame>
             </Card>
           </div>
         )}

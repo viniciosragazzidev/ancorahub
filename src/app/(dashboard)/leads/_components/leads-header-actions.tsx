@@ -103,19 +103,21 @@ export function LeadsHeaderActions({
             </DropdownMenuLabel>
             <div className="grid grid-cols-4 gap-1 px-2 pb-1">
               {PERIOD_OPTIONS.map((days) => (
-                <button
+                <Button
                   key={days}
+                  size="sm"
                   type="button"
+                  variant="ghost"
                   onClick={() => selectPeriod(days)}
                   aria-pressed={period === days}
-                  className={`h-8 rounded-lg text-xs font-medium transition-[background-color,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
+                  className={`h-8 text-xs ${
                     period === days
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted/40 text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {days}
-                </button>
+                </Button>
               ))}
             </div>
             <DropdownMenuSeparator className="my-1" />

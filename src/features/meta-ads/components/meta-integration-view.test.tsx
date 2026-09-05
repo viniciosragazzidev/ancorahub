@@ -124,7 +124,7 @@ describe("MetaIntegrationView", () => {
     fireEvent.click(within(screen.getByRole("region", { name: "Campanhas & Captura CRM" })).getByRole("button", { name: "Tornar Elegível" }));
 
     await waitFor(() => expect(toggleCampaignMock).toHaveBeenCalledWith({ campaignId: "campaign-1", enabled: true }));
-    expect(screen.getByText("✓ Elegível p/ Captura")).toBeInTheDocument();
+    expect(screen.getByText("Elegível para captura")).toBeInTheDocument();
     expect(refreshMock).toHaveBeenCalled();
   });
 
@@ -133,10 +133,10 @@ describe("MetaIntegrationView", () => {
     render(<MetaIntegrationView canConfigure connection={{ ...connectedConnection, globalCaptureMode: "all" }} assets={connectedAssets} logs={[]} />);
 
     fireEvent.click(screen.getByLabelText("Controle Mestre de Captura Meta Lead Ads"));
-    fireEvent.click(screen.getByRole("option", { name: /Capturar Apenas Selecionados/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Capturar apenas selecionados/i }));
 
     await waitFor(() => expect(setGlobalModeMock).toHaveBeenCalledWith({ mode: "selective" }));
-    expect(screen.getByText(/MODO SELETIVO/)).toBeInTheDocument();
+    expect(screen.getByText(/Modo seletivo/i)).toBeInTheDocument();
     expect(refreshMock).toHaveBeenCalled();
   });
 });

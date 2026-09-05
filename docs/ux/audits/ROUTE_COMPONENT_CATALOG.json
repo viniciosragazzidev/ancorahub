@@ -1,0 +1,2076 @@
+{
+  "schemaVersion": 1,
+  "scope": "Every src/app/**/page.tsx and its local transitive product imports",
+  "routes": [
+    {
+      "route": "/",
+      "entry": "src/app/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 16,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/2fa",
+      "entry": "src/app/(auth)/2fa/page.tsx",
+      "reachableProductFiles": 2,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/access-denied",
+      "entry": "src/app/(auth)/access-denied/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/admin/login",
+      "entry": "src/app/(auth)/admin/login/page.tsx",
+      "reachableProductFiles": 2,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/assinatura",
+      "entry": "src/app/(dashboard)/assinatura/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/assistente",
+      "entry": "src/app/(dashboard)/assistente/page.tsx",
+      "reachableProductFiles": 6,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/clientes",
+      "entry": "src/app/(dashboard)/clientes/page.tsx",
+      "reachableProductFiles": 15,
+      "primitives": {
+        "button": 3,
+        "card": 3,
+        "dataTable": 1,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/clientes/[clientId]",
+      "entry": "src/app/(dashboard)/clientes/[clientId]/page.tsx",
+      "reachableProductFiles": 44,
+      "primitives": {
+        "button": 4,
+        "card": 4,
+        "dataTable": 0,
+        "field": 4,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/compartilhado/[token]",
+      "entry": "src/app/compartilhado/[token]/page.tsx",
+      "reachableProductFiles": 2,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 1,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 2,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/configuracoes/comissoes",
+      "entry": "src/app/(dashboard)/configuracoes/comissoes/page.tsx",
+      "reachableProductFiles": 37,
+      "primitives": {
+        "button": 3,
+        "card": 3,
+        "dataTable": 0,
+        "field": 3,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 7,
+        "nativeSelect": 3,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/conversas",
+      "entry": "src/app/(dashboard)/conversas/page.tsx",
+      "reachableProductFiles": 84,
+      "primitives": {
+        "button": 7,
+        "card": 1,
+        "dataTable": 0,
+        "field": 5,
+        "foundation": 0,
+        "overlay": 4,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 8,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 2,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/conversas/broker",
+      "entry": "src/app/(dashboard)/conversas/broker/page.tsx",
+      "reachableProductFiles": 13,
+      "primitives": {
+        "button": 3,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/dashboard",
+      "entry": "src/app/(dashboard)/dashboard/page.tsx",
+      "reachableProductFiles": 40,
+      "primitives": {
+        "button": 8,
+        "card": 7,
+        "dataTable": 6,
+        "field": 7,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 4,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/dashboard/drill/[drillId]",
+      "entry": "src/app/(dashboard)/dashboard/drill/[drillId]/page.tsx",
+      "reachableProductFiles": 15,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 1,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/distribuicao",
+      "entry": "src/app/(dashboard)/distribuicao/page.tsx",
+      "reachableProductFiles": 62,
+      "primitives": {
+        "button": 11,
+        "card": 11,
+        "dataTable": 1,
+        "field": 10,
+        "foundation": 0,
+        "overlay": 4,
+        "tabs": 2
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 15,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/documentos",
+      "entry": "src/app/(dashboard)/documentos/page.tsx",
+      "reachableProductFiles": 30,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 1,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 2,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/empresas",
+      "entry": "src/app/(dashboard)/empresas/page.tsx",
+      "reachableProductFiles": 11,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/equipe",
+      "entry": "src/app/(dashboard)/equipe/page.tsx",
+      "reachableProductFiles": 34,
+      "primitives": {
+        "button": 5,
+        "card": 2,
+        "dataTable": 1,
+        "field": 4,
+        "foundation": 0,
+        "overlay": 2,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 2,
+        "nativeInput": 5,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 1,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/equipe/[id]",
+      "entry": "src/app/(dashboard)/equipe/[id]/page.tsx",
+      "reachableProductFiles": 14,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/equipe/cargos",
+      "entry": "src/app/(dashboard)/equipe/cargos/page.tsx",
+      "reachableProductFiles": 13,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/equipe/convidar",
+      "entry": "src/app/(dashboard)/equipe/convidar/page.tsx",
+      "reachableProductFiles": 28,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 2,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/equipe/recuperacoes",
+      "entry": "src/app/(dashboard)/equipe/recuperacoes/page.tsx",
+      "reachableProductFiles": 28,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 1,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/filiais",
+      "entry": "src/app/(dashboard)/filiais/page.tsx",
+      "reachableProductFiles": 13,
+      "primitives": {
+        "button": 2,
+        "card": 1,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 1,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 4,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/fluxos-whatsapp",
+      "entry": "src/app/(dashboard)/fluxos-whatsapp/page.tsx",
+      "reachableProductFiles": 8,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/guia",
+      "entry": "src/app/(dashboard)/guia/page.tsx",
+      "reachableProductFiles": 11,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/guia/webhook",
+      "entry": "src/app/(dashboard)/guia/webhook/page.tsx",
+      "reachableProductFiles": 10,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 2,
+        "nativeInput": 3,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/integrations",
+      "entry": "src/app/(dashboard)/integrations/page.tsx",
+      "reachableProductFiles": 12,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/integrations/meta",
+      "entry": "src/app/(dashboard)/integrations/meta/page.tsx",
+      "reachableProductFiles": 83,
+      "primitives": {
+        "button": 5,
+        "card": 4,
+        "dataTable": 0,
+        "field": 3,
+        "foundation": 0,
+        "overlay": 3,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/integrations/whatsapp",
+      "entry": "src/app/(dashboard)/integrations/whatsapp/page.tsx",
+      "reachableProductFiles": 57,
+      "primitives": {
+        "button": 8,
+        "card": 8,
+        "dataTable": 0,
+        "field": 6,
+        "foundation": 0,
+        "overlay": 4,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 6,
+        "nativeSelect": 2,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/integridade",
+      "entry": "src/app/(dashboard)/integridade/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/internal/design-system",
+      "entry": "src/app/(dashboard)/internal/design-system/page.tsx",
+      "reachableProductFiles": 2,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/internal/design-system/motion",
+      "entry": "src/app/(dashboard)/internal/design-system/motion/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/invite/accept",
+      "entry": "src/app/(auth)/invite/accept/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/l/[id]",
+      "entry": "src/app/l/[id]/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/l/[id]/feedback",
+      "entry": "src/app/l/[id]/feedback/page.tsx",
+      "reachableProductFiles": 34,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/leads",
+      "entry": "src/app/(dashboard)/leads/page.tsx",
+      "reachableProductFiles": 109,
+      "primitives": {
+        "button": 17,
+        "card": 5,
+        "dataTable": 2,
+        "field": 12,
+        "foundation": 2,
+        "overlay": 7,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 19,
+        "nativeInput": 11,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 1,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/leads/[id]",
+      "entry": "src/app/(dashboard)/leads/[id]/page.tsx",
+      "reachableProductFiles": 128,
+      "primitives": {
+        "button": 23,
+        "card": 9,
+        "dataTable": 0,
+        "field": 14,
+        "foundation": 0,
+        "overlay": 10,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 14,
+        "nativeInput": 17,
+        "nativeSelect": 9,
+        "nativeTable": 0,
+        "nativeTextarea": 3,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/leads/[id]/feedback",
+      "entry": "src/app/(dashboard)/leads/[id]/feedback/page.tsx",
+      "reachableProductFiles": 34,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/leads/distribuicao",
+      "entry": "src/app/(dashboard)/leads/distribuicao/page.tsx",
+      "reachableProductFiles": 61,
+      "primitives": {
+        "button": 11,
+        "card": 11,
+        "dataTable": 1,
+        "field": 10,
+        "foundation": 0,
+        "overlay": 4,
+        "tabs": 2
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 15,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/leads/distribuicao/plantao",
+      "entry": "src/app/(dashboard)/leads/distribuicao/plantao/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/login",
+      "entry": "src/app/(auth)/login/page.tsx",
+      "reachableProductFiles": 19,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/marketing",
+      "entry": "src/app/(dashboard)/marketing/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/marketing/campanhas",
+      "entry": "src/app/(dashboard)/marketing/campanhas/page.tsx",
+      "reachableProductFiles": 80,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/marketing/campanhas/[id]",
+      "entry": "src/app/(dashboard)/marketing/campanhas/[id]/page.tsx",
+      "reachableProductFiles": 42,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/marketing/importacoes",
+      "entry": "src/app/(dashboard)/marketing/importacoes/page.tsx",
+      "reachableProductFiles": 14,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/marketing/meta",
+      "entry": "src/app/(dashboard)/marketing/meta/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/minha-fila",
+      "entry": "src/app/(dashboard)/minha-fila/page.tsx",
+      "reachableProductFiles": 18,
+      "primitives": {
+        "button": 5,
+        "card": 3,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 9,
+        "nativeInput": 1,
+        "nativeSelect": 1,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/noc",
+      "entry": "src/app/(dashboard)/noc/page.tsx",
+      "reachableProductFiles": 22,
+      "primitives": {
+        "button": 3,
+        "card": 3,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/notificacoes",
+      "entry": "src/app/(dashboard)/notificacoes/page.tsx",
+      "reachableProductFiles": 11,
+      "primitives": {
+        "button": 2,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/onboarding",
+      "entry": "src/app/onboarding/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/onboarding/[token]",
+      "entry": "src/app/onboarding/[token]/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/primeiro-acesso",
+      "entry": "src/app/primeiro-acesso/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/propostas",
+      "entry": "src/app/(dashboard)/propostas/page.tsx",
+      "reachableProductFiles": 10,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 1,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/qualificacao",
+      "entry": "src/app/(dashboard)/qualificacao/page.tsx",
+      "reachableProductFiles": 80,
+      "primitives": {
+        "button": 8,
+        "card": 7,
+        "dataTable": 1,
+        "field": 8,
+        "foundation": 0,
+        "overlay": 3,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 3,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/recuperar-senha",
+      "entry": "src/app/(auth)/recuperar-senha/page.tsx",
+      "reachableProductFiles": 20,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/relatorios",
+      "entry": "src/app/(dashboard)/relatorios/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/relatorios/drill/[drillId]",
+      "entry": "src/app/(dashboard)/relatorios/drill/[drillId]/page.tsx",
+      "reachableProductFiles": 14,
+      "primitives": {
+        "button": 1,
+        "card": 1,
+        "dataTable": 1,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/roadmap",
+      "entry": "src/app/(dashboard)/roadmap/page.tsx",
+      "reachableProductFiles": 12,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings",
+      "entry": "src/app/(dashboard)/settings/page.tsx",
+      "reachableProductFiles": 55,
+      "primitives": {
+        "button": 16,
+        "card": 14,
+        "dataTable": 0,
+        "field": 9,
+        "foundation": 0,
+        "overlay": 2,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 7,
+        "nativeInput": 20,
+        "nativeSelect": 2,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings/extension",
+      "entry": "src/app/(dashboard)/settings/extension/page.tsx",
+      "reachableProductFiles": 15,
+      "primitives": {
+        "button": 3,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings/feedback-templates",
+      "entry": "src/app/(dashboard)/settings/feedback-templates/page.tsx",
+      "reachableProductFiles": 11,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 2,
+        "nativeSelect": 1,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings/integrations",
+      "entry": "src/app/(dashboard)/settings/integrations/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings/meta",
+      "entry": "src/app/(dashboard)/settings/meta/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings/waha-diagnostic",
+      "entry": "src/app/(dashboard)/settings/waha-diagnostic/page.tsx",
+      "reachableProductFiles": 5,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/settings/whatsapp",
+      "entry": "src/app/(dashboard)/settings/whatsapp/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin",
+      "entry": "src/app/(platform-admin)/super-admin/page.tsx",
+      "reachableProductFiles": 44,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/audit",
+      "entry": "src/app/(platform-admin)/super-admin/audit/page.tsx",
+      "reachableProductFiles": 44,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 1,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 4,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/catalogo",
+      "entry": "src/app/(platform-admin)/super-admin/catalogo/page.tsx",
+      "reachableProductFiles": 16,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/integrations/whatsapp",
+      "entry": "src/app/(platform-admin)/super-admin/integrations/whatsapp/page.tsx",
+      "reachableProductFiles": 37,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 1,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/materiais-divulgacao",
+      "entry": "src/app/(platform-admin)/super-admin/materiais-divulgacao/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/onboarding",
+      "entry": "src/app/(platform-admin)/super-admin/onboarding/page.tsx",
+      "reachableProductFiles": 44,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/overview",
+      "entry": "src/app/(platform-admin)/super-admin/overview/page.tsx",
+      "reachableProductFiles": 8,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/sessions",
+      "entry": "src/app/(platform-admin)/super-admin/sessions/page.tsx",
+      "reachableProductFiles": 44,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/settings",
+      "entry": "src/app/(platform-admin)/super-admin/settings/page.tsx",
+      "reachableProductFiles": 46,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 32,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 1,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/tenants",
+      "entry": "src/app/(platform-admin)/super-admin/tenants/page.tsx",
+      "reachableProductFiles": 46,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/tenants/[tenantId]",
+      "entry": "src/app/(platform-admin)/super-admin/tenants/[tenantId]/page.tsx",
+      "reachableProductFiles": 46,
+      "primitives": {
+        "button": 4,
+        "card": 3,
+        "dataTable": 0,
+        "field": 3,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 7,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-admin/whatsapp-review",
+      "entry": "src/app/(platform-admin)/super-admin/whatsapp-review/page.tsx",
+      "reachableProductFiles": 37,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev",
+      "entry": "src/app/(platform-admin)/super-dev/page.tsx",
+      "reachableProductFiles": 9,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev/audit",
+      "entry": "src/app/(platform-admin)/super-dev/audit/page.tsx",
+      "reachableProductFiles": 10,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 4,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev/integridade",
+      "entry": "src/app/(platform-admin)/super-dev/integridade/page.tsx",
+      "reachableProductFiles": 8,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev/sessions",
+      "entry": "src/app/(platform-admin)/super-dev/sessions/page.tsx",
+      "reachableProductFiles": 10,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev/settings",
+      "entry": "src/app/(platform-admin)/super-dev/settings/page.tsx",
+      "reachableProductFiles": 8,
+      "primitives": {
+        "button": 1,
+        "card": 2,
+        "dataTable": 0,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev/tenants",
+      "entry": "src/app/(platform-admin)/super-dev/tenants/page.tsx",
+      "reachableProductFiles": 12,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/super-dev/tenants/[tenantId]",
+      "entry": "src/app/(platform-admin)/super-dev/tenants/[tenantId]/page.tsx",
+      "reachableProductFiles": 11,
+      "primitives": {
+        "button": 2,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/termos",
+      "entry": "src/app/termos/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 1,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/unidades/[branchId]",
+      "entry": "src/app/(dashboard)/unidades/[branchId]/page.tsx",
+      "reachableProductFiles": 19,
+      "primitives": {
+        "button": 5,
+        "card": 2,
+        "dataTable": 0,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 1,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 3,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/vendas",
+      "entry": "src/app/(dashboard)/vendas/page.tsx",
+      "reachableProductFiles": 14,
+      "primitives": {
+        "button": 2,
+        "card": 1,
+        "dataTable": 1,
+        "field": 2,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 1,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/vendas/[id]",
+      "entry": "src/app/(dashboard)/vendas/[id]/page.tsx",
+      "reachableProductFiles": 17,
+      "primitives": {
+        "button": 3,
+        "card": 3,
+        "dataTable": 1,
+        "field": 1,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 1
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 2,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/verify",
+      "entry": "src/app/(auth)/verify/page.tsx",
+      "reachableProductFiles": 1,
+      "primitives": {
+        "button": 0,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 0,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 3,
+        "arbitraryRadius": 0
+      }
+    },
+    {
+      "route": "/welcome",
+      "entry": "src/app/(dashboard)/welcome/page.tsx",
+      "reachableProductFiles": 13,
+      "primitives": {
+        "button": 1,
+        "card": 0,
+        "dataTable": 0,
+        "field": 0,
+        "foundation": 0,
+        "overlay": 0,
+        "tabs": 0
+      },
+      "deviations": {
+        "nativeButton": 1,
+        "nativeInput": 0,
+        "nativeSelect": 0,
+        "nativeTable": 0,
+        "nativeTextarea": 0,
+        "hardcodedColor": 0,
+        "arbitraryRadius": 0
+      }
+    }
+  ]
+}

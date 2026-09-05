@@ -25,6 +25,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { AvailabilityToggle } from "@/components/availability-toggle";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getBrokerDailySummaryAction } from "@/features/lead-distribution/broker-summary-actions";
 import type { BrokerDailySummaryAggregate, BrokerDailySummaryItem } from "@/features/lead-distribution/broker-summary-service";
 
@@ -325,68 +327,68 @@ export function BrokerDailySummaryPanel({
       </div>
 
       {/* BROKER SUMMARY TABLE */}
-      <Card variant="overview" className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted/40 border-b border-border text-muted-foreground font-semibold">
-              <tr>
-                <th className="py-3 px-4">Corretor</th>
-                <th className="py-3 px-3">Filial</th>
-                <th className="py-3 px-3 text-center">Status</th>
-                <th className="py-3 px-3 text-right">Leads Recebidos</th>
-                <th className="py-3 px-3 text-right">Em Atendimento</th>
-                <th className="py-3 px-3 text-right">Não Iniciados</th>
-                <th className="py-3 px-3 text-right">Leads Perdidos</th>
-                <th className="py-3 px-3 text-right">Vendas</th>
-                <th className="py-3 px-3 text-right">Conversão (%)</th>
-                <th className="py-3 px-3 text-right">Tempo Resp.</th>
-                <th className="py-3 px-4 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
+      <Card variant="overview" className="border-0 p-0">
+        <DataTableFrame>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Corretor</TableHead>
+                <TableHead>Filial</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Leads Recebidos</TableHead>
+                <TableHead className="text-right">Em Atendimento</TableHead>
+                <TableHead className="text-right">Não Iniciados</TableHead>
+                <TableHead className="text-right">Leads Perdidos</TableHead>
+                <TableHead className="text-right">Vendas</TableHead>
+                <TableHead className="text-right">Conversão (%)</TableHead>
+                <TableHead className="text-right">Tempo Resp.</TableHead>
+                <TableHead className="text-center">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-8 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                     Nenhum corretor encontrado com os filtros selecionados.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 filteredItems.map((item) => (
-                  <tr key={item.brokerId} className="hover:bg-muted/20 transition-colors">
-                    <td className="py-3 px-4 font-medium">
+                  <TableRow key={item.brokerId}>
+                    <TableCell className="font-medium">
                       <div className="flex flex-col">
                         <span className="font-semibold text-foreground text-sm">{item.brokerName}</span>
                         <span className="text-[11px] text-muted-foreground">{item.brokerEmail}</span>
                       </div>
-                    </td>
-                    <td className="py-3 px-3 text-muted-foreground">{item.branchName || "Matriz"}</td>
-                    <td className="py-3 px-3 text-center">
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{item.branchName || "Matriz"}</TableCell>
+                    <TableCell className="text-center">
                       {canFilterBranch ? (
                         <AvailabilityToggle initialStatus={item.availabilityStatus as "available" | "paused" | "offline"} />
                       ) : (
                         getStatusBadge(item.availabilityStatus)
                       )}
-                    </td>
-                    <td className="py-3 px-3 text-right font-semibold tabular-nums text-sm">{item.leadsReceived}</td>
-                    <td className="py-3 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-medium">
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">{item.leadsReceived}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums text-success">
                       {item.activeAttending}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums text-amber-500 font-medium">
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums text-warning">
                       {item.unstartedLeads > 0 ? item.unstartedLeads : "-"}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums text-rose-600 dark:text-rose-400">
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
                       {item.lostLeads}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
+                    </TableCell>
+                    <TableCell className="text-right font-bold tabular-nums text-success">
                       {item.convertedLeads}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums font-semibold">
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
                       {item.conversionRate}%
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
                       {item.avgFirstContactMinutes !== null ? `${item.avgFirstContactMinutes} min` : "N/A"}
-                    </td>
-                    <td className="py-3 px-4 text-center">
+                    </TableCell>
+                    <TableCell className="text-center">
                       <Button
                         render={
                           <Link
@@ -400,13 +402,13 @@ export function BrokerDailySummaryPanel({
                         Leads
                         <ArrowUpRight className="h-3 w-3" />
                       </Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </DataTableFrame>
       </Card>
     </div>
   );

@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
 import { updateBrokerAvailabilityAction } from "@/features/leads/availability-action";
 import { toast } from "@/components/ui/sonner";
+import { AncoraLogo } from "@/components/ancora-logo";
 
 export type LightTopNavProps = {
   branding?: {
@@ -133,8 +134,8 @@ export function LightTopNavBar({
                 className="h-7 w-auto object-contain brightness-0 invert"
               />
             ) : (
-              <div className="grid size-7 place-items-center rounded-lg bg-white/20 text-white font-black text-xs">
-                ⚓
+              <div className="grid size-7 place-items-center rounded-lg bg-white/15">
+                <AncoraLogo className="size-5 object-contain brightness-0 invert" />
               </div>
             )}
           </Link>

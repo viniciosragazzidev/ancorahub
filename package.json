@@ -31,7 +31,9 @@
     "build:extension": "node scripts/build-browser-extension.mjs",
     "deploy:preview": "vercel",
     "deploy:prod": "vercel --prod",
-    "ui:audit": "tsx scripts/ui/audit-ui-components.ts"
+    "ui:audit": "tsx scripts/ui/audit-ui-components.ts",
+    "ui:audit:strict": "tsx scripts/ui/audit-ui-components.ts --strict",
+    "ui:catalog": "tsx scripts/ui/build-route-component-catalog.ts --write"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.17",

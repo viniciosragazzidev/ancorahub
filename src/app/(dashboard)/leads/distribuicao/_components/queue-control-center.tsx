@@ -2,16 +2,48 @@
 
 import { useMemo, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
-import { ChartBar, CheckCircle, Clock, MagicWand, Plus, SlidersHorizontal, Trash, UserList, Buildings, Lightning, MagnifyingGlass } from "@/components/huge-icons";
+import {
+  ChartBar,
+  CheckCircle,
+  Clock,
+  MagicWand,
+  Plus,
+  SlidersHorizontal,
+  Trash,
+  UserList,
+  Buildings,
+  Lightning,
+  MagnifyingGlass,
+} from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
-import { deleteDistributionQueueAction, deleteMetaAdQueueRouteAction, deleteMetaCampaignQueueRouteAction, forceDeleteQueueAction, getQueueDependenciesAction, saveDistributionQueueAction, saveMetaAdQueueRouteAction, saveMetaCampaignQueueRouteAction, simulateDistributionAction, type QueueDependencyInfo } from "@/features/lead-distribution/actions";
+import {
+  deleteDistributionQueueAction,
+  deleteMetaAdQueueRouteAction,
+  deleteMetaCampaignQueueRouteAction,
+  forceDeleteQueueAction,
+  getQueueDependenciesAction,
+  saveDistributionQueueAction,
+  saveMetaAdQueueRouteAction,
+  saveMetaCampaignQueueRouteAction,
+  simulateDistributionAction,
+  type QueueDependencyInfo,
+} from "@/features/lead-distribution/actions";
 import { toast } from "@/components/ui/sonner";
 import { Loader2Icon } from "@/components/huge-icons";
 import { cn } from "@/utils/core/cn";
@@ -37,12 +69,37 @@ type Queue = {
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string; branchId?: string | null; branchName?: string | null };
-type DutySchedule = { id: string; name: string; startsAt: string; endsAt: string; dayOfWeek?: number; branchName?: string | null };
+type DutySchedule = {
+  id: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  dayOfWeek?: number;
+  branchName?: string | null;
+};
 type Campaign = { campaignId: string; name: string; status: string };
-type CampaignRoute = { campaignId: string; queueId: string | null; queueName: string | null; enabled: boolean };
+type CampaignRoute = {
+  campaignId: string;
+  queueId: string | null;
+  queueName: string | null;
+  enabled: boolean;
+};
 type Ad = { adId: string; name: string; status: string };
 type AdRoute = { adId: string; queueId: string | null; queueName: string | null; enabled: boolean };
-type Simulation = { success: boolean; error?: string; queue?: { id: string; name: string } | null; reason?: string; selected?: { id: string; name: string; activeLeads: number; capacity: number | null } | null; eligible?: Array<{ id: string; name: string; activeLeads: number; capacity: number | null; score: number }> };
+type Simulation = {
+  success: boolean;
+  error?: string;
+  queue?: { id: string; name: string } | null;
+  reason?: string;
+  selected?: { id: string; name: string; activeLeads: number; capacity: number | null } | null;
+  eligible?: Array<{
+    id: string;
+    name: string;
+    activeLeads: number;
+    capacity: number | null;
+    score: number;
+  }>;
+};
 
 const emptyQueue = {
   branchId: "",
@@ -87,9 +144,20 @@ export function QueueControlCenter({
   const [saving, setSaving] = useState(false);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [simulating, setSimulating] = useState(false);
-  const [simulationForm, setSimulationForm] = useState({ branchId: branches[0]?.id ?? "", queueId: "", temperature: "warm", score: "50" });
-  const [campaignRoute, setCampaignRoute] = useState({ campaignId: campaigns[0]?.campaignId ?? "", queueId: queues[0]?.id ?? "" });
-  const [adRoute, setAdRoute] = useState({ adId: ads[0]?.adId ?? "", queueId: queues[0]?.id ?? "" });
+  const [simulationForm, setSimulationForm] = useState({
+    branchId: branches[0]?.id ?? "",
+    queueId: "",
+    temperature: "warm",
+    score: "50",
+  });
+  const [campaignRoute, setCampaignRoute] = useState({
+    campaignId: campaigns[0]?.campaignId ?? "",
+    queueId: queues[0]?.id ?? "",
+  });
+  const [adRoute, setAdRoute] = useState({
+    adId: ads[0]?.adId ?? "",
+    queueId: queues[0]?.id ?? "",
+  });
   const [savingCampaignRoute, setSavingCampaignRoute] = useState(false);
   const [savingAdRoute, setSavingAdRoute] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -102,7 +170,11 @@ export function QueueControlCenter({
   const [deleteDependencies, setDeleteDependencies] = useState<QueueDependencyInfo | null>(null);
   const [loadingDependencies, setLoadingDependencies] = useState(false);
   const [forceDeleting, setForceDeleting] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<{ type: "campaign" | "ad"; id: string; queueId: string } | null>(null);
+  const [editingRoute, setEditingRoute] = useState<{
+    type: "campaign" | "ad";
+    id: string;
+    queueId: string;
+  } | null>(null);
   const router = useRouter();
 
   const activeCampaigns = useMemo(
@@ -115,7 +187,11 @@ export function QueueControlCenter({
   );
   const filteredCampaigns = useMemo(() => {
     const query = campaignSearch.trim().toLocaleLowerCase("pt-BR");
-    return query ? displayedCampaigns.filter((campaign) => campaign.name.toLocaleLowerCase("pt-BR").includes(query)) : displayedCampaigns;
+    return query
+      ? displayedCampaigns.filter((campaign) =>
+          campaign.name.toLocaleLowerCase("pt-BR").includes(query),
+        )
+      : displayedCampaigns;
   }, [campaignSearch, displayedCampaigns]);
 
   const activeAds = useMemo(
@@ -128,7 +204,9 @@ export function QueueControlCenter({
   );
   const filteredAds = useMemo(() => {
     const query = adSearch.trim().toLocaleLowerCase("pt-BR");
-    return query ? displayedAds.filter((ad) => ad.name.toLocaleLowerCase("pt-BR").includes(query)) : displayedAds;
+    return query
+      ? displayedAds.filter((ad) => ad.name.toLocaleLowerCase("pt-BR").includes(query))
+      : displayedAds;
   }, [adSearch, displayedAds]);
 
   async function handleDeleteQueue(queue: Queue) {
@@ -161,12 +239,19 @@ export function QueueControlCenter({
     setDeleteTarget(null);
     setDeleteDependencies(null);
     if (!result.success) return toast.error(result.error ?? "Não foi possível forçar a exclusão.");
-    toast.success(result.message, { description: `A fila "${deleteTarget.name}" e todas as dependências foram removidas.` });
+    toast.success(result.message, {
+      description: `A fila "${deleteTarget.name}" e todas as dependências foram removidas.`,
+    });
     router.refresh();
   }
 
   const branchQueues = useMemo(
-    () => queues.filter((queue) => (queue.branchId === simulationForm.branchId || !queue.branchId) && queue.status === "active"),
+    () =>
+      queues.filter(
+        (queue) =>
+          (queue.branchId === simulationForm.branchId || !queue.branchId) &&
+          queue.status === "active",
+      ),
     [queues, simulationForm.branchId],
   );
 
@@ -232,7 +317,11 @@ export function QueueControlCenter({
         return { ...prev, branchId: newBranchId, allowedBranchIds: branches.map((b) => b.id) };
       }
       // Unidade específica → remover ela de allowedBranchIds
-      return { ...prev, branchId: newBranchId, allowedBranchIds: prev.allowedBranchIds.filter((id) => id !== newBranchId) };
+      return {
+        ...prev,
+        branchId: newBranchId,
+        allowedBranchIds: prev.allowedBranchIds.filter((id) => id !== newBranchId),
+      };
     });
   }
 
@@ -264,24 +353,50 @@ export function QueueControlCenter({
       status: form.status,
     });
     setSaving(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível salvar a fila.", { description: "Verifique os dados e tente novamente." });
-    toast.success(result.message, { description: editingId ? `A fila "${form.name}" foi atualizada.` : `A fila "${form.name}" está pronta para receber leads.` });
+    if (!result.success)
+      return toast.error(result.error ?? "Não foi possível salvar a fila.", {
+        description: "Verifique os dados e tente novamente.",
+      });
+    toast.success(result.message, {
+      description: editingId
+        ? `A fila "${form.name}" foi atualizada.`
+        : `A fila "${form.name}" está pronta para receber leads.`,
+    });
     setEditorOpen(false);
     router.refresh();
   }
 
   async function toggleCampaignForQueue(campaignId: string, queueId: string, enabled: boolean) {
     setSavingCampaignRoute(true);
-    const result = await saveMetaCampaignQueueRouteAction({ campaignId, queueId: enabled ? queueId : null, enabled });
+    const result = await saveMetaCampaignQueueRouteAction({
+      campaignId,
+      queueId: enabled ? queueId : null,
+      enabled,
+    });
     setSavingCampaignRoute(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.", { description: "Verifique se a fila está ativa." });
-    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."), { description: enabled ? "Leads dessa campanha serão direcionados automaticamente." : "A campanha voltará a usar a fila geral." });
+    if (!result.success)
+      return toast.error(result.error ?? "Não foi possível atualizar a campanha.", {
+        description: "Verifique se a fila está ativa.",
+      });
+    toast.success(
+      result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."),
+      {
+        description: enabled
+          ? "Leads dessa campanha serão direcionados automaticamente."
+          : "A campanha voltará a usar a fila geral.",
+      },
+    );
     router.refresh();
   }
 
   async function runSimulation() {
     setSimulating(true);
-    const result = await simulateDistributionAction({ branchId: simulationForm.branchId || undefined, queueId: simulationForm.queueId || undefined, temperature: simulationForm.temperature, score: Number(simulationForm.score) });
+    const result = await simulateDistributionAction({
+      branchId: simulationForm.branchId || undefined,
+      queueId: simulationForm.queueId || undefined,
+      temperature: simulationForm.temperature,
+      score: Number(simulationForm.score),
+    });
     setSimulating(false);
     setSimulation(result);
     if (!result.success) toast.error(result.error ?? "Não foi possível simular.");
@@ -289,19 +404,47 @@ export function QueueControlCenter({
 
   async function saveCampaignRoute(enabled: boolean) {
     setSavingCampaignRoute(true);
-    const result = await saveMetaCampaignQueueRouteAction({ campaignId: campaignRoute.campaignId, queueId: enabled ? campaignRoute.queueId : null, enabled });
+    const result = await saveMetaCampaignQueueRouteAction({
+      campaignId: campaignRoute.campaignId,
+      queueId: enabled ? campaignRoute.queueId : null,
+      enabled,
+    });
     setSavingCampaignRoute(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar a campanha.", { description: "Verifique se a fila está ativa." });
-    toast.success(result.message ?? (enabled ? "Campanha vinculada à fila." : "Campanha ignorada pelo CRM."), { description: enabled ? "Leads serão direcionados automaticamente." : "A campanha não será registrada no CRM." });
+    if (!result.success)
+      return toast.error(result.error ?? "Não foi possível atualizar a campanha.", {
+        description: "Verifique se a fila está ativa.",
+      });
+    toast.success(
+      result.message ?? (enabled ? "Campanha vinculada à fila." : "Campanha ignorada pelo CRM."),
+      {
+        description: enabled
+          ? "Leads serão direcionados automaticamente."
+          : "A campanha não será registrada no CRM.",
+      },
+    );
     router.refresh();
   }
 
   async function saveAdRoute(enabled: boolean) {
     setSavingAdRoute(true);
-    const result = await saveMetaAdQueueRouteAction({ adId: adRoute.adId, queueId: enabled ? adRoute.queueId : null, enabled });
+    const result = await saveMetaAdQueueRouteAction({
+      adId: adRoute.adId,
+      queueId: enabled ? adRoute.queueId : null,
+      enabled,
+    });
     setSavingAdRoute(false);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível atualizar o anúncio.", { description: "Verifique se a fila está ativa." });
-    toast.success(result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."), { description: enabled ? "Leads deste anúncio serão direcionados automaticamente." : "O anúncio não será registrado no CRM." });
+    if (!result.success)
+      return toast.error(result.error ?? "Não foi possível atualizar o anúncio.", {
+        description: "Verifique se a fila está ativa.",
+      });
+    toast.success(
+      result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."),
+      {
+        description: enabled
+          ? "Leads deste anúncio serão direcionados automaticamente."
+          : "O anúncio não será registrado no CRM.",
+      },
+    );
     router.refresh();
   }
 
@@ -326,14 +469,36 @@ export function QueueControlCenter({
       <section aria-labelledby="queues-title" className="space-y-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 id="queues-title" className="text-base font-semibold">Filas de distribuição</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Cada fila decide como a corretora ou unidade recebe, prioriza e distribui novos leads.</p>
+            <h2 id="queues-title" className="text-base font-semibold">
+              Filas de distribuição
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cada fila decide como a corretora ou unidade recebe, prioriza e distribui novos leads.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => { setSimulation(null); setSimulatorOpen(true); }} className="active:scale-[0.97] transition-transform">
-              <MagicWand />Simular distribuição
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSimulation(null);
+                setSimulatorOpen(true);
+              }}
+              className="active:scale-[0.97] transition-transform"
+            >
+              <MagicWand />
+              Simular distribuição
             </Button>
-            {canEdit ? <Button size="sm" onClick={openCreate} className="active:scale-[0.97] transition-transform"><Plus />Criar fila</Button> : null}
+            {canEdit ? (
+              <Button
+                size="sm"
+                onClick={openCreate}
+                className="active:scale-[0.97] transition-transform"
+              >
+                <Plus />
+                Criar fila
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -344,21 +509,39 @@ export function QueueControlCenter({
                 <UserList className="size-5" />
               </span>
               <p className="text-sm font-medium">Nenhuma fila configurada</p>
-              <p className="max-w-sm text-xs text-muted-foreground">Crie a primeira fila para tornar a distribuição previsível na operação.</p>
-              {canEdit ? <Button size="sm" onClick={openCreate}><Plus />Criar fila</Button> : null}
+              <p className="max-w-sm text-xs text-muted-foreground">
+                Crie a primeira fila para tornar a distribuição previsível na operação.
+              </p>
+              {canEdit ? (
+                <Button size="sm" onClick={openCreate}>
+                  <Plus />
+                  Criar fila
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {queues.map((queue) => {
-              const multiBranchCount = (queue.allowedBranchIds?.length ?? 0) + (queue.branchId ? 1 : 0);
+              const multiBranchCount =
+                (queue.allowedBranchIds?.length ?? 0) + (queue.branchId ? 1 : 0);
               const hasSpecificBrokers = (queue.allowedBrokerIds?.length ?? 0) > 0;
-              const dutyScheduleName = dutySchedules.find((ds) => ds.id === queue.exclusiveDutyScheduleId)?.name;
-              const queueCampaignRoutes = campaignRoutes.filter((r) => r.queueId === queue.id && r.enabled);
-              const queueCampaigns = campaigns.filter((c) => queueCampaignRoutes.some((r) => r.campaignId === c.campaignId));
+              const dutyScheduleName = dutySchedules.find(
+                (ds) => ds.id === queue.exclusiveDutyScheduleId,
+              )?.name;
+              const queueCampaignRoutes = campaignRoutes.filter(
+                (r) => r.queueId === queue.id && r.enabled,
+              );
+              const queueCampaigns = campaigns.filter((c) =>
+                queueCampaignRoutes.some((r) => r.campaignId === c.campaignId),
+              );
 
               return (
-                <Card key={queue.id} variant="compact" className="group transition-[border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-primary/30 motion-reduce:transition-none">
+                <Card
+                  key={queue.id}
+                  variant="compact"
+                  className="group transition-[border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-primary/30 motion-reduce:transition-none"
+                >
                   <CardHeader className="gap-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -371,16 +554,26 @@ export function QueueControlCenter({
                             </Badge>
                           )}
                           {queue.exclusiveDutyScheduleId && (
-                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]">
-                              ⚡ Plantão: {dutyScheduleName || "Exclusivo"}
+                            <Badge
+                              variant="secondary"
+                              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]"
+                            >
+                              <Lightning className="size-3.5" aria-hidden="true" /> Plantão:{" "}
+                              {dutyScheduleName || "Exclusivo"}
                             </Badge>
                           )}
                           {queue.aiQualificationEnabled !== false ? (
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-[10px] gap-1">
+                            <Badge
+                              variant="secondary"
+                              className="bg-primary/10 text-primary border-primary/20 text-[10px] gap-1"
+                            >
                               <MagicWand className="size-3" /> Bot IA Ativo
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-muted-foreground gap-1"
+                            >
                               Bot IA Pausado
                             </Badge>
                           )}
@@ -399,13 +592,23 @@ export function QueueControlCenter({
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>{queue.assignmentMode === "automatic" ? "Automática" : "Manual"} · {queue.assignmentStrategy === "round_robin" ? "Round robin" : "Menor carga"}</span>
+                      <span>
+                        {queue.assignmentMode === "automatic" ? "Automática" : "Manual"} ·{" "}
+                        {queue.assignmentStrategy === "round_robin" ? "Round robin" : "Menor carga"}
+                      </span>
                       {hasSpecificBrokers ? (
-                        <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] bg-primary/10 text-primary border-primary/20"
+                        >
                           {queue.allowedBrokerIds!.length} corretor(es) específico(s)
                         </Badge>
                       ) : (
-                        <span>{queue.capacityEnabled ? `${queue.capacityPerBroker}/corretor` : "Sem limite"}</span>
+                        <span>
+                          {queue.capacityEnabled
+                            ? `${queue.capacityPerBroker}/corretor`
+                            : "Sem limite"}
+                        </span>
                       )}
                     </div>
 
@@ -413,26 +616,38 @@ export function QueueControlCenter({
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5 space-y-2">
                       <div className="flex items-center justify-between text-xs font-semibold text-foreground">
                         <span className="flex items-center gap-1.5">
-                          🎯 Campanhas enviando para esta fila ({queueCampaigns.length})
+                          Campanhas enviando para esta fila ({queueCampaigns.length})
                         </span>
                       </div>
                       {displayedCampaigns.length > 0 ? (
                         <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
                           {displayedCampaigns.map((campaign) => {
-                            const route = campaignRoutes.find((r) => r.campaignId === campaign.campaignId);
+                            const route = campaignRoutes.find(
+                              (r) => r.campaignId === campaign.campaignId,
+                            );
                             const isChecked = route?.queueId === queue.id && route.enabled;
-                            const isOtherQueue = route?.queueId && route.queueId !== queue.id && route.enabled;
+                            const isOtherQueue =
+                              route?.queueId && route.queueId !== queue.id && route.enabled;
                             return (
-                              <label key={campaign.campaignId} className="flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-background/80 p-1 rounded">
+                              <label
+                                key={campaign.campaignId}
+                                className="flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-background/80 p-1 rounded"
+                              >
                                 <span className="flex items-center gap-1.5 min-w-0">
-                                  <input
-                                    type="checkbox"
+                                  <Checkbox
                                     checked={isChecked ?? false}
                                     disabled={!canEdit || savingCampaignRoute}
-                                    onChange={(e) => void toggleCampaignForQueue(campaign.campaignId, queue.id, e.target.checked)}
-                                    className="rounded border-input text-primary focus:ring-primary shrink-0"
+                                    onCheckedChange={(checked) =>
+                                      void toggleCampaignForQueue(
+                                        campaign.campaignId,
+                                        queue.id,
+                                        checked === true,
+                                      )
+                                    }
                                   />
-                                  <span className="truncate text-[11px] font-medium">{campaign.name}</span>
+                                  <span className="truncate text-[11px] font-medium">
+                                    {campaign.name}
+                                  </span>
                                 </span>
                                 {isOtherQueue && (
                                   <span className="text-[9px] text-muted-foreground shrink-0 truncate max-w-[90px]">
@@ -444,7 +659,9 @@ export function QueueControlCenter({
                           })}
                         </div>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground italic">Nenhuma campanha Meta cadastrada.</p>
+                        <p className="text-[11px] text-muted-foreground italic">
+                          Nenhuma campanha Meta cadastrada.
+                        </p>
                       )}
                     </div>
 
@@ -473,7 +690,8 @@ export function QueueControlCenter({
                           onClick={() => openEdit(queue)}
                           className="active:scale-[0.97] transition-transform"
                         >
-                          <SlidersHorizontal />Editar
+                          <SlidersHorizontal />
+                          Editar
                         </Button>
                       </div>
                     ) : null}
@@ -492,13 +710,20 @@ export function QueueControlCenter({
             <div>
               <CardTitle className="text-base flex items-center gap-2">
                 <span>Entrada por campanha Meta</span>
-                <InfoTooltip title="Regra de entrada por campanha" description="Define para qual fila cada campanha envia os leads (Fila Geral, Unidade ou Corretor específico). Opcionalmente é possível ignorar uma campanha." />
-                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs font-normal">
+                <InfoTooltip
+                  title="Regra de entrada por campanha"
+                  description="Define para qual fila cada campanha envia os leads (Fila Geral, Unidade ou Corretor específico). Opcionalmente é possível ignorar uma campanha."
+                />
+                <Badge
+                  variant="secondary"
+                  className="bg-primary/10 text-primary border-primary/20 text-xs font-normal"
+                >
                   {activeCampaigns.length} ativa(s)
                 </Badge>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
-                Escolha a campanha e selecione a fila de destino desejada. Campanhas sem regra explicita usam a Fila Geral.
+                Escolha a campanha e selecione a fila de destino desejada. Campanhas sem regra
+                explicita usam a Fila Geral.
               </CardDescription>
             </div>
             {campaigns.length > activeCampaigns.length && (
@@ -508,7 +733,9 @@ export function QueueControlCenter({
                 onClick={() => setShowOnlyActiveCampaigns((prev) => !prev)}
                 className="text-xs text-muted-foreground hover:text-foreground shrink-0"
               >
-                {showOnlyActiveCampaigns ? `Mostrar todas (${campaigns.length})` : `Filtrar ativas (${activeCampaigns.length})`}
+                {showOnlyActiveCampaigns
+                  ? `Mostrar todas (${campaigns.length})`
+                  : `Filtrar ativas (${activeCampaigns.length})`}
               </Button>
             )}
           </div>
@@ -516,8 +743,16 @@ export function QueueControlCenter({
         <CardContent className="space-y-4">
           <label className="relative block">
             <span className="sr-only">Buscar campanha Meta</span>
-            <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={campaignSearch} onChange={(event) => setCampaignSearch(event.target.value)} placeholder="Buscar campanha por nome..." className="h-9 pl-9 text-sm" />
+            <MagnifyingGlass
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={campaignSearch}
+              onChange={(event) => setCampaignSearch(event.target.value)}
+              placeholder="Buscar campanha por nome..."
+              className="h-9 pl-9 text-sm"
+            />
           </label>
           {displayedCampaigns.length && queues.length ? (
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
@@ -530,7 +765,7 @@ export function QueueControlCenter({
                   const isActive = (campaign.status ?? "").toUpperCase() === "ACTIVE";
                   return {
                     value: campaign.campaignId,
-                    label: `${isActive ? "🟢" : "⚪"} ${campaign.name} ${isActive ? "" : "· PAUSED"}`,
+                    label: `${campaign.name} ${isActive ? "· Ativa" : "· Pausada"}`,
                   };
                 })}
               />
@@ -543,26 +778,51 @@ export function QueueControlCenter({
                   .map((queue) => ({
                     value: queue.id,
                     label: queue.branchName
-                      ? `🏢 ${queue.name} · ${queue.branchName}`
-                      : `🌐 ${queue.name} (Fila geral)`,
+                      ? `${queue.name} · ${queue.branchName}`
+                      : `${queue.name} · Fila geral`,
                   }))}
               />
               <Button
                 size="sm"
                 onClick={() => void saveCampaignRoute(true)}
-                disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId || !campaignRoute.queueId}
-                className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", savingCampaignRoute && "pointer-events-none")}
+                disabled={
+                  !canEdit ||
+                  savingCampaignRoute ||
+                  !campaignRoute.campaignId ||
+                  !campaignRoute.queueId
+                }
+                className={cn(
+                  "gap-1.5 active:scale-[0.97] transition-all duration-150",
+                  savingCampaignRoute && "pointer-events-none",
+                )}
               >
-                {savingCampaignRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Receber na fila"}
+                {savingCampaignRoute ? (
+                  <>
+                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
+                    Salvando…
+                  </>
+                ) : (
+                  "Receber na fila"
+                )}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => void saveCampaignRoute(false)}
                 disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId}
-                className={cn("text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150", savingCampaignRoute && "pointer-events-none")}
+                className={cn(
+                  "text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150",
+                  savingCampaignRoute && "pointer-events-none",
+                )}
               >
-                {savingCampaignRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Não registrar"}
+                {savingCampaignRoute ? (
+                  <>
+                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
+                    Salvando…
+                  </>
+                ) : (
+                  "Não registrar"
+                )}
               </Button>
             </div>
           ) : (
@@ -580,54 +840,81 @@ export function QueueControlCenter({
               </div>
               <ScrollArea className="max-h-64 rounded-lg border border-border/60 bg-muted/20">
                 <div className="divide-y divide-border/40">
-                {campaignRoutes.filter((route) => {
-                  const campaign = campaigns.find((item) => item.campaignId === route.campaignId);
-                  return !campaignSearch.trim() || (campaign?.name ?? route.campaignId).toLocaleLowerCase("pt-BR").includes(campaignSearch.trim().toLocaleLowerCase("pt-BR"));
-                }).map((route) => {
-                  const matched = campaigns.find((c) => c.campaignId === route.campaignId);
-                  const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
-                  return (
-                    <div key={route.campaignId} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                        <span className="font-medium truncate">{matched?.name ?? route.campaignId}</span>
-                        {matched?.status && (
-                          <Badge variant="outline" className="text-[10px] font-normal uppercase">
-                            {matched.status}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
-                          {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
-                        </Badge>
-                        {canEdit && (
-                          <>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => {
-                                setCampaignRoute({ campaignId: route.campaignId, queueId: route.queueId ?? queues[0]?.id ?? "" });
-                                window.scrollTo({ top: 0, behavior: "smooth" });
-                              }}
-                              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                  {campaignRoutes
+                    .filter((route) => {
+                      const campaign = campaigns.find(
+                        (item) => item.campaignId === route.campaignId,
+                      );
+                      return (
+                        !campaignSearch.trim() ||
+                        (campaign?.name ?? route.campaignId)
+                          .toLocaleLowerCase("pt-BR")
+                          .includes(campaignSearch.trim().toLocaleLowerCase("pt-BR"))
+                      );
+                    })
+                    .map((route) => {
+                      const matched = campaigns.find((c) => c.campaignId === route.campaignId);
+                      const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
+                      return (
+                        <div
+                          key={route.campaignId}
+                          className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                            />
+                            <span className="font-medium truncate">
+                              {matched?.name ?? route.campaignId}
+                            </span>
+                            {matched?.status && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-normal uppercase"
+                              >
+                                {matched.status}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              variant={route.enabled ? "success" : "outline"}
+                              className="text-xs font-medium"
                             >
-                              Editar
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => void deleteMetaCampaignRoute(route.campaignId)}
-                              className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              Excluir
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                              {route.enabled
+                                ? `→ ${route.queueName ?? "Fila geral"}`
+                                : "Não registrar no CRM"}
+                            </Badge>
+                            {canEdit && (
+                              <>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setCampaignRoute({
+                                      campaignId: route.campaignId,
+                                      queueId: route.queueId ?? queues[0]?.id ?? "",
+                                    });
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                  }}
+                                  className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                                >
+                                  Editar
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => void deleteMetaCampaignRoute(route.campaignId)}
+                                  className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  Excluir
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </ScrollArea>
             </div>
@@ -642,13 +929,17 @@ export function QueueControlCenter({
             <div>
               <CardTitle className="text-base flex items-center gap-2">
                 <span>Exceção por anúncio</span>
-                <InfoTooltip title="Prioridade da regra" description="Se um anúncio tiver regra própria, ela prevalece sobre a regra da campanha. Use quando anúncios da mesma campanha precisam de filas diferentes." />
+                <InfoTooltip
+                  title="Prioridade da regra"
+                  description="Se um anúncio tiver regra própria, ela prevalece sobre a regra da campanha. Use quando anúncios da mesma campanha precisam de filas diferentes."
+                />
                 <Badge variant="outline" className="text-xs font-normal">
                   {activeAds.length} ativo(s)
                 </Badge>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
-                Configure o nível mais específico quando precisar separar anúncios dentro da mesma campanha.
+                Configure o nível mais específico quando precisar separar anúncios dentro da mesma
+                campanha.
               </CardDescription>
             </div>
             {ads.length > activeAds.length && (
@@ -658,7 +949,9 @@ export function QueueControlCenter({
                 onClick={() => setShowOnlyActiveAds((prev) => !prev)}
                 className="text-xs text-muted-foreground hover:text-foreground shrink-0"
               >
-                {showOnlyActiveAds ? `Mostrar todos (${ads.length})` : `Filtrar ativos (${activeAds.length})`}
+                {showOnlyActiveAds
+                  ? `Mostrar todos (${ads.length})`
+                  : `Filtrar ativos (${activeAds.length})`}
               </Button>
             )}
           </div>
@@ -666,8 +959,16 @@ export function QueueControlCenter({
         <CardContent className="space-y-4">
           <label className="relative block">
             <span className="sr-only">Buscar anúncio Meta</span>
-            <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={adSearch} onChange={(event) => setAdSearch(event.target.value)} placeholder="Buscar anúncio por nome..." className="h-9 pl-9 text-sm" />
+            <MagnifyingGlass
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={adSearch}
+              onChange={(event) => setAdSearch(event.target.value)}
+              placeholder="Buscar anúncio por nome..."
+              className="h-9 pl-9 text-sm"
+            />
           </label>
           {displayedAds.length && queues.length ? (
             <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
@@ -680,7 +981,7 @@ export function QueueControlCenter({
                   const isActive = (ad.status ?? "").toUpperCase() === "ACTIVE";
                   return {
                     value: ad.adId,
-                    label: `${isActive ? "🟢" : "⚪"} ${ad.name} ${isActive ? "" : "· PAUSED"}`,
+                    label: `${ad.name} ${isActive ? "· Ativo" : "· Pausado"}`,
                   };
                 })}
               />
@@ -693,26 +994,46 @@ export function QueueControlCenter({
                   .map((queue) => ({
                     value: queue.id,
                     label: queue.branchName
-                      ? `🏢 ${queue.name} · ${queue.branchName}`
-                      : `🌐 ${queue.name} (Fila geral)`,
+                      ? `${queue.name} · ${queue.branchName}`
+                      : `${queue.name} · Fila geral`,
                   }))}
               />
               <Button
                 size="sm"
                 onClick={() => void saveAdRoute(true)}
                 disabled={!canEdit || savingAdRoute || !adRoute.adId || !adRoute.queueId}
-                className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", savingAdRoute && "pointer-events-none")}
+                className={cn(
+                  "gap-1.5 active:scale-[0.97] transition-all duration-150",
+                  savingAdRoute && "pointer-events-none",
+                )}
               >
-                {savingAdRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Receber na fila"}
+                {savingAdRoute ? (
+                  <>
+                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
+                    Salvando…
+                  </>
+                ) : (
+                  "Receber na fila"
+                )}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => void saveAdRoute(false)}
                 disabled={!canEdit || savingAdRoute || !adRoute.adId}
-                className={cn("text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150", savingAdRoute && "pointer-events-none")}
+                className={cn(
+                  "text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150",
+                  savingAdRoute && "pointer-events-none",
+                )}
               >
-                {savingAdRoute ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Salvando…</> : "Não registrar"}
+                {savingAdRoute ? (
+                  <>
+                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
+                    Salvando…
+                  </>
+                ) : (
+                  "Não registrar"
+                )}
               </Button>
             </div>
           ) : (
@@ -730,54 +1051,79 @@ export function QueueControlCenter({
               </div>
               <ScrollArea className="max-h-64 rounded-lg border border-border/60 bg-muted/20">
                 <div className="divide-y divide-border/40">
-                {adRoutes.filter((route) => {
-                  const ad = ads.find((item) => item.adId === route.adId);
-                  return !adSearch.trim() || (ad?.name ?? route.adId).toLocaleLowerCase("pt-BR").includes(adSearch.trim().toLocaleLowerCase("pt-BR"));
-                }).map((route) => {
-                  const matched = ads.find((a) => a.adId === route.adId);
-                  const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
-                  return (
-                    <div key={route.adId} className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                        <span className="font-medium truncate">{matched?.name ?? route.adId}</span>
-                        {matched?.status && (
-                          <Badge variant="outline" className="text-[10px] font-normal uppercase">
-                            {matched.status}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={route.enabled ? "success" : "outline"} className="text-xs font-medium">
-                          {route.enabled ? `→ ${route.queueName ?? "Fila geral"}` : "🚫 Não registrar no CRM"}
-                        </Badge>
-                        {canEdit && (
-                          <>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => {
-                                setAdRoute({ adId: route.adId, queueId: route.queueId ?? queues[0]?.id ?? "" });
-                                window.scrollTo({ top: 0, behavior: "smooth" });
-                              }}
-                              className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                  {adRoutes
+                    .filter((route) => {
+                      const ad = ads.find((item) => item.adId === route.adId);
+                      return (
+                        !adSearch.trim() ||
+                        (ad?.name ?? route.adId)
+                          .toLocaleLowerCase("pt-BR")
+                          .includes(adSearch.trim().toLocaleLowerCase("pt-BR"))
+                      );
+                    })
+                    .map((route) => {
+                      const matched = ads.find((a) => a.adId === route.adId);
+                      const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
+                      return (
+                        <div
+                          key={route.adId}
+                          className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                            />
+                            <span className="font-medium truncate">
+                              {matched?.name ?? route.adId}
+                            </span>
+                            {matched?.status && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-normal uppercase"
+                              >
+                                {matched.status}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              variant={route.enabled ? "success" : "outline"}
+                              className="text-xs font-medium"
                             >
-                              Editar
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => void deleteMetaAdRoute(route.adId)}
-                              className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              Excluir
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                              {route.enabled
+                                ? `→ ${route.queueName ?? "Fila geral"}`
+                                : "Não registrar no CRM"}
+                            </Badge>
+                            {canEdit && (
+                              <>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setAdRoute({
+                                      adId: route.adId,
+                                      queueId: route.queueId ?? queues[0]?.id ?? "",
+                                    });
+                                    window.scrollTo({ top: 0, behavior: "smooth" });
+                                  }}
+                                  className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                                >
+                                  Editar
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => void deleteMetaAdRoute(route.adId)}
+                                  className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  Excluir
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </ScrollArea>
             </div>
@@ -791,13 +1137,21 @@ export function QueueControlCenter({
           <DialogPanel className="flex flex-col h-full min-h-0">
             <DialogHeader className="p-5 sm:p-6 border-b border-border/70 bg-card shrink-0">
               <DialogTitle>{editingId ? "Editar fila" : "Criar fila"}</DialogTitle>
-              <DialogDescription>As mudanças afetam os próximos leads distribuídos. Leads já atribuídos mantêm seu histórico.</DialogDescription>
+              <DialogDescription>
+                As mudanças afetam os próximos leads distribuídos. Leads já atribuídos mantêm seu
+                histórico.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 sm:p-6 space-y-4 min-h-0">
               <label className="grid gap-1.5 text-sm font-medium">
                 Nome da fila
-                <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Leads Quentes, Plantão Central" className="w-full" />
+                <Input
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  placeholder="Ex.: Leads Quentes, Plantão Central"
+                  className="w-full"
+                />
               </label>
 
               {/* Unidade Principal */}
@@ -817,15 +1171,19 @@ export function QueueControlCenter({
               {/* Exclusividade de Plantão */}
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <Lightning className="size-4 text-emerald-500 shrink-0" /> Exclusividade de Plantão Agendado ou Ativo
+                  <Lightning className="size-4 text-emerald-500 shrink-0" /> Exclusividade de
+                  Plantão Agendado ou Ativo
                 </p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Se selecionado, os leads direcionados a esta fila serão entregues exclusivamente aos corretores em escala ou ativos neste plantão.
+                  Se selecionado, os leads direcionados a esta fila serão entregues exclusivamente
+                  aos corretores em escala ou ativos neste plantão.
                 </p>
                 <AppSelect
                   aria-label="Exclusividade de Plantão"
                   value={form.exclusiveDutyScheduleId}
-                  onValueChange={(exclusiveDutyScheduleId) => setForm({ ...form, exclusiveDutyScheduleId })}
+                  onValueChange={(exclusiveDutyScheduleId) =>
+                    setForm({ ...form, exclusiveDutyScheduleId })
+                  }
                   options={[
                     { value: "", label: "Nenhum (Fila convencional / Atendimento padrão)" },
                     ...dutySchedules.map((ds) => ({
@@ -840,10 +1198,12 @@ export function QueueControlCenter({
               {branches.length > 1 && (
                 <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
                   <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Buildings className="size-4 text-primary shrink-0" /> Unidades adicionais atendidas por esta fila
+                    <Buildings className="size-4 text-primary shrink-0" /> Unidades adicionais
+                    atendidas por esta fila
                   </p>
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Marque outras unidades que também poderão enviar ou compartilhar corretores para esta fila.
+                    Marque outras unidades que também poderão enviar ou compartilhar corretores para
+                    esta fila.
                   </p>
                   <div className="grid gap-2 pt-1 sm:grid-cols-2">
                     {branches
@@ -851,12 +1211,13 @@ export function QueueControlCenter({
                       .map((branch) => {
                         const isChecked = form.allowedBranchIds.includes(branch.id);
                         return (
-                          <label key={branch.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer min-w-0">
-                            <input
-                              type="checkbox"
+                          <label
+                            key={branch.id}
+                            className="flex items-center gap-2 text-xs font-medium cursor-pointer min-w-0"
+                          >
+                            <Checkbox
                               checked={isChecked}
-                              onChange={() => toggleAllowedBranch(branch.id)}
-                              className="rounded border-input text-primary focus:ring-primary shrink-0"
+                              onCheckedChange={() => toggleAllowedBranch(branch.id)}
                             />
                             <span className="truncate">{branch.name}</span>
                           </label>
@@ -877,7 +1238,9 @@ export function QueueControlCenter({
                       aria-label="Escopo de corretores"
                       size="sm"
                       value={form.brokerScopeMode}
-                      onValueChange={(val) => setForm({ ...form, brokerScopeMode: val as "all" | "selected" })}
+                      onValueChange={(val) =>
+                        setForm({ ...form, brokerScopeMode: val as "all" | "selected" })
+                      }
                       options={[
                         { value: "all", label: "Todos os corretores elegíveis" },
                         { value: "selected", label: "Selecionar corretores específicos" },
@@ -896,13 +1259,14 @@ export function QueueControlCenter({
                         availableBrokersForForm.map((broker) => {
                           const isChecked = form.allowedBrokerIds.includes(broker.id);
                           return (
-                            <label key={broker.id} className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0">
+                            <label
+                              key={broker.id}
+                              className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0"
+                            >
                               <span className="flex items-center gap-2 truncate min-w-0">
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={isChecked}
-                                  onChange={() => toggleAllowedBroker(broker.id)}
-                                  className="rounded border-input text-primary focus:ring-primary shrink-0"
+                                  onCheckedChange={() => toggleAllowedBroker(broker.id)}
                                 />
                                 <span className="truncate">{broker.name}</span>
                               </span>
@@ -923,44 +1287,57 @@ export function QueueControlCenter({
                   </div>
                 ) : (
                   <p className="text-[11px] text-muted-foreground">
-                    Todos os corretores ativos e disponíveis na(s) unidade(s) selecionada(s) participarão da rodada.
+                    Todos os corretores ativos e disponíveis na(s) unidade(s) selecionada(s)
+                    participarão da rodada.
                   </p>
                 )}
               </div>
 
               {/* Modo e Estratégia */}
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-medium">
-                  Modo
-                  <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={form.assignmentMode} onChange={(event) => setForm({ ...form, assignmentMode: event.target.value })}>
-                    <option value="automatic">Automática</option>
-                    <option value="manual">Manual</option>
-                  </select>
-                </label>
-                <label className="grid gap-1.5 text-sm font-medium">
-                  Estratégia
-                  <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={form.assignmentStrategy} onChange={(event) => setForm({ ...form, assignmentStrategy: event.target.value })}>
-                    <option value="capacity">Menor carga</option>
-                    <option value="round_robin">Round robin</option>
-                  </select>
-                </label>
+                <div className="grid gap-1.5 text-sm font-medium">
+                  <span>Modo</span>
+                  <AppSelect
+                    aria-label="Modo de atribuição"
+                    value={form.assignmentMode}
+                    onValueChange={(assignmentMode) => setForm({ ...form, assignmentMode })}
+                    options={[
+                      { value: "automatic", label: "Automática" },
+                      { value: "manual", label: "Manual" },
+                    ]}
+                  />
+                </div>
+                <div className="grid gap-1.5 text-sm font-medium">
+                  <span>Estratégia</span>
+                  <AppSelect
+                    aria-label="Estratégia de atribuição"
+                    value={form.assignmentStrategy}
+                    onValueChange={(assignmentStrategy) => setForm({ ...form, assignmentStrategy })}
+                    options={[
+                      { value: "capacity", label: "Menor carga" },
+                      { value: "round_robin", label: "Round robin" },
+                    ]}
+                  />
+                </div>
               </div>
 
               {/* Qualificação por Bot de IA */}
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-1.5">
                 <label className="flex items-center justify-between text-sm font-semibold text-foreground cursor-pointer">
                   <span className="flex items-center gap-2">
-                    <MagicWand className="size-4 text-primary shrink-0" /> Ativar Qualificação por Bot de IA
+                    <MagicWand className="size-4 text-primary shrink-0" /> Ativar Qualificação por
+                    Bot de IA
                   </span>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={form.aiQualificationEnabled}
-                    onChange={(event) => setForm({ ...form, aiQualificationEnabled: event.target.checked })}
-                    className="size-4 rounded border-input text-primary focus:ring-primary cursor-pointer shrink-0"
+                    onCheckedChange={(checked) =>
+                      setForm({ ...form, aiQualificationEnabled: checked === true })
+                    }
                   />
                 </label>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Quando ativada, o Bot de IA do WhatsApp qualifica automaticamente os leads direcionados a esta fila.
+                  Quando ativada, o Bot de IA do WhatsApp qualifica automaticamente os leads
+                  direcionados a esta fila.
                 </p>
               </div>
 
@@ -968,7 +1345,7 @@ export function QueueControlCenter({
               {campaigns.length > 0 && (
                 <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
                   <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    🎯 Campanhas Meta que enviam leads para esta fila
+                    Campanhas Meta que enviam leads para esta fila
                   </p>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Marque as campanhas que direcionarão leads automaticamente para esta fila:
@@ -977,28 +1354,34 @@ export function QueueControlCenter({
                     {displayedCampaigns.map((c) => {
                       const route = campaignRoutes.find((r) => r.campaignId === c.campaignId);
                       const isAssignedToThisQueue = route?.queueId === editingId && route.enabled;
-                      const isAssignedToOtherQueue = route?.queueId && route.queueId !== editingId && route.enabled;
+                      const isAssignedToOtherQueue =
+                        route?.queueId && route.queueId !== editingId && route.enabled;
                       return (
                         <label
                           key={c.campaignId}
                           className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0"
                         >
                           <span className="flex items-center gap-2 truncate min-w-0">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={isAssignedToThisQueue ?? false}
                               disabled={!editingId || savingCampaignRoute}
-                              onChange={(e) => {
+                              onCheckedChange={(checked) => {
                                 if (editingId) {
-                                  void toggleCampaignForQueue(c.campaignId, editingId, e.target.checked);
+                                  void toggleCampaignForQueue(
+                                    c.campaignId,
+                                    editingId,
+                                    checked === true,
+                                  );
                                 }
                               }}
-                              className="rounded border-input text-primary focus:ring-primary shrink-0"
                             />
                             <span className="truncate">{c.name}</span>
                           </span>
                           {isAssignedToOtherQueue && (
-                            <Badge variant="outline" className="text-[9px] shrink-0 text-muted-foreground">
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] shrink-0 text-muted-foreground"
+                            >
                               Em: {route?.queueName}
                             </Badge>
                           )}
@@ -1015,29 +1398,56 @@ export function QueueControlCenter({
               )}
 
               <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                <input type="checkbox" checked={form.capacityEnabled} onChange={(event) => setForm({ ...form, capacityEnabled: event.target.checked })} className="rounded border-input text-primary focus:ring-primary shrink-0" />
+                <Checkbox
+                  checked={form.capacityEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm({ ...form, capacityEnabled: checked === true })
+                  }
+                />
                 <span>Limitar leads ativos por corretor</span>
-                <InfoTooltip title="Capacidade" description="Quando o limite é atingido, o corretor deixa de ser elegível para novos leads dessa fila." />
+                <InfoTooltip
+                  title="Capacidade"
+                  description="Quando o limite é atingido, o corretor deixa de ser elegível para novos leads dessa fila."
+                />
               </label>
 
               {form.capacityEnabled ? (
                 <label className="grid gap-1.5 text-sm font-medium">
                   Máximo por corretor
-                  <Input type="number" min={1} max={200} value={form.capacityPerBroker} onChange={(event) => setForm({ ...form, capacityPerBroker: event.target.value })} className="w-full" />
+                  <Input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={form.capacityPerBroker}
+                    onChange={(event) =>
+                      setForm({ ...form, capacityPerBroker: event.target.value })
+                    }
+                    className="w-full"
+                  />
                 </label>
               ) : null}
 
-              <label className="grid gap-1.5 text-sm font-medium">
-                Estado
-                <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-                  <option value="active">Ativa</option>
-                  <option value="inactive">Pausada</option>
-                </select>
-              </label>
+              <div className="grid gap-1.5 text-sm font-medium">
+                <span>Estado</span>
+                <AppSelect
+                  aria-label="Estado da fila"
+                  value={form.status}
+                  onValueChange={(status) => setForm({ ...form, status })}
+                  options={[
+                    { value: "active", label: "Ativa" },
+                    { value: "inactive", label: "Pausada" },
+                  ]}
+                />
+              </div>
             </div>
 
             <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 shrink-0 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditorOpen(false)} disabled={saving} className="active:scale-[0.97] transition-transform">
+              <Button
+                variant="outline"
+                onClick={() => setEditorOpen(false)}
+                disabled={saving}
+                className="active:scale-[0.97] transition-transform"
+              >
                 Cancelar
               </Button>
               <Button
@@ -1049,7 +1459,10 @@ export function QueueControlCenter({
                 )}
               >
                 {saving ? (
-                  <><Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> Salvando…</>
+                  <>
+                    <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" />{" "}
+                    Salvando…
+                  </>
                 ) : (
                   "Salvar fila"
                 )}
@@ -1066,64 +1479,103 @@ export function QueueControlCenter({
             <DialogHeader className="p-5 sm:p-6 border-b border-border/70">
               <DialogTitle>Excluir fila</DialogTitle>
               <DialogDescription>
-                {deleteTarget ? `Tem certeza que deseja excluir a fila "${deleteTarget.name}"?` : "Verificando pendências..."}
+                {deleteTarget
+                  ? `Tem certeza que deseja excluir a fila "${deleteTarget.name}"?`
+                  : "Verificando pendências..."}
               </DialogDescription>
             </DialogHeader>
             <div className="p-5 sm:p-6 space-y-4">
               {loadingDependencies ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> Verificando pendências...
+                  <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" />{" "}
+                  Verificando pendências...
                 </div>
               ) : deleteDependencies ? (
                 <div className="space-y-3">
-                  {(deleteDependencies.campaignRoutes.length > 0 || deleteDependencies.adRoutes.length > 0 || deleteDependencies.queuedLeads > 0) ? (
+                  {deleteDependencies.campaignRoutes.length > 0 ||
+                  deleteDependencies.adRoutes.length > 0 ||
+                  deleteDependencies.queuedLeads > 0 ? (
                     <>
                       <p className="text-sm font-medium text-foreground">Pendências encontradas:</p>
                       <div className="space-y-2">
                         {deleteDependencies.campaignRoutes.length > 0 && (
                           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">🎯 {deleteDependencies.campaignRoutes.length} campanha(s) vinculada(s)</p>
+                            <p className="text-xs font-semibold text-warning">
+                              {deleteDependencies.campaignRoutes.length} campanha(s) vinculada(s)
+                            </p>
                             <div className="mt-1 space-y-0.5">
                               {deleteDependencies.campaignRoutes.map((r) => (
-                                <p key={r.campaignId} className="text-[11px] text-muted-foreground">• {r.campaignName ?? r.campaignId}</p>
+                                <p key={r.campaignId} className="text-[11px] text-muted-foreground">
+                                  • {r.campaignName ?? r.campaignId}
+                                </p>
                               ))}
                             </div>
                           </div>
                         )}
                         {deleteDependencies.adRoutes.length > 0 && (
                           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">📢 {deleteDependencies.adRoutes.length} anuncio(s) vinculado(s)</p>
+                            <p className="text-xs font-semibold text-warning">
+                              {deleteDependencies.adRoutes.length} anúncio(s) vinculado(s)
+                            </p>
                             <div className="mt-1 space-y-0.5">
                               {deleteDependencies.adRoutes.map((r) => (
-                                <p key={r.adId} className="text-[11px] text-muted-foreground">• {r.adName ?? r.adId}</p>
+                                <p key={r.adId} className="text-[11px] text-muted-foreground">
+                                  • {r.adName ?? r.adId}
+                                </p>
                               ))}
                             </div>
                           </div>
                         )}
                         {deleteDependencies.queuedLeads > 0 && (
                           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">📋 {deleteDependencies.queuedLeads} lead(s) na fila</p>
-                            <p className="text-[11px] text-muted-foreground">Leaves sem unidade ficarão na inbox geral.</p>
+                            <p className="text-xs font-semibold text-warning">
+                              {deleteDependencies.queuedLeads} lead(s) na fila
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Leaves sem unidade ficarão na inbox geral.
+                            </p>
                           </div>
                         )}
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Nenhuma pendência encontrada. A fila pode ser excluída normalmente.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma pendência encontrada. A fila pode ser excluída normalmente.
+                    </p>
                   )}
                 </div>
               ) : null}
             </div>
             <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={forceDeleting} className="active:scale-[0.97] transition-transform">Cancelar</Button>
-              {deleteDependencies && (deleteDependencies.campaignRoutes.length > 0 || deleteDependencies.adRoutes.length > 0 || deleteDependencies.queuedLeads > 0) ? (
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={forceDeleting}
+                className="active:scale-[0.97] transition-transform"
+              >
+                Cancelar
+              </Button>
+              {deleteDependencies &&
+              (deleteDependencies.campaignRoutes.length > 0 ||
+                deleteDependencies.adRoutes.length > 0 ||
+                deleteDependencies.queuedLeads > 0) ? (
                 <Button
                   variant="destructive"
                   onClick={() => void forceDeleteQueue()}
                   disabled={forceDeleting}
-                  className={cn("gap-1.5 active:scale-[0.97] transition-all duration-150", forceDeleting && "pointer-events-none")}
+                  className={cn(
+                    "gap-1.5 active:scale-[0.97] transition-all duration-150",
+                    forceDeleting && "pointer-events-none",
+                  )}
                 >
-                  {forceDeleting ? <><Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" /> Desvinculando...</> : "Desvincular e excluir fila"}
+                  {forceDeleting ? (
+                    <>
+                      <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
+                      Desvinculando...
+                    </>
+                  ) : (
+                    "Desvincular e excluir fila"
+                  )}
                 </Button>
               ) : (
                 <Button
@@ -1146,37 +1598,77 @@ export function QueueControlCenter({
           <DialogPanel className="flex flex-col h-full min-h-0">
             <DialogHeader className="p-5 sm:p-6 border-b border-border/70 bg-card shrink-0">
               <DialogTitle>Simular distribuição</DialogTitle>
-              <DialogDescription>Veja a decisão provável antes de alterar uma regra. A simulação não cria eventos nem altera a fila.</DialogDescription>
+              <DialogDescription>
+                Veja a decisão provável antes de alterar uma regra. A simulação não cria eventos nem
+                altera a fila.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 sm:p-6 space-y-4 min-h-0">
               <div className="grid gap-3 sm:grid-cols-2">
-                <AppSelect aria-label="Unidade da simulação" value={simulationForm.branchId} onValueChange={(branchId) => setSimulationForm({ ...simulationForm, branchId, queueId: "" })} options={branches.map((branch) => ({ value: branch.id, label: branch.name }))} />
-                <AppSelect aria-label="Fila da simulação" value={simulationForm.queueId} onValueChange={(queueId) => setSimulationForm({ ...simulationForm, queueId })} options={[{ value: "", label: "Fila padrão da unidade" }, ...branchQueues.map((queue) => ({ value: queue.id, label: queue.name }))]} />
+                <AppSelect
+                  aria-label="Unidade da simulação"
+                  value={simulationForm.branchId}
+                  onValueChange={(branchId) =>
+                    setSimulationForm({ ...simulationForm, branchId, queueId: "" })
+                  }
+                  options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+                />
+                <AppSelect
+                  aria-label="Fila da simulação"
+                  value={simulationForm.queueId}
+                  onValueChange={(queueId) => setSimulationForm({ ...simulationForm, queueId })}
+                  options={[
+                    { value: "", label: "Fila padrão da unidade" },
+                    ...branchQueues.map((queue) => ({ value: queue.id, label: queue.name })),
+                  ]}
+                />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm font-medium">
-                  Temperatura
-                  <select className="h-9 w-full rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-primary" value={simulationForm.temperature} onChange={(event) => setSimulationForm({ ...simulationForm, temperature: event.target.value })}>
-                    <option value="hot">Quente</option>
-                    <option value="warm">Morno</option>
-                    <option value="cold">Frio</option>
-                  </select>
-                </label>
+                <div className="grid gap-1.5 text-sm font-medium">
+                  <span>Temperatura</span>
+                  <AppSelect
+                    aria-label="Temperatura do lead simulado"
+                    value={simulationForm.temperature}
+                    onValueChange={(temperature) =>
+                      setSimulationForm({ ...simulationForm, temperature })
+                    }
+                    options={[
+                      { value: "hot", label: "Quente" },
+                      { value: "warm", label: "Morno" },
+                      { value: "cold", label: "Frio" },
+                    ]}
+                  />
+                </div>
                 <label className="grid gap-1.5 text-sm font-medium">
                   Score
-                  <Input type="number" min={0} max={100} value={simulationForm.score} onChange={(event) => setSimulationForm({ ...simulationForm, score: event.target.value })} className="w-full" />
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={simulationForm.score}
+                    onChange={(event) =>
+                      setSimulationForm({ ...simulationForm, score: event.target.value })
+                    }
+                    className="w-full"
+                  />
                 </label>
               </div>
 
               <Button
-                className={cn("w-fit gap-1.5 active:scale-[0.97] transition-all duration-150", simulating && "pointer-events-none")}
+                className={cn(
+                  "w-fit gap-1.5 active:scale-[0.97] transition-all duration-150",
+                  simulating && "pointer-events-none",
+                )}
                 onClick={runSimulation}
                 disabled={simulating || !simulationForm.branchId}
               >
                 {simulating ? (
-                  <><Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> Calculando…</>
+                  <>
+                    <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" />{" "}
+                    Calculando…
+                  </>
                 ) : (
                   "Executar simulação"
                 )}
@@ -1186,12 +1678,18 @@ export function QueueControlCenter({
                 <div className="rounded-xl border border-border bg-muted/30 p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="size-4 text-success" />
-                    <p className="text-sm font-semibold">{simulation.queue?.name ?? "Sem fila resolvida"}</p>
+                    <p className="text-sm font-semibold">
+                      {simulation.queue?.name ?? "Sem fila resolvida"}
+                    </p>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">{simulation.reason}</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                    {simulation.reason}
+                  </p>
                   {simulation.selected ? (
                     <p className="mt-3 text-sm">
-                      Destino provável: <strong>{simulation.selected.name}</strong> · {simulation.selected.activeLeads} leads ativos{simulation.selected.capacity ? ` de ${simulation.selected.capacity}` : ""}
+                      Destino provável: <strong>{simulation.selected.name}</strong> ·{" "}
+                      {simulation.selected.activeLeads} leads ativos
+                      {simulation.selected.capacity ? ` de ${simulation.selected.capacity}` : ""}
                     </p>
                   ) : null}
                   {simulation.eligible?.length ? (
@@ -1199,7 +1697,10 @@ export function QueueControlCenter({
                       {simulation.eligible.map((broker) => (
                         <div key={broker.id} className="flex items-center justify-between text-xs">
                           <span>{broker.name}</span>
-                          <span className="font-mono text-muted-foreground">{broker.activeLeads}{broker.capacity ? `/${broker.capacity}` : ""} · score {broker.score}</span>
+                          <span className="font-mono text-muted-foreground">
+                            {broker.activeLeads}
+                            {broker.capacity ? `/${broker.capacity}` : ""} · score {broker.score}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -1209,7 +1710,9 @@ export function QueueControlCenter({
             </div>
 
             <DialogFooter className="p-4 sm:p-5 border-t border-border/70 bg-muted/20 shrink-0 flex items-center justify-end">
-              <Button variant="outline" onClick={() => setSimulatorOpen(false)}>Fechar</Button>
+              <Button variant="outline" onClick={() => setSimulatorOpen(false)}>
+                Fechar
+              </Button>
             </DialogFooter>
           </DialogPanel>
         </DialogPopup>
@@ -1218,7 +1721,15 @@ export function QueueControlCenter({
   );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: ComponentType<{ className?: string }>; label: string; value: number }) {
+function Metric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+}) {
   return (
     <div className="rounded-lg bg-muted/50 px-2 py-2">
       <Icon className="mx-auto size-3.5 text-muted-foreground" />

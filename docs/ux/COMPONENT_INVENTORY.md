@@ -1,5 +1,10 @@
 # Inventário de Componentes de Interface — Âncora CRM
 
+> Atualização 2026-09-05: o inventário executável por rota está em
+> `docs/ux/audits/ROUTE_COMPONENT_CATALOG.json`; o destino, lotes e gates estão
+> em `COMPONENT_STANDARDIZATION_PLAN.md`; o contrato de uso está em
+> `DESIGN_SYSTEM_MANUAL.md`.
+
 **Data:** 2026-09-04  
 **Etapa:** UX-1A (Auditoria)  
 **Diretórios Auditados:** `src/components/ui/`, `src/components/unlumen-ui/`, `src/components/`

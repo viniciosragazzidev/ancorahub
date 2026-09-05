@@ -1,16 +1,10 @@
-"use client";
-
-import { useId } from "react";
-import { motion } from "motion/react";
-import { Area, AreaChart } from "recharts";
 import { ArrowDownRight, ArrowUpRight } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { MiniDonut } from "./mini-donut";
-import { cardItemVariants } from "@/shared/animations";
+import { MetricSparkline } from "./metric-sparkline";
 
 export type StatCardProps = {
   /** Rótulo exibido no topo do card */
@@ -80,23 +74,8 @@ export function StatCard({
   animationDelay = 0,
   variant = "default",
 }: StatCardProps) {
-  const uniqueId = useId().replace(/:/g, "");
   const dataKey = sparklineDataKey || "value";
   const lineColor = sparklineColor || "var(--chart-1)";
-
-  const formattedSparklineData = (sparklineData ?? []).map((item, idx) => {
-    if (typeof item === "number") {
-      return { [dataKey]: item, index: idx };
-    }
-    return item;
-  });
-
-  const chartConfig = {
-    [dataKey]: {
-      label,
-      color: lineColor,
-    },
-  } satisfies ChartConfig;
 
   const resolvedVariant =
     changeVariant ??
@@ -163,27 +142,7 @@ export function StatCard({
           )}
         </div>
         {sparklineData && sparklineData.length > 0 ? (
-          <div className="h-10 w-24 shrink-0 overflow-hidden">
-            <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
-              <AreaChart data={formattedSparklineData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-                <defs>
-                  <linearGradient id={`sparkline-grad-${uniqueId}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={lineColor} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={lineColor} stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <Area
-                  type="monotone"
-                  dataKey={dataKey}
-                  stroke={lineColor}
-                  strokeWidth={2}
-                  fill={`url(#sparkline-grad-${uniqueId})`}
-                  isAnimationActive={true}
-                  dot={false}
-                />
-              </AreaChart>
-            </ChartContainer>
-          </div>
+          <MetricSparkline label={label} data={sparklineData} color={lineColor} dataKey={dataKey} />
         ) : chartSegments && chartSegments.length > 0 ? (
           <MiniDonut segments={chartSegments} showCenterText={false} />
         ) : null}
@@ -191,19 +150,11 @@ export function StatCard({
     </Card>
   );
 
-  if (!animated) return card;
-
-  return (
-    <motion.div
-      variants={cardItemVariants}
-      initial="hidden"
-      animate="visible"
-      transition={{ delay: animationDelay }}
-      className="h-full"
-    >
+  return animated ? (
+    <div data-animated="true" data-animation-delay={animationDelay} className="h-full">
       {card}
-    </motion.div>
-  );
+    </div>
+  ) : card;
 }
 
 // ─── Alias para retrocompatibilidade ─────────────────────────────────────────

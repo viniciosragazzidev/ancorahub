@@ -247,14 +247,14 @@ export function DocumentsWorkspace({
         if (s === "approved") {
           return (
             <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-              Aprovado ✓
+                                Aprovado
             </Badge>
           );
         }
         if (s === "rejected") {
           return (
             <Badge variant="destructive" className="font-semibold text-[11px]">
-              Rejeitado ✕
+                                Rejeitado
             </Badge>
           );
         }

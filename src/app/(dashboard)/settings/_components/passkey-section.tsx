@@ -79,7 +79,7 @@ export function PasskeySection() {
       }
 
       await recordSecurityAuditAction("cadastrou_passkey");
-      toast.success("Biometria cadastrada com sucesso! 🎉");
+          toast.success("Biometria cadastrada com sucesso.");
       setName("");
       await refresh();
     } catch (error) {
@@ -181,13 +181,15 @@ export function PasskeySection() {
         {/* Optional Name & Advanced Options Toggle for Desktop */}
         {!isMobile && (
           <div className="mt-4 border-t border-border/50 pt-4">
-            <button
+            <Button
               type="button"
+              variant="link"
+              size="sm"
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
             >
               {showAdvanced ? "Ocultar opções avançadas" : "Opções avançadas (nome, tipo de chave)"}
-            </button>
+            </Button>
 
             {showAdvanced && (
               <div className="mt-3 flex flex-wrap items-end gap-3 animate-fade-in">

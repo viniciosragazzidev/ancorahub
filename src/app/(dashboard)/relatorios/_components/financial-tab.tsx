@@ -1,6 +1,8 @@
 import type { PeriodValue } from "@/shared/period";
 import type { FinancialOverview } from "@/features/reports/metrics/metrics-service";
 import { CurrencyCircleDollar, Buildings, Users, ChartBar } from "@/components/huge-icons";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface FinancialTabProps {
   readonly period: PeriodValue;
@@ -15,34 +17,34 @@ function SummaryTable({ title, icon: Icon, rows }: { title: string; icon: typeof
         <Icon className="size-3.5" aria-hidden="true" />
         <h2 id={`fin-${title.toLowerCase().replace(/\s+/g, "-")}-title`} className="font-medium text-foreground">{title}</h2>
       </div>
-      <div className="rounded-lg border border-border bg-card shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-              <th className="px-4 py-3">{title === "Por canal" ? "Canal" : title === "Por corretor" ? "Corretor" : "Unidade"}</th>
-              <th className="px-4 py-3 text-right">Vendas</th>
-              <th className="px-4 py-3 text-right">Receita</th>
-              <th className="px-4 py-3 text-right">Ticket médio</th>
-            </tr>
-          </thead>
-          <tbody>
+      <DataTableFrame>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{title === "Por canal" ? "Canal" : title === "Por corretor" ? "Corretor" : "Unidade"}</TableHead>
+              <TableHead className="text-right">Vendas</TableHead>
+              <TableHead className="text-right">Receita</TableHead>
+              <TableHead className="text-right">Ticket médio</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((row) => (
-              <tr key={row.label} className="border-b border-border last:border-0">
-                <td className="px-4 py-2.5 font-medium">{row.label}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{row.sales}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">
+              <TableRow key={row.label}>
+                <TableCell className="font-medium">{row.label}</TableCell>
+                <TableCell className="text-right tabular-nums">{row.sales}</TableCell>
+                <TableCell className="text-right tabular-nums">
                   {row.revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </td>
-                <td className="px-4 py-2.5 text-right tabular-nums">
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
                   {row.sales > 0
                     ? (row.revenue / row.sales).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
                     : "—"}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </DataTableFrame>
     </section>
   );
 }

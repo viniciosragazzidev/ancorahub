@@ -433,7 +433,7 @@ function RoleEditorDialog({
                 : "Defina um nome, abrangência e quais permissões de leitura/escrita este cargo terá no CRM."}
             </DialogDescription>
           </div>
-          <DialogClose render={<button aria-label="Fechar" className="rounded-md p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><X className="size-4" /></button>} />
+          <DialogClose render={<Button type="button" variant="ghost" size="icon-sm" aria-label="Fechar" className="rounded-md p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><X className="size-4" /></Button>} />
         </div>
 
         <form onSubmit={submit} className="flex flex-1 flex-col overflow-hidden min-h-0">

@@ -1,6 +1,8 @@
 import type { PeriodValue } from "@/shared/period";
 import type { BrokerPerformanceRow } from "@/features/reports/metrics/metrics-service";
 import { Users } from "@/components/huge-icons";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface TeamTabProps {
   readonly period: PeriodValue;
@@ -24,40 +26,40 @@ export function TeamTab({ period, teamPerformance }: TeamTabProps) {
             <p className="text-sm font-medium text-muted-foreground">Nenhum dado de equipe disponível para este período.</p>
           </div>
         ) : (
-          <div data-slot="report-card" className="report-card rounded-lg border border-border bg-card shadow-sm overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-                  <th className="px-4 py-3">Corretor</th>
-                  <th className="px-4 py-3 text-right">Recebidos</th>
-                  <th className="px-4 py-3 text-right">Convertidos</th>
-                  <th className="px-4 py-3 text-right">Conversão</th>
-                  <th className="px-4 py-3 text-right">SLA 1º contato</th>
-                  <th className="px-4 py-3 text-right">Parados</th>
-                  <th className="px-4 py-3 text-right">Vendas</th>
-                </tr>
-              </thead>
-              <tbody>
+          <DataTableFrame data-slot="report-card" className="report-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Corretor</TableHead>
+                  <TableHead className="text-right">Recebidos</TableHead>
+                  <TableHead className="text-right">Convertidos</TableHead>
+                  <TableHead className="text-right">Conversão</TableHead>
+                  <TableHead className="text-right">SLA 1º contato</TableHead>
+                  <TableHead className="text-right">Parados</TableHead>
+                  <TableHead className="text-right">Vendas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {teamPerformance.map((row) => (
-                  <tr key={row.brokerId} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2.5 font-medium" title={row.brokerId}>{row.brokerName}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.received}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.converted}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.conversionRate.toFixed(1)}%</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.slaRate.toFixed(1)}%</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
+                  <TableRow key={row.brokerId}>
+                    <TableCell className="font-medium" title={row.brokerId}>{row.brokerName}</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.received}</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.converted}</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.conversionRate.toFixed(1)}%</TableCell>
+                    <TableCell className="text-right tabular-nums">{row.slaRate.toFixed(1)}%</TableCell>
+                    <TableCell className="text-right tabular-nums">
                       {row.stagnant > 0 ? (
                         <span className="text-red-600 font-medium">{row.stagnant}</span>
                       ) : (
                         <span className="text-muted-foreground">0</span>
                       )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.sales}</td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{row.sales}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </DataTableFrame>
         )}
       </section>
     </>

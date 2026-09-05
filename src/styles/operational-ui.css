@@ -17,11 +17,11 @@
   --ui-button-radius: var(--radius-control);
   --ui-control-height: 2.25rem;
   --ui-control-font-size: var(--text-sm-font-size);
-  --sidebar: #102124;
-  --sidebar-foreground: #dbe6e6;
-  --sidebar-accent: #243b3e;
+  --sidebar: #050505;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-accent: #171717;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #304649;
+  --sidebar-border: #262626;
 }
 
 :root.dark:has([data-ui-refinement="clean"]) {

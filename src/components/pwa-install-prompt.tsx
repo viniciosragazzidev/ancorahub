@@ -152,7 +152,7 @@ export function PwaInstallPrompt() {
                         onClick={() => {
                           toast.info("Como instalar no iOS", {
                             description:
-                              "Abra o Safari, toque no ícone Compartilhar (📤) e selecione \"Adicionar à Tela de Início\".",
+        "Abra o Safari, toque no botão Compartilhar e selecione \"Adicionar à Tela de Início\".",
                             duration: 6000,
                           });
                           rememberDismissal();

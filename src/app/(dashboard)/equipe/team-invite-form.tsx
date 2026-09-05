@@ -41,45 +41,49 @@ export function TeamInviteForm({
         <legend className="text-sm font-medium">Papel a convidar</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {canInviteDirector ? (
-            <button
+            <Button
               aria-pressed={role === "director"}
-              className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+              className="h-auto flex-col items-start gap-0.5 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
               onClick={() => setRole("director")}
               type="button"
+              variant="outline"
             >
               <span className="block text-xs font-medium">Diretor</span>
               <span className="text-[10px] text-muted-foreground">Acesso global.</span>
-            </button>
+            </Button>
           ) : null}
           {canInviteManager ? (
-            <button
+            <Button
               aria-pressed={role === "manager"}
-              className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+              className="h-auto flex-col items-start gap-0.5 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
               onClick={() => setRole("manager")}
               type="button"
+              variant="outline"
             >
               <span className="block text-xs font-medium">Gestor</span>
               <span className="text-[10px] text-muted-foreground">Multi-unidade.</span>
-            </button>
+            </Button>
           ) : null}
-          <button
+          <Button
             aria-pressed={role === "supervisor"}
-            className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+            className="h-auto flex-col items-start gap-0.5 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
             onClick={() => setRole("supervisor")}
             type="button"
+            variant="outline"
           >
             <span className="block text-xs font-medium">Supervisor</span>
             <span className="text-[10px] text-muted-foreground">Sua unidade.</span>
-          </button>
-          <button
+          </Button>
+          <Button
             aria-pressed={role === "broker"}
-            className="rounded-lg border border-border bg-muted/30 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+            className="h-auto flex-col items-start gap-0.5 p-2.5 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
             onClick={() => setRole("broker")}
             type="button"
+            variant="outline"
           >
             <span className="block text-xs font-medium">Corretor</span>
             <span className="text-[10px] text-muted-foreground">Carteira própria.</span>
-          </button>
+          </Button>
         </div>
       </fieldset>
       <div className="space-y-2">

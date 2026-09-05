@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableViewOptions } from "./data-table-view-options";
+import { DataTableFrame, dataTableStyles } from "./data-table-frame";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -125,15 +126,15 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-[var(--radius-card)] border border-border/75 bg-card">
+      <DataTableFrame>
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-transparent border-b border-border">
+            <TableHeader className={dataTableStyles.header}>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="h-10 border-b border-border hover:bg-transparent">
+                <TableRow key={headerGroup.id} className={dataTableStyles.headerRow}>
                   {headerGroup.headers.map((header) => {
                     return (
-                      <TableHead key={header.id} className="h-9 px-3.5 font-medium text-xs text-muted-foreground">
+                      <TableHead key={header.id} className={dataTableStyles.head}>
                         {header.isPlaceholder
                           ? null
                           : flexRender(
@@ -146,21 +147,21 @@ export function DataTable<TData, TValue>({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody>
+            <TableBody className={dataTableStyles.body}>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
                     className={cn(
-                      "group/row h-12 border-b border-border/70 transition-colors duration-[var(--duration-quick)] hover:bg-muted/40 motion-reduce:transition-none",
+                      `group/row h-12 ${dataTableStyles.row}`,
                       onRowClick && "cursor-pointer",
                       getRowClassName?.(row.original)
                     )}
                     onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-4 py-2.5 text-sm font-normal text-foreground">
+                      <TableCell key={cell.id} className={dataTableStyles.cell}>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()
@@ -188,7 +189,7 @@ export function DataTable<TData, TValue>({
         </div>
 
         {showPagination && <DataTablePagination table={table} />}
-      </div>
+      </DataTableFrame>
     </div>
   );
 }
