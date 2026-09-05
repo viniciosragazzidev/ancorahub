@@ -20,13 +20,14 @@ const MAX_BAR_WIDTH = 100;
 
 interface FunnelSectionProps {
   readonly funnel: FunnelSnapshot;
+  readonly className?: string;
 }
 
-export function FunnelSection({ funnel }: FunnelSectionProps) {
+export function FunnelSection({ funnel, className }: FunnelSectionProps) {
   const maxReached = Math.max(...funnel.rows.map((r) => r.reached), 1);
 
   return (
-    <section aria-labelledby="funnel-title">
+    <section aria-labelledby="funnel-title" className={className}>
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <TrendUp className="size-3.5" aria-hidden="true" />
         <h2 id="funnel-title" className="font-medium text-foreground">Funil de 8 estágios</h2>
@@ -40,8 +41,8 @@ export function FunnelSection({ funnel }: FunnelSectionProps) {
             const barWidth = Math.round((row.reached / maxReached) * MAX_BAR_WIDTH);
             const label = LEAD_STATUS_LABELS[row.stage] ?? row.stage;
             return (
-              <div key={row.stage} className="flex items-center gap-3">
-                <span className="w-40 shrink-0 truncate text-sm font-medium" title={label}>
+              <div key={row.stage} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 sm:flex sm:gap-3">
+                <span className="col-span-2 truncate text-xs font-medium sm:w-40 sm:shrink-0 sm:text-sm" title={label}>
                   {label}
                 </span>
                 <div className="relative h-6 flex-1 overflow-hidden rounded bg-muted">
@@ -64,8 +65,8 @@ export function FunnelSection({ funnel }: FunnelSectionProps) {
         </div>
 
         {funnel.lost > 0 && (
-          <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
-            <span className="w-40 shrink-0 truncate text-sm font-medium text-red-600">Perdidos</span>
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 sm:flex-nowrap">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-red-600 sm:w-40 sm:flex-none sm:shrink-0">Perdidos</span>
             <span className="text-sm tabular-nums text-red-600">{funnel.lost}</span>
             <span className="text-xs text-muted-foreground">
               ({((funnel.lost / funnel.received) * 100).toFixed(1)}% do total)

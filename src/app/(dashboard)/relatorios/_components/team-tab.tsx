@@ -2,6 +2,7 @@ import type { PeriodValue } from "@/shared/period";
 import type { BrokerPerformanceRow } from "@/features/reports/metrics/metrics-service";
 import { Users } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface TeamTabProps {
@@ -26,8 +27,8 @@ export function TeamTab({ period, teamPerformance }: TeamTabProps) {
             <p className="text-sm font-medium text-muted-foreground">Nenhum dado de equipe disponível para este período.</p>
           </div>
         ) : (
-          <DataTableFrame data-slot="report-card" className="report-card">
-            <Table>
+          <ResponsiveDataView
+            desktop={<DataTableFrame data-slot="report-card" className="report-card"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Corretor</TableHead>
@@ -58,8 +59,25 @@ export function TeamTab({ period, teamPerformance }: TeamTabProps) {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </DataTableFrame>
+            </Table></DataTableFrame>}
+            mobile={
+              <MobileDataList>
+                {teamPerformance.map((row) => (
+                  <MobileDataListItem key={row.brokerId}>
+                    <h3 className="mb-2.5 truncate text-sm font-semibold text-foreground">{row.brokerName}</h3>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <MobileDataRow label="Recebidos" value={row.received} />
+                      <MobileDataRow label="Convertidos" value={row.converted} />
+                      <MobileDataRow label="Conversão" value={`${row.conversionRate.toFixed(1)}%`} />
+                      <MobileDataRow label="SLA 1º contato" value={`${row.slaRate.toFixed(1)}%`} />
+                      <MobileDataRow label="Parados" value={<span className={row.stagnant > 0 ? "text-destructive" : undefined}>{row.stagnant}</span>} />
+                      <MobileDataRow label="Vendas" value={row.sales} />
+                    </div>
+                  </MobileDataListItem>
+                ))}
+              </MobileDataList>
+            }
+          />
         )}
       </section>
     </>

@@ -32,7 +32,7 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
           <span aria-hidden="true">•</span>
           <span>Últimos {period} dias</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-5">
           <KpiComparisonCard
             label="Conversão"
             value={`${commercial.conversion.rate.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
@@ -81,9 +81,9 @@ export function OverviewTab({ period, commercial, funnel, attention }: OverviewT
         </div>
       </section>
 
-      <FunnelSection funnel={funnel} />
+      <FunnelSection className="max-[559px]:order-3" funnel={funnel} />
 
-      <AttentionSection attention={attention} period={period} />
+      <AttentionSection attention={attention} className="max-[559px]:order-2" period={period} />
     </>
   );
 }

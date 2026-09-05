@@ -2,6 +2,7 @@ import type { PeriodValue } from "@/shared/period";
 import type { FinancialOverview } from "@/features/reports/metrics/metrics-service";
 import { CurrencyCircleDollar, Buildings, Users, ChartBar } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface FinancialTabProps {
@@ -17,8 +18,8 @@ function SummaryTable({ title, icon: Icon, rows }: { title: string; icon: typeof
         <Icon className="size-3.5" aria-hidden="true" />
         <h2 id={`fin-${title.toLowerCase().replace(/\s+/g, "-")}-title`} className="font-medium text-foreground">{title}</h2>
       </div>
-      <DataTableFrame>
-        <Table>
+      <ResponsiveDataView
+        desktop={<DataTableFrame><Table>
           <TableHeader>
             <TableRow>
               <TableHead>{title === "Por canal" ? "Canal" : title === "Por corretor" ? "Corretor" : "Unidade"}</TableHead>
@@ -43,8 +44,22 @@ function SummaryTable({ title, icon: Icon, rows }: { title: string; icon: typeof
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-      </DataTableFrame>
+        </Table></DataTableFrame>}
+        mobile={
+          <MobileDataList>
+            {rows.map((row) => (
+              <MobileDataListItem key={row.label}>
+                <h3 className="mb-2.5 truncate text-sm font-semibold text-foreground">{row.label}</h3>
+                <div className="space-y-2">
+                  <MobileDataRow label="Vendas" value={row.sales} />
+                  <MobileDataRow label="Receita" value={row.revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} />
+                  <MobileDataRow label="Ticket médio" value={row.sales > 0 ? (row.revenue / row.sales).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"} />
+                </div>
+              </MobileDataListItem>
+            ))}
+          </MobileDataList>
+        }
+      />
     </section>
   );
 }

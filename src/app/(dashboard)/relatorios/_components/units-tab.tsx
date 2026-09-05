@@ -2,6 +2,7 @@ import type { PeriodValue } from "@/shared/period";
 import type { UnitPerformanceRow } from "@/features/reports/metrics/metrics-service";
 import { Buildings } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface UnitsTabProps {
@@ -25,8 +26,8 @@ export function UnitsTab({ period, units }: UnitsTabProps) {
           <p className="text-sm font-medium text-muted-foreground">Nenhum dado de unidade disponível para este período.</p>
         </div>
       ) : (
-        <DataTableFrame>
-          <Table>
+        <ResponsiveDataView
+          desktop={<DataTableFrame><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Unidade</TableHead>
@@ -49,8 +50,24 @@ export function UnitsTab({ period, units }: UnitsTabProps) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </DataTableFrame>
+          </Table></DataTableFrame>}
+          mobile={
+            <MobileDataList>
+              {units.map((row) => (
+                <MobileDataListItem key={row.branchId}>
+                  <h3 className="mb-2.5 truncate text-sm font-semibold text-foreground">{row.branchName}</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <MobileDataRow label="Leads" value={row.leads} />
+                    <MobileDataRow label="Convertidos" value={row.converted} />
+                    <MobileDataRow label="Conversão" value={`${row.conversionRate.toFixed(1)}%`} />
+                    <MobileDataRow label="Vendas" value={row.sales} />
+                    <MobileDataRow className="col-span-2" label="SLA 1º contato" value={`${row.slaRate.toFixed(1)}%`} />
+                  </div>
+                </MobileDataListItem>
+              ))}
+            </MobileDataList>
+          }
+        />
       )}
     </section>
   );

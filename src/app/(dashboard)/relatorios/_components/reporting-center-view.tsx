@@ -73,10 +73,10 @@ export default async function ReportingCenterView({
     <>
       <DashboardHeader
         breadcrumb="Gestão comercial"
-        title="Relatórios"
+        title="Painel"
         rightSlot={<PeriodSelect value={period} />}
       />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         <ViewScopeContext role={context.role} />
 
         <ReportTabs tabs={tabs} active={currentTab} period={period} />

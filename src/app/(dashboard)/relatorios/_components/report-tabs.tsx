@@ -1,5 +1,6 @@
-import Link from "next/link";
-import { cn } from "@/lib/utils";
+"use client";
+
+import { PageTabs } from "@/components/foundations/page-tabs";
 import type { ReportTabId } from "@/features/reports/metrics/metric-catalog";
 
 const TAB_LABELS: Record<ReportTabId, string> = {
@@ -18,27 +19,10 @@ interface ReportTabsProps {
 
 export function ReportTabs({ tabs, active, period }: ReportTabsProps) {
   return (
-    <nav aria-label="Abas de relatórios" className="flex flex-wrap items-center gap-1.5">
-      {tabs.map((tab) => {
-        const isCurrent = active === tab;
-
-        return (
-          <Link
-            key={tab}
-            href={`/dashboard?period=${period}&tab=${tab}`}
-            className={cn(
-              "relative flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              isCurrent
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
-            )}
-            aria-current={isCurrent ? "page" : undefined}
-          >
-            <span>{TAB_LABELS[tab]}</span>
-          </Link>
-        );
-      })}
-    </nav>
+    <PageTabs
+      active={active}
+      hrefBuilder={(tab) => `/dashboard?period=${period}&tab=${tab}`}
+      tabs={tabs.map((tab) => ({ id: tab, label: TAB_LABELS[tab] }))}
+    />
   );
 }

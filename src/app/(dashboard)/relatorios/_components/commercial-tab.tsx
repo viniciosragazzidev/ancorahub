@@ -7,6 +7,7 @@ import { AttentionSection } from "./attention-section";
 import { comparisonDelta } from "@/features/reports/metrics/metrics-math";
 import { TrendUp, Target, Users, ChartBar, CurrencyCircleDollar } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CommercialTabProps {
@@ -36,7 +37,7 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
           <span aria-hidden="true">•</span>
           <span>Últimos {period} dias</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-5">
           <KpiComparisonCard
             label="Conversão"
             value={`${overview.conversion.rate.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
@@ -85,17 +86,17 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
         </div>
       </section>
 
-      <FunnelSection funnel={funnel} />
+      <FunnelSection className="max-[559px]:order-3" funnel={funnel} />
 
-      <AttentionSection attention={attention} period={period} />
+      <AttentionSection attention={attention} className="max-[559px]:order-2" period={period} />
 
-      <section aria-labelledby="source-performance-title">
+      <section aria-labelledby="source-performance-title" className="max-[559px]:order-4">
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <ChartBar className="size-3.5" aria-hidden="true" />
           <h2 id="source-performance-title" className="font-medium text-foreground">Desempenho por canal</h2>
         </div>
-        <DataTableFrame>
-          <Table>
+        <ResponsiveDataView
+          desktop={<DataTableFrame><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Canal</TableHead>
@@ -119,8 +120,26 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
                 );
               })}
             </TableBody>
-          </Table>
-        </DataTableFrame>
+          </Table></DataTableFrame>}
+          mobile={
+            <MobileDataList>
+              {sourcePerformance.map((row) => {
+                const convRate = row.leads > 0 ? ((row.converted / row.leads) * 100).toFixed(1) : "0,0";
+                return (
+                  <MobileDataListItem key={row.source}>
+                    <h3 className="mb-2.5 text-sm font-semibold text-foreground">{sourceLabel(row.source)}</h3>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <MobileDataRow label="Leads" value={row.leads} />
+                      <MobileDataRow label="Convertidos" value={row.converted} />
+                      <MobileDataRow label="Conversão" value={`${convRate}%`} />
+                      <MobileDataRow label="Vendas" value={row.sales} />
+                    </div>
+                  </MobileDataListItem>
+                );
+              })}
+            </MobileDataList>
+          }
+        />
       </section>
     </>
   );

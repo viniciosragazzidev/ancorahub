@@ -7,13 +7,14 @@ import { Warning, ArrowUpRight } from "@/components/huge-icons";
 interface AttentionSectionProps {
   readonly attention: AttentionSnapshot;
   readonly period: PeriodValue;
+  readonly className?: string;
 }
 
-export function AttentionSection({ attention, period }: AttentionSectionProps) {
+export function AttentionSection({ attention, period, className }: AttentionSectionProps) {
   if (attention.items.length === 0) return null;
 
   return (
-    <section aria-labelledby="attention-title">
+    <section aria-labelledby="attention-title" className={className}>
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Warning className="size-3.5" aria-hidden="true" />
         <h2 id="attention-title" className="font-medium text-foreground">O que exige atenção</h2>

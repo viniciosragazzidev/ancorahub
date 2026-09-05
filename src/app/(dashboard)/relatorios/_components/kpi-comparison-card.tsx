@@ -63,7 +63,7 @@ export function KpiComparisonCard({
   isCurrency,
 }: KpiComparisonCardProps) {
   return (
-    <div data-slot="report-card" className="report-card ui-metric-card p-4">
+    <div data-slot="report-card" className="report-card ui-metric-card min-w-0 p-3 sm:p-4">
       <div className="flex items-center justify-between">
         <div className={cn("ui-metric-card-icon flex size-9 items-center justify-center", iconClassName)}>
           <Icon className="size-4" />
@@ -71,7 +71,7 @@ export function KpiComparisonCard({
         {delta && <DeltaBadge delta={delta} unit={isCurrency ? "currency" : "number"} />}
       </div>
       <div className="mt-3">
-        <p className="ui-metric-card-value text-2xl font-semibold">{value}</p>
+        <p className="ui-metric-card-value truncate text-lg font-semibold sm:text-2xl" title={String(value)}>{value}</p>
         <p className="ui-metric-card-label">{label}</p>
       </div>
       <p className="ui-metric-card-label mt-1">{sublabel}</p>
