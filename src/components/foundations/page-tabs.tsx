@@ -17,6 +17,7 @@ export interface PageTabsProps {
   tabs: readonly PageTabItem[];
   active: string;
   onTabChange?: (tabId: string) => void;
+  onTabIntent?: (tabId: string) => void;
   hrefBuilder?: (tabId: string) => string;
   className?: string;
 }
@@ -25,6 +26,7 @@ export function PageTabs({
   tabs,
   active,
   onTabChange,
+  onTabIntent,
   hrefBuilder,
   className,
 }: PageTabsProps) {
@@ -47,6 +49,8 @@ export function PageTabs({
               key={tab.id}
               href={hrefBuilder(tab.id)}
               scroll={false}
+              onMouseEnter={() => onTabIntent?.(tab.id)}
+              onFocus={() => onTabIntent?.(tab.id)}
               aria-current={isCurrent ? "page" : undefined}
               className={cn(
                 "group relative flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all select-none",
@@ -78,6 +82,8 @@ export function PageTabs({
             key={tab.id}
             type="button"
             onClick={() => onTabChange?.(tab.id)}
+            onMouseEnter={() => onTabIntent?.(tab.id)}
+            onFocus={() => onTabIntent?.(tab.id)}
             disabled={tab.disabled || isCurrent}
             aria-current={isCurrent ? "page" : undefined}
             className={cn(

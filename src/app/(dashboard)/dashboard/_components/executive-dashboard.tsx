@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Area,
@@ -143,16 +143,36 @@ export function ExecutiveDashboard({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ReportTabId>(data.activeTab);
   const [isPending, startTransition] = useTransition();
+  const prefetchedTabs = useRef(new Set<string>());
+
+  const dashboardTabHref = useCallback(
+    (tabId: string) => `/dashboard?tab=${tabId}&period=${period}`,
+    [period],
+  );
+
+  const prefetchTab = useCallback(
+    (tabId: string) => {
+      if (tabId === data.activeTab || prefetchedTabs.current.has(tabId)) return;
+      prefetchedTabs.current.add(tabId);
+      router.prefetch(dashboardTabHref(tabId));
+    },
+    [data.activeTab, dashboardTabHref, router],
+  );
 
   useEffect(() => {
-    setActiveTab(data.activeTab);
-  }, [data.activeTab]);
+    const schedule = window.requestIdleCallback ?? ((callback: IdleRequestCallback) => window.setTimeout(callback, 1));
+    const cancel = window.cancelIdleCallback ?? ((id: number) => window.clearTimeout(id));
+    const handle = schedule(() => {
+      for (const tab of data.tabs) prefetchTab(tab);
+    });
+    return () => cancel(handle as number);
+  }, [data.tabs, prefetchTab]);
 
   const handleTabChange = (tabId: string) => {
     const nextTab = tabId as ReportTabId;
     setActiveTab(nextTab);
     startTransition(() => {
-      router.replace(`/dashboard?tab=${nextTab}&period=${period}`, { scroll: false });
+      router.replace(dashboardTabHref(nextTab), { scroll: false });
     });
   };
 
@@ -168,7 +188,9 @@ export function ExecutiveDashboard({
     icon: TAB_ICONS[tab],
   }));
 
-  const effectiveTab = activeTab;
+  // While the RSC transition is pending, show the user's intent. Once the
+  // server payload arrives, the URL-authoritative tab becomes the source of truth.
+  const effectiveTab = isPending ? activeTab : data.activeTab;
 
   const isTabReady =
     (effectiveTab === "overview" && "commercial" in data && "timeline" in data && "funnel" in data && "attention" in data) ||
@@ -199,6 +221,7 @@ export function ExecutiveDashboard({
               tabs={tabs}
               active={effectiveTab}
               onTabChange={handleTabChange}
+              onTabIntent={prefetchTab}
             />
             {isPending && (
               <div className="h-0.5 w-full overflow-hidden rounded-full bg-muted">

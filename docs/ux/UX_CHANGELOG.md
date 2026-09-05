@@ -324,3 +324,18 @@ Validar a biblioteca canônica de `src/components/foundations/` em uma página p
 QA visual autenticado por rota, validação de estados vazios/loading/error em
 desktop e mobile, extração futura das composições compartilhadas de relatórios e
 certificação individual das etapas UX-1G–UX-1J.
+
+## 2026-09-05 — `/dashboard` tabs sem espera perceptível
+
+### Causa confirmada
+
+A troca de tab usa `router.replace` com `searchParams`; isso reexecuta o Server
+Component e as consultas métricas da aba. O cliente já atualizava o rótulo, mas
+exibia um skeleton imediatamente, tornando todo o roundtrip visível.
+
+### Correção
+
+`PageTabs` agora comunica intenção por hover e foco. O dashboard chama
+`router.prefetch` para aquecer a próxima resposta RSC e agenda o restante em
+idle. A seleção visual continua imediata, sem reset de scroll e sem cache global
+de métricas entre tenants.

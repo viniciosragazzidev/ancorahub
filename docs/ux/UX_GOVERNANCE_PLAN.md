@@ -49,6 +49,21 @@ Não são parâmetros de autorização nem modificam regras do tenant.
    estados e rollback. Registrar separadamente QA autenticado ainda não observado.
 6. Rodar verificações, atualizar changelog, foundations, matriz e roadmap.
 
+## Performance das tabs do `/dashboard`
+
+O atraso percebido vinha de uma combinação de três fatos: cada troca altera os
+`searchParams` e reexecuta o Server Component do dashboard; a aba selecionada
+carrega dados próprios no banco; e a camada cliente mostrava um skeleton assim
+que `router.replace` começava, mesmo quando o usuário já tinha indicado a
+próxima aba.
+
+A correção mantém o fetch no servidor (com o contexto confiável do tenant), mas
+usa o cache de RSC do App Router de forma antecipada: abas são pré-carregadas em
+idle e também no hover/foco, antes do clique. A navegação continua com
+`scroll: false`, a seleção visual é imediata e o skeleton só aparece quando a
+aba ainda não está pronta. Não foi colocado um cache global de métricas, pois
+isso poderia servir dados entre tenants ou deixar indicadores obsoletos.
+
 ## Mini-spec de dashboard
 
 Usuário: diretor, gestor e supervisor dentro do escopo atual. L1: aba, período,
