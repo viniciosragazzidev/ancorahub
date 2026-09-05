@@ -204,3 +204,33 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
 - **WHY**: uma biblioteca declarada sem adoção verificável não impede drift.
   Catálogo, baseline e adapters permitem conversão gradual com rollback e sem
   misturar redesign com regras de domínio.
+
+## DEC-015 — Preservação da experiência clássica do Corretor Lite
+
+- **DECISION**: o workspace do Corretor Lite mantém a composição visual anterior
+  ao lote UX-H1. A exceção abrange somente `LightTopNavBar` e os componentes
+  `Light*` efetivamente usados em dashboard, fila, leads, clientes, detalhe,
+  feedback e insights.
+- **WHY**: após comparar a versão padronizada com a experiência anterior, o usuário
+  aprovou explicitamente o retorno da linguagem clássica por ser mais adequada ao
+  uso cotidiano do corretor.
+- **BOUNDARY**: a restauração é somente visual. Roteamento por papel e modo,
+  isolamento de tenant/carteira, permissões, leitura WAHA e regras operacionais
+  continuam inalterados. Gestor, Diretor, Super Admin e demais rotas não herdam
+  esta exceção.
+- **ROLLBACK**: reaplicar a migração dos componentes Lite sobre os primitives
+  canônicos em um lote próprio, somente após nova aprovação visual.
+
+## DEC-016 — UX-M1 como fundação transversal mobile
+
+- **DECISION**: mobile não terá rotas, APIs, autorização ou regras de negócio
+  paralelas. As mesmas rotas e fontes de dados serão recompostas por prioridade,
+  usando CSS responsivo e comportamento distinto somente quando a interação exigir.
+- **SEQUENCE**: auditoria e matriz funcional antecedem M1.1 Foundations; depois seguem
+  shell, dashboard, leads, lead workspace, conversas, clientes, equipe/vendas,
+  settings/integrações e QA transversal.
+- **PATTERNS**: tabelas operacionais viram listas semânticas quando necessário;
+  filtros avançados usam Sheet; contexto de conversas usa Sheet; formulários longos
+  usam full-height Sheet no mobile.
+- **BOUNDARY**: `/tarefas` e `/metas` não serão inventadas porque não existem como
+  Homes canônicas no código atual. O Corretor Lite continua protegido pela DEC-015.

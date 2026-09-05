@@ -402,3 +402,14 @@ de métricas entre tenants.
   erros, 652 testes globais e 19 testes focados aprovados. O `prebuild` do
   pacote de extensão permanece bloqueado localmente por permissão de leitura do
   diretório, e o lint global mantém dívida preexistente registrada pelo harness.
+
+## 2026-09-05 — restauração visual do Corretor Lite
+
+- O workspace exclusivo do Corretor Lite voltou ao estado visual imediatamente
+  anterior ao UX-H1 em dashboard, fila/leads, clientes, detalhe, feedback e
+  insights de conversas.
+- A restauração ficou limitada aos componentes `Light*` e à navegação superior
+  Lite; nenhum acesso, query, regra de distribuição, conexão WAHA ou fluxo dos
+  demais papéis foi alterado.
+- O Corretor Lite passa a ser uma exceção documentada da conversão transversal até
+  que exista nova aprovação visual específica para essa experiência.
