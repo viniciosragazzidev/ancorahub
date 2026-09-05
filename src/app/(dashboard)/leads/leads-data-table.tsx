@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { DataTable } from "@/components/data-table/data-table";
-import { DataTableAdvancedToolbar } from "@/components/data-table/data-table-advanced-toolbar";
 import { useDataTable } from "@/hooks/use-data-table";
 import { getLeadsColumns } from "./leads-table-columns";
 import type { LeadRow } from "./leads-table-config";
@@ -122,9 +121,7 @@ export function LeadsDataTable({
           </div>
         ) : null
       }
-    >
-      <DataTableAdvancedToolbar table={table} />
-    </DataTable>
+    />
   );
 }
 
@@ -193,8 +190,6 @@ export function QualifyingLeadsDataTable({
       table={table}
       isPending={isPending}
       containerClassName="bg-transparent shadow-none"
-    >
-      <DataTableAdvancedToolbar table={table} />
-    </DataTable>
+    />
   );
 }
