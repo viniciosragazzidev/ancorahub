@@ -243,7 +243,7 @@ export function LightLeadDetail({
   // Check if lead is unavailable for this broker
   if (!lead.isCurrentBroker && isDistributed === false) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <div className="min-h-full bg-background text-foreground flex flex-col">
         <LightAvailabilityBanner initialStatus={availabilityStatus} />
         <div className="mx-auto w-full max-w-lg space-y-4 px-4 py-12 text-center flex-1">
           <Card variant="subtle" className="p-8 bg-card/95 border-dashed space-y-4">
@@ -491,10 +491,10 @@ export function LightLeadDetail({
   const currentStepOption = STEP_OPTIONS.find((s) => s.id === selectedStep);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-full bg-background text-foreground flex flex-col">
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
-      <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6 pb-28 sm:px-6 flex-1">
+      <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-5 pb-[max(1.5rem,var(--mobile-safe-bottom))] sm:px-6 sm:py-6 flex-1">
         {/* Top Header Navigation */}
         <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
           <Link

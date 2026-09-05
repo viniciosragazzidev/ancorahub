@@ -113,7 +113,7 @@ export function LightTopNavBar({
   }, [mobileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-primary/20 bg-primary text-primary-foreground shadow-sm select-none">
+    <header className="sticky top-0 z-40 w-full border-b border-primary/20 bg-primary pt-(--mobile-safe-top) text-primary-foreground shadow-sm select-none">
       <div className="mx-auto flex h-14 w-full items-center justify-between px-3 sm:px-5 gap-3">
         {/* LADO ESQUERDO: LOGO + NAVEGAÇÃO HORIZONTAL */}
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
@@ -249,9 +249,29 @@ export function LightTopNavBar({
       {mobileMenuOpen && (
         <div
           ref={mobileMenuRef}
-          className="md:hidden border-t border-white/20 bg-primary animate-in slide-in-from-top-2 fade-in duration-150"
+          className="max-h-[calc(100dvh-3.5rem-var(--mobile-safe-top))] overflow-y-auto border-t border-white/20 bg-primary md:hidden animate-in slide-in-from-top-2 fade-in duration-150 motion-reduce:animate-none"
         >
-          <nav className="flex flex-col p-2 gap-0.5">
+          <nav aria-label="Menu mobile" className="flex flex-col gap-0.5 p-2">
+            {navItems.map((item) => {
+              const active = isTabActive(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={cn(
+                    "flex min-h-(--mobile-touch-target) items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    active ? "bg-white/20 text-white" : "text-white/80 hover:bg-white/15 hover:text-white",
+                  )}
+                >
+                  <Icon className="size-5 shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+            <div className="my-1 border-t border-white/15" />
             <Link
               href="/settings"
               onClick={() => setMobileMenuOpen(false)}
@@ -260,7 +280,6 @@ export function LightTopNavBar({
               <Settings className="size-4.5" />
               <span>Configurações</span>
             </Link>
-            <div className="my-1 border-t border-white/15" />
             <button
               type="button"
               onClick={() => {

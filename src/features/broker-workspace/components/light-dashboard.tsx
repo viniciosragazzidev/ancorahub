@@ -180,11 +180,11 @@ export function LightDashboard({
   const nextLeadDesc = topAction?.description || (topQueueLead?.status === "distributed" ? "Lead aguardando seu primeiro contato" : "Aguardando continuidade no funil");
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-full bg-background text-foreground flex flex-col">
       {/* Banner de status quando pausado ou offline */}
       <LightAvailabilityBanner initialStatus={data.viewer.availabilityStatus} />
 
-      <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 pb-28 sm:px-6 flex-1">
+      <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-5 pb-[max(1.5rem,var(--mobile-safe-bottom))] sm:px-6 sm:py-6 flex-1">
         {/* Header: tenant logo + status + buttons */}
         <header className="flex items-center justify-between gap-3">
           <AncoraLogo src={logoUrl} className="h-9 w-auto max-w-[180px] object-contain" />

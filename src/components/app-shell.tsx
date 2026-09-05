@@ -6,11 +6,9 @@ import { useEffect, useRef } from "react";
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { LightTopNavBar } from "@/components/light-top-nav";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
-import { cn } from "@/lib/utils";
 
 type Branding = {
   brandColor: string | null;
@@ -162,18 +160,14 @@ export function AppShell({
         <SidebarInset
           ref={canvasRef}
           data-slot="app-scroll-frame"
-          className={cn(
-            "app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]",
-            "max-[559px]:pb-[calc(var(--mobile-bottom-nav-height)+var(--mobile-safe-bottom))]"
-          )}
+          className="app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
           style={{
             scrollPaddingTop: "var(--header-height)",
-            scrollPaddingBottom: "calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom))",
+            scrollPaddingBottom: "var(--mobile-safe-bottom)",
           }}
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SidebarInset>
-        <MobileBottomNav role={user?.role} jobTitle={user?.jobTitle} />
         <OnboardingWelcomeDialog />
       </SidebarProvider>
     </OnboardingProvider>

@@ -12,9 +12,10 @@
 
 ## Breakpoints e tokens
 
-O breakpoint estrutural mobile permanece alinhado ao shell existente: abaixo de
-`560px`. Layouts intermediários continuam usando os breakpoints Tailwind existentes.
-Não adicionar magic breakpoints locais.
+O breakpoint da navegação lateral segue `useIsMobile`: abaixo de `768px` a rail
+vira `Sheet`. A recomposição compacta do conteúdo permanece abaixo de `560px`.
+Layouts intermediários continuam usando os breakpoints Tailwind existentes. Não
+adicionar magic breakpoints locais.
 
 | Token conceitual | Valor/implementação |
 |---|---|
@@ -23,7 +24,7 @@ Não adicionar magic breakpoints locais.
 | touch target | mínimo de `2.75rem` quando a ação é isolada |
 | compact header | uma linha principal; descrição sob demanda |
 | bottom safe area | `max(0.625rem, env(safe-area-inset-bottom))` |
-| sticky footer | padding inferior inclui safe area e não duplica bottom nav |
+| sticky footer | padding inferior inclui safe area e não concorre com overlays |
 
 ## Anatomia e componentes
 
@@ -35,8 +36,12 @@ quando não alteram a decisão.
 
 ### Navegação
 
-`MobileBottomNav` recebe somente destinos frequentes e autorizados. Itens secundários
-ficam em “Mais”. O Corretor Lite continua com `LightTopNavBar` pela DEC-015.
+A navegação gerencial usa uma única fonte: `CorreTopSidebar` como rail no desktop e
+como `Sheet` lateral fixo sobre o conteúdo no mobile. O mesmo conjunto autorizado
+de destinos é reutilizado, sem barra inferior paralela. O painel fecha ao escolher
+uma rota, clicar no backdrop, acionar o botão de fechar ou pressionar Escape; a
+transição respeita `prefers-reduced-motion`. O Corretor Lite continua com
+`LightTopNavBar` pela DEC-015 e replica seus destinos no menu compacto.
 
 ### List item
 

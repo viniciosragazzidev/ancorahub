@@ -218,6 +218,10 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
   isolamento de tenant/carteira, permissões, leitura WAHA e regras operacionais
   continuam inalterados. Gestor, Diretor, Super Admin e demais rotas não herdam
   esta exceção.
+- **MOBILE**: o Corretor Lite conserva a barra superior clássica e expõe os mesmos
+  destinos primários no menu compacto. Diretor, Gestor e Supervisor usam a rail no
+  desktop e a mesma navegação em `Sheet` lateral sobreposto no mobile, sem uma
+  segunda barra inferior concorrente.
 - **ROLLBACK**: reaplicar a migração dos componentes Lite sobre os primitives
   canônicos em um lote próprio, somente após nova aprovação visual.
 
@@ -232,5 +236,9 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
 - **PATTERNS**: tabelas operacionais viram listas semânticas quando necessário;
   filtros avançados usam Sheet; contexto de conversas usa Sheet; formulários longos
   usam full-height Sheet no mobile.
+- **NAVIGATION**: a navegação principal do CRM é única. A rail fica fora do fluxo
+  no mobile e abre como `Sheet` lateral fixo, com backdrop, fechamento explícito,
+  foco contido e transição compatível com `prefers-reduced-motion`. O shell não
+  renderiza `MobileBottomNav` em paralelo.
 - **BOUNDARY**: `/tarefas` e `/metas` não serão inventadas porque não existem como
   Homes canônicas no código atual. O Corretor Lite continua protegido pela DEC-015.

@@ -234,14 +234,6 @@
     min-width: var(--mobile-touch-target);
   }
 
-  :root:has([data-mobile-conversation-active="true"]) [data-slot="mobile-bottom-nav"] {
-    display: none;
-  }
-
-  :root:has([data-mobile-conversation-active="true"]) [data-slot="app-scroll-frame"] {
-    padding-bottom: 0;
-    scroll-padding-bottom: 0;
-  }
 }
 
 /* Reusable report composition. CSS grid only; metric calculations stay server-side. */

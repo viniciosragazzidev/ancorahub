@@ -28,7 +28,7 @@
 
 ## 2. Navegação Principal (Sidebar)
 
-Layout unificado: `<AppShell>` → `<SidebarProvider>` → `<CorreTopSidebar>` + `<WorkspaceRail>` + `<MobileBottomNav>`.
+Layout unificado: `<AppShell>` → `<SidebarProvider>` → `<CorreTopSidebar>` (rail no desktop e `Sheet` lateral sobreposto no mobile) + `<WorkspaceRail>`.
 
 ### Itens visíveis no menu da sidebar
 

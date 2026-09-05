@@ -10,6 +10,7 @@ Somente M1.10 pode promover uma linha para `PRESERVED`.
 | `/dashboard` | período e escopo | toolbar | header compacto / disclosure contextual | `CODE_READY` |
 | `/dashboard` | KPIs e alertas | grids | prioridade + lista acionável | `CODE_READY` |
 | `/dashboard` | gráficos/tabelas | painéis | conteúdo empilhado + listas semânticas | `CODE_READY` |
+| Shell CRM | navegação principal | rail lateral persistente | Sheet lateral sobreposto; sem barra inferior duplicada | `CODE_READY` |
 | `/leads` | busca | toolbar | input visível | `CODE_READY` |
 | `/leads` | filtros | toolbar/popover | controle compacto + disclosure existente | `CODE_READY` |
 | `/leads` | lista/kanban | tabela/board | lista semântica / perspectiva preservada | `CODE_READY` |
@@ -34,7 +35,7 @@ Somente M1.10 pode promover uma linha para `PRESERVED`.
 | `/integrations` | catálogo/status | cards | blocos empilhados | `CODE_READY` |
 | `/integrations/meta` | conexão/ativos | wizard/cards | composição empilhada | `CODE_READY` |
 | `/integrations/whatsapp` | canal/templates | cards/tabela | tabs touch roláveis + blocos empilhados | `CODE_READY` |
-| Corretor Lite | dashboard/fila/clientes/insights | composição Lite | composição clássica touch-first | `EXCEPTION_PRESERVED_QA_PENDING` |
+| Corretor Lite | dashboard/fila/clientes/insights | composição Lite | dashboard clássico + menu compacto com todos os destinos | `EXCEPTION_PRESERVED_QA_PENDING` |
 
 ## Regras de atualização
 

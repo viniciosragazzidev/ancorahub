@@ -12,7 +12,7 @@ não o domínio.
 ## Entregas
 
 1. **Foundation e shell:** viewport seguro, tokens globais de geometria, safe areas,
-   touch target, header compacto, bottom navigation por papel e Sheet full-height.
+   touch target, header compacto e sidebar única em Sheet lateral no mobile.
 2. **Dashboard:** KPIs compactos, ordem decisória e `ResponsiveDataView` para listas
    semânticas de comercial, equipe, unidades e financeiro.
 3. **Operação:** leads preservam lista/kanban; detalhe usa tabs roláveis; conversas
@@ -31,15 +31,32 @@ não o domínio.
 - Super Admin, dev, autenticação e páginas públicas permanecem fora;
 - visual clássico do Corretor Lite preservado pela DEC-015.
 
+## Correção de regressão do shell e do Corretor Lite
+
+- `/dashboard` voltou a resolver o modo `LIGHT` do corretor antes de entrar no
+  reporting center compartilhado; Diretor, Gestor e Supervisor permanecem no
+  dashboard gerencial.
+- o menu mobile do Lite agora contém Início, Minha Fila, Insights, Clientes e
+  Configurações, fechando após a navegação.
+- `MobileBottomNav` foi removida do shell gerencial. A rail desktop fica oculta em
+  viewport mobile e reaparece como painel lateral fixo sobre o conteúdo, usando o
+  primitive compartilhado `Sheet` e seus estados de foco, backdrop e movimento.
+- os containers Lite deixaram de criar uma segunda altura de viewport e o padding
+  inferior legado da barra removida foi substituído pela safe area do dispositivo.
+- regressão automatizada em
+  `src/features/broker-workspace/broker-lite-experience.test.tsx` protege roteamento,
+  destinos mobile e unicidade da navegação.
+
 ## Evidência técnica
 
 - TypeScript (`tsc --noEmit`): aprovado;
-- lint dirigido das superfícies alteradas: sem erros; somente avisos preexistentes;
+- lint dirigido: superfícies do lote sem novas ocorrências; o primitive histórico
+  `ui/sidebar.tsx` mantém dois erros preexistentes de hooks condicionais, confirmados
+  por `git blame` em linhas não alteradas por este lote;
 - testes de foundations, primitives, catálogo de integrações e conversas oficiais:
   4 arquivos, 16 testes aprovados;
-- harness rápido: documentação, TypeScript e suíte integral aprovados (144 arquivos,
-  652 testes), com evidência em
-  `reports/agent/verification/2026-09-05T23-19-00.416Z.md`;
+- validação documental, TypeScript e suíte integral aprovados (145 arquivos,
+  655 testes); o teste novo cobre as três regressões de shell/Lite;
 - auditoria estrita de componentes: aprovada, sem novas divergências;
 - build Next.js 16.2.10/Turbopack: compilação, TypeScript e geração de 79 páginas
   concluídos com sucesso. Os avisos de uso dinâmico de `headers` são rotas

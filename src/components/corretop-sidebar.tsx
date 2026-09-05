@@ -239,7 +239,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       className="sticky top-0 h-dvh max-h-dvh w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-none select-none"
     >
       {/* Header: Logo & SuperAdmin Switcher */}
-      <SidebarHeader className="flex flex-col items-center justify-center p-2 pt-3 pb-2 gap-2 border-b border-white/[0.08]">
+      <SidebarHeader className={cn("flex items-center justify-center gap-2 border-b border-white/[0.08] p-2 pt-3 pb-2", isMobile ? "min-h-[calc(4rem+var(--mobile-safe-top))] flex-row justify-start px-4 pt-[calc(0.75rem+var(--mobile-safe-top))] pr-14" : "flex-col")}>
         <Link
           href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
           className="flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent p-1.5 transition-colors hover:border-emerald-500/40 hover:bg-sidebar-accent/80"
@@ -247,6 +247,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
         >
           <img src="/icon.png" alt="Ancora" className="size-7 object-contain" />
         </Link>
+
+        {isMobile ? (
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-white">Menu principal</p>
+            <p className="truncate text-xs text-slate-400">{userName}</p>
+          </div>
+        ) : null}
 
         {user?.isPlatformAdmin && (
           <div className="w-full flex justify-center">
@@ -283,9 +290,9 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarHeader>
 
       {/* Navigation Rail Content */}
-      <SidebarContent className="flex-1 min-h-0 px-1 py-1">
+      <SidebarContent className={cn("flex-1 min-h-0 py-1", isMobile ? "px-2" : "px-1")}>
         <TooltipProvider delay={150}>
-          <nav aria-label="Menu principal" className="flex flex-col items-center gap-1.5 w-full pb-4">
+          <nav aria-label="Menu principal" className={cn("flex w-full flex-col gap-1.5 pb-4", isMobile ? "items-stretch py-2" : "items-center")}>
             {visibleItems.map((item) => {
               const Icon = item.icon;
               const isActive =
@@ -308,7 +315,10 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                         aria-current={isActive ? "page" : undefined}
                         prefetch={priorityNavigationPaths.has(itemTargetUrl)}
                         onClick={() => isMobile && setOpenMobile(false)}
-                        className="group relative flex w-full flex-col items-center justify-center gap-1 py-1 text-center outline-none select-none transition-transform active:scale-95"
+                        className={cn(
+                          "group relative flex w-full items-center outline-none select-none transition-transform active:scale-95 motion-reduce:transition-none",
+                          isMobile ? "min-h-(--mobile-touch-target) flex-row justify-start gap-3 rounded-lg px-2 py-1.5 text-left" : "flex-col justify-center gap-1 py-1 text-center",
+                        )}
                       />
                     }
                   >
@@ -323,7 +333,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     <div
                       data-slot="rail-tile"
                       className={cn(
-                        "relative flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-transparent transition-colors duration-[var(--duration-quick)]",
+                        "relative flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-transparent transition-colors duration-[var(--duration-quick)] motion-reduce:transition-none",
                         // Inactive state: crisp light icons on dark slate
                         !isActive && !item.isWhatsApp && "bg-transparent text-slate-300 hover:bg-white/[0.08] hover:text-white",
                         // Active state: glowing emerald container
@@ -357,18 +367,19 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     <span
                       data-slot="rail-label"
                       className={cn(
-                        "max-w-[70px] truncate text-[10px] font-medium leading-tight tracking-tight transition-colors",
+                        "truncate font-medium leading-tight tracking-tight transition-colors",
+                        isMobile ? "max-w-none flex-1 text-sm" : "max-w-[70px] text-[10px]",
                         isActive
                           ? "font-semibold text-emerald-300"
                           : "text-slate-400 group-hover:text-slate-100",
                         item.isWhatsApp && (isActive ? "text-emerald-300 font-semibold" : "text-emerald-300/90")
                       )}
                     >
-                      {item.label}
+                      {isMobile ? item.fullLabel : item.label}
                     </span>
 
                     {/* Active Chevron Indicator */}
-                    {isActive && (
+                    {isActive && !isMobile && (
                       <CaretDown className="size-2.5 text-emerald-400 -mt-0.5" />
                     )}
                   </TooltipTrigger>
@@ -383,7 +394,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarContent>
 
       {/* Footer: AI Agent & User Profile */}
-      <SidebarFooter className="flex flex-col items-center justify-center p-2 pb-3 gap-2 border-t border-white/[0.08]">
+      <SidebarFooter className={cn("flex items-center justify-center gap-2 border-t border-white/[0.08] p-2 pb-3", isMobile ? "flex-row justify-between px-4 pb-[max(0.75rem,var(--mobile-safe-bottom))]" : "flex-col")}>
         <TooltipProvider delay={150}>
           {/* AI Agent Trigger */}
           <Tooltip>
@@ -430,8 +441,8 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              side="right"
-              align="end"
+              side={isMobile ? "top" : "right"}
+              align={isMobile ? "start" : "end"}
               sideOffset={12}
               className="w-64 rounded-[var(--radius-card)] border border-sidebar-border bg-sidebar p-2.5 text-sidebar-foreground shadow-[var(--shadow-dialog)]"
             >

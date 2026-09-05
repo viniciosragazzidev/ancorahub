@@ -13,17 +13,18 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 ### Resultado
 
 - viewport com `viewport-fit=cover`, tokens de safe area, padding, touch target,
-  header e bottom navigation centralizados no shell;
-- navegação inferior varia apenas por papel/cargo já autorizado, sem derivar tenant
-  ou permissão no cliente;
+  header e navegação principal centralizados no shell;
+- a rail do CRM é persistente apenas no desktop e abre como Sheet lateral fixo no
+  mobile; a barra inferior duplicada foi removida para Diretor, Gestor e Supervisor;
 - dashboard recomposto com KPIs 2×2, atenção priorizada e listas semânticas no lugar
   de tabelas densas;
-- conversas usam estados explícitos `list | chat`, contexto em Sheet e removem a
-  concorrência entre composer e bottom navigation;
+- conversas usam estados explícitos `list | chat`, contexto em Sheet e mantêm o
+  composer livre de navegação sobreposta;
 - clientes, equipe, vendas, cronograma, qualificação, configurações e integrações
   receberam composição touch-first reutilizando primitives existentes;
 - detalhes de lead e cliente usam tabs horizontais com snap e alvo mínimo de toque;
-- Corretor Lite mantém sua composição clássica pela DEC-015.
+- Corretor Lite mantém sua composição clássica pela DEC-015, volta a ser resolvido
+  corretamente em `/dashboard` e recebe todos os destinos no menu mobile.
 
 ### Limites e gate
 

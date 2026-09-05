@@ -122,11 +122,11 @@ export function LightLeadsList({
   }, [leads, filter, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-full bg-background text-foreground flex flex-col">
       {/* Banner de status quando pausado */}
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
-      <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 pb-28 sm:px-6 flex-1">
+      <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-5 pb-[max(1.5rem,var(--mobile-safe-bottom))] sm:px-6 sm:py-6 flex-1">
         {/* Top Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
           <div>
@@ -156,7 +156,7 @@ export function LightLeadsList({
         </div>
 
         {/* Filter Pills */}
-        <div role="tablist" aria-label="Filtros de leads" className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+        <div role="tablist" aria-label="Filtros de leads" className="flex snap-x snap-mandatory flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
           <button
             type="button"
             role="tab"

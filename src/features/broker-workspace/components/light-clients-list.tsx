@@ -29,8 +29,8 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
   }, [clients, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-6 pb-28 sm:px-6 flex-1">
+    <div className="min-h-full bg-background text-foreground flex flex-col">
+      <div className="mx-auto w-full max-w-4xl space-y-5 px-4 py-5 pb-[max(1.5rem,var(--mobile-safe-bottom))] sm:px-6 sm:py-6 flex-1">
         {/* Top Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
           <div>
