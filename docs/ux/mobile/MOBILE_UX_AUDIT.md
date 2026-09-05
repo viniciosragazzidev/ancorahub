@@ -1,7 +1,7 @@
 # UX-M1 — Auditoria da experiência mobile
 
 **Data:** 05/09/2026  
-**Estado:** `AUDIT_COMPLETE`  
+**Estado:** `AUDIT_COMPLETE_IMPLEMENTED_QA_PENDING`
 **Escopo:** CRM autenticado; Super Admin, desenvolvimento, autenticação e páginas públicas permanecem fora.
 
 ## Método e critérios
@@ -217,6 +217,6 @@ Classificação: `KEEP_VISIBLE`, `RECOMPOSE`, `MOVE_TO_SHEET`, `MOVE_TO_MENU`,
 ## Gate da auditoria
 
 `MOBILE_AUDIT_COMPLETE = YES`  
-`MOBILE_UX_READY = NO` — implementação e QA ainda não concluídos.  
+`MOBILE_UX_READY = NO` — código concluído; QA visual/interacional M1.10 ainda pendente.
 `BUSINESS_RULE_CHANGED = NO`  
 `AUTHORIZATION_CHANGED = NO`

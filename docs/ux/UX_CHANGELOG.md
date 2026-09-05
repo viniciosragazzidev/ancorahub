@@ -8,6 +8,32 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-05 — UX-M1 Mobile Experience
+
+### Resultado
+
+- viewport com `viewport-fit=cover`, tokens de safe area, padding, touch target,
+  header e bottom navigation centralizados no shell;
+- navegação inferior varia apenas por papel/cargo já autorizado, sem derivar tenant
+  ou permissão no cliente;
+- dashboard recomposto com KPIs 2×2, atenção priorizada e listas semânticas no lugar
+  de tabelas densas;
+- conversas usam estados explícitos `list | chat`, contexto em Sheet e removem a
+  concorrência entre composer e bottom navigation;
+- clientes, equipe, vendas, cronograma, qualificação, configurações e integrações
+  receberam composição touch-first reutilizando primitives existentes;
+- detalhes de lead e cliente usam tabs horizontais com snap e alvo mínimo de toque;
+- Corretor Lite mantém sua composição clássica pela DEC-015.
+
+### Limites e gate
+
+Nenhuma rota, API, regra de negócio ou autorização mobile paralela foi criada.
+`/tarefas` e `/metas` continuam ausentes por decisão documental. O código passou
+TypeScript, lint dirigido, testes de regressão e auditoria estrutural; a promoção
+para `PRESERVED` depende da matriz autenticada M1.10 em viewports reais.
+
+---
+
 ## 2026-09-04 — /leads/[id] (UX-1F — Detalhe do Lead)
 
 ### Problema

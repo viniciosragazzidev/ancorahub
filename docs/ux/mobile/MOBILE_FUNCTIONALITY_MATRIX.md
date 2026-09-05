@@ -1,37 +1,40 @@
 # UX-M1 — Matriz de preservação funcional mobile
 
-**Estado:** baseline da implementação. Nenhum item `PRESERVED` significa QA final.
+**Estado:** implementação concluída no código; QA visual/interacional autenticado pendente.
+
+`CODE_READY` significa que a composição responsiva existe e passou validação estática.
+Somente M1.10 pode promover uma linha para `PRESERVED`.
 
 | Route | Feature | Desktop location | Mobile location/pattern | Status |
 |---|---|---|---|---|
-| `/dashboard` | período e escopo | toolbar | header compacto / Sheet quando avançado | `RECOMPOSED` |
-| `/dashboard` | KPIs e alertas | grids | prioridade + lista acionável | `RECOMPOSED` |
-| `/dashboard` | gráficos/tabelas | painéis | conteúdo empilhado + drill-down | `CONTEXTUAL` |
-| `/leads` | busca | toolbar | input visível | `PRESERVED` |
-| `/leads` | filtros | toolbar/popover | Filter Sheet + contador | `MOVED_TO_SHEET` |
-| `/leads` | lista/kanban | tabela/board | lista semântica / perspectiva preservada | `RECOMPOSED` |
-| `/leads` | ações em massa | selection toolbar | barra contextual | `CONTEXTUAL` |
-| `/leads/[id]` | resumo e status | header/painel | header compacto + L1 | `RECOMPOSED` |
-| `/leads/[id]` | edição | dialog/drawer | full-height Sheet | `MOVED_TO_SHEET` |
-| `/leads/[id]` | documentos/cotação | seções/tabs | tabs + detalhes | `CONTEXTUAL` |
-| `/conversas` | lista | painel esquerdo | tela de lista | `RECOMPOSED` |
-| `/conversas` | chat/composer | painel central | tela de chat | `RECOMPOSED` |
-| `/conversas` | perfil/contexto | painel direito | full-height Sheet | `MOVED_TO_SHEET` |
+| `/dashboard` | período e escopo | toolbar | header compacto / disclosure contextual | `CODE_READY` |
+| `/dashboard` | KPIs e alertas | grids | prioridade + lista acionável | `CODE_READY` |
+| `/dashboard` | gráficos/tabelas | painéis | conteúdo empilhado + listas semânticas | `CODE_READY` |
+| `/leads` | busca | toolbar | input visível | `CODE_READY` |
+| `/leads` | filtros | toolbar/popover | controle compacto + disclosure existente | `CODE_READY` |
+| `/leads` | lista/kanban | tabela/board | lista semântica / perspectiva preservada | `CODE_READY` |
+| `/leads` | ações em massa | selection toolbar | barra contextual | `CODE_READY` |
+| `/leads/[id]` | resumo e status | header/painel | resumo L1 empilhado | `CODE_READY` |
+| `/leads/[id]` | edição | dialog/drawer | primitive Sheet full-height abaixo de 560px | `CODE_READY` |
+| `/leads/[id]` | documentos/cotação | seções/tabs | tabs touch roláveis + detalhes | `CODE_READY` |
+| `/conversas` | lista | painel esquerdo | estado de tela `list` | `CODE_READY` |
+| `/conversas` | chat/composer | painel central | estado de tela `chat`, sem bottom nav concorrente | `CODE_READY` |
+| `/conversas` | perfil/contexto | painel direito | Sheet full-height | `CODE_READY` |
 | `/tarefas` | Home de tarefas | inexistente | não criar na UX-M1 | `NOT_APPLICABLE` |
-| `/clientes` | busca/lista | cards/lista | lista semântica | `RECOMPOSED` |
-| `/clientes/[clientId]` | perfil/tabs | detalhe | header + tabs roláveis | `RECOMPOSED` |
-| `/equipe` | membros | tabela | lista administrativa | `RECOMPOSED` |
-| `/equipe` | filtros/convite | toolbar/form | Sheet | `MOVED_TO_SHEET` |
-| `/vendas` | KPIs/lista | grid/tabela | resumo + lista | `RECOMPOSED` |
-| `/vendas/[id]` | cronograma | tabela | timeline/lista | `RECOMPOSED` |
+| `/clientes` | busca/lista | cards/lista | busca + lista semântica | `CODE_READY` |
+| `/clientes/[clientId]` | perfil/tabs | detalhe | header + tabs touch roláveis | `CODE_READY` |
+| `/equipe` | membros | tabela | lista administrativa existente | `CODE_READY` |
+| `/equipe` | filtros/convite | toolbar/form | controles responsivos existentes | `CODE_READY` |
+| `/vendas` | KPIs/lista | grid/tabela | resumo 2×2 + lista semântica | `CODE_READY` |
+| `/vendas/[id]` | cronograma | tabela | timeline/lista semântica | `CODE_READY` |
 | `/metas` | Home de metas | inexistente | dashboard/resumo pessoal | `NOT_APPLICABLE` |
-| `/qualificacao` | navegação de seções | rail/tabs | seletor/tabs roláveis | `RECOMPOSED` |
-| `/qualificacao` | editores | cards/dialogs | uma coluna + Sheet | `MOVED_TO_SHEET` |
-| `/settings` | seções e formulários | tabs/forms | seletor + uma coluna | `RECOMPOSED` |
-| `/integrations` | catálogo/status | cards | blocos empilhados | `PRESERVED` |
-| `/integrations/meta` | conexão/ativos | wizard/cards | fluxo full-height | `RECOMPOSED` |
-| `/integrations/whatsapp` | canal/templates | cards/tabela | estado + ação; detalhes sob demanda | `RECOMPOSED` |
-| Corretor Lite | dashboard/fila/clientes/insights | composição Lite | composição clássica touch-first | `PRESERVED` |
+| `/qualificacao` | navegação de seções | rail/tabs | tabs touch roláveis | `CODE_READY` |
+| `/qualificacao` | editores | cards/dialogs | uma coluna + primitive Sheet responsivo | `CODE_READY` |
+| `/settings` | seções e formulários | tabs/forms | tabs touch roláveis + uma coluna | `CODE_READY` |
+| `/integrations` | catálogo/status | cards | blocos empilhados | `CODE_READY` |
+| `/integrations/meta` | conexão/ativos | wizard/cards | composição empilhada | `CODE_READY` |
+| `/integrations/whatsapp` | canal/templates | cards/tabela | tabs touch roláveis + blocos empilhados | `CODE_READY` |
+| Corretor Lite | dashboard/fila/clientes/insights | composição Lite | composição clássica touch-first | `EXCEPTION_PRESERVED_QA_PENDING` |
 
 ## Regras de atualização
 
