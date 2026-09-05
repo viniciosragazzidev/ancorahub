@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useTransition, useCallback, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -28,7 +28,6 @@ import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
 import { updateBrokerAvailabilityAction } from "@/features/leads/availability-action";
 import { toast } from "@/components/ui/sonner";
-import { AncoraLogo } from "@/components/ancora-logo";
 
 export type LightTopNavProps = {
   branding?: {
@@ -96,24 +95,22 @@ export function LightTopNavBar({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
-
   // Close mobile menu on route change
   useEffect(() => {
-    closeMobileMenu();
-  }, [pathname, closeMobileMenu]);
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   // Close mobile menu on outside click
   useEffect(() => {
     if (!mobileMenuOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
-        closeMobileMenu();
+        setMobileMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [mobileMenuOpen, closeMobileMenu]);
+  }, [mobileMenuOpen]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-primary/20 bg-primary text-primary-foreground shadow-sm select-none">
@@ -134,8 +131,8 @@ export function LightTopNavBar({
                 className="h-7 w-auto object-contain brightness-0 invert"
               />
             ) : (
-              <div className="grid size-7 place-items-center rounded-lg bg-white/15">
-                <AncoraLogo className="size-5 object-contain brightness-0 invert" />
+              <div className="grid size-7 place-items-center rounded-lg bg-white/20 text-white font-black text-xs">
+                ⚓
               </div>
             )}
           </Link>
@@ -257,7 +254,7 @@ export function LightTopNavBar({
           <nav className="flex flex-col p-2 gap-0.5">
             <Link
               href="/settings"
-              onClick={closeMobileMenu}
+              onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition-all"
             >
               <Settings className="size-4.5" />
@@ -267,7 +264,7 @@ export function LightTopNavBar({
             <button
               type="button"
               onClick={() => {
-                closeMobileMenu();
+                setMobileMenuOpen(false);
                 signOut();
               }}
               className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/15 hover:text-white transition-all cursor-pointer"

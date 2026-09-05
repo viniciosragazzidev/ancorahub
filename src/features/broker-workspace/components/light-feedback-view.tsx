@@ -75,7 +75,7 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
               <CheckCircle className="size-7" />
             </div>
             <div>
-        <h2 className="text-lg font-bold text-foreground">Atualização registrada</h2>
+              <h2 className="text-lg font-bold text-foreground">✓ Atualização registrada</h2>
               <p className="text-xs text-muted-foreground mt-1">
                 Obrigado. O atendimento foi atualizado para <strong>{selectedLabel}</strong>.
               </p>

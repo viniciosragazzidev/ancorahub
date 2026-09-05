@@ -220,7 +220,7 @@ export function LightLeadDetail({
     if (!lead.telefone) return;
     navigator.clipboard.writeText(lead.telefone);
     setCopiedPhone(true);
-    toast.success("Telefone copiado.");
+    toast.success("Telefone copiado ✓");
     setTimeout(() => setCopiedPhone(false), 2000);
   }
 
@@ -518,7 +518,7 @@ export function LightLeadDetail({
             <div className="mx-auto grid size-10 place-items-center rounded-full bg-primary text-primary-foreground">
               <CheckCircle className="size-6" />
             </div>
-            <h2 className="text-base font-bold text-primary">Venda registrada</h2>
+            <h2 className="text-base font-bold text-primary">✓ Venda registrada!</h2>
             <p className="text-xs text-muted-foreground">
               O atendimento foi concluído e registrado como venda realizada.
             </p>
@@ -660,7 +660,7 @@ export function LightLeadDetail({
 
               {whatsappOpenedAt ? (
                 <p className="text-center text-[11px] text-emerald-600 font-medium">
-                  Contato aberto às {whatsappOpenedAt}
+                  ✓ Contato aberto às {whatsappOpenedAt}
                 </p>
               ) : null}
 
@@ -811,7 +811,7 @@ export function LightLeadDetail({
                   <div>
                     <span className="text-muted-foreground block text-[11px]">Consentimento LGPD</span>
                     <strong className="font-semibold text-emerald-600 truncate block">
-                      Confirmado
+                      ✓ Confirmado
                     </strong>
                   </div>
                 </div>
@@ -902,7 +902,7 @@ export function LightLeadDetail({
                     "size-4 rounded-full border flex items-center justify-center text-[10px]",
                     declineReason === r ? "border-primary bg-primary text-primary-foreground font-bold" : "border-border"
                   )}>
-                    {declineReason === r ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                    {declineReason === r ? "✓" : ""}
                   </span>
                 </button>
               ))}

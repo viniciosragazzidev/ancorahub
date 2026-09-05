@@ -29,6 +29,11 @@ const EXEMPTIONS = [
   "src/components/ui/",
   "src/components/unlumen-ui/",
   "src/components/foundations/",
+  // DEC-015: o Corretor Lite preserva temporariamente a experiência clássica
+  // aprovada. A exceção é estreita e deve ser removida somente em uma onda Lite
+  // com nova aprovação visual.
+  "src/components/light-top-nav.tsx",
+  "src/features/broker-workspace/components/",
   "node_modules/",
 ];
 
