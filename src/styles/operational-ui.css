@@ -2,10 +2,12 @@
  * :has() keeps tokens available to portals without a client effect/flash, and
  * stops matching immediately when the authenticated shell unmounts. */
 :root:has([data-ui-refinement="clean"]) {
-  --background: #fafbfc;
+  /* The clean shell uses a white canvas; hierarchy comes from spacing and
+   * restrained borders instead of a gray application wash. */
+  --background: #ffffff;
   --surface-base: var(--background);
-  --surface-secondary: #f4f6f7;
-  --muted: #f0f3f5;
+  --surface-secondary: #f8fafb;
+  --muted: #f3f5f6;
   --muted-foreground: #59636e;
   --border: #e3e7eb;
   --border-strong: #a3adb8;
@@ -149,12 +151,25 @@
 :root:has([data-ui-refinement="clean"]) [data-slot="data-table-surface"] {
   border-radius: var(--radius-card);
   border-color: transparent;
-  background: color-mix(in srgb, var(--card) 40%, transparent);
+  background: var(--card);
   box-shadow: none;
 }
 
 :root.dark:has([data-ui-refinement="clean"]) [data-slot="data-table-surface"] {
-  background: color-mix(in srgb, var(--card) 60%, transparent);
+  background: var(--card);
+}
+
+/* Qualification is a dense operational workspace, but it shares the same
+ * light surface grammar as the canonical dashboard. */
+:root:has([data-ui-refinement="clean"]) [data-ui-surface="qualification"] [data-slot="card"] {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+:root:has([data-ui-refinement="clean"]) [data-slot="qualification-tabs"] {
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: none;
 }
 
 /* Rail keeps its approved silhouette; emphasis communicates location. */

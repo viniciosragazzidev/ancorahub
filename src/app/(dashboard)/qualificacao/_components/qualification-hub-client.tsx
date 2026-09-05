@@ -46,6 +46,7 @@ import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-t
 import { AgentTriggersPanel } from "./agent-triggers-panel";
 import { MetaTemplatesPanel } from "./meta-templates-panel";
 import { SituationalPlaybooksPanel } from "./situational-playbooks-panel";
+import { StatCard } from "@/components/dashboard/metric-card";
 
 import {
   updateQualificationSettingsAction,
@@ -514,7 +515,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen space-y-6">
+    <div className="flex min-h-full flex-col bg-background">
       <DashboardHeader
         breadcrumb="Qualificação IA"
         title="Qualificação IA"
@@ -534,108 +535,21 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         }
       />
 
-      <div className="space-y-6">
+      <main data-ui-surface="qualification" className="flex flex-1 flex-col gap-6 bg-background p-4 lg:p-6">
         {/* TOP METRICS SUMMARY */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-                Leads Atendidos
-                <Activity className="size-4 text-primary" />
-              </CardDescription>
-
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                {initialStats.operation.startedToday}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-[11px] text-muted-foreground">
-                {initialStats.operation.active} ativos | {initialStats.operation.transferredToHuman} trans. humano
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-                Taxa Qualificação
-                <Sparkles className="size-4 text-amber-500" />
-              </CardDescription>
-
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                {initialStats.qualification.totalQualified}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-[11px] text-muted-foreground">
-                {initialStats.qualification.hotLeads} quentes | {initialStats.qualification.completionRatePct}% conclusão
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-                Fila de Espera
-                <Clock className="size-4 text-purple-500" />
-              </CardDescription>
-
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                {initialStats.distribution.waitingQueue}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-[11px] text-muted-foreground">
-                {initialStats.distribution.waitingQueue} em fila | SLA méd. 45s
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-                Custo de Operação
-                <DollarSign className="size-4 text-emerald-500" />
-              </CardDescription>
-
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                R$ {(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-[11px] text-muted-foreground">
-                R$ {initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card variant="subtle" className="rounded-xl border-border/80">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-                Follow-ups Ativos
-                <RotateCcw className="size-4 text-sky-500" />
-              </CardDescription>
-
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                {initialStats.followup.sent} enviados
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-[11px] text-muted-foreground">
-                {initialStats.followup.conversionsPostFollowup} rec. pós-followup
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard label="Leads atendidos" value={initialStats.operation.startedToday} sublabel={`${initialStats.operation.active} ativos | ${initialStats.operation.transferredToHuman} trans. humano`} icon={Activity} iconClassName="bg-primary/10 text-primary" />
+          <StatCard label="Taxa de qualificação" value={initialStats.qualification.totalQualified} sublabel={`${initialStats.qualification.hotLeads} quentes | ${initialStats.qualification.completionRatePct}% conclusão`} icon={Sparkles} iconClassName="bg-amber-500/10 text-amber-600" />
+          <StatCard label="Fila de espera" value={initialStats.distribution.waitingQueue} sublabel={`${initialStats.distribution.waitingQueue} em fila | SLA méd. 45s`} icon={Clock} iconClassName="bg-violet-500/10 text-violet-600" />
+          <StatCard label="Custo de operação" value={`R$ ${(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}`} sublabel={`R$ ${initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento`} icon={DollarSign} iconClassName="bg-emerald-500/10 text-emerald-600" valueClassName="text-emerald-700" />
+          <StatCard label="Follow-ups ativos" value={`${initialStats.followup.sent} enviados`} sublabel={`${initialStats.followup.conversionsPostFollowup} rec. pós-followup`} icon={RotateCcw} iconClassName="bg-sky-500/10 text-sky-600" />
         </div>
 
         {/* 2-COLUMN SETTINGS-STYLE LAYOUT */}
         <div className="grid gap-6 lg:grid-cols-[16.5rem_1fr] items-start">
           {/* MOBILE HORIZONTAL SUBNAV */}
           <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
-            <nav className="flex gap-1.5 pb-2">
+            <nav data-slot="qualification-tabs" className="flex gap-1.5 rounded-[var(--radius-card)] border bg-card p-1 pb-2">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -644,6 +558,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                     key={tab.id}
                     type="button"
                     onClick={() => handleSelectTab(tab.id)}
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all",
                       isActive
@@ -660,7 +575,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </ScrollArea>
 
           {/* DESKTOP SIDEBAR SUBNAV */}
-          <nav className="hidden lg:flex lg:flex-col gap-1 p-2 rounded-2xl border bg-card/80 backdrop-blur-xs shadow-2xs sticky top-4">
+          <nav data-slot="qualification-tabs" className="hidden lg:flex lg:flex-col gap-1 p-2 rounded-2xl border bg-card sticky top-4">
             <div className="px-3 py-2 text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase border-b mb-1">
               Menu de Configuração IA
             </div>
@@ -672,6 +587,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                   key={tab.id}
                   type="button"
                   onClick={() => handleSelectTab(tab.id)}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs transition-all text-left w-full",
                     isActive
@@ -1213,11 +1129,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
             </Card>
           </div>
         )}
-      </div>
+        </div>
+        </div>
+      </main>
     </div>
-  </div>
-</div>
 );
 }
-
-

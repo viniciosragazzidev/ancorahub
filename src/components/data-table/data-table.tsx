@@ -37,7 +37,7 @@ export function DataTable<TData>({
   return (
     <div data-slot="data-table" className={cn("w-full space-y-3", className)} {...props}>
       {children}
-      <div data-slot="data-table-surface" className={cn("relative overflow-hidden rounded-2xl border-0 bg-card/40 dark:bg-card/60", containerClassName)}>
+      <div data-slot="data-table-surface" className={cn("relative overflow-hidden rounded-2xl border-0 bg-card dark:bg-card", containerClassName)}>
         {isPending && (
           <div className="absolute top-0 left-0 right-0 z-20 h-0.5 overflow-hidden bg-primary/20">
             <div className="h-full w-full animate-pulse bg-primary" />

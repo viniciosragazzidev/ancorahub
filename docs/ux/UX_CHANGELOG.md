@@ -357,3 +357,13 @@ de métricas entre tenants.
 - `Table` e `DataTable` passaram a compartilhar cabeçalho recuado, bordas
   discretas e hover de linha suave; `/filiais` e `/leads` herdam o padrão sem
   lógica específica de rota.
+
+## 2026-09-05 — canvas claro, `/leads` e `/qualificacao`
+
+- O canvas do tema claro do shell Clean UI passou para branco (`#ffffff`),
+  mantendo o tema escuro e o rollback por tenant.
+- `DataTable` e as tabelas de `/leads` passaram a usar a superfície opaca de
+  card, removendo a mistura transparente que deixava o fundo acinzentado.
+- Os indicadores de `/qualificacao` foram compostos com `StatCard`, os mesmos
+  tokens de métrica do `/dashboard`; a subnavegação recebeu slot semântico,
+  borda leve e `aria-current` para o estado ativo.

@@ -170,3 +170,19 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
 - **GUARDRAIL**: estados semânticos (warning, success, destructive), ações e
   regras de negócio permanecem definidos pela feature e não são sobrescritos
   pelo tratamento visual comum.
+
+## DEC-013 — Canvas claro e Qualificação alinhada ao Dashboard
+
+- **DECISION**: no tema claro, o canvas operacional usa branco como superfície
+  base; áreas de conteúdo e tabelas continuam separadas por espaçamento,
+  bordas discretas e superfícies compartilhadas, não por um fundo cinza escuro.
+  Os cinco indicadores de `/qualificacao` usam `StatCard`, o mesmo primitive do
+  dashboard, e a navegação da configuração recebe slots semânticos e estado
+  acessível.
+- **WHY**: reduzir contraste ambiental e variação entre rotas melhora leitura
+  de dados e torna o centro de qualificação reconhecível como parte do mesmo
+  produto.
+- **SCOPE**: somente apresentação; tema escuro, permissões, métricas, estados de
+  IA e regras de tenant permanecem inalterados.
+- **ROLLBACK**: a flag Clean UI continua sendo a fronteira de ativação dos
+  tokens claros; não há migração de dados nem dependência nova.
