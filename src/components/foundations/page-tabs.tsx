@@ -46,6 +46,7 @@ export function PageTabs({
             <Link
               key={tab.id}
               href={hrefBuilder(tab.id)}
+              scroll={false}
               aria-current={isCurrent ? "page" : undefined}
               className={cn(
                 "group relative flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all select-none",

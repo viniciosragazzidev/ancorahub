@@ -234,6 +234,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
 
   return (
     <Sidebar
+      data-slot="navigation-rail"
       variant="sidebar"
       collapsible="none"
       className="sticky top-0 h-dvh max-h-dvh w-(--sidebar-width) min-w-(--sidebar-width) max-w-(--sidebar-width) border-r border-[#16292B] bg-[#0A1517] text-slate-100 shadow-xl select-none overflow-hidden"
@@ -304,7 +305,9 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   <TooltipTrigger
                     render={
                       <Link
+                        data-slot="rail-link"
                         href={itemTargetUrl}
+                        aria-current={isActive ? "page" : undefined}
                         prefetch={priorityNavigationPaths.has(itemTargetUrl)}
                         onClick={() => isMobile && setOpenMobile(false)}
                         className="group relative flex w-full flex-col items-center justify-center gap-1 py-1 text-center outline-none select-none transition-transform active:scale-95"
@@ -320,6 +323,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
 
                     {/* Icon Tile */}
                     <div
+                      data-slot="rail-tile"
                       className={cn(
                         "relative flex size-11 items-center justify-center rounded-2xl transition-all duration-200",
                         // Inactive state: crisp light icons on dark slate
@@ -337,6 +341,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       {isActive && !item.isWhatsApp && (
                         <motion.div
                           layoutId="sidebar-rail-active"
+                          data-slot="rail-decoration"
                           className="absolute inset-0 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 pointer-events-none"
                           transition={{ type: "spring", stiffness: 400, damping: 30 }}
                         />
@@ -362,6 +367,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
 
                     {/* Label Text Underneath */}
                     <span
+                      data-slot="rail-label"
                       className={cn(
                         "max-w-[70px] truncate text-[10px] font-medium leading-tight tracking-tight transition-colors",
                         isActive

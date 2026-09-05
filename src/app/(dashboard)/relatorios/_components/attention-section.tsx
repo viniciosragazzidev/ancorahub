@@ -27,7 +27,7 @@ export function AttentionSection({ attention, period }: AttentionSectionProps) {
             key={item.id}
             href={item.href}
             className={cn(
-              "group rounded-lg border border-border bg-card p-4 shadow-sm",
+              "report-card group rounded-lg border border-border bg-card p-4 shadow-sm",
               "transition-colors hover:border-primary/30 hover:bg-primary/5",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               item.count === 0 && "opacity-60",

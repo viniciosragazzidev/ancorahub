@@ -40,12 +40,14 @@ export function AppShell({
   user,
   isLightBroker = false,
   initialAvailability = "available",
+  cleanUiEnabled = false,
 }: {
   children: ReactNode;
   branding?: Branding;
   user?: UserInfo;
   isLightBroker?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
+  cleanUiEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -94,6 +96,7 @@ export function AppShell({
   if (isLightBroker) {
     return (
       <SidebarProvider
+        data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
         defaultOpen={false}
         open={false}
         className="min-h-dvh flex-col overflow-x-hidden"
@@ -120,7 +123,7 @@ export function AppShell({
             user={user}
             initialAvailability={initialAvailability}
           />
-          <main className="flex-1 min-h-0 w-full overflow-y-auto">
+          <main ref={canvasRef} className="flex-1 min-h-0 w-full overflow-y-auto">
             {children}
           </main>
         </div>
@@ -131,6 +134,7 @@ export function AppShell({
   return (
     <OnboardingProvider>
       <SidebarProvider
+        data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
         className="min-h-dvh overflow-hidden"
         style={
           {

@@ -34,7 +34,7 @@ export function FunnelSection({ funnel }: FunnelSectionProps) {
         <span>{funnel.received} leads recebidos</span>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <div data-slot="report-card" className="report-card rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="space-y-3">
           {funnel.rows.map((row) => {
             const barWidth = Math.round((row.reached / maxReached) * MAX_BAR_WIDTH);

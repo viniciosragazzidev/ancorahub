@@ -8,7 +8,10 @@ anterior.
 
 1. [Contrato de Redesign](./UX_REDESIGN_CONTRACT.md)
 2. [Controle de Execução](./UX_REDESIGN_CONTROL.md)
-3. Regras de domínio e permissões aplicáveis em `docs/business-rules.md` e
+3. [Governança do refinamento transversal](./UX_GOVERNANCE_PLAN.md)
+4. [Decisões visuais](./UX_DECISIONS.md)
+5. [Changelog visual](./UX_CHANGELOG.md)
+6. Regras de domínio e permissões aplicáveis em `docs/business-rules.md` e
    `docs/decision-log.md`.
 
 ## Regra de operação

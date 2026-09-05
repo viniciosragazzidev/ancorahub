@@ -304,4 +304,23 @@ Validar a biblioteca canônica de `src/components/foundations/` em uma página p
 - `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Omissão do status em `chips` e remoção da chamada duplicada de `<ActiveFilterChips>`.
 - `src/components/corretop-sidebar.tsx`: Atualização do label de navegação para "Equipe".
 
+## 2026-09-04 — UX-GOV-1: refinamento transversal governado
 
+### Entregue
+
+- Rollout Clean UI resolvido no servidor e aplicado ao shell autenticado sem
+  alterar o escopo do tenant.
+- Tokens de superfície, borda, controle e raio consolidados em
+  `src/styles/operational-ui.css`.
+- Rail, abas, filtros e campos passaram a expor slots semânticos para uma única
+  camada visual; o link de aba preserva a posição de scroll.
+- Cards de KPI, atenção, funil e equipe receberam a mesma composição leve do
+  dashboard.
+- Removido o ocultamento global de scrollbar dentro de `Card`, preservando a
+  descoberta de regiões roláveis.
+
+### Ainda pendente
+
+QA visual autenticado por rota, validação de estados vazios/loading/error em
+desktop e mobile, extração futura das composições compartilhadas de relatórios e
+certificação individual das etapas UX-1G–UX-1J.

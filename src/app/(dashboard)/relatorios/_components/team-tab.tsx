@@ -19,12 +19,12 @@ export function TeamTab({ period, teamPerformance }: TeamTabProps) {
         </div>
 
         {!teamPerformance || teamPerformance.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-8 text-center shadow-sm">
+          <div data-slot="report-card" className="report-card rounded-lg border border-border bg-card p-8 text-center shadow-sm">
             <Users className="mx-auto mb-2 size-8 text-muted-foreground" />
             <p className="text-sm font-medium text-muted-foreground">Nenhum dado de equipe disponível para este período.</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-border bg-card shadow-sm overflow-x-auto">
+          <div data-slot="report-card" className="report-card rounded-lg border border-border bg-card shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">

@@ -11,6 +11,7 @@ export interface FilterBarProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  searchLabel?: string;
   quickFilters?: React.ReactNode;
   advancedFiltersTrigger?: {
     activeCount?: number;
@@ -26,6 +27,7 @@ export function FilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder = "Buscar...",
+  searchLabel = "Buscar",
   quickFilters,
   advancedFiltersTrigger,
   onClearFilters,
@@ -43,14 +45,15 @@ export function FilterBar({
     >
       <div className="flex flex-1 flex-wrap items-center gap-2">
         {onSearchChange !== undefined && (
-          <div className="relative min-w-[200px] max-w-sm flex-1">
+          <div className="relative min-w-[12rem] max-w-sm flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
               value={searchValue ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className="h-8 pl-8.5 pr-8 text-xs bg-background"
+              aria-label={searchLabel}
+              className="pl-8.5 pr-8 bg-background"
             />
             {searchValue && (
               <button
@@ -73,7 +76,7 @@ export function FilterBar({
             variant="outline"
             size="sm"
             onClick={advancedFiltersTrigger.onClick}
-            className="h-8 gap-1.5 text-xs font-medium"
+            className="gap-1.5 font-medium"
           >
             <SlidersHorizontal className="size-3.5 text-muted-foreground" />
             <span>Filtros</span>
@@ -94,7 +97,7 @@ export function FilterBar({
             variant="ghost"
             size="sm"
             onClick={onClearFilters}
-            className="h-8 text-xs text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
           >
             Limpar tudo
           </Button>

@@ -63,7 +63,7 @@ export function KpiComparisonCard({
   isCurrency,
 }: KpiComparisonCardProps) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <div data-slot="report-card" className="report-card rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <div className={cn("flex size-9 items-center justify-center rounded-md", iconClassName)}>
           <Icon className="size-4" />

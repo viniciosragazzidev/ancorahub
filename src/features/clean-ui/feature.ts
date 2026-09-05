@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 import { getSystemSettings } from "@/features/system-settings/queries";
 
@@ -21,8 +22,8 @@ export async function getCleanUiOperationalLegacyTenantIds() {
   return parseTenantIds(settings[0]?.value);
 }
 
-export async function isCleanUiOperationalEnabled(tenantId: string) {
+export const isCleanUiOperationalEnabled = cache(async (tenantId: string) => {
   const settings = await getSystemSettings([CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING]);
   const values = new Map(settings.map((setting) => [setting.key, setting.value]));
   return values.get(CLEAN_UI_FEATURE) !== "false" && !parseTenantIds(values.get(CLEAN_UI_LEGACY_TENANTS_SETTING)).includes(tenantId);
-}
+});

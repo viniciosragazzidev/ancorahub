@@ -116,3 +116,14 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
 - **CHOSEN**: Opção 2.
 - **WHY**: Toda cor na interface passa a ter um significado claro e intuitivo, reduzindo o tempo de leitura do operador.
 - **IMPACT**: `<StatusBadge />`, `<StatusDot />`, Leads, Filiais, Qualificação IA, Webhooks.
+## DEC-009 — Refinamento Clean UI com rollout reversível
+
+- **DECISION**: O refinamento visual transversal usa os primitives existentes e é
+  habilitado pelo controle auditável `feature_clean_ui_operational_enabled`.
+- **SCOPE**: shell, rail, controles, abas, cards e composições do dashboard; não
+  altera autorização, métricas, distribuição ou transporte de mensagens.
+- **RULES**: bordas discretas, sombra apenas quando comunica ação, cor reservada a
+  estado, uma gramática de controle e foco visível. O estado `classic` permanece
+  como rollback por tenant.
+- **VALIDATION**: cada rota continua sujeita ao gate visual e funcional próprio;
+  nenhuma aprovação é inferida apenas pela existência dos tokens.

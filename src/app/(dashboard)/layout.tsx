@@ -20,8 +20,8 @@ import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
+import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -37,6 +37,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // is resolved. Starting them together keeps client-side route transitions from
   // serializing the shell, preference, branding and pathname lookups.
   const experienceModePromise = getExperienceMode(context);
+  const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
   const tenantPromise = getDatabase()
     .select({
@@ -76,12 +77,14 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     tenantRows,
     userRows,
     membershipRows,
+    cleanUiEnabled,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
     tenantPromise,
     userPromise,
     membershipPromise,
+    cleanUiPromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
@@ -118,6 +121,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   return (
     <AgentDrawerProvider>
       <AppShell
+        cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker}
         branding={{
           tenantName: tenant?.name ?? null,
