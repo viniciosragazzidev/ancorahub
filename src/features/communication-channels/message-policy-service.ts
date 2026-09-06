@@ -80,10 +80,11 @@ export type ResolvedEventMessagePlan = {
 };
 
 export function isMissingMessagePolicyTable(error: unknown) {
-  return typeof error === "object"
-    && error !== null
-    && "code" in error
-    && (error as { code?: unknown }).code === "42P01";
+  if (!error || typeof error !== "object") return false;
+  const databaseError = error as { code?: unknown; cause?: { code?: unknown }; message?: unknown };
+  return databaseError.code === "42P01"
+    || databaseError.cause?.code === "42P01"
+    || (typeof databaseError.message === "string" && /relation .* does not exist/i.test(databaseError.message));
 }
 
 function asStringArray(value: unknown) {
