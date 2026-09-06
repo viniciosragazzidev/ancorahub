@@ -41,7 +41,7 @@ type EventItem = {
 };
 type MetaTemplate = { id: string; name: string; language: string; category: string; status: string; variables: string[] };
 type FreeMessage = { id: string; name: string; category: string; content: string; variables: string[] };
-type StudioData = { globallyEnabled: boolean; events: EventItem[]; metaTemplates: MetaTemplate[]; freeMessages: FreeMessage[] };
+type StudioData = { globallyEnabled: boolean; loadError?: string; events: EventItem[]; metaTemplates: MetaTemplate[]; freeMessages: FreeMessage[] };
 type Draft = {
   primaryKind: ResourceKind;
   metaTemplateId: string;
@@ -71,10 +71,12 @@ function policyToDraft(policy: Policy | null): Draft {
 export function MessagePoliciesPanel({
   canManage,
   preferredMetaTemplateId,
+  preferredEventKey,
   onPreferredMetaTemplateApplied,
 }: {
   canManage: boolean;
   preferredMetaTemplateId: string | null;
+  preferredEventKey: string | null;
   onPreferredMetaTemplateApplied: () => void;
 }) {
   const [data, setData] = useState<StudioData | null>(null);
@@ -119,8 +121,10 @@ export function MessagePoliciesPanel({
     // O template pode ser escolhido enquanto a lista de situações ainda está
     // carregando. Nesse caso, usa a primeira situação como destino explícito,
     // em vez de fechar o drawer e perder a ação.
-    const eventKey = selectedEventKey ?? data.events[0].key;
-    if (!selectedEventKey) setSelectedEventKey(eventKey);
+    const eventKey = preferredEventKey && data.events.some((event) => event.key === preferredEventKey)
+      ? preferredEventKey
+      : selectedEventKey ?? data.events[0].key;
+    setSelectedEventKey(eventKey);
 
     setDrafts((current) => ({
       ...current,
@@ -140,7 +144,7 @@ export function MessagePoliciesPanel({
     }, 220);
     toast.info("Template selecionado. Revise a situação e clique em ‘Salvar e publicar’.");
     onPreferredMetaTemplateApplied();
-  }, [data, onPreferredMetaTemplateApplied, preferredMetaTemplateId, selectedEventKey]);
+  }, [data, onPreferredMetaTemplateApplied, preferredEventKey, preferredMetaTemplateId, selectedEventKey]);
 
   const selectedEvent = data?.events.find((event) => event.key === selectedEventKey) ?? null;
   const selectedDraft = selectedEventKey ? drafts[selectedEventKey] ?? emptyDraft : emptyDraft;
@@ -215,6 +219,11 @@ export function MessagePoliciesPanel({
           {data && !data.globallyEnabled ? (
             <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-muted-foreground">
               As políticas por situação estão pausadas pela plataforma. As configurações permanecem salvas e o envio usa o comportamento homologado anterior.
+            </div>
+          ) : null}
+          {data?.loadError ? (
+            <div className="mb-4 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-muted-foreground">
+              {data.loadError}
             </div>
           ) : null}
           {loading ? (

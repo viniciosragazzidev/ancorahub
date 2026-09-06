@@ -370,7 +370,27 @@ export async function fetchMessageEventPoliciesAction() {
     throw new AuthorizationError("Você não tem permissão para visualizar as mensagens da qualificação.");
   }
   const { listMessageEventPolicies } = await import("@/features/communication-channels/message-policy-service");
-  return listMessageEventPolicies(context.tenantId);
+  try {
+    return await listMessageEventPolicies(context.tenantId);
+  } catch (error) {
+    // Nunca devolva o erro bruto do banco ao cliente. A tela permanece útil com
+    // o catálogo tipado e permite tentar novamente depois que a infraestrutura
+    // voltar a responder.
+    console.error("[qualification] message_policies_load_failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+      code: typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code ?? "unknown")
+        : "unknown",
+    });
+    const { MESSAGE_EVENT_CATALOG } = await import("@/features/communication-channels/message-event-catalog");
+    return {
+      globallyEnabled: false,
+      loadError: "Não foi possível consultar as mensagens e situações agora. Tente novamente em instantes.",
+      events: MESSAGE_EVENT_CATALOG.map((event) => ({ ...event, variables: event.variables.map((variable) => ({ ...variable })), policy: null })),
+      metaTemplates: [],
+      freeMessages: [],
+    };
+  }
 }
 
 export async function saveMessageEventPolicyAction(input: {

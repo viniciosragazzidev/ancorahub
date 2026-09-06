@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ArrowsClockwise, Check, InfoIcon, PaperPlaneTilt, Plus, Trash } from "@/components/huge-icons";
+import { MESSAGE_EVENT_CATALOG } from "@/features/communication-channels/message-event-catalog";
 import { TemplateBuilderWizard } from "./template-builder-wizard";
 
 type Template = {
@@ -26,7 +27,7 @@ type Template = {
   componentsJson: any;
 };
 
-export function TemplateListView({ canManage, onUseTemplate }: { canManage: boolean; onUseTemplate?: (templateId: string) => void }) {
+export function TemplateListView({ canManage, onUseTemplate }: { canManage: boolean; onUseTemplate?: (templateId: string, eventKey: string) => void }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -35,6 +36,7 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [configuringTemplate, setConfiguringTemplate] = useState(false);
+  const [selectedSituationKey, setSelectedSituationKey] = useState(MESSAGE_EVENT_CATALOG[0]?.key ?? "FIRST_CONTACT");
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Test modal state
@@ -213,6 +215,7 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
                   className="group cursor-pointer border-border transition-colors hover:border-primary/50"
                   onClick={() => {
                     setConfiguringTemplate(false);
+                    setSelectedSituationKey(MESSAGE_EVENT_CATALOG[0]?.key ?? "FIRST_CONTACT");
                     setSelectedTemplate(t);
                   }}
                 >
@@ -308,12 +311,33 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
                 <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4">
                   <p className="text-sm font-semibold">Configurar este template</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Escolha a situação no painel seguinte. O template será aplicado como mensagem principal, mas só será ativado depois de você salvar e publicar.
+                    Selecione ou crie a configuração de uma situação diretamente aqui. O template será aplicado como mensagem principal, mas só será ativado depois de você salvar e publicar.
                   </p>
+                  <div className="mt-3 grid gap-2">
+                    <label htmlFor="template-situation" className="text-xs font-medium text-foreground">Situação do fluxo</label>
+                    <Select value={selectedSituationKey} onValueChange={(value) => value && setSelectedSituationKey(value)}>
+                      <SelectTrigger id="template-situation" className="w-full">
+                        <SelectValue placeholder="Escolha uma situação" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MESSAGE_EVENT_CATALOG.map((event) => (
+                          <SelectItem key={event.key} value={event.key}>
+                            <span className="flex flex-col items-start py-0.5">
+                              <span>{event.label}</span>
+                              <span className="text-[11px] text-muted-foreground">{event.audience === "user" ? "Aviso interno" : "Mensagem ao cliente"}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] leading-4 text-muted-foreground">
+                      Escolher uma situação ainda sem política cria a configuração dela; situações já configuradas serão atualizadas após a publicação.
+                    </p>
+                  </div>
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={() => setConfiguringTemplate(false)}>Cancelar</Button>
                     <Button type="button" size="sm" onClick={() => {
-                      onUseTemplate(selectedTemplate.id);
+                      onUseTemplate(selectedTemplate.id, selectedSituationKey);
                       setConfiguringTemplate(false);
                       setSelectedTemplate(null);
                     }}>
