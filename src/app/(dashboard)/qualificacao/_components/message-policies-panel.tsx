@@ -160,7 +160,7 @@ export function MessagePoliciesPanel({
     if (!selectedEventKey || !canManage) return;
     setSaving(true);
     try {
-      await saveMessageEventPolicyAction({
+      const result = await saveMessageEventPolicyAction({
         eventKey: selectedEventKey,
         primaryKind: selectedDraft.primaryKind,
         metaTemplateId: selectedDraft.metaTemplateId || null,
@@ -168,6 +168,10 @@ export function MessagePoliciesPanel({
         fallbackKind: selectedDraft.fallbackKind === "none" ? null : selectedDraft.fallbackKind,
         active: selectedDraft.active,
       });
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Política publicada e conectada ao fluxo.");
       await load();
     } catch (error) {

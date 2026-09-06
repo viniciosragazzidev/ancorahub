@@ -404,7 +404,35 @@ export async function saveMessageEventPolicyAction(input: {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { saveMessageEventPolicy } = await import("@/features/communication-channels/message-policy-service");
-  return saveMessageEventPolicy(context.tenantId, context.userId, input);
+  try {
+    return await saveMessageEventPolicy(context.tenantId, context.userId, input);
+  } catch (error) {
+    const databaseError = error as { code?: unknown; cause?: { code?: unknown } };
+    console.error("[qualification] message_policy_save_failed", {
+      eventKey: input.eventKey,
+      errorType: error instanceof Error ? error.name : "unknown",
+      code: String(databaseError.code ?? databaseError.cause?.code ?? "unknown"),
+    });
+
+    const message = error instanceof Error ? error.message : "";
+    const isSafeDomainMessage = [
+      "A situação",
+      "O template Meta",
+      "A variável",
+      "A mensagem livre",
+      "Para usar mensagem livre",
+      "A contingência",
+      "Selecione um template Meta",
+      "Selecione uma mensagem livre",
+    ].some((prefix) => message.startsWith(prefix));
+
+    return {
+      success: false as const,
+      error: isSafeDomainMessage
+        ? message
+        : "Não foi possível publicar esta situação. Atualize a página e tente novamente.",
+    };
+  }
 }
 
 /* ─── Modelos Livres (Janela de 24 Horas / Sem Aprovação) ─── */

@@ -62,6 +62,18 @@ idempotência e política Meta/WAHA.
   erro de lint preexistente em `src/lib/compose-refs.ts`; os diagnósticos de
   arquitetura/desempenho são recomendações para arquivos grandes já existentes.
 
+### Correção operacional de persistência
+
+- A tentativa de publicar uma situação em produção revelou que a migration
+  `0142_event_message_policies` ainda era a única pendente no ledger da base.
+- A migration aditiva foi aplicada de forma controlada e a existência da tabela,
+  colunas, índices e políticas legadas migradas foi conferida depois da execução.
+- A Server Action de publicação agora devolve falha estruturada e segura para a
+  interface, mantendo o detalhe técnico apenas no log sem conteúdo de mensagem.
+- A consulta direta à WABA ativa confirmou que o seletor apresenta todos os
+  templates `APPROVED` efetivamente disponíveis nessa conta. Templates vistos em
+  outra WABA não são combinados, pois seriam inválidos para envio pelo canal ativo.
+
 ## Catálogo inicial
 
 | Situação | Finalidade atual | Público | Regra |
