@@ -307,7 +307,7 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
                       }}
                     >
                       <Check className="size-4 mr-2" />
-                      Usar em uma situação
+                      Configurar situação
                     </Button>
                   ) : null}
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(selectedTemplate.id)}>

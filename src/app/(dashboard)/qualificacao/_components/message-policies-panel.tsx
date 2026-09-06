@@ -105,19 +105,27 @@ export function MessagePoliciesPanel({
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!preferredMetaTemplateId || !selectedEventKey) return;
+    if (!preferredMetaTemplateId || !data?.events.length) return;
+
+    // O template pode ser escolhido enquanto a lista de situações ainda está
+    // carregando. Nesse caso, usa a primeira situação como destino explícito,
+    // em vez de fechar o drawer e perder a ação.
+    const eventKey = selectedEventKey ?? data.events[0].key;
+    if (!selectedEventKey) setSelectedEventKey(eventKey);
+
     setDrafts((current) => ({
       ...current,
-      [selectedEventKey]: {
-        ...(current[selectedEventKey] ?? emptyDraft),
+      [eventKey]: {
+        ...(current[eventKey] ?? emptyDraft),
         primaryKind: "meta_template",
         metaTemplateId: preferredMetaTemplateId,
         active: true,
       },
     }));
-    toast.info("Template aplicado à situação aberta. Revise e salve a política.");
+    document.getElementById("message-situations")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    toast.info("Template selecionado. Revise a situação e clique em ‘Salvar e publicar’.");
     onPreferredMetaTemplateApplied();
-  }, [onPreferredMetaTemplateApplied, preferredMetaTemplateId, selectedEventKey]);
+  }, [data, onPreferredMetaTemplateApplied, preferredMetaTemplateId, selectedEventKey]);
 
   const selectedEvent = data?.events.find((event) => event.key === selectedEventKey) ?? null;
   const selectedDraft = selectedEventKey ? drafts[selectedEventKey] ?? emptyDraft : emptyDraft;
@@ -181,7 +189,7 @@ export function MessagePoliciesPanel({
 
   return (
     <div className="grid gap-6">
-      <Card>
+      <Card id="message-situations">
         <CardHeader>
           <CardTitle>Situações do fluxo</CardTitle>
           <CardDescription>
