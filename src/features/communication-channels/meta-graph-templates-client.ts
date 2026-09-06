@@ -66,6 +66,41 @@ export async function fetchWabaMessageTemplates(
   );
 }
 
+export async function createWabaMessageTemplate(
+  wabaId: string,
+  accessToken: string,
+  input: {
+    name: string;
+    language: string;
+    category: MetaTemplateCategory;
+    components: MetaGraphTemplateComponent[];
+  },
+) {
+  return graphRequest<{ id?: string; status?: string; category?: string }>(
+    `${encodeURIComponent(wabaId)}/message_templates`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+    accessToken,
+  );
+}
+
+export async function deleteWabaMessageTemplate(
+  wabaId: string,
+  accessToken: string,
+  input: { name: string; metaTemplateId?: string | null },
+) {
+  const params = new URLSearchParams({ name: input.name });
+  if (input.metaTemplateId) params.set("hsm_id", input.metaTemplateId);
+  return graphRequest<{ success?: boolean }>(
+    `${encodeURIComponent(wabaId)}/message_templates?${params.toString()}`,
+    { method: "DELETE" },
+    accessToken,
+  );
+}
+
 export async function sendMetaCloudTemplateTest(
   phoneNumberId: string,
   accessToken: string,

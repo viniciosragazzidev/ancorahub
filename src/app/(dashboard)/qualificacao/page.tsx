@@ -107,6 +107,7 @@ export default async function QualificacaoPage() {
       stats={stats}
       alerts={alerts}
       agentTraining={agentTraining}
+      canManageMessages={context.role === "director" || context.role === "manager"}
     />
   );
 }

@@ -1,15 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { CheckCircle, ShieldWarning } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
 import { MetaEmbeddedSignupCard } from "@/features/communication-channels/components/meta-embedded-signup-card";
 import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
-import { TemplateListView } from "../integrations/whatsapp/_components/template-list-view";
-import { TemplateUsagesCard } from "../integrations/whatsapp/_components/template-usages-card";
+import { Button } from "@/components/ui/button";
 
 type Channel = {
   id: string;
@@ -67,16 +67,11 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
           Central WhatsApp da Operação
         </h1>
         <p className="mt-1 text-pretty text-sm leading-6 text-muted-foreground">
-          Conecte o número corporativo oficial da Meta e gerencie templates de mensagem com sincronização automática.
+          Conecte e monitore o número corporativo oficial usado pelos fluxos de atendimento.
         </p>
       </header>
 
-      <Tabs defaultValue="connection" variant="segment" className="w-full space-y-6">
-        <TabsList className="w-full max-w-md snap-x snap-mandatory flex-nowrap justify-start overflow-x-auto">
-          <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="connection">Número & Conexão</TabsTrigger>
-          <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="templates">Templates Meta</TabsTrigger>
-          <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="usages">Eventos & Usos</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="connection" className="w-full">
 
         {/* ABA 1: CONEXÃO */}
         <TabsContent value="connection" className="space-y-6">
@@ -173,16 +168,21 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
           </section>
         </TabsContent>
 
-        {/* ABA 2: TEMPLATES META */}
-        <TabsContent value="templates">
-          <TemplateListView canManage={official.canConfigure} />
-        </TabsContent>
-
-        {/* ABA 3: MAPEAMENTO DE EVENTOS */}
-        <TabsContent value="usages">
-          <TemplateUsagesCard canManage={official.canConfigure} />
-        </TabsContent>
       </Tabs>
+
+      <Card className="border-border bg-card shadow-none">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Mensagens automáticas</CardTitle>
+            <CardDescription className="mt-1">
+              Templates Meta, mensagens livres e situações do fluxo agora possuem uma única configuração na Qualificação.
+            </CardDescription>
+          </div>
+          <Button render={<Link href="/qualificacao?tab=meta_templates" />}>
+            Configurar mensagens
+          </Button>
+        </CardHeader>
+      </Card>
     </main>
   );
 }

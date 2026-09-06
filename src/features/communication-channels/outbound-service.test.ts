@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
+import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, resolveWahaNoticeBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS, scheduleBrokerLeadNotification } from "@/features/notifications/broker-lead-cadence";
 
 vi.mock("server-only", () => ({}));
@@ -77,5 +77,17 @@ describe("outboundService", () => {
     const qualifText = resolveTemplateTextBody("leadQualification", ["Fernanda"]);
     expect(qualifText).toContain("Olá *Fernanda*!");
     expect(qualifText).toContain("Como podemos te ajudar");
+  });
+
+  it("keeps the selected free primary in direct WAHA mode and uses fallback only after a Meta failure", () => {
+    const row = {
+      messageType: "text",
+      variables: ["legacy"],
+      renderedBody: "Mensagem principal configurada",
+      fallbackRenderedBody: "Mensagem de contingência configurada",
+      purpose: "brokerLeadNotification",
+    };
+    expect(resolveWahaNoticeBody(row, "direct")).toBe("Mensagem principal configurada");
+    expect(resolveWahaNoticeBody(row, "fallback")).toBe("Mensagem de contingência configurada");
   });
 });

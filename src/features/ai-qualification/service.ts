@@ -5,7 +5,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { aiComplete } from "@/features/ai/engine";
-import { processMetaOutboundBatch, enqueueMetaTextMessage } from "@/features/communication-channels/outbound-service";
+import {
+  enqueueAndProcessMetaEventMessage,
+  enqueueMetaTextMessage,
+  processMetaOutboundBatch,
+} from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { startQualificationConversationForLead } from "@/features/ai-agent/conversation-state-machine";
@@ -81,214 +85,55 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
   const expiresAt = new Date(now.getTime() + config.timeoutMinutes * 60_000);
   await db.insert(schema.aiQualificationSessions).values({ id: sessionId, tenantId: input.tenantId, leadId: input.leadId, status: "waiting_customer", currentQuestionKey: questions[0].key, collectedData: {}, missingFields: questions.map((question) => question.key), expiresAt, createdAt: now, updatedAt: now }).onConflictDoUpdate({ target: [schema.aiQualificationSessions.tenantId, schema.aiQualificationSessions.leadId], set: { status: "waiting_customer", currentQuestionKey: questions[0].key, collectedData: {}, missingFields: questions.map((question) => question.key), expiresAt, failureReason: null, retryCount: 0, updatedAt: now } });
   
-  let dispatchedViaTemplate = false;
   let finalBody = `${config.initialMessage}\n\n${questions[0].prompt}`;
   let queuedId: string | undefined = undefined;
 
   try {
-    const { resolveMetaChannelCredentials } = await import("@/features/communication-channels/template-sync-service");
-    const { sendMetaCloudTemplateTest } = await import("@/features/communication-channels/meta-graph-templates-client");
-    const credentials = await resolveMetaChannelCredentials(input.tenantId);
-
-    if (credentials.phoneNumberId && credentials.accessToken) {
-      // 1. Check metaWhatsAppTemplateUsages for user-selected default FIRST_CONTACT template
-      const [userDefaultTemplate] = await db
-        .select({
-          id: schema.metaWhatsAppTemplates.id,
-          name: schema.metaWhatsAppTemplates.name,
-          language: schema.metaWhatsAppTemplates.language,
-          category: schema.metaWhatsAppTemplates.category,
-          status: schema.metaWhatsAppTemplates.status,
-          bodyText: schema.metaWhatsAppTemplates.bodyText,
-          componentsJson: schema.metaWhatsAppTemplates.componentsJson,
-        })
-        .from(schema.metaWhatsAppTemplateUsages)
-        .innerJoin(
-          schema.metaWhatsAppTemplates,
-          eq(schema.metaWhatsAppTemplateUsages.templateId, schema.metaWhatsAppTemplates.id)
-        )
-        .where(
-          and(
-            eq(schema.metaWhatsAppTemplateUsages.tenantId, input.tenantId),
-            eq(schema.metaWhatsAppTemplateUsages.eventKey, "FIRST_CONTACT"),
-            eq(schema.metaWhatsAppTemplateUsages.active, true),
-            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-            isNull(schema.metaWhatsAppTemplates.deletedAt)
-          )
-        )
-        .limit(1);
-
-      // 2. Fall back to template named lead_first_contact
-      const [firstContactTemplate] = userDefaultTemplate ? [null] : await db
-        .select()
-        .from(schema.metaWhatsAppTemplates)
-        .where(
-          and(
-            eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
-            eq(schema.metaWhatsAppTemplates.name, "lead_first_contact"),
-            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-            isNull(schema.metaWhatsAppTemplates.deletedAt)
-          )
-        )
-        .limit(1);
-
-      // 3. Fall back to any approved template
-      const template = userDefaultTemplate ?? firstContactTemplate ?? (
-        await db
-          .select()
-          .from(schema.metaWhatsAppTemplates)
-          .where(
-            and(
-              eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
-              eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-              isNull(schema.metaWhatsAppTemplates.deletedAt)
-            )
-          )
-          .limit(1)
-      )[0];
-
-      if (template) {
-        const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
-        const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
-        const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
-        const leadName = lead.nome || "Cliente";
-
-        const { sendMetaCloudTemplate, MetaCloudApiError } = await import("@/features/communication-channels/meta-cloud-client");
-
-        // Analisar quantidade de marcadores no bodyText do template para ajustar os parâmetros exatamente
-        const bodyText = template.bodyText || "";
-        const matches = bodyText.match(/\{\{([a-zA-Z0-9_]+)\}\}/g) || [];
-        const uniqueParams = Array.from(new Set(matches));
-        const paramCount = Math.max(1, uniqueParams.length);
-
-        const possibleValues = [leadName, botName, "Âncora Saúde"];
-        const bodyVariables = possibleValues.slice(0, paramCount);
-
-        const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
-        const namedParams = bodyComp?.example?.body_text_named_params;
-        const variableNames = namedParams && namedParams.length === bodyVariables.length
-          ? namedParams.map((p: any) => p.param_name || p.parameter_name || "param")
-          : undefined;
-
-        let res: { messages?: Array<{ id: string }> } = {};
-        let sentSuccessfully = false;
-
-        // Tentativa 1: Envio com nomes de variáveis (se houver) ou posicionais
-        try {
-          res = await sendMetaCloudTemplate({
-            phoneNumberId: credentials.phoneNumberId,
-            accessToken: credentials.accessToken,
-            to: lead.phone,
-            templateName: template.name,
-            languageCode: template.language || "pt_BR",
-            variables: bodyVariables,
-            variableNames,
-          });
-          sentSuccessfully = true;
-        } catch (err1) {
-          // Tentativa 2: Se falhar por erro de parâmetro nomeado (código 100), tentar estritamente posicional
-          if (variableNames) {
-            try {
-              res = await sendMetaCloudTemplate({
-                phoneNumberId: credentials.phoneNumberId,
-                accessToken: credentials.accessToken,
-                to: lead.phone,
-                templateName: template.name,
-                languageCode: template.language || "pt_BR",
-                variables: bodyVariables,
-                variableNames: undefined,
-              });
-              sentSuccessfully = true;
-            } catch {
-              // Prosegue para fallback de idioma
-            }
-          }
-
-          // Tentativa 3: Se falhar por código de idioma ("pt_BR" vs "pt" vs "en"), tentar idiomas alternativos
-          if (!sentSuccessfully && err1 instanceof MetaCloudApiError && (err1.code === 100 || err1.message.toLowerCase().includes("language"))) {
-            const fallbackLangs = (template.language || "pt_BR").startsWith("pt") ? ["pt", "pt_BR", "en"] : ["pt_BR", "pt"];
-            for (const langCode of fallbackLangs) {
-              if (langCode === (template.language || "pt_BR")) continue;
-              try {
-                res = await sendMetaCloudTemplate({
-                  phoneNumberId: credentials.phoneNumberId,
-                  accessToken: credentials.accessToken,
-                  to: lead.phone,
-                  templateName: template.name,
-                  languageCode: langCode,
-                  variables: bodyVariables,
-                  variableNames: undefined,
-                });
-                sentSuccessfully = true;
-                break;
-              } catch {
-                // Tenta próximo idioma
-              }
-            }
-          }
-
-          if (!sentSuccessfully) {
-            console.warn("[startAiQualificationForLead] Meta template dispatch failed:", err1);
-          }
-        }
-
-        if (sentSuccessfully) {
-          dispatchedViaTemplate = true;
-          const wamid = res.messages?.[0]?.id ?? null;
-          if (wamid) queuedId = wamid;
-
-          let rendered = template.bodyText || "";
-          if (rendered) {
-            rendered = rendered
-              .replace(/\{\{1\}\}/g, leadName)
-              .replace(/\{\{2\}\}/g, botName)
-              .replace(/\{\{3\}\}/g, "Âncora Saúde")
-              .replace(/\{\{nome\}\}/g, leadName)
-              .replace(/\{\{nome_bot\}\}/g, botName)
-              .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
-          } else {
-            rendered = finalBody;
-          }
-          finalBody = rendered;
-
-          await db.insert(schema.whatsappMessages).values({
-            id: wamid || `tpl_start_${randomUUID()}`,
-            tenantId: input.tenantId,
-            leadId: input.leadId,
-            communicationChannelId: channel.id,
-            senderRole: "assistant",
-            provider: META_CLOUD_PROVIDER,
-            phone: lead.phone,
-            direction: "outbound",
-            body: finalBody,
-            providerStatus: "sent",
-            messageId: wamid ?? undefined,
-            sentAt: now,
-          }).onConflictDoNothing();
-        }
-      }
+    const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
+    const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
+    const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
+    const delivery = await enqueueAndProcessMetaEventMessage({
+      tenantId: input.tenantId,
+      channelId: channel.id,
+      recipientType: "lead",
+      recipientId: input.leadId,
+      destinationPhone: lead.phone,
+      purpose: "leadQualification",
+      variables: [lead.nome || "Cliente", botName, "Âncora Saúde"],
+      requestedBy: input.actorUserId,
+      idempotencyKey: `ai-qualification:${input.leadId}:start:${sessionId}`,
+    });
+    queuedId = delivery.id;
+    if (["sent", "delivered", "read"].includes(delivery.status)) {
+      finalBody = delivery.renderedBody ?? delivery.fallbackRenderedBody ?? finalBody;
+      await db.insert(schema.whatsappMessages).values({
+        id: delivery.providerMessageId || `qualification_start_${randomUUID()}`,
+        tenantId: input.tenantId,
+        leadId: input.leadId,
+        communicationChannelId: delivery.channelId ?? channel.id,
+        senderRole: "assistant",
+        provider: META_CLOUD_PROVIDER,
+        phone: lead.phone,
+        direction: "outbound",
+        body: finalBody,
+        providerStatus: "sent",
+        messageId: delivery.providerMessageId ?? undefined,
+        sentAt: now,
+      }).onConflictDoNothing();
+    } else {
+      throw new Error(delivery.providerErrorMessage || "A mensagem inicial não foi aceita pelo provedor.");
     }
   } catch (templateError) {
-    console.warn("[startAiQualificationForLead] Meta template dispatch skipped/failed:", templateError);
-  }
-
-  if (!dispatchedViaTemplate) {
-    const queued = await enqueueMetaTextMessage({ tenantId: input.tenantId, channelId: channel.id, recipientType: "lead", recipientId: input.leadId, destinationPhone: lead.phone, body: finalBody, requestedBy: input.actorUserId, idempotencyKey: `ai-qualification:${input.leadId}:start:${Date.now()}` });
-    queuedId = queued.id;
-    await db.insert(schema.whatsappMessages).values({
-      id: `ai_msg_start_${randomUUID()}`,
-      tenantId: input.tenantId,
-      leadId: input.leadId,
-      communicationChannelId: channel.id,
-      senderRole: "assistant",
-      provider: META_CLOUD_PROVIDER,
-      phone: lead.phone,
-      direction: "outbound",
-      body: finalBody,
-      providerStatus: "sent",
-      sentAt: now,
-    }).onConflictDoNothing();
-    await processMetaOutboundBatch(1, input.tenantId).catch((error) => console.error("[ai-qualification] initial delivery deferred", error));
+    console.warn("[startAiQualificationForLead] configured first contact failed:", templateError);
+    await db.update(schema.aiQualificationSessions).set({
+      status: "failed",
+      failureReason: "initial_message_dispatch_failed",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(schema.aiQualificationSessions.id, sessionId),
+      eq(schema.aiQualificationSessions.tenantId, input.tenantId),
+    ));
+    return { started: false as const, reason: "initial_message_failed" as const, queuedId };
   }
 
   await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: now }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));

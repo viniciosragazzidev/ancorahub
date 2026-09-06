@@ -16,6 +16,7 @@ import { WhatsAppTemplateResolver } from "./template-sync-service";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS } from "@/features/notifications/broker-lead-cadence";
 import { getInternalBrokerNotificationPolicy, getSelectedInternalWahaNumber, isInternalBrokerNotice } from "./internal-notification-policy";
+import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-policy-service";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -124,13 +125,29 @@ export async function enqueueMetaTemplateMessage(input: {
 }) {
   const destinationPhone = phoneSchema.parse(input.destinationPhone);
   const variables = variablesSchema.parse(input.variables ?? []);
-  const resolvedTemplate = await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
+  const messagePlan = await resolveEventMessagePlan({
+    tenantId: input.tenantId,
+    recipientType: input.recipientType,
+    recipientId: input.recipientId,
+    destinationPhone,
+    purpose: input.purpose,
+    variables,
+  });
+  const resolvedTemplate = messagePlan ? null : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
   const template = resolvedTemplate ?? getMetaWhatsAppTemplate(input.purpose);
-  if (!template) throw new Error("Modelo de WhatsApp não permitido para esta operação.");
+  const primary = messagePlan?.primary ?? (template ? {
+    type: "template" as const,
+    templateName: template.name,
+    templateLanguage: template.language,
+  } : null);
+  if (!primary) throw new Error("Modelo de WhatsApp não permitido para esta operação.");
   const db = getDatabase();
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
-  const delivery = await resolveInternalBrokerDeliveryRoute(input);
+  const configuredDelivery = await resolveInternalBrokerDeliveryRoute(input);
+  const delivery = messagePlan?.preferWahaDirect
+    ? { route: "waha_direct" as const, wahaNumberId: configuredDelivery.wahaNumberId }
+    : configuredDelivery;
   const channelQuery = input.channelId
     ? and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId))
     : and(
@@ -150,7 +167,23 @@ export async function enqueueMetaTemplateMessage(input: {
   const now = new Date();
   await db.insert(schema.whatsappOutboundMessages).values({
     id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: delivery.route, wahaNumberId: delivery.wahaNumberId, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
-    destinationPhone, purpose: input.purpose, messageType: "template", templateName: template.name, templateLanguage: template.language, variables,
+    destinationPhone,
+    purpose: input.purpose,
+    messageType: primary.type,
+    templateName: primary.templateName,
+    templateLanguage: primary.templateLanguage,
+    variables,
+    providerVariables: primary.providerVariables ?? null,
+    templateVariableNames: primary.templateVariableNames ?? null,
+    messagePolicyId: messagePlan?.policyId ?? null,
+    messagePolicyVersion: messagePlan?.policyVersion ?? null,
+    renderedBody: primary.renderedBody ?? null,
+    fallbackMessageType: messagePlan?.fallback?.type ?? null,
+    fallbackTemplateName: messagePlan?.fallback?.templateName ?? null,
+    fallbackTemplateLanguage: messagePlan?.fallback?.templateLanguage ?? null,
+    fallbackRenderedBody: messagePlan?.fallback?.renderedBody ?? null,
+    fallbackProviderVariables: messagePlan?.fallback?.providerVariables ?? null,
+    fallbackTemplateVariableNames: messagePlan?.fallback?.templateVariableNames ?? null,
     status: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued", idempotencyKey: input.idempotencyKey,
     scheduledAt: input.scheduledAt ?? null, queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
   });
@@ -158,6 +191,36 @@ export async function enqueueMetaTemplateMessage(input: {
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.requestedBy, entidade: "whatsapp_outbound_message", entidadeId: id, acao: "whatsapp_message_queued" });
   }
   return { id, status: "queued" as const, duplicate: false };
+}
+
+/**
+ * Persists and immediately attempts one configured event message.
+ *
+ * The outbox remains the source of truth: callers use this helper only when
+ * the business flow needs the provider result before it can advance (for
+ * example, the first qualification message).
+ */
+export async function enqueueAndProcessMetaEventMessage(
+  input: Parameters<typeof enqueueMetaTemplateMessage>[0],
+) {
+  const queued = await enqueueMetaTemplateMessage(input);
+  await processMetaOutboundBatch(1, input.tenantId, queued.id);
+  const [message] = await getDatabase().select({
+    id: schema.whatsappOutboundMessages.id,
+    channelId: schema.whatsappOutboundMessages.channelId,
+    status: schema.whatsappOutboundMessages.status,
+    messageType: schema.whatsappOutboundMessages.messageType,
+    renderedBody: schema.whatsappOutboundMessages.renderedBody,
+    fallbackRenderedBody: schema.whatsappOutboundMessages.fallbackRenderedBody,
+    providerMessageId: schema.whatsappOutboundMessages.providerMessageId,
+    providerErrorCode: schema.whatsappOutboundMessages.providerErrorCode,
+    providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
+  }).from(schema.whatsappOutboundMessages).where(and(
+    eq(schema.whatsappOutboundMessages.id, queued.id),
+    eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+  )).limit(1);
+  if (!message) throw new Error("Mensagem configurada não foi encontrada no outbox.");
+  return message;
 }
 
 /** Queue a tenant-scoped text message through the protected outbox (supports Meta Cloud or WAHA Direct for team). */
@@ -321,9 +384,20 @@ type WahaDeliveryRow = {
   destinationPhone: string;
   messageType: string;
   variables: unknown;
+  renderedBody?: string | null;
+  fallbackRenderedBody?: string | null;
   purpose: string;
   attempts: number;
 };
+
+export function resolveWahaNoticeBody(row: Pick<WahaDeliveryRow, "messageType" | "variables" | "renderedBody" | "fallbackRenderedBody" | "purpose">, mode: "direct" | "fallback") {
+  const variables = Array.isArray(row.variables)
+    ? row.variables.filter((value): value is string => typeof value === "string")
+    : [];
+  const baseBody = row.renderedBody
+    ?? (row.messageType === "text" ? variables[0] ?? "" : resolveTemplateTextBody(row.purpose, variables));
+  return mode === "fallback" ? row.fallbackRenderedBody ?? baseBody : baseBody;
+}
 
 async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direct" | "fallback") {
   const number = await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId);
@@ -332,8 +406,7 @@ async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direc
     error.code = "WAHA_INTERNAL_NUMBER_UNAVAILABLE";
     throw error;
   }
-  const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-  const body = row.messageType === "text" ? variables[0] ?? "" : resolveTemplateTextBody(row.purpose, variables);
+  const body = resolveWahaNoticeBody(row, mode);
   console.info("[waha_internal_outbound] sending notice", {
     outboundId: row.id,
     mode,
@@ -503,73 +576,104 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       const phoneNumberId = channel.phoneNumberId;
       const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
 
-      let metaResponse: { messages?: Array<{ id: string }> } = {};
-      if (row.messageType === "text") {
-        const bodyText = Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "";
-        metaResponse = await sendMetaCloudText({ phoneNumberId, accessToken, to: row.destinationPhone, body: bodyText });
-      } else {
-        const variableNames = getMetaWhatsAppTemplateVariableNames(row.purpose);
-        const rawVariables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-        const templateVariables = splitMetaWhatsAppTemplateVariables(row.purpose, rawVariables);
-        urlButtonParameter ??= templateVariables.urlButtonParameter;
+      const rawVariables = Array.isArray(row.variables)
+        ? row.variables.filter((value): value is string => typeof value === "string")
+        : [];
+      const defaultTemplateVariables = splitMetaWhatsAppTemplateVariables(row.purpose, rawVariables);
+      urlButtonParameter ??= defaultTemplateVariables.urlButtonParameter;
+      const stringArray = (value: unknown) => Array.isArray(value)
+        ? value.filter((item): item is string => typeof item === "string")
+        : [];
+      const sendTemplateResource = async (resource: {
+        name: string;
+        language: string;
+        providerVariables?: unknown;
+        variableNames?: unknown;
+      }) => {
+        const configuredVariables = stringArray(resource.providerVariables);
+        const variables = configuredVariables.length > 0 ? configuredVariables : defaultTemplateVariables.bodyVariables;
+        const configuredNames = stringArray(resource.variableNames);
+        const variableNames = configuredNames.length > 0 ? configuredNames : getMetaWhatsAppTemplateVariableNames(row.purpose);
         try {
-          metaResponse = await sendMetaCloudTemplate({
-            phoneNumberId,
-            accessToken,
-            to: row.destinationPhone,
-            templateName: row.templateName,
-            languageCode: row.templateLanguage,
-            variables: templateVariables.bodyVariables,
-            variableNames,
-            urlButtonParameter,
+          return await sendMetaCloudTemplate({
+            phoneNumberId, accessToken, to: row.destinationPhone,
+            templateName: resource.name, languageCode: resource.language,
+            variables, variableNames, urlButtonParameter,
           });
         } catch (templateError) {
-          let sentWithFallback = false;
           if (variableNames) {
             try {
-              metaResponse = await sendMetaCloudTemplate({
-                phoneNumberId,
-                accessToken,
-                to: row.destinationPhone,
-                templateName: row.templateName,
-                languageCode: row.templateLanguage,
-                variables: templateVariables.bodyVariables,
-                variableNames: undefined,
-                urlButtonParameter,
+              return await sendMetaCloudTemplate({
+                phoneNumberId, accessToken, to: row.destinationPhone,
+                templateName: resource.name, languageCode: resource.language,
+                variables, variableNames: undefined, urlButtonParameter,
               });
-              sentWithFallback = true;
             } catch {
-              // Prosegue para fallback de idioma se falhar
+              // Some migrated templates use positional parameters instead of named parameters.
             }
           }
-          if (!sentWithFallback) {
-            const isLanguageError = templateError instanceof MetaCloudApiError && (templateError.code === 100 || templateError.message.toLowerCase().includes("language") || templateError.message.toLowerCase().includes("does not exist"));
-            if (isLanguageError) {
-              const fallbackLangs = row.templateLanguage.startsWith("pt") ? ["en", "en_US"] : ["pt_BR"];
-              for (const lang of fallbackLangs) {
-                try {
-                  metaResponse = await sendMetaCloudTemplate({
-                    phoneNumberId,
-                    accessToken,
-                    to: row.destinationPhone,
-                    templateName: row.templateName,
-                    languageCode: lang,
-                    variables: templateVariables.bodyVariables,
-                    variableNames,
-                    urlButtonParameter,
-                  });
-                  sentWithFallback = true;
-                  break;
-                } catch {
-                  // Tenta próximo idioma de fallback
-                }
-              }
-              if (!sentWithFallback) throw templateError;
-            } else {
-              throw templateError;
+          const isLanguageError = templateError instanceof MetaCloudApiError
+            && (templateError.code === 100
+              || templateError.message.toLowerCase().includes("language")
+              || templateError.message.toLowerCase().includes("does not exist"));
+          if (!isLanguageError) throw templateError;
+          const fallbackLangs = resource.language.startsWith("pt") ? ["en", "en_US"] : ["pt_BR"];
+          for (const languageCode of fallbackLangs) {
+            try {
+              return await sendMetaCloudTemplate({
+                phoneNumberId, accessToken, to: row.destinationPhone,
+                templateName: resource.name, languageCode,
+                variables, variableNames, urlButtonParameter,
+              });
+            } catch {
+              // The next language is attempted only before a provider accepts the message.
             }
           }
+          throw templateError;
         }
+      };
+
+      let metaResponse: { messages?: Array<{ id: string }> };
+      try {
+        if (row.messageType === "text") {
+          const bodyText = row.renderedBody ?? rawVariables[0] ?? "";
+          metaResponse = await sendMetaCloudText({ phoneNumberId, accessToken, to: row.destinationPhone, body: bodyText });
+        } else {
+          metaResponse = await sendTemplateResource({
+            name: row.templateName,
+            language: row.templateLanguage,
+            providerVariables: row.providerVariables,
+            variableNames: row.templateVariableNames,
+          });
+        }
+      } catch (primaryError) {
+        let fallbackResponse: { messages?: Array<{ id: string }> } | null = null;
+        try {
+          if (row.fallbackMessageType === "template" && row.fallbackTemplateName) {
+            fallbackResponse = await sendTemplateResource({
+              name: row.fallbackTemplateName,
+              language: row.fallbackTemplateLanguage ?? "pt_BR",
+              providerVariables: row.fallbackProviderVariables,
+              variableNames: row.fallbackTemplateVariableNames,
+            });
+          } else if (row.fallbackMessageType === "text" && row.fallbackRenderedBody) {
+            const serviceWindowOpen = await isCustomerServiceWindowOpen({
+              tenantId: row.tenantId,
+              recipientType: row.recipientType as "lead" | "client" | "user",
+              recipientId: row.recipientId ?? undefined,
+              destinationPhone: row.destinationPhone,
+            });
+            if (serviceWindowOpen) {
+              fallbackResponse = await sendMetaCloudText({
+                phoneNumberId, accessToken, to: row.destinationPhone, body: row.fallbackRenderedBody,
+              });
+            }
+          }
+        } catch {
+          // Preserve the original provider error for retry classification and diagnostics.
+        }
+        if (!fallbackResponse) throw primaryError;
+        metaResponse = fallbackResponse;
       }
 
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
@@ -598,16 +702,36 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
 
       let sentViaWaha = false;
       try {
-        const capability = (row.purpose === "aiQualification" || row.purpose === "leadQualification" || row.purpose === "lead_qualification")
+        const isQualificationFirstContact = row.purpose === "aiQualification"
+          || row.purpose === "leadQualification"
+          || row.purpose === "lead_qualification";
+        const qualificationWindowOpen = isQualificationFirstContact
+          ? await isCustomerServiceWindowOpen({
+              tenantId: row.tenantId,
+              recipientType: row.recipientType as "lead" | "client" | "user",
+              recipientId: row.recipientId ?? undefined,
+              destinationPhone: row.destinationPhone,
+            })
+          : true;
+        const hasEligibleQualificationFallback = !isQualificationFirstContact
+          || (qualificationWindowOpen && row.fallbackMessageType === "text" && Boolean(row.fallbackRenderedBody));
+        const capability = isQualificationFirstContact
           ? "qualificationFallback"
           : "brokerFallback";
-        const wahaFallbackNumber = row.deliveryRoute === "meta_then_waha"
-          ? await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId)
-          : await findActiveWahaFallbackNumber(row.tenantId, null, capability);
+        const internalNotice = isInternalBrokerNotice({ recipientType: row.recipientType, purpose: row.purpose });
+        const wahaFallbackNumber = hasEligibleQualificationFallback
+          ? internalNotice
+            ? row.deliveryRoute === "meta_then_waha"
+              ? await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId)
+              : null
+            : await findActiveWahaFallbackNumber(row.tenantId, null, capability)
+          : null;
         if (wahaFallbackNumber) {
-          const bodyText = row.messageType === "text"
-            ? (Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "")
-            : resolveTemplateTextBody(row.purpose, Array.isArray(row.variables) ? row.variables.filter((v): v is string => typeof v === "string") : [], urlButtonParameter);
+          const bodyText = row.fallbackRenderedBody
+            ?? row.renderedBody
+            ?? (row.messageType === "text"
+              ? (Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "")
+              : resolveTemplateTextBody(row.purpose, Array.isArray(row.variables) ? row.variables.filter((v): v is string => typeof v === "string") : [], urlButtonParameter));
 
           const wahaRes = await sendWahaRelayMessage({
             idempotencyKey: `waha-fallback-${row.id}-${row.attempts}`,

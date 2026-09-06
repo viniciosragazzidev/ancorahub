@@ -2838,6 +2838,17 @@ export const whatsappOutboundMessages = pgTable(
     templateName: text("template_name").notNull(),
     templateLanguage: text("template_language").notNull().default("pt_BR"),
     variables: jsonb("variables").notNull().default([]),
+    providerVariables: jsonb("provider_variables"),
+    templateVariableNames: jsonb("template_variable_names"),
+    messagePolicyId: text("message_policy_id"),
+    messagePolicyVersion: integer("message_policy_version"),
+    renderedBody: text("rendered_body"),
+    fallbackMessageType: text("fallback_message_type", { enum: ["template", "text"] }),
+    fallbackTemplateName: text("fallback_template_name"),
+    fallbackTemplateLanguage: text("fallback_template_language"),
+    fallbackRenderedBody: text("fallback_rendered_body"),
+    fallbackProviderVariables: jsonb("fallback_provider_variables"),
+    fallbackTemplateVariableNames: jsonb("fallback_template_variable_names"),
     status: text("status").notNull().default("pending"),
     providerMessageId: text("provider_message_id"),
     providerErrorCode: text("provider_error_code"),
@@ -2861,6 +2872,7 @@ export const whatsappOutboundMessages = pgTable(
     index("whatsapp_outbound_messages_tenant_idx").on(table.tenantId, table.createdAt),
     index("whatsapp_outbound_messages_provider_idx").on(table.providerMessageId),
     index("whatsapp_outbound_messages_waha_number_idx").on(table.wahaNumberId),
+    index("whatsapp_outbound_messages_policy_idx").on(table.tenantId, table.messagePolicyId),
   ],
 );
 
@@ -3437,6 +3449,48 @@ export const messageTemplateRelations = relations(
       references: [user.id],
     }),
   }),
+);
+
+/**
+ * Published selection of Meta/free-message resources for a registered business
+ * event. The event catalog and eligibility rules live in the communication
+ * domain; this table stores only tenant choices and their revision.
+ */
+export const communicationEventMessagePolicies = pgTable(
+  "communication_event_message_policies",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    eventKey: text("event_key").notNull(),
+    primaryKind: text("primary_kind", { enum: ["meta_template", "free_message"] })
+      .notNull()
+      .default("meta_template"),
+    metaTemplateId: text("meta_template_id").references(() => metaWhatsAppTemplates.id, {
+      onDelete: "set null",
+    }),
+    freeMessageTemplateId: text("free_message_template_id").references(() => messageTemplates.id, {
+      onDelete: "set null",
+    }),
+    metaVariableMappingsJson: jsonb("meta_variable_mappings_json").notNull().default({}),
+    fallbackKind: text("fallback_kind", { enum: ["meta_template", "free_message"] }),
+    active: boolean("active").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("communication_event_message_policies_tenant_event_unique").on(
+      table.tenantId,
+      table.eventKey,
+    ),
+    index("communication_event_message_policies_tenant_active_idx").on(
+      table.tenantId,
+      table.active,
+    ),
+  ],
 );
 
 export const importedSpreadsheets = pgTable(

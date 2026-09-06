@@ -15,8 +15,8 @@ Cada capacidade técnica ou de negócio possui **apenas UMA tela canônica de ge
 
 | Domínio de Configuração | Rota Canônica de Autoridade | Responsável / Papel Autorizado | Sub-recursos Governados |
 |---|---|---|---|
-| **Canais de Comunicação (WhatsApp & WAHA)** | `/settings/whatsapp` e `/settings/waha-diagnostic` | Super-Admin / Diretor | Meta Cloud API App Credentials, Webhook Token, WABA ID, Telefones Cadastrados, Instâncias WAHA VPS, Diagnóstico de Conexão. |
-| **Templates WhatsApp Meta** | `/qualificacao?tab=meta_templates` | Super-Admin / Diretor | Sincronização com Meta Graph API, Validação de Variáveis Posicionais, Edição e Recriação em Nova WABA, Associação com Acontecimentos de Negócio. |
+| **Canais de Comunicação (WhatsApp & WAHA)** | `/integrations/whatsapp` | Super-Admin / Diretor | Meta Cloud API App Credentials, Webhook Token, WABA ID, Telefones Cadastrados, Instâncias WAHA VPS, Diagnóstico de Conexão. |
+| **Mensagens por situação (Meta e texto livre)** | `/qualificacao?tab=meta_templates` | Diretor / Gestor; Supervisor em consulta | Sincronização e criação de templates na WABA ativa, mensagens livres, variáveis permitidas, ordem principal/contingência e ativação por evento real. |
 | **Robô de Qualificação & IA** | `/qualificacao` | Super-Admin / Diretor | Modelo de IA, Prompt do Sistema, Playbooks Situacionais, Thresholds de Confiança, Simulador Interativo. |
 | **Regras de Distribuição & Roletas** | `/distribuicao` | Super-Admin / Diretor / Gerente | Roleta por Unidade, Capacidade Máxima de Leads por Corretor, Regras de Transbordo, Horário de Plantão. |
 | **Estrutura de Equipe & Permissões** | `/equipe` e `/equipe/cargos` | Super-Admin / Diretor | Cadastro de Membros, Atribuição de Cargos, Matriz de Capabilities (RBAC), Custom Roles por Tenant. |

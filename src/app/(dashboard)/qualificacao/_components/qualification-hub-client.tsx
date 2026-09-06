@@ -44,7 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
-import { MetaTemplatesPanel } from "./meta-templates-panel";
+import { MessageAutomationStudio } from "./message-automation-studio";
 import { SituationalPlaybooksPanel } from "./situational-playbooks-panel";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
@@ -157,6 +157,7 @@ type QualificationHubProps = {
     brokers: Array<{ id: string; name: string }>;
     distributionPolicy: unknown;
   };
+  canManageMessages: boolean;
 };
 
 type SimMemory = {
@@ -249,6 +250,7 @@ export function QualificationHubClient({
   stats: initialStats,
   alerts: initialAlerts,
   agentTraining,
+  canManageMessages,
 }: QualificationHubProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -297,7 +299,7 @@ export function QualificationHubClient({
   const tabs = [
     { id: "overview", label: "1. Prompt & Comportamento", icon: MessageSquare, color: "text-primary" },
     { id: "situational_playbooks", label: "2. Roteiros & Situações IA", icon: Sparkles, color: "text-amber-500" },
-    { id: "meta_templates", label: "3. Modelos de Mensagem (Meta)", icon: FileText, color: "text-blue-500" },
+    { id: "meta_templates", label: "3. Mensagens & Situações", icon: FileText, color: "text-blue-500" },
     { id: "agent_triggers", label: "4. Triggers & Permissões MCP", icon: Zap, color: "text-amber-500" },
     { id: "followup_rules", label: "5. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
     { id: "whatsapp_diag", label: "6. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
@@ -818,7 +820,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         )}
 
         {/* TAB 2: MODELOS DE MENSAGEM META */}
-        {activeTab === "meta_templates" && <MetaTemplatesPanel />}
+        {activeTab === "meta_templates" && <MessageAutomationStudio canManage={canManageMessages} />}
 
         {/* TAB 3: TRIGGERS & PERMISSÕES MCP */}
         {activeTab === "agent_triggers" && (

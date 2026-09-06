@@ -7,6 +7,8 @@ import { decryptChannelSecret } from "./secret-crypto";
 import { META_CLOUD_PROVIDER } from "./types";
 import {
   fetchWabaMessageTemplates,
+  createWabaMessageTemplate,
+  deleteWabaMessageTemplate,
   sendMetaCloudTemplateTest,
   type MetaGraphTemplateComponent,
   type MetaGraphTemplateItem,
@@ -15,6 +17,7 @@ import {
 import { META_WHATSAPP_TEMPLATE_PURPOSES, type MetaWhatsAppTemplatePurpose } from "./templates";
 
 export type EventKey =
+  | "FIRST_CONTACT"
   | "BROKER_WELCOME"
   | "LEAD_ASSIGNMENT"
   | "LEAD_OFFER"
@@ -26,6 +29,7 @@ export type EventKey =
   | "CLIENT_NOTICE";
 
 export const CRM_EVENT_LABEL_MAP: Record<EventKey, string> = {
+  FIRST_CONTACT: "Primeiro contato da qualificação",
   BROKER_WELCOME: "Cadastro de Corretor / Primeiro Acesso",
   LEAD_ASSIGNMENT: "Novo Lead Atribuído",
   LEAD_OFFER: "Oferta de Lead para Aceite",
@@ -306,25 +310,77 @@ export async function sendTenantTemplateTestMessage(
   return { success: true, wamid };
 }
 
+export async function createTenantTemplate(
+  tenantId: string,
+  userId: string,
+  input: {
+    name: string;
+    language: string;
+    category: MetaTemplateCategory;
+    components: MetaGraphTemplateComponent[];
+  },
+) {
+  const credentials = await resolveMetaChannelCredentials(tenantId);
+  const response = await createWabaMessageTemplate(credentials.wabaId, credentials.accessToken, input);
+  await syncTenantTemplates(tenantId);
+  await getDatabase().insert(schema.auditLogs).values({
+    id: randomUUID(), userId, entidade: "meta_whatsapp_template", entidadeId: response.id ?? input.name,
+    acao: "criou_template_meta", createdAt: new Date(),
+  });
+  return { success: true as const, id: response.id ?? null, status: response.status ?? "PENDING" };
+}
+
+export async function deleteTenantTemplate(tenantId: string, userId: string, templateId: string) {
+  const db = getDatabase();
+  const credentials = await resolveMetaChannelCredentials(tenantId);
+  const [template] = await db.select({
+    id: schema.metaWhatsAppTemplates.id,
+    wabaId: schema.metaWhatsAppTemplates.wabaId,
+    name: schema.metaWhatsAppTemplates.name,
+    metaTemplateId: schema.metaWhatsAppTemplates.metaTemplateId,
+  }).from(schema.metaWhatsAppTemplates).where(and(
+    eq(schema.metaWhatsAppTemplates.id, templateId),
+    eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+    eq(schema.metaWhatsAppTemplates.wabaId, credentials.wabaId),
+    isNull(schema.metaWhatsAppTemplates.deletedAt),
+  )).limit(1);
+  if (!template) throw new Error("Template não encontrado na WABA ativa.");
+
+  try {
+    const [policy] = await db.select({ id: schema.communicationEventMessagePolicies.id })
+      .from(schema.communicationEventMessagePolicies)
+      .where(and(
+        eq(schema.communicationEventMessagePolicies.tenantId, tenantId),
+        eq(schema.communicationEventMessagePolicies.metaTemplateId, template.id),
+        eq(schema.communicationEventMessagePolicies.active, true),
+      )).limit(1);
+    if (policy) throw new Error("Remova este template das situações ativas antes de excluí-lo.");
+  } catch (error) {
+    if (!(typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "42P01")) throw error;
+  }
+
+  await deleteWabaMessageTemplate(credentials.wabaId, credentials.accessToken, template);
+  const now = new Date();
+  await db.update(schema.metaWhatsAppTemplates).set({ deletedAt: now, status: "DELETED", updatedAt: now })
+    .where(and(eq(schema.metaWhatsAppTemplates.id, template.id), eq(schema.metaWhatsAppTemplates.tenantId, tenantId)));
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId, entidade: "meta_whatsapp_template", entidadeId: template.id,
+    acao: "excluiu_template_meta", createdAt: now,
+  });
+  return { success: true as const };
+}
+
 /** Dynamic Event-to-Template Resolver with Built-in Legacy Fallbacks */
 export class WhatsAppTemplateResolver {
   static async resolveTemplateForEvent(
     tenantId: string,
     purpose: MetaWhatsAppTemplatePurpose | string,
   ): Promise<{ name: string; language: string; isCustom: boolean }> {
-    // Broker assignment and offer acceptance have fixed operational contracts.
-    // They cannot inherit tenant bindings because qualification targets the lead,
-    // while these templates target the broker with different payloads.
-    if (purpose === "brokerLeadNotification" || purpose === "leadAssignmentConfirmed") {
-      const template = META_WHATSAPP_TEMPLATE_PURPOSES[purpose];
-      return { ...template, isCustom: false };
-    }
-
-    const db = getDatabase();
-
     // Map purpose string to eventKey
     let eventKey: EventKey | null = null;
-    if (purpose === "brokerInvitation") eventKey = "BROKER_WELCOME";
+    if (purpose === "leadQualification" || purpose === "lead_qualification") eventKey = "FIRST_CONTACT";
+    else if (purpose === "brokerInvitation") eventKey = "BROKER_WELCOME";
+    else if (purpose === "brokerLeadNotification") eventKey = "LEAD_ASSIGNMENT";
     else if (purpose === "newLeadAssignment") eventKey = "LEAD_OFFER";
     else if (purpose === "leadAssignmentConfirmed") eventKey = "LEAD_ASSIGNMENT_CONFIRMED";
     else if (purpose === "leadAssignmentUnavailable") eventKey = "LEAD_ASSIGNMENT_UNAVAILABLE";
@@ -333,6 +389,7 @@ export class WhatsAppTemplateResolver {
     else if (purpose === "clientNotice") eventKey = "CLIENT_NOTICE";
 
     try {
+      const db = getDatabase();
       if (eventKey) {
         const [usage] = await db
           .select({

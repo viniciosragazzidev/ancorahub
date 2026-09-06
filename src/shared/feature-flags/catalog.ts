@@ -62,6 +62,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita o WAHA para avisos internos de distribuição destinados a corretores.",
   },
 
+  MESSAGE_EVENT_POLICIES: {
+    key: "feature_message_event_policies_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita as políticas versionadas de mensagens por situação; desativar restaura os templates homologados legados.",
+  },
+
   // ── IA / Qualificação ─────────────────────────────────────────────────────
   AI_ENABLED: {
     key: "ai_enabled",

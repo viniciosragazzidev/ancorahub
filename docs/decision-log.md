@@ -1,5 +1,30 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-092 — Políticas de mensagem por situação na Qualificação
+
+**Estado:** Aceita
+**Data:** 2026-09-06
+
+O catálogo de templates Meta, as mensagens livres e a associação com eventos passam
+a ter uma única superfície em `/qualificacao?tab=meta_templates`. A configuração do
+WhatsApp mantém somente conexão, saúde e o número corporativo. Cada evento registrado
+possui uma política versionada por tenant com mensagem principal, contingência e
+estado ativo, validada contra o contrato de variáveis do produtor.
+
+Meta continua prioritária. Sem uma mensagem inbound válida nas últimas 24 horas —
+inclusive no primeiro contato — somente um template Meta `APPROVED` da WABA ativa é
+elegível. Dentro da janela, uma mensagem livre pode ser principal ou contingência.
+Eventos internos ao corretor também podem usar texto livre pelo WAHA corporativo
+selecionado; conexão pessoal permanece somente leitura conforme DEC-091. Uma
+contingência só é executada após falha confirmada anterior ao aceite do provedor,
+nunca após um WAMID/ID WAHA aceito.
+
+A DEC-079 é emendada: `new_lead_broker` deixa de ser nome imutável e passa a ser o
+fallback homologado do evento `LEAD_ASSIGNMENT`. A atribuição, horário comercial,
+cadência, revalidação do dono, outbox e idempotência das DEC-079/083/084 não mudam.
+O catálogo de eventos é extensível em código, mas a UI não inventa eventos sem um
+produtor real. Detalhes técnicos e rollback estão no ADR-0041.
+
 ## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
 
 **Estado:** Aceita

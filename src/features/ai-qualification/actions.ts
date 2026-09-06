@@ -3,6 +3,7 @@
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
+import { hasCapability } from "@/shared/auth/permissions";
 import {
   getQualificationTenantSettings,
   updateQualificationTenantSettings,
@@ -181,7 +182,7 @@ export async function fetchMetaTemplatesAction() {
   assertAdminRole(context.role);
   const { listTenantTemplates, syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
   const { getDatabase, schema } = await import("@/shared/db");
-  const { and, eq, isNull } = await import("drizzle-orm");
+  const { and, eq } = await import("drizzle-orm");
 
   const db = getDatabase();
 
@@ -363,10 +364,34 @@ export async function syncMetaTemplatesAction() {
   }
 }
 
+export async function fetchMessageEventPoliciesAction() {
+  const context = await getRequiredTenantContext();
+  if (!hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)) {
+    throw new AuthorizationError("Você não tem permissão para visualizar as mensagens da qualificação.");
+  }
+  const { listMessageEventPolicies } = await import("@/features/communication-channels/message-policy-service");
+  return listMessageEventPolicies(context.tenantId);
+}
+
+export async function saveMessageEventPolicyAction(input: {
+  eventKey: string;
+  primaryKind: "meta_template" | "free_message";
+  metaTemplateId: string | null;
+  freeMessageTemplateId: string | null;
+  fallbackKind: "meta_template" | "free_message" | null;
+  active: boolean;
+}) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { saveMessageEventPolicy } = await import("@/features/communication-channels/message-policy-service");
+  return saveMessageEventPolicy(context.tenantId, context.userId, input);
+}
+
 /* ─── Modelos Livres (Janela de 24 Horas / Sem Aprovação) ─── */
 
 export async function fetchFreeMessageTemplatesAction() {
   const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, desc, eq } = await import("drizzle-orm");
 

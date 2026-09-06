@@ -1,6 +1,6 @@
 # Controle de Execução do Redesign
 
-**Atualizado em:** 2026-09-05
+**Atualizado em:** 2026-09-06
 **Fonte de verdade:** este documento e `UX_REDESIGN_CONTRACT.md`.
 
 ## Estado atual
@@ -10,7 +10,7 @@
 | Etapa atual | UX-M1.10 — Mobile QA transversal |
 | Estado | `IMPLEMENTATION_COMPLETE_QA_PENDING` |
 | Protocolo de Governança | UX-GOV-1 (`UX_FOUNDATIONS.md`, `UX_DECISIONS.md`, `UX_CHANGELOG.md`, `UX_FUNCTIONALITY_MATRIX.md`) |
-| Mudança visual autorizada | Hardening transversal UX-H1 aprovado pelo usuário: biblioteca única, sidebar preta, tabelas claras e auditoria por rota |
+| Mudança visual autorizada | Hardening transversal UX-H1 e centralização autorizada de templates, mensagens livres e situações em `/qualificacao`; biblioteca única, sidebar preta, tabelas claras e auditoria por rota |
 | Próxima ação obrigatória | Executar a matriz visual/interacional autenticada de M1.10 nas larguras 320, 360, 375, 390, 412 e 430px. O Corretor Lite permanece preservado pela DEC-015 |
 | Bloqueios conhecidos | QA autenticado em dispositivos/viewports reais ainda pendente; roteamento Lite e navegação lateral mobile estão protegidos por regressão automatizada |
 

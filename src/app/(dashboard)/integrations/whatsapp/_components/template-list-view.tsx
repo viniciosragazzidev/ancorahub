@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ArrowsClockwise, InfoIcon, PaperPlaneTilt, Plus, Trash } from "@/components/huge-icons";
+import { ArrowsClockwise, Check, InfoIcon, PaperPlaneTilt, Plus, Trash } from "@/components/huge-icons";
 import { TemplateBuilderWizard } from "./template-builder-wizard";
 
 type Template = {
@@ -26,7 +26,7 @@ type Template = {
   componentsJson: any;
 };
 
-export function TemplateListView({ canManage }: { canManage: boolean }) {
+export function TemplateListView({ canManage, onUseTemplate }: { canManage: boolean; onUseTemplate?: (templateId: string) => void }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -296,7 +296,20 @@ export function TemplateListView({ canManage }: { canManage: boolean }) {
               ) : null}
 
               {canManage ? (
-                <div className="pt-4 border-t border-border flex justify-end">
+                <div className="pt-4 border-t border-border flex flex-wrap justify-end gap-2">
+                  {selectedTemplate.status === "APPROVED" && onUseTemplate ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        onUseTemplate(selectedTemplate.id);
+                        setSelectedTemplate(null);
+                      }}
+                    >
+                      <Check className="size-4 mr-2" />
+                      Usar em uma situação
+                    </Button>
+                  ) : null}
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(selectedTemplate.id)}>
                     <Trash className="size-4 mr-2" />
                     Excluir template da Meta

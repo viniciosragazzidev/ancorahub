@@ -440,3 +440,14 @@ de métricas entre tenants.
   demais papéis foi alterado.
 - O Corretor Lite passa a ser uma exceção documentada da conversão transversal até
   que exista nova aprovação visual específica para essa experiência.
+
+## 2026-09-06 — estúdio de mensagens por situação
+
+- O catálogo completo de templates da WABA saiu da tela de conexão e passou a
+  compor a aba `Mensagens & Situações` de `/qualificacao`.
+- A mesma superfície reúne templates Meta, mensagens livres e políticas por
+  evento, com principal, contingência, variáveis compatíveis e estado publicado.
+- `/integrations/whatsapp` permanece a autoridade de conexão e saúde do canal e
+  oferece apenas um atalho para o estúdio, eliminando formulários duplicados.
+- Diretor e Gestor editam; Supervisor consulta. Estados de carregamento, vazio,
+  erro, pausa global e indisponibilidade de canal permanecem explícitos.
