@@ -81,6 +81,7 @@ export function MessagePoliciesPanel({
   const [selectedEventKey, setSelectedEventKey] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [freeEditorOpen, setFreeEditorOpen] = useState(false);
   const [editingFree, setEditingFree] = useState<FreeMessage | null>(null);
@@ -90,13 +91,21 @@ export function MessagePoliciesPanel({
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const result = await fetchMessageEventPoliciesAction() as StudioData;
+      const result = await Promise.race<StudioData>([
+        fetchMessageEventPoliciesAction() as Promise<StudioData>,
+        new Promise<StudioData>((_, reject) => {
+          window.setTimeout(() => reject(new Error("A configuração demorou mais que o esperado. Tente novamente.")), 12_000);
+        }),
+      ]);
       setData(result);
       setSelectedEventKey((current) => current ?? result.events[0]?.key ?? null);
       setDrafts(Object.fromEntries(result.events.map((event) => [event.key, policyToDraft(event.policy)])));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível carregar as situações.");
+      const message = error instanceof Error ? error.message : "Não foi possível carregar as situações.";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -122,7 +131,13 @@ export function MessagePoliciesPanel({
         active: true,
       },
     }));
-    document.getElementById("message-situations")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      const target = document.getElementById("message-situations");
+      const scrollFrame = document.querySelector<HTMLElement>('[data-slot="app-scroll-frame"]');
+      if (!target || !scrollFrame) return;
+      const targetTop = target.getBoundingClientRect().top - scrollFrame.getBoundingClientRect().top + scrollFrame.scrollTop - 24;
+      scrollFrame.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+    }, 220);
     toast.info("Template selecionado. Revise a situação e clique em ‘Salvar e publicar’.");
     onPreferredMetaTemplateApplied();
   }, [data, onPreferredMetaTemplateApplied, preferredMetaTemplateId, selectedEventKey]);
@@ -202,8 +217,16 @@ export function MessagePoliciesPanel({
               As políticas por situação estão pausadas pela plataforma. As configurações permanecem salvas e o envio usa o comportamento homologado anterior.
             </div>
           ) : null}
-          {loading || !data ? (
+          {loading ? (
             <p className="py-10 text-center text-sm text-muted-foreground" role="status">Carregando situações…</p>
+          ) : loadError ? (
+            <div className="grid gap-3 rounded-xl border border-destructive/20 bg-destructive/[0.03] p-6 text-center">
+              <p className="text-sm font-medium">Não foi possível carregar as situações</p>
+              <p className="text-sm text-muted-foreground">{loadError}</p>
+              <div><Button type="button" variant="outline" onClick={() => void load()}>Tentar novamente</Button></div>
+            </div>
+          ) : !data ? (
+            <p className="py-10 text-center text-sm text-muted-foreground" role="status">Nenhuma situação disponível.</p>
           ) : (
             <div className="grid overflow-hidden rounded-xl border bg-card xl:grid-cols-[19rem_minmax(0,1fr)]">
               <nav className="border-b bg-muted/20 p-2 xl:border-b-0 xl:border-r" aria-label="Situações disponíveis">

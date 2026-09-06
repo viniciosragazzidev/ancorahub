@@ -34,6 +34,7 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [configuringTemplate, setConfiguringTemplate] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Test modal state
@@ -210,7 +211,10 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
                 <Card
                   key={t.id}
                   className="group cursor-pointer border-border transition-colors hover:border-primary/50"
-                  onClick={() => setSelectedTemplate(t)}
+                  onClick={() => {
+                    setConfiguringTemplate(false);
+                    setSelectedTemplate(t);
+                  }}
                 >
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-2">
@@ -238,7 +242,12 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
       </Card>
 
       {/* Drawer de Detalhes */}
-      <Sheet open={Boolean(selectedTemplate)} onOpenChange={(open) => !open && setSelectedTemplate(null)}>
+      <Sheet open={Boolean(selectedTemplate)} onOpenChange={(open) => {
+        if (!open) {
+          setConfiguringTemplate(false);
+          setSelectedTemplate(null);
+        }
+      }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           {selectedTemplate ? (
             <div className="space-y-6">
@@ -295,16 +304,33 @@ export function TemplateListView({ canManage, onUseTemplate }: { canManage: bool
                 </div>
               ) : null}
 
+              {canManage && selectedTemplate.status === "APPROVED" && onUseTemplate && configuringTemplate ? (
+                <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4">
+                  <p className="text-sm font-semibold">Configurar este template</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Escolha a situação no painel seguinte. O template será aplicado como mensagem principal, mas só será ativado depois de você salvar e publicar.
+                  </p>
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setConfiguringTemplate(false)}>Cancelar</Button>
+                    <Button type="button" size="sm" onClick={() => {
+                      onUseTemplate(selectedTemplate.id);
+                      setConfiguringTemplate(false);
+                      setSelectedTemplate(null);
+                    }}>
+                      <Check className="size-4 mr-2" />
+                      Aplicar e abrir situações
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               {canManage ? (
                 <div className="pt-4 border-t border-border flex flex-wrap justify-end gap-2">
                   {selectedTemplate.status === "APPROVED" && onUseTemplate ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        onUseTemplate(selectedTemplate.id);
-                        setSelectedTemplate(null);
-                      }}
+                      onClick={() => setConfiguringTemplate(true)}
                     >
                       <Check className="size-4 mr-2" />
                       Configurar situação
