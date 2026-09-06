@@ -20,6 +20,7 @@ import {
 } from "./message-event-catalog";
 import { getInternalBrokerNotificationPolicy, getSelectedInternalWahaNumber } from "./internal-notification-policy";
 import { META_WHATSAPP_TEMPLATE_PURPOSES } from "./templates";
+import { listTenantTemplates } from "./template-sync-service";
 import { META_CLOUD_PROVIDER } from "./types";
 
 const policyInputSchema = z.object({
@@ -154,24 +155,31 @@ export async function listMessageEventPolicies(tenantId: string) {
     policies = await getDatabase().select().from(schema.communicationEventMessagePolicies)
       .where(eq(schema.communicationEventMessagePolicies.tenantId, tenantId));
   } catch (error) {
-    if (!isMissingMessagePolicyTable(error)) throw error;
+    // A migration incompleta não pode esconder os templates Meta já existentes.
+    // Mantemos a configuração vazia e deixamos a gravação exigir a migration
+    // quando o usuário tentar publicar uma política.
+    console.warn("[message-policy] policies_read_unavailable", {
+      reason: isMissingMessagePolicyTable(error) ? "table_unavailable" : "query_failed",
+    });
   }
 
   const [metaTemplates, freeMessages, globallyEnabled] = await Promise.all([
-    getActiveWabaId(tenantId).then(async (wabaId) => wabaId
-      ? getDatabase().select({
-          id: schema.metaWhatsAppTemplates.id,
-          name: schema.metaWhatsAppTemplates.name,
-          language: schema.metaWhatsAppTemplates.language,
-          category: schema.metaWhatsAppTemplates.category,
-          status: schema.metaWhatsAppTemplates.status,
-          variables: schema.metaWhatsAppTemplates.variablesJson,
-        }).from(schema.metaWhatsAppTemplates).where(and(
-          eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
-          eq(schema.metaWhatsAppTemplates.wabaId, wabaId),
-          isNull(schema.metaWhatsAppTemplates.deletedAt),
-        )).orderBy(schema.metaWhatsAppTemplates.name)
-      : []),
+    // Reutiliza a mesma resolução tenant-safe usada pela lista oficial da WABA.
+    // Isso evita que pequenas diferenças entre as duas consultas escondam os
+    // templates aprovados no seletor de situações.
+    listTenantTemplates(tenantId).then((templates) => templates.map((template) => ({
+      id: template.id,
+      name: template.name,
+      language: template.language,
+      category: template.category,
+      status: template.status,
+      variables: template.variablesJson,
+    }))).catch((error) => {
+        console.warn("[message-policy] meta_templates_read_unavailable", {
+          errorType: error instanceof Error ? error.name : "unknown",
+        });
+        return [];
+      }),
     getDatabase().select({
       id: schema.messageTemplates.id,
       name: schema.messageTemplates.name,
@@ -181,8 +189,20 @@ export async function listMessageEventPolicies(tenantId: string) {
     }).from(schema.messageTemplates).where(and(
       eq(schema.messageTemplates.tenantId, tenantId),
       eq(schema.messageTemplates.active, true),
-    )).orderBy(schema.messageTemplates.name),
-    getFeatureFlag(FEATURE_FLAGS.MESSAGE_EVENT_POLICIES).then((value) => value !== "false"),
+    )).orderBy(schema.messageTemplates.name).catch((error) => {
+      console.warn("[message-policy] free_messages_read_unavailable", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+      return [];
+    }),
+    getFeatureFlag(FEATURE_FLAGS.MESSAGE_EVENT_POLICIES)
+      .then((value) => value !== "false")
+      .catch((error) => {
+        console.warn("[message-policy] feature_flag_read_unavailable", {
+          errorType: error instanceof Error ? error.name : "unknown",
+        });
+        return true;
+      }),
   ]);
 
   return {
