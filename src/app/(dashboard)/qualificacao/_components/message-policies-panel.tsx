@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, InfoIcon, PencilSimple, Plus, Trash } from "@/components/huge-icons";
+import { Check, PencilSimple, Plus, Trash } from "@/components/huge-icons";
+import { Info } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -269,7 +270,7 @@ export function MessagePoliciesPanel({
                   </div>
 
                   <div className="rounded-lg border bg-muted/15 p-3 text-xs text-muted-foreground">
-                    <InfoIcon className="mr-2 inline size-4 align-text-bottom text-primary" />
+                    <Info className="mr-2 inline-block size-4 align-text-bottom text-primary" aria-hidden="true" />
                     {selectedEvent.windowRule === "meta_required_without_window"
                       ? "Sem inbound nas últimas 24 horas, o sistema força um template Meta aprovado. Texto livre nunca abre uma conversa fora da janela."
                       : "Mensagem livre como principal exige o WhatsApp corporativo ativo. O WhatsApp pessoal do corretor nunca envia pelo CRM."}
