@@ -6,7 +6,7 @@ import { listOwnWahaConnections } from "@/features/waha-cadence/connection-servi
 import { getInternalBrokerNotificationPolicy } from "@/features/communication-channels/internal-notification-policy";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { WahaConnectionsCard } from "../../settings/_components/waha-connections-card";
 import { WhatsAppPage } from "../../settings/whatsapp-page";
@@ -40,6 +40,7 @@ export default async function WhatsAppIntegrationPage() {
       activatedAt: schema.communicationChannels.activatedAt,
       tokenExpiresAt: schema.communicationChannels.tokenExpiresAt,
       isDefault: schema.communicationChannels.isDefault,
+      hasCredentials: sql<boolean>`${schema.communicationChannels.accessTokenCiphertext} is not null`.as("has_credentials"),
     }).from(schema.communicationChannels)
       .leftJoin(schema.branches, eq(schema.communicationChannels.branchId, schema.branches.id))
       .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, "meta_cloud")))

@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { after } from "next/server";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
@@ -34,6 +35,8 @@ export async function getPreferredMetaCloudChannel(input: { tenantId: string; br
         eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
         eq(schema.communicationChannels.status, "active"),
         eq(schema.communicationChannels.registrationStatus, "registered"),
+        isNotNull(schema.communicationChannels.phoneNumberId),
+        isNotNull(schema.communicationChannels.accessTokenCiphertext),
       ),
     )
     .limit(1);
@@ -270,10 +273,9 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           });
 
           try {
-            const { waitUntil } = require("next/server");
-            if (typeof waitUntil === "function") waitUntil(aiPromise);
+            after(() => aiPromise);
           } catch {
-            // Fallback: non-blocking execution in environment without waitUntil
+            // Fallback: non-blocking execution outside a Next.js request context.
           }
         } else if (activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_non_pending_qualification", {

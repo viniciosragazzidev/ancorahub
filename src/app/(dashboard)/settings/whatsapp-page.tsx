@@ -30,6 +30,7 @@ type Channel = {
   activatedAt: Date | null;
   tokenExpiresAt: Date | null;
   isDefault: boolean;
+  hasCredentials: boolean;
 };
 
 type OfficialSetup = {
@@ -49,7 +50,8 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.enabled &&
     official.configured &&
     official.companyAccount?.status === "active" &&
-    official.companyAccount.registrationStatus === "registered";
+    official.companyAccount.registrationStatus === "registered" &&
+    official.companyAccount.hasCredentials;
 
   const canConnectNumber =
     official.canConfigure &&
@@ -57,7 +59,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.configured &&
     official.appId &&
     official.embeddedSignupConfigId &&
-    official.companyAccount?.status !== "active";
+    (!official.companyAccount?.hasCredentials || official.companyAccount.status !== "active");
 
   return (
     <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">

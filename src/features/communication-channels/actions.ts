@@ -18,6 +18,7 @@ import {
 } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "./service";
+import { getMetaCloudChannelActivationError } from "./channel-lifecycle";
 import { META_CLOUD_PROVIDER, type MetaEmbeddedSignupPayload } from "./types";
 
 const signupInput = z.object({
@@ -166,8 +167,21 @@ export async function setMetaCloudChannelStatusAction(channelId: string, active:
   const context = await getRequiredTenantContext();
   if (context.role !== "director") throw new Error("Somente o Diretor pode alterar canais oficiais.");
   const db = getDatabase();
-  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.id, channelId), eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER))).limit(1);
+  const [channel] = await db.select({
+    id: schema.communicationChannels.id,
+    phoneNumberId: schema.communicationChannels.phoneNumberId,
+    registrationStatus: schema.communicationChannels.registrationStatus,
+    accessTokenCiphertext: schema.communicationChannels.accessTokenCiphertext,
+  }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.id, channelId), eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER))).limit(1);
   if (!channel) throw new Error("Canal oficial não encontrado.");
+  if (active) {
+    const activationError = getMetaCloudChannelActivationError({
+      phoneNumberId: channel.phoneNumberId,
+      registrationStatus: channel.registrationStatus,
+      hasCredentials: Boolean(channel.accessTokenCiphertext),
+    });
+    if (activationError) throw new Error(activationError);
+  }
   await db.update(schema.communicationChannels).set({ status: active ? "active" : "inactive", updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channelId));
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: active ? "meta_cloud_channel_activated" : "meta_cloud_channel_deactivated" });
 }

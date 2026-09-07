@@ -74,6 +74,24 @@ idempotência e política Meta/WAHA.
   templates `APPROVED` efetivamente disponíveis nessa conta. Templates vistos em
   outra WABA não são combinados, pois seriam inválidos para envio pelo canal ativo.
 
+### Correção operacional do ciclo de conexão
+
+- Foi reproduzido um estado inconsistente em que um canal desconectado, já sem a
+  credencial cifrada da Meta, podia ser marcado como ativo pela ação de reativação.
+- A reativação agora exige `phone_number_id`, registro Cloud API concluído e
+  credencial cifrada presente. Sem esses requisitos, a interface apresenta
+  **Reconexão necessária** e direciona o Diretor ao Embedded Signup.
+- O resolvedor de envio também ignora canais sem número ou credencial, impedindo
+  que a outbox selecione uma conexão incapaz de entregar mensagens.
+- A reconexão completa foi conferida no canal do tenant: estado ativo, registro
+  concluído, canal padrão e credencial presente. Testes regressivos cobrem o
+  bloqueio e a exibição do estado recuperável, sem registrar token ou telefone.
+- Verificação de 06/09: lint dirigido e type-check passaram; 2 arquivos/7 testes
+  focados e a suíte completa de 147 arquivos/662 testes passaram; o build de
+  produção passou. O harness completo passou em documentação, escopo,
+  arquitetura, segurança, desempenho, type-check, testes e build; o lint global
+  permanece não-zero por erros preexistentes fora dos arquivos desta correção.
+
 ## Catálogo inicial
 
 | Situação | Finalidade atual | Público | Regra |
