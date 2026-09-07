@@ -242,3 +242,19 @@ Este documento registra formalmente todas as decisões de UX, UI, arquitetura de
   renderiza `MobileBottomNav` em paralelo.
 - **BOUNDARY**: `/tarefas` e `/metas` não serão inventadas porque não existem como
   Homes canônicas no código atual. O Corretor Lite continua protegido pela DEC-015.
+
+## DEC-017 — Efferd como piloto visual, não como segunda arquitetura
+
+- **DECISION**: o bloco `@efferd/dashboard-2` fornece a referência de densidade e
+  composição do dashboard gerencial. Sua gramática é implementada por
+  `DashboardGrid` e `DashboardCard`, sobre os tokens e o `Card` já existentes.
+- **ADOPTION**: KPIs, funil, alertas e resumo financeiro usam grids contínuos
+  separados por borda de 1 px, cards sem sombra e superfícies sem arredondamento
+  interno. Os agrupamentos preservam o raio canônico na borda externa.
+- **REJECTED**: substituir o app shell, a sidebar, os primitives compartilhados ou
+  as métricas reais pelos arquivos demonstrativos e dados fictícios do registro.
+- **PERFORMANCE**: nenhuma nova ilha client é criada e nenhuma dependência de
+  runtime permanece adicionada; os componentes estruturais são server-safe.
+- **BOUNDARY**: somente o dashboard de gestão participa deste teste. O Corretor
+  Lite continua visualmente preservado pela DEC-015, e regras de tenant, papel,
+  período e capacidade não são alteradas.

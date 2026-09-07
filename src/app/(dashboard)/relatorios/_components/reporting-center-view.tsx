@@ -44,30 +44,42 @@ export default async function ReportingCenterView({
 
   const allowedTabs = reportTabsForRole(context.role);
   const tabs = allowedTabs.filter((tab) => {
-    if (tab === "financial") return hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
+    if (tab === "financial")
+      return hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
     return true;
   });
   const currentTab = tabs.includes(activeTab) ? activeTab : (tabs[0] ?? "commercial");
 
-  const canViewFinancial = hasCapability(context.role, "ver_relatorios_financeiros", context.jobTitle);
+  const canViewFinancial = hasCapability(
+    context.role,
+    "ver_relatorios_financeiros",
+    context.jobTitle,
+  );
 
   const needsCommercialContext = currentTab === "overview" || currentTab === "commercial";
-  const [commercialOverview, funnel, attention, sourcePerformance, financial, teamPerformance, units] =
-    await Promise.all([
-      needsCommercialContext
-        ? getCommercialOverview(context, period, { includeFinancial: canViewFinancial })
-        : Promise.resolve(null),
-      needsCommercialContext ? getFunnelSnapshot(context, period) : Promise.resolve(null),
-      needsCommercialContext ? getAttentionSnapshot(context, period) : Promise.resolve(null),
-      currentTab === "commercial"
-        ? getCommercialBySource(context, period, { includeFinancial: canViewFinancial })
-        : Promise.resolve(null),
-      currentTab === "financial" ? getFinancialOverview(context, period) : Promise.resolve(null),
-      currentTab === "team"
-        ? getTeamPerformance(context, period, { includeFinancial: canViewFinancial })
-        : Promise.resolve(null),
-      currentTab === "units" ? getUnitPerformance(context, period) : Promise.resolve(null),
-    ]);
+  const [
+    commercialOverview,
+    funnel,
+    attention,
+    sourcePerformance,
+    financial,
+    teamPerformance,
+    units,
+  ] = await Promise.all([
+    needsCommercialContext
+      ? getCommercialOverview(context, period, { includeFinancial: canViewFinancial })
+      : Promise.resolve(null),
+    needsCommercialContext ? getFunnelSnapshot(context, period) : Promise.resolve(null),
+    needsCommercialContext ? getAttentionSnapshot(context, period) : Promise.resolve(null),
+    currentTab === "commercial"
+      ? getCommercialBySource(context, period, { includeFinancial: canViewFinancial })
+      : Promise.resolve(null),
+    currentTab === "financial" ? getFinancialOverview(context, period) : Promise.resolve(null),
+    currentTab === "team"
+      ? getTeamPerformance(context, period, { includeFinancial: canViewFinancial })
+      : Promise.resolve(null),
+    currentTab === "units" ? getUnitPerformance(context, period) : Promise.resolve(null),
+  ]);
 
   return (
     <>
@@ -89,21 +101,23 @@ export default async function ReportingCenterView({
             attention={attention}
           />
         )}
-        {currentTab === "commercial" && commercialOverview && funnel && attention && sourcePerformance && (
-          <CommercialTab
-            period={period}
-            overview={commercialOverview}
-            funnel={funnel}
-            attention={attention}
-            sourcePerformance={sourcePerformance}
-          />
-        )}
+        {currentTab === "commercial" &&
+          commercialOverview &&
+          funnel &&
+          attention &&
+          sourcePerformance && (
+            <CommercialTab
+              period={period}
+              overview={commercialOverview}
+              funnel={funnel}
+              attention={attention}
+              sourcePerformance={sourcePerformance}
+            />
+          )}
         {currentTab === "team" && teamPerformance && (
           <TeamTab period={period} teamPerformance={teamPerformance} />
         )}
-        {currentTab === "units" && (
-          <UnitsTab period={period} units={units ?? []} />
-        )}
+        {currentTab === "units" && <UnitsTab period={period} units={units ?? []} />}
         {currentTab === "financial" && canViewFinancial && financial && (
           <FinancialTab period={period} financial={financial} />
         )}

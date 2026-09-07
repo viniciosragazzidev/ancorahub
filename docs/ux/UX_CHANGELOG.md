@@ -451,3 +451,15 @@ de métricas entre tenants.
   oferece apenas um atalho para o estúdio, eliminando formulários duplicados.
 - Diretor e Gestor editam; Supervisor consulta. Estados de carregamento, vazio,
   erro, pausa global e indisponibilidade de canal permanecem explícitos.
+
+## 2026-09-07 — dashboard gerencial com composição Efferd
+
+- Registrado e instalado `@efferd/dashboard-2` no shadcn local.
+- Preservados os primitives Base UI, o shell e a sidebar existentes; arquivos de
+  demonstração incompatíveis ou com dados fictícios foram descartados após a
+  instalação.
+- Criados `DashboardGrid` e `DashboardCard` reutilizáveis com borda contínua,
+  divisores finos, superfície neutra e sombra zero.
+- Visão geral, Comercial e Financeiro adotam os novos cards; Funil e Atenção
+  compartilham a mesma composição sem mudanças de dados ou autorização.
+- O dashboard Lite do corretor não foi modificado.

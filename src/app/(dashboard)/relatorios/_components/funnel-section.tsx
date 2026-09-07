@@ -3,6 +3,8 @@ import type { FunnelSnapshot } from "@/features/reports/metrics/metrics-service"
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { FunnelStage } from "@/features/reports/metrics/metrics-math";
 import { TrendUp } from "@/components/huge-icons";
+import { DashboardCard } from "@/components/dashboard-card";
+import { DashboardGrid } from "@/components/dashboard";
 
 const STAGE_COLORS: Record<FunnelStage | "lost", string> = {
   new: "bg-sky-500/20 text-sky-700 dark:text-sky-300",
@@ -30,58 +32,71 @@ export function FunnelSection({ funnel, className }: FunnelSectionProps) {
     <section aria-labelledby="funnel-title" className={className}>
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <TrendUp className="size-3.5" aria-hidden="true" />
-        <h2 id="funnel-title" className="font-medium text-foreground">Funil de 8 estágios</h2>
+        <h2 id="funnel-title" className="font-medium text-foreground">
+          Funil de 8 estágios
+        </h2>
         <span aria-hidden="true">•</span>
         <span>{funnel.received} leads recebidos</span>
       </div>
 
-      <div data-slot="report-card" className="report-card rounded-lg border border-border bg-card p-4 shadow-sm">
-        <div className="space-y-3">
-          {funnel.rows.map((row) => {
-            const barWidth = Math.round((row.reached / maxReached) * MAX_BAR_WIDTH);
-            const label = LEAD_STATUS_LABELS[row.stage] ?? row.stage;
-            return (
-              <div key={row.stage} className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 sm:flex sm:gap-3">
-                <span className="col-span-2 truncate text-xs font-medium sm:w-40 sm:shrink-0 sm:text-sm" title={label}>
-                  {label}
-                </span>
-                <div className="relative h-6 flex-1 overflow-hidden rounded bg-muted">
-                  <div
-                    className={cn("absolute inset-y-0 left-0 rounded", STAGE_COLORS[row.stage])}
-                    style={{ width: `${barWidth}%` }}
-                  />
-                  <span className="relative z-10 flex h-full items-center px-2 text-xs font-medium tabular-nums">
-                    {row.reached}
+      <DashboardGrid>
+        <DashboardCard data-slot="report-card" className="report-card p-4">
+          <div className="space-y-3">
+            {funnel.rows.map((row) => {
+              const barWidth = Math.round((row.reached / maxReached) * MAX_BAR_WIDTH);
+              const label = LEAD_STATUS_LABELS[row.stage] ?? row.stage;
+              return (
+                <div
+                  key={row.stage}
+                  className="grid grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-1 sm:flex sm:gap-3"
+                >
+                  <span
+                    className="col-span-2 truncate text-xs font-medium sm:w-40 sm:shrink-0 sm:text-sm"
+                    title={label}
+                  >
+                    {label}
                   </span>
+                  <div className="relative h-6 flex-1 overflow-hidden rounded bg-muted">
+                    <div
+                      className={cn("absolute inset-y-0 left-0 rounded", STAGE_COLORS[row.stage])}
+                      style={{ width: `${barWidth}%` }}
+                    />
+                    <span className="relative z-10 flex h-full items-center px-2 text-xs font-medium tabular-nums">
+                      {row.reached}
+                    </span>
+                  </div>
+                  {row.progressionToNext !== null && (
+                    <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                      {row.progressionToNext.toFixed(0)}%
+                    </span>
+                  )}
                 </div>
-                {row.progressionToNext !== null && (
-                  <span className="w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
-                    {row.progressionToNext.toFixed(0)}%
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {funnel.lost > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 sm:flex-nowrap">
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-red-600 sm:w-40 sm:flex-none sm:shrink-0">Perdidos</span>
-            <span className="text-sm tabular-nums text-red-600">{funnel.lost}</span>
-            <span className="text-xs text-muted-foreground">
-              ({((funnel.lost / funnel.received) * 100).toFixed(1)}% do total)
-            </span>
+              );
+            })}
           </div>
-        )}
 
-        {funnel.biggestBottleneck !== null && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Maior gargalo: <span className="font-medium text-foreground">
-              {LEAD_STATUS_LABELS[funnel.biggestBottleneck] ?? funnel.biggestBottleneck}
-            </span>
-          </p>
-        )}
-      </div>
+          {funnel.lost > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 sm:flex-nowrap">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-red-600 sm:w-40 sm:flex-none sm:shrink-0">
+                Perdidos
+              </span>
+              <span className="text-sm tabular-nums text-red-600">{funnel.lost}</span>
+              <span className="text-xs text-muted-foreground">
+                ({((funnel.lost / funnel.received) * 100).toFixed(1)}% do total)
+              </span>
+            </div>
+          )}
+
+          {funnel.biggestBottleneck !== null && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Maior gargalo:{" "}
+              <span className="font-medium text-foreground">
+                {LEAD_STATUS_LABELS[funnel.biggestBottleneck] ?? funnel.biggestBottleneck}
+              </span>
+            </p>
+          )}
+        </DashboardCard>
+      </DashboardGrid>
     </section>
   );
 }

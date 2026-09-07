@@ -1,5 +1,10 @@
 import type { PeriodValue } from "@/shared/period";
-import type { CommercialOverview, FunnelSnapshot, AttentionSnapshot, SourcePerformanceRow } from "@/features/reports/metrics/metrics-types";
+import type {
+  CommercialOverview,
+  FunnelSnapshot,
+  AttentionSnapshot,
+  SourcePerformanceRow,
+} from "@/features/reports/metrics/metrics-types";
 import { sourceLabel } from "@/features/reports/metrics/metrics-types";
 import { KpiComparisonCard } from "./kpi-comparison-card";
 import { FunnelSection } from "./funnel-section";
@@ -7,8 +12,21 @@ import { AttentionSection } from "./attention-section";
 import { comparisonDelta } from "@/features/reports/metrics/metrics-math";
 import { TrendUp, Target, Users, ChartBar, CurrencyCircleDollar } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
-import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  MobileDataList,
+  MobileDataListItem,
+  MobileDataRow,
+  ResponsiveDataView,
+} from "@/components/ui/responsive-data-view";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DashboardGrid } from "@/components/dashboard";
 
 interface CommercialTabProps {
   readonly period: PeriodValue;
@@ -18,26 +36,40 @@ interface CommercialTabProps {
   readonly sourcePerformance: readonly SourcePerformanceRow[];
 }
 
-export function CommercialTab({ period, overview, funnel, attention, sourcePerformance }: CommercialTabProps) {
-  const conversionDelta = comparisonDelta(overview.conversion.rate, overview.previousConversion.rate, "rate");
+export function CommercialTab({
+  period,
+  overview,
+  funnel,
+  attention,
+  sourcePerformance,
+}: CommercialTabProps) {
+  const conversionDelta = comparisonDelta(
+    overview.conversion.rate,
+    overview.previousConversion.rate,
+    "rate",
+  );
   const salesDelta = comparisonDelta(overview.sales, overview.previousSales, "value");
-  const revenueDelta = overview.revenue !== null && overview.previousRevenue !== null
-    ? comparisonDelta(overview.revenue, overview.previousRevenue, "value")
-    : undefined;
-  const avgTicketDelta = overview.avgTicket !== null && overview.previousAvgTicket !== null
-    ? comparisonDelta(overview.avgTicket, overview.previousAvgTicket, "value")
-    : undefined;
+  const revenueDelta =
+    overview.revenue !== null && overview.previousRevenue !== null
+      ? comparisonDelta(overview.revenue, overview.previousRevenue, "value")
+      : undefined;
+  const avgTicketDelta =
+    overview.avgTicket !== null && overview.previousAvgTicket !== null
+      ? comparisonDelta(overview.avgTicket, overview.previousAvgTicket, "value")
+      : undefined;
 
   return (
     <>
       <section aria-labelledby="commercial-kpi-title">
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Target className="size-3.5" aria-hidden="true" />
-          <h2 id="commercial-kpi-title" className="font-medium text-foreground">Indicadores comerciais</h2>
+          <h2 id="commercial-kpi-title" className="font-medium text-foreground">
+            Indicadores comerciais
+          </h2>
           <span aria-hidden="true">•</span>
           <span>Últimos {period} dias</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-5">
+        <DashboardGrid className="grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
           <KpiComparisonCard
             label="Conversão"
             value={`${overview.conversion.rate.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
@@ -57,7 +89,10 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
           {overview.revenue !== null && (
             <KpiComparisonCard
               label="Receita ativa"
-              value={overview.revenue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              value={overview.revenue.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
               sublabel="Vendas ativas no período"
               icon={CurrencyCircleDollar}
               iconClassName="bg-success/10 text-success"
@@ -68,7 +103,10 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
           {overview.avgTicket !== null && (
             <KpiComparisonCard
               label="Ticket médio"
-              value={overview.avgTicket.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              value={overview.avgTicket.toLocaleString("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              })}
               sublabel="Receita / vendas"
               icon={Users}
               iconClassName="bg-chart-1/10 text-chart-1"
@@ -83,7 +121,7 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
             icon={Users}
             iconClassName="bg-chart-1/10 text-chart-1"
           />
-        </div>
+        </DashboardGrid>
       </section>
 
       <FunnelSection className="max-[559px]:order-3" funnel={funnel} />
@@ -93,41 +131,51 @@ export function CommercialTab({ period, overview, funnel, attention, sourcePerfo
       <section aria-labelledby="source-performance-title" className="max-[559px]:order-4">
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <ChartBar className="size-3.5" aria-hidden="true" />
-          <h2 id="source-performance-title" className="font-medium text-foreground">Desempenho por canal</h2>
+          <h2 id="source-performance-title" className="font-medium text-foreground">
+            Desempenho por canal
+          </h2>
         </div>
         <ResponsiveDataView
-          desktop={<DataTableFrame><Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Canal</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
-                <TableHead className="text-right">Convertidos</TableHead>
-                <TableHead className="text-right">Conversão</TableHead>
-                <TableHead className="text-right">Vendas</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sourcePerformance.map((row) => {
-                const convRate = row.leads > 0 ? ((row.converted / row.leads) * 100).toFixed(1) : "0,0";
-                return (
-                  <TableRow key={row.source}>
-                    <TableCell className="font-medium">{sourceLabel(row.source)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.leads}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.converted}</TableCell>
-                    <TableCell className="text-right tabular-nums">{convRate}%</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.sales}</TableCell>
+          desktop={
+            <DataTableFrame>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Canal</TableHead>
+                    <TableHead className="text-right">Leads</TableHead>
+                    <TableHead className="text-right">Convertidos</TableHead>
+                    <TableHead className="text-right">Conversão</TableHead>
+                    <TableHead className="text-right">Vendas</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table></DataTableFrame>}
+                </TableHeader>
+                <TableBody>
+                  {sourcePerformance.map((row) => {
+                    const convRate =
+                      row.leads > 0 ? ((row.converted / row.leads) * 100).toFixed(1) : "0,0";
+                    return (
+                      <TableRow key={row.source}>
+                        <TableCell className="font-medium">{sourceLabel(row.source)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.leads}</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.converted}</TableCell>
+                        <TableCell className="text-right tabular-nums">{convRate}%</TableCell>
+                        <TableCell className="text-right tabular-nums">{row.sales}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </DataTableFrame>
+          }
           mobile={
             <MobileDataList>
               {sourcePerformance.map((row) => {
-                const convRate = row.leads > 0 ? ((row.converted / row.leads) * 100).toFixed(1) : "0,0";
+                const convRate =
+                  row.leads > 0 ? ((row.converted / row.leads) * 100).toFixed(1) : "0,0";
                 return (
                   <MobileDataListItem key={row.source}>
-                    <h3 className="mb-2.5 text-sm font-semibold text-foreground">{sourceLabel(row.source)}</h3>
+                    <h3 className="mb-2.5 text-sm font-semibold text-foreground">
+                      {sourceLabel(row.source)}
+                    </h3>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                       <MobileDataRow label="Leads" value={row.leads} />
                       <MobileDataRow label="Convertidos" value={row.converted} />

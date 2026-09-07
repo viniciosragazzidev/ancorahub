@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { ComparisonDelta } from "@/features/reports/metrics/metrics-math";
 import { TrendUp, TrendDown } from "@/components/huge-icons";
+import { DashboardCard } from "@/components/dashboard-card";
 import type { ComponentType } from "react";
 
 interface IconComponentProps {
@@ -25,7 +26,10 @@ function formatDelta(delta: ComparisonDelta, unit: "pp" | "currency" | "number")
   if (delta.relativePercent !== null) {
     const val = delta.relativePercent;
     if (unit === "currency") {
-      const formatted = Math.abs(val).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      const formatted = Math.abs(val).toLocaleString("pt-BR", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
       return val >= 0 ? `+${formatted}%` : `-${formatted}%`;
     }
     const sign = val > 0 ? "+" : "";
@@ -34,7 +38,13 @@ function formatDelta(delta: ComparisonDelta, unit: "pp" | "currency" | "number")
   return "";
 }
 
-function DeltaBadge({ delta, unit }: { delta: ComparisonDelta; unit: "pp" | "currency" | "number" }) {
+function DeltaBadge({
+  delta,
+  unit,
+}: {
+  delta: ComparisonDelta;
+  unit: "pp" | "currency" | "number";
+}) {
   if (delta.direction === "flat") return null;
 
   const isPositive = delta.direction === "up";
@@ -47,7 +57,11 @@ function DeltaBadge({ delta, unit }: { delta: ComparisonDelta; unit: "pp" | "cur
         isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
       )}
     >
-      {isPositive ? <TrendUp className="size-3" aria-hidden="true" /> : <TrendDown className="size-3" aria-hidden="true" />}
+      {isPositive ? (
+        <TrendUp className="size-3" aria-hidden="true" />
+      ) : (
+        <TrendDown className="size-3" aria-hidden="true" />
+      )}
       {formatted}
     </span>
   );
@@ -63,18 +77,31 @@ export function KpiComparisonCard({
   isCurrency,
 }: KpiComparisonCardProps) {
   return (
-    <div data-slot="report-card" className="report-card ui-metric-card min-w-0 p-3 sm:p-4">
+    <DashboardCard
+      data-slot="report-card"
+      className="report-card ui-metric-card min-w-0 p-3 sm:p-4"
+    >
       <div className="flex items-center justify-between">
-        <div className={cn("ui-metric-card-icon flex size-9 items-center justify-center", iconClassName)}>
+        <div
+          className={cn(
+            "ui-metric-card-icon flex size-9 items-center justify-center",
+            iconClassName,
+          )}
+        >
           <Icon className="size-4" />
         </div>
         {delta && <DeltaBadge delta={delta} unit={isCurrency ? "currency" : "number"} />}
       </div>
       <div className="mt-3">
-        <p className="ui-metric-card-value truncate text-lg font-semibold sm:text-2xl" title={String(value)}>{value}</p>
+        <p
+          className="ui-metric-card-value truncate text-lg font-semibold sm:text-2xl"
+          title={String(value)}
+        >
+          {value}
+        </p>
         <p className="ui-metric-card-label">{label}</p>
       </div>
       <p className="ui-metric-card-label mt-1">{sublabel}</p>
-    </div>
+    </DashboardCard>
   );
 }

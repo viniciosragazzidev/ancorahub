@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { AttentionSnapshot } from "@/features/reports/metrics/metrics-service";
 import type { PeriodValue } from "@/shared/period";
 import { Warning, ArrowUpRight } from "@/components/huge-icons";
+import { DashboardGrid } from "@/components/dashboard";
 
 interface AttentionSectionProps {
   readonly attention: AttentionSnapshot;
@@ -17,19 +18,21 @@ export function AttentionSection({ attention, period, className }: AttentionSect
     <section aria-labelledby="attention-title" className={className}>
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Warning className="size-3.5" aria-hidden="true" />
-        <h2 id="attention-title" className="font-medium text-foreground">O que exige atenção</h2>
+        <h2 id="attention-title" className="font-medium text-foreground">
+          O que exige atenção
+        </h2>
         <span aria-hidden="true">•</span>
         <span>Período: {period} dias</span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <DashboardGrid className="sm:grid-cols-2 xl:grid-cols-4">
         {attention.items.map((item) => (
           <Link
             key={item.id}
             href={item.href}
             className={cn(
-              "report-card group rounded-lg border border-border bg-card p-4 shadow-sm",
-              "transition-colors hover:border-primary/30 hover:bg-primary/5",
+              "report-card group min-h-32 bg-card p-4",
+              "transition-colors hover:bg-primary/5",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               item.count === 0 && "opacity-60",
             )}
@@ -47,7 +50,7 @@ export function AttentionSection({ attention, period, className }: AttentionSect
             <p className="mt-2 text-xs text-muted-foreground leading-5">{item.description}</p>
           </Link>
         ))}
-      </div>
+      </DashboardGrid>
     </section>
   );
 }
