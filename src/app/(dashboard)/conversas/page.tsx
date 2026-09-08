@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, or, sql } from "drizzle-orm";
 
 import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -613,7 +613,12 @@ export default async function ConversationsPage({
                 and(
                   eq(schema.whatsappMessages.tenantId, context.tenantId),
                   eq(schema.whatsappMessages.direction, "incoming"),
-                  inArray(schema.whatsappMessages.phone, brokerPhones),
+                  or(
+                    inArray(schema.whatsappMessages.phone, brokerPhones),
+                    ...brokerPhones.map((phone) =>
+                      like(schema.whatsappMessages.phone, `%${phone.slice(-4)}`),
+                    ),
+                  ),
                 ),
               )
               .orderBy(desc(schema.whatsappMessages.sentAt))

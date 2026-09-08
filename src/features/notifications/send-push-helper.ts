@@ -191,7 +191,7 @@ export async function notifyNewLead(
   corretorId: string | null,
   leadName: string,
   idempotencyPrefix?: string,
-  options?: { isRedistribution?: boolean },
+  options?: { isRedistribution?: boolean; skipBrokerWhatsApp?: boolean },
 ): Promise<{ notificationError?: string } | void> {
   let whatsappError: string | undefined;
   let pushError: string | undefined;
@@ -204,7 +204,7 @@ export async function notifyNewLead(
     console.error("[notifyNewLead] Capability check error:", err);
   }
 
-  if (corretorId && !pushError) {
+  if (corretorId && !pushError && !options?.skipBrokerWhatsApp) {
     try {
       await enqueueBrokerLeadNotification({
         tenantId,

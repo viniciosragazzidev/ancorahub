@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveQueueCandidateBranchIds } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveLeadOfferCycle, resolveQueueCandidateBranchIds } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -67,6 +67,82 @@ describe("lead distribution domain", () => {
 
   it("calculates an explainable weighted broker score", () => {
     expect(calculateBrokerRankingScore({ conversionRate: 1, slaRate: 1, manualPriority: 0 }, defaultIntelligentDistributionPolicy)).toBe(80);
+  });
+
+  it("keeps one active offer exclusive until it expires", () => {
+    const now = new Date("2026-09-08T15:00:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        { brokerId: "broker-a", status: "SENT", expiresAt: new Date("2026-09-08T15:03:00Z") },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBe("broker-a");
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+    expect(cycle.exhausted).toBe(false);
+  });
+
+  it("advances to brokers that have not received the lead yet", () => {
+    const now = new Date("2026-09-08T15:10:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b", "broker-c"],
+      offers: [
+        { brokerId: "broker-a", status: "DECLINED", expiresAt: now },
+        { brokerId: "broker-b", status: "EXPIRED", expiresAt: now },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBeNull();
+    expect(cycle.remainingBrokerIds).toEqual(["broker-c"]);
+    expect(cycle.exhausted).toBe(false);
+  });
+
+  it("requires manual distribution only after every eligible broker was attempted", () => {
+    const now = new Date("2026-09-08T15:10:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        { brokerId: "broker-a", status: "DECLINED", expiresAt: now },
+        { brokerId: "broker-b", status: "EXPIRED", expiresAt: now },
+      ],
+      now,
+    });
+
+    expect(cycle.remainingBrokerIds).toEqual([]);
+    expect(cycle.exhausted).toBe(true);
+  });
+
+  it("treats unavailable-channel attempts as consumed and advances immediately", () => {
+    const now = new Date("2026-09-08T15:10:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        { brokerId: "broker-a", status: "CANCELLED", expiresAt: now },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBeNull();
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+    expect(cycle.exhausted).toBe(false);
+  });
+
+  it("does not keep an overdue pending offer active", () => {
+    const now = new Date("2026-09-08T15:10:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        { brokerId: "broker-a", status: "PENDING", expiresAt: new Date("2026-09-08T15:09:59Z") },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBeNull();
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+    expect(cycle.exhausted).toBe(false);
   });
 
   it("shares the same deterministic candidate decision with a simulator", () => {

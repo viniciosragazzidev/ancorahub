@@ -4,11 +4,11 @@ import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
-import { chooseAvailableBroker } from "./assignment";
-import { notifyLeadReassigned, notifyNewLead, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 type SlaKind = "lead_unworked" | "lead_warning_10m" | "lead_stalled";
@@ -112,118 +112,81 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
           continue;
         }
 
-        // Save previous owner to notify them later
+        // Save previous owner to exclude them from the next automatic offer cycle.
         const previousOwnerId = lead.corretorId;
         const currentRedistributions = lead.redistributionCount ?? 0;
-        const MAX_REDISTRIBUTIONS = 2;
         const updateTime = new Date();
-
-        if (currentRedistributions >= MAX_REDISTRIBUTIONS) {
-          // Bateu o limite máximo de 2 redistribuições: o lead fica sem corretor aguardando atribuição manual
-          await db.transaction(async (tx) => {
-            await tx.update(schema.leads)
-              .set({
-                corretorId: null,
-                status: "new",
-                distributionStatus: "unassigned",
-                assignedAt: null,
-                assignmentSource: "manual_pending",
-                stageEnteredAt: updateTime,
-                distributionUpdatedAt: updateTime,
-                firstContactAt: null,
-                serviceStartedAt: null,
-                serviceStartedBy: null,
-              })
-              .where(eq(schema.leads.id, lead.id));
-
-            if (systemUserId) {
-              await tx.insert(schema.leadInteractions).values({
-                id: randomUUID(),
-                leadId: lead.id,
-                userId: systemUserId,
-                tipo: "system_alert",
-                conteudo: `Limite máximo de ${MAX_REDISTRIBUTIONS} redistribuições automáticas atingido. Lead retornado para atribuição manual.`,
-              });
-
-              await tx.insert(schema.auditLogs).values({
-                id: randomUUID(),
-                userId: systemUserId,
-                entidade: "lead",
-                entidadeId: lead.id,
-                acao: "lead.redistribution_limit_reached",
-              });
-            }
-          });
-
-          // Notificar gestores/diretores sobre a necessidade de atribuição manual
-          for (const recipient of recipients) {
-            await publishNotification({
-              capability: "lead_assignment",
-              tenantId: tenant.id,
-              recipientUserId: recipient.userId,
-              leadId: lead.id,
-              type: "lead_reassigned",
-              title: "Lead aguardando atribuição manual ⚠️",
-              message: `O lead "${lead.nome}" atingiu o limite de 2 redistribuições por inatividade e aguarda atribuição manual.`,
-              pushTitle: "Lead Aguarda Atribuição Manual ⚠️",
-              pushBody: `"${lead.nome}" atingiu 2 redistribuições automáticas e precisa de intervenção manual.`,
-              url: `/leads/${lead.id}`,
-              tag: "corretop-leads",
-            }).catch(console.error);
-          }
+        await db.transaction(async (tx) => {
+          await tx.update(schema.leads)
+            .set({
+              corretorId: null,
+              status: "new",
+              distributionStatus: "queued",
+              redistributionCount: currentRedistributions + 1,
+              assignedAt: null,
+              assignmentSource: "redistribution",
+              stageEnteredAt: updateTime,
+              distributionUpdatedAt: updateTime,
+              firstContactAt: null,
+              serviceStartedAt: null,
+              serviceStartedBy: null,
+            })
+            .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, tenant.id)));
 
           if (previousOwnerId) {
-            void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
-            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
-          }
-        } else {
-          // Dentro do limite: efetua a redistribuição e incrementa o contador
-          const nextBrokerId = await chooseAvailableBroker(tenant.id, lead.branchId, lead.corretorId, lead.webhookCredentialId);
-          
-          await db.transaction(async (tx) => {
-            await tx.update(schema.leads)
-              .set({
-                corretorId: nextBrokerId,
-                status: nextBrokerId ? "distributed" : "new",
-                distributionStatus: nextBrokerId ? "assigned" : "queued",
-                redistributionCount: currentRedistributions + 1,
-                assignedAt: nextBrokerId ? updateTime : null,
-                stageEnteredAt: updateTime,
-                distributionUpdatedAt: updateTime,
-                firstContactAt: null,
-                serviceStartedAt: null,
-                serviceStartedBy: null,
-              })
-              .where(eq(schema.leads.id, lead.id));
-
-            if (systemUserId) {
-              await tx.insert(schema.leadInteractions).values({
+            const [existingOffer] = await tx
+              .select({ id: schema.leadOffers.id })
+              .from(schema.leadOffers)
+              .where(
+                and(
+                  eq(schema.leadOffers.tenantId, tenant.id),
+                  eq(schema.leadOffers.leadId, lead.id),
+                  eq(schema.leadOffers.brokerId, previousOwnerId),
+                ),
+              )
+              .limit(1);
+            if (!existingOffer) {
+              await tx.insert(schema.leadOffers).values({
                 id: randomUUID(),
+                tenantId: tenant.id,
                 leadId: lead.id,
-                userId: systemUserId,
-                tipo: "system_alert",
-                conteudo: nextBrokerId
-                  ? `Lead redistribuído automaticamente por estouro de SLA (tentativa ${currentRedistributions + 1} de ${MAX_REDISTRIBUTIONS}).`
-                  : `Lead retornado para a fila da unidade por estouro de SLA (sem outro corretor disponível).`,
-              });
-
-              await tx.insert(schema.auditLogs).values({
-                id: randomUUID(),
-                userId: systemUserId,
-                entidade: "lead",
-                entidadeId: lead.id,
-                acao: "lead.redistributed_sla",
+                brokerId: previousOwnerId,
+                status: "EXPIRED",
+                offeredAt: lead.assignedAt ?? updateTime,
+                expiresAt: updateTime,
+                createdAt: updateTime,
+                updatedAt: updateTime,
               });
             }
-          });
-
-          // Disparar notificações de redistribuição
-          await notifyNewLead(lead.id, tenant.id, lead.branchId, nextBrokerId, lead.nome, undefined, { isRedistribution: true }).catch(console.error);
-
-          if (previousOwnerId && previousOwnerId !== nextBrokerId) {
-            void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
-            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
           }
+
+          if (systemUserId) {
+            await tx.insert(schema.leadInteractions).values({
+              id: randomUUID(),
+              leadId: lead.id,
+              userId: systemUserId,
+              tipo: "system_alert",
+              conteudo: `Lead devolvido ao ciclo automático por estouro de SLA. O corretor anterior foi excluído da próxima tentativa.`,
+            });
+            await tx.insert(schema.auditLogs).values({
+              id: randomUUID(),
+              userId: systemUserId,
+              entidade: "lead",
+              entidadeId: lead.id,
+              acao: "lead.redistributed_sla",
+            });
+          }
+        });
+
+        await enqueueAndProcessLeadDistribution({
+          tenantId: tenant.id,
+          leadId: lead.id,
+          source: "sla_timeout",
+        });
+
+        if (previousOwnerId) {
+          void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+          void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
         }
 
       } else if (kind === "lead_warning_10m") {

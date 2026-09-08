@@ -19,6 +19,7 @@ const payloadSchema = z.object({
   leadName: z.string().min(1).max(160).optional(),
   brokerId: z.string().min(1).optional(),
   isRedistribution: z.enum(["true", "false"]).optional(),
+  skipBrokerWhatsapp: z.enum(["true", "false"]).optional(),
   failedEffectId: z.string().min(1).optional(),
   failedEffectType: z.enum(effectTypes).optional(),
 }).strict();
@@ -143,7 +144,10 @@ async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect
       payload.brokerId,
       payload.leadName ?? "Novo lead",
       `lead-assigned:${effect.id}`,
-      { isRedistribution: payload.isRedistribution === "true" },
+      {
+        isRedistribution: payload.isRedistribution === "true",
+        skipBrokerWhatsApp: payload.skipBrokerWhatsapp === "true",
+      },
     );
     return;
   }

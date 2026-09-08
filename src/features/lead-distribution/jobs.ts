@@ -9,6 +9,7 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
 
 import { processQueuedLead } from "./service";
+import { expireOutdatedLeadOffers } from "./offers";
 import { distributionRetryDelayMilliseconds, isDeferredDistributionReason } from "./domain";
 
 const JOB_TYPE = "process_queued_lead";
@@ -87,7 +88,7 @@ export async function enqueueLeadDistributionJob(input: { tenantId: string; lead
 export async function enqueueAndProcessLeadDistribution(input: {
   tenantId: string;
   leadId: string;
-  source: "qualification_timeout" | "human_handoff" | "agent_trigger";
+  source: "qualification_timeout" | "human_handoff" | "agent_trigger" | "offer_declined" | "sla_timeout";
 }) {
   await enqueueLeadDistributionJob({ tenantId: input.tenantId, leadId: input.leadId });
 
@@ -264,13 +265,29 @@ async function completeJob(jobId: string) {
   await getDatabase().update(schema.leadDistributionJobs).set({ status: "completed", completedAt: now, lockedAt: null, lockedBy: null, leaseExpiresAt: null, lastErrorCode: null, lastErrorMessage: null, updatedAt: now }).where(eq(schema.leadDistributionJobs.id, jobId));
 }
 
-async function deferOrFailJob(job: typeof schema.leadDistributionJobs.$inferSelect, config: DistributionJobConfig, code: string, message: string, defer: boolean) {
+async function deferOrFailJob(
+  job: typeof schema.leadDistributionJobs.$inferSelect,
+  config: DistributionJobConfig,
+  code: string,
+  message: string,
+  defer: boolean,
+  runAfterOverride?: Date,
+) {
   const now = new Date();
   const exhausted = !defer && job.attemptCount >= job.maxAttempts;
+  const nextRunAfter = exhausted
+    ? now
+    : runAfterOverride ?? new Date(
+      now.getTime() + (
+        defer
+          ? Math.max(config.retryBaseSeconds * 2, 120) * 1000
+          : distributionRetryDelayMilliseconds(job.attemptCount, config.retryBaseSeconds)
+      ),
+    );
   await getDatabase().update(schema.leadDistributionJobs).set({
     status: exhausted ? "failed" : "retrying",
     attemptCount: defer ? sql`greatest(${schema.leadDistributionJobs.attemptCount} - 1, 0)` : job.attemptCount,
-    runAfter: exhausted ? now : new Date(now.getTime() + (defer ? Math.max(config.retryBaseSeconds * 2, 120) * 1000 : distributionRetryDelayMilliseconds(job.attemptCount, config.retryBaseSeconds))),
+    runAfter: nextRunAfter,
     lockedAt: null,
     lockedBy: null,
     leaseExpiresAt: null,
@@ -293,6 +310,7 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
     result.deferred = await deferJobsUntilBusinessHours(now, input.tenantId, input.leadId);
     return result;
   }
+  await expireOutdatedLeadOffers(input.tenantId);
   result.recoveredLeases = await recoverExpiredJobLeases(now, input.tenantId, input.leadId);
   result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId);
   result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId);
@@ -313,6 +331,23 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
       if (distribution.status === "assigned") {
         await completeJob(job.id);
         result.assigned += 1;
+        continue;
+      }
+      if (distribution.status === "manual_required") {
+        await completeJob(job.id);
+        result.skipped += 1;
+        continue;
+      }
+      if (distribution.status === "offered") {
+        const failed = await deferOrFailJob(
+          job,
+          effectiveConfig,
+          "AWAITING_BROKER_ACCEPTANCE",
+          `Oferta ativa para corretor até ${distribution.expiresAt.toISOString()}.`,
+          true,
+          distribution.expiresAt,
+        );
+        if (failed) result.failed += 1; else result.deferred += 1;
         continue;
       }
       const reason = distribution.reason ?? "O lead não está pronto para atribuição automática.";

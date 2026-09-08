@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
@@ -58,7 +58,11 @@ export async function createLeadOffersForBrokers(input: {
   // Fetch branch & tenant company name
   let branchName = "Unidade Principal";
   if (lead.branchId) {
-    const [branch] = await db.select({ name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.id, lead.branchId)).limit(1);
+    const [branch] = await db
+      .select({ name: schema.branches.name })
+      .from(schema.branches)
+      .where(and(eq(schema.branches.id, lead.branchId), eq(schema.branches.tenantId, input.tenantId)))
+      .limit(1);
     if (branch) branchName = branch.name;
   }
 
@@ -73,31 +77,96 @@ export async function createLeadOffersForBrokers(input: {
       name: schema.user.name,
       phone: schema.brokerProfiles.phone,
     })
-    .from(schema.user)
-    .leftJoin(schema.brokerProfiles, eq(schema.brokerProfiles.userId, schema.user.id))
-    .where(inArray(schema.user.id, input.brokerIds));
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+    .leftJoin(
+      schema.brokerProfiles,
+      and(
+        eq(schema.brokerProfiles.userId, schema.user.id),
+        eq(schema.brokerProfiles.tenantId, input.tenantId),
+      ),
+    )
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, input.tenantId),
+        eq(schema.tenantMemberships.role, "broker"),
+        eq(schema.tenantMemberships.status, "active"),
+        inArray(schema.user.id, input.brokerIds),
+      ),
+    );
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
 
   for (const broker of brokers) {
     const destinationPhone = broker.phone;
-    if (!destinationPhone) {
+    const offerId = randomUUID();
+    const claimStatus = await db.transaction(async (tx) => {
+      // Serialize offer creation per lead. This is the final guard against two
+      // workers creating simultaneous active offers for different brokers.
+      const [lockedLead] = await tx
+        .select({ id: schema.leads.id, corretorId: schema.leads.corretorId })
+        .from(schema.leads)
+        .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+        .for("update")
+        .limit(1);
+
+      if (!lockedLead || lockedLead.corretorId) return null;
+
+      const [activeOffer] = await tx
+        .select({ id: schema.leadOffers.id })
+        .from(schema.leadOffers)
+        .where(
+          and(
+            eq(schema.leadOffers.tenantId, input.tenantId),
+            eq(schema.leadOffers.leadId, input.leadId),
+            inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+            gt(schema.leadOffers.expiresAt, now),
+          ),
+        )
+        .limit(1);
+      if (activeOffer) return null;
+
+      const [alreadyAttempted] = await tx
+        .select({ id: schema.leadOffers.id })
+        .from(schema.leadOffers)
+        .where(
+          and(
+            eq(schema.leadOffers.tenantId, input.tenantId),
+            eq(schema.leadOffers.leadId, input.leadId),
+            eq(schema.leadOffers.brokerId, broker.id),
+          ),
+        )
+        .limit(1);
+      if (alreadyAttempted) return null;
+
+      await tx.insert(schema.leadOffers).values({
+        id: offerId,
+        tenantId: input.tenantId,
+        leadId: input.leadId,
+        brokerId: broker.id,
+        status: destinationPhone ? "PENDING" : "CANCELLED",
+        offeredAt: now,
+        expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return destinationPhone ? "pending" as const : "unavailable" as const;
+    });
+
+    if (!claimStatus) continue;
+    if (claimStatus === "unavailable" || !destinationPhone) {
       console.warn(`[createLeadOffersForBrokers] Corretor ${broker.id} (${broker.name}) não possui telefone cadastrado.`);
+      if (input.requestedBy) {
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: input.requestedBy,
+          entidade: "lead_offer",
+          entidadeId: offerId,
+          acao: "lead_offer_channel_unavailable",
+        });
+      }
       continue;
     }
-
-    const offerId = randomUUID();
-    await db.insert(schema.leadOffers).values({
-      id: offerId,
-      tenantId: input.tenantId,
-      leadId: input.leadId,
-      brokerId: broker.id,
-      status: "PENDING",
-      offeredAt: now,
-      expiresAt,
-      createdAt: now,
-      updatedAt: now,
-    });
 
     const idempotencyKey = `lead-offer:${input.leadId}:${broker.id}:${now.getTime()}`;
     const brokerName = broker.name || "Corretor(a)";
@@ -105,24 +174,54 @@ export async function createLeadOffersForBrokers(input: {
     // Enqueue approved offer template: novo_lead_
     // The synchronized template may use the lead name, but never receives its phone before acceptance.
     // The lead id is reserved for the text fallback link.
-    const outbound = await enqueueMetaTemplateMessage({
-      tenantId: input.tenantId,
-      recipientType: "user",
-      recipientId: broker.id,
-      destinationPhone,
-      purpose: "newLeadAssignment",
-      variables: buildLeadOfferVariables({
-        corretorNome: brokerName,
-        leadNome: lead.nome,
-        empresa: companyName,
-        tipoLead: leadTypeLabel,
-        unidade: branchName,
-        tempoResposta: String(timeoutMinutes),
-        leadId: lead.id,
-      }),
-      requestedBy: input.requestedBy,
-      idempotencyKey,
-    });
+    let outbound: Awaited<ReturnType<typeof enqueueMetaTemplateMessage>>;
+    try {
+      outbound = await enqueueMetaTemplateMessage({
+        tenantId: input.tenantId,
+        recipientType: "user",
+        recipientId: broker.id,
+        destinationPhone,
+        purpose: "newLeadAssignment",
+        variables: buildLeadOfferVariables({
+          corretorNome: brokerName,
+          leadNome: lead.nome,
+          empresa: companyName,
+          tipoLead: leadTypeLabel,
+          unidade: branchName,
+          tempoResposta: String(timeoutMinutes),
+          leadId: lead.id,
+        }),
+        requestedBy: input.requestedBy,
+        idempotencyKey,
+      });
+    } catch (error) {
+      await db
+        .update(schema.leadOffers)
+        .set({ status: "CANCELLED", updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.leadOffers.id, offerId),
+            eq(schema.leadOffers.tenantId, input.tenantId),
+            eq(schema.leadOffers.status, "PENDING"),
+          ),
+        );
+      if (input.requestedBy) {
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: input.requestedBy,
+          entidade: "lead_offer",
+          entidadeId: offerId,
+          acao: "lead_offer_enqueue_failed",
+        });
+      }
+      console.error("[createLeadOffersForBrokers] Falha ao enfileirar oferta; tentativa cancelada.", {
+        tenantId: input.tenantId,
+        leadId: input.leadId,
+        brokerId: broker.id,
+        error: error instanceof Error ? error.name : "unknown_error",
+      });
+      continue;
+    }
 
     if (outbound.id) {
       await db
@@ -170,7 +269,13 @@ export async function handleLeadOfferWebhookResponse(input: {
     })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-    .leftJoin(schema.brokerProfiles, eq(schema.brokerProfiles.userId, schema.user.id))
+    .leftJoin(
+      schema.brokerProfiles,
+      and(
+        eq(schema.brokerProfiles.userId, schema.user.id),
+        eq(schema.brokerProfiles.tenantId, input.tenantId),
+      ),
+    )
     .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker")));
 
   const broker = allUsers.find((u) => u.phone && samePhone(u.phone, phone));
@@ -222,10 +327,19 @@ export async function handleLeadOfferWebhookResponse(input: {
 
   // Handle DECLINE
   if (isDecline) {
-    await db
+    const [declined] = await db
       .update(schema.leadOffers)
       .set({ status: "DECLINED", declinedAt: new Date(), updatedAt: new Date() })
-      .where(eq(schema.leadOffers.id, offer.id));
+      .where(
+        and(
+          eq(schema.leadOffers.id, offer.id),
+          eq(schema.leadOffers.tenantId, input.tenantId),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        ),
+      )
+      .returning({ id: schema.leadOffers.id });
+
+    if (!declined) return { processed: true, action: "declined", leadId: offer.leadId };
 
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
@@ -233,6 +347,13 @@ export async function handleLeadOfferWebhookResponse(input: {
       entidade: "lead_offer",
       entidadeId: offer.id,
       acao: "lead_offer_declined",
+    });
+
+    const { enqueueAndProcessLeadDistribution } = await import("./jobs");
+    await enqueueAndProcessLeadDistribution({
+      tenantId: input.tenantId,
+      leadId: offer.leadId,
+      source: "offer_declined",
     });
 
     return { processed: true, action: "declined", leadId: offer.leadId };
@@ -265,7 +386,7 @@ export async function handleLeadOfferWebhookResponse(input: {
     const [currentOffer] = await tx
       .select()
       .from(schema.leadOffers)
-      .where(eq(schema.leadOffers.id, offer.id))
+      .where(and(eq(schema.leadOffers.id, offer.id), eq(schema.leadOffers.tenantId, input.tenantId)))
       .for("update")
       .limit(1);
 
@@ -317,6 +438,26 @@ export async function handleLeadOfferWebhookResponse(input: {
         ),
       );
 
+    await tx
+      .update(schema.leadDistributionJobs)
+      .set({
+        status: "completed",
+        completedAt: now,
+        lockedAt: null,
+        lockedBy: null,
+        leaseExpiresAt: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.leadDistributionJobs.tenantId, input.tenantId),
+          eq(schema.leadDistributionJobs.leadId, lead.id),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying", "processing"]),
+        ),
+      );
+
     // 4. Record audit log
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(),
@@ -330,7 +471,13 @@ export async function handleLeadOfferWebhookResponse(input: {
       leadId: lead.id,
       type: "NOTIFY_LEAD_ASSIGNED",
       idempotencyKey: `lead-assigned:offer:${offer.id}`,
-      payload: { branchId: lead.branchId, brokerId: broker.id, leadName: lead.nome, isRedistribution: "false" },
+      payload: {
+        branchId: lead.branchId,
+        brokerId: broker.id,
+        leadName: lead.nome,
+        isRedistribution: "false",
+        skipBrokerWhatsapp: "true",
+      },
     });
 
     return { won: true, lead, broker };
@@ -380,7 +527,13 @@ export async function handleLeadOfferWebhookResponse(input: {
           phone: schema.brokerProfiles.phone,
         })
         .from(schema.user)
-        .leftJoin(schema.brokerProfiles, eq(schema.brokerProfiles.userId, schema.user.id))
+        .leftJoin(
+          schema.brokerProfiles,
+          and(
+            eq(schema.brokerProfiles.userId, schema.user.id),
+            eq(schema.brokerProfiles.tenantId, input.tenantId),
+          ),
+        )
         .where(eq(schema.user.id, losingOffer.brokerId))
         .limit(1);
 
@@ -449,7 +602,13 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
     const [updated] = await db
       .update(schema.leadOffers)
       .set({ status: "EXPIRED", updatedAt: now })
-      .where(and(eq(schema.leadOffers.id, offer.id), inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"])))
+      .where(
+        and(
+          eq(schema.leadOffers.id, offer.id),
+          eq(schema.leadOffers.tenantId, offer.tenantId),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        ),
+      )
       .returning({ id: schema.leadOffers.id });
 
     if (updated) {
@@ -462,7 +621,13 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
           phone: schema.brokerProfiles.phone,
         })
         .from(schema.user)
-        .leftJoin(schema.brokerProfiles, eq(schema.brokerProfiles.userId, schema.user.id))
+        .leftJoin(
+          schema.brokerProfiles,
+          and(
+            eq(schema.brokerProfiles.userId, schema.user.id),
+            eq(schema.brokerProfiles.tenantId, offer.tenantId),
+          ),
+        )
         .where(eq(schema.user.id, offer.brokerId))
         .limit(1);
 

@@ -154,3 +154,31 @@ export function isAutomaticDistributionBranch(branch: {
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {
   return Math.min(baseSeconds * 1000 * (2 ** Math.max(attempt - 1, 0)), 30 * 60_000);
 }
+
+export function resolveLeadOfferCycle(input: {
+  eligibleBrokerIds: string[];
+  offers: Array<{ brokerId: string; status: string; expiresAt: Date }>;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const activeStatuses = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
+  const activeOffer = input.offers.find(
+    (offer) => activeStatuses.has(offer.status) && offer.expiresAt > now,
+  );
+  const attemptedBrokerIds = new Set(input.offers.map((offer) => offer.brokerId));
+  const remainingBrokerIds = input.eligibleBrokerIds.filter(
+    (brokerId) => !attemptedBrokerIds.has(brokerId),
+  );
+
+  return {
+    activeBrokerId: activeOffer?.brokerId ?? null,
+    activeExpiresAt: activeOffer?.expiresAt ?? null,
+    attemptedBrokerIds,
+    remainingBrokerIds,
+    exhausted:
+      !activeOffer &&
+      input.eligibleBrokerIds.length > 0 &&
+      remainingBrokerIds.length === 0 &&
+      attemptedBrokerIds.size > 0,
+  };
+}
