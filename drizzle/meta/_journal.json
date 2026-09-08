@@ -631,6 +631,13 @@
                         "when":  1788714000000,
                         "tag":  "0142_event_message_policies",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  90,
+                        "version":  "7",
+                        "when":  1788876383773,
+                        "tag":  "0143_repair_credential_account_identity",
+                        "breakpoints":  true
                     }
                 ]
 }

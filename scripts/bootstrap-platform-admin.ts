@@ -5,6 +5,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "../src/shared/db/client";
+import { buildCredentialAccount, buildCredentialAccountPasswordUpdate } from "../src/shared/auth/credential-account";
 
 loadEnvConfig(process.cwd());
 
@@ -47,8 +48,8 @@ async function main() {
 
   const password = await hashPassword(credentials.password);
   const [account] = await db.select().from(schema.account).where(and(eq(schema.account.userId, admin.id), eq(schema.account.providerId, "credential"))).limit(1);
-  if (account) await db.update(schema.account).set({ password, updatedAt: new Date() }).where(eq(schema.account.id, account.id));
-  else await db.insert(schema.account).values({ id: randomUUID(), userId: admin.id, providerId: "credential", accountId: admin.id, password });
+  if (account) await db.update(schema.account).set(buildCredentialAccountPasswordUpdate(admin.id, password)).where(eq(schema.account.id, account.id));
+  else await db.insert(schema.account).values(buildCredentialAccount({ id: randomUUID(), userId: admin.id, password }));
 
   const [membership] = await db.select().from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.userId, admin.id))).limit(1);
   if (membership) await db.update(schema.tenantMemberships).set({ branchId: branch.id, role: "director", status: "active", updatedAt: new Date() }).where(eq(schema.tenantMemberships.id, membership.id));

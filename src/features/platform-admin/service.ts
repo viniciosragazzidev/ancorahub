@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 import { getDatabase, schema } from "@/shared/db";
+import { buildCredentialAccount } from "@/shared/auth/credential-account";
 
 const cnpjPattern = /^\d{14}$/;
 
@@ -137,7 +138,11 @@ export async function createTenantAccess(rawInput: unknown) {
   const userId = randomUUID();
   await db.transaction(async (tx) => {
     await tx.insert(schema.user).values({ id: userId, name: input.name, email: input.email, emailVerified: true, active: true });
-    await tx.insert(schema.account).values({ id: randomUUID(), userId, providerId: "credential", accountId: userId, password: await hashPassword(input.password) });
+    await tx.insert(schema.account).values(buildCredentialAccount({
+      id: randomUUID(),
+      userId,
+      password: await hashPassword(input.password),
+    }));
     await tx.insert(schema.tenantMemberships).values({ id: randomUUID(), tenantId: input.tenantId, userId, branchId: input.branchId, role: input.role, status: "active" });
   });
   await writeAudit("tenant_access.created", "tenant_membership", userId, { tenantId: input.tenantId, role: input.role });

@@ -1,12 +1,13 @@
 import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole, type CreatableTeamRole } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
+import { buildCredentialAccount } from "@/shared/auth/credential-account";
 
 const inviteInput = z.object({
   name: z.string().trim().min(2).max(120),
@@ -50,7 +51,11 @@ export async function acceptTeamInvite(token: string, password: string) {
   const [pendingUser] = await db.select().from(schema.user).where(and(eq(schema.user.id, invite.userId), eq(schema.user.status, "pending"))).limit(1);
   if (!pendingUser) throw new Error("O acesso convidado não está pendente.");
   const { hashPassword } = await import("better-auth/crypto");
-  await db.insert(schema.account).values({ id: randomUUID(), userId: pendingUser.id, providerId: "credential", accountId: pendingUser.id, password: await hashPassword(validatedPassword) });
+  await db.insert(schema.account).values(buildCredentialAccount({
+    id: randomUUID(),
+    userId: pendingUser.id,
+    password: await hashPassword(validatedPassword),
+  }));
   await db.update(schema.user).set({ active: true, status: "active", emailVerified: true, updatedAt: new Date() }).where(eq(schema.user.id, pendingUser.id));
   await db.update(schema.invites).set({ usedAt: new Date() }).where(eq(schema.invites.id, invite.id));
 }

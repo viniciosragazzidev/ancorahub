@@ -2,7 +2,6 @@
 
 import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { toast } from "@/components/ui/sonner";
 import { CheckCircle, LockKey, Warning } from "@/components/huge-icons";
 
 import { Button } from "@/components/ui/button";
@@ -38,10 +37,19 @@ export default function PasswordResetPage() {
         <Card className="w-full max-w-md border-border bg-card shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><CheckCircle size={20} className="text-emerald-500" /> Senha alterada com sucesso!</CardTitle>
-            <CardDescription>Sua senha foi redefinida e seu login foi realizado automaticamente no sistema.</CardDescription>
+            <CardDescription>
+              {state.authenticated
+                ? "Sua senha foi redefinida e seu login foi realizado automaticamente no sistema."
+                : "Sua senha foi redefinida. Entre com a nova senha para continuar."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" render={<a href="/dashboard" />}>Acessar o sistema</Button>
+            <Button
+              className="w-full"
+              render={<a href={state.authenticated ? "/dashboard" : "/login"} />}
+            >
+              {state.authenticated ? "Acessar o sistema" : "Ir para o login"}
+            </Button>
           </CardContent>
         </Card>
       </div>

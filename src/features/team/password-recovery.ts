@@ -7,6 +7,11 @@ import { and, eq, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
+import {
+  buildCredentialAccount,
+  buildCredentialAccountPasswordUpdate,
+  CREDENTIAL_PROVIDER_ID,
+} from "@/shared/auth/credential-account";
 
 /**
  * Cria uma solicitação de recuperação de senha.
@@ -243,15 +248,24 @@ export async function completePasswordReset(token: string, newPassword: string) 
 
   await db.transaction(async (tx) => {
     // Atualizar senha
-    await tx
+    const updatedAccounts = await tx
       .update(schema.account)
-      .set({ password: hashedPassword, updatedAt: new Date() })
+      .set(buildCredentialAccountPasswordUpdate(request.userId, hashedPassword))
       .where(
         and(
           eq(schema.account.userId, request.userId),
-          eq(schema.account.providerId, "credential"),
+          eq(schema.account.providerId, CREDENTIAL_PROVIDER_ID),
         ),
-      );
+      )
+      .returning({ id: schema.account.id });
+
+    if (updatedAccounts.length === 0) {
+      await tx.insert(schema.account).values(buildCredentialAccount({
+        id: randomUUID(),
+        userId: request.userId,
+        password: hashedPassword,
+      }));
+    }
 
     // Marcar solicitação como concluída
     await tx

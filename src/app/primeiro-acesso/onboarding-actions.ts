@@ -1,11 +1,15 @@
 "use server";
 
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
+import {
+  buildCredentialAccount,
+  CREDENTIAL_PROVIDER_ID,
+} from "@/shared/auth/credential-account";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -112,17 +116,22 @@ export async function completeOnboardingAction(
           active: true,
           status: "active",
         }).where(eq(schema.user.id, userId));
-        await tx.delete(schema.account).where(eq(schema.account.userId, userId));
+        await tx
+          .delete(schema.account)
+          .where(
+            and(
+              eq(schema.account.userId, userId),
+              eq(schema.account.providerId, CREDENTIAL_PROVIDER_ID),
+            ),
+          );
       }
 
       // Create credential account
-      await tx.insert(schema.account).values({
+      await tx.insert(schema.account).values(buildCredentialAccount({
         id: randomUUID(),
         userId,
-        providerId: "credential",
-        accountId: userId,
         password: hashedPassword,
-      });
+      }));
 
       // Upsert tenant membership
       const [existingMembership] = await tx
