@@ -11,7 +11,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
  * - GROQ_API_KEY            chave da Groq (ou setting `ai_groq_api_key`)
  * - GROQ_MODEL              modelo Groq (default: llama-3.3-70b-versatile)
  * - OPENROUTER_API_KEY      chave do OpenRouter (ou setting `openrouter_key_<tenantId>`)
- * - OPENROUTER_MODEL        modelo OpenRouter (default: google/gemma-2-9b-it:free)
+ * - OPENROUTER_MODEL        modelo OpenRouter (default: meta-llama/llama-3.1-70b-instruct)
  * - AI_PROVIDER_ORDER       ordem de preferência, separada por vírgula
  *                           (default: groq,openrouter)
  *
@@ -56,7 +56,7 @@ const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
-export const DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+export const DEFAULT_OPENROUTER_MODEL = "meta-llama/llama-3.1-70b-instruct";
 const LEGACY_OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet";
 
 type ProviderConfig = {

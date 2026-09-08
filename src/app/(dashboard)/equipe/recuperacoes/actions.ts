@@ -1,9 +1,11 @@
 "use server";
 
 
+import { randomUUID } from "node:crypto";
+
 import { approvePasswordReset, rejectPasswordReset } from "@/features/team/password-recovery";
 
-export type RecoveryActionState = { success?: boolean; error?: string; message?: string };
+export type RecoveryActionState = { success?: boolean; error?: string; message?: string; mutationId?: string };
 
 export async function approveResetAction(
   _prev: RecoveryActionState,
@@ -14,9 +16,9 @@ export async function approveResetAction(
     if (!requestId) throw new Error("ID da solicitação não informado.");
 
     await approvePasswordReset(requestId);
-    return { success: true, message: "Solicitação aprovada! O link de recuperação será enviado por WhatsApp." };
+    return { success: true, mutationId: randomUUID(), message: "Solicitação aprovada! O link de recuperação será enviado por WhatsApp." };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao aprovar solicitação." };
+    return { success: false, mutationId: randomUUID(), error: e instanceof Error ? e.message : "Erro ao aprovar solicitação." };
   }
 }
 
@@ -31,8 +33,8 @@ export async function rejectResetAction(
     if (!requestId) throw new Error("ID da solicitação não informado.");
 
     await rejectPasswordReset(requestId, reason);
-    return { success: true, message: reason ? "Solicitação rejeitada com justificativa." : "Solicitação rejeitada." };
+    return { success: true, mutationId: randomUUID(), message: reason ? "Solicitação rejeitada com justificativa." : "Solicitação rejeitada." };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao rejeitar solicitação." };
+    return { success: false, mutationId: randomUUID(), error: e instanceof Error ? e.message : "Erro ao rejeitar solicitação." };
   }
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Check, X, Loader2, Eye, Ban } from "lucide-react";
 import { RecoveryStatusBadge } from "@/components/status-badges";
 import { toast } from "@/components/ui/sonner";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 import { Button } from "@/components/ui/button";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
@@ -58,10 +59,33 @@ export function RecoveryRequestsTable({ requests }: { requests: ResetRequest[] }
     {},
   );
 
-  if (approveState.message) { toast.success(approveState.message); approveState.message = undefined; }
-  if (approveState.error) { toast.error(approveState.error); approveState.error = undefined; }
-  if (rejectState.message) { toast.success(rejectState.message); rejectState.message = undefined; }
-  if (rejectState.error) { toast.error(rejectState.error); rejectState.error = undefined; }
+  // Feedback único por mutação via effect (não durante o render), evitando
+  // toasts duplicados e a mutação de estado durante render.
+  const handleApproveSuccess = useCallback((result: RecoveryActionState) => {
+    if (result.message) toast.success(result.message);
+  }, []);
+  const handleApproveError = useCallback((result: RecoveryActionState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: approveState,
+    pending: approvePending,
+    onSuccess: handleApproveSuccess,
+    onError: handleApproveError,
+  });
+
+  const handleRejectSuccess = useCallback((result: RecoveryActionState) => {
+    if (result.message) toast.success(result.message);
+  }, []);
+  const handleRejectError = useCallback((result: RecoveryActionState) => {
+    if (result.error) toast.error(result.error);
+  }, []);
+  useActionDialogLifecycle({
+    state: rejectState,
+    pending: rejectPending,
+    onSuccess: handleRejectSuccess,
+    onError: handleRejectError,
+  });
 
   const columns: ColumnDef<ResetRequest>[] = [
     {

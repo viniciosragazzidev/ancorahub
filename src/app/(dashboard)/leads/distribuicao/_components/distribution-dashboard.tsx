@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useId } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useId } from "react";
 import { motion } from "motion/react";
 import {
   Buildings,
@@ -92,16 +92,20 @@ function ToggleCell({
   const formKey = useId();
   const [state, formAction, pending] = useActionState<BranchActionState, FormData>(action, {});
   const [formVersion, setFormVersion] = useState(0);
-  const prevSuccess = useState(state.success);
-  if (state.success !== prevSuccess[0]) {
-    prevSuccess[0] = state.success;
+  // Rastreia a transição de sucesso/erro da action fora do render; um novo
+  // resultado remonta o form para reiniciar o ciclo de submissão.
+  const prevSuccessRef = useRef(state.success);
+  useEffect(() => {
+    if (state.success === prevSuccessRef.current) return;
+    prevSuccessRef.current = state.success;
     if (state.success) setFormVersion((v) => v + 1);
-  }
-  const prevError = useState(state.error);
-  if (state.error !== prevError[0]) {
-    prevError[0] = state.error;
+  }, [state.success]);
+  const prevErrorRef = useRef(state.error);
+  useEffect(() => {
+    if (state.error === prevErrorRef.current) return;
+    prevErrorRef.current = state.error;
     if (state.error) setFormVersion((v) => v + 1);
-  }
+  }, [state.error]);
   return (
     <form key={`${formKey}-${formVersion}`} action={formAction} className="flex items-center gap-2">
       <input type="hidden" name="branchId" value={branchId} />
@@ -132,16 +136,18 @@ function BrokerAvailabilityToggle({ broker }: { broker: BrokerItem }) {
   );
   const [formVersion, setFormVersion] = useState(0);
   const available = broker.availabilityStatus === "available";
-  const prevSuccess = useState(state.success);
-  if (state.success !== prevSuccess[0]) {
-    prevSuccess[0] = state.success;
+  const prevSuccessRef = useRef(state.success);
+  useEffect(() => {
+    if (state.success === prevSuccessRef.current) return;
+    prevSuccessRef.current = state.success;
     if (state.success) setFormVersion((v) => v + 1);
-  }
-  const prevError = useState(state.error);
-  if (state.error !== prevError[0]) {
-    prevError[0] = state.error;
+  }, [state.success]);
+  const prevErrorRef = useRef(state.error);
+  useEffect(() => {
+    if (state.error === prevErrorRef.current) return;
+    prevErrorRef.current = state.error;
     if (state.error) setFormVersion((v) => v + 1);
-  }
+  }, [state.error]);
   return (
     <form key={`${formKey}-${formVersion}`} action={formAction}>
       <input name="brokerId" type="hidden" value={broker.id} />

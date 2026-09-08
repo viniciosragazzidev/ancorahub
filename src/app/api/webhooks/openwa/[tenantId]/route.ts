@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
 import { publishDomainInvalidation } from "@/features/notifications/realtime-sync";
@@ -102,10 +102,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       console.error("[openwa-ai] inbound.failed", { tenantId, leadId: lead.id, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
     });
 
-    try {
-      const { waitUntil } = require("next/server");
-      if (typeof waitUntil === "function") waitUntil(aiPromise);
-    } catch {}
+    // Mantém o processamento da IA vivo após a resposta (next/server `after`).
+    after(() => aiPromise);
   }
   if (lead?.id) revalidatePath(`/leads/${lead.id}`);
   console.info("[OpenWA] mensagem persistida", JSON.stringify({ hasLead: Boolean(lead), hasClient: Boolean(client), direction: event.direction === "outgoing" || event.fromMe === true ? "outgoing" : "incoming" }));

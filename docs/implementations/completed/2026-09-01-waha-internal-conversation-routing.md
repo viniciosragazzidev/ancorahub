@@ -42,3 +42,19 @@ comportamento anterior; não há migration ou alteração de dados.
   desempenho preexistentes; nenhum bloqueio novo foi atribuído a esta mudança.
 - Pendente apenas o teste integrado VPS/WAHA com número selecionado, sessão
   pausada e webhook assinado.
+
+## Atualização 2026-09-08 — isolamento da caixa principal
+
+- Corrigida a montagem de `/conversas`: mensagens internas de corretores com
+  `leadId = null` não podem mais virar cards sintéticos `Contato (...)` na fila
+  geral de clientes.
+- A classificação agora consulta os telefones de `broker_profiles` somente no
+  tenant autenticado e reutiliza a normalização de telefone já usada no webhook.
+- Mensagens sem lead de números realmente desconhecidos continuam elegíveis para
+  a conversa sintética `whatsapp_unassigned`.
+- Regressão coberta por teste específico de corretor, cliente desconhecido e
+  mensagem já vinculada a lead.
+- Verificação completa aprovada em
+  `reports/agent/verification/2026-09-08T18-19-53.299Z.md`: documentação,
+  arquitetura, segurança, desempenho, lint, TypeScript, 149 arquivos/671 testes
+  e build de produção.

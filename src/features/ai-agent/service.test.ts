@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { getSystemSetting } = vi.hoisted(() => ({
   getSystemSetting: vi.fn(async (key: string) => key.startsWith("openrouter_model_") ? "anthropic/claude-3.5-sonnet" : null),
@@ -9,6 +9,17 @@ vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting }));
 import { detectHumanTransferRequest, generateAiResponse } from "./service";
 
 describe("OpenRouter WhatsApp AI integration", () => {
+  beforeEach(() => {
+    // Isola o teste: sem chave da Groq nem acesso ao banco real, para que o
+    // roteador use apenas a chave OpenRouter definida no próprio teste.
+    delete process.env.GROQ_API_KEY;
+    delete process.env.GROQ_MODEL;
+    delete process.env.OPENROUTER_MODEL;
+    delete process.env.AI_PROVIDER_ORDER;
+    delete process.env.DATABASE_URL;
+    delete process.env.SUPABASE_DB_URL;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.OPENROUTER_API_KEY;
@@ -28,9 +39,9 @@ describe("OpenRouter WhatsApp AI integration", () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.modelUsed).toBe("meta-llama/llama-3.3-70b-instruct:free");
+    expect(result.modelUsed).toBe("meta-llama/llama-3.1-70b-instruct");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).model).toBe("meta-llama/llama-3.3-70b-instruct:free");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).model).toBe("meta-llama/llama-3.1-70b-instruct");
   });
 
   it.each(["Atendente", "Falar com atendente", "quero falar com uma pessoa"]) (

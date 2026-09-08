@@ -1,14 +1,17 @@
 "use client";
 
-import { ShieldCheck, TriangleAlert } from "lucide-react";
+import { ShieldCheck, TriangleAlert, Unplug } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WhatsAppConnectDialog } from "@/components/whatsapp/whatsapp-connect-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   getWhatsAppConnection,
   getWhatsAppSessionStatus,
+  resetWhatsAppSessionAction,
 } from "@/app/(dashboard)/settings/whatsapp-actions";
+import { toast } from "@/components/ui/sonner";
 
 type ConnectionBadgeProps = {
   connected: boolean;
@@ -19,6 +22,8 @@ export function ConnectionBadge({ connected, status }: ConnectionBadgeProps) {
   const [connection, setConnection] = useState<
     Awaited<ReturnType<typeof getWhatsAppConnection>> | null
   >(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   const refreshConnection = useCallback(async () => {
     try {
@@ -28,6 +33,23 @@ export function ConnectionBadge({ connected, status }: ConnectionBadgeProps) {
       /* server state remains usable */
     }
   }, []);
+
+  function disconnect() {
+    startTransition(async () => {
+      try {
+        const result = await resetWhatsAppSessionAction();
+        if (!result.success) {
+          toast.error("Não foi possível desconectar. Tente novamente.");
+          return;
+        }
+        setConfirmOpen(false);
+        toast.success("WhatsApp desconectado.");
+        refreshConnection();
+      } catch {
+        toast.error("Erro ao desconectar.");
+      }
+    });
+  }
 
   useEffect(() => {
     if (connected) return;
@@ -47,10 +69,33 @@ export function ConnectionBadge({ connected, status }: ConnectionBadgeProps) {
 
   if (connected) {
     return (
-      <Badge variant="success" className="gap-1.5 px-2.5 py-1">
-        <ShieldCheck className="size-3.5" />
-        Sincronização ativa
-      </Badge>
+      <>
+        <div className="flex items-center gap-2">
+          <Badge variant="success" className="gap-1.5 px-2.5 py-1">
+            <ShieldCheck className="size-3.5" />
+            Sincronização ativa
+          </Badge>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setConfirmOpen(true)}
+            className="gap-1.5"
+          >
+            <Unplug className="size-3.5" />
+            Desconectar
+          </Button>
+        </div>
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title="Desconectar WhatsApp"
+          description="Tem certeza que deseja desconectar? A sincronização de mensagens será interrompida."
+          confirmLabel="Desconectar"
+          destructive
+          loading={pending}
+          onConfirm={disconnect}
+        />
+      </>
     );
   }
 

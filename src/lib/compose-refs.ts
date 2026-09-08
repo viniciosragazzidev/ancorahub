@@ -55,8 +55,10 @@ function composeRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
  * Accepts callback refs and RefObject(s)
  */
 function useComposedRefs<T>(...refs: PossibleRef<T>[]): React.RefCallback<T> {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we don't want to re-run this callback when the refs change
-  return React.useCallback(composeRefs(...refs), refs);
+  // useCallback exige uma lista literal de dependências; o rest param `refs` é
+  // recriado a cada chamada, então o callback também é recriado (comportamento
+  // equivalente ao original, que não conseguia memoizar de qualquer forma).
+  return React.useCallback((node) => composeRefs(...refs)(node), [refs]);
 }
 
 export { composeRefs, useComposedRefs };

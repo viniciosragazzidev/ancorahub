@@ -509,36 +509,8 @@ function SidebarMenuButton({
   const { isMobile, state } = useSidebar()
   const showTooltip = Boolean(tooltip && state === "collapsed" && !isMobile)
 
-  if (React.isValidElement(render)) {
-    const renderElement = render as React.ReactElement<Record<string, unknown>>;
-    const linkButton = React.cloneElement(renderElement, {
-      className: cn(sidebarMenuButtonVariants({ variant, size }), className, renderElement.props.className as string),
-      "data-slot": "sidebar-menu-button",
-      "data-sidebar": "menu-button",
-      "data-size": size,
-      "data-active": isActive,
-      ...props,
-    });
-
-    if (!showTooltip) {
-      return linkButton;
-    }
-
-    const tooltipProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
-
-    return (
-      <Tooltip>
-        <TooltipTrigger render={linkButton} />
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltipProps}
-        />
-      </Tooltip>
-    );
-  }
-
+  // useRender sempre chamado (mesma ordem em todo render); ele mescla className
+  // e data-* via state no render element/component quando informado.
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -547,7 +519,7 @@ function SidebarMenuButton({
       },
       props
     ),
-    render: !showTooltip ? render : <TooltipTrigger render={render} />,
+    render,
     state: {
       slot: "sidebar-menu-button",
       sidebar: "menu-button",
@@ -565,7 +537,7 @@ function SidebarMenuButton({
 
   return (
     <Tooltip>
-      {comp}
+      <TooltipTrigger render={comp} />
       <TooltipContent
         side="right"
         align="center"
@@ -700,22 +672,8 @@ function SidebarMenuSubButton({
     size?: "sm" | "md"
     isActive?: boolean
   }) {
-  if (React.isValidElement(render)) {
-    const renderElement = render as React.ReactElement<Record<string, unknown>>;
-    return React.cloneElement(renderElement, {
-      className: cn(
-        "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-xl px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-        className,
-        renderElement.props.className as string
-      ),
-      "data-slot": "sidebar-menu-sub-button",
-      "data-sidebar": "menu-sub-button",
-      "data-size": size,
-      "data-active": isActive,
-      ...props,
-    });
-  }
-
+  // useRender sempre chamado (mesma ordem em todo render); ele mescla className
+  // e state no elemento render, seja element, componente ou tag padrão.
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(

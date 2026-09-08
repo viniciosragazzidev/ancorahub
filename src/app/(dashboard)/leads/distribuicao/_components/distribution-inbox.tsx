@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AppSelect } from "@/components/ui/select";
+import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import {
   assignLeadBatchToBrokerAction,
   assignLeadToBrokerAction,
@@ -77,29 +78,30 @@ type Broker = {
 const PAGE_SIZE = 10;
 const MAX_BATCH = 10;
 
-/** Toast imediato baseado no estado da action */
+/** Toast imediato baseado no estado da action, disparado em effect (nunca no render). */
 function useActionFeedback(state: DistributionActionState, label: string) {
-  const shownRef = useState({ s: state.success, e: state.error });
-  if (state.success !== shownRef[0].s || state.error !== shownRef[0].e) {
-    shownRef[0] = { s: state.success, e: state.error };
+  const prevSuccessRef = useRef(state.success);
+  const prevErrorRef = useRef(state.error);
+  useEffect(() => {
+    const successChanged = state.success !== prevSuccessRef.current;
+    const errorChanged = state.error !== prevErrorRef.current;
+    prevSuccessRef.current = state.success;
+    prevErrorRef.current = state.error;
+    if (!successChanged && !errorChanged) return;
     if (state.error) {
       toast.error(state.error, { description: `Falha ao ${label}.` });
     } else if (state.message) {
       if (state.success) {
         toast.success(state.message, {
-          description: processedCount(state)
-            ? `${processedCount(state)} lead(s) processado(s).`
+          description: state.processed
+            ? `${state.processed} lead(s) processado(s).`
             : undefined,
         });
       } else {
         toast.warning(state.message);
       }
     }
-  }
-}
-
-function processedCount(state: DistributionActionState): number | undefined {
-  return state.processed ?? undefined;
+  }, [label, state]);
 }
 
 /** Botão de ação com spinner + ícone de sucesso animado */
@@ -176,14 +178,15 @@ function ActionForm({
   // Feedback imediato via toast
   useActionFeedback(state, label);
 
-  // Detect campaign conflict and notify parent
-  const prevConflictRef = useState(state.campaignConflict);
-  if (state.campaignConflict !== prevConflictRef[0]) {
-    prevConflictRef[0] = state.campaignConflict;
+  // Detect campaign conflict and notify parent (uma vez por mudança de estado)
+  const prevConflictRef = useRef(state.campaignConflict);
+  useEffect(() => {
+    if (state.campaignConflict === prevConflictRef.current) return;
+    prevConflictRef.current = state.campaignConflict;
     if (state.campaignConflict && onCampaignConflict) {
       onCampaignConflict(state.campaignConflict, fields);
     }
-  }
+  }, [fields, onCampaignConflict, state.campaignConflict]);
 
   // Reset only after the action settles.  The visible queue is patched first;
   // refresh is merely reconciliation and can never keep the button pending.
@@ -339,22 +342,30 @@ export function DistributionInbox({
   const [batchSuccess, setBatchSuccess] = useState(false);
   const [assignSuccess, setAssignSuccess] = useState(false);
 
-  const prevBatchSuccess = useState(batchState.success);
-  if (batchState.success !== prevBatchSuccess[0]) {
-    prevBatchSuccess[0] = batchState.success;
-    if (batchState.success) {
-      setBatchSuccess(true);
-      setTimeout(() => setBatchSuccess(false), 1800);
-    }
-  }
-  const prevAssignSuccess = useState(assignState.success);
-  if (assignState.success !== prevAssignSuccess[0]) {
-    prevAssignSuccess[0] = assignState.success;
-    if (assignState.success) {
-      setAssignSuccess(true);
-      setTimeout(() => setAssignSuccess(false), 1800);
-    }
-  }
+  // Acende o indicador de sucesso ao concluir a ação em lote; um effect próprio
+  // apaga após 1,8s (com cleanup para não vazar timer).
+  useActionDialogLifecycle({
+    state: batchState,
+    pending: batchPending,
+    onSuccess: () => setBatchSuccess(true),
+    onError: () => undefined,
+  });
+  useActionDialogLifecycle({
+    state: assignState,
+    pending: assignPending,
+    onSuccess: () => setAssignSuccess(true),
+    onError: () => undefined,
+  });
+  useEffect(() => {
+    if (!batchSuccess) return;
+    const timer = window.setTimeout(() => setBatchSuccess(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [batchSuccess]);
+  useEffect(() => {
+    if (!assignSuccess) return;
+    const timer = window.setTimeout(() => setAssignSuccess(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [assignSuccess]);
 
   function clearBatchUi() {
     setSelected([]);

@@ -19,6 +19,7 @@ import {
 } from "./official-broker-conversations";
 import { ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
+import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
@@ -73,7 +74,7 @@ export default async function ConversationsPage({
   let branches: { id: string; name: string }[] = [];
 
   if (!officialBrokerTab) {
-    const [leads, branchRows] = await Promise.all([
+    const [leads, branchRows, brokerPhoneRows] = await Promise.all([
       db
         .select({
           id: schema.leads.id,
@@ -127,6 +128,10 @@ export default async function ConversationsPage({
             )
             .orderBy(asc(schema.branches.name))
         : Promise.resolve([] as { id: string; name: string }[]),
+      db
+        .select({ phone: schema.brokerProfiles.phone })
+        .from(schema.brokerProfiles)
+        .where(eq(schema.brokerProfiles.tenantId, context.tenantId)),
     ]);
 
     branches = branchRows;
@@ -335,6 +340,7 @@ export default async function ConversationsPage({
 
     const unassignedSyntheticId = "00000000-0000-0000-0000-000000000000";
     const leadPhones = new Set<string>();
+    const brokerPhones = brokerPhoneRows.map((profile) => profile.phone);
     for (const l of leads) {
       if (l.telefone) {
         leadPhones.add(l.telefone.replace(/\D/g, ""));
@@ -342,10 +348,11 @@ export default async function ConversationsPage({
     }
 
     const unlinkedMessages = messageRows.filter((msg) => {
-      if (msg.leadId) return false;
-      if (!msg.phone) return false;
-      const clean = msg.phone.replace(/\D/g, "");
-      return !leadPhones.has(clean) && !leadPhones.has(clean.slice(-11));
+      return shouldCreateSyntheticCustomerConversation(
+        msg,
+        leadPhones,
+        brokerPhones,
+      );
     });
 
     const unlinkedByPhone = new Map<string, typeof unlinkedMessages>();

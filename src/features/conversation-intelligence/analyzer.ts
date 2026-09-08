@@ -147,7 +147,7 @@ export async function analyzeLeadConversation(
 
   candidateModels.push(
     { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct" },
     { provider: "google", model: "gemini-2.0-flash" },
   );
 

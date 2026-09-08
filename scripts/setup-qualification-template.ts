@@ -84,7 +84,7 @@ async function main() {
       throw new Error(`Erro ao listar templates na Meta: ${listData.error?.message || listRes.statusText}`);
     }
 
-    let existing = listData.data?.find((t) => t.name === templateName && t.language === language);
+    const existing = listData.data?.find((t) => t.name === templateName && t.language === language);
 
     if (existing) {
       console.log(`✅ Template "${templateName}" já existe na Meta. Status atual: ${existing.status}`);
