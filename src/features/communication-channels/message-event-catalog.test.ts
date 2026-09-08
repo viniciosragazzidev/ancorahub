@@ -51,4 +51,40 @@ describe("message event catalog", () => {
       automatic.mappings,
     )).toEqual(["João", "Maria", "Plano PME"]);
   });
+
+  it("accepts corretor and corretor_nome as names for the same broker variable", () => {
+    const event = getMessageEventByKey("LEAD_ASSIGNMENT");
+    expect(event).not.toBeNull();
+
+    const metaAliases = buildAutomaticMetaVariableMappings(event!, ["corretor", "nome_lead"]);
+    expect(metaAliases).toEqual({
+      valid: true,
+      mappings: {
+        corretor: "corretor_nome",
+        nome_lead: "lead_nome",
+      },
+    });
+    expect(getFreeMessageUnknownVariables(event!, ["corretor", "corretor_nome"])).toEqual([]);
+    expect(buildMetaProviderVariables(
+      event!,
+      ["Corretor(a)", "Edvania", "Seu Romário", "Plano de saúde", "lead-1"],
+      ["corretor", "nome_lead"],
+      metaAliases.mappings,
+    )).toEqual(["Edvania", "Seu Romário"]);
+  });
+
+  it("allows the lead name, but not the phone, in a pre-acceptance offer", () => {
+    const event = getMessageEventByKey("LEAD_OFFER");
+    expect(event).not.toBeNull();
+
+    expect(buildAutomaticMetaVariableMappings(event!, ["corretor", "nome_lead"])).toEqual({
+      valid: true,
+      mappings: {
+        corretor: "corretor_nome",
+        nome_lead: "lead_nome",
+      },
+    });
+    expect(getFreeMessageUnknownVariables(event!, ["nome_lead", "telefone_cliente"]))
+      .toEqual(["telefone_cliente"]);
+  });
 });

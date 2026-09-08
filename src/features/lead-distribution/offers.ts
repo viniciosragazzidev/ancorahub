@@ -1,11 +1,11 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { buildLeadAssignmentConfirmedVariables } from "@/features/communication-channels/templates";
+import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "@/features/communication-channels/templates";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 import { normalizePhone } from "@/shared/utils/phone";
@@ -103,7 +103,7 @@ export async function createLeadOffersForBrokers(input: {
     const brokerName = broker.name || "Corretor(a)";
 
     // Enqueue approved offer template: novo_lead_
-    // Variables: {{nome_corretor}}, {{empresa}}, {{tipo_lead}}, {{unidade}}, {{tempo_resposta}}.
+    // The synchronized template may use the lead name, but never receives its phone before acceptance.
     // The lead id is reserved for the text fallback link.
     const outbound = await enqueueMetaTemplateMessage({
       tenantId: input.tenantId,
@@ -111,7 +111,15 @@ export async function createLeadOffersForBrokers(input: {
       recipientId: broker.id,
       destinationPhone,
       purpose: "newLeadAssignment",
-      variables: [brokerName, companyName, leadTypeLabel, branchName, String(timeoutMinutes), lead.id],
+      variables: buildLeadOfferVariables({
+        corretorNome: brokerName,
+        leadNome: lead.nome,
+        empresa: companyName,
+        tipoLead: leadTypeLabel,
+        unidade: branchName,
+        tempoResposta: String(timeoutMinutes),
+        leadId: lead.id,
+      }),
       requestedBy: input.requestedBy,
       idempotencyKey,
     });

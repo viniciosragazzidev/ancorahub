@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLeadAssignmentConfirmedVariables, getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
+import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables, getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 
 describe("approved Meta WhatsApp templates", () => {
   it("uses the approved new-lead template for broker offers", () => {
@@ -23,6 +23,26 @@ describe("approved Meta WhatsApp templates", () => {
 
   it("keeps positional templates without named parameter metadata", () => {
     expect(getMetaWhatsAppTemplateVariableNames("newLeadAssignment")).toBeUndefined();
+  });
+
+  it("keeps the lead name available to offer policies without leaking it into the legacy positional contract", () => {
+    const variables = buildLeadOfferVariables({
+      corretorNome: "Edvania",
+      leadNome: "Seu Romário",
+      empresa: "Âncora Saúde",
+      tipoLead: "Pessoa Física",
+      unidade: "Matriz",
+      tempoResposta: "3",
+      leadId: "lead-id",
+    });
+
+    expect(variables).toEqual([
+      "Edvania", "Seu Romário", "Âncora Saúde", "Pessoa Física", "Matriz", "3", "lead-id",
+    ]);
+    expect(splitMetaWhatsAppTemplateVariables("newLeadAssignment", variables)).toEqual({
+      bodyVariables: ["Edvania", "Âncora Saúde", "Pessoa Física", "Matriz", "3"],
+      urlButtonParameter: "lead-id",
+    });
   });
 
   it("reserves the fifth stored value for the new-lead button, not the body", () => {

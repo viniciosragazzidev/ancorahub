@@ -57,6 +57,26 @@ export function buildLeadAssignmentConfirmedVariables(input: {
   ];
 }
 
+export function buildLeadOfferVariables(input: {
+  corretorNome: string;
+  leadNome: string;
+  empresa: string;
+  tipoLead: string;
+  unidade: string;
+  tempoResposta: string;
+  leadId: string;
+}) {
+  return [
+    input.corretorNome,
+    input.leadNome,
+    input.empresa,
+    input.tipoLead,
+    input.unidade,
+    input.tempoResposta,
+    input.leadId,
+  ];
+}
+
 /**
  * The lead id is stored with the durable outbound message exclusively for the
  * dynamic URL button. It is not a body parameter.
@@ -91,7 +111,7 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
   }
 
   if (purpose === "newLeadAssignment") {
-    const [brokerName, companyName, leadTypeLabel, branchName, timeoutMinutes, leadId] = variables;
+    const [brokerName, , companyName, leadTypeLabel, branchName, timeoutMinutes, leadId] = variables;
     return {
       bodyVariables: [brokerName ?? "", companyName ?? "", leadTypeLabel ?? "", branchName ?? "", timeoutMinutes ?? ""],
       urlButtonParameter: leadId,

@@ -367,7 +367,35 @@ async function resolveLegacyMetaResource(tenantId: string, eventKey: string, pur
     if (configured) return configured;
   }
   const fallback = META_WHATSAPP_TEMPLATE_PURPOSES[purpose as keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES];
-  return fallback ? { id: "legacy", name: fallback.name, language: fallback.language, status: "APPROVED", bodyText: null, variables: [] } : null;
+  if (!fallback) return null;
+
+  // The fallback name is stable, but its variable contract belongs to the
+  // currently connected WABA. Reuse the synchronized resource whenever it is
+  // available so renamed aliases and a changed parameter count are reflected
+  // in the provider payload instead of applying a global legacy contract.
+  if (wabaId) {
+    const [syncedFallback] = await getDatabase().select({
+      id: schema.metaWhatsAppTemplates.id,
+      name: schema.metaWhatsAppTemplates.name,
+      language: schema.metaWhatsAppTemplates.language,
+      status: schema.metaWhatsAppTemplates.status,
+      bodyText: schema.metaWhatsAppTemplates.bodyText,
+      variables: schema.metaWhatsAppTemplates.variablesJson,
+    }).from(schema.metaWhatsAppTemplates).where(and(
+      eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+      eq(schema.metaWhatsAppTemplates.wabaId, wabaId),
+      eq(schema.metaWhatsAppTemplates.name, fallback.name),
+      eq(schema.metaWhatsAppTemplates.language, fallback.language),
+      eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+      isNull(schema.metaWhatsAppTemplates.deletedAt),
+    )).limit(1);
+
+    if (syncedFallback) {
+      return { ...syncedFallback, variables: asStringArray(syncedFallback.variables) };
+    }
+  }
+
+  return { id: "legacy", name: fallback.name, language: fallback.language, status: "APPROVED", bodyText: null, variables: [] };
 }
 
 export async function resolveEventMessagePlan(input: {

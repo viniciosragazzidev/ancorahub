@@ -92,6 +92,23 @@ idempotência e política Meta/WAHA.
   arquitetura, segurança, desempenho, type-check, testes e build; o lint global
   permanece não-zero por erros preexistentes fora dos arquivos desta correção.
 
+### Correção de aliases e quantidade de parâmetros Meta
+
+- Em 08/09, o template sincronizado `new_lead_broker` da WABA ativa passou a
+  declarar `corretor` e `nome_lead`, enquanto o produtor usa as chaves canônicas
+  `corretor_nome` e `lead_nome`. O catálogo agora aceita `corretor`,
+  `corretor_nome` e `nome_corretor` como nomes equivalentes para o corretor.
+- O fallback homologado deixou de presumir o contrato global legado de quatro
+  parâmetros quando existe um template aprovado e sincronizado na WABA ativa.
+  O resolvedor reutiliza o contrato real dessa WABA, preserva os nomes esperados
+  pelo provedor e mantém `lead_id` exclusivamente no botão URL.
+- O template que inclui `nome_lead` é elegível para `LEAD_ASSIGNMENT` e
+  `LEAD_OFFER`. Na oferta anterior ao aceite, o nome pode ser exibido, mas o
+  telefone e os demais dados de contato permanecem indisponíveis conforme a
+  emenda da DEC-049 de 08/09.
+- Regressão coberta por testes do alias e do payload com dois parâmetros de corpo
+  mais o parâmetro do botão, impedindo nova falha Meta `132000`.
+
 ## Catálogo inicial
 
 | Situação | Finalidade atual | Público | Regra |

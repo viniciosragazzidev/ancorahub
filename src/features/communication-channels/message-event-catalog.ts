@@ -25,7 +25,7 @@ export type MessageEventDefinition = {
 const brokerName = {
   key: "corretor_nome",
   label: "Nome do corretor",
-  aliases: ["nome_corretor", "broker_name"],
+  aliases: ["corretor", "nome_corretor", "broker_name"],
   fallback: "Corretor(a)",
 } as const;
 
@@ -86,6 +86,7 @@ export const MESSAGE_EVENT_CATALOG = [
     windowRule: "corporate_internal",
     variables: [
       brokerName,
+      leadName,
       { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "sua corretora" },
       { key: "tipo_lead", label: "Tipo do lead", aliases: ["lead_type"], fallback: "Lead" },
       { key: "unidade", label: "Unidade", aliases: ["branch_name"], fallback: "Unidade" },
