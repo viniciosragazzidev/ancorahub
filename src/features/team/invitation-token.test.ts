@@ -18,6 +18,13 @@ describe("normalizeInvitationToken", () => {
     expect(normalizeInvitationToken("valid-token_123")).toBe("valid-token_123");
   });
 
+  it("removes {id} placeholder before the real token (bug do modelo meta)", () => {
+    // Token vem com {id} codificado antes do token real, ex: %7B%7Bid%7D%7Dr0nDuj...
+    expect(normalizeInvitationToken("%7B%7Bid%7D%7Dr0nDuj713hg2S86hz6O2nM8-PB_14He8WSXZpnrHx8")).toBe("r0nDuj713hg2S86hz6O2nM8-PB_14He8WSXZpnrHx8");
+    // Versão já decodificada (após decodeURIComponent)
+    expect(normalizeInvitationToken("{id}r0nDuj713hg2S86hz6O2nM8-PB_14He8WSXZpnrHx8")).toBe("r0nDuj713hg2S86hz6O2nM8-PB_14He8WSXZpnrHx8");
+  });
+
   it("does not alter an unrelated malformed value", () => {
     expect(normalizeInvitationToken("%E0%A4%A")).toBe("%E0%A4%A");
   });

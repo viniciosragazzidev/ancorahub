@@ -20,6 +20,17 @@ export function normalizeInvitationToken(rawToken: string | undefined) {
     }
   }
 
+  // Remove placeholder codificado do modelo meta bugado: {{id}} ou {id} (já decodificado)
+  // Também remove a versão codificada caso não tenha passado pelo decode
+  if (token.startsWith("{{id}}")) {
+    token = token.slice(6);
+  } else if (token.startsWith("{id}")) {
+    token = token.slice(4);
+  }
+  if (token.startsWith("%7B%7Bid%7D%7D")) {
+    token = token.slice(12);
+  }
+
   token = token.startsWith(META_DYNAMIC_TOKEN_PREFIX)
     ? token.slice(META_DYNAMIC_TOKEN_PREFIX.length)
     : token;
