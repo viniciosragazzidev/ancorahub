@@ -125,6 +125,7 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 
 | BR-062 | O Diretor pode consultar, em modo somente leitura, o histórico do número oficial com corretores do próprio tenant. | Mensagem oficial para/desde número de corretor → persiste no ledger autorizado; Diretor abre `/conversas?tab=corretores` → consulta convites, entregas e respostas sem enviar mensagens. | DEC-065 |
 | BR-062A | A conexão pessoal do Corretor é somente leitura e sincroniza exclusivamente conversas operacionais atribuídas a ele; conversas pessoais e internas não entram no CRM. | Webhook WAHA de sessão do corretor → resolve lead/cliente pelo tenant e pelo `corretorId` da sessão; contato sem vínculo, número oficial do tenant e conversa interna são ignorados. O CRM nunca envia por essa sessão; lead/cliente vinculado é persistido pelo mesmo `leadId` da qualificação e aparece na Central de Insights. | DEC-091 |
+| BR-062B | Apenas Diretor e Gestor podem excluir uma conversa avulsa da caixa de entrada; qualquer vínculo com lead, cliente ou integrante da equipe torna a conversa protegida. | Exclusão solicitada → servidor deriva tenant e papel, normaliza o telefone, revalida vínculos, aplica o kill switch global e registra auditoria sem PII antes de remover somente as mensagens avulsas. | DEC-093 |
 
 ## Feedback e lembretes
 

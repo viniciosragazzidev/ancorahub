@@ -140,7 +140,13 @@ export async function createTeamUser(rawInput: unknown) {
       eq(schema.communicationChannels.status, "active"),
     )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
     if (channel) {
-      const company = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+      const [company, branch] = await Promise.all([
+        db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
+        db.select({ name: schema.branches.name }).from(schema.branches).where(and(
+          eq(schema.branches.id, input.branchId),
+          eq(schema.branches.tenantId, context.tenantId),
+        )).limit(1),
+      ]);
       const roleLabel = input.jobTitle === "director" || input.role === "director" ? "Diretor" : input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
       const queued = await enqueueMetaTemplateMessage({
         tenantId: context.tenantId,
@@ -149,7 +155,7 @@ export async function createTeamUser(rawInput: unknown) {
         recipientId: invitationId,
         destinationPhone: input.phone,
         purpose: "brokerInvitation",
-        variables: [input.name, company[0]?.name ?? "sua corretora", roleLabel],
+        variables: [input.name, company[0]?.name ?? "sua corretora", roleLabel, branch[0]?.name ?? "Unidade"],
         requestedBy: context.userId,
         idempotencyKey: `team-invitation:${invitationId}`,
       });

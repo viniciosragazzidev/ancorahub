@@ -911,3 +911,10 @@ sinal, o navegador consulta os detalhes pela API interna autenticada. Há reconc
 lenta quando a aba está visível e propagação local entre abas. A capacidade pode ser
 desativada globalmente pelo Super-admin; persistência de notificação e Web Push não
 falham se o Realtime estiver indisponível.
+## DEC-093 — Exclusão protegida de conversas avulsas e governança temporária de filas
+
+**Decisão aprovada em 2026-09-09.** Diretor e Gestor podem excluir da caixa de entrada somente uma conversa do WhatsApp sem vínculo com lead, cliente ou perfil de integrante da equipe. O servidor deriva tenant e papel da sessão, revalida todos os vínculos pelo telefone normalizado antes da exclusão e registra auditoria por identificador irreversível, sem telefone ou conteúdo. Uma chave global do Super-admin pode interromper novas exclusões sem alterar o histórico existente.
+
+A definição de filas fica temporariamente exclusiva do Diretor. Gestor não recebe a aba nem seu conteúdo e uma URL direta para `view=filas` retorna à matriz de roteamento; Supervisor continua sem acesso administrativo à Central de Distribuição. As demais operações autorizadas de acompanhamento não são ampliadas por esta decisão.
+
+Para `/vendas`, a navegação principal passa a antecipar o payload parcial, exibir estado imediato de carregamento e evitar a segunda consulta da mesma população usada apenas para somar receita. A otimização não altera escopo, filtros ou regra de cálculo.

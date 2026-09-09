@@ -31,6 +31,7 @@ import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channe
 import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
 import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -758,6 +759,23 @@ export async function updateLeadManagementActionsSettingsAction(formData: FormDa
     createdAt: now,
   });
 
+}
+
+export async function updateUnlinkedConversationDeletionSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("unlinkedConversationDeletionEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+
+  await setSystemSetting(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "unlinked_conversation_deletion.settings_updated",
+    targetType: "system_settings",
+    targetId: FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
+    metadata: { enabled },
+    createdAt: now,
+  });
 }
 
 export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formData: FormData) {

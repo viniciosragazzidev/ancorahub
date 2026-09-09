@@ -108,6 +108,11 @@ idempotência e política Meta/WAHA.
   emenda da DEC-049 de 08/09.
 - Regressão coberta por testes do alias e do payload com dois parâmetros de corpo
   mais o parâmetro do botão, impedindo nova falha Meta `132000`.
+- Em 09/09, `BROKER_WELCOME` passou a fornecer também `unidade`, preenchida pela
+  filial tenant-scoped do convite inicial ou do reenvio. O contrato de
+  `LEAD_ASSIGNMENT_CONFIRMED` passou a reconhecer os nomes aprovados
+  `nome`, `telefone`, `interesse`, `n_dependentes` e `cidade`; a cidade é lida
+  do formulário do lead e o identificador continua reservado ao botão URL.
 
 ## Catálogo inicial
 

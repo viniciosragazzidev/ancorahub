@@ -490,6 +490,8 @@ export async function handleLeadOfferWebhookResponse(input: {
       ?? "Plano de saúde";
     const dependents = readLeadFormValue(result.lead.formData, ["dependentes", "n_dependentes", "numeroDependentes", "qtdDependentes"])
       ?? "Não informado";
+    const city = readLeadFormValue(result.lead.formData, ["cidade", "city", "municipio", "município", "cidade_residencia"])
+      ?? "Não informada";
 
     // Enqueue confirmation template: lead_assignment_confirmed
     if (result.broker.phone) {
@@ -506,6 +508,7 @@ export async function handleLeadOfferWebhookResponse(input: {
           interesse: interest,
           tipo: leadTypeLabel,
           dependentes: dependents,
+          cidade: city,
           leadId: result.lead.id,
         }),
         requestedBy: broker.id,

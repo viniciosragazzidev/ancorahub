@@ -8,7 +8,7 @@ describe("approved Meta WhatsApp templates", () => {
   });
 
   it("maps the named body variables configured for the broker invitation template", () => {
-    expect(getMetaWhatsAppTemplateVariableNames("brokerInvitation")).toEqual(["nome", "empresa", "cargo"]);
+    expect(getMetaWhatsAppTemplateVariableNames("brokerInvitation")).toEqual(["nome", "empresa", "cargo", "unidade"]);
   });
 
   it("uses the approved notification template and names its body variables", () => {
@@ -60,6 +60,7 @@ describe("approved Meta WhatsApp templates", () => {
       interesse: "Plano familiar",
       tipo: "Pessoa Física",
       dependentes: "2",
+      cidade: "Nova Iguaçu",
       leadId: "lead-id",
     });
 
@@ -67,7 +68,7 @@ describe("approved Meta WhatsApp templates", () => {
       "nome_corretor", "nome_cliente", "telefone_cliente", "interesse", "tipo", "n_dependentes",
     ]);
     expect(splitMetaWhatsAppTemplateVariables("leadAssignmentConfirmed", variables)).toEqual({
-      bodyVariables: ["André", "Maria", "5511999999999", "Plano familiar", "Pessoa Física", "2"],
+      bodyVariables: ["André", "Maria", "5511999999999", "Plano familiar", "Pessoa Física", "2", "Nova Iguaçu"],
       urlButtonParameter: "lead-id",
     });
   });

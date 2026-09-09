@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, UserSwitch, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
 import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -198,6 +198,8 @@ export function LeadsWorkspace({
   qualifyingLeads = [],
   queues = [],
   contextRole,
+  showUnassignedFilter = false,
+  initialView,
   contextJobTitle,
   contextBranchId,
   slaFirstContactMinutes = 15,
@@ -211,6 +213,8 @@ export function LeadsWorkspace({
   qualifyingLeads?: QualifyingLeadItem[];
   queues?: Array<{ id: string; name: string; branchId: string | null }>;
   contextRole: string;
+  showUnassignedFilter?: boolean;
+  initialView?: string;
   contextJobTitle?: string | null;
   contextBranchId?: string | null;
   slaFirstContactMinutes?: number;
@@ -226,10 +230,11 @@ export function LeadsWorkspace({
   };
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const drawerOptimisticSnapshots = useRef(new Map<string, LeadWorkspaceItem>());
-  const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
+  const [activeTab, setActiveTab] = useState<string>(() => initialView ?? (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -266,6 +271,16 @@ export function LeadsWorkspace({
         : [...current, status],
     );
   }
+
+  const handleViewChange = useCallback((view: string) => {
+    setActiveTab(view);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    if (view === "list") params.delete("view");
+    else params.set("view", view);
+    const query = params.toString();
+    router.replace(`/leads${query ? `?${query}` : ""}`, { scroll: false });
+  }, [router, searchParams]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -314,7 +329,8 @@ export function LeadsWorkspace({
     return brokers.filter((b) => b.branchId === selectedLead.branchId);
   }, [selectedLead, brokers]);
 
-  const unassignedCount = useMemo(() => workspaceLeads.filter((l) => !l.corretorId).length, [workspaceLeads]);
+  const unassignedLeads = useMemo(() => workspaceLeads.filter((lead) => !lead.corretorId), [workspaceLeads]);
+  const unassignedCount = unassignedLeads.length;
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
 
@@ -487,7 +503,7 @@ export function LeadsWorkspace({
   return (
     <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
-      <Tabs defaultValue={qualifyingLeads.length > 0 ? "qualificacoes" : "list"} className="flex min-h-0 flex-1 flex-col">
+      <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-2 border-b border-border/60 pb-2">
           <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
             <TabsTrigger value="list" className="text-xs gap-1.5">
@@ -530,6 +546,18 @@ export function LeadsWorkspace({
                 </Badge>
               ) : null}
             </TabsTrigger>
+            {showUnassignedFilter ? (
+              <TabsTrigger value="sem-atribuicao" className="text-xs gap-1.5">
+                <UserSwitch className="size-4 text-warning" />
+                <span className="hidden sm:inline">Sem Atribuição</span>
+                <span className="sm:hidden">Sem atrib.</span>
+                {activeTab === "sem-atribuicao" && unassignedCount > 0 ? (
+                  <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                    {pagination?.totalItems ?? unassignedCount}
+                  </Badge>
+                ) : null}
+              </TabsTrigger>
+            ) : null}
           </TabsList>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
@@ -702,6 +730,49 @@ export function LeadsWorkspace({
             </div>
           </div>
         </TabsContent>
+
+        {/* ─── TAB 6: SEM ATRIBUIÇÃO (DIREÇÃO) ─── */}
+        {showUnassignedFilter ? (
+          <TabsContent value="sem-atribuicao" className="mt-4">
+            {unassignedLeads.length === 0 ? (
+              <EmptyState
+                variant="ghost"
+                icon={UserSwitch}
+                title="Nenhum lead sem atribuição"
+                description="Todos os leads operacionais possuem um corretor responsável no momento."
+              />
+            ) : (
+              <div className="space-y-4">
+                <SelectionToolbar
+                  selectedCount={multiSelect.count}
+                  totalCount={unassignedLeads.length}
+                  onClear={multiSelect.clear}
+                >
+                  {selectionActions}
+                </SelectionToolbar>
+                <div className="w-full">
+                  <LeadsDataTable
+                    leads={unassignedLeads}
+                    contextRole={contextRole}
+                    shouldMask={shouldMask}
+                    slaFirstContactMinutes={slaFirstContactMinutes}
+                    slaStagnantDays={slaStagnantDays}
+                    pageSize={pageSize}
+                    pagination={pagination}
+                    selectedIds={multiSelect.selectedIds}
+                    isAllSelected={unassignedLeads.every((lead) => multiSelect.isSelected(lead.id))}
+                    onToggleRow={multiSelect.toggle}
+                    onSelectAll={(checked: boolean) => {
+                      if (checked) multiSelect.setSelected(unassignedLeads.map((lead) => lead.id));
+                      else multiSelect.clear();
+                    }}
+                    onRowClick={setSelectedLead}
+                  />
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        ) : null}
       </Tabs>
 
       {/* ─── QUICK VIEW DETAIL DRAWER ─── */}

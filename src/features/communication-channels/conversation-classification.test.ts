@@ -37,4 +37,14 @@ describe("main conversation synthetic customer classification", () => {
       ),
     ).toBe(false);
   });
+
+  it("does not synthesize a conversation already linked to a client", () => {
+    expect(
+      shouldCreateSyntheticCustomerConversation(
+        { leadId: null, clientId: "client-1", phone: "5521977776666" },
+        leadPhones,
+        brokerPhones,
+      ),
+    ).toBe(false);
+  });
 });

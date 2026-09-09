@@ -12,6 +12,7 @@ export function DistributionTabsContainer({
   operarContent,
   plantaoContent,
   saudeHistoricoContent,
+  showQueueDefinition = false,
 }: {
   initialView: string;
   roteamentoContent: React.ReactNode;
@@ -20,6 +21,7 @@ export function DistributionTabsContainer({
   operarContent: React.ReactNode;
   plantaoContent: React.ReactNode;
   saudeHistoricoContent: React.ReactNode;
+  showQueueDefinition?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState(initialView);
 
@@ -37,7 +39,7 @@ export function DistributionTabsContainer({
       <TabsList className="max-w-5xl w-full justify-start overflow-x-auto">
         <TabsTrigger value="roteamento" className="gap-1.5"><ArrowsDownUp aria-hidden="true" className="size-4" />Matriz de Roteamento</TabsTrigger>
         <TabsTrigger value="resumo_dia" className="gap-1.5"><ChartLineUp aria-hidden="true" className="size-4" />Resumo do Dia</TabsTrigger>
-        <TabsTrigger value="filas" className="gap-1.5"><Buildings aria-hidden="true" className="size-4" />Filas & Unidades</TabsTrigger>
+        {showQueueDefinition ? <TabsTrigger value="filas" className="gap-1.5"><Buildings aria-hidden="true" className="size-4" />Filas & Unidades</TabsTrigger> : null}
         <TabsTrigger value="operar" className="gap-1.5"><FileArrowDown aria-hidden="true" className="size-4" />Operar & Inbox</TabsTrigger>
         <TabsTrigger value="plantao" className="gap-1.5"><CalendarBlank aria-hidden="true" className="size-4" />Plantão & Escala</TabsTrigger>
         <TabsTrigger value="saude_historico" className="gap-1.5"><ChartBar aria-hidden="true" className="size-4" />Saúde & Auditoria</TabsTrigger>
@@ -45,7 +47,7 @@ export function DistributionTabsContainer({
 
       <TabsContent value="roteamento" className="space-y-6">{roteamentoContent}</TabsContent>
       <TabsContent value="resumo_dia" className="space-y-6">{resumoDiaContent}</TabsContent>
-      <TabsContent value="filas" className="space-y-6">{filasContent}</TabsContent>
+      {showQueueDefinition ? <TabsContent value="filas" className="space-y-6">{filasContent}</TabsContent> : null}
       <TabsContent value="operar" className="space-y-6">{operarContent}</TabsContent>
       <TabsContent value="plantao" className="space-y-6">{plantaoContent}</TabsContent>
       <TabsContent value="saude_historico" className="space-y-6">{saudeHistoricoContent}</TabsContent>

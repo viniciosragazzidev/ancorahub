@@ -305,9 +305,10 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const interesse = split.bodyVariables[3] || rawVariables[3] || "Plano de Saúde";
     const leadType = split.bodyVariables[4] || rawVariables[4] || "Individual";
     const dependentes = split.bodyVariables[5] || rawVariables[5] || "0";
+    const cidade = split.bodyVariables[6] || rawVariables[6] || "Não informada";
     const leadId = urlButtonParameter || split.urlButtonParameter;
     const link = leadId ? `\n\n👉 *Abrir conversa:* ${baseUrl}/conversas?lead=${leadId}` : "";
-    return `✅ *Atribuição Confirmada*\n\nOlá *${brokerName}*, você assumiu o atendimento de *${leadNome}*.\n\n📞 *Telefone:* ${leadPhone}\n📋 *Tipo:* ${leadType}\n🏥 *Interesse:* ${interesse}\n👥 *Dependentes:* ${dependentes}${link}`;
+    return `✅ *Atribuição Confirmada*\n\nOlá *${brokerName}*, você assumiu o atendimento de *${leadNome}*.\n\n📞 *Telefone:* ${leadPhone}\n📋 *Tipo:* ${leadType}\n🏥 *Interesse:* ${interesse}\n👥 *Dependentes:* ${dependentes}\n📍 *Cidade:* ${cidade}${link}`;
   }
 
   if (purpose === "newLeadAssignment") {
@@ -560,8 +561,8 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         }
       } else if (row.purpose === "leadAssignmentConfirmed") {
         const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
-        if (variables[6]) {
-          urlButtonParameter = variables[6];
+        if (variables[7]) {
+          urlButtonParameter = variables[7];
         }
       }
 

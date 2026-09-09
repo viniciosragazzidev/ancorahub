@@ -169,7 +169,7 @@ const marketingHiddenPaths = [
 ];
 
 const brokerHiddenPaths = ["/cotacao", "/automacoes", "/filiais", "/unidades"];
-const priorityNavigationPaths = new Set(["/dashboard", "/leads", "/conversas", "/clientes"]);
+const priorityNavigationPaths = new Set(["/dashboard", "/leads", "/conversas", "/clientes", "/vendas"]);
 const managerHiddenPaths = [
   "/marketing",
   "/integrations",

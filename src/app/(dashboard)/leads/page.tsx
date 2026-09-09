@@ -57,6 +57,7 @@ async function LeadsPageContent({
     sort?: string;
     joinOperator?: string;
     eligibleCampaigns?: string;
+    view?: string;
   }>;
 }) {
   await connection();
@@ -180,6 +181,10 @@ async function LeadsPageContent({
 
   const filters = await searchParams;
   const db = getDatabase();
+  const canViewUnassigned = context.role === "director";
+  const allowedViews = new Set(["list", "kanban", "qualificacoes", "radar", "perdidos", "sem-atribuicao"]);
+  const requestedView = filters.view && allowedViews.has(filters.view) ? filters.view : undefined;
+  const initialView = requestedView === "sem-atribuicao" && !canViewUnassigned ? "list" : requestedView;
 
   const period = parsePeriod(filters.period);
   const eligibleCampaignsOnly = filters.eligibleCampaigns === "1";
@@ -294,6 +299,9 @@ async function LeadsPageContent({
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
+  const unassignedFilter = canViewUnassigned && initialView === "sem-atribuicao"
+    ? isNull(schema.leads.corretorId)
+    : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
   const metaCampaignEligibility = eligibleCampaignsOnly
       ? await withPerfSpan("leads.campaign_eligibility", () => Promise.all([
@@ -363,6 +371,7 @@ async function LeadsPageContent({
     ...(origemFilter ? [origemFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),
     ...(corretorFilter ? [corretorFilter] : []),
+    ...(unassignedFilter ? [unassignedFilter] : []),
     ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
     ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
   );
@@ -564,6 +573,7 @@ async function LeadsPageContent({
     filters.tipo ||
     filters.qualification ||
     eligibleCampaignsOnly
+    || unassignedFilter
   );
   const leadViewKey = [
     page,
@@ -579,6 +589,7 @@ async function LeadsPageContent({
     filters.filters ?? "",
     filters.sort ?? "",
     filters.joinOperator ?? "",
+    initialView ?? "",
   ].join(":");
 
   return (
@@ -661,6 +672,8 @@ async function LeadsPageContent({
               qualifyingLeads={qualifyingLeads}
               queues={activeQueues}
               contextRole={leadManagementActionsEnabled ? context.role : "broker"}
+              showUnassignedFilter={canViewUnassigned}
+              initialView={initialView}
               contextJobTitle={context.jobTitle}
               contextBranchId={context.branchId}
               slaFirstContactMinutes={slaFirstContactMinutes}

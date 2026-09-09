@@ -34,6 +34,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OwnershipContext } from "@/components/ownership-context";
 import {
@@ -57,6 +66,7 @@ import {
   SunDim,
   ThermometerCold,
   WarningCircle,
+  Trash,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -80,6 +90,7 @@ import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-messag
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
 import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
+import { deleteUnlinkedConversationAction } from "@/features/conversations/actions";
 
 export type ConversationMessage = {
   id: string;
@@ -424,6 +435,7 @@ function ConversationHeader({
   role?: string;
 }) {
   const [isPending, setIsPending] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const router = useRouter();
 
   const aiStatus = client.aiConversation?.status ?? "NEW";
@@ -431,6 +443,28 @@ function ConversationHeader({
   const isWaitingHuman = aiStatus === "WAITING_HUMAN";
   const isAiActive = aiStatus === "AI_ACTIVE" || aiStatus === "WAITING_CUSTOMER";
   const isAssignedToMe = client.aiConversation?.assignedUserId === userId;
+  const canDeleteUnlinked =
+    (role === "director" || role === "manager") && client.id.startsWith("unassigned-");
+
+  async function handleDeleteUnlinkedConversation() {
+    setIsPending(true);
+    const toastId = toast.loading("Excluindo conversa avulsa...");
+    try {
+      const result = await deleteUnlinkedConversationAction(client.telefone);
+      if (!result.success) {
+        toast.error(result.error, { id: toastId });
+        return;
+      }
+      setDeleteDialogOpen(false);
+      toast.success("Conversa excluída da caixa de entrada.", { id: toastId });
+      router.replace("/conversas");
+      router.refresh();
+    } catch {
+      toast.error("Não foi possível excluir a conversa agora.", { id: toastId });
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   async function handleTakeover() {
     if (!client.aiConversation?.id) return;
@@ -634,6 +668,22 @@ function ConversationHeader({
                   </DropdownMenuItem>
                 </>
               )}
+              {canDeleteUnlinked ? (
+                <>
+                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={isPending}
+                    className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive focus:bg-destructive/10"
+                  >
+                    <Trash className="mt-0.5 size-4 shrink-0 text-destructive" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-destructive">Excluir conversa</span>
+                      <span className="text-[10px] text-muted-foreground">Remove apenas este contato avulso do CRM</span>
+                    </div>
+                  </DropdownMenuItem>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -683,6 +733,26 @@ function ConversationHeader({
           </div>
         </div>
       </div>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogPopup>
+          <DialogPanel>
+            <DialogHeader>
+              <DialogTitle>Excluir esta conversa avulsa?</DialogTitle>
+              <DialogDescription>
+                As mensagens serão removidas da caixa de entrada do CRM. Conversas vinculadas a leads, clientes ou integrantes da equipe são protegidas e nunca entram nesta ação.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" onClick={() => void handleDeleteUnlinkedConversation()} disabled={isPending}>
+                {isPending ? "Excluindo..." : "Excluir conversa"}
+              </Button>
+            </DialogFooter>
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
     </header>
   );
 }

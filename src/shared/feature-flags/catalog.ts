@@ -160,6 +160,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita a extensão de navegador para captura de leads.",
   },
 
+  UNLINKED_CONVERSATION_DELETION: {
+    key: "feature_unlinked_conversation_deletion_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite que Diretores e Gestores excluam conversas do WhatsApp sem vínculo com lead, cliente ou equipe.",
+  },
+
   AGENT_TRAINING_CENTER: {
     key: "feature_agent_training_center_enabled",
     scope: "global",

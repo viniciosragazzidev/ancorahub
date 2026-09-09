@@ -143,6 +143,7 @@ export default async function ConversationsPage({
             .select({
               id: schema.whatsappMessages.id,
               leadId: schema.whatsappMessages.leadId,
+              clientId: schema.whatsappMessages.clientId,
               phone: schema.whatsappMessages.phone,
               body: schema.whatsappMessages.body,
               direction: schema.whatsappMessages.direction,

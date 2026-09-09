@@ -24,10 +24,10 @@ export function getMetaWhatsAppTemplate(purpose: string) {
 /**
  * Named variables must carry `parameter_name` in the Cloud API payload. The
  * broker invitation template is configured with {{nome}}, {{empresa}} and
- * {{cargo}}, rather than positional {{1}}, {{2}} and {{3}} placeholders.
+ * {{cargo}} and {{unidade}}, rather than positional placeholders.
  */
 export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
-  if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo"];
+  if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo", "unidade"];
   if (purpose === "brokerLeadNotification") {
     return ["cargo", "corretor_nome", "lead_nome", "produto_interesse"];
   }
@@ -44,6 +44,7 @@ export function buildLeadAssignmentConfirmedVariables(input: {
   interesse: string;
   tipo: string;
   dependentes: string;
+  cidade: string;
   leadId: string;
 }) {
   return [
@@ -53,6 +54,7 @@ export function buildLeadAssignmentConfirmedVariables(input: {
     input.interesse,
     input.tipo,
     input.dependentes,
+    input.cidade,
     input.leadId,
   ];
 }
@@ -96,7 +98,7 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
   }
 
   if (purpose === "leadAssignmentConfirmed") {
-    const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, leadId] = variables;
+    const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, cidade, leadId] = variables;
     return {
       bodyVariables: [
         brokerName?.trim() || "Corretor(a)",
@@ -105,6 +107,7 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
         interesse?.trim() || "Plano de saúde",
         leadTypeLabel?.trim() || "Individual",
         dependentes?.trim() || "0",
+        cidade?.trim() || "Não informada",
       ],
       urlButtonParameter: leadId || undefined,
     };

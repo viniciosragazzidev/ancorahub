@@ -598,7 +598,13 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
     let whatsappStatus: TeamActionState["whatsappStatus"] = "not_available";
     if (newInvite.phone) {
       try {
-        const [company] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
+        const [[company], [branch]] = await Promise.all([
+          db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
+          db.select({ name: schema.branches.name }).from(schema.branches).where(and(
+            eq(schema.branches.id, invitation.branchId),
+            eq(schema.branches.tenantId, context.tenantId),
+          )).limit(1),
+        ]);
         const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
           eq(schema.communicationChannels.tenantId, context.tenantId),
           inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
@@ -611,7 +617,7 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
           recipientId: newInvite.id,
           destinationPhone: newInvite.phone,
           purpose: "brokerInvitation",
-          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "director" ? "Diretor" : invitation.role === "manager" ? "Gestor" : "Corretor"],
+          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "director" ? "Diretor" : invitation.role === "manager" ? "Gestor" : "Corretor", branch?.name ?? "Unidade"],
           requestedBy: context.userId,
           idempotencyKey: `team-invitation:${newInvite.id}`,
         });

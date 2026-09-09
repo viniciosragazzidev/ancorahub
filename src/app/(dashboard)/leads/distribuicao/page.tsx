@@ -30,10 +30,10 @@ import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-sum
 import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
 import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
+import { resolveDistributionView } from "@/features/lead-distribution/distribution-view-access";
 
 export const dynamic = "force-dynamic";
 
-type DistributionView = "roteamento" | "resumo_dia" | "filas" | "operar" | "plantao" | "saude_historico";
 type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
 
 const activeStatuses = [
@@ -52,11 +52,6 @@ export default async function LeadDistributionPage({
   searchParams: Promise<{ view?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  const view: DistributionView =
-    params.view === "resumo_dia" || params.view === "resumo" || params.view === "filas" || params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
-      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view === "resumo" ? "resumo_dia" : (params.view as DistributionView)))
-      : "roteamento";
-
   const queueFilter: QueueFilter =
     params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
       ? params.status
@@ -64,6 +59,7 @@ export default async function LeadDistributionPage({
 
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
+  const view = resolveDistributionView(context.role, params.view);
 
   if (context.role === "manager" && !context.branchId) {
     return (
@@ -436,6 +432,7 @@ export default async function LeadDistributionPage({
       <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
         <DistributionTabsContainer
           initialView={view}
+          showQueueDefinition={context.role === "director"}
           roteamentoContent={
             <div className="space-y-6">
               <RoutingMatrixPanel
@@ -460,7 +457,7 @@ export default async function LeadDistributionPage({
             />
           }
           filasContent={
-            <>
+            context.role === "director" ? <>
               <QueueControlCenter
                 queues={queuesForControl}
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
@@ -482,7 +479,7 @@ export default async function LeadDistributionPage({
                 brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
                 policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
               />
-            </>
+            </> : null
           }
           operarContent={
             <>

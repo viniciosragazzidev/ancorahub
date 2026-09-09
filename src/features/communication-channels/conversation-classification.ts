@@ -2,6 +2,7 @@ import { matchesKnownBrokerPhone } from "./service";
 
 type SyntheticCustomerCandidate = {
   leadId: string | null;
+  clientId?: string | null;
   phone: string | null;
 };
 
@@ -10,7 +11,7 @@ export function shouldCreateSyntheticCustomerConversation(
   leadPhones: ReadonlySet<string>,
   brokerPhones: readonly string[],
 ) {
-  if (message.leadId || !message.phone) return false;
+  if (message.leadId || message.clientId || !message.phone) return false;
   if (matchesKnownBrokerPhone(message.phone, brokerPhones)) return false;
 
   const clean = message.phone.replace(/\D/g, "");

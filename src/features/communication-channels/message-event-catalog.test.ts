@@ -87,4 +87,16 @@ describe("message event catalog", () => {
     expect(getFreeMessageUnknownVariables(event!, ["nome_lead", "telefone_cliente"]))
       .toEqual(["telefone_cliente"]);
   });
+
+  it("accepts the approved invitation and accepted-lead template aliases", () => {
+    const welcome = getMessageEventByKey("BROKER_WELCOME");
+    const confirmed = getMessageEventByKey("LEAD_ASSIGNMENT_CONFIRMED");
+
+    expect(welcome).not.toBeNull();
+    expect(confirmed).not.toBeNull();
+    expect(getFreeMessageUnknownVariables(welcome!, ["nome", "empresa", "cargo", "unidade"]))
+      .toEqual([]);
+    expect(getFreeMessageUnknownVariables(confirmed!, ["nome", "telefone", "interesse", "n_dependentes", "cidade"]))
+      .toEqual([]);
+  });
 });

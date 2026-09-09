@@ -65,10 +65,11 @@ describe("outboundService", () => {
     expect(leadNotifText).toContain("Plano de Saúde PME");
     expect(leadNotifText).toContain("https://crm.ancorasaude.cloud/conversas?lead=lead-999");
 
-    const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "lead-999"]);
+    const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "Nova Iguaçu", "lead-999"]);
     expect(confirmedText).toContain("✅ *Atribuição Confirmada*");
     expect(confirmedText).toContain("Ana Lima");
     expect(confirmedText).toContain("(11) 98888-7777");
+    expect(confirmedText).toContain("Nova Iguaçu");
 
     const taskText = resolveTemplateTextBody("taskReminder", ["Carlos", "Retornar orçamento", "15:30"]);
     expect(taskText).toContain("⏰ *Lembrete de Tarefa*");

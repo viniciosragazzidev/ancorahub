@@ -104,10 +104,11 @@ export const MESSAGE_EVENT_CATALOG = [
     variables: [
       brokerName,
       leadName,
-      { key: "telefone_cliente", label: "Telefone do lead", aliases: ["lead_phone", "cliente_telefone"], fallback: "Sem telefone" },
+      { key: "telefone_cliente", label: "Telefone do lead", aliases: ["telefone", "lead_phone", "cliente_telefone"], fallback: "Sem telefone" },
       { key: "interesse", label: "Interesse", aliases: ["produto_interesse"], fallback: "Plano de saúde" },
       { key: "tipo", label: "Tipo de contratação", aliases: ["tipo_lead"], fallback: "Individual" },
       { key: "n_dependentes", label: "Número de dependentes", aliases: ["dependentes"], fallback: "0" },
+      { key: "cidade", label: "Cidade do lead", aliases: ["city", "municipio", "município"], fallback: "Não informada" },
       leadId,
     ],
   },
@@ -140,6 +141,7 @@ export const MESSAGE_EVENT_CATALOG = [
       { key: "nome", label: "Nome do convidado", aliases: ["corretor_nome"], fallback: "Corretor(a)" },
       { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "sua corretora" },
       { key: "cargo", label: "Cargo", aliases: ["role"], fallback: "Corretor" },
+      { key: "unidade", label: "Unidade", aliases: ["branch_name"], fallback: "Unidade" },
     ],
   },
   {

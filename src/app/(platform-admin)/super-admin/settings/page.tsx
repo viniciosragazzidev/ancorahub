@@ -35,6 +35,7 @@ import {
   updateTeamMemberProfileSettingsAction,
   updateUserProfileSettingsAction,
   updateReportingCenterSettingsAction,
+  updateUnlinkedConversationDeletionSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
@@ -50,6 +51,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +93,7 @@ export default async function SuperAdminSettingsPage() {
     "lead_intake_outbox_retry_base_seconds",
     "lead_intake_outbox_lease_seconds",
     "feature_lead_management_actions_enabled",
+    FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
     "feature_ai_quick_reply_enabled",
@@ -142,6 +145,8 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_lead_distribution_jobs_enabled") !== "false";
   const leadManagementActionsEnabled =
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
+  const unlinkedConversationDeletionEnabled =
+    settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
   const distributionMaxAttempts = settingMap.get("lead_distribution_jobs_max_attempts") ?? "8";
   const distributionRetryBaseSeconds =
@@ -372,6 +377,35 @@ export default async function SuperAdminSettingsPage() {
                 <Button render={<Link href="/super-admin/tenants" />} size="sm" variant="ghost">
                   Gerenciar piloto por empresa
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Exclusão de conversas avulsas</CardTitle>
+                <CardDescription>
+                  Controla a remoção de chats sem vínculo com lead, cliente ou membro da equipe. A proteção dos contatos vinculados permanece obrigatória.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateUnlinkedConversationDeletionSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="unlinkedConversationDeletionEnabled"
+                      value="true"
+                      defaultChecked={unlinkedConversationDeletionEnabled}
+                      className="size-4 warning-[var(--primary)]"
+                    />
+                    <span>
+                      <span className="font-medium">Permitir exclusão por Diretor e Gestor</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Cada exclusão registra auditoria sem guardar telefone ou conteúdo da conversa.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar controle</Button>
+                </form>
               </CardContent>
             </Card>
 
