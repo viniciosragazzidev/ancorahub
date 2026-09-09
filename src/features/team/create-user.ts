@@ -1,16 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "./onboarding-helpers";
-import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { scheduleAfterResponse } from "@/shared/async/after-response";
+import { enqueueBrokerInvitation } from "./broker-invitation-delivery";
 
 const createUserInput = z.object({
   name: z.string().trim().min(2).max(120),
@@ -132,45 +130,16 @@ export async function createTeamUser(rawInput: unknown) {
     });
   });
 
-  let whatsappStatus: "queued" | "not_available" | "failed" | "sent" = "not_available";
-  try {
-    const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
-      eq(schema.communicationChannels.tenantId, context.tenantId),
-      inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-      eq(schema.communicationChannels.status, "active"),
-    )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
-    if (channel) {
-      const [company, branch] = await Promise.all([
-        db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
-        db.select({ name: schema.branches.name }).from(schema.branches).where(and(
-          eq(schema.branches.id, input.branchId),
-          eq(schema.branches.tenantId, context.tenantId),
-        )).limit(1),
-      ]);
-      const roleLabel = input.jobTitle === "director" || input.role === "director" ? "Diretor" : input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
-      const queued = await enqueueMetaTemplateMessage({
-        tenantId: context.tenantId,
-        channelId: channel.id,
-        recipientType: "user",
-        recipientId: invitationId,
-        destinationPhone: input.phone,
-        purpose: "brokerInvitation",
-        variables: [input.name, company[0]?.name ?? "sua corretora", roleLabel, branch[0]?.name ?? "Unidade"],
-        requestedBy: context.userId,
-        idempotencyKey: `team-invitation:${invitationId}`,
-      });
-      whatsappStatus = queued.duplicate || queued.status === "queued" ? "queued" : "failed";
-      await db.update(schema.brokerInvitations).set({ deliveryStatus: whatsappStatus === "queued" ? "queued" : "failed" }).where(eq(schema.brokerInvitations.id, invitationId));
-      // Delivery is durable but intentionally asynchronous. The UI can finish
-      // onboarding immediately; the VPS worker handles delivery and retries.
-      scheduleAfterResponse("team-invitation-outbound", () => processMetaOutboundBatch(3, context.tenantId));
-    } else {
-      await db.update(schema.brokerInvitations).set({ deliveryStatus: "not_available" }).where(eq(schema.brokerInvitations.id, invitationId));
-    }
-  } catch {
-    await db.update(schema.brokerInvitations).set({ deliveryStatus: "failed", deliveryError: "Não foi possível enfileirar o convite." }).where(eq(schema.brokerInvitations.id, invitationId));
-    whatsappStatus = "failed";
-  }
+  const whatsappStatus = await enqueueBrokerInvitation({
+    tenantId: context.tenantId,
+    branchId: input.branchId,
+    invitationId,
+    destinationPhone: normalizedPhone,
+    name: input.name,
+    jobTitle: input.jobTitle,
+    role: input.role,
+    requestedBy: context.userId,
+  });
 
   return { token: inviteToken, invitationId, whatsappStatus };
 }

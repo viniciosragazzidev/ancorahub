@@ -918,3 +918,9 @@ falham se o Realtime estiver indisponível.
 A definição de filas fica temporariamente exclusiva do Diretor. Gestor não recebe a aba nem seu conteúdo e uma URL direta para `view=filas` retorna à matriz de roteamento; Supervisor continua sem acesso administrativo à Central de Distribuição. As demais operações autorizadas de acompanhamento não são ampliadas por esta decisão.
 
 Para `/vendas`, a navegação principal passa a antecipar o payload parcial, exibir estado imediato de carregamento e evitar a segunda consulta da mesma população usada apenas para somar receita. A otimização não altera escopo, filtros ou regra de cálculo.
+
+## DEC-094 — Importação de corretores reutiliza o onboarding e a outbox oficiais
+
+**Decisão aprovada em 2026-09-09.** A importação CSV exige somente nome e telefone; e-mail, CPF e unidade são opcionais. Cada linha válida cria um perfil `INVITED` e um convite de uso único, sem ativar usuário ou associação antes do aceite. Quando o e-mail não vier no arquivo, o próprio convidado deve defini-lo no primeiro acesso, com validação de unicidade no tenant.
+
+O convite usa exclusivamente o propósito `brokerInvitation`, resolvido para o template Meta `broker_first_access`, com idempotência por convite e entrega gradual pela outbox oficial existente. O processamento nunca usa WhatsApp pessoal. Links de templates Meta legados podem conter placeholders codificados antes ou depois do token; a entrada pública remove somente os sufixos/prefixos conhecidos e mantém a validação pelo hash como autoridade.

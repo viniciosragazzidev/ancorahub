@@ -65,6 +65,20 @@ export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean
   };
 }
 
+const terminalBrokerInvitationErrorCodes = new Set([
+  "BROKER_INVITATION_NOT_FOUND",
+  "BROKER_INVITATION_NOT_PENDING",
+  "BROKER_INVITATION_EXPIRED",
+  "BROKER_INVITATION_TOKEN_UNAVAILABLE",
+  "BROKER_INVITATION_TOKEN_DECRYPT_FAILED",
+]);
+
+function brokerInvitationError(code: string, message: string) {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
 async function isCurrentBrokerLeadNotification(row: {
   tenantId: string;
   purpose: string;
@@ -549,15 +563,29 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       if (row.purpose === "brokerInvitation" && row.recipientId) {
         const [loadedInvitation] = await db.select({ tokenCiphertext: schema.brokerInvitations.tokenCiphertext, expiresAt: schema.brokerInvitations.expiresAt, status: schema.brokerInvitations.status }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, row.recipientId), eq(schema.brokerInvitations.tenantId, row.tenantId))).limit(1);
         invitation = loadedInvitation;
+        if (!invitation) {
+          throw brokerInvitationError("BROKER_INVITATION_NOT_FOUND", "Convite de primeiro acesso não encontrado.");
+        }
+        if (invitation.status !== "PENDING") {
+          throw brokerInvitationError("BROKER_INVITATION_NOT_PENDING", "Convite de primeiro acesso não está mais pendente.");
+        }
+        if (invitation.expiresAt <= now) {
+          throw brokerInvitationError("BROKER_INVITATION_EXPIRED", "Convite de primeiro acesso expirou antes do envio.");
+        }
         const invitationKey = process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim() || process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim();
-        if (invitation?.tokenCiphertext && invitationKey) {
-          try {
-            urlButtonParameter = decryptChannelSecret(invitation.tokenCiphertext, invitationKey);
-          } catch {
-            urlButtonParameter = row.recipientId;
-          }
-        } else {
-          urlButtonParameter = row.recipientId;
+        if (!invitation.tokenCiphertext || !invitationKey) {
+          throw brokerInvitationError(
+            "BROKER_INVITATION_TOKEN_UNAVAILABLE",
+            "Token seguro do convite indisponível para entrega pelo WhatsApp.",
+          );
+        }
+        try {
+          urlButtonParameter = decryptChannelSecret(invitation.tokenCiphertext, invitationKey);
+        } catch {
+          throw brokerInvitationError(
+            "BROKER_INVITATION_TOKEN_DECRYPT_FAILED",
+            "Não foi possível recuperar o token seguro do convite para entrega.",
+          );
         }
       } else if (row.purpose === "leadAssignmentConfirmed") {
         const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
@@ -680,12 +708,20 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
       await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
       if (invitation && row.recipientId) {
-        await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts, deliveryError: null }).where(eq(schema.brokerInvitations.id, row.recipientId));
+        await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts + 1, deliveryError: null }).where(and(
+          eq(schema.brokerInvitations.id, row.recipientId),
+          eq(schema.brokerInvitations.tenantId, row.tenantId),
+        ));
       }
       sent += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha no envio via Meta Cloud API.";
-      const code = error instanceof MetaCloudApiError ? String(error.code ?? error.status) : "META_OUTBOUND_FAILED";
+      const code = error instanceof MetaCloudApiError
+        ? String(error.code ?? error.status)
+        : typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code?: unknown }).code ?? "META_OUTBOUND_FAILED")
+          : "META_OUTBOUND_FAILED";
+      const terminalInvitationFailure = row.purpose === "brokerInvitation" && terminalBrokerInvitationErrorCodes.has(code);
 
       if (row.deliveryRoute === "waha_direct") {
         const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
@@ -703,6 +739,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
 
       let sentViaWaha = false;
       try {
+        if (terminalInvitationFailure) {
+          throw brokerInvitationError(code, message);
+        }
         const isQualificationFirstContact = row.purpose === "aiQualification"
           || row.purpose === "leadQualification"
           || row.purpose === "lead_qualification";
@@ -758,16 +797,26 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           sentViaWaha = true;
         }
       } catch (wahaError) {
-        console.warn("[meta-outbox] WAHA fallback attempt failed:", wahaError);
+        if (!terminalInvitationFailure) {
+          console.warn("[meta-outbox] WAHA fallback attempt failed:", wahaError);
+        }
       }
 
       if (!sentViaWaha) {
-        const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
+        const nextAttemptAt = !terminalInvitationFailure && row.attempts < 3
+          ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000)
+          : null;
         const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
         await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
         if (row.purpose === "brokerInvitation" && row.recipientId) {
-          const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts });
-          await db.update(schema.brokerInvitations).set(failureUpdate).where(eq(schema.brokerInvitations.id, row.recipientId));
+          const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
+          await db.update(schema.brokerInvitations).set({
+            ...failureUpdate,
+            deliveryError: terminalInvitationFailure ? message.slice(0, 240) : failureUpdate.deliveryError,
+          }).where(and(
+            eq(schema.brokerInvitations.id, row.recipientId),
+            eq(schema.brokerInvitations.tenantId, row.tenantId),
+          ));
         }
         if (nextAttemptAt) retried += 1; else failed += 1;
       }

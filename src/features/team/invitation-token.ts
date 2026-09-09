@@ -1,4 +1,5 @@
 const META_DYNAMIC_TOKEN_PREFIX = "{{activation_token}}";
+const STALE_META_TOKEN_SUFFIXES = ["{{id}}", "{{activation_token}}"] as const;
 
 /**
  * Older approved Meta templates may preserve an encoded named URL placeholder
@@ -19,7 +20,15 @@ export function normalizeInvitationToken(rawToken: string | undefined) {
     }
   }
 
-  return token.startsWith(META_DYNAMIC_TOKEN_PREFIX)
+  token = token.startsWith(META_DYNAMIC_TOKEN_PREFIX)
     ? token.slice(META_DYNAMIC_TOKEN_PREFIX.length)
     : token;
+
+  for (const suffix of STALE_META_TOKEN_SUFFIXES) {
+    if (token.endsWith(suffix)) {
+      token = token.slice(0, -suffix.length);
+    }
+  }
+
+  return token;
 }

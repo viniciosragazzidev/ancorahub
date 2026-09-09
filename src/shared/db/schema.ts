@@ -3549,7 +3549,7 @@ export const brokerProfiles = pgTable(
     internalCode: text("internal_code").notNull(),
     professionalName: text("professional_name").notNull(),
     phone: text("phone").notNull(),
-    invitedEmail: text("invited_email").notNull(),
+    invitedEmail: text("invited_email"),
     cpf: text("cpf"),
     lifecycleStatus: brokerLifecycleStatus("lifecycle_status").notNull().default("DRAFT"),
     managerId: text("manager_id")
@@ -3583,7 +3583,7 @@ export const brokerInvitations = pgTable(
     brokerProfileId: text("broker_profile_id")
       .notNull()
       .references(() => brokerProfiles.id, { onDelete: "cascade" }),
-    email: text("email").notNull(),
+    email: text("email"),
     role: tenantRole("role").notNull().default("broker"),
     jobTitle: text("job_title").notNull().default("broker"),
     tokenHash: text("token_hash").notNull().unique(),

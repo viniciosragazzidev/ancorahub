@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -13,6 +13,7 @@ import {
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   name: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(8).max(30),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
@@ -21,7 +22,7 @@ const completeOnboardingSchema = z.object({
   termsAccepted: z.literal("on"),
 });
 
-export type OnboardingResult = { success?: boolean; error?: string };
+export type OnboardingResult = { success?: boolean; error?: string; email?: string };
 
 export async function completeOnboardingAction(
   _prev: OnboardingResult,
@@ -50,12 +51,29 @@ export async function completeOnboardingAction(
     const [profile] = await db
       .select()
       .from(schema.brokerProfiles)
-      .where(eq(schema.brokerProfiles.id, invitation.brokerProfileId))
+      .where(and(
+        eq(schema.brokerProfiles.id, invitation.brokerProfileId),
+        eq(schema.brokerProfiles.tenantId, invitation.tenantId),
+      ))
       .limit(1);
 
     if (!profile) {
       throw new Error("Perfil de corretor correspondente não encontrado.");
     }
+    const accessEmail = invitation.email?.trim().toLowerCase() || input.email;
+    if (invitation.email && invitation.email.toLowerCase() !== input.email) {
+      throw new Error("O e-mail informado não corresponde ao convite.");
+    }
+    const [emailInTenant] = await db
+      .select({ id: schema.brokerProfiles.id })
+      .from(schema.brokerProfiles)
+      .where(and(
+        eq(schema.brokerProfiles.tenantId, invitation.tenantId),
+        eq(schema.brokerProfiles.invitedEmail, accessEmail),
+        ne(schema.brokerProfiles.id, profile.id),
+      ))
+      .limit(1);
+    if (emailInTenant) throw new Error("Este e-mail já pertence a outro membro desta corretora.");
 
     // 3. Clean and validate CPF matches the profile one
     const cleanInputCpf = input.cpf?.replace(/\D/g, "") || "";
@@ -68,7 +86,7 @@ export async function completeOnboardingAction(
     const [existingUser] = await db
       .select({ id: schema.user.id })
       .from(schema.user)
-      .where(eq(schema.user.email, invitation.email))
+      .where(eq(schema.user.email, accessEmail))
       .limit(1);
 
     let userId: string;
@@ -103,7 +121,7 @@ export async function completeOnboardingAction(
         await tx.insert(schema.user).values({
           id: userId,
           name: input.name,
-          email: invitation.email,
+          email: accessEmail,
           emailVerified: true,
           active: true,
           status: "active",
@@ -178,19 +196,21 @@ export async function completeOnboardingAction(
           activatedAt: new Date(),
           professionalName: input.name,
           phone: input.phone,
+          invitedEmail: accessEmail,
           cpf: cleanInputCpf || profile.cpf,
           updatedAt: new Date(),
         })
-        .where(eq(schema.brokerProfiles.id, profile.id));
+        .where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, invitation.tenantId)));
 
       // Accept invitation
       await tx
         .update(schema.brokerInvitations)
         .set({
+          email: accessEmail,
           status: "ACCEPTED",
           acceptedAt: new Date(),
         })
-        .where(eq(schema.brokerInvitations.id, invitation.id));
+        .where(and(eq(schema.brokerInvitations.id, invitation.id), eq(schema.brokerInvitations.tenantId, invitation.tenantId)));
 
       // Set onboarding complete
       const onboardingId = randomUUID();
@@ -233,7 +253,7 @@ export async function completeOnboardingAction(
       });
     });
 
-    return { success: true };
+    return { success: true, email: accessEmail };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao concluir o onboarding.";
     return { success: false, error: message };

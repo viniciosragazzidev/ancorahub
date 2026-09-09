@@ -30,6 +30,7 @@ type TeamMember = {
   userId: string | null;
   name: string | null;
   email: string;
+  phone: string | null;
   role: TenantRole;
   jobTitle: string;
   status: "pending" | "active" | "disabled";
@@ -97,7 +98,8 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     return visibleMembers.filter(
       (member) =>
         (member.name ?? "").toLowerCase().includes(query) ||
-        member.email.toLowerCase().includes(query),
+        member.email.toLowerCase().includes(query) ||
+        (member.phone ?? "").includes(query.replace(/\D/g, "")),
     );
   }, [mobileQuery, visibleMembers]);
 
@@ -172,6 +174,15 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
       ),
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">{row.original.email}</span>
+      ),
+    },
+    {
+      accessorKey: "phone",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="WhatsApp" />
+      ),
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">{row.original.phone ?? "Não informado"}</span>
       ),
     },
     {
@@ -289,7 +300,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
             <Search className="pointer-events-none absolute left-7 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               aria-label="Buscar colaborador"
-              placeholder="Buscar colaborador por nome ou email..."
+              placeholder="Buscar por nome, e-mail ou WhatsApp..."
               value={mobileQuery}
               onChange={(event) => setMobileQuery(event.target.value)}
               className="h-9 rounded-xl border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground"
@@ -310,6 +321,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
                       {member.userId === currentUserId ? <span className="shrink-0 font-mono text-[11px] text-muted-foreground">Você</span> : null}
                     </div>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{member.email}</p>
+                    {member.phone ? <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{member.phone}</p> : null}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <RoleBadge role={member.role} jobTitle={member.jobTitle} />
                       <MemberStatusBadge status={member.status} />
@@ -358,7 +370,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
             columns={columns}
             data={visibleMembers}
             searchKey="name"
-            searchPlaceholder="Buscar colaborador por nome ou email..."
+            searchPlaceholder="Buscar colaborador por nome, e-mail ou WhatsApp..."
             showColumnToggle={true}
             showPagination={true}
             pageSize={10}

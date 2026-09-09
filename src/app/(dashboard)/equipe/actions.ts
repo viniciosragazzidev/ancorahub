@@ -9,7 +9,6 @@ import { generatePasswordResetLinkForMember } from "@/features/team/password-rec
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import {
-  requireCanCreateRole,
   requireCanManageMember,
   canManageMember,
   requireCanUpdateMemberAuthority,
@@ -19,18 +18,8 @@ import { generateNextInternalCode, createBrokerInvitation } from "@/features/tea
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
-
-// Pending invitations don't have a userId, they use brokerProfileId
-type PendingInvite = {
-  id: string;
-  brokerProfileId: string;
-  email: string;
-  createdAt: Date;
-  expiresAt: Date;
-  deliveryStatus: string | null;
-  phone: string | null;
-  name: string | null;
-};
+import { enqueueBrokerInvitation } from "@/features/team/broker-invitation-delivery";
+import { parseCsv } from "@/shared/utils/csv";
 
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
@@ -535,7 +524,6 @@ export async function transferLeadsAction(
 export async function getPendingInvitesAction() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const now = new Date();
   return db.select({
     id: schema.brokerInvitations.id,
     brokerProfileId: schema.brokerInvitations.brokerProfileId,
@@ -677,48 +665,75 @@ export async function importBrokersAction(
       throw new Error("Arquivo CSV inválido ou vazio.");
     }
     const text = await file.text();
-    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-    if (lines.length <= 1) {
-      throw new Error("O arquivo CSV deve conter um cabeçalho e pelo menos uma linha de dados.");
-    }
-
-    const headers = lines[0].toLowerCase().split(/[,;]/).map(h => h.trim());
-    const nameIdx = headers.indexOf("nome");
-    const emailIdx = headers.indexOf("email");
-    const phoneIdx = headers.indexOf("telefone");
-    const cpfIdx = headers.indexOf("cpf");
-    const branchIdx = headers.indexOf("unidade");
-
-    if (nameIdx === -1 || emailIdx === -1 || phoneIdx === -1) {
-      throw new Error("O cabeçalho do CSV deve conter as colunas: nome, email, telefone, cpf.");
+    const headerLine = text.split(/\r?\n/, 1)[0]?.toLowerCase() ?? "";
+    const delimiter = headerLine.includes(";") ? ";" : ",";
+    const rows = parseCsv(text, delimiter).map((row) => Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key.replace(/^\uFEFF/, "").trim().toLowerCase(), value]),
+    ));
+    if (rows.length === 0) throw new Error("O arquivo CSV deve conter um cabeçalho e pelo menos uma linha de dados.");
+    const headers = Object.keys(rows[0]);
+    if (!headers.includes("nome") || !headers.includes("telefone")) {
+      throw new Error("O cabeçalho do CSV deve conter nome e telefone. E-mail, CPF e unidade são opcionais.");
     }
 
     const db = getDatabase();
     let imported = 0;
+    let queued = 0;
     const errors: string[] = [];
+    const createdInvitations: Array<{
+      invitationId: string;
+      branchId: string;
+      phone: string;
+      name: string;
+    }> = [];
+    const phonesInFile = new Set<string>();
+    const emailsInFile = new Set<string>();
 
     await db.transaction(async (tx) => {
-      for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(/[,;]/).map(val => val.trim());
-        if (row.length < 4) continue;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const lineNumber = i + 2;
+        const name = String(row.nome ?? "").trim();
+        const email = String(row.email ?? "").trim().toLowerCase() || null;
+        const phone = String(row.telefone ?? "").replace(/\D/g, "");
+        const cpf = String(row.cpf ?? "").replace(/\D/g, "") || null;
 
-        const name = row[nameIdx];
-        const email = row[emailIdx]?.toLowerCase();
-        const phone = row[phoneIdx];
-        const cpf = cpfIdx >= 0 ? row[cpfIdx]?.replace(/\D/g, "") || null : null;
-
-        if (!name || !email || !phone) {
-          errors.push(`Linha ${i + 1}: Dados incompletos.`);
+        if (!name || phone.length < 10 || phone.length > 15) {
+          errors.push(`Linha ${lineNumber}: informe nome e um telefone internacional válido.`);
           continue;
         }
+        if (email && !z.string().email().safeParse(email).success) {
+          errors.push(`Linha ${lineNumber}: e-mail inválido.`);
+          continue;
+        }
+        if (phonesInFile.has(phone)) {
+          errors.push(`Linha ${lineNumber}: telefone repetido no arquivo.`);
+          continue;
+        }
+        if (email && emailsInFile.has(email)) {
+          errors.push(`Linha ${lineNumber}: e-mail repetido no arquivo.`);
+          continue;
+        }
+        phonesInFile.add(phone);
+        if (email) emailsInFile.add(email);
 
-        const [existingEmail] = await tx
+        const [existingEmail] = email ? await tx
           .select({ id: schema.brokerProfiles.id })
           .from(schema.brokerProfiles)
           .where(and(eq(schema.brokerProfiles.invitedEmail, email), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-          .limit(1);
+          .limit(1) : [];
         if (existingEmail) {
-          errors.push(`Linha ${i + 1}: E-mail ${email} já cadastrado.`);
+          errors.push(`Linha ${lineNumber}: e-mail ${email} já cadastrado.`);
+          continue;
+        }
+
+        const [existingPhone] = await tx
+          .select({ id: schema.brokerProfiles.id })
+          .from(schema.brokerProfiles)
+          .where(and(eq(schema.brokerProfiles.phone, phone), eq(schema.brokerProfiles.tenantId, context.tenantId)))
+          .limit(1);
+        if (existingPhone) {
+          errors.push(`Linha ${lineNumber}: telefone já cadastrado.`);
           continue;
         }
 
@@ -728,13 +743,13 @@ export async function importBrokersAction(
           .where(and(eq(schema.brokerProfiles.cpf, cpf), eq(schema.brokerProfiles.tenantId, context.tenantId)))
           .limit(1) : [];
         if (existingCpf) {
-          errors.push(`Linha ${i + 1}: CPF ${cpf} já cadastrado.`);
+          errors.push(`Linha ${lineNumber}: CPF ${cpf} já cadastrado.`);
           continue;
         }
 
         let targetBranchId = context.branchId;
         if (context.role === "director") {
-          const branchVal = row[branchIdx];
+          const branchVal = String(row.unidade ?? "").trim();
           if (branchVal) {
             const [matchedBranch] = await tx
               .select({ id: schema.branches.id })
@@ -750,7 +765,7 @@ export async function importBrokersAction(
             if (matchedBranch) {
               targetBranchId = matchedBranch.id;
             } else {
-              errors.push(`Linha ${i + 1}: Unidade "${branchVal}" não encontrada.`);
+              errors.push(`Linha ${lineNumber}: Unidade "${branchVal}" não encontrada.`);
               continue;
             }
           } else {
@@ -762,14 +777,14 @@ export async function importBrokersAction(
             if (firstBranch) {
               targetBranchId = firstBranch.id;
             } else {
-              errors.push(`Linha ${i + 1}: Nenhuma filial ativa cadastrada.`);
+              errors.push(`Linha ${lineNumber}: Nenhuma filial ativa cadastrada.`);
               continue;
             }
           }
         }
 
         if (!targetBranchId) {
-          errors.push(`Linha ${i + 1}: Unidade não especificada.`);
+          errors.push(`Linha ${lineNumber}: Unidade não especificada.`);
           continue;
         }
 
@@ -786,26 +801,55 @@ export async function importBrokersAction(
           phone,
           invitedEmail: email,
           cpf,
-          lifecycleStatus: "DRAFT",
+          lifecycleStatus: "INVITED",
           managerId: context.userId,
+          invitedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
+        const invitation = await createBrokerInvitation(
+          tx,
+          context.tenantId,
+          targetBranchId,
+          brokerProfileId,
+          email,
+          "broker",
+          "broker",
+        );
+        createdInvitations.push({ invitationId: invitation.id, branchId: targetBranchId, phone, name });
 
         await tx.insert(schema.auditLogs).values({
           id: randomUUID(),
           userId: context.userId,
           entidade: "broker_profile",
           entidadeId: brokerProfileId,
-          acao: "importou_corretor_draft",
+          acao: "importou_corretor_pendente",
         });
 
         imported++;
       }
     });
 
+    for (const invitation of createdInvitations) {
+      const status = await enqueueBrokerInvitation({
+        tenantId: context.tenantId,
+        branchId: invitation.branchId,
+        invitationId: invitation.invitationId,
+        destinationPhone: invitation.phone,
+        name: invitation.name,
+        jobTitle: "broker",
+        role: "broker",
+        requestedBy: context.userId,
+        scheduleDelivery: false,
+      });
+      if (status === "queued") queued += 1;
+    }
+    if (queued > 0) {
+      scheduleAfterResponse("team-csv-invitation-outbound", () => processMetaOutboundBatch(3, context.tenantId));
+    }
 
-    let reportMessage = `Importação concluída. ${imported} corretores importados com sucesso como Rascunho (DRAFT).`;
+    let reportMessage = `Importação concluída. ${imported} corretores ficaram pendentes de ativação; ${queued} convites foram enfileirados no WhatsApp oficial.`;
     if (errors.length > 0) {
       reportMessage += ` Erros encontrados:\n${errors.join("\n")}`;
     }

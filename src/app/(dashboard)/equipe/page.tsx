@@ -41,13 +41,14 @@ export default async function TeamPage() {
         id: sql<string>`coalesce(${schema.tenantMemberships.id}, ${schema.brokerProfiles.id})`,
         userId: schema.brokerProfiles.userId,
         name: schema.brokerProfiles.professionalName,
-        email: schema.brokerProfiles.invitedEmail,
+        email: sql<string>`coalesce(${schema.brokerProfiles.invitedEmail}, 'E-mail será definido no cadastro')`,
+        phone: schema.brokerProfiles.phone,
         role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}::text, ${schema.brokerInvitations.role}::text, 'broker')::tenant_role`,
         jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, ${schema.brokerInvitations.jobTitle}, 'broker')`,
         customRoleScope: schema.customRoles.scope,
         status: sql<"pending" | "active" | "disabled">`
           case
-            when ${schema.user.status}::text = 'pending' or ${schema.brokerProfiles.lifecycleStatus}::text = 'INVITED' then 'pending'
+            when ${schema.brokerProfiles.userId} is null or ${schema.user.status}::text = 'pending' or ${schema.brokerProfiles.lifecycleStatus}::text in ('DRAFT', 'INVITED', 'INVITATION_EXPIRED', 'ONBOARDING') then 'pending'
             when ${schema.user.status}::text = 'disabled' or ${schema.tenantMemberships.status}::text = 'inactive' then 'disabled'
             else 'active'
           end
@@ -77,6 +78,7 @@ export default async function TeamPage() {
         userId: schema.user.id,
         name: schema.user.name,
         email: schema.user.email,
+        phone: sql<string | null>`null`,
         role: schema.tenantMemberships.role,
         jobTitle: sql<string>`case
           when ${schema.tenantMemberships.role}::text in ('director', 'manager', 'supervisor')
@@ -160,8 +162,9 @@ export default async function TeamPage() {
 
   // Dedup por id: gestores/supervisores/diretores com broker_profiles + tenant_memberships
   // aparecem nas duas queries; a versão de tenant_memberships (nome/e-mail atuais) vence.
+  type TeamMemberRow = (typeof brokers)[number] | (typeof nonBrokers)[number];
   const members = [
-    ...new Map<string, (typeof brokers)[number]>(
+    ...new Map<string, TeamMemberRow>(
       [...brokers, ...nonBrokers].map((member) => [member.id, member])
     ).values(),
   ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));

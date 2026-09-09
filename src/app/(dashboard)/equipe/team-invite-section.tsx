@@ -224,9 +224,9 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                 </Field>
                 <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground space-y-1.5">
                   <p className="font-semibold text-foreground">Instruções para o CSV:</p>
-                  <p>1. O cabeçalho deve conter: <strong>nome, email, telefone, cpf</strong>.</p>
-                  <p>2. Adicionalmente, pode conter a coluna opcional <strong>unidade</strong> (nome ou ID da filial).</p>
-                  <p>3. Os corretores importados serão criados como Rascunho (DRAFT) na unidade correspondente.</p>
+                  <p>1. O cabeçalho obrigatório é: <strong>nome, telefone</strong>.</p>
+                  <p>2. <strong>email, cpf e unidade</strong> são opcionais. Sem e-mail, o corretor o define no primeiro acesso.</p>
+                  <p>3. Cada corretor entra como pendente e recebe o convite <strong>broker_first_access</strong> pela fila do WhatsApp oficial.</p>
                 </div>
                 <div className="sticky bottom-0 -mx-1 border-t border-border bg-card px-1 pt-3">
                   <Button className="w-full" type="submit" disabled={pending}>{pending ? "Importando..." : "Importar Corretores"}</Button>

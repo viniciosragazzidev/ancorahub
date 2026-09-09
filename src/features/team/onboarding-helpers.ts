@@ -44,7 +44,7 @@ export async function createBrokerInvitation(
   tenantId: string,
   branchId: string,
   brokerProfileId: string,
-  email: string,
+  email: string | null,
   role: CreatableTeamRole = "broker",
   jobTitle: string = role,
 ) {

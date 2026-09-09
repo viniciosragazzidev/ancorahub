@@ -16,7 +16,7 @@ import { completeOnboardingAction } from "./onboarding-actions";
 type Props = {
   invitation: {
     id: string;
-    email: string;
+    email: string | null;
     tenantName: string;
     branchName: string;
   };
@@ -40,6 +40,7 @@ async function platformAuthenticatorAvailable(): Promise<boolean> {
 export function OnboardingWizard({ invitation, profile }: Props) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(profile.professionalName);
+  const [email, setEmail] = useState(invitation.email ?? "");
   const [phone, setPhone] = useState(profile.phone);
   const [cpfInput, setCpfInput] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -57,8 +58,8 @@ export function OnboardingWizard({ invitation, profile }: Props) {
 
   function nextStep() {
     if (step === 1) {
-      if (!name.trim() || !phone.trim()) {
-        toast.error("Por favor, preencha seu nome e telefone profissional.");
+      if (!name.trim() || !phone.trim() || !email.trim()) {
+        toast.error("Por favor, preencha nome, e-mail e telefone profissional.");
         return;
       }
       setStep(2);
@@ -124,6 +125,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
     startTransition(async () => {
       const formData = new FormData();
       formData.append("invitationId", invitation.id);
+      formData.append("email", email);
       formData.append("name", name);
       formData.append("phone", phone);
       formData.append("cpf", cpfInput);
@@ -141,7 +143,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
       // Se falhar, a conta já está ativa e o login manual continua válido.
       try {
         const signIn = await authClient.signIn.email({
-          email: invitation.email,
+          email: result.email ?? email,
           password,
         });
         if (!signIn.error) {
@@ -190,7 +192,17 @@ export function OnboardingWizard({ invitation, profile }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="prof-email">E-mail Corporativo</Label>
-                <Input id="prof-email" value={invitation.email} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                <Input
+                  id="prof-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  disabled={Boolean(invitation.email)}
+                  required
+                  autoComplete="email"
+                  className={invitation.email ? "bg-muted text-muted-foreground cursor-not-allowed" : undefined}
+                />
+                {!invitation.email ? <p className="text-xs text-muted-foreground">Defina o e-mail que será usado para entrar na plataforma.</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="prof-phone">Telefone</Label>
