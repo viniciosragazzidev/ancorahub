@@ -25,8 +25,9 @@ export function TeamInviteForm({
         <Input id="team-name" name="name" required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="team-email">E-mail</Label>
-        <Input id="team-email" name="email" required type="email" />
+        <Label htmlFor="team-email">E-mail <span className="text-muted-foreground">(opcional)</span></Label>
+        <Input id="team-email" name="email" type="email" autoComplete="email" />
+        <p className="text-xs text-muted-foreground">Se ficar vazio, o membro definirá o e-mail de acesso ao abrir o convite.</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="team-phone">Telefone</Label>

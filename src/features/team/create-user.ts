@@ -10,9 +10,12 @@ import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "./onboarding-helpers";
 import { enqueueBrokerInvitation } from "./broker-invitation-delivery";
 
-const createUserInput = z.object({
+export const createUserInput = z.object({
   name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()),
+  email: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable(),
+  ),
   phone: z.string().trim().min(8).max(30),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
   // The UI sends the job title and profile separately. Older clients could
@@ -46,11 +49,11 @@ export async function createTeamUser(rawInput: unknown) {
     .limit(1);
   if (!branch) throw new Error("A filial selecionada não pertence ao tenant ativo ou está inativa.");
 
-  const [existingEmail] = await db
+  const [existingEmail] = input.email ? await db
     .select({ id: schema.brokerProfiles.id })
     .from(schema.brokerProfiles)
     .where(and(eq(schema.brokerProfiles.invitedEmail, input.email), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-    .limit(1);
+    .limit(1) : [];
   if (existingEmail) throw new Error("Já existe um corretor com este e-mail.");
 
   const normalizedCpf = input.cpf?.replace(/\D/g, "") || null;
@@ -69,11 +72,11 @@ export async function createTeamUser(rawInput: unknown) {
   if (existingPhone) throw new Error("Já existe um acesso com este telefone nesta corretora.");
   if (existingCpf) throw new Error("Já existe um corretor com este CPF.");
 
-  const [existingUser] = await db
+  const [existingUser] = input.email ? await db
     .select({ id: schema.user.id })
     .from(schema.user)
     .where(eq(schema.user.email, input.email))
-    .limit(1);
+    .limit(1) : [];
 
   if (existingUser) {
     throw new Error("Este e-mail já pertence a uma conta existente. Use outro e-mail para criar o novo acesso.");

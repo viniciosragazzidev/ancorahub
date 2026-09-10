@@ -12,9 +12,6 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-const DISMISSED_KEY = "corretop-pwa-install-dismissed-at";
-const DISMISS_COOLDOWN_MS = 1000 * 60 * 60 * 24 * 14;
-
 function useIsIOS(): boolean {
   const [isIOS, setIsIOS] = useState(false);
   useEffect(() => {
@@ -24,6 +21,32 @@ function useIsIOS(): boolean {
     return () => window.cancelAnimationFrame(frame);
   }, []);
   return isIOS;
+}
+
+function useIsMobileBrowser(): boolean {
+  const [isMobileBrowser, setIsMobileBrowser] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const coarsePointer = window.matchMedia("(pointer: coarse)");
+    const narrowViewport = window.matchMedia("(max-width: 767px)");
+    const check = () => {
+      const mobileUserAgent = /Android|iPad|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+      setIsMobileBrowser(mobileUserAgent || (coarsePointer.matches && narrowViewport.matches));
+    };
+
+    check();
+    coarsePointer.addEventListener("change", check);
+    narrowViewport.addEventListener("change", check);
+
+    return () => {
+      coarsePointer.removeEventListener("change", check);
+      narrowViewport.removeEventListener("change", check);
+    };
+  }, []);
+
+  return isMobileBrowser;
 }
 
 function useIsStandalone(): boolean {
@@ -48,17 +71,10 @@ export function PwaInstallPrompt() {
   const [canInstall, setCanInstall] = useState(false);
   const [showCard, setShowCard] = useState(false);
   const isIOS = useIsIOS();
+  const isMobileBrowser = useIsMobileBrowser();
   const isStandalone = useIsStandalone();
 
-  const shouldSkipPrompt = useCallback(() => {
-    if (typeof window === "undefined") return true;
-    if (isStandalone) return true;
-    const dismissedAt = Number(window.localStorage.getItem(DISMISSED_KEY) ?? 0);
-    return dismissedAt > 0 && Date.now() - dismissedAt < DISMISS_COOLDOWN_MS;
-  }, [isStandalone]);
-
-  const rememberDismissal = useCallback(() => {
-    window.localStorage.setItem(DISMISSED_KEY, String(Date.now()));
+  const closeCard = useCallback(() => {
     setShowCard(false);
   }, []);
 
@@ -73,31 +89,24 @@ export function PwaInstallPrompt() {
       toast.success("CorreTop instalado", {
         description: "Você já pode abrir o sistema pela tela inicial.",
       });
-    } else {
-      rememberDismissal();
     }
-  }, [rememberDismissal]);
+  }, []);
 
   useEffect(() => {
-    // No iOS, `beforeinstallprompt` não existe — usamos detecção manual
-    if (isIOS) {
-      const timeout = window.setTimeout(() => {
-        if (!shouldSkipPrompt()) setCanInstall(true);
-      }, 0);
-      return () => window.clearTimeout(timeout);
-    }
+    // `beforeinstallprompt` não é interoperável (por exemplo, não existe no
+    // Safari iOS) e pode ocorrer antes da hidratação. No mobile mantemos um CTA
+    // manual como fallback; quando o evento existir, usamos o prompt nativo.
+    if (isMobileBrowser) setCanInstall(true);
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       deferredPrompt.current = event as InstallPromptEvent;
-      if (!shouldSkipPrompt()) {
-        setCanInstall(true);
-      }
+      setCanInstall(true);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-  }, [isIOS, shouldSkipPrompt]);
+  }, [isMobileBrowser]);
 
   // Se já está instalado, não mostra nada
   if (isStandalone) return null;
@@ -123,14 +132,17 @@ export function PwaInstallPrompt() {
                         <CardDescription>
                           {isIOS
                             ? "Toque no botão Compartilhar e depois em \"Adicionar à Tela de Início\"."
-                            : "Acesse o sistema direto da tela inicial, mesmo offline."}
+                            : deferredPrompt.current
+                              ? "Acesse o sistema direto da tela inicial, mesmo offline."
+                              : "Abra o menu do navegador e escolha \"Instalar app\" ou \"Adicionar à tela inicial\"."}
                         </CardDescription>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        onClick={rememberDismissal}
+                        onClick={closeCard}
                         className="mt-0.5 shrink-0"
+                        aria-label="Fechar instruções de instalação"
                       >
                         <X />
                       </Button>
@@ -141,21 +153,23 @@ export function PwaInstallPrompt() {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={rememberDismissal}
+                      onClick={closeCard}
                     >
                       Agora não
                     </Button>
-                    {isIOS ? (
+                    {isIOS || !deferredPrompt.current ? (
                       <Button
                         size="sm"
                         className="flex-1 gap-1.5"
                         onClick={() => {
                           toast.info("Como instalar no iOS", {
                             description:
-        "Abra o Safari, toque no botão Compartilhar e selecione \"Adicionar à Tela de Início\".",
+                              isIOS
+                                ? "Abra o Safari, toque no botão Compartilhar e selecione \"Adicionar à Tela de Início\"."
+                                : "Abra o menu do navegador e selecione \"Instalar app\" ou \"Adicionar à tela inicial\".",
                             duration: 6000,
                           });
-                          rememberDismissal();
+                          closeCard();
                         }}
                       >
                         <ArrowSquareOut className="size-3.5" />
@@ -178,7 +192,7 @@ export function PwaInstallPrompt() {
             exit={{ opacity: 0, scale: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 20 }}
             onClick={() => setShowCard((prev) => !prev)}
-            className="flex size-12 items-center justify-center rounded-full border border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90 max-[559px]:size-10"
+            className="flex size-12 items-center justify-center rounded-full border border-primary-foreground/15 bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90 motion-reduce:transition-none max-[559px]:size-11"
             aria-label="Instalar CorreTop"
           >
             <FileArrowDown className="size-5 max-[559px]:size-4" />

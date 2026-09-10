@@ -472,3 +472,12 @@ de métricas entre tenants.
   cadastros vinculados serão preservados.
 - A permissão continua revalidada no servidor, com isolamento por tenant,
   auditoria sem PII e controle global reversível pelo Super-Admin.
+
+## 2026-09-10 — instalação PWA disponível no mobile
+
+- O botão flutuante de instalação permanece global para todos os papéis e agora
+  também aparece de forma confiável para Corretores no mobile.
+- O fluxo usa o prompt nativo quando suportado e oferece instruções pelo menu do
+  navegador como fallback, sem desaparecer após fechar o cartão informativo.
+- O controle preserva área segura, alvo de toque móvel e preferência por movimento
+  reduzido.
