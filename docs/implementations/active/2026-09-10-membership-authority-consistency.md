@@ -1,6 +1,6 @@
 # Consistência de vínculo e autoridade da equipe
 
-Status: em validação
+Status: validado em 2026-09-10
 
 ## Objetivo
 
@@ -23,3 +23,11 @@ no servidor e não deixem sessões com autoridade anterior.
 - Teste unitário da seleção de vínculo ativo.
 - Testes de autorização e exclusão da equipe.
 - Type-check, build e harness completo antes da publicação.
+
+## Evidências
+
+- 24 testes focados de vínculo ativo, autorização e ações de equipe aprovados.
+- Suíte completa aprovada: 154 arquivos e 699 testes.
+- Type-check e build de produção aprovados.
+- Harness: documentação e segurança sem regressões; diagnósticos
+  arquiteturais e de desempenho permaneceram informativos.
