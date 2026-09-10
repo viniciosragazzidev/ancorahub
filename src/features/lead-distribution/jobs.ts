@@ -143,7 +143,7 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
   const queuedLeads = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId })
     .from(schema.leads)
     .where(and(
-      eq(schema.leads.distributionStatus, "queued"),
+      inArray(schema.leads.distributionStatus, ["queued", "unassigned"]),
       isNull(schema.leads.corretorId),
       ne(schema.leads.qualificationState, "IN_PROGRESS"),
       ne(schema.leads.qualificationStatus, "qualifying"),

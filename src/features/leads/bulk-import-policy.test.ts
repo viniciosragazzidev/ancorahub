@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBulkImportDistributionState,
+  getBulkImportDistributionReadiness,
   getBulkImportQueuesForBranch,
   isAutomaticQueueAvailableForBulkImport,
   shouldQualifyBulkImportLead,
@@ -55,5 +56,37 @@ describe("bulk import distribution policy", () => {
       qualificationEngineEnabled: true,
       queueAiQualificationEnabled: null,
     })).toBe(true);
+  });
+
+  it("activates automatic distribution before importing into an operational unit", () => {
+    expect(getBulkImportDistributionReadiness({
+      acceptingLeads: true,
+      autoDistribute: false,
+      isDistributionHub: false,
+    })).toEqual({ allowed: true, activateAutoDistribution: true });
+  });
+
+  it("blocks imports that would leave leads parked in a paused unit", () => {
+    expect(getBulkImportDistributionReadiness({
+      acceptingLeads: false,
+      autoDistribute: false,
+      isDistributionHub: false,
+    })).toEqual({
+      allowed: false,
+      activateAutoDistribution: false,
+      reason: "A unidade está com o recebimento de leads pausado.",
+    });
+  });
+
+  it("does not activate the manual redistribution hub", () => {
+    expect(getBulkImportDistributionReadiness({
+      acceptingLeads: true,
+      autoDistribute: false,
+      isDistributionHub: true,
+    })).toEqual({
+      allowed: false,
+      activateAutoDistribution: false,
+      reason: "A Central de redistribuição não recebe distribuição automática.",
+    });
   });
 });

@@ -118,6 +118,7 @@ export function isDeferredDistributionReason(reason: string) {
     normalized.includes("fila configurada pertence") ||
     normalized.includes("nenhuma unidade elegível") ||
     normalized.includes("fila geral não possui unidades") ||
+    normalized.includes("próximo ciclo automático") ||
     normalized.includes("qualificação por ia") ||
     normalized.includes("qualificação em andamento")
   );
@@ -141,6 +142,13 @@ export function resolveQueueCandidateBranchIds(input: {
   return Array.from(new Set(list));
 }
 
+export function resolveDistributionPolicyScope(
+  queueId: string | null,
+  profileKey: string | null,
+) {
+  return { queueId, profileKey };
+}
+
 /** A distribution hub (Matriz) receives leads for human redistribution only. */
 export function isAutomaticDistributionBranch(branch: {
   status: "active" | "inactive";
@@ -157,15 +165,21 @@ export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds:
 
 export function resolveLeadOfferCycle(input: {
   eligibleBrokerIds: string[];
-  offers: Array<{ brokerId: string; status: string; expiresAt: Date }>;
+  offers: Array<{ brokerId: string; status: string; offeredAt?: Date; expiresAt: Date }>;
+  cycleStartedAt?: Date | null;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
+  const offers = input.cycleStartedAt
+    ? input.offers.filter(
+        (offer) => !offer.offeredAt || offer.offeredAt >= input.cycleStartedAt!,
+      )
+    : input.offers;
   const activeStatuses = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
-  const activeOffer = input.offers.find(
+  const activeOffer = offers.find(
     (offer) => activeStatuses.has(offer.status) && offer.expiresAt > now,
   );
-  const attemptedBrokerIds = new Set(input.offers.map((offer) => offer.brokerId));
+  const attemptedBrokerIds = new Set(offers.map((offer) => offer.brokerId));
   const remainingBrokerIds = input.eligibleBrokerIds.filter(
     (brokerId) => !attemptedBrokerIds.has(brokerId),
   );

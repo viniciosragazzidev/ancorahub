@@ -14,10 +14,15 @@ fluxo resiliente de ofertas WhatsApp da distribuição normal.
   idempotente, em vez de uma atribuição direta pela lógica legada;
 - o toggle de Qualificação IA da fila prevalece na importação: desligado significa
   `qualified`/`COMPLETED` e disparo imediato do processador, sem estado `pending`;
+- a importação ativa automaticamente a distribuição da unidade operacional e a
+  política exata da fila; unidade pausada ou Central é recusada antes de persistir;
+- o job recorrente recupera `queued` e `unassigned` e reinicia ciclos esgotados,
+  preservando o histórico e priorizando corretores com menor carga;
+- a rota legada do scheduler Coolify encaminha para o endpoint canônico de jobs;
 - o processador inicia um lote limitado imediatamente e preserva o restante para retry,
   respeitando janela comercial e a configuração global existente;
-- a oferta oficial continua sequencial: um corretor elegível por vez, confirmação
-  atômica no aceite e fallback manual apenas após o ciclo se esgotar.
+- a oferta oficial continua sequencial: um corretor elegível por vez e confirmação
+  atômica no aceite; ciclo esgotado reinicia automaticamente após o intervalo seguro.
 
 ## Arquivos principais
 
@@ -26,6 +31,10 @@ fluxo resiliente de ofertas WhatsApp da distribuição normal.
 - `src/features/leads/bulk-import.ts`
 - `src/features/leads/bulk-import-policy.ts`
 - `src/features/leads/bulk-import-policy.test.ts`
+- `src/features/lead-distribution/service.ts`
+- `src/features/lead-distribution/jobs.ts`
+- `src/app/api/internal/cron/distribution/route.ts`
+- `docs/runbooks/coolify-lead-distribution-scheduler.md`
 
 ## Segurança e auditoria
 
@@ -43,6 +52,9 @@ aceites e esgotamento separadamente, sem conteúdo de mensagem.
   157 arquivos de teste/708 testes aprovados e build aprovado. O lint geral terminou
   sem erros e com 1.110 avisos preexistentes; o lint dirigido não encontrou erro novo;
 - evidência integral em `reports/agent/verification/2026-09-10T12-28-12.230Z.md`.
+- validação incremental desta emenda: 43 testes dirigidos e build Next.js aprovados;
+  o harness integral de `2026-09-10T17-07-07.740Z` aprovou documentação, segurança e
+  type-check, mas foi interrompido após timeouts em testes globais de UI não relacionados.
 
 ## Rollback
 

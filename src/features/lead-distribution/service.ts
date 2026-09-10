@@ -5,7 +5,7 @@ import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, rankBrokers, resolveDistributionCandidate, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, type IntelligentDistributionPolicy } from "./domain";
+import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { isWithinBusinessHours } from "@/shared/time/business-hours";
@@ -94,9 +94,18 @@ function readDistributionPolicy(value: unknown): IntelligentDistributionPolicy {
 }
 
 async function loadDistributionPolicy(tenantId: string, queueId: string | null, profileKey: string | null) {
+  const scope = resolveDistributionPolicyScope(queueId, profileKey);
   const [row] = await getDatabase().select({ enabled: schema.leadDistributionPolicies.enabled, policy: schema.leadDistributionPolicies.policy })
     .from(schema.leadDistributionPolicies)
-    .where(and(eq(schema.leadDistributionPolicies.tenantId, tenantId), queueId ? eq(schema.leadDistributionPolicies.queueId, queueId) : undefined, profileKey ? eq(schema.leadDistributionPolicies.profileKey, profileKey) : undefined))
+    .where(and(
+      eq(schema.leadDistributionPolicies.tenantId, tenantId),
+      scope.queueId
+        ? eq(schema.leadDistributionPolicies.queueId, scope.queueId)
+        : isNull(schema.leadDistributionPolicies.queueId),
+      scope.profileKey
+        ? eq(schema.leadDistributionPolicies.profileKey, scope.profileKey)
+        : isNull(schema.leadDistributionPolicies.profileKey),
+    ))
     .orderBy(asc(schema.leadDistributionPolicies.createdAt)).limit(1);
   return { enabled: row?.enabled ?? true, value: readDistributionPolicy(row?.policy) };
 }
@@ -383,6 +392,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     qualificationProfileKey: schema.leads.qualificationProfileKey,
     qualificationState: schema.leads.qualificationState,
     qualificationStatus: schema.leads.qualificationStatus,
+    distributionUpdatedAt: schema.leads.distributionUpdatedAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.distributionStatus, ["queued", "unassigned"]), isNull(schema.leads.corretorId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
@@ -420,6 +430,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     .select({
       brokerId: schema.leadOffers.brokerId,
       status: schema.leadOffers.status,
+      offeredAt: schema.leadOffers.offeredAt,
       expiresAt: schema.leadOffers.expiresAt,
     })
     .from(schema.leadOffers)
@@ -427,6 +438,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const offerCycle = resolveLeadOfferCycle({
     eligibleBrokerIds: brokers.map((broker) => broker.id),
     offers: offerHistory,
+    cycleStartedAt: lead.distributionUpdatedAt,
   });
   if (offerCycle.activeBrokerId && offerCycle.activeExpiresAt) {
     return {
@@ -443,16 +455,16 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const remainingBrokers = brokers.filter((broker) => remainingBrokerSet.has(broker.id));
   if (offerCycle.exhausted) {
     const manualAt = new Date();
-    const reason = "Todos os corretores elegíveis já receberam esta oferta sem aceite. Lead encaminhado para distribuição manual.";
-    const markedManual = await db.transaction(async (tx) => {
+    const reason = "Todos os corretores elegíveis concluíram este ciclo sem aceite. Lead aguardando o próximo ciclo automático de ofertas.";
+    const restartedCycle = await db.transaction(async (tx) => {
       const changed = await tx
         .update(schema.leads)
         .set({
           corretorId: null,
           status: "new",
-          distributionStatus: "unassigned",
+          distributionStatus: "queued",
           assignedAt: null,
-          assignmentSource: "manual_pending",
+          assignmentSource: "automatic_retry",
           distributionUpdatedAt: manualAt,
           stageEnteredAt: manualAt,
         })
@@ -475,7 +487,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         toBranchId: lead.branchId,
         fromQueueId: lead.queueId,
         toQueueId: lead.queueId,
-        action: "offer_cycle_exhausted",
+        action: "offer_cycle_restarted",
         source: "redistribution",
         strategy: "automatic",
         reason,
@@ -488,13 +500,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         userId: context.userId,
         entidade: "lead_distribution",
         entidadeId: leadId,
-        acao: "lead.offer_cycle_exhausted",
+        acao: "lead.offer_cycle_restarted",
       });
       return true;
     });
 
-    return markedManual
-      ? { status: "manual_required", leadId, reason }
+    return restartedCycle
+      ? { status: "queued", leadId, reason }
       : { status: "conflict", leadId, reason: "O estado do lead mudou durante a redistribuição." };
   }
 

@@ -47,3 +47,28 @@ export function shouldQualifyBulkImportLead(input: {
     input.queueAiQualificationEnabled !== false
   );
 }
+
+export function getBulkImportDistributionReadiness(branch: {
+  acceptingLeads: boolean;
+  autoDistribute: boolean;
+  isDistributionHub: boolean;
+}) {
+  if (branch.isDistributionHub) {
+    return {
+      allowed: false as const,
+      activateAutoDistribution: false as const,
+      reason: "A Central de redistribuição não recebe distribuição automática.",
+    };
+  }
+  if (!branch.acceptingLeads) {
+    return {
+      allowed: false as const,
+      activateAutoDistribution: false as const,
+      reason: "A unidade está com o recebimento de leads pausado.",
+    };
+  }
+  return {
+    allowed: true as const,
+    activateAutoDistribution: !branch.autoDistribute,
+  };
+}

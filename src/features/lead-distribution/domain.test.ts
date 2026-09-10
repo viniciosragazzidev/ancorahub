@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveLeadOfferCycle, resolveQueueCandidateBranchIds } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds } from "./domain";
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -100,7 +100,7 @@ describe("lead distribution domain", () => {
     expect(cycle.exhausted).toBe(false);
   });
 
-  it("requires manual distribution only after every eligible broker was attempted", () => {
+  it("marks the current cycle exhausted after every eligible broker was attempted", () => {
     const now = new Date("2026-09-08T15:10:00Z");
     const cycle = resolveLeadOfferCycle({
       eligibleBrokerIds: ["broker-a", "broker-b"],
@@ -113,6 +113,23 @@ describe("lead distribution domain", () => {
 
     expect(cycle.remainingBrokerIds).toEqual([]);
     expect(cycle.exhausted).toBe(true);
+  });
+
+  it("starts a new automatic cycle without deleting the previous offer history", () => {
+    const cycleStartedAt = new Date("2026-09-10T15:00:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        { brokerId: "broker-a", status: "DECLINED", offeredAt: new Date("2026-09-10T14:00:00Z"), expiresAt: cycleStartedAt },
+        { brokerId: "broker-b", status: "EXPIRED", offeredAt: new Date("2026-09-10T14:05:00Z"), expiresAt: cycleStartedAt },
+      ],
+      cycleStartedAt,
+      now: new Date("2026-09-10T15:02:00Z"),
+    });
+
+    expect(cycle.attemptedBrokerIds.size).toBe(0);
+    expect(cycle.remainingBrokerIds).toEqual(["broker-a", "broker-b"]);
+    expect(cycle.exhausted).toBe(false);
   });
 
   it("treats unavailable-channel attempts as consumed and advances immediately", () => {
@@ -183,5 +200,16 @@ describe("lead distribution domain", () => {
   it("keeps the Matriz available for human redistribution but out of automatic distribution", () => {
     expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: true })).toBe(false);
     expect(isAutomaticDistributionBranch({ status: "active", acceptingLeads: true, autoDistribute: true, isDistributionHub: false })).toBe(true);
+  });
+
+  it("keeps the automatic policy lookup inside the exact queue and profile scope", () => {
+    expect(resolveDistributionPolicyScope(null, null)).toEqual({
+      queueId: null,
+      profileKey: null,
+    });
+    expect(resolveDistributionPolicyScope("queue-a", null)).toEqual({
+      queueId: "queue-a",
+      profileKey: null,
+    });
   });
 });

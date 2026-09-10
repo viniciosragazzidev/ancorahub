@@ -17,6 +17,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
 import {
   buildBulkImportDistributionState,
+  getBulkImportDistributionReadiness,
   isAutomaticQueueAvailableForBulkImport,
   shouldQualifyBulkImportLead,
 } from "./bulk-import-policy";
@@ -78,12 +79,19 @@ export async function importLeadsFromCsvAction(formData: FormData) {
 
     const db = getDatabase();
     const [branch] = await db
-      .select({ id: schema.branches.id })
+      .select({
+        id: schema.branches.id,
+        acceptingLeads: schema.branches.acceptingLeads,
+        autoDistribute: schema.branches.autoDistribute,
+        isDistributionHub: schema.branches.isDistributionHub,
+      })
       .from(schema.branches)
       .where(and(eq(schema.branches.id, branchId), eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active")))
       .limit(1);
 
     if (!branch) throw new Error("A unidade selecionada não pertence à corretora ativa.");
+    const distributionReadiness = getBulkImportDistributionReadiness(branch);
+    if (!distributionReadiness.allowed) throw new Error(distributionReadiness.reason);
 
     // Check if AI qualification is enabled globally for this tenant
     const isQualificationEngineActive =
@@ -128,6 +136,58 @@ export async function importLeadsFromCsvAction(formData: FormData) {
     });
     const rows = parseCsv(await input.file.text());
     const tipoImport = formData.get("tipo") === "PME" ? "PME" : "PF";
+
+    const [pausedPolicy] = await db
+      .select({ id: schema.leadDistributionPolicies.id })
+      .from(schema.leadDistributionPolicies)
+      .where(and(
+        eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
+        targetQueueId
+          ? eq(schema.leadDistributionPolicies.queueId, targetQueueId)
+          : isNull(schema.leadDistributionPolicies.queueId),
+        isNull(schema.leadDistributionPolicies.profileKey),
+        eq(schema.leadDistributionPolicies.enabled, false),
+      ))
+      .limit(1);
+
+    if (distributionReadiness.activateAutoDistribution || pausedPolicy) {
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        if (distributionReadiness.activateAutoDistribution) {
+          await tx
+            .update(schema.branches)
+            .set({ autoDistribute: true, updatedAt: now })
+            .where(and(
+              eq(schema.branches.id, branch.id),
+              eq(schema.branches.tenantId, context.tenantId),
+              eq(schema.branches.autoDistribute, false),
+            ));
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId: context.userId,
+            entidade: "branch",
+            entidadeId: branch.id,
+            acao: "bulk_import.auto_distribution_activated",
+          });
+        }
+        if (pausedPolicy) {
+          await tx
+            .update(schema.leadDistributionPolicies)
+            .set({ enabled: true, updatedBy: context.userId, updatedAt: now })
+            .where(and(
+              eq(schema.leadDistributionPolicies.id, pausedPolicy.id),
+              eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
+            ));
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId: context.userId,
+            entidade: "lead_distribution_policy",
+            entidadeId: pausedPolicy.id,
+            acao: "bulk_import.distribution_policy_activated",
+          });
+        }
+      });
+    }
 
     let imported = 0;
     let duplicates = 0;

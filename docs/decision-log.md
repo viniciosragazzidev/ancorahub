@@ -958,3 +958,12 @@ global para decidir a passagem pela IA. Quando `aiQualificationEnabled` estiver
 desativado na fila selecionada, o lead importado nasce `qualified` e com a etapa de
 qualificação `COMPLETED`; o job de distribuição é enfileirado e tentado imediatamente,
 sem criar sessão de IA nem permanecer em `pending`.
+
+**Emenda aprovada em 2026-09-10.** Uma importação para unidade operacional ativa
+liga `autoDistribute` e reativa a política de distribuição do escopo exato da fila,
+com auditoria. Unidade com recebimento pausado e Central de redistribuição são
+recusadas antes da criação de qualquer lead. O executor recorrente recupera estados
+`queued` e `unassigned`; ao esgotar todos os corretores sem aceite, abre novo ciclo
+automático após o intervalo do job, preservando as ofertas anteriores. A atribuição
+definitiva continua dependendo do aceite atômico e o kill switch global do
+Super-admin continua prevalecendo.
