@@ -4,6 +4,7 @@ import {
   buildBulkImportDistributionState,
   getBulkImportQueuesForBranch,
   isAutomaticQueueAvailableForBulkImport,
+  shouldQualifyBulkImportLead,
 } from "./bulk-import-policy";
 
 describe("bulk import distribution policy", () => {
@@ -37,6 +38,22 @@ describe("bulk import distribution policy", () => {
       assignmentSource: null,
       assignmentStrategy: null,
       assignedAt: null,
+      qualificationStatus: "qualified",
+      qualificationState: "COMPLETED",
     });
+  });
+
+  it("bypasses IA when the selected queue has qualification disabled", () => {
+    expect(shouldQualifyBulkImportLead({
+      qualificationEngineEnabled: true,
+      queueAiQualificationEnabled: false,
+    })).toBe(false);
+  });
+
+  it("uses the global qualification decision when no queue override exists", () => {
+    expect(shouldQualifyBulkImportLead({
+      qualificationEngineEnabled: true,
+      queueAiQualificationEnabled: null,
+    })).toBe(true);
   });
 });

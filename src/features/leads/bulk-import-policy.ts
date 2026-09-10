@@ -3,6 +3,7 @@ export type BulkImportQueue = {
   name: string;
   branchId: string | null;
   assignmentMode?: string;
+  aiQualificationEnabled?: boolean;
 };
 
 export function getBulkImportQueuesForBranch(
@@ -32,5 +33,17 @@ export function buildBulkImportDistributionState() {
     assignmentSource: null,
     assignmentStrategy: null,
     assignedAt: null,
+    qualificationStatus: "qualified" as const,
+    qualificationState: "COMPLETED" as const,
   };
+}
+
+export function shouldQualifyBulkImportLead(input: {
+  qualificationEngineEnabled: boolean;
+  queueAiQualificationEnabled: boolean | null;
+}) {
+  return (
+    input.qualificationEngineEnabled &&
+    input.queueAiQualificationEnabled !== false
+  );
 }

@@ -12,6 +12,8 @@ fluxo resiliente de ofertas WhatsApp da distribuição normal.
 - a fila escolhida é revalidada no servidor por tenant, unidade, estado, exclusão e modo;
 - leads sem qualificação automática são persistidos sem owner e recebem job durável e
   idempotente, em vez de uma atribuição direta pela lógica legada;
+- o toggle de Qualificação IA da fila prevalece na importação: desligado significa
+  `qualified`/`COMPLETED` e disparo imediato do processador, sem estado `pending`;
 - o processador inicia um lote limitado imediatamente e preserva o restante para retry,
   respeitando janela comercial e a configuração global existente;
 - a oferta oficial continua sequencial: um corretor elegível por vez, confirmação
@@ -34,13 +36,13 @@ aceites e esgotamento separadamente, sem conteúdo de mensagem.
 
 ## Validação
 
-- `npx vitest run src/features/leads/bulk-import-policy.test.ts src/features/lead-distribution/domain.test.ts src/features/lead-distribution/jobs.test.ts src/features/communication-channels/templates.test.ts`: 33 testes aprovados;
+- `npx vitest run src/features/leads/bulk-import-policy.test.ts src/features/lead-distribution/domain.test.ts src/features/lead-distribution/jobs.test.ts src/features/communication-channels/templates.test.ts`: cobertura da fila, bypass da IA, estado qualificado, jobs e templates aprovada;
 - `npm run type-check`: aprovado;
 - `npm run build`: aprovado;
 - `npm run agent:verify -- --level full`: documentação e segurança aprovadas,
-  157 arquivos de teste/706 testes aprovados e build aprovado. O lint geral terminou
+  157 arquivos de teste/708 testes aprovados e build aprovado. O lint geral terminou
   sem erros e com 1.110 avisos preexistentes; o lint dirigido não encontrou erro novo;
-- evidência integral em `reports/agent/verification/2026-09-10T11-22-40.435Z.md`.
+- evidência integral em `reports/agent/verification/2026-09-10T12-28-12.230Z.md`.
 
 ## Rollback
 

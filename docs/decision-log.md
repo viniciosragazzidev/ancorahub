@@ -952,3 +952,9 @@ recusa, expiração ou canal indisponível e só grava o owner após aceite atô
 execução imediata é limitada ao lote operacional do processador; o restante permanece
 persistido para recuperação, respeitando janela comercial, capacidade e controles do
 Super-admin já existentes.
+
+**Emenda aprovada em 2026-09-10.** O toggle da fila prevalece sobre a habilitação
+global para decidir a passagem pela IA. Quando `aiQualificationEnabled` estiver
+desativado na fila selecionada, o lead importado nasce `qualified` e com a etapa de
+qualificação `COMPLETED`; o job de distribuição é enfileirado e tentado imediatamente,
+sem criar sessão de IA nem permanecer em `pending`.

@@ -18,6 +18,7 @@ import { startAiQualificationForLead } from "@/features/ai-qualification/service
 import {
   buildBulkImportDistributionState,
   isAutomaticQueueAvailableForBulkImport,
+  shouldQualifyBulkImportLead,
 } from "./bulk-import-policy";
 
 const MAX_FILE_BYTES = 2_000_000;
@@ -96,6 +97,7 @@ export async function importLeadsFromCsvAction(formData: FormData) {
             id: schema.leadQueues.id,
             branchId: schema.leadQueues.branchId,
             assignmentMode: schema.leadQueues.assignmentMode,
+            aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
           })
           .from(schema.leadQueues)
           .where(and(
@@ -120,6 +122,10 @@ export async function importLeadsFromCsvAction(formData: FormData) {
           : "A fila selecionada pertence a outra unidade.",
       );
     }
+    const shouldQualifyLead = shouldQualifyBulkImportLead({
+      qualificationEngineEnabled: isQualificationEngineActive,
+      queueAiQualificationEnabled: targetQueue?.aiQualificationEnabled ?? null,
+    });
     const rows = parseCsv(await input.file.text());
     const tipoImport = formData.get("tipo") === "PME" ? "PME" : "PF";
 
@@ -153,7 +159,7 @@ export async function importLeadsFromCsvAction(formData: FormData) {
 
         const leadId = randomUUID();
 
-        if (isQualificationEngineActive) {
+        if (shouldQualifyLead) {
           // Qualification Engine Active: Lead enters qualification first, and is targeted to targetQueueId
           await db.transaction(async (tx) => {
             await tx.insert(schema.leads).values({
@@ -221,7 +227,6 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               sourceChannel: "bulk_import",
               sourceCampaign: campanha,
               sourceMetadata: { import: "csv", targetQueueId },
-              qualificationStatus: "pending",
               distributionUpdatedAt: new Date(),
               consentimentoLgpd: true,
             });
@@ -262,7 +267,7 @@ export async function importLeadsFromCsvAction(formData: FormData) {
       }
     }
 
-    if (imported > 0 && !isQualificationEngineActive) {
+    if (imported > 0 && !shouldQualifyLead) {
       try {
         await runLeadDistributionProcessor({
           tenantId: context.tenantId,
