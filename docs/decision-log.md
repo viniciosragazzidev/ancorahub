@@ -434,6 +434,7 @@ capacidade global, da configuração do tenant e do registro individual da ferra
 | DEC-027 | No estouro do SLA de primeiro contato, o owner anterior é removido antes de qualquer nova atribuição. Leads originados pelo Diretor usam a fila central da corretora mãe: tentam outro corretor elegível na unidade e, se não houver, retornam à fila central para nova distribuição. Leads originados pelo Gestor permanecem na fila da unidade para distribuição manual. A origem é persistida, toda transição é auditada e o corretor que perdeu o SLA é excluído da tentativa imediata. | Aprovada — 2026-07-16 | Solicitação do usuário; implementação de `feedback-sla` e distribuição |
 | DEC-028 | Notificações operacionais devem ser publicadas por um serviço central com registro in-app/Realtime e push coordenados. Cada capacidade possui uma chave global reversível controlada pelo Super-admin; quando desativada, nenhum dos dois canais é emitido para o evento. O catálogo e a auditoria da configuração são obrigatórios. | Aprovada — 2026-07-16 | Solicitação do usuário; correção de toast junto com push |
 | DEC-027A | Emenda de 2026-09-08 à DEC-027: qualquer retomada automática por SLA usa o mesmo ciclo sequencial da DEC-049. O owner anterior é removido e passa a contar como tentativa consumida; Diretor e Gestor não desviam para distribuição manual enquanto existir corretor elegível ainda não tentado. A intervenção manual só ocorre após esgotamento do ciclo ou quando não há caminho automático utilizável. Esta emenda prevalece sobre o fallback manual descrito originalmente na DEC-027. | Aprovada — 2026-09-08 | Solicitação do usuário; unificação da redistribuição automática |
+| DEC-027B | Emenda de 2026-09-10 à DEC-027/027A: no estouro do SLA sem primeiro contato, o owner atual não é removido antes da escolha. O motor seleciona outro corretor ativo, disponível, escalado quando aplicável e com telefone utilizável, exclui o owner atual e persiste a troca diretamente de um corretor para o outro. Se não houver substituto elegível ou a escrita concorrente falhar, mantém o owner atual e alerta a gestão; `queued` e `unassigned` não são estados intermediários permitidos nesse handoff. A troca reinicia o SLA, incrementa a redistribuição, é auditada e dispara o aviso oficial de novo lead. O kill switch global de SLA do Super-admin permanece aplicável. | Aprovada — 2026-09-10 | Solicitação do usuário; nenhum lead órfão durante redistribuição por SLA |
 
 ## DEC-033 — WhatsApp Cloud API oficial com Embedded Signup
 
@@ -661,7 +662,7 @@ O CorreTop adota o fluxo de ofertas em duas etapas para distribuição de novos 
 4. **Rotação Sequencial até Aceite:** existe no máximo uma oferta ativa por lead. Recusa, expiração ou impossibilidade de enfileirar a oferta consome aquela tentativa e devolve o lead imediatamente ao mesmo motor, que escolhe o próximo corretor elegível ainda não tentado. O lead permanece sem `corretorId` durante todo esse ciclo e só ganha owner após aceite atômico. A distribuição manual é o fallback terminal somente quando todos os corretores elegíveis foram tentados sem aceite ou quando não existe caminho automático utilizável sob as regras canônicas da fila.
 5. **Resiliência e Fallbacks:** Todos os 4 modelos contam com geradores automáticos de mensagens de texto alternativas caso a entrega do modelo oficial falhe. Toda transição é registrada nos logs de auditoria.
 
-**Emenda aprovada em 2026-09-08:** a rotação sequencial acima também se aplica às retomadas por estouro de SLA. O corretor que perdeu o SLA deixa de ser owner antes da nova oferta e não pode receber novamente o mesmo lead no ciclo atual.
+**Emenda aprovada em 2026-09-10:** a oferta em duas etapas continua sendo a regra para leads novos. Para um lead já atribuído cujo SLA de primeiro contato venceu, a DEC-027B prevalece: o owner atual é mantido até a confirmação transacional de outro corretor elegível, evitando qualquer estado intermediário sem responsável.
 ## DEC-050 - Qualificação inicial opcional por IA no canal oficial
 
 **Estado:** Aceita  
@@ -967,3 +968,11 @@ recusadas antes da criação de qualquer lead. O executor recorrente recupera es
 automático após o intervalo do job, preservando as ofertas anteriores. A atribuição
 definitiva continua dependendo do aceite atômico e o kill switch global do
 Super-admin continua prevalecendo.
+
+**Emenda aprovada em 2026-09-10.** A área de leads sem atribuição oferece uma
+recuperação administrativa em lote. Diretor pode reenfileirar o tenant e Gestor
+somente a própria unidade. Leads em qualificação, perdidos, convertidos ou
+desqualificados não entram na ação. O comando não escolhe nem grava um corretor:
+ele reabre o trabalho idempotente e a atribuição continua ocorrendo somente após
+o aceite atômico de uma oferta válida. A solicitação gera auditoria e permanece
+sujeita à janela operacional, elegibilidade, canal corporativo e kill switch.

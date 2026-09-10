@@ -490,3 +490,12 @@ de métricas entre tenants.
   cumprir o fluxo automático prometido pelo formulário.
 - O texto de apoio explica que cada lead será ofertado sequencialmente aos corretores
   elegíveis até aceite, sem alterar componentes ou tokens compartilhados.
+
+## 2026-09-10 — recuperação dos leads sem atribuição
+
+- A aba `Sem atribuição` de `/leads` ganhou a ação contextual `Distribuir todos` para
+  Diretor e Gestor.
+- O estado de carregamento impede disparos repetidos, e o retorno informa quantos leads
+  operacionais foram reenfileirados ou por que nenhum estava pronto.
+- A ação reutiliza o botão, o toast e os tokens existentes; não cria uma segunda Home de
+  distribuição nem substitui o aceite do corretor por atribuição direta.

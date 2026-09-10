@@ -18,7 +18,9 @@ import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/featur
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -461,6 +463,107 @@ export async function distributeLeadAutomaticallyAction(
     return {
       mutationId,
       error: error instanceof Error ? error.message : "Não foi possível distribuir o lead.",
+    };
+  }
+}
+
+export async function distributeAllUnassignedLeadsAction(): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
+
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director" && context.role !== "manager") {
+      return { mutationId, error: "Você não pode iniciar a distribuição de todos os leads." };
+    }
+
+    const db = getDatabase();
+    const unassignedLeads = await db
+      .select({
+        id: schema.leads.id,
+        status: schema.leads.status,
+        distributionStatus: schema.leads.distributionStatus,
+        qualificationState: schema.leads.qualificationState,
+        qualificationStatus: schema.leads.qualificationStatus,
+      })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.corretorId),
+        isNull(schema.leads.deletedAt),
+        context.role === "manager" && context.branchId
+          ? eq(schema.leads.branchId, context.branchId)
+          : undefined,
+      ));
+
+    const candidateIds = selectBulkDistributionCandidateIds(unassignedLeads);
+    if (!candidateIds.length) {
+      return {
+        success: true,
+        mutationId,
+        processed: 0,
+        message: "Não há leads operacionais prontos para distribuição.",
+      };
+    }
+
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.leads)
+        .set({
+          distributionStatus: "queued",
+          assignmentSource: "system_recovery",
+          distributionUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.leads.tenantId, context.tenantId),
+          inArray(schema.leads.id, candidateIds),
+          isNull(schema.leads.corretorId),
+        ));
+
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_distribution",
+        entidadeId: context.tenantId,
+        acao: "lead.bulk_distribution_requested",
+      });
+    });
+
+    await runWithConcurrency(candidateIds, 10, async (id) => {
+      await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: id });
+    });
+
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: context.role === "manager" && context.branchId ? [context.branchId] : undefined,
+    }).catch(() => {});
+
+    scheduleAfterResponse("lead-distribution-bulk-recovery", async () => {
+      const maxPasses = Math.min(Math.ceil(candidateIds.length / 25), 8);
+      for (let pass = 0; pass < maxPasses; pass += 1) {
+        const result = await runLeadDistributionProcessor({
+          tenantId: context.tenantId,
+          limit: 100,
+        });
+        if (result.claimed === 0) break;
+      }
+    });
+
+    return {
+      success: true,
+      mutationId,
+      processed: candidateIds.length,
+      processedLeadIds: candidateIds,
+      message: `${candidateIds.length} lead${candidateIds.length === 1 ? "" : "s"} enviado${candidateIds.length === 1 ? "" : "s"} para a distribuição automática.`,
+    };
+  } catch (error) {
+    return {
+      mutationId,
+      error: error instanceof Error
+        ? error.message
+        : "Não foi possível iniciar a distribuição dos leads.",
     };
   }
 }

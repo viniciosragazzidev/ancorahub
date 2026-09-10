@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, UserSwitch, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ArrowsClockwise, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, UserSwitch, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
 import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +34,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
+import { distributeAllUnassignedLeadsAction } from "@/features/lead-distribution/actions";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
@@ -237,6 +238,7 @@ export function LeadsWorkspace({
   const [activeTab, setActiveTab] = useState<string>(() => initialView ?? (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isDistributingAll, startDistribution] = useTransition();
 
   const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
     const saved = loadKanbanConfig();
@@ -333,6 +335,23 @@ export function LeadsWorkspace({
   const unassignedCount = unassignedLeads.length;
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
+
+  const handleDistributeAll = useCallback(() => {
+    startDistribution(async () => {
+      const result = await distributeAllUnassignedLeadsAction();
+      if (result.error) {
+        toast.error("Não foi possível distribuir os leads", {
+          description: result.error,
+        });
+        return;
+      }
+
+      toast.success("Distribuição iniciada", {
+        description: result.message,
+      });
+      router.refresh();
+    });
+  }, [router]);
 
   const applyLeadPatch = useCallback((leadIds: string[], patch: (lead: LeadWorkspaceItem) => LeadWorkspaceItem) => {
     const changedIds = new Set(leadIds);
@@ -743,6 +762,24 @@ export function LeadsWorkspace({
               />
             ) : (
               <div className="space-y-4">
+                <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Recuperar leads sem corretor</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Reenvia todos os leads elegíveis para as ofertas automáticas da fila.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isDistributingAll}
+                    onClick={handleDistributeAll}
+                  >
+                    <ArrowsClockwise className="size-4" />
+                    {isDistributingAll ? "Distribuindo..." : "Distribuir todos"}
+                  </Button>
+                </div>
                 <SelectionToolbar
                   selectedCount={multiSelect.count}
                   totalCount={unassignedLeads.length}

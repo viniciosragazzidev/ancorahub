@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
@@ -416,7 +416,32 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const activeBranches = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, autoDistribute: schema.branches.autoDistribute, isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), inArray(schema.branches.id, requestedBranchIds)));
   const targetBranchIds = activeBranches.filter(isAutomaticDistributionBranch).map((branch) => branch.id);
   if (!targetBranchIds.length) return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
-  const allBrokers = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId, createdAt: schema.user.createdAt }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), inArray(schema.tenantMemberships.branchId, targetBranchIds), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(asc(schema.user.createdAt));
+  const allBrokers = await db
+    .select({
+      id: schema.user.id,
+      branchId: schema.tenantMemberships.branchId,
+      createdAt: schema.user.createdAt,
+    })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+    .innerJoin(
+      schema.brokerProfiles,
+      and(
+        eq(schema.brokerProfiles.userId, schema.user.id),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+        isNotNull(schema.brokerProfiles.phone),
+      ),
+    )
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      inArray(schema.tenantMemberships.branchId, targetBranchIds),
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      eq(schema.tenantMemberships.availabilityStatus, "available"),
+      eq(schema.user.active, true),
+      eq(schema.user.status, "active"),
+    ))
+    .orderBy(asc(schema.user.createdAt));
   const rosterResults = await Promise.all(targetBranchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId)] as const));
   const rosterByBranch = new Map(rosterResults);
   const allowedBrokerSet = intelligentPolicy.value.allowedBrokerIds?.length ? new Set(intelligentPolicy.value.allowedBrokerIds) : null;

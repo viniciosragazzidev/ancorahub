@@ -4,11 +4,14 @@ import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
-import { notifyLeadReassigned, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
-import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { assignLeadToBroker } from "@/features/lead-distribution/service";
+import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 type SlaKind = "lead_unworked" | "lead_warning_10m" | "lead_stalled";
@@ -22,7 +25,6 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     id: schema.tenants.id,
     firstContactMinutes: schema.tenants.slaFirstContactMinutes,
     stagnantDays: schema.tenants.slaStagnantDays,
-    autoRedistribute: schema.tenants.autoRedistributeOnFeedbackTimeout,
   })
     .from(schema.tenants).where(tenantId ? eq(schema.tenants.id, tenantId) : eq(schema.tenants.status, "active"));
   let unworked = 0;
@@ -66,13 +68,6 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     const recipients = await db.select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
       .from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["manager", "director"])));
     
-    const [anyActiveMember] = await db
-      .select({ userId: schema.tenantMemberships.userId })
-      .from(schema.tenantMemberships)
-      .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active")))
-      .limit(1);
-    const systemUserId = anyActiveMember?.userId;
-
     const leadIds = leads.map((lead) => lead.id);
     const existing = await db.select({ recipientUserId: schema.notifications.recipientUserId, leadId: schema.notifications.leadId, type: schema.notifications.type })
       .from(schema.notifications).where(and(eq(schema.notifications.tenantId, tenant.id), inArray(schema.notifications.leadId, leadIds), gte(schema.notifications.createdAt, new Date(now - 24 * 60 * 60 * 1000))));
@@ -93,100 +88,47 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       if (kind === "lead_unworked") {
         unworked += 1;
 
-        if (tenant.autoRedistribute === false) {
-          for (const recipient of recipients) {
-            await publishNotification({
-              capability: "lead_assignment",
-              tenantId: tenant.id,
-              recipientUserId: recipient.userId,
-              leadId: lead.id,
-              type: "lead_unworked",
-              title: "Lead aguardando início de atendimento ⚠️",
-              message: `O lead "${lead.nome}" ultrapassou o tempo limite de ${firstContactMinutes} minutos sem início de atendimento.`,
-              pushTitle: "Alerta de SLA ⚠️",
-              pushBody: `"${lead.nome}" ultrapassou ${firstContactMinutes} minutos sem primeiro contato.`,
-              url: `/leads/${lead.id}`,
-              tag: "corretop-leads",
-            }).catch(console.error);
-          }
-          continue;
-        }
-
-        // Save previous owner to exclude them from the next automatic offer cycle.
+        // Keep the current owner until the replacement is committed. This avoids
+        // exposing an intermediate queued/unassigned state if selection or
+        // notification fails during the SLA handoff.
         const previousOwnerId = lead.corretorId;
-        const currentRedistributions = lead.redistributionCount ?? 0;
-        const updateTime = new Date();
-        await db.transaction(async (tx) => {
-          await tx.update(schema.leads)
-            .set({
-              corretorId: null,
-              status: "new",
-              distributionStatus: "queued",
-              redistributionCount: currentRedistributions + 1,
-              assignedAt: null,
-              assignmentSource: "redistribution",
-              stageEnteredAt: updateTime,
-              distributionUpdatedAt: updateTime,
-              firstContactAt: null,
-              serviceStartedAt: null,
-              serviceStartedBy: null,
-            })
-            .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, tenant.id)));
+        const automationActor = recipients.find((recipient) => recipient.role === "director");
+        const nextBrokerId = previousOwnerId
+          ? await chooseAvailableBroker(tenant.id, lead.branchId, previousOwnerId, lead.webhookCredentialId)
+          : null;
 
-          if (previousOwnerId) {
-            const [existingOffer] = await tx
-              .select({ id: schema.leadOffers.id })
-              .from(schema.leadOffers)
-              .where(
-                and(
-                  eq(schema.leadOffers.tenantId, tenant.id),
-                  eq(schema.leadOffers.leadId, lead.id),
-                  eq(schema.leadOffers.brokerId, previousOwnerId),
-                ),
-              )
-              .limit(1);
-            if (!existingOffer) {
-              await tx.insert(schema.leadOffers).values({
-                id: randomUUID(),
-                tenantId: tenant.id,
-                leadId: lead.id,
-                brokerId: previousOwnerId,
-                status: "EXPIRED",
-                offeredAt: lead.assignedAt ?? updateTime,
-                expiresAt: updateTime,
-                createdAt: updateTime,
-                updatedAt: updateTime,
-              });
-            }
+        if (previousOwnerId && automationActor && nextBrokerId) {
+          const reassigned = await assignLeadToBroker(
+            {
+              tenantId: tenant.id,
+              userId: automationActor.userId,
+              role: "director",
+              jobTitle: "director",
+              branchId: null,
+            },
+            lead.id,
+            nextBrokerId,
+            "redistribution",
+            `Reatribuição direta por estouro do SLA de primeiro contato (${firstContactMinutes} minutos).`,
+            previousOwnerId,
+            lead.branchId ?? undefined,
+          );
+
+          if (reassigned.status === "assigned") {
+            await db.update(schema.leads)
+              .set({ redistributionCount: (lead.redistributionCount ?? 0) + 1 })
+              .where(and(
+                eq(schema.leads.id, lead.id),
+                eq(schema.leads.tenantId, tenant.id),
+                eq(schema.leads.corretorId, nextBrokerId),
+              ));
+
+            await runLeadEffectOutboxProcessor({ tenantId: tenant.id, leadId: lead.id, limit: 5 });
+            await processMetaOutboundBatch(10, tenant.id);
+            void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: nextBrokerId }).catch(() => {});
           }
-
-          if (systemUserId) {
-            await tx.insert(schema.leadInteractions).values({
-              id: randomUUID(),
-              leadId: lead.id,
-              userId: systemUserId,
-              tipo: "system_alert",
-              conteudo: `Lead devolvido ao ciclo automático por estouro de SLA. O corretor anterior foi excluído da próxima tentativa.`,
-            });
-            await tx.insert(schema.auditLogs).values({
-              id: randomUUID(),
-              userId: systemUserId,
-              entidade: "lead",
-              entidadeId: lead.id,
-              acao: "lead.redistributed_sla",
-            });
-          }
-        });
-
-        await enqueueAndProcessLeadDistribution({
-          tenantId: tenant.id,
-          leadId: lead.id,
-          source: "sla_timeout",
-        });
-
-        if (previousOwnerId) {
-          void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
-          void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
         }
 
       } else if (kind === "lead_warning_10m") {

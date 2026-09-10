@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, eq, gt, inArray, isNull, lte, not, or } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNotNull, lte, not } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
@@ -67,10 +67,19 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
       .select({ id: schema.user.id, createdAt: schema.user.createdAt })
       .from(schema.user)
       .innerJoin(schema.tenantMemberships, eq(schema.tenantMemberships.userId, schema.user.id))
+      .innerJoin(
+        schema.brokerProfiles,
+        and(
+          eq(schema.brokerProfiles.userId, schema.user.id),
+          eq(schema.brokerProfiles.tenantId, tenantId),
+          isNotNull(schema.brokerProfiles.phone),
+        ),
+      )
       .where(and(
         eq(schema.tenantMemberships.tenantId, tenantId),
         eq(schema.tenantMemberships.branchId, branchId),
         eq(schema.tenantMemberships.role, "broker"),
+        eq(schema.tenantMemberships.jobTitle, "broker"),
         eq(schema.tenantMemberships.status, "active"),
         eq(schema.tenantMemberships.availabilityStatus, "available"),
         eq(schema.user.active, true),
