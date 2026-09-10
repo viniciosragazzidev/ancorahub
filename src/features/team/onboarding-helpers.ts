@@ -54,6 +54,7 @@ export async function createBrokerInvitation(
     .set({ status: "REPLACED", revokedAt: new Date() })
     .where(
       and(
+        eq(schema.brokerInvitations.tenantId, tenantId),
         eq(schema.brokerInvitations.brokerProfileId, brokerProfileId),
         eq(schema.brokerInvitations.status, "PENDING")
       )

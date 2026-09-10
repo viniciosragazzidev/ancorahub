@@ -6,10 +6,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
-import {
-  buildCredentialAccount,
-  CREDENTIAL_PROVIDER_ID,
-} from "@/shared/auth/credential-account";
+import { buildCredentialAccount } from "@/shared/auth/credential-account";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -89,60 +86,23 @@ export async function completeOnboardingAction(
       .where(eq(schema.user.email, accessEmail))
       .limit(1);
 
-    let userId: string;
-    let isNewUser = false;
-
     if (existingUser) {
-      const [activeMembership] = await db
-        .select({ id: schema.tenantMemberships.id })
-        .from(schema.tenantMemberships)
-        .where(
-          and(
-            eq(schema.tenantMemberships.userId, existingUser.id),
-            eq(schema.tenantMemberships.tenantId, invitation.tenantId),
-          ),
-        )
-        .limit(1);
-      if (activeMembership) {
-        throw new Error("Já existe uma conta de acesso ativa com este e-mail.");
-      }
-      userId = existingUser.id;
-    } else {
-      userId = randomUUID();
-      isNewUser = true;
+      throw new Error("Este e-mail já pertence a uma conta existente. Informe outro e-mail para concluir o cadastro.");
     }
+    const userId = randomUUID();
 
     const hashedPassword = await hashPassword(input.password);
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
-      if (isNewUser) {
-        // Create user
-        await tx.insert(schema.user).values({
-          id: userId,
-          name: input.name,
-          email: accessEmail,
-          emailVerified: true,
-          active: true,
-          status: "active",
-        });
-      } else {
-        // Update user
-        await tx.update(schema.user).set({
-          name: input.name,
-          emailVerified: true,
-          active: true,
-          status: "active",
-        }).where(eq(schema.user.id, userId));
-        await tx
-          .delete(schema.account)
-          .where(
-            and(
-              eq(schema.account.userId, userId),
-              eq(schema.account.providerId, CREDENTIAL_PROVIDER_ID),
-            ),
-          );
-      }
+      await tx.insert(schema.user).values({
+        id: userId,
+        name: input.name,
+        email: accessEmail,
+        emailVerified: true,
+        active: true,
+        status: "active",
+      });
 
       // Create credential account
       await tx.insert(schema.account).values(buildCredentialAccount({

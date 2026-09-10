@@ -921,6 +921,18 @@ Para `/vendas`, a navegação principal passa a antecipar o payload parcial, exi
 
 ## DEC-094 — Importação de corretores reutiliza o onboarding e a outbox oficiais
 
-**Decisão aprovada em 2026-09-09.** A importação CSV exige somente nome e telefone; e-mail, CPF e unidade são opcionais. Cada linha válida cria um perfil `INVITED` e um convite de uso único, sem ativar usuário ou associação antes do aceite. Quando o e-mail não vier no arquivo, o próprio convidado deve defini-lo no primeiro acesso, com validação de unicidade no tenant.
+**Decisão aprovada em 2026-09-09.** A importação CSV exige somente nome e telefone; e-mail, CPF e unidade são opcionais. Cada linha válida cria um perfil `INVITED` e um convite de uso único, sem ativar usuário ou associação antes do aceite. Quando o e-mail não vier no arquivo, o próprio convidado deve defini-lo no primeiro acesso. Como a identidade Better Auth possui e-mail globalmente único, o onboarding não pode reutilizar uma identidade já existente nem substituir sua credencial; o e-mail escolhido precisa estar livre antes da ativação.
 
-O convite usa exclusivamente o propósito `brokerInvitation`, resolvido para o template Meta `broker_first_access`, com idempotência por convite e entrega gradual pela outbox oficial existente. O processamento nunca usa WhatsApp pessoal. Links de templates Meta legados podem conter placeholders codificados antes ou depois do token; a entrada pública remove somente os sufixos/prefixos conhecidos e mantém a validação pelo hash como autoridade.
+O convite usa exclusivamente o propósito `brokerInvitation`, resolvido para o template Meta `broker_first_access`, com idempotência por convite e entrega gradual pela outbox oficial existente. O processamento nunca usa WhatsApp pessoal. Links de templates Meta legados podem conter placeholders codificados antes ou depois do token; a entrada pública remove somente os sufixos/prefixos conhecidos e mantém a validação pelo hash como autoridade. A entrega automática exige o token cifrado recuperável: o worker não pode usar `invitationId` como substituto do token nem enviar fallback sem um token válido.
+
+## DEC-095 — Autoridade de membro é derivada do vínculo ativo do tenant
+
+**Decisão aprovada em 2026-09-10.** A identidade global pode conservar vínculos
+históricos inativos, mas somente um vínculo ativo pode compor o contexto de
+autorização. Mais de um vínculo ativo continua sendo uma inconsistência negada
+até existir uma escolha explícita de tenant.
+
+Alterações de papel, cargo ou unidade atualizam o vínculo no servidor, geram
+auditoria e revogam as sessões do membro para impedir autoridade obsoleta.
+Exclusões removem o vínculo do tenant e revogam sessões, sem apagar a identidade
+global que possa ser usada por outro tenant.

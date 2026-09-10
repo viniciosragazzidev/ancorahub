@@ -76,20 +76,7 @@ export async function createTeamUser(rawInput: unknown) {
     .limit(1);
 
   if (existingUser) {
-    const [membershipInTenant] = await db
-      .select({ id: schema.tenantMemberships.id })
-      .from(schema.tenantMemberships)
-      .where(
-        and(
-          eq(schema.tenantMemberships.userId, existingUser.id),
-          eq(schema.tenantMemberships.tenantId, context.tenantId),
-        ),
-      )
-      .limit(1);
-
-    if (membershipInTenant) {
-      throw new Error("Já existe um membro da equipe cadastrado com este e-mail nesta corretora.");
-    }
+    throw new Error("Este e-mail já pertence a uma conta existente. Use outro e-mail para criar o novo acesso.");
   }
 
   const brokerProfileId = randomUUID();

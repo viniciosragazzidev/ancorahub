@@ -8,6 +8,7 @@ import { getRequiredSession } from "./session";
 import type { TenantContext } from "./types";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getSuperAdminRoleOverride } from "@/features/super-admin/role-impersonation";
+import { selectSingleActiveMembership } from "./active-membership";
 import {
   markTenantStart,
   markTenantEnd,
@@ -67,21 +68,10 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
     markDbEnd();
     markTenantEnd();
 
-    if (memberships.length !== 1) {
-      throw new AuthorizationError(
-        "The authenticated user must have exactly one tenant membership.",
-        "INCONSISTENT_MEMBERSHIP",
-      );
-    }
-
-    const membership = memberships[0];
+    const membership = selectSingleActiveMembership(memberships);
 
     if (!membership.userActive) {
       throw new AuthorizationError("The authenticated user is inactive.");
-    }
-
-    if (membership.membershipStatus !== "active") {
-      throw new AuthorizationError("The tenant membership is inactive.");
     }
 
     if (membership.tenantStatus !== "active") {

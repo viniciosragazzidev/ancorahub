@@ -156,6 +156,22 @@ export async function updateTeamMemberAction(
         updatedAt: new Date(),
       }).where(eq(schema.tenantMemberships.id, member.membershipId));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.membershipId, acao: "atualizou_membro" });
+
+      const authorityChanged =
+        member.role !== input.role ||
+        member.jobTitle !== input.jobTitle ||
+        member.branchId !== normalizedBranchId;
+
+      if (authorityChanged) {
+        await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "tenant_membership",
+          entidadeId: member.membershipId,
+          acao: "revogou_sessoes_por_alteracao_de_autoridade",
+        });
+      }
     });
 
     return { success: true };
@@ -724,6 +740,16 @@ export async function importBrokersAction(
           .limit(1) : [];
         if (existingEmail) {
           errors.push(`Linha ${lineNumber}: e-mail ${email} já cadastrado.`);
+          continue;
+        }
+
+        const [existingIdentity] = email ? await tx
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(eq(schema.user.email, email))
+          .limit(1) : [];
+        if (existingIdentity) {
+          errors.push(`Linha ${lineNumber}: o e-mail ${email} já pertence a uma conta existente.`);
           continue;
         }
 
