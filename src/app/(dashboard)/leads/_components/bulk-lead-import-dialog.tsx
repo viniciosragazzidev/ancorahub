@@ -9,11 +9,14 @@ import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { importLeadsFromCsvAction } from "@/features/leads/bulk-import";
+import {
+  getBulkImportQueuesForBranch,
+  type BulkImportQueue,
+} from "@/features/leads/bulk-import-policy";
 
 import type { TenantRole } from "@/shared/db/schema";
 
 type Branch = { id: string; name: string };
-type LeadQueue = { id: string; name: string; branchId: string | null };
 
 export function BulkLeadImportDialog({
   branches,
@@ -25,7 +28,7 @@ export function BulkLeadImportDialog({
   onOpenChange,
 }: {
   branches: Branch[];
-  queues?: LeadQueue[];
+  queues?: BulkImportQueue[];
   role: TenantRole;
   jobTitle: string;
   branchId: string | null;
@@ -56,7 +59,7 @@ export function BulkLeadImportDialog({
     errors: Array<{ row: number; message: string }>;
   } | null>(null);
 
-  const availableQueues = queues.filter((q) => !selectedBranch || q.branchId === selectedBranch);
+  const availableQueues = getBulkImportQueuesForBranch(queues, selectedBranch);
 
   function downloadTemplate() {
     const blob = new Blob(
@@ -155,14 +158,14 @@ export function BulkLeadImportDialog({
                 <SelectContent>
                   <SelectItem value="">Geral da unidade (Padrão)</SelectItem>
                   {availableQueues.map((q) => (
-                    <SelectItem key={q.id} value={q.id}>
-                      Fila: {q.name}
+                    <SelectItem key={q.id} value={q.id} disabled={q.assignmentMode === "manual"}>
+                      Fila: {q.name}{q.assignmentMode === "manual" ? " (manual)" : q.branchId === null ? " (geral)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                Define para onde o lote irá após ser qualificado (ou imediatamente se a qualificação estiver desativada).
+                Filas gerais e da unidade selecionada são exibidas. Filas manuais aparecem apenas para consulta; as automáticas ofertam cada lead aos corretores elegíveis até o aceite.
               </p>
             </div>
 

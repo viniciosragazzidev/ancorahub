@@ -514,9 +514,14 @@ async function LeadsPageContent({
         id: schema.leadQueues.id,
         name: schema.leadQueues.name,
         branchId: schema.leadQueues.branchId,
+        assignmentMode: schema.leadQueues.assignmentMode,
       })
       .from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active")))),
+      .where(and(
+        eq(schema.leadQueues.tenantId, context.tenantId),
+        eq(schema.leadQueues.status, "active"),
+        isNull(schema.leadQueues.deletedAt),
+      ))),
     withPerfSpan("leads.urgent", () => getUrgentLeadForUser().catch(() => null)),
   ]));
 

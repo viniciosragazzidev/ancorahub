@@ -481,3 +481,12 @@ de métricas entre tenants.
   navegador como fallback, sem desaparecer após fechar o cartão informativo.
 - O controle preserva área segura, alvo de toque móvel e preferência por movimento
   reduzido.
+
+## 2026-09-10 — filas completas na importação de leads
+
+- O seletor de importação em massa passou a reunir as filas gerais da corretora e as
+  filas pertencentes à unidade escolhida, sem exibir filas de outra unidade.
+- Filas manuais continuam identificáveis, mas ficam desabilitadas porque não podem
+  cumprir o fluxo automático prometido pelo formulário.
+- O texto de apoio explica que cada lead será ofertado sequencialmente aos corretores
+  elegíveis até aceite, sem alterar componentes ou tokens compartilhados.

@@ -3,17 +3,22 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
-import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-push-helper";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import {
+  enqueueLeadDistributionJob,
+  runLeadDistributionProcessor,
+} from "@/features/lead-distribution/jobs";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
+import {
+  buildBulkImportDistributionState,
+  isAutomaticQueueAvailableForBulkImport,
+} from "./bulk-import-policy";
 
 const MAX_FILE_BYTES = 2_000_000;
 const MAX_ROWS = 500;
@@ -85,6 +90,36 @@ export async function importLeadsFromCsvAction(formData: FormData) {
       (await getSystemSetting("feature_ai_whatsapp_qualification_enabled")) === "true";
 
     const targetQueueId = input.queueId || null;
+    const [targetQueue] = targetQueueId
+      ? await db
+          .select({
+            id: schema.leadQueues.id,
+            branchId: schema.leadQueues.branchId,
+            assignmentMode: schema.leadQueues.assignmentMode,
+          })
+          .from(schema.leadQueues)
+          .where(and(
+            eq(schema.leadQueues.id, targetQueueId),
+            eq(schema.leadQueues.tenantId, context.tenantId),
+            eq(schema.leadQueues.status, "active"),
+            isNull(schema.leadQueues.deletedAt),
+          ))
+          .limit(1)
+      : [];
+
+    if (targetQueueId && !targetQueue) {
+      throw new Error("A fila selecionada não está ativa nesta corretora.");
+    }
+    if (
+      targetQueue &&
+      !isAutomaticQueueAvailableForBulkImport(targetQueue, branchId)
+    ) {
+      throw new Error(
+        targetQueue.assignmentMode === "manual"
+          ? "A fila selecionada está em modo manual e não pode receber uma importação automática."
+          : "A fila selecionada pertence a outra unidade.",
+      );
+    }
     const rows = parseCsv(await input.file.text());
     const tipoImport = formData.get("tipo") === "PME" ? "PME" : "PF";
 
@@ -167,16 +202,16 @@ export async function importLeadsFromCsvAction(formData: FormData) {
           }).catch(console.error);
 
         } else {
-          // Qualification Engine Inactive: Direct distribution path
-          const brokerId = await chooseAvailableBroker(context.tenantId, branchId);
-          const assigned = Boolean(brokerId);
+          // Qualification Engine Inactive: persist first, then use the same
+          // durable offer engine as every other automatic lead entry.
+          const distributionState = buildBulkImportDistributionState();
 
           await db.transaction(async (tx) => {
             await tx.insert(schema.leads).values({
               id: leadId,
               tenantId: context.tenantId,
               branchId,
-              corretorId: brokerId,
+              ...distributionState,
               queueId: targetQueueId,
               nome,
               telefone,
@@ -186,13 +221,8 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               sourceChannel: "bulk_import",
               sourceCampaign: campanha,
               sourceMetadata: { import: "csv", targetQueueId },
-              status: assigned ? "distributed" : "new",
               qualificationStatus: "pending",
-              distributionStatus: assigned ? "assigned" : "queued",
-              assignmentSource: assigned ? "automatic" : null,
-              assignmentStrategy: assigned ? "capacity" : null,
               distributionUpdatedAt: new Date(),
-              assignedAt: assigned ? new Date() : null,
               consentimentoLgpd: true,
             });
 
@@ -200,8 +230,8 @@ export async function importLeadsFromCsvAction(formData: FormData) {
               id: randomUUID(),
               leadId,
               userId: context.userId,
-              tipo: assigned ? "system_alert" : "note",
-              conteudo: "Lead importado por arquivo CSV.",
+              tipo: "note",
+              conteudo: "Lead importado por arquivo CSV e encaminhado para a fila de distribuição.",
             });
 
             await tx.insert(schema.auditLogs).values({
@@ -213,17 +243,39 @@ export async function importLeadsFromCsvAction(formData: FormData) {
             });
           });
 
-          void notifyLeadArrived(leadId, context.tenantId, branchId, nome).catch(console.error);
-          void notifyNewLead(leadId, context.tenantId, branchId, brokerId, nome).catch(console.error);
-
-          if (!assigned) {
-            void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId }).catch(console.error);
+          try {
+            await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId });
+          } catch (error) {
+            // The queued lead itself is the durable recovery source. The
+            // processor seeds a missing idempotent job on its next run.
+            console.error("[bulk-lead-import] distribution_job_enqueue_failed", {
+              tenantId: context.tenantId,
+              leadId,
+              error: error instanceof Error ? error.name : "unknown_error",
+            });
           }
         }
 
         imported += 1;
       } catch (error) {
         errors.push({ row: row.row, message: error instanceof Error ? error.message : "linha inválida" });
+      }
+    }
+
+    if (imported > 0 && !isQualificationEngineActive) {
+      try {
+        await runLeadDistributionProcessor({
+          tenantId: context.tenantId,
+          limit: Math.min(imported, 25),
+        });
+      } catch (error) {
+        // Do not report a committed import as failed. Every lead remains
+        // queued and can be recovered by the scheduled processor.
+        console.error("[bulk-lead-import] immediate_distribution_failed", {
+          tenantId: context.tenantId,
+          imported,
+          error: error instanceof Error ? error.name : "unknown_error",
+        });
       }
     }
 

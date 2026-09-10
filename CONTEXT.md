@@ -24,6 +24,7 @@
 - **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.
 - **Decisão de distribuição**: resultado explicável de uma tentativa de roteamento, contendo fila, candidatos elegíveis, estratégia, corretor selecionado — quando houver — e os motivos de exclusão ou fallback.
 - **Fila de espera**: estado recuperável de um lead sem corretor elegível. O lead permanece visível para ação humana e nunca é descartado silenciosamente.
+- **Lote de leads**: conjunto importado por CSV que preserva a unidade e a fila escolhidas. Cada lead é persistido sem owner e entra individualmente no motor durável de ofertas; a importação não constitui uma atribuição paralela.
 - **Agenda pessoal do corretor**: janelas semanais declaradas pelo próprio corretor, no fuso operacional. Elas determinam quando ele entra na distribuição automática e não revogam a possibilidade de atribuição manual assistida.
 
 ## Canais de comunicação

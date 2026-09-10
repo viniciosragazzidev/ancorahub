@@ -936,3 +936,19 @@ Alterações de papel, cargo ou unidade atualizam o vínculo no servidor, geram
 auditoria e revogam as sessões do membro para impedir autoridade obsoleta.
 Exclusões removem o vínculo do tenant e revogam sessões, sem apagar a identidade
 global que possa ser usada por outro tenant.
+
+## DEC-096 — Importação de leads usa a fila e o motor canônico de ofertas
+
+**Decisão aprovada em 2026-09-10.** O seletor da importação CSV mostra filas ativas
+gerais do tenant e filas da unidade escolhida. Filas manuais permanecem visíveis para
+contexto, mas não podem ser selecionadas para distribuição automática. O servidor
+revalida a fila por tenant, estado, exclusão, modo e unidade; identificadores enviados
+pelo navegador nunca concedem escopo.
+
+Cada lead importado é gravado sem `corretorId`, preserva `queueId` e entra no job
+idempotente de distribuição. O fluxo não escolhe um corretor por atalho: cria no
+máximo uma oferta por vez pelo WhatsApp oficial, avança entre os elegíveis da fila em
+recusa, expiração ou canal indisponível e só grava o owner após aceite atômico. A
+execução imediata é limitada ao lote operacional do processador; o restante permanece
+persistido para recuperação, respeitando janela comercial, capacidade e controles do
+Super-admin já existentes.
