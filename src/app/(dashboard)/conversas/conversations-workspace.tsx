@@ -90,7 +90,7 @@ import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-messag
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
 import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
-import { deleteUnlinkedConversationAction } from "@/features/conversations/actions";
+import { deleteConversationHistoryAction } from "@/features/conversations/actions";
 
 export type ConversationMessage = {
   id: string;
@@ -443,14 +443,14 @@ function ConversationHeader({
   const isWaitingHuman = aiStatus === "WAITING_HUMAN";
   const isAiActive = aiStatus === "AI_ACTIVE" || aiStatus === "WAITING_CUSTOMER";
   const isAssignedToMe = client.aiConversation?.assignedUserId === userId;
-  const canDeleteUnlinked =
-    (role === "director" || role === "manager") && client.id.startsWith("unassigned-");
+  const canDeleteHistory =
+    role === "director" || (role === "manager" && client.id.startsWith("unassigned-"));
 
-  async function handleDeleteUnlinkedConversation() {
+  async function handleDeleteConversationHistory() {
     setIsPending(true);
-    const toastId = toast.loading("Excluindo conversa avulsa...");
+    const toastId = toast.loading("Excluindo histórico da conversa...");
     try {
-      const result = await deleteUnlinkedConversationAction(client.telefone);
+      const result = await deleteConversationHistoryAction(client.telefone);
       if (!result.success) {
         toast.error(result.error, { id: toastId });
         return;
@@ -668,7 +668,7 @@ function ConversationHeader({
                   </DropdownMenuItem>
                 </>
               )}
-              {canDeleteUnlinked ? (
+              {canDeleteHistory ? (
                 <>
                   <DropdownMenuSeparator className="my-1" />
                   <DropdownMenuItem
@@ -679,7 +679,9 @@ function ConversationHeader({
                     <Trash className="mt-0.5 size-4 shrink-0 text-destructive" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-destructive">Excluir conversa</span>
-                      <span className="text-[10px] text-muted-foreground">Remove apenas este contato avulso do CRM</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {role === "director" ? "Remove o histórico deste contato no CRM" : "Remove apenas este contato avulso do CRM"}
+                      </span>
                     </div>
                   </DropdownMenuItem>
                 </>
@@ -737,16 +739,18 @@ function ConversationHeader({
         <DialogPopup>
           <DialogPanel>
             <DialogHeader>
-              <DialogTitle>Excluir esta conversa avulsa?</DialogTitle>
+              <DialogTitle>Excluir o histórico desta conversa?</DialogTitle>
               <DialogDescription>
-                As mensagens serão removidas da caixa de entrada do CRM. Conversas vinculadas a leads, clientes ou integrantes da equipe são protegidas e nunca entram nesta ação.
+                {role === "director"
+                  ? "Todas as mensagens desta conversa serão removidas do CRM. O cadastro do lead, cliente ou membro da equipe será preservado. Esta ação não pode ser desfeita."
+                  : "As mensagens serão removidas da caixa de entrada do CRM. Conversas vinculadas a leads, clientes ou integrantes da equipe continuam protegidas para Gestores."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>
                 Cancelar
               </Button>
-              <Button type="button" variant="destructive" onClick={() => void handleDeleteUnlinkedConversation()} disabled={isPending}>
+              <Button type="button" variant="destructive" onClick={() => void handleDeleteConversationHistory()} disabled={isPending}>
                 {isPending ? "Excluindo..." : "Excluir conversa"}
               </Button>
             </DialogFooter>

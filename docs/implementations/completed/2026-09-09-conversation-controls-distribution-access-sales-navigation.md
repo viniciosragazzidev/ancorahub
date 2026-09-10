@@ -6,9 +6,9 @@ Entregar quatro ajustes operacionais aprovados: exclusão segura de chats avulso
 
 ## Decisões e segurança
 
-- A exclusão existe apenas para conversas sintéticas `unassigned-*` e é novamente autorizada no servidor.
+- Em 10/09, o Diretor passou a poder excluir o histórico de qualquer conversa do próprio tenant; o Gestor continua limitado às conversas sintéticas `unassigned-*`.
 - Tenant e papel vêm da sessão. Telefone recebido é apenas o identificador validado do alvo, nunca autoridade de escopo.
-- Antes de excluir, o servidor bloqueia mensagens ou telefones vinculados a lead, cliente ou perfil da equipe.
+- O servidor preserva lead, cliente, perfil da equipe, convite e demais registros operacionais; somente as mensagens do histórico são removidas.
 - A auditoria usa um hash de tenant + telefone e a quantidade removida; telefone, corpo e demais dados pessoais não são gravados.
 - `feature_unlinked_conversation_deletion_enabled` permite ao Super-admin interromper a capacidade e toda alteração da flag gera auditoria de plataforma.
 - Gestor não recebe o conteúdo da aba `Filas & Unidades`; URL direta é normalizada para `Matriz de Roteamento`. Supervisor não recebe acesso administrativo à rota.
@@ -23,7 +23,7 @@ Entregar quatro ajustes operacionais aprovados: exclusão segura de chats avulso
 ## Arquivos principais
 
 - `src/features/conversations/actions.ts`
-- `src/features/conversations/delete-unlinked-conversation-policy.ts`
+- `src/features/conversations/delete-conversation-history-policy.ts`
 - `src/app/(dashboard)/conversas/conversations-workspace.tsx`
 - `src/features/lead-distribution/distribution-view-access.ts`
 - `src/app/(dashboard)/leads/distribuicao/page.tsx`
@@ -42,6 +42,11 @@ Entregar quatro ajustes operacionais aprovados: exclusão segura de chats avulso
   acesso e os aliases `nome`, `telefone`, `interesse`, `n_dependentes` e
   `cidade` no aceite. Essa extensão foi validada por testes focados e TypeScript;
   por solicitação, o build não foi repetido depois dessa extensão.
+- Ampliação de 10/09: política dirigida aprovada em 6 cenários, ESLint dirigido
+  sem erros, TypeScript aprovado, suíte completa com 154 arquivos e 699 testes
+  aprovada e build de produção aprovado. O harness confirmou documentação e
+  segurança sem achados; avisos globais e diagnósticos informativos permanecem
+  separados do recorte.
 
 ## Rollback
 

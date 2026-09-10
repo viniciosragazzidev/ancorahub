@@ -382,9 +382,9 @@ export default async function SuperAdminSettingsPage() {
 
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
-                <CardTitle>Exclusão de conversas avulsas</CardTitle>
+                <CardTitle>Exclusão de históricos de conversa</CardTitle>
                 <CardDescription>
-                  Controla a remoção de chats sem vínculo com lead, cliente ou membro da equipe. A proteção dos contatos vinculados permanece obrigatória.
+                  Controla a remoção de históricos no CRM. Diretor pode excluir qualquer conversa; Gestor permanece limitado a chats sem vínculo.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -398,7 +398,7 @@ export default async function SuperAdminSettingsPage() {
                       className="size-4 warning-[var(--primary)]"
                     />
                     <span>
-                      <span className="font-medium">Permitir exclusão por Diretor e Gestor</span>
+                      <span className="font-medium">Permitir exclusão governada de históricos</span>
                       <span className="block text-xs text-muted-foreground">
                         Cada exclusão registra auditoria sem guardar telefone ou conteúdo da conversa.
                       </span>

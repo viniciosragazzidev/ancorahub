@@ -8,7 +8,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { canDeleteUnlinkedConversation } from "./delete-unlinked-conversation-policy";
+import { canDeleteConversationHistory } from "./delete-conversation-history-policy";
 
 const phoneSchema = z.string().trim().min(8).max(32);
 
@@ -29,11 +29,11 @@ function normalizedPhoneSql(
 
 function deletionError(reason: "feature_disabled" | "forbidden_role" | "linked_contact") {
   if (reason === "feature_disabled") return "A exclusão de conversas está pausada pela plataforma.";
-  if (reason === "forbidden_role") return "Apenas Diretor ou Gestor podem excluir conversas avulsas.";
-  return "Esta conversa pertence a um lead, cliente ou membro da equipe e não pode ser excluída.";
+  if (reason === "forbidden_role") return "Apenas Diretor ou Gestor podem excluir históricos de conversa.";
+  return "Somente o Diretor pode excluir o histórico de uma conversa vinculada a lead, cliente ou membro da equipe.";
 }
 
-export async function deleteUnlinkedConversationAction(rawPhone: string): Promise<DeleteConversationResult> {
+export async function deleteConversationHistoryAction(rawPhone: string): Promise<DeleteConversationResult> {
   try {
     const parsed = phoneSchema.safeParse(rawPhone);
     if (!parsed.success) return { success: false, error: "Conversa inválida." };
@@ -72,7 +72,7 @@ export async function deleteUnlinkedConversationAction(rawPhone: string): Promis
 
       if (!messageRows.length) return { success: false as const, error: "Conversa não encontrada." };
 
-      const policy = canDeleteUnlinkedConversation({
+      const policy = canDeleteConversationHistory({
         role: context.role,
         featureEnabled: featureValue === "true",
         hasLead: leadRows.length > 0 || messageRows.some((message) => Boolean(message.leadId)),
@@ -93,9 +93,9 @@ export async function deleteUnlinkedConversationAction(rawPhone: string): Promis
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),
         userId: context.userId,
-        entidade: "unlinked_whatsapp_conversation",
+        entidade: "whatsapp_conversation_history",
         entidadeId: conversationFingerprint,
-        acao: `conversation.deleted:${messageIds.length}`,
+        acao: `conversation.history_deleted:${messageIds.length}`,
       });
 
       return { success: true as const, deletedMessages: messageIds.length };

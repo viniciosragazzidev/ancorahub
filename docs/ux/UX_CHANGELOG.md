@@ -463,3 +463,12 @@ de métricas entre tenants.
 - Visão geral, Comercial e Financeiro adotam os novos cards; Funil e Atenção
   compartilham a mesma composição sem mudanças de dados ou autorização.
 - O dashboard Lite do corretor não foi modificado.
+
+## 2026-09-10 — exclusão de histórico em Conversas
+
+- O menu contextual de `/conversas` passou a exibir `Excluir conversa` em todos
+  os atendimentos para Diretor; Gestor mantém o controle apenas em chats avulsos.
+- A confirmação explica que somente as mensagens serão removidas e que os
+  cadastros vinculados serão preservados.
+- A permissão continua revalidada no servidor, com isolamento por tenant,
+  auditoria sem PII e controle global reversível pelo Super-Admin.

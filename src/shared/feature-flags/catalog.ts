@@ -165,7 +165,7 @@ export const FEATURE_FLAGS = {
     scope: "global",
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
-    description: "Permite que Diretores e Gestores excluam conversas do WhatsApp sem vínculo com lead, cliente ou equipe.",
+    description: "Permite que Diretores excluam qualquer histórico do WhatsApp e Gestores excluam somente conversas sem vínculo.",
   },
 
   AGENT_TRAINING_CENTER: {

@@ -911,9 +911,9 @@ sinal, o navegador consulta os detalhes pela API interna autenticada. Há reconc
 lenta quando a aba está visível e propagação local entre abas. A capacidade pode ser
 desativada globalmente pelo Super-admin; persistência de notificação e Web Push não
 falham se o Realtime estiver indisponível.
-## DEC-093 — Exclusão protegida de conversas avulsas e governança temporária de filas
+## DEC-093 — Exclusão governada de históricos de conversa e acesso temporário a filas
 
-**Decisão aprovada em 2026-09-09.** Diretor e Gestor podem excluir da caixa de entrada somente uma conversa do WhatsApp sem vínculo com lead, cliente ou perfil de integrante da equipe. O servidor deriva tenant e papel da sessão, revalida todos os vínculos pelo telefone normalizado antes da exclusão e registra auditoria por identificador irreversível, sem telefone ou conteúdo. Uma chave global do Super-admin pode interromper novas exclusões sem alterar o histórico existente.
+**Decisão aprovada em 2026-09-09 e ampliada em 2026-09-10.** O Diretor pode excluir o histórico de qualquer conversa do WhatsApp pertencente ao próprio tenant, independentemente de vínculo com lead, cliente ou integrante da equipe. O Gestor continua limitado a conversas sem esses vínculos. A exclusão remove somente as mensagens armazenadas no CRM; lead, cliente, perfil de equipe, convite e demais registros operacionais permanecem intactos. O servidor deriva tenant e papel da sessão, normaliza o telefone, revalida os vínculos e registra auditoria por identificador irreversível, sem telefone ou conteúdo. Uma chave global do Super-admin pode interromper novas exclusões sem alterar o histórico existente.
 
 A definição de filas fica temporariamente exclusiva do Diretor. Gestor não recebe a aba nem seu conteúdo e uma URL direta para `view=filas` retorna à matriz de roteamento; Supervisor continua sem acesso administrativo à Central de Distribuição. As demais operações autorizadas de acompanhamento não são ampliadas por esta decisão.
 

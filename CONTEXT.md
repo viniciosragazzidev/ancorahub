@@ -38,6 +38,7 @@
 - **Regra de entrada Meta**: configuração que resolve uma fila a partir da atribuição de mídia. Ela nunca escolhe um corretor; depois dela, o motor central de distribuição decide elegibilidade, capacidade e responsável.
 - **Catálogo de integrações**: ponto de entrada administrativo que lista conectores disponíveis e planejados. Ele não concede acesso por si só: cada conector conserva sua própria autorização, configuração e controles de capacidade.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
+- **Histórico de conversa**: conjunto de mensagens armazenadas pelo CRM para um telefone dentro de um tenant. Excluir o histórico não exclui o lead, cliente, integrante da equipe, convite ou demais registros operacionais vinculados.
 - **Atendimento externo temporário**: enquanto o chat interno não estiver operacional, o Corretor inicia o atendimento auditado no CorreTop e é direcionado ao WhatsApp pessoal pelo número autorizado do lead. A interface não apresenta mensagens como se estivessem sincronizadas.
 
 ## Extensão CorreTop Assistant
