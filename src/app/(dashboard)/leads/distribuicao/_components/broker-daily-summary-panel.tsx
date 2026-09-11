@@ -170,7 +170,7 @@ export function BrokerDailySummaryPanel({
       };
       const query = new URLSearchParams({ start: `${formatDate(start)}T00:00:00.000Z`, end: `${formatDate(end)}T23:59:59.999Z`, format: "pdf" });
       if (selectedBranchId !== "all") query.set("branchId", selectedBranchId);
-      const response = await fetch(`/api/reports/distribution?${query.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/reports/distribution-summary?${query.toString()}`, { cache: "no-store" });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error ?? "Não foi possível gerar o PDF.");
