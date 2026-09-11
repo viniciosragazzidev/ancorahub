@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, not, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
@@ -503,43 +503,79 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     });
     branchToActivate.autoDistribute = true;
   }
-  const targetBranchIds = activeBranches.filter(isAutomaticDistributionBranch).map((branch) => branch.id);
+  let targetBranchIds = activeBranches.filter(isAutomaticDistributionBranch).map((branch) => branch.id);
   if (!targetBranchIds.length) {
     return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
   }
-  const allBrokers = await db
-    .select({
-      id: schema.user.id,
-      branchId: schema.tenantMemberships.branchId,
-      createdAt: schema.user.createdAt,
-    })
-    .from(schema.tenantMemberships)
-    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-    .innerJoin(
-      schema.brokerProfiles,
-      and(
-        eq(schema.brokerProfiles.userId, schema.user.id),
-        eq(schema.brokerProfiles.tenantId, context.tenantId),
-        isNotNull(schema.brokerProfiles.phone),
-      ),
-    )
-    .where(and(
-      eq(schema.tenantMemberships.tenantId, context.tenantId),
-      inArray(schema.tenantMemberships.branchId, targetBranchIds),
-      eq(schema.tenantMemberships.role, "broker"),
-      eq(schema.tenantMemberships.status, "active"),
-      eq(schema.tenantMemberships.availabilityStatus, "available"),
-      eq(schema.user.active, true),
-      eq(schema.user.status, "active"),
-    ))
-    .orderBy(asc(schema.user.createdAt));
-  const rosterResults = await Promise.all(targetBranchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId)] as const));
-  const rosterByBranch = new Map(rosterResults);
   const allowedBrokerSet = intelligentPolicy.value.allowedBrokerIds?.length ? new Set(intelligentPolicy.value.allowedBrokerIds) : null;
-  const brokers = allBrokers.filter((broker) => {
-    const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
-    return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
-  });
+  const loadEligibleBrokers = async (branchIds: string[]) => {
+    const allBrokers = await db
+      .select({
+        id: schema.user.id,
+        branchId: schema.tenantMemberships.branchId,
+        createdAt: schema.user.createdAt,
+      })
+      .from(schema.tenantMemberships)
+      .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .innerJoin(
+        schema.brokerProfiles,
+        and(
+          eq(schema.brokerProfiles.userId, schema.user.id),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          isNotNull(schema.brokerProfiles.phone),
+        ),
+      )
+      .where(and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        inArray(schema.tenantMemberships.branchId, branchIds),
+        eq(schema.tenantMemberships.role, "broker"),
+        eq(schema.tenantMemberships.status, "active"),
+        eq(schema.tenantMemberships.availabilityStatus, "available"),
+        eq(schema.user.active, true),
+        eq(schema.user.status, "active"),
+      ))
+      .orderBy(asc(schema.user.createdAt));
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId)] as const));
+    const rosterByBranch = new Map(rosterResults);
+    const brokers = allBrokers.filter((broker) => {
+      const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
+      return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
+    });
+    return { brokers, rosterByBranch };
+  };
+
+  let { brokers, rosterByBranch } = await loadEligibleBrokers(targetBranchIds);
+  let fallbackUnitUsed = false;
+  if (!brokers.length && context.role === "director") {
+    // A unit with no available eligible broker must not strand the lead. Expand
+    // only after the primary unit is empty, preserving the configured order.
+    const fallbackBranches = await db
+      .select({ id: schema.branches.id })
+      .from(schema.branches)
+      .where(and(
+        eq(schema.branches.tenantId, context.tenantId),
+        eq(schema.branches.status, "active"),
+        eq(schema.branches.acceptingLeads, true),
+        eq(schema.branches.autoDistribute, true),
+        eq(schema.branches.isDistributionHub, false),
+        ...((intelligentPolicy.value.allowedBranchIds?.length)
+          ? [inArray(schema.branches.id, intelligentPolicy.value.allowedBranchIds)]
+          : []),
+        ...(intelligentPolicy.value.excludedBranchIds.length
+          ? [not(inArray(schema.branches.id, intelligentPolicy.value.excludedBranchIds))]
+          : []),
+      ));
+    const fallbackIds = fallbackBranches.map((branch) => branch.id).filter((id) => !targetBranchIds.includes(id));
+    if (fallbackIds.length) {
+      const fallback = await loadEligibleBrokers(fallbackIds);
+      if (fallback.brokers.length) {
+        targetBranchIds = fallbackIds;
+        brokers = fallback.brokers;
+        rosterByBranch = fallback.rosterByBranch;
+        fallbackUnitUsed = true;
+      }
+    }
+  }
   if (!brokers.length) {
     return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
   }
@@ -700,9 +736,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     brokerId: chosen.id,
     expiresAt: offer.expiresAt,
     outboundMessageId: offer.createdOffers[0]?.whatsappMessageId,
-    reason: attemptedBrokerIds.size > 0
-      ? "Oferta enviada ao próximo corretor elegível."
-      : "Oferta enviada ao primeiro corretor elegível.",
+    reason: fallbackUnitUsed
+      ? "Unidade sem corretor elegível; lead avançou para a próxima unidade disponível."
+      : attemptedBrokerIds.size > 0
+        ? "Oferta enviada ao próximo corretor elegível."
+        : "Oferta enviada ao primeiro corretor elegível.",
   };
 }
 

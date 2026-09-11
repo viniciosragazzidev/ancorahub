@@ -27,15 +27,23 @@ export function canCreateRole(role: TenantRole, targetRole: CreatableTeamRole): 
 
 export type ManagedTeamRole = CreatableTeamRole;
 
+type TeamMemberAuthorityTarget = {
+  role: TenantRole;
+  branchId: string | null;
+  userId: string;
+};
+
+type TeamMemberAuthorityContext = TenantContext | {
+  userId: string;
+  role: TenantRole;
+  branchId: string | null;
+  allowedUnitIds?: string[];
+  scope?: { unitIds: readonly string[]; tenantWide: boolean };
+};
+
 export function canManageMember(
-  context: TenantContext | {
-    userId: string;
-    role: TenantRole;
-    branchId: string | null;
-    allowedUnitIds?: string[];
-    scope?: { unitIds: readonly string[]; tenantWide: boolean };
-  },
-  target: { role: TenantRole; branchId: string | null; userId: string },
+  context: TeamMemberAuthorityContext,
+  target: TeamMemberAuthorityTarget,
 ): boolean {
   if (context.userId === target.userId) return false;
   if (target.role === "director") return false;
@@ -62,15 +70,27 @@ export function canManageMember(
   return false;
 }
 
+/**
+ * A edição de autoridade é menos destrutiva que desativar/excluir um membro.
+ * Um Diretor pode editar outro Diretor somente quando ambos pertencem à mesma
+ * unidade explícita. A autoedição e Diretores gerais continuam bloqueados.
+ */
+export function canEditMemberAuthority(
+  context: TeamMemberAuthorityContext,
+  target: TeamMemberAuthorityTarget,
+): boolean {
+  if (canManageMember(context, target)) return true;
+  if (context.userId === target.userId) return false;
+
+  return context.role === "director" &&
+    target.role === "director" &&
+    context.branchId !== null &&
+    target.branchId === context.branchId;
+}
+
 export function requireCanManageMember(
-  context: TenantContext | {
-    userId: string;
-    role: TenantRole;
-    branchId: string | null;
-    allowedUnitIds?: string[];
-    scope?: { unitIds: readonly string[]; tenantWide: boolean };
-  },
-  target: { role: TenantRole; branchId: string | null; userId: string },
+  context: TeamMemberAuthorityContext,
+  target: TeamMemberAuthorityTarget,
 ): TenantContext | typeof context {
   if (!canManageMember(context, target)) {
     throw new AuthorizationError("O papel atual não pode gerenciar este membro.");
@@ -92,8 +112,10 @@ export function requireCanUpdateMemberAuthority(params: {
 }): void {
   const { actorContext, targetMember, proposed } = params;
 
-  // 1. O ator pode gerenciar o membro alvo?
-  requireCanManageMember(actorContext, targetMember);
+  // 1. O ator pode editar a autoridade do membro alvo?
+  if (!canEditMemberAuthority(actorContext, targetMember)) {
+    throw new AuthorizationError("O papel atual não pode editar este membro.");
+  }
 
   // 2. O ator pode conceder o papel proposto? (Manager não pode promover a Director)
   if (!canCreateRole(actorContext.role, proposed.role)) {
@@ -101,6 +123,16 @@ export function requireCanUpdateMemberAuthority(params: {
   }
 
   const isDirector = actorContext.role === "director";
+
+  // A exceção Diretor -> Diretor é estritamente local: a mesma ação não pode
+  // mover o alvo para outra unidade nem transformá-lo em um acesso geral.
+  if (
+    isDirector &&
+    targetMember.role === "director" &&
+    proposed.branchId !== targetMember.branchId
+  ) {
+    throw new AuthorizationError("Diretores só podem editar outro Diretor mantendo-o na mesma unidade.");
+  }
   const actorAllowedUnits: readonly string[] =
     "scope" in actorContext && actorContext.scope?.unitIds
       ? actorContext.scope.unitIds

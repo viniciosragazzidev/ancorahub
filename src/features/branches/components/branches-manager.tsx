@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import Link from "next/link";
-import { ArrowSquareOut, PencilSimple, Plus, Power, WifiHigh, XCircle } from "@/components/huge-icons";
+import { ArrowSquareOut, PencilSimple, Plus, Power } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Section, StatusBadge, EmptyState } from "@/components/foundations";
-import { createBranchAction, toggleBranchAction, toggleAcceptingLeadsAction, toggleDistributionHubAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
+import { createBranchAction, toggleBranchAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
 
 type Branch = { id: string; name: string; externalId: string | null; status: "active" | "inactive"; memberCount: number; acceptingLeads: boolean; isDistributionHub: boolean };
 
@@ -86,35 +86,9 @@ function CreateBranchSheet() {
   );
 }
 
-function AcceptingLeadsToggle({ branch }: { branch: Branch }) {
-  const [state, action, pending] = useActionState<BranchActionState, FormData>(toggleAcceptingLeadsAction, {});
-  const accepting = branch.acceptingLeads;
-
-  return (
-    <form action={action} className="flex items-center gap-2">
-      <input type="hidden" name="branchId" value={branch.id} />
-      <button
-        type="submit"
-        disabled={pending}
-        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all duration-200 ${
-          accepting
-            ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
-            : "bg-muted text-muted-foreground hover:bg-muted/80"
-        } disabled:opacity-50`}
-        title={accepting ? "Clique para pausar recebimento de leads" : "Clique para ativar recebimento de leads"}
-      >
-        {accepting ? <WifiHigh className="size-3.5" /> : <XCircle className="size-3.5" />}
-        {accepting ? "Recebendo" : "Pausado"}
-      </button>
-      <ActionFeedback state={state} />
-    </form>
-  );
-}
-
 function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
   const [updateState, updateAction, updatePending] = useActionState<BranchActionState, FormData>(updateBranchAction, {});
   const [toggleState, toggleAction, togglePending] = useActionState<BranchActionState, FormData>(toggleBranchAction, {});
-  const [hubState, hubAction, hubPending] = useActionState<BranchActionState, FormData>(toggleDistributionHubAction, {});
   const updateFormId = `branch-update-${branch.id}`;
   const cells = (
     <>
@@ -131,7 +105,7 @@ function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
           {branch.isDistributionHub ? <Badge variant="secondary">Central</Badge> : null}
         </div>
       </TableCell>
-      <TableCell><AcceptingLeadsToggle branch={branch} /></TableCell>
+      <TableCell><Badge variant={branch.acceptingLeads ? "success" : "secondary"}>{branch.acceptingLeads ? "Recebendo" : "Pausado"}</Badge></TableCell>
       <TableCell className="pr-5 text-right">
         <div className="flex items-center justify-end gap-1">
           <Button render={<Link href={`/unidades/${branch.id}`} />} size="sm" variant="ghost" className="gap-1.5 text-xs">
@@ -139,9 +113,7 @@ function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
             Ver perfil
           </Button>
           <form action={toggleAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" className="text-xs" disabled={togglePending}><Power size={14} />{branch.status === "active" ? "Desativar" : "Ativar"}</Button></form>
-          <form action={hubAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" className="text-xs" disabled={hubPending}>{branch.isDistributionHub ? "Remover central" : "Definir central"}</Button></form>
           <ActionFeedback state={toggleState} />
-          <ActionFeedback state={hubState} />
         </div>
       </TableCell>
     </>

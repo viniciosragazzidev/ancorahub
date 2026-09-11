@@ -19,18 +19,18 @@
 
 - A tabela `lead_distribution_jobs` persiste trabalhos de atribuição e impede jobs ativos duplicados por lead.
 - O executor interno trabalha em lotes, usa atualização condicional, lease recuperável, backoff e falha visível após o limite configurado.
-- A rota protegida `/api/internal/jobs/distribution` é executada por agendador a cada dois minutos; `CRON_SECRET` é obrigatório. A frequência é compatível com o ambiente de produção e a fila continua preservada para nova tentativa se uma execução falhar.
+- A rota protegida `/api/internal/jobs/distribution` é executada por agendador a cada minuto; `CRON_SECRET` é obrigatório. A fila continua preservada para nova tentativa se uma execução falhar.
 - O Super-admin pode pausar, parametrizar e executar um ciclo manual com auditoria.
 - A tela de Distribuição informa pendências, processamento e exceções reais. A migration 0059 é pré-requisito para esta telemetria.
 
 ### Pendência obrigatória de infraestrutura
 
-Em qualquer mudança de ambiente, manter as chamadas autenticadas para `/api/internal/jobs/distribution` e `/api/internal/jobs/qualification-timeout` a cada **2 minutos** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
+Em qualquer mudança de ambiente, manter as chamadas autenticadas para `/api/internal/jobs/distribution` e `/api/internal/jobs/qualification-timeout` a cada **1 minuto** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
 
 ## Pendência urgente de infraestrutura
 
-- **Upgrade do agendador:** atualizar o projeto para Vercel Pro ou configurar um executor externo autorizado para recuperar a frequência de 2 minutos. O cron diário atual existe somente para manter o deploy compatível com o plano Hobby; ele não atende o SLA operacional de recebimento e distribuição.
-- **Critério de conclusão:** deploy de produção aprovado com `schedule: "*/2 * * * *"`, duas execuções consecutivas confirmadas nos logs e um lead de teste processado sem intervenção manual.
+- **Upgrade do agendador:** atualizar o projeto para Vercel Pro ou configurar um executor externo autorizado para recuperar a frequência de 1 minuto. O executor ativo deve ser único por ambiente; chamadas concorrentes continuam protegidas por claim/lease idempotente.
+- **Critério de conclusão:** deploy de produção aprovado com `schedule: "* * * * *"`, duas execuções consecutivas confirmadas nos logs e um lead de teste processado sem intervenção manual.
 
 Atualizado em 15/07/2026.
 

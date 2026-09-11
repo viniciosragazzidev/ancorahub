@@ -120,6 +120,7 @@ export default async function LeadDistributionPage({
       status: schema.branches.status,
       acceptingLeads: schema.branches.acceptingLeads,
       autoDistribute: schema.branches.autoDistribute,
+      isDistributionHub: schema.branches.isDistributionHub,
     })
     .from(schema.branches)
     .where(branchScope);
@@ -406,6 +407,7 @@ export default async function LeadDistributionPage({
     status: branch.status,
     acceptingLeads: branch.acceptingLeads,
     autoDistribute: branch.autoDistribute,
+    isDistributionHub: branch.isDistributionHub,
     memberCount: countsByBranch.get(branch.id) ?? 0,
     availableBrokers: availableByBranch.get(branch.id) ?? 0,
     activeLeads: leadsByBranch.get(branch.id) ?? 0,
@@ -487,6 +489,19 @@ export default async function LeadDistributionPage({
           filasContent={
             context.role === "director" ? <>
               <DistributionRulesOverview />
+              <DistributionPanel
+                branches={enrichedBranches}
+                brokers={brokers.map((broker) => ({
+                  id: broker.id,
+                  name: broker.name,
+                  email: broker.email ?? "",
+                  branchId: broker.branchId,
+                  branchName: broker.branchName,
+                  availabilityStatus: broker.availabilityStatus,
+                  activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+                }))}
+                canManageAcceptingLeads
+              />
               <QueueControlCenter
                 queues={queuesForControl}
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}

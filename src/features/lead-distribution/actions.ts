@@ -11,7 +11,6 @@ import {
   routeLeadToBranchAndAssignBroker,
 } from "./service";
 import { enqueueLeadDistributionJob, runLeadDistributionProcessor } from "./jobs";
-import { isWithinBusinessHours } from "@/shared/time/business-hours";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -450,9 +449,7 @@ export async function distributeLeadAutomaticallyAction(
     return {
       success: true,
       mutationId,
-      message: isWithinBusinessHours()
-        ? "Distribuição automática iniciada em segundo plano."
-        : "Distribuição automática agendada para o próximo horário comercial.",
+      message: "Distribuição automática iniciada em segundo plano.",
       entity: {
         leadId: parsed.data,
         corretorId: null,
@@ -521,6 +518,27 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
           isNull(schema.leads.corretorId),
         ));
 
+      // A manual recovery starts a new generation of work. Supersede only
+      // queued/retrying jobs for these leads; a live processing lease is left
+      // untouched so two workers can never own the same lead concurrently.
+      await tx
+        .update(schema.leadDistributionJobs)
+        .set({
+          status: "superseded",
+          completedAt: now,
+          lockedAt: null,
+          lockedBy: null,
+          leaseExpiresAt: null,
+          lastErrorCode: "SUPERSEDED_BY_RECOVERY",
+          lastErrorMessage: "Processo antigo encerrado para iniciar uma recuperação idempotente.",
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.leadDistributionJobs.tenantId, context.tenantId),
+          inArray(schema.leadDistributionJobs.leadId, candidateIds),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+        ));
+
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),
         userId: context.userId,
@@ -540,13 +558,12 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
       branchIds: context.role === "manager" && context.branchId ? [context.branchId] : undefined,
     }).catch(() => {});
 
-    const withinBusinessHours = isWithinBusinessHours();
-    const initialDistribution = withinBusinessHours
-      ? await runLeadDistributionProcessor({
-          tenantId: context.tenantId,
-          limit: Math.min(candidateIds.length, 25),
-        })
-      : null;
+    // Ownership recovery is a 24/7 operation. The Meta outbox applies its own
+    // policy/window; the lead must never remain unassigned because of a clock.
+    const initialDistribution = await runLeadDistributionProcessor({
+      tenantId: context.tenantId,
+      limit: Math.min(candidateIds.length, 25),
+    });
     const initialDelivery = { processed: 0, sent: 0, failed: 0, retried: 0 };
     if (initialDistribution?.outboundMessageIds.length) {
       await runWithConcurrency(initialDistribution.outboundMessageIds, 5, async (outboundMessageId) => {
@@ -574,9 +591,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
       mutationId,
       processed: candidateIds.length,
       processedLeadIds: candidateIds,
-      message: !withinBusinessHours
-        ? `${candidateIds.length} lead${candidateIds.length === 1 ? "" : "s"} agendado${candidateIds.length === 1 ? "" : "s"} para o próximo horário comercial.`
-        : initialDelivery?.sent
+      message: initialDelivery?.sent
           ? `${initialDelivery.sent} oferta${initialDelivery.sent === 1 ? " foi enviada" : "s foram enviadas"} agora. Os demais leads continuam na fila automática.`
           : initialDistribution?.offered
             ? `${initialDistribution.offered} oferta${initialDistribution.offered === 1 ? " foi criada" : "s foram criadas"}, mas o canal ainda não confirmou o envio. O sistema continuará tentando.`

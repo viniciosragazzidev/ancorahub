@@ -10,15 +10,19 @@
     },
     {
       "path": "/api/internal/jobs/distribution",
-      "schedule": "*/2 * * * *"
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/jobs/qualification-timeout",
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/internal/jobs/lead-effects",
-      "schedule": "*/2 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/internal/jobs/whatsapp",
-      "schedule": "*/2 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/internal/jobs/meta-sync",
@@ -26,7 +30,7 @@
     },
     {
       "path": "/api/internal/jobs/purge",
-      "schedule": "*/2 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/internal/jobs/waha-cadence",

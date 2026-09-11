@@ -29,6 +29,8 @@ type TeamMember = {
   branchId: string | null;
   branchName: string | null;
   customRoleScope?: "none" | "own" | "branch" | "tenant" | null;
+  canEditAuthority: boolean;
+  canManage: boolean;
 };
 
 type Props = {
@@ -389,11 +391,11 @@ export function TeamMemberActions({
     if (resendState.error) toast.error(resendState.error);
   }, [resendState, router]);
 
-  const canEdit = currentUserId !== member.userId && member.role !== "director";
-  const canDelete = canEdit;
-  const canToggle = canEdit && member.userId !== null;
+  const canEdit = member.canEditAuthority;
+  const canDelete = member.canManage;
+  const canToggle = member.canManage && member.userId !== null;
   const toggleLabel = displayStatus === "active" ? "Desativar" : "Ativar";
-  const canManageInvite = canEdit && (member.role === "broker" || member.role === "manager");
+  const canManageInvite = member.canManage && (member.role === "broker" || member.role === "manager");
   const canResetPassword = member.userId !== null && (currentRole === "director" || currentRole === "manager");
 
   return (
@@ -513,7 +515,6 @@ export function TeamMemberActions({
         key={`${member.id}-transfer`}
         member={member}
         allMembers={allMembers}
-        currentUserId={currentUserId}
         open={transferOpen}
         onOpenChange={setTransferOpen}
       />
@@ -676,13 +677,11 @@ function TransferLeadsDialog({
   open,
   onOpenChange,
   allMembers,
-  currentUserId,
 }: {
   member: TeamMember;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   allMembers: TeamMember[];
-  currentUserId: string;
 }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(
     transferLeadsAction,

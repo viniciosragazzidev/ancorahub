@@ -968,6 +968,13 @@ auditoria e revogam as sessões do membro para impedir autoridade obsoleta.
 Exclusões removem o vínculo do tenant e revogam sessões, sem apagar a identidade
 global que possa ser usada por outro tenant.
 
+**Emenda aprovada em 2026-09-11.** Um Diretor vinculado a uma unidade pode editar
+os dados, o cargo e o perfil de acesso de outro Diretor vinculado à mesma unidade.
+A exceção não permite autoedição, alvo geral ou de outra unidade, mudança de unidade,
+desativação ou exclusão do outro Diretor. O servidor revalida o vínculo do tenant e
+a unidade atual antes de aplicar a alteração; mudanças de autoridade continuam
+auditadas e revogam as sessões do alvo.
+
 ## DEC-096 — Importação de leads usa a fila e o motor canônico de ofertas
 
 **Decisão aprovada em 2026-09-10.** O seletor da importação CSV mostra filas ativas
@@ -1006,3 +1013,14 @@ desqualificados não entram na ação. O comando não escolhe nem grava um corre
 ele reabre o trabalho idempotente e a atribuição continua ocorrendo somente após
 o aceite atômico de uma oferta válida. A solicitação gera auditoria e permanece
 sujeita à janela operacional, elegibilidade, canal corporativo e kill switch.
+## DEC-098 — Central de distribuição como autoridade operacional
+
+**Estado:** Aceita
+**Data:** 2026-09-11
+
+Recebimento da unidade, auto-distribuição, papel da unidade, filas, regras de
+roteamento, elegibilidade, plantões, SLA e recuperação pertencem à Central
+`/distribuicao`. Filiais e Configurações exibem somente o estado e apontam para
+essa central; não oferecem mutações concorrentes. Se a unidade primária não
+possuir corretor elegível, o motor tenta a próxima unidade ativa permitida pela
+política, mantendo a ordem e registrando o motivo.

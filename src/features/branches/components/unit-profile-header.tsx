@@ -1,14 +1,10 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Buildings, SlidersHorizontal, WifiHigh } from "@/components/huge-icons";
+import { ArrowLeft, Buildings, WifiHigh } from "@/components/huge-icons";
 import Link from "next/link";
-import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toggleAcceptingLeadsAction, toggleAutoDistributeAction, type BranchActionState } from "@/features/branches/actions";
 import { UnitReportsExporter } from "@/features/branches/components/unit-reports-exporter";
 import type { TenantRole } from "@/shared/db/schema";
 
@@ -24,35 +20,11 @@ type UnitProfileHeaderProps = {
   backHref: string;
 };
 
-function ActionFeedback({ state }: { state: BranchActionState }) {
-  const router = useRouter();
-  useEffect(() => {
-    if (state.success) {
-      toast.success("Configuração atualizada.");
-      router.refresh();
-    }
-    if (state.error) toast.error(state.error);
-  }, [state, router]);
-  return null;
-}
-
 export function UnitProfileHeader({
   branch,
   currentRole,
   backHref,
 }: UnitProfileHeaderProps) {
-  const [acceptingState, acceptingAction, acceptingPending] = useActionState<BranchActionState, FormData>(
-    toggleAcceptingLeadsAction,
-    {},
-  );
-  const [autoDistState, autoDistAction, autoDistPending] = useActionState<BranchActionState, FormData>(
-    toggleAutoDistributeAction,
-    {},
-  );
-
-  const canToggleAccepting = currentRole === "director";
-  const canToggleAutoDist = currentRole === "director" || currentRole === "manager";
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
@@ -106,38 +78,13 @@ export function UnitProfileHeader({
             branchName={branch.name}
             currentRole={currentRole}
           />
-          {canToggleAccepting && (
-            <form action={acceptingAction}>
-              <input type="hidden" name="branchId" value={branch.id} />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                disabled={acceptingPending}
-                className="gap-1.5"
-              >
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                {branch.acceptingLeads ? "Pausar recebimento" : "Retomar recebimento"}
-              </Button>
-              <ActionFeedback state={acceptingState} />
-            </form>
-          )}
-          {canToggleAutoDist && (
-            <form action={autoDistAction}>
-              <input type="hidden" name="branchId" value={branch.id} />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                disabled={autoDistPending}
-                className="gap-1.5"
-              >
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                {branch.autoDistribute ? "Desativar auto-distribuição" : "Ativar auto-distribuição"}
-              </Button>
-              <ActionFeedback state={autoDistState} />
-            </form>
-          )}
+          <Button
+            render={<Link href="/distribuicao?view=filas" />}
+            variant="outline"
+            size="sm"
+          >
+            Configurar distribuição
+          </Button>
         </div>
       </div>
     </div>

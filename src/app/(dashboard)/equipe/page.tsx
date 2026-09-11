@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
+import { canEditMemberAuthority, canManageMember } from "@/shared/auth/team-permissions";
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
 
@@ -167,7 +168,21 @@ export default async function TeamPage() {
     ...new Map<string, TeamMemberRow>(
       [...brokers, ...nonBrokers].map((member) => [member.id, member])
     ).values(),
-  ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  ]
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    .map((member) => {
+      const target = {
+        role: member.role,
+        branchId: member.branchId,
+        userId: member.userId ?? member.id,
+      };
+
+      return {
+        ...member,
+        canEditAuthority: canEditMemberAuthority(context, target),
+        canManage: canManageMember(context, target),
+      };
+    });
   const activeMembers = members.filter((member) => member.status === "active").length;
   const unassignedCount = unassignedLeads[0]?.count ?? 0;
   const totalVolume = salesTotal[0]?.sum ?? 0;

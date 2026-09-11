@@ -1,14 +1,11 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
-import { toast } from "@/components/ui/sonner";
-import { Buildings, CheckCircle, XCircle, WifiHigh } from "@/components/huge-icons";
+import Link from "next/link";
+import { Buildings, WifiHigh } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toggleAcceptingLeadsAction, toggleAutoDistributeAction, type BranchActionState } from "@/features/branches/actions";
 import type { TenantRole } from "@/shared/db/schema";
 
 type BranchInfo = {
@@ -27,36 +24,7 @@ export function UnitTab({
   branch: BranchInfo | null;
   currentRole: TenantRole;
 }) {
-  const [acceptingState, acceptingAction, acceptingPending] = useActionState<BranchActionState, FormData>(
-    toggleAcceptingLeadsAction,
-    {},
-  );
-  const [autoDistState, autoDistAction, autoDistPending] = useActionState<BranchActionState, FormData>(
-    toggleAutoDistributeAction,
-    {},
-  );
-  const router = useRouter();
-
-  useEffect(() => {
-    if (acceptingState.success) {
-      toast.success("Recebimento de leads atualizado.");
-      router.refresh();
-    }
-    if (acceptingState.error) toast.error(acceptingState.error);
-  }, [acceptingState, router]);
-
-  useEffect(() => {
-    if (autoDistState.success) {
-      toast.success("Distribuição automática atualizada.");
-      router.refresh();
-    }
-    if (autoDistState.error) toast.error(autoDistState.error);
-  }, [autoDistState, router]);
-
-  const isDirector = currentRole === "director";
-  const canToggleAccepting = isDirector;
-  const canToggleAutoDist = currentRole === "director" || currentRole === "manager";
-
+  void currentRole;
   // Director without a specific branch selected — show overview
   if (!branch) {
     return (
@@ -72,11 +40,11 @@ export function UnitTab({
             <p className="text-xs text-muted-foreground">Escopo atual</p>
             <p className="mt-1 text-sm font-medium">Todas as unidades da corretora</p>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              As configurações de cada unidade podem ser ajustadas individualmente na página de{" "}
-              <a href="/filiais" className="text-primary underline underline-offset-2 hover:text-primary/80">
-                Filiais
-              </a>
-              .
+              A identidade da unidade continua em Filiais. Recebimento, auto-distribuição,
+              filas, regras e elegibilidade são definidos em um único lugar: {" "}
+              <Link href="/distribuicao?view=filas" className="text-primary underline underline-offset-2 hover:text-primary/80">
+                Central de Distribuição
+              </Link>.
             </p>
           </div>
         </CardContent>
@@ -127,87 +95,21 @@ export function UnitTab({
         </CardHeader>
       </Card>
 
-      {/* Accepting leads toggle — director only */}
-      {canToggleAccepting && (
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Recebimento de leads</CardTitle>
-            <CardDescription>
-              {branch.acceptingLeads
-                ? "A unidade está aceitando novos leads normalmente."
-                : "A unidade está pausada e não receberá novos leads."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={acceptingAction} className="flex items-center justify-between gap-4">
-              <input type="hidden" name="branchId" value={branch.id} />
-              <div className="flex items-center gap-3">
-                <motion.div
-                  animate={{ scale: acceptingPending ? 0.95 : 1 }}
-                  transition={{ duration: 0.15, ease: [0, 0, 0.2, 1] }}
-                >
-                  <button
-                    type="submit"
-                    disabled={acceptingPending}
-                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                      branch.acceptingLeads
-                        ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    } disabled:opacity-50`}
-                  >
-                    {branch.acceptingLeads ? <CheckCircle className="size-5" /> : <XCircle className="size-5" />}
-                    {branch.acceptingLeads ? "Ativo" : "Pausado"}
-                  </button>
-                </motion.div>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {acceptingPending ? "Alterando..." : "Clique para alternar"}
-              </span>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Auto-distribute toggle — manager & director */}
-      {canToggleAutoDist && (
-        <Card className="border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle>Distribuição automática</CardTitle>
-            <CardDescription>
-              {branch.autoDistribute
-                ? "Leads são distribuídos automaticamente entre corretores disponíveis desta unidade."
-                : "Leads chegam como novos e precisam ser distribuídos manualmente."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={autoDistAction} className="flex items-center justify-between gap-4">
-              <input type="hidden" name="branchId" value={branch.id} />
-              <div className="flex items-center gap-3">
-                <motion.div
-                  animate={{ scale: autoDistPending ? 0.95 : 1 }}
-                  transition={{ duration: 0.15, ease: [0, 0, 0.2, 1] }}
-                >
-                  <button
-                    type="submit"
-                    disabled={autoDistPending}
-                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                      branch.autoDistribute
-                        ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    } disabled:opacity-50`}
-                  >
-                    {branch.autoDistribute ? <CheckCircle className="size-5" /> : <XCircle className="size-5" />}
-                    {branch.autoDistribute ? "Ativada" : "Desativada"}
-                  </button>
-                </motion.div>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {autoDistPending ? "Alterando..." : "Clique para alternar"}
-              </span>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="border-border bg-card shadow-none">
+        <CardHeader>
+          <CardTitle>Configuração de distribuição</CardTitle>
+          <CardDescription>
+            Esta tela mostra o estado da unidade; todas as alterações de recebimento e distribuição ficam na Central de Distribuição.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Badge variant={branch.acceptingLeads ? "success" : "secondary"}>{branch.acceptingLeads ? "Recebendo leads" : "Recebimento pausado"}</Badge>
+            <Badge variant={branch.autoDistribute ? "success" : "secondary"}>{branch.autoDistribute ? "Auto-distribuição ativa" : "Auto-distribuição pausada"}</Badge>
+          </div>
+          <Button render={<Link href="/distribuicao?view=filas" />} size="sm">Abrir Central de Distribuição</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

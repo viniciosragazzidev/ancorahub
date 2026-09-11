@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canCreateRole,
+  canEditMemberAuthority,
   canManageMember,
   requireCanUpdateMemberAuthority,
 } from "@/shared/auth/team-permissions";
@@ -189,6 +190,44 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
     });
   });
 
+  describe("canEditMemberAuthority", () => {
+    it("allows a Director to edit another Director in the same explicit unit", () => {
+      const localDirector = {
+        ...directorContext,
+        branchId: unitA,
+      };
+
+      expect(canEditMemberAuthority(localDirector, {
+        userId: "director-2",
+        role: "director",
+        branchId: unitA,
+      })).toBe(true);
+    });
+
+    it("keeps self-edit, cross-unit Directors and tenant-wide Directors blocked", () => {
+      const localDirector = {
+        ...directorContext,
+        branchId: unitA,
+      };
+
+      expect(canEditMemberAuthority(localDirector, {
+        userId: localDirector.userId,
+        role: "director",
+        branchId: unitA,
+      })).toBe(false);
+      expect(canEditMemberAuthority(localDirector, {
+        userId: "director-unit-b",
+        role: "director",
+        branchId: unitB,
+      })).toBe(false);
+      expect(canEditMemberAuthority(directorContext, {
+        userId: "director-global",
+        role: "director",
+        branchId: null,
+      })).toBe(false);
+    });
+  });
+
   describe("requireCanUpdateMemberAuthority (Privilege & Scope Escalation Protection)", () => {
     it("prevents Manager from promoting a Broker to Director (Privilege Escalation)", () => {
       expect(() => {
@@ -275,6 +314,40 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
           },
         });
       }).not.toThrow();
+    });
+
+    it("allows a local Director to change another same-unit Director role", () => {
+      expect(() => {
+        requireCanUpdateMemberAuthority({
+          actorContext: { ...directorContext, branchId: unitA },
+          targetMember: {
+            userId: "director-2",
+            role: "director",
+            branchId: unitA,
+          },
+          proposed: {
+            role: "manager",
+            branchId: unitA,
+          },
+        });
+      }).not.toThrow();
+    });
+
+    it("prevents editing a same-unit Director while moving them to another unit", () => {
+      expect(() => {
+        requireCanUpdateMemberAuthority({
+          actorContext: { ...directorContext, branchId: unitA },
+          targetMember: {
+            userId: "director-2",
+            role: "director",
+            branchId: unitA,
+          },
+          proposed: {
+            role: "manager",
+            branchId: unitB,
+          },
+        });
+      }).toThrow(AuthorizationError);
     });
   });
 });

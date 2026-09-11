@@ -34,6 +34,7 @@ import {
   setBrokersAvailabilityAction,
   toggleAcceptingLeadsAction,
   toggleAutoDistributeAction,
+  toggleDistributionHubAction,
   toggleBrokerAvailabilityAction,
   type BranchActionState,
 } from "@/features/branches/actions";
@@ -44,6 +45,7 @@ type BranchItem = {
   status: "active" | "inactive";
   acceptingLeads: boolean;
   autoDistribute: boolean;
+  isDistributionHub: boolean;
   memberCount: number;
   availableBrokers: number;
   activeLeads: number;
@@ -122,6 +124,28 @@ function ToggleCell({
       >
         {enabled ? <CheckCircle /> : <XCircle />}
         {enabled ? "Ativo" : "Inativo"}
+      </Button>
+      <ActionFeedback state={state} />
+    </form>
+  );
+}
+
+function HubToggleCell({ branchId, enabled }: { branchId: string; enabled: boolean }) {
+  const formKey = useId();
+  const [state, formAction, pending] = useActionState<BranchActionState, FormData>(toggleDistributionHubAction, {});
+  const [formVersion, setFormVersion] = useState(0);
+  const previousResult = useRef(`${state.success ?? false}:${state.error ?? ""}`);
+  useEffect(() => {
+    const next = `${state.success ?? false}:${state.error ?? ""}`;
+    if (next === previousResult.current) return;
+    previousResult.current = next;
+    setFormVersion((value) => value + 1);
+  }, [state.success, state.error]);
+  return (
+    <form key={`${formKey}-${formVersion}`} action={formAction}>
+      <input type="hidden" name="branchId" value={branchId} />
+      <Button type="submit" disabled={pending} size="xs" variant={enabled ? "secondary" : "outline"}>
+        {enabled ? "Central" : "Distribui"}
       </Button>
       <ActionFeedback state={state} />
     </form>
@@ -340,7 +364,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
                   <TableHead className="pr-4 text-right">Ação</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+      <TableBody>
                 {visible.map((broker) => (
                   <TableRow key={broker.id}>
                     <TableCell className="pl-4">
@@ -596,6 +620,7 @@ export function DistributionPanel({
                     <TableHead className="min-w-[100px]">Status</TableHead>
                     <TableHead className="min-w-[120px]">Receber leads</TableHead>
                     <TableHead className="min-w-[140px]">Distrib. automática</TableHead>
+                    <TableHead className="min-w-[110px]">Papel da unidade</TableHead>
                     <TableHead className="min-w-[100px]">Corretores</TableHead>
                     <TableHead className="min-w-[80px]">Disponíveis</TableHead>
                     <TableHead className="min-w-[80px]">Leads ativos</TableHead>
@@ -650,6 +675,9 @@ export function DistributionPanel({
                           enabled={branch.autoDistribute}
                           action={toggleAutoDistributeAction}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <HubToggleCell branchId={branch.id} enabled={branch.isDistributionHub} />
                       </TableCell>
                       <TableCell>
                         <span className="font-mono text-sm tabular-nums">{branch.memberCount}</span>

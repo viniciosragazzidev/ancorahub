@@ -37,6 +37,8 @@ type TeamMember = {
   branchId: string | null;
   branchName: string | null;
   customRoleScope: "none" | "own" | "branch" | "tenant" | null;
+  canEditAuthority: boolean;
+  canManage: boolean;
 };
 
 type Props = {
