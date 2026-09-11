@@ -449,7 +449,11 @@ export default async function ConversationsPage({
       };
     });
 
-    const allConversations = [...mappedLeadConversations, ...syntheticLeadConversations];
+    // A conversation only exists once at least one WhatsApp message is
+    // persisted. Leads without history stay in Leads/Distribuição and must
+    // not appear as empty rows in the Conversations workspace.
+    const allConversations = [...mappedLeadConversations, ...syntheticLeadConversations]
+      .filter((conversation) => conversation.messages.length > 0);
     const uniqueConversationsByPhone = new Map<string, ConversationItem>();
 
     for (const conv of allConversations) {
@@ -727,7 +731,7 @@ export default async function ConversationsPage({
         })
         .filter(
           (conversation) =>
-            conversation.messages.length > 0 || Boolean(conversation.invitationStatus),
+            conversation.messages.length > 0,
         )
         .sort((a, b) => {
           const lastA = a.messages.at(-1)?.sentAt;
