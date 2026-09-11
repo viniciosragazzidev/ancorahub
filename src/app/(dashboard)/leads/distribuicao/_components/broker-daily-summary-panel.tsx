@@ -48,6 +48,7 @@ export function BrokerDailySummaryPanel({
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const fetchSummary = async (
     newPeriod = period,
@@ -148,6 +149,49 @@ export function BrokerDailySummaryPanel({
     toast.success("Relatório CSV baixado com sucesso!");
   };
 
+  const handleExportPDF = async () => {
+    setIsExportingPdf(true);
+    try {
+      const end = new Date();
+      const start = new Date(end);
+      if (period === "week") start.setDate(start.getDate() - 6);
+      if (period === "month") start.setDate(1);
+      if (period === "custom" && startDate) {
+        const customStart = new Date(`${startDate}T00:00:00`);
+        if (!Number.isNaN(customStart.getTime())) start.setTime(customStart.getTime());
+        if (endDate) {
+          const customEnd = new Date(`${endDate}T23:59:59`);
+          if (!Number.isNaN(customEnd.getTime())) end.setTime(customEnd.getTime());
+        }
+      }
+      const formatDate = (value: Date) => {
+        const offset = value.getTimezoneOffset() * 60_000;
+        return new Date(value.getTime() - offset).toISOString().slice(0, 10);
+      };
+      const query = new URLSearchParams({ start: `${formatDate(start)}T00:00:00.000Z`, end: `${formatDate(end)}T23:59:59.999Z`, format: "pdf" });
+      if (selectedBranchId !== "all") query.set("branchId", selectedBranchId);
+      const response = await fetch(`/api/reports/distribution?${query.toString()}`, { cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Não foi possível gerar o PDF.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `distribuicao-${formatDate(start)}-a-${formatDate(end)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("PDF da distribuição baixado com sucesso!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar o PDF.");
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const filteredItems = data.items.filter((item) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return true;
@@ -221,6 +265,10 @@ export function BrokerDailySummaryPanel({
             <Button size="xs" variant="outline" onClick={handleExportCSV} className="gap-1.5">
               <Download className="h-3.5 w-3.5" />
               Exportar CSV
+            </Button>
+            <Button size="xs" variant="outline" onClick={handleExportPDF} disabled={isExportingPdf} className="gap-1.5">
+              <Download className="h-3.5 w-3.5" />
+              {isExportingPdf ? "Gerando PDF..." : "Exportar PDF"}
             </Button>
           </div>
         </div>
