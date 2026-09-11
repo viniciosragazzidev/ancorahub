@@ -24,6 +24,7 @@ export type EventKey =
   | "LEAD_ASSIGNMENT_CONFIRMED"
   | "LEAD_ASSIGNMENT_UNAVAILABLE"
   | "LEAD_ASSIGNMENT_EXPIRED"
+  | "LEAD_FEEDBACK_REMINDER"
   | "QUOTE_READY"
   | "TASK_REMINDER"
   | "CLIENT_NOTICE";
@@ -36,6 +37,7 @@ export const CRM_EVENT_LABEL_MAP: Record<EventKey, string> = {
   LEAD_ASSIGNMENT_CONFIRMED: "Confirmação de Aceite pelo Corretor",
   LEAD_ASSIGNMENT_UNAVAILABLE: "Lead Indisponível / Já Resgatado",
   LEAD_ASSIGNMENT_EXPIRED: "Expiração de Fila de Plantão",
+  LEAD_FEEDBACK_REMINDER: "Lembrete de feedback do atendimento",
   QUOTE_READY: "Cotação / Proposta Concluída",
   TASK_REMINDER: "Lembrete de Tarefa Comercial",
   CLIENT_NOTICE: "Aviso Geral ao Cliente",
