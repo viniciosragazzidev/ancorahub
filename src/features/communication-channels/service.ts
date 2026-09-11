@@ -214,19 +214,10 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
         const matchedClient = clients.find((item) => samePhone(item.phone, phone));
         let activeLeadId = lead?.id;
-        if (!lead && !matchedClient) {
-          // Etapa 2 — Criar novo lead automaticamente para contato recebido sem cadastro
-          activeLeadId = randomUUID();
-          await db.insert(schema.leads).values({
-            id: activeLeadId,
-            tenantId: channel.tenantId,
-            nome: `Lead WhatsApp (${phone.slice(-4)})`,
-            telefone: phone,
-            origem: "webhook",
-            status: "new",
-            serviceStartedAt: new Date(),
-          });
-        }
+        // Unknown first messages are retained as channel history only. Lead
+        // creation is restricted to the governed intake/integration flow;
+        // this prevents internal or unsolicited WhatsApp messages from being
+        // distributed as synthetic leads.
 
         await db.insert(schema.whatsappMessages).values({
           id: randomUUID(),

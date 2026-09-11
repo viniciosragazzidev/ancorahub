@@ -18,7 +18,7 @@ describe("shouldCreateSyntheticLead", () => {
     ).toBe(false);
   });
 
-  it("keeps tenant relay intake for unknown external inbound", () => {
+  it("does not manufacture a lead from an unknown official inbound", () => {
     expect(
       shouldCreateSyntheticLead({
         sourceKind: "number",
@@ -27,7 +27,7 @@ describe("shouldCreateSyntheticLead", () => {
         hasClient: false,
         isTenantOfficialNumber: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

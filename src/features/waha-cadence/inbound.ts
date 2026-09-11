@@ -36,14 +36,10 @@ export function shouldCreateSyntheticLead(input: {
   isTenantOfficialNumber: boolean;
   isBrokerOrTeam?: boolean;
 }) {
-  return (
-    input.sourceKind === "number" &&
-    !input.isOutgoing &&
-    !input.hasLead &&
-    !input.hasClient &&
-    !input.isTenantOfficialNumber &&
-    !input.isBrokerOrTeam
-  );
+  // Official WhatsApp inbound is history-only. Leads enter through the
+  // governed intake/integration flow; an unknown first message must never
+  // manufacture a synthetic lead that can reach automatic distribution.
+  return false;
 }
 
 /**
