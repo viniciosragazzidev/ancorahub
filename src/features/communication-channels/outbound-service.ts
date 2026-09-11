@@ -90,15 +90,16 @@ async function isCurrentBrokerLeadNotification(row: {
     ? row.variables[4]
     : null;
   if (!leadId || !row.recipientId) return false;
-  const [lead] = await getDatabase().select({ id: schema.leads.id })
+  const [lead] = await getDatabase().select({ id: schema.leads.id, status: schema.leads.status, deletedAt: schema.leads.deletedAt, nome: schema.leads.nome })
     .from(schema.leads)
     .where(and(
       eq(schema.leads.id, leadId),
       eq(schema.leads.tenantId, row.tenantId),
       eq(schema.leads.corretorId, row.recipientId),
+      isNull(schema.leads.deletedAt),
     ))
     .limit(1);
-  return Boolean(lead);
+  return Boolean(lead && lead.status !== "lost" && !/^Lead WhatsApp\s*\(/i.test(lead.nome?.trim() ?? ""));
 }
 
 async function getBrokerLeadNotificationCadenceAt(row: {

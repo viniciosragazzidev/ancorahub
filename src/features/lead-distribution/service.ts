@@ -395,8 +395,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     distributionUpdatedAt: schema.leads.distributionUpdatedAt,
     corretorId: schema.leads.corretorId,
     assignmentSource: schema.leads.assignmentSource,
+    status: schema.leads.status,
+    deletedAt: schema.leads.deletedAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  if (lead.deletedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
+    return { status: "manual_required", leadId, reason: "Lead inativo; distribuição bloqueada." };
+  }
   // Synthetic records created from internal/team WhatsApp messages are not
   // customer leads and must never enter the broker offer cycle.
   if (/^Lead WhatsApp\s*\(/i.test(lead.nome?.trim() ?? "")) {
