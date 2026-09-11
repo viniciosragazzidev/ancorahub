@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, lte, inArray, isNull, isNotNull, count, avg } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, isNull, isNotNull, count, avg, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { percentage } from "@/features/reports/metrics/metrics-math";
@@ -19,6 +19,12 @@ export type BrokerDailySummaryItem = {
   convertedLeads: number;
   conversionRate: number;
   avgFirstContactMinutes: number | null;
+  offersReceived: number;
+  offersAccepted: number;
+  offersExpired: number;
+  redistributedLeads: number;
+  redistributionRate: number;
+  avgOfferResponseMinutes: number | null;
 };
 
 export type BrokerDailySummaryAggregate = {
@@ -192,12 +198,32 @@ export async function fetchBrokerDailySummary(
     )
     .groupBy(schema.leads.corretorId);
 
+  const offerStats = await db
+    .select({
+      brokerId: schema.leadOffers.brokerId,
+      offersReceived: count(schema.leadOffers.id),
+      offersAccepted: sql<number>`count(*) filter (where ${schema.leadOffers.acceptedAt} is not null)`,
+      offersExpired: sql<number>`count(*) filter (where ${schema.leadOffers.status} = 'EXPIRED')`,
+      avgResponseSeconds: sql<number>`avg(extract(epoch from (${schema.leadOffers.acceptedAt} - ${schema.leadOffers.offeredAt}))) filter (where ${schema.leadOffers.acceptedAt} is not null)`,
+    })
+    .from(schema.leadOffers)
+    .where(and(eq(schema.leadOffers.tenantId, tenantId), inArray(schema.leadOffers.brokerId, brokerIds), gte(schema.leadOffers.offeredAt, options.startDate), lte(schema.leadOffers.offeredAt, options.endDate)))
+    .groupBy(schema.leadOffers.brokerId);
+
+  const redistributionStats = await db
+    .select({ brokerId: schema.leadDistributionEvents.previousOwnerId, count: count(schema.leadDistributionEvents.id) })
+    .from(schema.leadDistributionEvents)
+    .where(and(eq(schema.leadDistributionEvents.tenantId, tenantId), inArray(schema.leadDistributionEvents.previousOwnerId, brokerIds), eq(schema.leadDistributionEvents.source, "redistribution"), gte(schema.leadDistributionEvents.createdAt, options.startDate), lte(schema.leadDistributionEvents.createdAt, options.endDate)))
+    .groupBy(schema.leadDistributionEvents.previousOwnerId);
+
   // Maps for fast aggregation
   const receivedMap = new Map(receivedLeads.map((r) => [r.corretorId!, { count: Number(r.count), avgLatency: r.avgLatency ? Number(r.avgLatency) : null }]));
   const activeMap = new Map(activeLeads.map((a) => [a.corretorId!, Number(a.count)]));
   const unstartedMap = new Map(unstartedLeads.map((u) => [u.corretorId!, Number(u.count)]));
   const lostMap = new Map(lostLeads.map((l) => [l.corretorId!, Number(l.count)]));
   const convertedMap = new Map(convertedLeads.map((c) => [c.corretorId!, Number(c.count)]));
+  const offerMap = new Map(offerStats.map((o) => [o.brokerId, { offersReceived: Number(o.offersReceived), offersAccepted: Number(o.offersAccepted), offersExpired: Number(o.offersExpired), avgResponseMinutes: o.avgResponseSeconds ? Math.round(Number(o.avgResponseSeconds) / 60) : null }]));
+  const redistributionMap = new Map(redistributionStats.map((r) => [r.brokerId!, Number(r.count)]));
 
   let totalReceived = 0;
   let totalActive = 0;
@@ -228,6 +254,8 @@ export async function fetchBrokerDailySummary(
 
     const conversionRate = percentage(convCount, recCount);
     const avgFirstContactMinutes = rec?.avgLatency ? Math.round(rec.avgLatency / 60) : null;
+    const offers = offerMap.get(broker.id) ?? { offersReceived: 0, offersAccepted: 0, offersExpired: 0, avgResponseMinutes: null };
+    const redistributedLeads = redistributionMap.get(broker.id) ?? 0;
 
     return {
       brokerId: broker.id,
@@ -243,6 +271,12 @@ export async function fetchBrokerDailySummary(
       convertedLeads: convCount,
       conversionRate,
       avgFirstContactMinutes,
+      offersReceived: offers.offersReceived,
+      offersAccepted: offers.offersAccepted,
+      offersExpired: offers.offersExpired,
+      redistributedLeads,
+      redistributionRate: percentage(redistributedLeads, recCount),
+      avgOfferResponseMinutes: offers.avgResponseMinutes,
     };
   });
 

@@ -397,6 +397,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     assignmentSource: schema.leads.assignmentSource,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  // Synthetic records created from internal/team WhatsApp messages are not
+  // customer leads and must never enter the broker offer cycle.
+  if (/^Lead WhatsApp\s*\(/i.test(lead.nome?.trim() ?? "")) {
+    return { status: "manual_required", leadId, reason: "Mensagem interna sem lead válido; distribuição ignorada." };
+  }
   const canRotateCurrentOwner = Boolean(
     lead.corretorId
       && (lead.assignmentSource === "automatic_offer" || lead.corretorId === excludeBrokerId),

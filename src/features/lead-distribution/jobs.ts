@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -174,6 +174,7 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       isNull(schema.leads.deletedAt),
+      not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
@@ -238,6 +239,7 @@ async function recoverStuckLeadAssignments(now: Date, config: DistributionJobCon
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       isNull(schema.leads.deletedAt),
+      not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
@@ -356,11 +358,11 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   }
 
   await runWithConcurrency(claimedJobs, Math.min(5, claimedJobs.length || 1), async (job) => {
-    const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, deletedAt: schema.leads.deletedAt })
+    const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, deletedAt: schema.leads.deletedAt, nome: schema.leads.nome })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))
       .limit(1);
-    if (!currentLead || currentLead.deletedAt || currentLead.status === "lost" || currentLead.qualificationStatus === "disqualified") {
+    if (!currentLead || currentLead.deletedAt || currentLead.status === "lost" || currentLead.qualificationStatus === "disqualified" || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
       await completeJob(job.id);
       result.skipped += 1;
       return;

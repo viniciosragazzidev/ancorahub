@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import * as XLSX from "xlsx";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 
@@ -16,7 +17,7 @@ const MAX_RANGE_DAYS = 366;
 const inputSchema = z.object({
   start: z.coerce.date(),
   end: z.coerce.date(),
-  format: z.enum(["xlsx", "csv"]).default("xlsx"),
+  format: z.enum(["xlsx", "csv", "pdf"]).default("xlsx"),
   branchId: z.string().optional(),
 });
 
@@ -38,6 +39,42 @@ function encodeCsv(rows: Record<string, unknown>[]) {
   const columns = Object.keys(normalized[0] ?? {});
   const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
   return `\uFEFF${[columns.join(";"), ...normalized.map((row) => columns.map((column) => quote(row[column])).join(";"))].join("\r\n")}`;
+}
+
+function printable(value: unknown) {
+  return String(value ?? "").replace(/[\r\n]+/g, " ").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
+}
+
+async function encodePdf(title: string, start: Date, end: Date, rows: Record<string, unknown>[]) {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const margin = 36;
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const lineHeight = 12;
+  const maxChars = 105;
+  let page = pdf.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+  const addPage = () => { page = pdf.addPage([pageWidth, pageHeight]); y = pageHeight - margin; };
+  const draw = (text: string, size = 8, isBold = false) => {
+    if (y < margin + lineHeight) addPage();
+    page.drawText(text.slice(0, maxChars), { x: margin, y, size, font: isBold ? bold : font, color: rgb(0.12, 0.16, 0.22) });
+    y -= lineHeight;
+  };
+  draw(`Relatório ${printable(title)}`, 16, true);
+  draw(`Período: ${start.toLocaleDateString("pt-BR")} a ${end.toLocaleDateString("pt-BR")}`, 9);
+  draw(`Registros: ${rows.length}`, 9);
+  y -= 8;
+  for (const [index, row] of rows.entries()) {
+    draw(`${index + 1}.`, 8, true);
+    for (const [key, value] of Object.entries(row)) {
+      const text = `${printable(key)}: ${printable(value)}`;
+      for (let offset = 0; offset < text.length; offset += maxChars) draw(text.slice(offset, offset + maxChars), 7);
+    }
+    y -= 5;
+  }
+  return new Uint8Array(await pdf.save());
 }
 
 function filename(reportId: ReportId, start: Date, end: Date, format: ReportFormat) {
@@ -116,8 +153,9 @@ export async function generateReport(context: TenantContext, reportId: string, r
       rows = await db.select({
         data: schema.leadDistributionEvents.createdAt, lead: schema.leads.nome, acao: schema.leadDistributionEvents.action,
         origem: schema.leadDistributionEvents.source, estrategia: schema.leadDistributionEvents.strategy,
+        motivo: schema.leadDistributionEvents.reason, unidade: schema.branches.name,
         responsavel: schema.user.name, primeiroContatoEm: schema.leads.firstContactAt,
-      }).from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), leadScope, gte(schema.leadDistributionEvents.createdAt, input.start), lte(schema.leadDistributionEvents.createdAt, input.end))).orderBy(asc(schema.leadDistributionEvents.createdAt)).limit(MAX_EXPORT_ROWS);
+      }).from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).leftJoin(schema.branches, eq(schema.leadDistributionEvents.toBranchId, schema.branches.id)).where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), leadScope, gte(schema.leadDistributionEvents.createdAt, input.start), lte(schema.leadDistributionEvents.createdAt, input.end))).orderBy(asc(schema.leadDistributionEvents.createdAt)).limit(MAX_EXPORT_ROWS);
       break;
     case "tasks":
       rows = await db.select({
@@ -132,6 +170,7 @@ export async function generateReport(context: TenantContext, reportId: string, r
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "report", entidadeId: definition.id, acao: `report.generated:${definition.id}:${normalized.length}:${input.format}` });
   const exportName = filename(definition.id, input.start, input.end, input.format);
   if (input.format === "csv") return { body: encodeCsv(normalized), contentType: "text/csv; charset=utf-8", filename: exportName, rows: normalized.length };
+  if (input.format === "pdf") return { body: await encodePdf(definition.title, input.start, input.end, normalized), contentType: "application/pdf", filename: exportName, rows: normalized.length };
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(normalized), "Relatório");
   return { body: new Uint8Array(XLSX.write(workbook, { type: "array", bookType: "xlsx" })), contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename: exportName, rows: normalized.length };

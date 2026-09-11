@@ -109,6 +109,12 @@ export function BrokerDailySummaryPanel({
       "Vendas Fechadas",
       "Taxa Conversao (%)",
       "Tempo Medio Resposta (min)",
+      "Ofertas Recebidas",
+      "Ofertas Aceitas",
+      "Ofertas Expiradas",
+      "Redistribuídos",
+      "Taxa Redistribuição (%)",
+      "Tempo Médio para Aceitar (min)",
     ];
 
     const rows = data.items.map((item) => [
@@ -123,6 +129,12 @@ export function BrokerDailySummaryPanel({
       item.convertedLeads,
       `${item.conversionRate}%`,
       item.avgFirstContactMinutes !== null ? item.avgFirstContactMinutes : "N/A",
+      item.offersReceived,
+      item.offersAccepted,
+      item.offersExpired,
+      item.redistributedLeads,
+      `${item.redistributionRate}%`,
+      item.avgOfferResponseMinutes !== null ? item.avgOfferResponseMinutes : "N/A",
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
@@ -342,13 +354,14 @@ export function BrokerDailySummaryPanel({
                 <TableHead className="text-right">Vendas</TableHead>
                 <TableHead className="text-right">Conversão (%)</TableHead>
                 <TableHead className="text-right">Tempo Resp.</TableHead>
+                <TableHead className="text-right">Redistribuição</TableHead>
                 <TableHead className="text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={12} className="py-8 text-center text-muted-foreground">
                     Nenhum corretor encontrado com os filtros selecionados.
                   </TableCell>
                 </TableRow>
@@ -387,6 +400,10 @@ export function BrokerDailySummaryPanel({
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {item.avgFirstContactMinutes !== null ? `${item.avgFirstContactMinutes} min` : "N/A"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <span className="font-semibold">{item.redistributionRate}%</span>
+                      <span className="ml-1 text-xs text-muted-foreground">({item.redistributedLeads})</span>
                     </TableCell>
                     <TableCell className="text-center">
                       <Button
