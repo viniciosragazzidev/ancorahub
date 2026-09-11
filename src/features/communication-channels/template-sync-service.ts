@@ -385,6 +385,7 @@ export class WhatsAppTemplateResolver {
     else if (purpose === "leadAssignmentConfirmed") eventKey = "LEAD_ASSIGNMENT_CONFIRMED";
     else if (purpose === "leadAssignmentUnavailable") eventKey = "LEAD_ASSIGNMENT_UNAVAILABLE";
     else if (purpose === "leadAssignmentExpired") eventKey = "LEAD_ASSIGNMENT_EXPIRED";
+    else if (purpose === "leadFeedbackReminder") eventKey = "LEAD_FEEDBACK_REMINDER";
     else if (purpose === "taskReminder") eventKey = "TASK_REMINDER";
     else if (purpose === "clientNotice") eventKey = "CLIENT_NOTICE";
 

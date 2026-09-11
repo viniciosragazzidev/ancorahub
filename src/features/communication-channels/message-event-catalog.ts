@@ -131,6 +131,15 @@ export const MESSAGE_EVENT_CATALOG = [
     variables: [brokerName],
   },
   {
+    key: "LEAD_FEEDBACK_REMINDER",
+    purpose: "leadFeedbackReminder",
+    label: "Lembrete de feedback do atendimento",
+    description: "Lembra o corretor de registrar uma atualização após o tempo configurado.",
+    audience: "user",
+    windowRule: "corporate_internal",
+    variables: [brokerName, leadName],
+  },
+  {
     key: "BROKER_WELCOME",
     purpose: "brokerInvitation",
     label: "Primeiro acesso do corretor",

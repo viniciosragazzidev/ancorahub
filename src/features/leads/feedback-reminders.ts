@@ -4,8 +4,11 @@ import { and, count, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
+const MAX_DAILY_FEEDBACK_REMINDERS = 2;
 
 export type FeedbackReminderResult = {
   reminders: number;
@@ -142,6 +145,17 @@ export async function createLeadFeedbackReminders(tenantId?: string): Promise<Fe
       title: string;
       message: string;
     }> = [];
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dailyReminders = await db.select({ recipientUserId: schema.notifications.recipientUserId, count: count(schema.notifications.id) })
+      .from(schema.notifications)
+      .where(and(
+        eq(schema.notifications.type, "lead_feedback_reminder"),
+        eq(schema.notifications.tenantId, tenant.id),
+        gte(schema.notifications.createdAt, dayStart),
+        inArray(schema.notifications.recipientUserId, leads.map((lead) => lead.corretorId!).filter(Boolean)),
+      ))
+      .groupBy(schema.notifications.recipientUserId);
+    const dailyCounts = new Map(dailyReminders.map((row) => [row.recipientUserId, Number(row.count)]));
 
     for (const lead of leads) {
       if (!lead.corretorId) continue;
@@ -173,6 +187,7 @@ export async function createLeadFeedbackReminders(tenantId?: string): Promise<Fe
         });
       } else {
         // Active status leads (post-first-contact) — regular feedback reminders
+        if ((dailyCounts.get(lead.corretorId) ?? 0) >= MAX_DAILY_FEEDBACK_REMINDERS) continue;
         if (attemptCount >= maxAttempts) {
           tenantEscalated += 1;
           toNotify.push({
@@ -194,6 +209,7 @@ export async function createLeadFeedbackReminders(tenantId?: string): Promise<Fe
           title: "Atualize o atendimento",
           message: `Registre um feedback sobre ${lead.nome} e atualize o status (${attemptCount + 1}/${maxAttempts}).`,
         });
+        dailyCounts.set(lead.corretorId, (dailyCounts.get(lead.corretorId) ?? 0) + 1);
       }
     }
 
@@ -216,6 +232,34 @@ export async function createLeadFeedbackReminders(tenantId?: string): Promise<Fe
         }).catch(() => { /* non-blocking */ }),
       ),
     );
+
+    const feedbackNotices = toNotify.filter((notice) => notice.leadId && notice.message.startsWith("Registre um feedback"));
+    if (feedbackNotices.length) {
+      const brokerIds = [...new Set(feedbackNotices.map((notice) => notice.recipientUserId))];
+      const brokers = await db.select({ userId: schema.user.id, name: schema.user.name, phone: schema.brokerProfiles.phone })
+        .from(schema.tenantMemberships)
+        .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+        .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, tenant.id)))
+        .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.userId, brokerIds)));
+      const brokerMap = new Map(brokers.map((broker) => [broker.userId, broker]));
+      const requestedBy = await resolveSystemUserId(tenant.id);
+      await Promise.allSettled(feedbackNotices.map(async (notice) => {
+        const broker = brokerMap.get(notice.recipientUserId);
+        const lead = leads.find((item) => item.id === notice.leadId);
+        const phone = broker?.phone?.trim();
+        if (!broker || !lead || !phone || !notice.leadId) return;
+        await enqueueMetaTemplateMessage({
+          tenantId: tenant.id,
+          recipientType: "user",
+          recipientId: broker.userId,
+          destinationPhone: phone,
+          purpose: "leadFeedbackReminder",
+          variables: [broker.name?.trim() || "Corretor(a)", lead.nome],
+          requestedBy,
+          idempotencyKey: `feedback-reminder:${lead.id}:${broker.userId}:${dayStart.toISOString()}:${dailyCounts.get(broker.userId) ?? 1}`,
+        });
+      }));
+    }
 
     totalReminders += toNotify.length;
 

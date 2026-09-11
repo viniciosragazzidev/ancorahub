@@ -11,6 +11,7 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
   leadAssignmentConfirmed: { name: "lead_assignment_confirmed", language: "pt_BR" },
   leadAssignmentUnavailable: { name: "lead_assignment_unavailable", language: "pt_BR" },
   leadAssignmentExpired: { name: "lead_assignment_expired", language: "pt_BR" },
+  leadFeedbackReminder: { name: "registrar_feedback_lead", language: "pt_BR" },
   aiQualification: { name: "__text__", language: "pt_BR" },
 } as const;
 

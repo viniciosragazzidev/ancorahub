@@ -120,7 +120,7 @@ const navigationItems: NavItemConfig[] = [
     label: "WhatsApp",
     fullLabel: "Conexões WhatsApp",
     icon: WhatsappLogo,
-    url: "/settings/whatsapp",
+    url: "/integrations/whatsapp",
     permission: "acessar_configuracoes_pessoais",
     isWhatsApp: true,
     beta: true,
