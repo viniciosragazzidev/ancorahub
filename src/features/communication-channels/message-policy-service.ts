@@ -244,14 +244,6 @@ export async function saveMessageEventPolicy(tenantId: string, userId: string, i
     if (unknown.length > 0) throw new Error(`A mensagem livre usa variáveis incompatíveis: ${unknown.map((item) => `{{${item}}}`).join(", ")}.`);
   }
 
-  if (event.windowRule === "corporate_internal" && parsed.primaryKind === "free_message" && parsed.active) {
-    const internalPolicy = await getInternalBrokerNotificationPolicy(tenantId);
-    const wahaNumber = await getSelectedInternalWahaNumber(tenantId, internalPolicy.wahaNumberId);
-    if (!internalPolicy.enabled || !wahaNumber) {
-      throw new Error("Para usar mensagem livre como principal neste aviso, ative e selecione um WhatsApp corporativo.");
-    }
-  }
-
   const db = getDatabase();
   const now = new Date();
   const [existing] = await db.select({ id: schema.communicationEventMessagePolicies.id, version: schema.communicationEventMessagePolicies.version })
@@ -463,7 +455,7 @@ export async function resolveEventMessagePlan(input: {
     const internalPolicy = await getInternalBrokerNotificationPolicy(input.tenantId);
     const wahaNumber = await getSelectedInternalWahaNumber(input.tenantId, internalPolicy.wahaNumberId);
     if (internalPolicy.enabled && wahaNumber) preferWahaDirect = true;
-    else {
+    else if (!serviceWindowOpen) {
       const automaticMappings = legacyMeta
         ? buildAutomaticMetaVariableMappings(event, legacyMeta.variables)
         : null;

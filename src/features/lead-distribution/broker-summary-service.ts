@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, lte, inArray, isNull, count, avg } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, isNull, isNotNull, count, avg } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { percentage } from "@/features/reports/metrics/metrics-math";
@@ -109,8 +109,12 @@ export async function fetchBrokerDailySummary(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
         inArray(schema.leads.corretorId, brokerIds),
-        gte(schema.leads.createdAt, options.startDate),
-        lte(schema.leads.createdAt, options.endDate),
+        // “Recebidos” is based on the moment the lead was assigned to the
+        // broker, not when the lead record was originally created/imported.
+        // A lead created yesterday and distributed today must count today.
+        isNotNull(schema.leads.assignedAt),
+        gte(schema.leads.assignedAt, options.startDate),
+        lte(schema.leads.assignedAt, options.endDate),
       ),
     )
     .groupBy(schema.leads.corretorId);

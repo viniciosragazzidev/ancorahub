@@ -169,6 +169,11 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
           isNotNull(schema.leads.corretorId),
         ),
       ),
+      // Lost, disqualified or soft-deleted leads are terminal and must never
+      // be re-seeded into (or continue through) the distribution queue.
+      ne(schema.leads.status, "lost"),
+      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+      isNull(schema.leads.deletedAt),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
@@ -230,6 +235,9 @@ async function recoverStuckLeadAssignments(now: Date, config: DistributionJobCon
       eq(schema.leads.distributionStatus, "assigning"),
       isNull(schema.leads.corretorId),
       lte(schema.leads.distributionUpdatedAt, cutoff),
+      ne(schema.leads.status, "lost"),
+      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+      isNull(schema.leads.deletedAt),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
@@ -348,6 +356,15 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   }
 
   await runWithConcurrency(claimedJobs, Math.min(5, claimedJobs.length || 1), async (job) => {
+    const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, deletedAt: schema.leads.deletedAt })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))
+      .limit(1);
+    if (!currentLead || currentLead.deletedAt || currentLead.status === "lost" || currentLead.qualificationStatus === "disqualified") {
+      await completeJob(job.id);
+      result.skipped += 1;
+      return;
+    }
     const context = await getAutomationContext(job.tenantId);
     if (!context) {
       const failed = await deferOrFailJob(job, effectiveConfig, "NO_AUTOMATION_ACTOR", "Não existe Diretor ativo para auditar a distribuição automática.", true);

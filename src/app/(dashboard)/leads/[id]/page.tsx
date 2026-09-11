@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +103,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (!lead) notFound();
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
 
+  const [redistributionNotice] = context.role === "broker"
+    ? await db
+      .select({ reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt })
+      .from(schema.leadDistributionEvents)
+      .where(and(
+        eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+        eq(schema.leadDistributionEvents.leadId, lead.id),
+        eq(schema.leadDistributionEvents.previousOwnerId, context.userId),
+        eq(schema.leadDistributionEvents.source, "redistribution"),
+      ))
+      .orderBy(desc(schema.leadDistributionEvents.createdAt))
+      .limit(1)
+    : [];
+
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
     const [brokerUser] = await db
       .select({ name: schema.user.name })
@@ -155,6 +169,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       consentimentoLgpd: lead.consentimentoLgpd,
       aiIntelligence: qualificationDetails?.aiIntelligence || null,
       aiPolicyResult: qualificationDetails?.aiPolicyResult || null,
+      redistributionNotice: redistributionNotice ? {
+        reason: redistributionNotice.reason,
+        createdAt: redistributionNotice.createdAt,
+      } : null,
     };
 
     return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
@@ -561,13 +561,25 @@ export function OfficialBrokerConversations({
                     </MarkerContent>
                   </Marker>
 
-                  {selected.messages.map((message) => (
-                    <MessageBubble
-                      brokerName={selected.name}
-                      key={message.id}
-                      message={message}
-                    />
-                  ))}
+                  {selected.messages.map((message, index) => {
+                    const previous = selected.messages[index - 1];
+                    const dateLabel = formatDateDivider(message.sentAt);
+                    const previousDateLabel = previous ? formatDateDivider(previous.sentAt) : null;
+                    return (
+                      <Fragment key={message.id}>
+                        {dateLabel !== previousDateLabel ? (
+                          <div className="my-2 flex items-center justify-center gap-3" role="separator" aria-label={dateLabel}>
+                            <div className="h-px flex-1 bg-border/50" />
+                            <span className="rounded-full border border-border/60 bg-muted/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shadow-2xs">
+                              {dateLabel}
+                            </span>
+                            <div className="h-px flex-1 bg-border/50" />
+                          </div>
+                        ) : null}
+                        <MessageBubble brokerName={selected.name} message={message} />
+                      </Fragment>
+                    );
+                  })}
 
                   {!selected.messages.length ? (
                     <EmptyState
@@ -877,4 +889,14 @@ function formatTime(isoDate: string) {
   } catch {
     return "";
   }
+}
+
+function formatDateDivider(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return "Hoje";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Ontem";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
 }

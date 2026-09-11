@@ -432,7 +432,16 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (queue?.branchId && intelligentPolicy.value.excludedBranchIds.includes(queue.branchId)) {
     return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta unidade." };
   }
-  const configuredBranchIds = resolveQueueCandidateBranchIds({ queueBranchId: queue?.branchId ?? null, allowedBranchIds: (intelligentPolicy.value.allowedBranchIds ?? []).filter((branchId) => !intelligentPolicy.value.excludedBranchIds.includes(branchId)), leadBranchId: lead.branchId });
+  const policyBranchIds = (intelligentPolicy.value.allowedBranchIds ?? [])
+    .filter((branchId) => !intelligentPolicy.value.excludedBranchIds.includes(branchId));
+  // An unbound queue with no allow-list means “todas as unidades”. Do not
+  // collapse that scope to the lead's current unit; the tenant-wide selector
+  // below will choose the least-loaded eligible unit in rotation.
+  const configuredBranchIds = resolveQueueCandidateBranchIds({
+    queueBranchId: queue?.branchId ?? null,
+    allowedBranchIds: policyBranchIds,
+    leadBranchId: queue?.branchId || policyBranchIds.length ? lead.branchId : null,
+  });
   const requestedBranchIds = context.role === "manager" && context.branchId
     ? configuredBranchIds.filter((branchId) => branchId === context.branchId)
     : configuredBranchIds;
