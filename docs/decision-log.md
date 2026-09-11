@@ -25,6 +25,36 @@ cadência, revalidação do dono, outbox e idempotência das DEC-079/083/084 nã
 O catálogo de eventos é extensível em código, mas a UI não inventa eventos sem um
 produtor real. Detalhes técnicos e rollback estão no ADR-0041.
 
+## DEC-097 — Titularidade provisória e autoridade única da distribuição
+
+**Estado:** Aceita
+**Data:** 2026-09-10
+
+`src/features/lead-distribution` é a autoridade única para seleção automática de
+unidade, fila e corretor. Entradas manuais, CSV, Meta Ads, webhooks, IA e SLA apenas
+registram/enfileiram a intenção; não mantêm algoritmos próprios de escolha.
+
+Ao criar uma oferta válida, o corretor selecionado vira owner provisório na mesma
+transação do registro da oferta. Recusa, expiração e SLA mantêm o owner anterior
+até a troca atômica para o próximo elegível. Para leads sem unidade definida, o
+motor escolhe uma unidade ativa, receptiva, automática e não-Matriz pela menor
+carga ativa, com desempate estável. Dentro da unidade/fila, continuam obrigatórias
+as regras de tenant, disponibilidade, canal, plantão e política; capacidade é uma
+meta de balanceamento e não deixa um lead órfão quando todos os elegíveis a
+atingiram. Fila manual e qualificação por IA permanecem pausas explícitas.
+
+Uma unidade operacional já definida para um intake é reativada para distribuição
+automática quando estiver ativa, aceitando leads e não for Matriz; a mudança gera
+auditoria e continua editável. Filas inativas são removidas do lead com evento de
+reparo, permitindo que o motor volte à política global. Filas manuais permanecem
+pausas explícitas.
+
+As tasks re-semeiam tanto leads `queued`/`unassigned` sem owner quanto owners
+provisórios com oferta expirada. Campos de qualificação nulos são válidos para
+recuperação. O motor roda 24/7; a janela da Meta regula a entrega da mensagem, não
+a persistência do owner. Nunca há fallback para corretor pausado, outra unidade já
+definida ou outro tenant.
+
 ## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
 
 **Estado:** Aceita

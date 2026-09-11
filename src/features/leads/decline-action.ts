@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 
 export type DeclineLeadState = { success?: boolean; error?: string };
 
@@ -41,12 +41,15 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
     const now = new Date();
 
     const result = await db.transaction(async (tx) => {
-      // 1. Update lead status back to distributed and clear corretorId
+      // Keep the current owner visible until the distribution engine commits
+      // the next eligible broker. assignmentSource authorizes that atomic swap.
       const updated = await tx
         .update(schema.leads)
         .set({
-          corretorId: null,
           status: "distributed",
+          distributionStatus: "assigned",
+          assignmentSource: "automatic_offer",
+          distributionUpdatedAt: now,
           stageEnteredAt: now,
         })
         .where(
@@ -59,6 +62,16 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
         .returning({ id: schema.leads.id });
 
       if (!updated.length) return false;
+
+      await tx.update(schema.leadOffers).set({
+        status: "DECLINED",
+        declinedAt: now,
+        updatedAt: now,
+      }).where(and(
+        eq(schema.leadOffers.tenantId, context.tenantId),
+        eq(schema.leadOffers.leadId, lead.id),
+        eq(schema.leadOffers.brokerId, context.userId),
+      ));
 
       // 2. Mark assignment attempt as released/declined
       await tx
@@ -100,8 +113,7 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
       return { error: "Não foi possível recusar o lead. Verifique se o estado já foi alterado." };
     }
 
-    // The persistent worker retries automatic redistribution in the permitted window.
-    void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id }).catch(() => { /* Non-blocking */ });
+    await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "offer_declined" });
 
 
     return { success: true };

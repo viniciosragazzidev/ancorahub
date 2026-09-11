@@ -10,7 +10,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 
 const formDataSchema = z.object({
@@ -102,7 +102,7 @@ export async function createManualLead(rawInput: unknown) {
   }
   const [duplicate] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, createdAt: schema.leads.createdAt, corretorNome: schema.user.name }).from(schema.leads).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.telefone, telefone))).orderBy(asc(schema.leads.createdAt)).limit(1);
   if (duplicate && input.duplicateConfirmed !== "true") return { duplicate: duplicate as DuplicateLeadNotice };
-  const corretorId = context.role === "broker" ? context.userId : await chooseAvailableBroker(context.tenantId, branchId);
+  const corretorId = context.role === "broker" ? context.userId : null;
   const leadId = randomUUID();
   const cnpj = input.tipo === "PF" ? null : normalizeCnpj(input.formData.cnpj);
   if (input.tipo !== "PF" && input.formData.cnpj && !cnpj) {
@@ -166,9 +166,9 @@ export async function createManualLead(rawInput: unknown) {
     console.error("[createManualLead] notification delivery failed:", error);
   });
 
-  // Enqueue distribution job if lead was queued (no broker available immediately)
+  // All non-broker intake delegates broker selection to the canonical engine.
   if (!assigned) {
-    void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId }).catch(console.error);
+    await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId, source: "intake" });
   }
 
   // Auto-initiate AI qualification if active

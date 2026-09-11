@@ -5,10 +5,9 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, or } from "dr
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, type IntelligentDistributionPolicy } from "./domain";
-import type { AssignmentSource, AssignmentStrategy, LeadAssignmentResult, LeadRoutingResult } from "./types";
+import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
+import type { AssignmentSource, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { isWithinBusinessHours } from "@/shared/time/business-hours";
 import { createLeadOffersForBrokers } from "./offers";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -386,6 +385,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const db = getDatabase();
   const [lead] = await db.select({
     id: schema.leads.id,
+    nome: schema.leads.nome,
     branchId: schema.leads.branchId,
     queueId: schema.leads.queueId,
     webhookCredentialId: schema.leads.webhookCredentialId,
@@ -393,29 +393,120 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     qualificationState: schema.leads.qualificationState,
     qualificationStatus: schema.leads.qualificationStatus,
     distributionUpdatedAt: schema.leads.distributionUpdatedAt,
-  }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.distributionStatus, ["queued", "unassigned"]), isNull(schema.leads.corretorId))).limit(1);
+    corretorId: schema.leads.corretorId,
+    assignmentSource: schema.leads.assignmentSource,
+  }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  const canRotateCurrentOwner = Boolean(
+    lead.corretorId
+      && (lead.assignmentSource === "automatic_offer" || lead.corretorId === excludeBrokerId),
+  );
+  if (lead.corretorId && !canRotateCurrentOwner) {
+    return { status: "conflict", leadId, reason: "Lead já possui corretor confirmado." };
+  }
+  const brokerToExclude = excludeBrokerId ?? (lead.assignmentSource === "automatic_offer" ? lead.corretorId : null);
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
   }
   const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
-  if (lead.queueId && !queue) return { status: "queued", leadId, reason: "A fila configurada não está ativa." };
+  if (lead.queueId && !queue) {
+    const staleQueueId = lead.queueId;
+    const repairedAt = new Date();
+    await db.transaction(async (tx) => {
+      await tx.update(schema.leads).set({ queueId: null, distributionUpdatedAt: repairedAt, updatedAt: repairedAt })
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, staleQueueId)));
+      await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: lead.branchId, fromQueueId: staleQueueId, toQueueId: null, action: "inactive_queue_repaired", source: "system_recovery", strategy: "automatic", reason: "Fila inativa removida para permitir recuperação automática.", actorId: context.userId, createdAt: repairedAt });
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.inactive_queue_repaired" });
+    });
+    lead.queueId = null;
+  }
   if (queue?.mode === "manual") return { status: "queued", leadId, reason: "A fila está em modo manual." };
   if (queue?.branchId) {
     if (lead.branchId && queue.branchId !== lead.branchId) return { status: "queued", leadId, reason: "A fila configurada pertence a outra unidade." };
     assertBranchScope(context, queue.branchId);
   }
   const intelligentPolicy = await loadDistributionPolicy(context.tenantId, lead.queueId, lead.qualificationProfileKey);
-  if (!intelligentPolicy.enabled) return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta fila." };
-  if (queue?.branchId && intelligentPolicy.value.excludedBranchIds.includes(queue.branchId)) return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta unidade." };
+  if (!intelligentPolicy.enabled) {
+    return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta fila." };
+  }
+  if (queue?.branchId && intelligentPolicy.value.excludedBranchIds.includes(queue.branchId)) {
+    return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta unidade." };
+  }
   const configuredBranchIds = resolveQueueCandidateBranchIds({ queueBranchId: queue?.branchId ?? null, allowedBranchIds: (intelligentPolicy.value.allowedBranchIds ?? []).filter((branchId) => !intelligentPolicy.value.excludedBranchIds.includes(branchId)), leadBranchId: lead.branchId });
   const requestedBranchIds = context.role === "manager" && context.branchId
     ? configuredBranchIds.filter((branchId) => branchId === context.branchId)
     : configuredBranchIds;
-  if (!requestedBranchIds.length) return { status: "queued", leadId, reason: "A fila geral não possui unidades elegíveis configuradas." };
+  if (!requestedBranchIds.length) {
+    if (context.role === "manager" && context.branchId) {
+      requestedBranchIds.push(context.branchId);
+    }
+  }
+  if (!requestedBranchIds.length) {
+    const tenantWideBranches = await db
+      .select({ id: schema.branches.id, createdAt: schema.branches.createdAt })
+      .from(schema.branches)
+      .where(and(
+        eq(schema.branches.tenantId, context.tenantId),
+        eq(schema.branches.status, "active"),
+        eq(schema.branches.acceptingLeads, true),
+        eq(schema.branches.autoDistribute, true),
+        eq(schema.branches.isDistributionHub, false),
+      ));
+    if (!tenantWideBranches.length) return { status: "queued", leadId, reason: "A fila geral não possui unidades elegíveis configuradas." };
+    const branchLoads = await db
+      .select({ branchId: schema.leads.branchId, total: count(schema.leads.id) })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        inArray(schema.leads.branchId, tenantWideBranches.map((branch) => branch.id)),
+        inArray(schema.leads.status, activeCommercialStatuses),
+      ))
+      .groupBy(schema.leads.branchId);
+    const loadMap = new Map(branchLoads.map((row) => [row.branchId, Number(row.total)]));
+    const selectedBranch = selectDistributionBranch(tenantWideBranches.map((branch) => ({ ...branch, activeLeads: loadMap.get(branch.id) ?? 0 })));
+    if (!selectedBranch) return { status: "queued", leadId, reason: "A fila geral não possui unidades elegíveis configuradas." };
+    const routedAt = new Date();
+    await db.transaction(async (tx) => {
+      await tx.update(schema.leads).set({ branchId: selectedBranch.id, unitAssignedAt: routedAt, distributionUpdatedAt: routedAt })
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.branchId)));
+      await tx.insert(schema.leadDistributionEvents).values({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        leadId,
+        fromBranchId: null,
+        toBranchId: selectedBranch.id,
+        fromQueueId: lead.queueId,
+        toQueueId: lead.queueId,
+        action: "auto_routed_to_unit",
+        source: "automatic",
+        strategy: "capacity",
+        reason: "Unidade automática com menor carga ativa.",
+        actorId: context.userId,
+        metadata: { activeLeads: selectedBranch.activeLeads },
+        createdAt: routedAt,
+      });
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.auto_routed_to_unit" });
+    });
+    lead.branchId = selectedBranch.id;
+    requestedBranchIds.push(selectedBranch.id);
+  }
   const activeBranches = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, autoDistribute: schema.branches.autoDistribute, isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), inArray(schema.branches.id, requestedBranchIds)));
+  const configuredTargetBranchId = queue?.branchId ?? lead.branchId;
+  const branchToActivate = configuredTargetBranchId
+    ? activeBranches.find((branch) => branch.id === configuredTargetBranchId && branch.status === "active" && branch.acceptingLeads && !branch.isDistributionHub && !branch.autoDistribute)
+    : null;
+  if (branchToActivate) {
+    await db.transaction(async (tx) => {
+      await tx.update(schema.branches).set({ autoDistribute: true, updatedAt: new Date() })
+        .where(and(eq(schema.branches.id, branchToActivate.id), eq(schema.branches.tenantId, context.tenantId)));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "branch", entidadeId: branchToActivate.id, acao: "branch.auto_distribution_enabled_by_intake" });
+    });
+    branchToActivate.autoDistribute = true;
+  }
   const targetBranchIds = activeBranches.filter(isAutomaticDistributionBranch).map((branch) => branch.id);
-  if (!targetBranchIds.length) return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
+  if (!targetBranchIds.length) {
+    return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
+  }
   const allBrokers = await db
     .select({
       id: schema.user.id,
@@ -447,9 +538,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const allowedBrokerSet = intelligentPolicy.value.allowedBrokerIds?.length ? new Set(intelligentPolicy.value.allowedBrokerIds) : null;
   const brokers = allBrokers.filter((broker) => {
     const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
-    return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== excludeBrokerId && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
+    return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
   });
-  if (!brokers.length) return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
+  if (!brokers.length) {
+    return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
+  }
 
   const offerHistory = await db
     .select({
@@ -457,6 +550,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       status: schema.leadOffers.status,
       offeredAt: schema.leadOffers.offeredAt,
       expiresAt: schema.leadOffers.expiresAt,
+      outboundMessageId: schema.leadOffers.outboundMessageId,
     })
     .from(schema.leadOffers)
     .where(and(eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.leadId, leadId)));
@@ -480,25 +574,19 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const remainingBrokers = brokers.filter((broker) => remainingBrokerSet.has(broker.id));
   if (offerCycle.exhausted) {
     const manualAt = new Date();
-    const reason = "Todos os corretores elegíveis concluíram este ciclo sem aceite. Lead aguardando o próximo ciclo automático de ofertas.";
+    const reason = "Todos os corretores elegíveis concluíram este ciclo sem aceite. Um novo ciclo automático foi iniciado.";
     const restartedCycle = await db.transaction(async (tx) => {
       const changed = await tx
         .update(schema.leads)
         .set({
-          corretorId: null,
-          status: "new",
-          distributionStatus: "queued",
-          assignedAt: null,
-          assignmentSource: "automatic_retry",
+          assignmentSource: "automatic_offer",
           distributionUpdatedAt: manualAt,
-          stageEnteredAt: manualAt,
         })
         .where(
           and(
             eq(schema.leads.id, leadId),
             eq(schema.leads.tenantId, context.tenantId),
-            isNull(schema.leads.corretorId),
-            inArray(schema.leads.distributionStatus, ["queued", "unassigned"]),
+            lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId),
           ),
         )
         .returning({ id: schema.leads.id });
@@ -530,9 +618,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       return true;
     });
 
-    return restartedCycle
-      ? { status: "queued", leadId, reason }
-      : { status: "conflict", leadId, reason: "O estado do lead mudou durante a redistribuição." };
+    if (!restartedCycle) return { status: "conflict", leadId, reason: "O estado do lead mudou durante a redistribuição." };
+    return processQueuedLead(context, leadId, excludeBrokerId ?? lead.corretorId);
   }
 
   const ids = remainingBrokers.map((broker) => broker.id);
@@ -542,7 +629,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
   ]);
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
-  const ranked = rankBrokers(remainingBrokers.map((broker) => {
+  const candidates = remainingBrokers.map((broker) => {
     const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
     const conversionRate = history.length ? history.filter((item) => item.status === "converted").length / history.length : 0;
@@ -551,10 +638,15 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const unstartedLeads = history.filter((item) => item.status === "distributed" || item.status === "new" || (!item.serviceStartedAt && !item.firstContactAt)).length;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
-  }), intelligentPolicy.value);
-  const decision = resolveDistributionCandidate(ranked, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
-  const chosen = decision.selected;
-  if (!chosen) return { status: "queued", leadId, reason: "Todos os corretores elegíveis atingiram a capacidade." };
+  });
+  const decision = resolveDistributionCandidate(candidates, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
+  // Capacity is a preference, not a reason to strand the lead. When every
+  // eligible broker reached the configured target, keep the same fair ranking
+  // and select its least-loaded first candidate.
+  const chosen = decision.selected ?? decision.overflowSelected;
+  if (!chosen) {
+    return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
+  }
   const chosenBranchId = remainingBrokers.find((broker) => broker.id === chosen.id)?.branchId ?? lead.branchId;
   if (!chosenBranchId) return { status: "queued", leadId, reason: "A unidade do corretor selecionado não foi encontrada." };
 
@@ -563,12 +655,16 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     leadId,
     brokerIds: [chosen.id],
     requestedBy: context.userId,
+    expectedCurrentBrokerId: lead.corretorId,
+    targetBranchId: chosenBranchId,
+    cycleStartedAt: lead.distributionUpdatedAt,
   });
   if (!offer.createdOffers.length) {
     const [activeOffer] = await db
       .select({
         brokerId: schema.leadOffers.brokerId,
         expiresAt: schema.leadOffers.expiresAt,
+        outboundMessageId: schema.leadOffers.outboundMessageId,
       })
       .from(schema.leadOffers)
       .where(
@@ -576,6 +672,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
           eq(schema.leadOffers.tenantId, context.tenantId),
           eq(schema.leadOffers.leadId, leadId),
           inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+          isNotNull(schema.leadOffers.outboundMessageId),
           gt(schema.leadOffers.expiresAt, new Date()),
         ),
       )
@@ -586,6 +683,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         leadId,
         brokerId: activeOffer.brokerId,
         expiresAt: activeOffer.expiresAt,
+        outboundMessageId: activeOffer.outboundMessageId ?? undefined,
         reason: "Oferta ativa aguardando resposta do corretor.",
       };
     }
@@ -593,54 +691,15 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     // A broker without a usable corporate channel is recorded as an attempted
     // offer (CANCELLED). Re-evaluate immediately so the lead advances to the
     // next eligible broker instead of consuming a scheduler retry.
-    return processQueuedLead(context, leadId, excludeBrokerId);
+    return processQueuedLead(context, leadId, chosen.id);
   }
-
-  const offeredAt = new Date();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(schema.leads)
-      .set({
-        corretorId: null,
-        status: "new",
-        distributionStatus: "queued",
-        branchId: chosenBranchId,
-        assignmentSource: "automatic_offer",
-        assignmentStrategy: "whatsapp_offer",
-        distributionUpdatedAt: offeredAt,
-      })
-      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId)));
-    await tx.insert(schema.leadDistributionEvents).values({
-      id: randomUUID(),
-      tenantId: context.tenantId,
-      leadId,
-      fromBranchId: lead.branchId,
-      toBranchId: chosenBranchId,
-      fromQueueId: lead.queueId,
-      toQueueId: lead.queueId,
-      newOwnerId: null,
-      action: "offer_sent",
-      source: attemptedBrokerIds.size > 0 ? "redistribution" : "automatic",
-      strategy: "automatic",
-      reason: attemptedBrokerIds.size > 0 ? "Oferta enviada ao próximo corretor elegível." : "Oferta enviada ao primeiro corretor elegível.",
-      actorId: context.userId,
-      metadata: { offeredBrokerId: chosen.id, attempt: attemptedBrokerIds.size + 1 },
-      createdAt: offeredAt,
-    });
-    await tx.insert(schema.auditLogs).values({
-      id: randomUUID(),
-      userId: context.userId,
-      entidade: "lead_distribution",
-      entidadeId: leadId,
-      acao: "lead.offer_sent",
-    });
-  });
 
   return {
     status: "offered",
     leadId,
     brokerId: chosen.id,
     expiresAt: offer.expiresAt,
+    outboundMessageId: offer.createdOffers[0]?.whatsappMessageId,
     reason: attemptedBrokerIds.size > 0
       ? "Oferta enviada ao próximo corretor elegível."
       : "Oferta enviada ao primeiro corretor elegível.",
@@ -670,7 +729,7 @@ export async function distributeQualifiedLead(input: {
   if (!lead) return { distributed: false, reason: "lead_not_found" };
   if (lead.corretorId) return { distributed: true, brokerId: lead.corretorId, reason: "already_assigned" };
 
-  const { resolveQualificationDestination, getBrokerEligibilityProfiles } = await import("@/features/ai-qualification/destination-routing-service");
+  const { resolveQualificationDestination } = await import("@/features/ai-qualification/destination-routing-service");
 
   const classification = (["hot", "warm", "cold", "not_qualified"].includes(lead.qualificationStatus)
     ? lead.qualificationStatus
@@ -691,42 +750,23 @@ export async function distributeQualifiedLead(input: {
     return { distributed: false, destination, reason: "destination_closed_or_no_distribution" };
   }
 
-  // Buscar unidade padrão se o lead não possuir branchId
-  let targetBranchId = lead.branchId;
-  if (!targetBranchId) {
-    const [defaultBranch] = await db
-      .select({ id: schema.branches.id })
-      .from(schema.branches)
-      .where(and(eq(schema.branches.tenantId, input.tenantId), eq(schema.branches.status, "active")))
-      .limit(1);
-    targetBranchId = defaultBranch?.id ?? null;
-  }
-
-  if (!targetBranchId) {
-    return { distributed: false, destination, reason: "no_active_branch_found" };
-  }
-
   const [distributionDirector] = await db.select({ id: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
     .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.role, "director"), eq(schema.tenantMemberships.status, "active")))
     .orderBy(asc(schema.tenantMemberships.createdAt)).limit(1);
   const distributionActorId = input.actorUserId ?? distributionDirector?.id;
   if (!distributionActorId) return { distributed: false, destination, reason: "no_distribution_actor" };
-  const distributionContext: TenantContext = { tenantId: input.tenantId, userId: distributionActorId, role: "director", jobTitle: "director", branchId: targetBranchId };
-  const routedQualifiedLead = lead.queueId
+  const distributionContext: TenantContext = { tenantId: input.tenantId, userId: distributionActorId, role: "director", jobTitle: "director", branchId: lead.branchId };
+  const routedQualifiedLead = lead.queueId || !lead.branchId
     ? { status: "routed" as const }
-    : await routeLeadToBranch(distributionContext, input.leadId, targetBranchId, `Qualification completed (${classification.toUpperCase()})`);
+    : await routeLeadToBranch(distributionContext, input.leadId, lead.branchId, `Qualification completed (${classification.toUpperCase()})`);
   if (routedQualifiedLead.status !== "routed") return { distributed: false, destination, reason: `routing_${routedQualifiedLead.status}` };
   const { enqueueLeadDistributionJob } = await import("./jobs");
   await enqueueLeadDistributionJob({ tenantId: input.tenantId, leadId: input.leadId });
-  if (!isWithinBusinessHours()) {
-    return { distributed: false, destination, reason: "scheduled_for_business_hours" };
-  }
   const routedAssignment = await processQueuedLead(distributionContext, input.leadId);
   if (routedAssignment.status === "queued") {
     // A qualified lead is never discarded because the roster is empty. Keep
     // its qualification and queue position until a broker becomes eligible.
     await db.update(schema.leads).set({
-      corretorId: null,
       distributionStatus: "queued",
       distributionUpdatedAt: new Date(),
       updatedAt: new Date(),
@@ -738,91 +778,10 @@ export async function distributeQualifiedLead(input: {
     });
   }
   return {
-    distributed: routedAssignment.status === "assigned",
-    brokerId: routedAssignment.status === "assigned" ? routedAssignment.brokerId : null,
+    distributed: routedAssignment.status === "assigned" || routedAssignment.status === "offered",
+    brokerId: routedAssignment.status === "assigned" || routedAssignment.status === "offered" ? routedAssignment.brokerId : null,
     destination,
     assignedResult: routedAssignment,
   };
 
-  /*
-   * Legacy direct-assignment path retained temporarily as migration reference.
-   * Qualification now exits through routeLeadToBranch + processQueuedLead above,
-   * so its capacity, roster, policy, audit and fallback rules remain identical
-   * to every other distribution source.
-   */
-
-  // Buscar corretores elegíveis
-  const allBrokers = await db
-    .select({
-      id: schema.user.id,
-      name: schema.user.name,
-      createdAt: schema.user.createdAt,
-    })
-    .from(schema.tenantMemberships)
-    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-    .where(
-      and(
-        eq(schema.tenantMemberships.tenantId, input.tenantId),
-        eq(schema.tenantMemberships.branchId, targetBranchId!),
-        eq(schema.tenantMemberships.role, "broker"),
-        eq(schema.tenantMemberships.status, "active"),
-        eq(schema.tenantMemberships.availabilityStatus, "available"),
-        eq(schema.user.active, true),
-        eq(schema.user.status, "active")
-      )
-    );
-
-  const eligibilityProfiles = await getBrokerEligibilityProfiles(input.tenantId);
-
-  const eligibleBrokers = allBrokers.filter((broker) => {
-    const profile = eligibilityProfiles.find((p) => p.userId === broker.id);
-    if (!profile) return true; // sem perfil específico, usa regras globais
-    if (!profile.active || profile.paused) return false;
-    const allowedTypes = (profile.allowedLeadTypes ?? []) as string[];
-    if (allowedTypes.length > 0 && !allowedTypes.includes(classification)) return false;
-    return true;
-  });
-
-  if (eligibleBrokers.length === 0) {
-    // Manter na fila sem perder a qualificação
-    await db.update(schema.leads).set({
-      branchId: targetBranchId,
-      distributionStatus: "queued",
-      updatedAt: new Date(),
-    }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
-
-    console.warn("[distribute-qualified] Nenhum corretor elegível disponível. Lead mantido na fila de espera.", {
-      tenantId: input.tenantId,
-      leadId: input.leadId,
-      classification,
-    });
-
-    return { distributed: false, destination, reason: "no_eligible_broker_available" };
-  }
-
-  // Escolher corretor (round-robin / menor carga)
-  const chosenBroker = eligibleBrokers[0];
-
-  const adminContext = {
-    tenantId: input.tenantId,
-    userId: input.actorUserId ?? chosenBroker.id,
-    role: "director" as const,
-    jobTitle: "director",
-    branchId: targetBranchId,
-  };
-
-  const assigned = await assignLeadToBroker(
-    adminContext,
-    input.leadId,
-    chosenBroker.id,
-    "automatic",
-    `Distribuição automática por qualificação (${classification.toUpperCase()})`
-  );
-
-  return {
-    distributed: assigned.status === "assigned",
-    brokerId: chosenBroker.id,
-    destination,
-    assignedResult: assigned,
-  };
 }

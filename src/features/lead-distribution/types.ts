@@ -1,6 +1,6 @@
 export type LeadDistributionStatus = "unassigned" | "awaiting_unit" | "queued" | "assigning" | "assigned" | "distribution_failed" | "returned_to_queue";
-export type AssignmentSource = "manual_director" | "manual_manager" | "automatic" | "duty_schedule" | "redistribution" | "system_recovery";
-export type AssignmentStrategy = "round_robin" | "capacity" | "manual" | "duty_schedule";
+export type AssignmentSource = "manual_director" | "manual_manager" | "automatic" | "automatic_offer" | "duty_schedule" | "redistribution" | "system_recovery";
+export type AssignmentStrategy = "round_robin" | "capacity" | "manual" | "duty_schedule" | "whatsapp_offer";
 
 export type LeadRoutingResult =
   | { status: "routed"; branchId: string; queueId: string | null; strategy: AssignmentStrategy; ruleId?: string }
@@ -11,7 +11,7 @@ export type LeadRoutingResult =
 
 export type LeadAssignmentResult =
   | { status: "assigned"; leadId: string; brokerId: string; strategy: AssignmentStrategy; notificationWarnings?: string[] }
-  | { status: "offered"; leadId: string; brokerId: string; expiresAt: Date; reason: string }
+  | { status: "offered"; leadId: string; brokerId: string; expiresAt: Date; reason: string; outboundMessageId?: string }
   | { status: "manual_required"; leadId: string; reason: string }
   | { status: "queued"; leadId: string; reason: string }
   | { status: "conflict"; leadId: string; reason: string };

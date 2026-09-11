@@ -127,8 +127,8 @@ async function notifyException(effect: typeof schema.leadEffectOutbox.$inferSele
 async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect) {
   const payload = payloadSchema.parse(effect.payload);
   if (effect.type === "DISTRIBUTE_LEAD") {
-    const { enqueueLeadDistributionJob } = await import("@/features/lead-distribution/jobs");
-    await enqueueLeadDistributionJob({ tenantId: effect.tenantId, leadId: effect.leadId });
+    const { enqueueAndProcessLeadDistribution } = await import("@/features/lead-distribution/jobs");
+    await enqueueAndProcessLeadDistribution({ tenantId: effect.tenantId, leadId: effect.leadId, source: "intake" });
     return;
   }
   if (effect.type === "NOTIFY_LEAD_ARRIVED") {

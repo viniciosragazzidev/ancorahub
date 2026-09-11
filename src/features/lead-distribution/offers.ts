@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
@@ -35,6 +35,9 @@ export async function createLeadOffersForBrokers(input: {
   brokerIds: string[];
   responseTimeoutMinutes?: number;
   requestedBy?: string | null;
+  expectedCurrentBrokerId?: string | null;
+  targetBranchId: string;
+  cycleStartedAt?: Date | null;
 }) {
   const db = getDatabase();
   const timeoutMinutes = Math.max(1, Math.min(input.responseTimeoutMinutes ?? 3, 60));
@@ -110,7 +113,7 @@ export async function createLeadOffersForBrokers(input: {
         .for("update")
         .limit(1);
 
-      if (!lockedLead || lockedLead.corretorId) return null;
+      if (!lockedLead || lockedLead.corretorId !== (input.expectedCurrentBrokerId ?? null)) return null;
 
       const [activeOffer] = await tx
         .select({ id: schema.leadOffers.id })
@@ -120,6 +123,7 @@ export async function createLeadOffersForBrokers(input: {
             eq(schema.leadOffers.tenantId, input.tenantId),
             eq(schema.leadOffers.leadId, input.leadId),
             inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+            isNotNull(schema.leadOffers.outboundMessageId),
             gt(schema.leadOffers.expiresAt, now),
           ),
         )
@@ -134,6 +138,7 @@ export async function createLeadOffersForBrokers(input: {
             eq(schema.leadOffers.tenantId, input.tenantId),
             eq(schema.leadOffers.leadId, input.leadId),
             eq(schema.leadOffers.brokerId, broker.id),
+            input.cycleStartedAt ? gte(schema.leadOffers.offeredAt, input.cycleStartedAt) : undefined,
           ),
         )
         .limit(1);
@@ -150,6 +155,52 @@ export async function createLeadOffersForBrokers(input: {
         createdAt: now,
         updatedAt: now,
       });
+      if (destinationPhone) {
+        const assignmentEventId = randomUUID();
+        await tx.update(schema.leads).set({
+          branchId: input.targetBranchId,
+          corretorId: broker.id,
+          status: "distributed",
+          distributionStatus: "assigned",
+          assignedAt: now,
+          assignmentSource: "automatic_offer",
+          assignmentStrategy: "whatsapp_offer",
+          distributionUpdatedAt: now,
+          stageEnteredAt: now,
+          firstContactAt: null,
+          serviceStartedAt: null,
+          serviceStartedBy: null,
+          motivoPerda: null,
+          updatedAt: now,
+        }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+        await tx.insert(schema.leadDistributionEvents).values({
+          id: assignmentEventId,
+          tenantId: input.tenantId,
+          leadId: input.leadId,
+          fromBranchId: lead.branchId,
+          toBranchId: input.targetBranchId,
+          previousOwnerId: input.expectedCurrentBrokerId ?? null,
+          newOwnerId: broker.id,
+          action: "offer_sent",
+          source: input.expectedCurrentBrokerId ? "redistribution" : "automatic",
+          strategy: "automatic",
+          reason: input.expectedCurrentBrokerId
+            ? "Responsabilidade provisória transferida ao próximo corretor elegível."
+            : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
+          actorId: input.requestedBy ?? broker.id,
+          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true },
+          createdAt: now,
+        });
+        if (input.requestedBy) {
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId: input.requestedBy,
+            entidade: "lead_distribution",
+            entidadeId: input.leadId,
+            acao: "lead.provisional_owner_assigned",
+          });
+        }
+      }
       return destinationPhone ? "pending" as const : "unavailable" as const;
     });
 
@@ -393,7 +444,7 @@ export async function handleLeadOfferWebhookResponse(input: {
     if (!currentOffer) return { won: false, reason: "offer_not_found" };
 
     const isExpired = currentOffer.expiresAt <= now;
-    const isAlreadyAssigned = Boolean(lead.corretorId);
+    const isAlreadyAssigned = Boolean(lead.corretorId && lead.corretorId !== broker.id);
 
     if (isExpired || isAlreadyAssigned || !["PENDING", "SENT", "DELIVERED", "READ"].includes(currentOffer.status)) {
       await tx
@@ -416,8 +467,11 @@ export async function handleLeadOfferWebhookResponse(input: {
         assignmentSource: "whatsapp_offer_accepted",
         assignmentStrategy: "whatsapp_offer",
         distributionUpdatedAt: now,
+        firstContactAt: null,
+        serviceStartedAt: null,
+        serviceStartedBy: null,
       })
-      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, input.tenantId)));
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, input.tenantId), eq(schema.leads.corretorId, broker.id)));
 
     // 2. Update winning offer
     await tx

@@ -10,9 +10,9 @@ import { hasCapability } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import {
-  enqueueLeadDistributionJob,
-  runLeadDistributionProcessor,
+  enqueueAndProcessLeadDistribution,
 } from "@/features/lead-distribution/jobs";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
 import {
@@ -192,6 +192,7 @@ export async function importLeadsFromCsvAction(formData: FormData) {
     let imported = 0;
     let duplicates = 0;
     const errors: Array<{ row: number; message: string }> = [];
+    const distributionLeadIds: string[] = [];
 
     for (const row of rows) {
       try {
@@ -308,17 +309,7 @@ export async function importLeadsFromCsvAction(formData: FormData) {
             });
           });
 
-          try {
-            await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId });
-          } catch (error) {
-            // The queued lead itself is the durable recovery source. The
-            // processor seeds a missing idempotent job on its next run.
-            console.error("[bulk-lead-import] distribution_job_enqueue_failed", {
-              tenantId: context.tenantId,
-              leadId,
-              error: error instanceof Error ? error.name : "unknown_error",
-            });
-          }
+          distributionLeadIds.push(leadId);
         }
 
         imported += 1;
@@ -329,9 +320,12 @@ export async function importLeadsFromCsvAction(formData: FormData) {
 
     if (imported > 0 && !shouldQualifyLead) {
       try {
-        await runLeadDistributionProcessor({
-          tenantId: context.tenantId,
-          limit: Math.min(imported, 25),
+        await runWithConcurrency(distributionLeadIds, 5, async (leadId) => {
+          await enqueueAndProcessLeadDistribution({
+            tenantId: context.tenantId,
+            leadId,
+            source: "intake",
+          });
         });
       } catch (error) {
         // Do not report a committed import as failed. Every lead remains

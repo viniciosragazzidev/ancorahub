@@ -46,6 +46,34 @@ const activeStatuses = [
   "under_analysis",
 ] as const;
 
+function DistributionRulesOverview() {
+  const stages = [
+    { title: "1. Entrada", text: "Manual, CSV, Meta Ads, webhook, IA ou integração. Toda entrada cria uma intenção durável de distribuição." },
+    { title: "2. Unidade", text: "Regra de campanha/fila prevalece. Sem regra, a unidade ativa com menor carga é escolhida de forma estável." },
+    { title: "3. Fila", text: "A fila define modo, capacidade-alvo, unidades e corretores permitidos ou excluídos." },
+    { title: "4. Corretor", text: "Somente ativos, disponíveis, com canal válido e plantão compatível. Menor fila sem contato e menor carga vêm primeiro." },
+    { title: "5. Oferta e SLA", text: "O selecionado vira responsável provisório. Recusa, expiração ou SLA troca diretamente para o próximo elegível." },
+  ];
+  return (
+    <Card variant="overview">
+      <CardHeader>
+        <CardTitle>Regra única de distribuição</CardTitle>
+        <CardDescription>
+          Este é o único centro de configuração. Os canais de entrada apenas entregam o lead; unidade, fila, corretor, ordem e redistribuição são decididos aqui.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {stages.map((stage) => (
+          <div key={stage.title} className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-sm font-semibold text-foreground">{stage.title}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{stage.text}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default async function LeadDistributionPage({
   searchParams,
 }: {
@@ -458,6 +486,7 @@ export default async function LeadDistributionPage({
           }
           filasContent={
             context.role === "director" ? <>
+              <DistributionRulesOverview />
               <QueueControlCenter
                 queues={queuesForControl}
                 branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}

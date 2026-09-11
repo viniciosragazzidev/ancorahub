@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -12,6 +12,42 @@ import type { TenantRole } from "@/shared/db/schema";
 const memberUserIdSchema = z.string().uuid();
 
 type Viewer = { role: TenantRole; branchId: string | null };
+
+type LeadOfferStatusGroup = {
+  status: string;
+  total: number;
+  overdue?: boolean;
+};
+
+export function summarizeLeadOfferPerformance(rows: LeadOfferStatusGroup[]) {
+  const summary = {
+    total: 0,
+    accepted: 0,
+    notAccepted: 0,
+    declined: 0,
+    expired: 0,
+    pending: 0,
+  };
+
+  for (const row of rows) {
+    const total = Number(row.total) || 0;
+    if (row.status === "CANCELLED" || row.status === "LOST") continue;
+
+    summary.total += total;
+    if (row.status === "ACCEPTED") summary.accepted += total;
+    else if (row.status === "DECLINED") {
+      summary.declined += total;
+      summary.notAccepted += total;
+    } else if (row.status === "EXPIRED" || row.overdue) {
+      summary.expired += total;
+      summary.notAccepted += total;
+    } else if (["PENDING", "SENT", "DELIVERED", "READ"].includes(row.status)) {
+      summary.pending += total;
+    }
+  }
+
+  return summary;
+}
 
 /** A manager or supervisor can inspect a member whose membership belongs to the same unit. */
 export function canViewTeamMemberProfile(viewer: Viewer, memberBranchId: string | null) {
@@ -94,8 +130,15 @@ export async function getTeamMemberProfile(memberUserId: string) {
     or(ne(schema.leadDistributionEvents.newOwnerId, member.userId), isNull(schema.leadDistributionEvents.newOwnerId)),
     context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
   );
+  const offerScope = and(
+    eq(schema.leadOffers.tenantId, context.tenantId),
+    eq(schema.leadOffers.brokerId, member.userId),
+    isNotNull(schema.leadOffers.outboundMessageId),
+    inArray(schema.whatsappOutboundMessages.status, ["sent", "delivered", "read"]),
+    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+  );
 
-  const [leadMetrics, salesMetrics, taskMetrics, quoteMetrics, interactionMetrics, redistributionMetrics, recentLeads, recentRedistributions] = await Promise.all([
+  const [leadMetrics, salesMetrics, taskMetrics, quoteMetrics, interactionMetrics, redistributionMetrics, offerStatusMetrics, recentLeads, recentRedistributions] = await Promise.all([
     db.select({
       total: sql<number>`count(*)::int`,
       active: sql<number>`count(*) filter (where ${schema.leads.status} in ('distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))::int`,
@@ -126,6 +169,18 @@ export async function getTeamMemberProfile(memberUserId: string) {
       total: sql<number>`count(*)::int`,
       withoutFirstContact: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} is null)::int`,
     }).from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).where(redistributionScope),
+    db.select({
+      status: schema.leadOffers.status,
+      overdue: sql<boolean>`${schema.leadOffers.expiresAt} <= now()`,
+      total: sql<number>`count(*)::int`,
+    }).from(schema.leadOffers)
+      .innerJoin(schema.leads, eq(schema.leadOffers.leadId, schema.leads.id))
+      .innerJoin(schema.whatsappOutboundMessages, and(
+        eq(schema.leadOffers.outboundMessageId, schema.whatsappOutboundMessages.id),
+        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+      ))
+      .where(offerScope)
+      .groupBy(schema.leadOffers.status, sql`${schema.leadOffers.expiresAt} <= now()`),
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, createdAt: schema.leads.createdAt })
       .from(schema.leads).where(leadScope).orderBy(desc(schema.leads.updatedAt)).limit(6),
     db.select({ id: schema.leadDistributionEvents.id, leadName: schema.leads.nome, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt })
@@ -139,6 +194,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
   if (member.jobTitle !== "broker") {
     member.brokerCode = null;
   }
+  const offerPerformance = summarizeLeadOfferPerformance(offerStatusMetrics);
 
   return {
     member,
@@ -148,6 +204,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
       tasks: taskMetrics[0] ?? { total: 0, completed: 0, overdue: 0, open: 0 },
       quotes: quoteMetrics[0] ?? { total: 0, sent: 0, accepted: 0 },
       interactions: interactionMetrics[0]?.total ?? 0,
+      offers: offerPerformance,
       redistributions: redistributionMetrics[0]?.total ?? 0,
       redistributionsWithoutFirstContact: redistributionMetrics[0]?.withoutFirstContact ?? 0,
     },

@@ -94,7 +94,11 @@ export function resolveDistributionCandidate(
   const selected = policy.ranking.enabled
     ? eligible[0] ?? null
     : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity");
-  return { eligible, selected };
+  const overflowSelected = selected ?? rankBrokers(
+    brokers.map((broker) => ({ ...broker, capacity: null })),
+    policy,
+  )[0] ?? null;
+  return { eligible, selected, overflowSelected };
 }
 
 export function isValidDutyWindow(dayOfWeek: number, startsAt: string, endsAt: string) {
@@ -105,6 +109,17 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
   const assigned = Math.max(0, Math.trunc(assignedBrokers));
   const minimum = Math.max(1, Math.trunc(minimumBrokers));
   return { assigned, minimum, missing: Math.max(0, minimum - assigned), covered: assigned >= minimum };
+}
+
+export type DistributionBranchCandidate = { id: string; activeLeads: number; createdAt: Date };
+
+/** Stable load-based routing for intake that has no unit rule. */
+export function selectDistributionBranch(branches: DistributionBranchCandidate[]): DistributionBranchCandidate | null {
+  return [...branches].sort((a, b) =>
+    a.activeLeads - b.activeLeads
+      || a.createdAt.getTime() - b.createdAt.getTime()
+      || a.id.localeCompare(b.id),
+  )[0] ?? null;
 }
 
 export function isDeferredDistributionReason(reason: string) {
@@ -165,7 +180,7 @@ export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds:
 
 export function resolveLeadOfferCycle(input: {
   eligibleBrokerIds: string[];
-  offers: Array<{ brokerId: string; status: string; offeredAt?: Date; expiresAt: Date }>;
+  offers: Array<{ brokerId: string; status: string; offeredAt?: Date; expiresAt: Date; outboundMessageId?: string | null }>;
   cycleStartedAt?: Date | null;
   now?: Date;
 }) {
@@ -177,7 +192,9 @@ export function resolveLeadOfferCycle(input: {
     : input.offers;
   const activeStatuses = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
   const activeOffer = offers.find(
-    (offer) => activeStatuses.has(offer.status) && offer.expiresAt > now,
+    (offer) => activeStatuses.has(offer.status)
+      && offer.expiresAt > now
+      && offer.outboundMessageId !== null,
   );
   const attemptedBrokerIds = new Set(offers.map((offer) => offer.brokerId));
   const remainingBrokerIds = input.eligibleBrokerIds.filter(

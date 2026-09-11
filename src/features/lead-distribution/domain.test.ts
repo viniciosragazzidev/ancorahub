@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
+
+describe("automatic unit routing", () => {
+  it("selects the least loaded unit with a stable tie break", () => {
+    const branches = [
+      { id: "unit-b", createdAt: new Date("2026-01-01"), activeLeads: 4 },
+      { id: "unit-c", createdAt: new Date("2026-01-03"), activeLeads: 1 },
+      { id: "unit-a", createdAt: new Date("2026-01-02"), activeLeads: 1 },
+    ];
+    expect(selectDistributionBranch(branches)?.id).toBe("unit-a");
+    expect(selectDistributionBranch([])).toBeNull();
+  });
+});
 
 describe("lead distribution domain", () => {
   it("chooses the lowest active workload when capacity is available", () => {
@@ -13,6 +25,16 @@ describe("lead distribution domain", () => {
   it("does not choose a broker at capacity", () => {
     const result = chooseBroker([{ id: "a", createdAt: new Date(), activeLeads: 5, capacity: 5 }], "capacity");
     expect(result).toBeNull();
+  });
+
+  it("keeps the fairest overflow candidate when every eligible broker reached capacity", () => {
+    const policy = defaultIntelligentDistributionPolicy;
+    const decision = resolveDistributionCandidate([
+      { id: "busy", createdAt: new Date("2026-01-01"), activeLeads: 8, capacity: 5, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0, unstartedLeads: 4 },
+      { id: "less-busy", createdAt: new Date("2026-01-02"), activeLeads: 6, capacity: 5, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0, unstartedLeads: 2 },
+    ], policy, "capacity");
+    expect(decision.selected).toBeNull();
+    expect(decision.overflowSelected?.id).toBe("less-busy");
   });
 
   it("uses the oldest eligible broker for the current round-robin policy", () => {
@@ -160,6 +182,25 @@ describe("lead distribution domain", () => {
     expect(cycle.activeBrokerId).toBeNull();
     expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
     expect(cycle.exhausted).toBe(false);
+  });
+
+  it("does not treat an offer without a durable outbound message as delivered to a broker", () => {
+    const now = new Date("2026-09-10T15:00:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        {
+          brokerId: "broker-a",
+          status: "PENDING",
+          outboundMessageId: null,
+          expiresAt: new Date("2026-09-10T15:03:00Z"),
+        },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBeNull();
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
   });
 
   it("shares the same deterministic candidate decision with a simulator", () => {

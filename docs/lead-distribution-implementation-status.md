@@ -1,5 +1,20 @@
 # Sistema de distribuição de leads — estado da implementação
 
+## Titularidade provisória e autoridade única (DEC-097) — 11/09/2026
+
+- `src/features/lead-distribution` resolve unidade, fila, elegibilidade, ordem,
+  oferta, redistribuição e SLA; os canais de entrada não escolhem corretor.
+- A criação durável da oferta já persiste o corretor como owner provisório.
+- Recusa, expiração e SLA fazem troca direta para o próximo elegível, sem limpar o
+  owner antes da substituição.
+- Leads sem unidade usam a unidade automática de menor carga com desempate estável.
+- Cooldown, menor fila sem contato e menor carga evitam sequências no mesmo corretor;
+  capacidade é meta e não deixa o lead órfão quando todos atingem o alvo.
+- As tasks rodam 24/7 e re-semeiam `queued`/`unassigned`, campos de qualificação
+  nulos e ofertas provisórias vencidas. A janela da Meta continua na outbox.
+- Fila manual, qualificação ativa ou ausência real de corretor elegível permanecem
+  com motivo auditável; nunca se burlam tenant, unidade, plantão ou disponibilidade.
+
 ## Motor resiliente — 20/07/2026
 
 - A tabela `lead_distribution_jobs` persiste trabalhos de atribuição e impede jobs ativos duplicados por lead.
@@ -30,7 +45,7 @@ Atualizado em 15/07/2026.
 - Plantões em `/leads/distribuicao/plantao`, com horário, prioridade, vigência, ativação e desativação.
 - Notificação in-app ao corretor atribuído.
 - Eventos de movimentação e auditoria em cada ação relevante.
-- Estouro do SLA de primeiro contato desatrela o corretor vencido, exclui-o da tentativa seguinte, redistribui leads da origem Diretor na mesma unidade e devolve-os à fila central quando não há elegíveis; leads da origem Gestor ficam na fila da unidade para distribuição manual.
+- Estouro do SLA de primeiro contato mantém o owner vencido até a troca atômica e oferece diretamente ao próximo corretor elegível da mesma unidade.
 - Ajuda contextual em `/guia`, no tema “Distribuição de leads”.
 
 ## Regras de segurança
@@ -43,12 +58,11 @@ O servidor resolve tenant, papel, unidade e elegibilidade. IDs enviados pelo nav
 
 ## Operação diária
 
-1. Diretor ou Gestor abre Distribuição.
-2. Leads sem destino aparecem na Inbox.
-3. O responsável envia para uma unidade.
-4. A fila recebe o lead e pode atribuir manualmente ou executar Auto.
-5. O corretor recebe a notificação e passa a ser o owner.
-6. O histórico da movimentação permanece disponível para auditoria.
+1. O canal de entrada registra o lead e a intenção durável.
+2. O motor resolve unidade e fila pelas regras configuradas em `/distribuicao`.
+3. O corretor elegível melhor ranqueado recebe a oferta e vira owner provisório.
+4. Aceite confirma; recusa, expiração ou SLA trocam para o próximo elegível.
+5. As tasks recuperam qualquer pendência e o histórico permanece auditável.
 
 ## Próxima camada
 

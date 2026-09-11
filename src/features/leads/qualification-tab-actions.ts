@@ -9,9 +9,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
 import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-push-helper";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { resolveMetaChannelCredentials } from "@/features/communication-channels/template-sync-service";
 import { sendMetaCloudTemplateTest } from "@/features/communication-channels/meta-graph-templates-client";
 import { enqueueMetaTextMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
@@ -55,12 +54,6 @@ export async function forceCompleteQualificationAction(input: {
     const finalQueueId = input.targetQueueId !== undefined ? input.targetQueueId : lead.queueId;
     const branchId = lead.branchId || context.branchId;
 
-    if (!branchId) {
-      return { success: false, error: "O lead precisa ter uma unidade vinculada para ser distribuído." };
-    }
-
-    const brokerId = await chooseAvailableBroker(context.tenantId, branchId);
-    const assigned = Boolean(brokerId);
     const now = new Date();
 
     await db.transaction(async (tx) => {
@@ -70,14 +63,14 @@ export async function forceCompleteQualificationAction(input: {
           qualificationStatus: "qualified",
           qualificationState: "QUALIFIED",
           qualificationCompletedAt: now,
-          status: assigned ? "distributed" : "new",
-          distributionStatus: assigned ? "assigned" : "queued",
-          corretorId: brokerId,
+          status: "new",
+          distributionStatus: "queued",
+          corretorId: null,
           queueId: finalQueueId,
-          assignmentSource: assigned ? "manual_override" : null,
-          assignmentStrategy: assigned ? "capacity" : null,
+          assignmentSource: null,
+          assignmentStrategy: null,
           distributionUpdatedAt: now,
-          assignedAt: assigned ? now : null,
+          assignedAt: null,
           updatedAt: now,
         })
         .where(
@@ -104,12 +97,8 @@ export async function forceCompleteQualificationAction(input: {
       });
     });
 
-    void notifyLeadArrived(lead.id, context.tenantId, branchId, lead.nome).catch(console.error);
-    if (brokerId) {
-      void notifyNewLead(lead.id, context.tenantId, branchId, brokerId, lead.nome).catch(console.error);
-    } else {
-      void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id }).catch(console.error);
-    }
+    void notifyLeadArrived(lead.id, context.tenantId, branchId ?? null, lead.nome).catch(console.error);
+    await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "human_handoff" });
 
     return { success: true };
   } catch (error) {
@@ -295,7 +284,7 @@ export async function manuallyChangeQualificationStageAction(input: {
         });
       });
     } else if (input.targetStage === "qualificado" || input.targetStage === "humano") {
-      const brokerToAssign = input.brokerId || (input.targetStage === "humano" ? await chooseAvailableBroker(context.tenantId, lead.branchId || context.branchId || "") : null);
+      const brokerToAssign = input.brokerId || null;
       const isAssigned = Boolean(brokerToAssign);
       const chosenRating = input.rating ?? "qualified";
       const finalQualStatus = chosenRating === "not_qualified" ? "disqualified" : chosenRating;
@@ -346,8 +335,7 @@ export async function manuallyChangeQualificationStageAction(input: {
           `lead-assigned:${randomUUID()}`,
         ).catch(console.error);
       } else {
-        const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
-        void distributeQualifiedLead({ tenantId: context.tenantId, leadId: lead.id, actorUserId: context.userId }).catch((err) => console.warn("[manuallyChangeQualificationStageAction] Immediate distribution error:", err));
+        await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "human_handoff" });
       }
 
       if (input.sendMessageToCustomer && lead.telefone) {

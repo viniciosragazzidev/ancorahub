@@ -540,6 +540,24 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
       branchIds: context.role === "manager" && context.branchId ? [context.branchId] : undefined,
     }).catch(() => {});
 
+    const withinBusinessHours = isWithinBusinessHours();
+    const initialDistribution = withinBusinessHours
+      ? await runLeadDistributionProcessor({
+          tenantId: context.tenantId,
+          limit: Math.min(candidateIds.length, 25),
+        })
+      : null;
+    const initialDelivery = { processed: 0, sent: 0, failed: 0, retried: 0 };
+    if (initialDistribution?.outboundMessageIds.length) {
+      await runWithConcurrency(initialDistribution.outboundMessageIds, 5, async (outboundMessageId) => {
+        const delivery = await processMetaOutboundBatch(1, context.tenantId, outboundMessageId);
+        initialDelivery.processed += delivery.processed;
+        initialDelivery.sent += delivery.sent;
+        initialDelivery.failed += delivery.failed;
+        initialDelivery.retried += delivery.retried;
+      });
+    }
+
     scheduleAfterResponse("lead-distribution-bulk-recovery", async () => {
       const maxPasses = Math.min(Math.ceil(candidateIds.length / 25), 8);
       for (let pass = 0; pass < maxPasses; pass += 1) {
@@ -556,7 +574,13 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
       mutationId,
       processed: candidateIds.length,
       processedLeadIds: candidateIds,
-      message: `${candidateIds.length} lead${candidateIds.length === 1 ? "" : "s"} enviado${candidateIds.length === 1 ? "" : "s"} para a distribuição automática.`,
+      message: !withinBusinessHours
+        ? `${candidateIds.length} lead${candidateIds.length === 1 ? "" : "s"} agendado${candidateIds.length === 1 ? "" : "s"} para o próximo horário comercial.`
+        : initialDelivery?.sent
+          ? `${initialDelivery.sent} oferta${initialDelivery.sent === 1 ? " foi enviada" : "s foram enviadas"} agora. Os demais leads continuam na fila automática.`
+          : initialDistribution?.offered
+            ? `${initialDistribution.offered} oferta${initialDistribution.offered === 1 ? " foi criada" : "s foram criadas"}, mas o canal ainda não confirmou o envio. O sistema continuará tentando.`
+            : `Nenhuma oferta foi enviada agora. Os ${candidateIds.length} leads continuam na fila automática para nova tentativa.`,
     };
   } catch (error) {
     return {

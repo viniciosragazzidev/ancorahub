@@ -8,8 +8,7 @@ import { notifyLeadReassigned, sendNotificationToUser } from "@/features/notific
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
-import { assignLeadToBroker } from "@/features/lead-distribution/service";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { processQueuedLead } from "@/features/lead-distribution/service";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
@@ -93,12 +92,8 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
         // notification fails during the SLA handoff.
         const previousOwnerId = lead.corretorId;
         const automationActor = recipients.find((recipient) => recipient.role === "director");
-        const nextBrokerId = previousOwnerId
-          ? await chooseAvailableBroker(tenant.id, lead.branchId, previousOwnerId, lead.webhookCredentialId)
-          : null;
-
-        if (previousOwnerId && automationActor && nextBrokerId) {
-          const reassigned = await assignLeadToBroker(
+        if (previousOwnerId && automationActor) {
+          const reassigned = await processQueuedLead(
             {
               tenantId: tenant.id,
               userId: automationActor.userId,
@@ -107,14 +102,11 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
               branchId: null,
             },
             lead.id,
-            nextBrokerId,
-            "redistribution",
-            `Reatribuição direta por estouro do SLA de primeiro contato (${firstContactMinutes} minutos).`,
             previousOwnerId,
-            lead.branchId ?? undefined,
           );
 
-          if (reassigned.status === "assigned") {
+          if (reassigned.status === "assigned" || reassigned.status === "offered") {
+            const nextBrokerId = reassigned.brokerId;
             await db.update(schema.leads)
               .set({ redistributionCount: (lead.redistributionCount ?? 0) + 1 })
               .where(and(
@@ -124,7 +116,9 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
               ));
 
             await runLeadEffectOutboxProcessor({ tenantId: tenant.id, leadId: lead.id, limit: 5 });
-            await processMetaOutboundBatch(10, tenant.id);
+            if (reassigned.status === "offered" && reassigned.outboundMessageId) {
+              await processMetaOutboundBatch(1, tenant.id, reassigned.outboundMessageId);
+            }
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
             void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
             void publishLeadInvalidation({ tenantId: tenant.id, actorId: nextBrokerId }).catch(() => {});

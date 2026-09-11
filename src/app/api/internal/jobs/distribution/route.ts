@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
+import { drainLeadDistributionBacklog } from "@/features/lead-distribution/jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await runLeadDistributionProcessor();
+  const result = await drainLeadDistributionBacklog({ maxBatches: 4 });
   return NextResponse.json({ success: true, result });
 }
 

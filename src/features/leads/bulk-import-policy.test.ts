@@ -31,7 +31,7 @@ describe("bulk import distribution policy", () => {
     expect(isAutomaticQueueAvailableForBulkImport(queues[3], "branch-a")).toBe(false);
   });
 
-  it("never assigns a CSV lead directly before the broker accepts the offer", () => {
+  it("persists a CSV lead queued before the canonical motor assigns its provisional owner", () => {
     expect(buildBulkImportDistributionState()).toEqual({
       corretorId: null,
       status: "new",

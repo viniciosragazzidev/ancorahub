@@ -1,12 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSettings } from "@/features/system-settings/queries";
-import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
 import { processQueuedLead } from "./service";
 import { expireOutdatedLeadOffers } from "./offers";
@@ -29,6 +30,8 @@ export type DistributionJobRunResult = {
   seeded: number;
   claimed: number;
   assigned: number;
+  offered: number;
+  outboundMessageIds: string[];
   deferred: number;
   failed: number;
   skipped: number;
@@ -63,7 +66,9 @@ export async function getDistributionJobConfig(): Promise<DistributionJobConfig>
 
 export async function enqueueLeadDistributionJob(input: { tenantId: string; leadId: string; runAfter?: Date; maxAttempts?: number }) {
   const now = new Date();
-  const runAfter = scheduleForBusinessHours(input.runAfter ?? now);
+  // DEC-097: ownership recovery runs 24/7. Message delivery still follows
+  // the Meta window in the outbox; the assignment itself is never delayed.
+  const runAfter = input.runAfter ?? now;
   await getDatabase().insert(schema.leadDistributionJobs).values({
     id: randomUUID(),
     tenantId: input.tenantId,
@@ -78,6 +83,25 @@ export async function enqueueLeadDistributionJob(input: { tenantId: string; lead
   }).onConflictDoNothing();
 }
 
+export async function wakeLeadDistributionJob(tenantId: string, leadId: string) {
+  const now = new Date();
+  await getDatabase().update(schema.leadDistributionJobs).set({
+    status: "retrying",
+    runAfter: now,
+    lockedAt: null,
+    lockedBy: null,
+    leaseExpiresAt: null,
+    completedAt: null,
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    updatedAt: now,
+  }).where(and(
+    eq(schema.leadDistributionJobs.tenantId, tenantId),
+    eq(schema.leadDistributionJobs.leadId, leadId),
+    inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+  ));
+}
+
 /**
  * Persists the distribution intent before attempting the immediate path.
  *
@@ -88,15 +112,19 @@ export async function enqueueLeadDistributionJob(input: { tenantId: string; lead
 export async function enqueueAndProcessLeadDistribution(input: {
   tenantId: string;
   leadId: string;
-  source: "qualification_timeout" | "human_handoff" | "agent_trigger" | "offer_declined" | "sla_timeout";
+  source: "qualification_timeout" | "human_handoff" | "agent_trigger" | "offer_declined" | "sla_timeout" | "intake" | "bulk_recovery";
 }) {
   await enqueueLeadDistributionJob({ tenantId: input.tenantId, leadId: input.leadId });
+  await wakeLeadDistributionJob(input.tenantId, input.leadId);
 
   try {
     const result = await runLeadDistributionProcessor({
       tenantId: input.tenantId,
       leadId: input.leadId,
       limit: 1,
+    });
+    await runWithConcurrency(result.outboundMessageIds, 3, async (outboundMessageId) => {
+      await processMetaOutboundBatch(1, input.tenantId, outboundMessageId);
     });
     console.info("[lead-distribution] immediate_attempt", {
       tenantId: input.tenantId,
@@ -121,32 +149,28 @@ export async function enqueueAndProcessLeadDistribution(input: {
   }
 }
 
-async function deferJobsUntilBusinessHours(now: Date, tenantId?: string, leadId?: string) {
-  const runAfter = scheduleForBusinessHours(now);
-  const deferred = await getDatabase().update(schema.leadDistributionJobs).set({
-    runAfter,
-    lastErrorCode: "OUTSIDE_BUSINESS_HOURS",
-    lastErrorMessage: "Distribuição automática aguarda o próximo horário comercial.",
-    updatedAt: now,
-  }).where(and(
-    eq(schema.leadDistributionJobs.type, JOB_TYPE),
-    inArray(schema.leadDistributionJobs.status, [...ACTIVE_JOB_STATUSES]),
-    lte(schema.leadDistributionJobs.runAfter, runAfter),
-    tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
-    leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
-  )).returning({ id: schema.leadDistributionJobs.id });
-  return deferred.length;
-}
+// DEC-097: the business-hours deferral block was removed. Ownership recovery
+// processes the durable queue 24/7; outbound message delivery keeps
+// its own Meta window inside the outbox.
 
 async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: string, leadId?: string) {
   const db = getDatabase();
   const queuedLeads = await db.select({ id: schema.leads.id, tenantId: schema.leads.tenantId })
     .from(schema.leads)
     .where(and(
-      inArray(schema.leads.distributionStatus, ["queued", "unassigned"]),
-      isNull(schema.leads.corretorId),
-      ne(schema.leads.qualificationState, "IN_PROGRESS"),
-      ne(schema.leads.qualificationStatus, "qualifying"),
+      or(
+        and(
+          inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
+          isNull(schema.leads.corretorId),
+        ),
+        and(
+          eq(schema.leads.distributionStatus, "assigned"),
+          eq(schema.leads.assignmentSource, "automatic_offer"),
+          isNotNull(schema.leads.corretorId),
+        ),
+      ),
+      or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
+      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
@@ -301,42 +325,46 @@ async function deferOrFailJob(
 
 export async function runLeadDistributionProcessor(input: { tenantId?: string; leadId?: string; limit?: number } = {}): Promise<DistributionJobRunResult> {
   const config = await getDistributionJobConfig();
-  const result: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
+  const result: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
   if (!config.enabled) return result;
 
   const effectiveConfig = { ...config, batchSize: Math.min(input.limit ?? config.batchSize, config.batchSize) };
   const now = new Date();
-  if (!isWithinBusinessHours(now)) {
-    result.deferred = await deferJobsUntilBusinessHours(now, input.tenantId, input.leadId);
-    return result;
-  }
+  // DEC-097: ownership recovery runs 24/7 — no business-hours dead-end.
+  // Outbound offer/notification delivery still follows the Meta window in the
+  // outbox; only the assignment itself is never delayed by the clock.
   await expireOutdatedLeadOffers(input.tenantId);
   result.recoveredLeases = await recoverExpiredJobLeases(now, input.tenantId, input.leadId);
   result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId);
   result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId);
   const workerId = `distribution:${randomUUID()}`;
 
+  const claimedJobs: Array<typeof schema.leadDistributionJobs.$inferSelect> = [];
   for (let index = 0; index < effectiveConfig.batchSize; index += 1) {
     const job = await claimNextJob(workerId, effectiveConfig, input.tenantId, input.leadId);
     if (!job) break;
+    claimedJobs.push(job);
     result.claimed += 1;
+  }
+
+  await runWithConcurrency(claimedJobs, Math.min(5, claimedJobs.length || 1), async (job) => {
     const context = await getAutomationContext(job.tenantId);
     if (!context) {
       const failed = await deferOrFailJob(job, effectiveConfig, "NO_AUTOMATION_ACTOR", "Não existe Diretor ativo para auditar a distribuição automática.", true);
       if (failed) result.failed += 1; else result.deferred += 1;
-      continue;
+      return;
     }
     try {
       const distribution = await processQueuedLead(context, job.leadId);
       if (distribution.status === "assigned") {
         await completeJob(job.id);
         result.assigned += 1;
-        continue;
+        return;
       }
       if (distribution.status === "manual_required") {
         await completeJob(job.id);
         result.skipped += 1;
-        continue;
+        return;
       }
       if (distribution.status === "offered") {
         const failed = await deferOrFailJob(
@@ -347,8 +375,10 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
           true,
           distribution.expiresAt,
         );
+        result.offered += 1;
+        if (distribution.outboundMessageId) result.outboundMessageIds.push(distribution.outboundMessageId);
         if (failed) result.failed += 1; else result.deferred += 1;
-        continue;
+        return;
       }
       const reason = distribution.reason ?? "O lead não está pronto para atribuição automática.";
       const deferred = isDeferredDistributionReason(reason);
@@ -358,8 +388,25 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
       const failed = await deferOrFailJob(job, effectiveConfig, "PROCESSING_ERROR", sanitizeError(error), false);
       if (failed) result.failed += 1; else result.deferred += 1;
     }
-  }
+  });
   return result;
+}
+
+export async function drainLeadDistributionBacklog(input: { tenantId?: string; maxBatches?: number } = {}) {
+  const aggregate: DistributionJobRunResult = { seeded: 0, claimed: 0, assigned: 0, offered: 0, outboundMessageIds: [], deferred: 0, failed: 0, skipped: 0, recoveredLeases: 0, recoveredAssignments: 0 };
+  const maxBatches = Math.max(1, Math.min(input.maxBatches ?? 4, 10));
+  for (let batch = 0; batch < maxBatches; batch += 1) {
+    const result = await runLeadDistributionProcessor({ tenantId: input.tenantId });
+    for (const key of ["seeded", "claimed", "assigned", "offered", "deferred", "failed", "skipped", "recoveredLeases", "recoveredAssignments"] as const) {
+      aggregate[key] += result[key];
+    }
+    aggregate.outboundMessageIds.push(...result.outboundMessageIds);
+    await runWithConcurrency(result.outboundMessageIds, 3, async (outboundMessageId) => {
+      await processMetaOutboundBatch(1, input.tenantId, outboundMessageId);
+    });
+    if (result.claimed === 0) break;
+  }
+  return aggregate;
 }
 
 export async function getLeadDistributionJobHealth(tenantId?: string) {

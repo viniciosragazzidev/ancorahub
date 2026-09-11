@@ -7,7 +7,8 @@ import * as XLSX from "xlsx";
 
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/tenant-context";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const BATCH_SIZE = 200;
@@ -314,9 +315,10 @@ export async function importMetaLeads(
     let imported = 0;
     let duplicates = 0;
     const invalid: Array<{ row: number; message: string }> = [];
-    let insertBuffer: Array<{ normalized: NormalizedRow; leadId: string; brokerId: string | null }> = [];
+    let insertBuffer: Array<{ normalized: NormalizedRow; leadId: string }> = [];
+    const importedLeadIds: string[] = [];
 
-    async function flushBuffer(b: Array<{ normalized: NormalizedRow; leadId: string; brokerId: string | null }>) {
+    async function flushBuffer(b: Array<{ normalized: NormalizedRow; leadId: string }>) {
       if (b.length === 0) return;
       await db.transaction(async (tx) => {
         for (const item of b) {
@@ -337,7 +339,7 @@ export async function importMetaLeads(
             id: item.leadId,
             tenantId: context.tenantId,
             branchId,
-            corretorId: item.brokerId,
+            corretorId: null,
             nome: item.normalized.nome,
             telefone: item.normalized.telefone,
             email: item.normalized.email,
@@ -349,12 +351,12 @@ export async function importMetaLeads(
             sourceMetadata,
             externalId: item.normalized.externalId || null,
             capturedAt,
-            status: item.brokerId ? "distributed" : "new",
-            distributionStatus: item.brokerId ? "assigned" : "queued",
-            assignmentSource: item.brokerId ? "automatic" : null,
-            assignmentStrategy: item.brokerId ? "capacity" : null,
+            status: "new",
+            distributionStatus: "queued",
+            assignmentSource: null,
+            assignmentStrategy: null,
             distributionUpdatedAt: new Date(),
-            assignedAt: item.brokerId ? new Date() : null,
+            assignedAt: null,
             consentimentoLgpd: true,
           });
 
@@ -415,8 +417,8 @@ export async function importMetaLeads(
 
       // New lead - add to buffer
       const leadId = randomUUID();
-      const brokerId = branchId ? await chooseAvailableBroker(context.tenantId, branchId) : null;
-      insertBuffer.push({ normalized, leadId, brokerId });
+      insertBuffer.push({ normalized, leadId });
+      importedLeadIds.push(leadId);
       imported++;
 
       // Flush buffer when full
@@ -429,6 +431,10 @@ export async function importMetaLeads(
     // Flush remaining
     await flushBuffer(insertBuffer);
     insertBuffer = [];
+
+    await runWithConcurrency(importedLeadIds, 5, async (leadId) => {
+      await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId, source: "intake" });
+    });
 
     // Update import record
     const durationMs = Date.now() - startTime;
