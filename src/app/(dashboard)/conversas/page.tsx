@@ -201,8 +201,7 @@ export default async function ConversationsPage({
                 eq(schema.aiConversations.tenantId, context.tenantId),
                 inArray(schema.aiConversations.leadId, leadIds),
               ),
-            )
-            .catch(() => []),
+            ),
         ])
       : ([[], [], []] as const);
 

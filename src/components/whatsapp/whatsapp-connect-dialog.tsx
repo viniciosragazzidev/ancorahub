@@ -296,6 +296,47 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     });
   }
 
+  /** Encerra a sessão atual e cria uma nova para invalidar o QR anterior. */
+  function regenerateQr() {
+    if (shouldBlockQrOnMobile()) return;
+    startTransition(async () => {
+      try {
+        const disconnected = await resetWhatsAppSessionAction();
+        if (!disconnected.success) {
+          toast.error(errorMessage(disconnected.code));
+          return;
+        }
+
+        setConnection((current) => ({
+          ...current,
+          sessionId: null,
+          sessionName: null,
+          qrCode: null,
+          status: "disconnected",
+          connectedAt: null,
+        }));
+
+        const started = await startWhatsAppConnection();
+        if (!started.success) {
+          toast.error(errorMessage(started.code));
+          return;
+        }
+
+        setConnection((current) => ({
+          ...current,
+          sessionId: started.sessionId ?? current.sessionId,
+          sessionName: started.sessionId ?? current.sessionName,
+          qrCode: started.qrCode ?? null,
+          status: started.status ?? "initializing",
+        }));
+        toast.success("Novo QR Code gerado. Escaneie no WhatsApp.");
+        await pollStatus();
+      } catch (error) {
+        showUnexpectedActionError(error);
+      }
+    });
+  }
+
   function toggle() {
     startTransition(async () => {
       try {
@@ -514,9 +555,14 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
                 <Button disabled={pending} onClick={hasError ? resetAndRetry : start}>
                   {connection.sessionId ? "Conectar novamente" : "Conectar WhatsApp"}
                 </Button>
-                {initializing && connection.qrCode && (
-                  <Button disabled={pending} onClick={refresh} variant="outline">
+                {initializing && (
+                  <Button disabled={pending} onClick={regenerateQr} variant="outline">
                     Gerar novo QR
+                  </Button>
+                )}
+                {!ready && connection.sessionId && (
+                  <Button disabled={pending} onClick={() => void pollStatus()} variant="outline">
+                    Verificar conexão
                   </Button>
                 )}
               </div>
