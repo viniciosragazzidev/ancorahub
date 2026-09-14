@@ -119,6 +119,22 @@ export function LeadsFilters({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restored, searchParams, storageKey]);
 
+  // Keep controls aligned with URL changes (pagination, sorting, browser back)
+  // without remounting the whole leads workspace.
+  const serializedSearchParams = searchParams.toString();
+  useEffect(() => {
+    const params = new URLSearchParams(serializedSearchParams);
+    setSearch(params.get("search") ?? "");
+    setStatus(params.get("status") ?? "");
+    setBranch(params.get("branch") ?? "");
+    setTipo(params.get("tipo") ?? "");
+    setOrigem(params.get("origem") ?? "");
+    setQualification(params.get("qualification") ?? "");
+    setCorretor(params.get("corretor") ?? "");
+    setEligibleCampaigns(params.get("eligibleCampaigns") === "1");
+    setPageSize(params.get("pageSize") ?? "20");
+  }, [serializedSearchParams]);
+
   const activeCount = [
     status,
     branch,
@@ -137,7 +153,7 @@ export function LeadsFilters({
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
     setOpen(false);
     startTransition(() => {
-      router.push(buildUrl(preferences));
+      router.replace(buildUrl(preferences), { scroll: false });
     });
   }
 
@@ -154,7 +170,7 @@ export function LeadsFilters({
 
     window.localStorage.removeItem(storageKey);
     startTransition(() => {
-      router.push("/leads");
+      router.replace("/leads", { scroll: false });
     });
   }
 
@@ -182,7 +198,7 @@ export function LeadsFilters({
 
     window.localStorage.setItem(storageKey, JSON.stringify(updated));
     startTransition(() => {
-      router.push(buildUrl(updated));
+      router.replace(buildUrl(updated), { scroll: false });
     });
   }
 

@@ -71,6 +71,7 @@ export function LeadsDataTable({
     data: tableData,
     columns,
     pageCount,
+    queryHistory: "replace",
     meta: {
       onRowClick: (row: LeadRow) => {
         const original = leads.find((l) => l.id === row.id);

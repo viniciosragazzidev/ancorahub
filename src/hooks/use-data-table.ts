@@ -39,12 +39,15 @@ export interface UseDataTableProps<TData>
   columns: ColumnDef<TData, any>[];
   data: TData[];
   pageCount: number;
+  /** Use replace for high-frequency operational tables to avoid history churn. */
+  queryHistory?: "push" | "replace";
 }
 
 export function useDataTable<TData>({
   columns,
   data,
   pageCount,
+  queryHistory = "push",
   initialState,
   ...props
 }: UseDataTableProps<TData>) {
@@ -57,31 +60,31 @@ export function useDataTable<TData>({
 
   const [page, setPage] = useQueryState(
     "page",
-    parseAsInteger.withOptions({ history: "push", shallow: false, startTransition }).withDefault(1)
+    parseAsInteger.withOptions({ history: queryHistory, shallow: false, startTransition }).withDefault(1)
   );
   const [pageSize, setPageSize] = useQueryState(
     "pageSize",
-    parseAsInteger.withOptions({ history: "push", shallow: false, startTransition }).withDefault(20)
+    parseAsInteger.withOptions({ history: queryHistory, shallow: false, startTransition }).withDefault(20)
   );
 
   const [sorting, setSorting] = useQueryState(
     "sort",
     getSortingStateParser<TData>()
-      .withOptions({ history: "push", shallow: false, startTransition })
+      .withOptions({ history: queryHistory, shallow: false, startTransition })
       .withDefault([])
   );
 
   const [filters, setFilters] = useQueryState(
     "filters",
     getFiltersStateParser<TData>()
-      .withOptions({ history: "push", shallow: false, startTransition })
+      .withOptions({ history: queryHistory, shallow: false, startTransition })
       .withDefault([])
   );
 
   const [joinOperator, setJoinOperator] = useQueryState(
     "joinOperator",
     parseAsStringEnum([...dataTableConfig.joinOperators])
-      .withOptions({ history: "push", shallow: false, startTransition })
+      .withOptions({ history: queryHistory, shallow: false, startTransition })
       .withDefault("and")
   );
 

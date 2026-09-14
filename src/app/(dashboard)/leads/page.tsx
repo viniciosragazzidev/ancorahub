@@ -580,23 +580,6 @@ async function LeadsPageContent({
     eligibleCampaignsOnly
     || unassignedFilter
   );
-  const leadViewKey = [
-    page,
-    pageSize,
-    filters.search ?? "",
-    filters.status ?? "",
-    filters.branch ?? "",
-    filters.tipo ?? "",
-    filters.origem ?? "",
-    filters.qualification ?? "",
-    filters.corretor ?? "",
-    filters.eligibleCampaigns ?? "",
-    filters.filters ?? "",
-    filters.sort ?? "",
-    filters.joinOperator ?? "",
-    initialView ?? "",
-  ].join(":");
-
   return (
     <>
       <DashboardHeader
@@ -645,7 +628,6 @@ async function LeadsPageContent({
 
         {/* Filters */}
         <LeadsFilters
-          key={leadViewKey}
           branches={branches}
           brokers={brokers}
           initialBranch={filters.branch}
@@ -664,7 +646,6 @@ async function LeadsPageContent({
         {leads.length || qualifyingLeads.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
-              key={leadViewKey}
               leads={leads.map((lead) => ({
                 ...lead,
                 createdAt: lead.createdAt.toISOString(),
