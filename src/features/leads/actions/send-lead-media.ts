@@ -246,5 +246,3 @@ async function sendMetaCloudMediaMessage(input: {
   }
   return { messageId: payload.messages[0].id };
 }
-
-export const CONVERSATION_MEDIA_KIND_LIST = CONVERSATION_MEDIA_KINDS;
