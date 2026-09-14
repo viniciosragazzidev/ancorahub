@@ -191,7 +191,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     if (!open || !connection.sessionId || connection.status === "ready") return;
     void pollStatus();
     const interval = connection.status === "initializing" ? 500 : 1_500;
-    const timer = window.setInterval(() => startTransition(async () => pollStatus()), interval);
+    const timer = window.setInterval(() => void pollStatus(), interval);
     return () => window.clearInterval(timer);
   }, [open, connection.sessionId, connection.status]);
 
@@ -200,10 +200,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     if (!open || !connection.sessionId || connection.status === "ready") return;
     function onVisibilityChange() {
       if (document.visibilityState === "visible") {
-        startTransition(async () => {
-          await pollStatus();
-          router.refresh();
-        });
+        void pollStatus().then(() => router.refresh());
       }
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -213,10 +210,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen && connection.sessionId && connection.status !== "ready") {
-      startTransition(async () => {
-        await pollStatus();
-        router.refresh();
-      });
+      void pollStatus().then(() => router.refresh());
     }
   }
 
