@@ -538,12 +538,10 @@ export function DistributionMetrics({ metrics }: { metrics: Metrics }) {
               hidden: { opacity: 0, y: 8 },
               visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
             }}
-            whileHover={{ y: -2, transition: { duration: 0.2, ease: [0, 0, 0.2, 1] } }}
-            whileTap={{ scale: 0.995, transition: { duration: 0.1 } }}
           >
             <Card
               variant="compact"
-              className="group/card transition-[border-color,box-shadow] duration-200 hover:border-primary/30"
+              className="group/card"
             >
               <CardContent className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">

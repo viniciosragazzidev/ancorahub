@@ -8,6 +8,25 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-14 — `/leads/distribuicao` refinamento operacional
+
+### Resultado
+
+- A navegação por abas agora permanece disponível durante a rolagem, com contraste
+  de superfície, blur discreto e rolagem horizontal acessível em viewport estreito.
+- O estado da aba acompanha o histórico do navegador (`popstate`), preservando o
+  contexto compartilhável em `?view=` sem duplicar regras de distribuição.
+- Os cards de métricas deixaram de deslocar no hover/tap: são indicadores, não
+  controles, e agora reservam movimento apenas para mudanças que comunicam estado.
+
+### Validação
+
+Fluxo preserva as seis visões existentes, os filtros e ações server-side. Testes de
+fundação e build de produção permanecem aprovados; QA autenticado em larguras reais
+continua sendo o gate M1.10 do Controle de Execução.
+
+---
+
 ## 2026-09-14 — UX-H1 Design engineering hardening
 
 ### Resultado

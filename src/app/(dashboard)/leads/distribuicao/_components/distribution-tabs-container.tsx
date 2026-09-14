@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowsDownUp, Buildings, CalendarBlank, ChartBar, ChartLineUp, FileArrowDown } from "@/components/huge-icons";
 
@@ -25,6 +25,15 @@ export function DistributionTabsContainer({
 }) {
   const [activeTab, setActiveTab] = useState(initialView);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextView = new URL(window.location.href).searchParams.get("view");
+      if (nextView) setActiveTab(nextView);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const handleValueChange = (val: string) => {
     setActiveTab(val);
     if (typeof window !== "undefined") {
@@ -36,7 +45,7 @@ export function DistributionTabsContainer({
 
   return (
     <Tabs value={activeTab} onValueChange={handleValueChange} variant="segment" className="w-full space-y-6">
-      <TabsList className="max-w-5xl w-full justify-start overflow-x-auto">
+      <TabsList className="sticky top-0 z-20 w-full justify-start overflow-x-auto bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <TabsTrigger value="roteamento" className="gap-1.5"><ArrowsDownUp aria-hidden="true" className="size-4" />Matriz de Roteamento</TabsTrigger>
         <TabsTrigger value="resumo_dia" className="gap-1.5"><ChartLineUp aria-hidden="true" className="size-4" />Resumo do Dia</TabsTrigger>
         {showQueueDefinition ? <TabsTrigger value="filas" className="gap-1.5"><Buildings aria-hidden="true" className="size-4" />Filas & Unidades</TabsTrigger> : null}
