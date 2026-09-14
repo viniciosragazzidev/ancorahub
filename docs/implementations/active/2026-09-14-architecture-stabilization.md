@@ -24,3 +24,8 @@ sem corretor. A primeira correção da O2 removeu o bloqueio indevido da fila ge
 pela unidade de origem em `resolveQueueCandidateBranchIds`; o contrato agora é
 coberto por teste de domínio. O dashboard refinado aguarda QA visual/responsivo
 antes de publicar.
+
+Na O3, a borda de configuração de distribuição passou a resolver o contexto
+canônico completo antes da avaliação de capability, corrigindo a falsa ausência de
+`distribution_settings_manage` causada pelo adaptador legado. A restrição de produto
+para alteração pelo Diretor foi preservada; testes de autorização e type-check passaram.

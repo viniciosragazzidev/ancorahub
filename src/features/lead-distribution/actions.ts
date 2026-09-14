@@ -3,6 +3,7 @@
 import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { resolveAccessContext } from "@/shared/auth/access-context";
 import { toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
 import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import {
@@ -90,7 +91,11 @@ export async function saveDistributionPolicyAction(
     return { success: false, error: "Os pesos do ranking não podem ultrapassar 100." };
   try {
     const context = await getRequiredTenantContext();
-    const accessContext = toEffectiveLeadAccessContext(context);
+    // Resolve the complete server-side capability set (including custom roles)
+    // before evaluating distribution-settings authorization. The legacy adapter
+    // intentionally exposes only `acessar_leads` and would make this specific
+    // capability appear missing even for an authorized actor.
+    const accessContext = await resolveAccessContext(context);
     const legacyAllowed = context.role === "director";
 
     await evaluateShadowAuthorization({

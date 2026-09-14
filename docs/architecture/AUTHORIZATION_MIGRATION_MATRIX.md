@@ -23,7 +23,7 @@ Este documento registra o status de migração dos consumers da aplicação para
 | C-15 | `src/app/(dashboard)/equipe/actions.ts:transferLeadsAction` | Team / Bulk | WRITE (Bulk Reassign) | HIGH | CANONICAL (Enforced) | EQUIVALENTE | Actor + Resource + Target com mutation SQL restrita ao escopo de filiais autorizadas. |
 | C-16 | `src/features/leads/management-actions.ts:reassignLeadAction` | Leads / Ownership | WRITE (Manual Reassign) | HIGH | CANONICAL (Enforced) | EQUIVALENTE | Avalia Shadow Mode, Actor/Resource/Target e suporte a Gestores multi-unidade. |
 | C-17 | `src/app/(dashboard)/leads/actions.ts:deleteLeadAction` | Leads / Delete | WRITE (Soft Delete) | HIGH | CANONICAL (Enforced) | EQUIVALENTE | Delete seguro com escopo atômico de tenant e avaliação de shadow mode. |
-| C-18 | `src/features/lead-distribution/actions.ts:saveDistributionPolicyAction` | Distribuição / Config | WRITE (Policy Admin) | HIGH | CANONICAL (Enforced) | EQUIVALENTE | Autorização central de quem pode alterar regras de distribuição sem tocar no motor. |
+| C-18 | `src/features/lead-distribution/actions.ts:saveDistributionPolicyAction` | Distribuição / Config | WRITE (Policy Admin) | HIGH | CANONICAL (Enforced) | EQUIVALENTE | Usa `resolveAccessContext` para avaliar a capability completa (incluindo custom roles); a regra de produto que restringe a alteração ao Diretor permanece aplicada. |
 
 ---
 
