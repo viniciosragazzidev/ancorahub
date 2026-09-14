@@ -140,6 +140,62 @@ export function isDeferredDistributionReason(reason: string) {
 }
 
 /**
+ * Window during which a PENDING offer without a linked durable outbox row is
+ * treated as an in-flight delivery attempt. `createLeadOffersForBrokers` links
+ * the outbox row right after enqueueing, so a stale PENDING offer past this
+ * window is abnormal and must not block the cycle forever.
+ */
+export const OFFER_ENQUEUE_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * DEC-049/DEC-027B: the provisional owner keeps the lead until another broker
+ * confirms transactionally. A slightly-late accept from the current provisional
+ * owner is honored while the rotation has not claimed another broker yet.
+ */
+export const LEAD_OFFER_ACCEPT_GRACE_MS = 60 * 1000;
+
+const ACTIVE_OFFER_STATUSES = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
+
+/**
+ * Whether an active offer must block the creation of a second offer for the
+ * same lead. An offer with a linked outbox row (or unknown/legacy linkage) is
+ * always blocking; a PENDING offer whose outbox row was not linked yet only
+ * blocks during the enqueue grace window.
+ */
+export function isBlockingActiveOffer(
+  offer: { status: string; offeredAt?: Date | null; expiresAt: Date; outboundMessageId?: string | null },
+  now: Date,
+) {
+  if (!ACTIVE_OFFER_STATUSES.has(offer.status) || offer.expiresAt <= now) return false;
+  // `undefined` means legacy/unknown linkage and keeps the historical blocking
+  // behavior; an explicit `null` means the enqueue has not linked the row yet.
+  if (offer.outboundMessageId !== null) return true;
+  if (offer.status !== "PENDING" || !offer.offeredAt) return false;
+  return now.getTime() - offer.offeredAt.getTime() <= OFFER_ENQUEUE_GRACE_MS;
+}
+
+export type LeadOfferAcceptanceDecision = {
+  isExpired: boolean;
+  isAlreadyAssigned: boolean;
+  withinGrace: boolean;
+  isAcceptable: boolean;
+};
+
+/** Pure accept-time decision shared by the offer webhook transaction. */
+export function resolveLeadOfferAcceptance(
+  input: { offerStatus: string; expiresAt: Date; leadCorretorId: string | null; brokerId: string },
+  now: Date,
+): LeadOfferAcceptanceDecision {
+  const overdueMs = now.getTime() - input.expiresAt.getTime();
+  const isProvisionalOwner = input.leadCorretorId === input.brokerId;
+  const withinGrace = overdueMs > 0 && overdueMs <= LEAD_OFFER_ACCEPT_GRACE_MS && isProvisionalOwner;
+  const isExpired = overdueMs > 0 && !withinGrace;
+  const isAlreadyAssigned = Boolean(input.leadCorretorId && input.leadCorretorId !== input.brokerId);
+  const isAcceptable = ACTIVE_OFFER_STATUSES.has(input.offerStatus) && !isExpired && !isAlreadyAssigned;
+  return { isExpired, isAlreadyAssigned, withinGrace, isAcceptable };
+}
+
+/**
  * A queue tied to one unit can only select brokers from that unit. A general
  * queue is deliberately different: it may distribute only to the unit IDs
  * explicitly allowed in its policy, never to every tenant unit by default.
@@ -194,12 +250,7 @@ export function resolveLeadOfferCycle(input: {
         (offer) => !offer.offeredAt || offer.offeredAt >= input.cycleStartedAt!,
       )
     : input.offers;
-  const activeStatuses = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
-  const activeOffer = offers.find(
-    (offer) => activeStatuses.has(offer.status)
-      && offer.expiresAt > now
-      && offer.outboundMessageId !== null,
-  );
+  const activeOffer = offers.find((offer) => isBlockingActiveOffer(offer, now));
   const attemptedBrokerIds = new Set(offers.map((offer) => offer.brokerId));
   const remainingBrokerIds = input.eligibleBrokerIds.filter(
     (brokerId) => !attemptedBrokerIds.has(brokerId),

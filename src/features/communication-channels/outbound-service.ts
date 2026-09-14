@@ -708,6 +708,15 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
 
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
       await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      // DEC-049: bind the provider wamid to the offer so a broker's button
+      // reply can be resolved even when Meta omits `context.id`.
+      if (row.purpose === "newLeadAssignment") {
+        await db.update(schema.leadOffers).set({ whatsappMessageId: providerMessageId, updatedAt: new Date() }).where(and(
+          eq(schema.leadOffers.outboundMessageId, row.id),
+          eq(schema.leadOffers.tenantId, row.tenantId),
+          isNull(schema.leadOffers.whatsappMessageId),
+        ));
+      }
       if (invitation && row.recipientId) {
         await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts + 1, deliveryError: null }).where(and(
           eq(schema.brokerInvitations.id, row.recipientId),

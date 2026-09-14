@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isDeferredDistributionReason, isValidDutyWindow, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
+import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
 
 describe("automatic unit routing", () => {
   it("selects the least loaded unit with a stable tie break", () => {
@@ -184,6 +184,134 @@ describe("lead distribution domain", () => {
     expect(cycle.exhausted).toBe(false);
   });
 
+  it("keeps a freshly enqueued offer without a linked outbox row as the exclusive active offer (bug: duplicate offers)", () => {
+    const now = new Date("2026-09-14T15:00:30Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        {
+          brokerId: "broker-a",
+          status: "PENDING",
+          outboundMessageId: null,
+          offeredAt: new Date("2026-09-14T15:00:00Z"),
+          expiresAt: new Date("2026-09-14T15:03:00Z"),
+        },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBe("broker-a");
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+  });
+
+  it("releases an orphaned PENDING offer whose outbox linkage never landed (bug: lead fica indisponível)", () => {
+    const now = new Date("2026-09-14T15:05:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        {
+          brokerId: "broker-a",
+          status: "PENDING",
+          outboundMessageId: null,
+          offeredAt: new Date("2026-09-14T15:00:00Z"),
+          expiresAt: new Date("2026-09-14T15:03:00Z"),
+        },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBeNull();
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+  });
+
+  it("never blocks on a sent offer whose outbox linkage is missing", () => {
+    const now = new Date("2026-09-10T15:00:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        {
+          brokerId: "broker-a",
+          status: "SENT",
+          outboundMessageId: null,
+          expiresAt: new Date("2026-09-10T15:03:00Z"),
+        },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBeNull();
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+  });
+
+  it("treats an offer with unknown (legacy) linkage as blocking", () => {
+    const now = new Date("2026-09-10T15:00:00Z");
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-a", "broker-b"],
+      offers: [
+        {
+          brokerId: "broker-a",
+          status: "SENT",
+          expiresAt: new Date("2026-09-10T15:03:00Z"),
+        },
+      ],
+      now,
+    });
+
+    expect(cycle.activeBrokerId).toBe("broker-a");
+    expect(cycle.remainingBrokerIds).toEqual(["broker-b"]);
+  });
+
+  it("honors a slightly-late accept from the provisional owner within the grace window", () => {
+    const now = new Date("2026-09-14T15:03:30Z");
+    const decision = resolveLeadOfferAcceptance({
+      offerStatus: "SENT",
+      expiresAt: new Date("2026-09-14T15:03:00Z"),
+      leadCorretorId: "broker-a",
+      brokerId: "broker-a",
+    }, now);
+
+    expect(decision.isExpired).toBe(false);
+    expect(decision.isAcceptable).toBe(true);
+    expect(decision.withinGrace).toBe(true);
+  });
+
+  it("rejects a late accept beyond the grace window", () => {
+    const now = new Date("2026-09-14T15:04:31Z");
+    const decision = resolveLeadOfferAcceptance({
+      offerStatus: "SENT",
+      expiresAt: new Date("2026-09-14T15:03:00Z"),
+      leadCorretorId: "broker-a",
+      brokerId: "broker-a",
+    }, now);
+
+    expect(decision.isExpired).toBe(true);
+    expect(decision.isAcceptable).toBe(false);
+  });
+
+  it("grants no grace window to a broker who never received the provisional ownership", () => {
+    const now = new Date("2026-09-14T15:03:30Z");
+    const decision = resolveLeadOfferAcceptance({
+      offerStatus: "SENT",
+      expiresAt: new Date("2026-09-14T15:03:00Z"),
+      leadCorretorId: null,
+      brokerId: "broker-a",
+    }, now);
+
+    expect(decision.isExpired).toBe(true);
+    expect(decision.isAcceptable).toBe(false);
+  });
+
+  it("exposes the documented grace constants", () => {
+    expect(OFFER_ENQUEUE_GRACE_MS).toBe(2 * 60 * 1000);
+    expect(LEAD_OFFER_ACCEPT_GRACE_MS).toBe(60 * 1000);
+  });
+
+  it("isBlockingActiveOffer keeps legacy linkage blocking until expiry", () => {
+    const now = new Date("2026-09-14T15:00:00Z");
+    expect(isBlockingActiveOffer({ status: "DELIVERED", expiresAt: new Date("2026-09-14T15:03:00Z") }, now)).toBe(true);
+    expect(isBlockingActiveOffer({ status: "DELIVERED", expiresAt: new Date("2026-09-14T14:59:59Z") }, now)).toBe(false);
+  });
+
   it("does not treat an offer without a durable outbound message as delivered to a broker", () => {
     const now = new Date("2026-09-10T15:00:00Z");
     const cycle = resolveLeadOfferCycle({
@@ -193,6 +321,7 @@ describe("lead distribution domain", () => {
           brokerId: "broker-a",
           status: "PENDING",
           outboundMessageId: null,
+          offeredAt: new Date("2026-09-10T14:55:00Z"),
           expiresAt: new Date("2026-09-10T15:03:00Z"),
         },
       ],

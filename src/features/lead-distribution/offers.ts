@@ -9,6 +9,7 @@ import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 import { normalizePhone } from "@/shared/utils/phone";
+import { isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
 
 function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
@@ -123,20 +124,27 @@ export async function createLeadOffersForBrokers(input: {
 
       if (!lockedLead || lockedLead.corretorId !== (input.expectedCurrentBrokerId ?? null)) return null;
 
-      const [activeOffer] = await tx
-        .select({ id: schema.leadOffers.id })
+      const activeOffers = await tx
+        .select({
+          id: schema.leadOffers.id,
+          status: schema.leadOffers.status,
+          offeredAt: schema.leadOffers.offeredAt,
+          expiresAt: schema.leadOffers.expiresAt,
+          outboundMessageId: schema.leadOffers.outboundMessageId,
+        })
         .from(schema.leadOffers)
         .where(
           and(
             eq(schema.leadOffers.tenantId, input.tenantId),
             eq(schema.leadOffers.leadId, input.leadId),
-            inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
-            isNotNull(schema.leadOffers.outboundMessageId),
             gt(schema.leadOffers.expiresAt, now),
           ),
         )
-        .limit(1);
-      if (activeOffer) return null;
+        .limit(50);
+      // Exclusivity decision shared with the offer-cycle resolver so the
+      // claim guard and the rotation never disagree about what blocks a
+      // second offer (duplicate-offer bug).
+      if (activeOffers.some((offer) => isBlockingActiveOffer(offer, now))) return null;
 
       const [alreadyAttempted] = await tx
         .select({ id: schema.leadOffers.id })
@@ -180,7 +188,15 @@ export async function createLeadOffersForBrokers(input: {
           serviceStartedBy: null,
           motivoPerda: null,
           updatedAt: now,
-        }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+        }).where(and(
+          eq(schema.leads.id, input.leadId),
+          eq(schema.leads.tenantId, input.tenantId),
+          // DEC-027B: the provisional owner only changes after a confirmed
+          // transactional claim; a concurrent accept must not be overwritten.
+          lockedLead.corretorId === null
+            ? isNull(schema.leads.corretorId)
+            : eq(schema.leads.corretorId, lockedLead.corretorId),
+        ));
         await tx.insert(schema.leadDistributionEvents).values({
           id: assignmentEventId,
           tenantId: input.tenantId,
@@ -366,6 +382,36 @@ export async function handleLeadOfferWebhookResponse(input: {
   }
 
   if (!offer) {
+    // The offer row stores the outbox id, not the provider wamid. Before
+    // falling back to the latest active offer, resolve the reply through the
+    // outbox row so accepts/declines land even when context.id is absent.
+    if (input.providerMessageId) {
+      const [outboundRow] = await db
+        .select({ id: schema.whatsappOutboundMessages.id })
+        .from(schema.whatsappOutboundMessages)
+        .where(and(
+          eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+          eq(schema.whatsappOutboundMessages.providerMessageId, input.providerMessageId),
+        ))
+        .limit(1);
+      if (outboundRow) {
+        const [matchedByOutbound] = await db
+          .select()
+          .from(schema.leadOffers)
+          .where(
+            and(
+              eq(schema.leadOffers.tenantId, input.tenantId),
+              eq(schema.leadOffers.brokerId, broker.id),
+              eq(schema.leadOffers.outboundMessageId, outboundRow.id),
+            ),
+          )
+          .limit(1);
+        offer = matchedByOutbound;
+      }
+    }
+  }
+
+  if (!offer) {
     const activeOffers = await db
       .select()
       .from(schema.leadOffers)
@@ -445,7 +491,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         queueId: schema.leads.queueId,
       })
       .from(schema.leads)
-      .where(and(eq(schema.leads.id, offer.leadId), eq(schema.leads.tenantId, input.tenantId)))
+      .where(and(eq(schema.leads.id, offer.leadId), eq(schema.leads.tenantId, input.tenantId), isNull(schema.leads.deletedAt)))
       .for("update")
       .limit(1);
 
@@ -461,16 +507,20 @@ export async function handleLeadOfferWebhookResponse(input: {
 
     if (!currentOffer) return { won: false, reason: "offer_not_found" };
 
-    const isExpired = currentOffer.expiresAt <= now;
-    const isAlreadyAssigned = Boolean(lead.corretorId && lead.corretorId !== broker.id);
-
-    if (isExpired || isAlreadyAssigned || !["PENDING", "SENT", "DELIVERED", "READ"].includes(currentOffer.status)) {
+    // Accept decision shared with the domain seam (incl. the 60s provisional
+    // owner grace) so the webhook and the rotation agree on expiry semantics.
+    const decision = resolveLeadOfferAcceptance(
+      { offerStatus: currentOffer.status, expiresAt: currentOffer.expiresAt, leadCorretorId: lead.corretorId, brokerId: broker.id },
+      now,
+    );
+    const winningStatuses = ["PENDING", "SENT", "DELIVERED", "READ"] as const;
+    if (decision.isExpired || decision.isAlreadyAssigned || !(winningStatuses as readonly string[]).includes(currentOffer.status)) {
       await tx
         .update(schema.leadOffers)
-        .set({ status: isExpired ? "EXPIRED" : "LOST", updatedAt: now })
+        .set({ status: decision.isExpired ? "EXPIRED" : "LOST", updatedAt: now })
         .where(eq(schema.leadOffers.id, offer.id));
 
-      return { won: false, reason: isExpired ? "expired" : "already_assigned", lead };
+      return { won: false, reason: decision.isExpired ? "expired" : "already_assigned", lead };
     }
 
     // WINNER CONFIRMED!
@@ -489,7 +539,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         serviceStartedAt: null,
         serviceStartedBy: null,
       })
-      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, input.tenantId), eq(schema.leads.corretorId, broker.id)));
+      .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, input.tenantId), lead.corretorId === null ? isNull(schema.leads.corretorId) : eq(schema.leads.corretorId, lead.corretorId)));
 
     // 2. Update winning offer
     await tx
@@ -661,6 +711,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
       tenantId: schema.leadOffers.tenantId,
       leadId: schema.leadOffers.leadId,
       brokerId: schema.leadOffers.brokerId,
+      outboundMessageId: schema.leadOffers.outboundMessageId,
     })
     .from(schema.leadOffers)
     .where(
@@ -707,6 +758,23 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
 
     if (updated) {
       expiredCount += 1;
+
+      // DEC-049: an expired offer must never be delivered afterwards. Cancel
+      // the queued outbox row immediately so the broker does not receive an
+      // offer whose accept is already dead ("lead indisponível" symptom).
+      await db
+        .update(schema.whatsappOutboundMessages)
+        .set({
+          status: "cancelled",
+          providerErrorCode: "OFFER_EXPIRED",
+          providerErrorMessage: "Oferta expirou antes do envio.",
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.whatsappOutboundMessages.tenantId, offer.tenantId),
+          eq(schema.whatsappOutboundMessages.id, offer.outboundMessageId ?? "__none__"),
+          inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
+        ));
 
       const [broker] = await db
         .select({
