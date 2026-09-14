@@ -1,14 +1,12 @@
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { withRequestTiming } from "@/shared/observability/request-timing";
-import { getFeatureFlag } from "@/features/system-settings/queries";
-import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
-import LegacyReportsView from "../relatorios/_components/legacy-reports-view";
-import ReportingCenterView from "../relatorios/_components/reporting-center-view";
+import { getDashboardViewModel } from "@/features/dashboard/service";
+import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
 
 /**
  * The reporting center is the canonical operational dashboard. The old
@@ -41,13 +39,8 @@ export default async function DashboardPage({
       return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
     }
 
-    const reportingCenterEnabled = await getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER);
-
-    if (reportingCenterEnabled !== "false") {
-      return <ReportingCenterView context={context} searchParams={searchParams} />;
-    }
-
-    return <LegacyReportsView context={context} searchParams={searchParams} />;
+    const model = await getDashboardViewModel(context, 7);
+    return <OperationalDashboard model={model} period={7} />;
   });
 
   return result;
