@@ -12,7 +12,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     ? and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.id, context.branchId))
     : eq(schema.branches.tenantId, context.tenantId);
   const branches = await db
-    .select({ id: schema.branches.id, name: schema.branches.name })
+    .select({ id: schema.branches.id, name: schema.branches.name, isDistributionHub: schema.branches.isDistributionHub })
     .from(schema.branches)
     .where(branchCondition)
     .orderBy(asc(schema.branches.name));

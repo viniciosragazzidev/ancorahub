@@ -65,6 +65,12 @@ type DutyAction = (previous: DutyActionState, formData: FormData) => Promise<Dut
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
 
+function firstSchedulableBranchId(snapshot: Snapshot) {
+  return snapshot.branches.find(
+    (branch) => !branch.isDistributionHub && snapshot.queues.some((queue) => queue.branchId === branch.id),
+  )?.id ?? "";
+}
+
 function dateInputValue(value: Date | null) {
   if (!value) return "";
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(value);
@@ -345,11 +351,11 @@ function DutyFormSheet({
 }) {
   const [pending, startTransition] = useTransition();
   const [branchIds, setBranchIds] = useState<string[]>(
-    schedule ? [schedule.branchId] : [snapshot.branches[0]?.id ?? ""].filter(Boolean),
+    schedule ? [schedule.branchId] : [firstSchedulableBranchId(snapshot)].filter(Boolean),
   );
   const [queueIdsByBranch, setQueueIdsByBranch] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      (schedule ? [schedule.branchId] : [snapshot.branches[0]?.id ?? ""].filter(Boolean)).map(
+      (schedule ? [schedule.branchId] : [firstSchedulableBranchId(snapshot)].filter(Boolean)).map(
         (branchId) => [
           branchId,
           schedule && schedule.branchId === branchId
@@ -429,7 +435,7 @@ function DutyFormSheet({
             <fieldset className="grid gap-2">
               <Label>Unidades</Label>
               <div className="grid gap-2">
-                {snapshot.branches.map((branch) => {
+                {snapshot.branches.filter((branch) => !branch.isDistributionHub).map((branch) => {
                   const selected = branchIds.includes(branch.id);
                   const hasQueue = snapshot.queues.some((queue) => queue.branchId === branch.id);
                   return (
@@ -455,6 +461,11 @@ function DutyFormSheet({
                     </label>
                   );
                 })}
+                {snapshot.branches.some((branch) => branch.isDistributionHub) && (
+                  <p className="text-xs text-muted-foreground">
+                    A Matriz é uma central de redistribuição e não participa de plantões operacionais.
+                  </p>
+                )}
               </div>
               {schedule && (
                 <p className="text-xs text-muted-foreground">
