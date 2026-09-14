@@ -190,14 +190,15 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
     }
 
     if (isNativeWahaSession) {
-      const rawStatus = String(innerPayload.status || raw.sessionStatus || "active").toUpperCase();
-      let sessionStatus: "active" | "paused" | "offline" | "error" = "active";
+      const rawStatus = String(innerPayload.status || raw.sessionStatus || "").toUpperCase();
+      // Fail-safe: status desconhecido nunca é "active". O default otimista
+      // marcava sessões em pareamento (SCAN_QR_CODE/AUTHENTICATING) como
+      // prontas no banco, fazendo a conexão oscilar ready↔disconnected.
+      let sessionStatus: "active" | "paused" | "offline" | "error" = "offline";
       if (rawStatus === "WORKING" || rawStatus === "CONNECTED" || rawStatus === "ACTIVE") {
         sessionStatus = "active";
       } else if (rawStatus === "PAUSED") {
         sessionStatus = "paused";
-      } else if (rawStatus === "STOPPED" || rawStatus === "OFFLINE") {
-        sessionStatus = "offline";
       } else if (rawStatus === "FAILED" || rawStatus === "ERROR") {
         sessionStatus = "error";
       }

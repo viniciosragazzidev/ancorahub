@@ -148,8 +148,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       paused: "paused",
       offline: "disconnected",
       error: "error",
-    };
-    const normalizedStatus = event.sessionStatus
+    };    const normalizedStatus = event.sessionStatus
       ? (statusMap[event.sessionStatus] ?? event.sessionStatus)
       : "disconnected";
 

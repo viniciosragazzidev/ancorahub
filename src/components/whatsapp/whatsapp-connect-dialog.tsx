@@ -167,13 +167,17 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         if (returnTo) router.replace(returnTo);
       } else {
         updateStatus(result.status);
-        // Buscar QR code quando estiver aguardando pareamento
+        // Buscar QR code quando estiver aguardando pareamento.
+        // IMPORTANTE: qrCode null com success true significa que o WAHA
+        // rotacionou o QR (ou ainda não regenerou). Manter a imagem antiga
+        // fazia o usuário escanear um código morto — limpar para exibir
+        // "Gerando QR Code…" até o próximo ciclo trazer o código atual.
         if (result.status === "initializing") {
           const qr = await refreshWhatsAppQr();
-          if (qr.success && qr.qrCode) {
+          if (qr.success) {
             setConnection((current) => ({
               ...current,
-              qrCode: qr.qrCode ?? current.qrCode,
+              qrCode: qr.qrCode ?? null,
               status: qr.status ?? current.status,
             }));
           }
@@ -249,11 +253,13 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           return;
         }
         // A action já busca o QR uma vez. Não repetir a mesma chamada antes do polling.
+        // Se vier null, é porque a sessão ainda não tem QR pronto — NÃO reaproveitar
+        // um QR de uma sessão anterior (já invalidado).
         const newQrCode = (result as { qrCode?: string | null }).qrCode ?? null;
         setConnection((current) => ({
           ...current,
           sessionId: result.sessionId ?? current.sessionId,
-          qrCode: newQrCode ?? current.qrCode,
+          qrCode: newQrCode,
           status: result.status ?? "initializing",
         }));
         if (newQrCode) {
@@ -277,9 +283,11 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           const code = (result as { code?: string }).code;
           toast.error(errorMessage(code));
         } else {
+          // success com qrCode null = QR rotacionado/ausente: limpar a imagem
+          // antiga em vez de reexibir um código morto.
           setConnection((current) => ({
             ...current,
-            qrCode: result.qrCode ?? current.qrCode,
+            qrCode: result.qrCode ?? null,
             status: result.status ?? current.status,
           }));
           await pollStatus();

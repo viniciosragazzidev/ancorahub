@@ -119,14 +119,21 @@ async function getOwnConnection() {
   return { context, db, connection };
 }
 
+/**
+ * Normaliza o status devolvido pelo Fastify/WAHA para os estados da UI.
+ * A janela pós-scan (AUTHENTICATING/AUTHENTICATED/OPENING) deve manter a UI
+ * em "initializing" — mapeá-la para "disconnected" dava a impressão de falha
+ * exatamente no momento em que o celular confirmava o pareamento.
+ */
 function normalizeWahaStatus(raw: string): string {
-  const s = raw.toUpperCase();
-  if (s === "WORKING") return "ready";
-  if (s === "CONNECTED") return "ready";
-  if (s === "STOPPED") return "disconnected";
-  if (s === "FAILED") return "error";
-  if (s === "ERROR") return "error";
-  if (s === "SCAN_QR_CODE" || s === "STARTING" || s === "WAITING_QR") return "initializing";
+  const s = raw.trim().toUpperCase();
+  if (["WORKING", "CONNECTED", "READY", "AUTHENTICATED", "OPEN", "ONLINE"].includes(s)) return "ready";
+  if (["FAILED", "ERROR", "INVALID", "UNAVAILABLE"].includes(s)) return "error";
+  if (
+    ["SCAN_QR_CODE", "STARTING", "WAITING_QR", "WAITING_FOR_QR", "QR", "QR_READY", "CREATED", "INITIALIZING", "CONNECTING", "LOADING", "AUTHENTICATING", "OPENING"].includes(s)
+  ) {
+    return "initializing";
+  }
   return "disconnected";
 }
 
