@@ -174,8 +174,10 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   } catch {
     // Unidade sem fila: roteamento continua sem fila vinculada
   }
-  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, metaCampaignId: schema.leads.metaCampaignId, sourceCampaign: schema.leads.sourceCampaign }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, metaCampaignId: schema.leads.metaCampaignId, sourceCampaign: schema.leads.sourceCampaign }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1);
   if (!lead) return { status: "failed", code: "LEAD_NOT_FOUND" };
+  const canMovePendingAssignment = !lead.corretorId || ((lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt && !lead.serviceStartedAt);
+  if (!canMovePendingAssignment) return { status: "conflict", code: "LEAD_ALREADY_IN_SERVICE" };
 
   if (queueId && !overrideCampaign) {
     const campaignCheck = await validateCampaignQueueRoute(db, context.tenantId, leadId, queueId);
@@ -199,7 +201,7 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
     };
     // Só vincula fila quando existe; sem fila, o lead fica aguardando fila/unidade
     if (queueId) updateData.queueId = queueId;
-    const result = await tx.update(schema.leads).set(updateData).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
+    const result = await tx.update(schema.leads).set(updateData).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), or(isNull(schema.leads.corretorId), and(inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.serviceStartedAt))))).returning({ id: schema.leads.id });
     if (!result.length) return false;
     await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: branchId, previousOwnerId: lead.corretorId, toQueueId: queueId, action: "routed_to_unit", source: context.role === "director" ? "manual_director" : "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: new Date() });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.routed_to_unit" });

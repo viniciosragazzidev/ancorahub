@@ -45,7 +45,7 @@ export function BulkReassignDialog({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<BulkMode>("broker");
   const [selectedBrokerId, setSelectedBrokerId] = useState("");
-  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
   const [visibleError, setVisibleError] = useState<string | null>(null);
 
   // Mode 1: Reassign Broker
@@ -98,7 +98,7 @@ export function BulkReassignDialog({
     (result: typeof branchState) => {
       toast.success(result.message ?? `Transferência para a unidade concluída.`);
       setOpen(false);
-      setSelectedBranchId("");
+      setSelectedBranchIds([]);
       if (result.changedLeadIds?.length && result.branchId) {
         onBranchCommitted?.({ leadIds: result.changedLeadIds, branchId: result.branchId });
       }
@@ -147,7 +147,7 @@ export function BulkReassignDialog({
       setOpen(nextOpen);
       if (!nextOpen && !isPending) {
         setSelectedBrokerId("");
-        setSelectedBranchId("");
+        setSelectedBranchIds([]);
         setVisibleError(null);
       }
     },
@@ -255,23 +255,28 @@ export function BulkReassignDialog({
             {leadIds.map((id) => (
               <input key={id} name="leadIds" type="hidden" value={id} />
             ))}
-            <input name="branchId" type="hidden" value={selectedBranchId} />
-
             <div className="space-y-2">
-              <Label htmlFor="branch-select" className="text-xs">Selecione a nova unidade / filial</Label>
-              <AppSelect
-                id="branch-select"
-                value={selectedBranchId}
-                onValueChange={setSelectedBranchId}
-                placeholder="Selecione uma unidade..."
-                required
-                options={branches.map((branch) => ({
-                  value: branch.id,
-                  label: branch.name,
-                }))}
-              />
+              <Label className="text-xs">Selecione uma ou mais unidades / filiais</Label>
+              <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                {branches.map((branch) => {
+                  const checked = selectedBranchIds.includes(branch.id);
+                  return (
+                    <label key={branch.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/60">
+                      <input
+                        type="checkbox"
+                        name="branchIds"
+                        value={branch.id}
+                        checked={checked}
+                        onChange={(event) => setSelectedBranchIds((current) => event.target.checked ? [...current, branch.id] : current.filter((id) => id !== branch.id))}
+                        className="size-3.5 accent-primary"
+                      />
+                      <span>{branch.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                Os leads serão desatribuídos do corretor atual e transferidos para a nova unidade.
+                Os leads serão distribuídos em rodízio entre as unidades selecionadas e enviados aos corretores elegíveis.
               </p>
             </div>
 
@@ -283,7 +288,7 @@ export function BulkReassignDialog({
 
             <DialogFooter>
               <DialogClose render={<Button type="button" variant="outline" disabled={isPending}>Cancelar</Button>} />
-              <Button type="submit" disabled={isPending || !selectedBranchId}>
+              <Button type="submit" disabled={isPending || selectedBranchIds.length === 0}>
                 {branchPending ? "Transferindo..." : "Transferir unidade"}
               </Button>
             </DialogFooter>

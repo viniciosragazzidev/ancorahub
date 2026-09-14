@@ -309,7 +309,7 @@ export async function routeLeadToBranchAction(
         mutationId,
         error:
           result.status === "conflict"
-            ? "Este lead já foi atribuído."
+            ? result.code === "LEAD_ALREADY_IN_SERVICE" ? "Este lead já está em atendimento e não pode mudar de unidade." : "Este lead não está disponível para reatribuição."
             : "A unidade não pode receber leads agora.",
       };
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });

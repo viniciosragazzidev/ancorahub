@@ -144,7 +144,7 @@ export function LeadDrawerManagementActions({
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
-  const needsBranch = !leadBranchId && branches && branches.length > 0 && isDirectorOrManager;
+  const canReassignUnit = !activeStatus && branches && branches.length > 0 && isDirectorOrManager;
 
   const handleAssumeMessaging = async () => {
     try {
@@ -170,14 +170,14 @@ export function LeadDrawerManagementActions({
   return (
     <div className="space-y-4 pt-2">
       {/* Atribuir unidade */}
-      {needsBranch && (
+      {canReassignUnit && (
         <div className="rounded-lg border border-primary/20 bg-primary/[0.02] p-3 space-y-3">
           <div className="flex items-center gap-2">
             <Buildings className="size-4 text-primary" />
-            <p className="text-xs font-semibold text-foreground">Lead sem unidade</p>
+            <p className="text-xs font-semibold text-foreground">Reatribuir unidade</p>
           </div>
           <p className="text-xs text-muted-foreground leading-normal">
-            Este lead ainda não foi atribuído a nenhuma unidade. Selecione uma filial para enviá-lo à fila de distribuição.
+            Selecione uma filial para enviar este lead à fila de distribuição. Só é permitido antes do início do atendimento.
           </p>
           <form action={routeAction} className="flex items-center gap-2">
             <input name="leadId" type="hidden" value={leadId} />
