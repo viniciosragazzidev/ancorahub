@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { notifyLeadArrived, notifyNewLead, publishNotification } from "@/features/notifications/send-push-helper";
@@ -124,7 +124,22 @@ async function notifyException(effect: typeof schema.leadEffectOutbox.$inferSele
   })));
 }
 
+/** A soft-deleted lead must never produce a durable side effect. */
+export function isLeadEligibleForEffect(lead: { deletedAt: Date | null } | null | undefined) {
+  return Boolean(lead && lead.deletedAt === null);
+}
+
 async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect) {
+  const [lead] = await getDatabase().select({ deletedAt: schema.leads.deletedAt })
+    .from(schema.leads)
+    .where(and(
+      eq(schema.leads.id, effect.leadId),
+      eq(schema.leads.tenantId, effect.tenantId),
+      isNull(schema.leads.deletedAt),
+    ))
+    .limit(1);
+  if (!isLeadEligibleForEffect(lead)) return;
+
   const payload = payloadSchema.parse(effect.payload);
   if (effect.type === "DISTRIBUTE_LEAD") {
     const { enqueueAndProcessLeadDistribution } = await import("@/features/lead-distribution/jobs");

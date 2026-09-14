@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
@@ -674,6 +674,25 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
   let expiredCount = 0;
 
   for (const offer of expiredOffers) {
+    // Deleted leads are terminal: expire silently without notifying the broker
+    // or re-entering any distribution flow.
+    const [activeLead] = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.id, offer.leadId),
+        eq(schema.leads.tenantId, offer.tenantId),
+        isNull(schema.leads.deletedAt),
+      ))
+      .limit(1);
+    if (!activeLead) {
+      await db
+        .update(schema.leadOffers)
+        .set({ status: "EXPIRED", updatedAt: now })
+        .where(and(eq(schema.leadOffers.id, offer.id), eq(schema.leadOffers.tenantId, offer.tenantId), inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES)));
+      continue;
+    }
+
     const [updated] = await db
       .update(schema.leadOffers)
       .set({ status: "EXPIRED", updatedAt: now })

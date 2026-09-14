@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -55,6 +55,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       .from(schema.leads).where(
         and(
           eq(schema.leads.tenantId, tenant.id),
+          isNull(schema.leads.deletedAt),
           or(
             and(eq(schema.leads.status, "distributed"), lt(schema.leads.assignedAt, warningCutoff)),
             and(inArray(schema.leads.status, activeStatuses), lt(schema.leads.stageEnteredAt, stagnantCutoff))
