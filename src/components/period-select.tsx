@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 
 import {
   DEFAULT_PERIOD,
@@ -35,6 +36,7 @@ export function PeriodSelect({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   function select(period: PeriodValue | "all") {
     const params = new URLSearchParams(searchParams.toString());
@@ -43,7 +45,7 @@ export function PeriodSelect({
     } else {
       params.set("period", String(period));
     }
-    if (pathname) router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`);
+    if (pathname) startTransition(() => router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false }));
   }
 
   return (
@@ -61,7 +63,7 @@ export function PeriodSelect({
         }
       }}
     >
-      <SelectTrigger className="w-32 bg-card text-xs max-[559px]:h-(--mobile-touch-target)" aria-label={label}>
+      <SelectTrigger className="w-32 bg-card text-xs max-[559px]:h-(--mobile-touch-target)" aria-label={label} disabled={isPending}>
         <SelectValue placeholder="Selecione o período" />
       </SelectTrigger>
       <SelectContent>
