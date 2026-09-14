@@ -20,4 +20,7 @@ de distribuição, autorização e integrações continuam bloqueadas pelos gate
 
 Executar a Onda 2 (distribuição) somente em uma mudança isolada, após registrar a
 decisão do executor único e adicionar testes de concorrência, idempotência e lead
-sem corretor. O dashboard refinado aguarda QA visual/responsivo antes de publicar.
+sem corretor. A primeira correção da O2 removeu o bloqueio indevido da fila geral
+pela unidade de origem em `resolveQueueCandidateBranchIds`; o contrato agora é
+coberto por teste de domínio. O dashboard refinado aguarda QA visual/responsivo
+antes de publicar.

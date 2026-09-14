@@ -151,7 +151,11 @@ export function resolveQueueCandidateBranchIds(input: {
 }) {
   if (input.queueBranchId) return [input.queueBranchId];
   const list = [...input.allowedBranchIds];
-  if (input.leadBranchId && !list.includes(input.leadBranchId)) {
+  // An unbound/general queue with no allow-list explicitly means all active
+  // units. In that mode the lead's current branch must not pin the rotation;
+  // the service resolves the eligible unit by current load. A lead branch is
+  // only a fallback when the policy already constrains the candidate set.
+  if (list.length > 0 && input.leadBranchId && !list.includes(input.leadBranchId)) {
     list.push(input.leadBranchId);
   }
   return Array.from(new Set(list));

@@ -224,6 +224,14 @@ describe("lead distribution domain", () => {
     })).toEqual(["centro-1", "centro-2"]);
   });
 
+  it("keeps an unrestricted general queue eligible for all units", () => {
+    expect(resolveQueueCandidateBranchIds({
+      queueBranchId: null,
+      allowedBranchIds: [],
+      leadBranchId: "source-unit",
+    })).toEqual([]);
+  });
+
   it("keeps a unit queue local even when its policy contains other units", () => {
     expect(resolveQueueCandidateBranchIds({
       queueBranchId: "matriz",
