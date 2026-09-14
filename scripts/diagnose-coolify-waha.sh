@@ -9,7 +9,7 @@ echo ""
 
 # 1. Verificar DNS
 echo "1️⃣  Verificando DNS..."
-DNS_RESULT=$(nslookup api.crm.ancorasaude.cloud 2>&1)
+DNS_RESULT=$(nslookup api-crm.ancorasaude.cloud 2>&1)
 echo "$DNS_RESULT" | grep -E "Address:|Name:" | head -5
 echo ""
 
@@ -20,7 +20,7 @@ echo ""
 
 # 3. Testar HTTP (deve retornar 302)
 echo "3️⃣  Testando HTTP (deve redirecionar para HTTPS)..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 http://api.crm.ancorasaude.cloud/health)
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 http://api-crm.ancorasaude.cloud/health)
 if [ "$HTTP_CODE" = "302" ]; then
     echo "   ✅ HTTP funciona (302 redirect)"
 else
@@ -30,7 +30,7 @@ echo ""
 
 # 4. Testar HTTPS (o problema atual)
 echo "4️⃣  Testando HTTPS (onde está falhando)..."
-HTTPS_RESULT=$(curl -v --connect-timeout 10 --max-time 15 https://api.crm.ancorasaude.cloud/health 2>&1)
+HTTPS_RESULT=$(curl -v --connect-timeout 10 --max-time 15 https://api-crm.ancorasaude.cloud/health 2>&1)
 if echo "$HTTPS_RESULT" | grep -q "SSL alert number 40"; then
     echo "   ❌ HTTPS falha: SSL handshake failure"
     echo "   Causa: Cloudflare não consegue conectar à origem Fastify"

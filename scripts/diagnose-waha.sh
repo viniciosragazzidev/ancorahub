@@ -3,8 +3,8 @@
 # Diagnóstico rápido de conectividade com o VPS WhatsApp
 # Uso: bash scripts/diagnose-waha.sh
 
-VPS_URL="https://api.crm.ancorasaude.cloud"
-TOKEN="${VPS_INTERNAL_API_TOKEN:-e381a7120e3440d4fbc73c435fc050de0b178384687c4673afb8aafa19eac552}"
+VPS_URL="https://api-crm.ancorasaude.cloud"
+TOKEN="${VPS_INTERNAL_API_TOKEN:-}"
 
 echo "🔍 Diagnóstico de Conectividade WhatsApp (WAHA)"
 echo "================================================"
@@ -12,7 +12,7 @@ echo ""
 
 # 1. Teste de DNS
 echo "1️⃣  Testando resolução DNS..."
-if nslookup api.crm.ancorasaude.cloud > /dev/null 2>&1; then
+if nslookup api-crm.ancorasaude.cloud > /dev/null 2>&1; then
     echo "   ✅ DNS resolve corretamente"
 else
     echo "   ❌ Falha na resolução DNS"
@@ -21,7 +21,7 @@ echo ""
 
 # 2. Teste de conectividade TCP
 echo "2️⃣  Testando conectividade TCP (porta 443)..."
-if nc -z -w5 api.crm.ancorasaude.cloud 443 2>/dev/null; then
+if nc -z -w5 api-crm.ancorasaude.cloud 443 2>/dev/null; then
     echo "   ✅ Porta 443 acessível"
 else
     echo "   ❌ Porta 443 inacessível"
@@ -30,7 +30,7 @@ echo ""
 
 # 3. Teste de TLS/SSL
 echo "3️⃣  Testando certificado SSL..."
-SSL_INFO=$(echo | openssl s_client -connect api.crm.ancorasaude.cloud:443 -servername api.crm.ancorasaude.cloud 2>/dev/null | grep -E "subject|issuer|expire|Verify return code")
+SSL_INFO=$(echo | openssl s_client -connect api-crm.ancorasaude.cloud:443 -servername api-crm.ancorasaude.cloud 2>/dev/null | grep -E "subject|issuer|expire|Verify return code")
 if [ $? -eq 0 ]; then
     echo "   ✅ Certificado SSL válido"
     echo "   $SSL_INFO"
@@ -56,6 +56,10 @@ echo ""
 
 # 5. Teste de autenticação
 echo "5️⃣  Testando autenticação com token..."
+if [ -z "$TOKEN" ]; then
+    echo "   ⚠️  VPS_INTERNAL_API_TOKEN não definido; teste autenticado não executado"
+    echo ""
+else
 AUTH_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 15 \
     -H "Authorization: Bearer $TOKEN" \
     -H "X-CorreTop-Internal-Token: $TOKEN" \
@@ -86,6 +90,7 @@ if [ "$SESSIONS_CODE" = "200" ]; then
 else
     echo "   ❌ Falha no endpoint de sessões (HTTP $SESSIONS_CODE)"
     echo "   Resposta: $SESSIONS_BODY"
+fi
 fi
 echo ""
 
