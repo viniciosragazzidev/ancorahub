@@ -23,8 +23,8 @@ a persistência, os eventos e os consumidores.
 
 - 342 arquivos em `src/app` e 526 em `src/features` (inventário por `rg --files`).
 - 65 rotas em `src/app/api`.
-- Grafo `.ua/knowledge-graph.json`: 6.452 nós, 11.558 arestas, 8 camadas e 11 passos de tour.
-- O grafo existente foi analisado em 2026-08-20; portanto, é uma base útil, mas precisa ser atualizado antes de decisões estruturais.
+- Grafo `graphify-out/graph.json`: 12.910 nós, 37.555 relações e 467 comunidades, gerado no commit `b83178f` em 2026-09-14.
+- O grafo `.ua/knowledge-graph.json` continua sendo a base documental anterior; decisões estruturais devem usar o grafo `graphify-out` atualizado e excluir o ruído de ferramentas.
 - O mapa existente em `docs/architecture/AUTHORITY_MAP.md` já registra conflitos críticos de distribuição, RBAC, pipeline e integrações.
 
 ## Fontes canônicas atuais (com confiança)
