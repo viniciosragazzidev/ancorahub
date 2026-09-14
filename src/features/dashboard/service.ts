@@ -1,14 +1,23 @@
 import "server-only";
 
 import type { TenantContext } from "@/shared/auth/types";
-import { getAttentionSnapshot, getCommercialOverview, getFunnelSnapshot } from "@/features/reports/metrics/metrics-service";
+import { getAttentionSnapshot, getCommercialOverview, getFunnelSnapshot, getLeadTimeline } from "@/features/reports/metrics/metrics-service";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import type { PeriodValue } from "@/shared/period";
 import { resolveDashboardProfile, type DashboardViewModel } from "./contracts";
-import { and, count, eq, gte, isNull, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, isNotNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { periodStart } from "@/shared/period";
 
 export type DomainDashboard = { title: string; description: string; metrics: readonly { label: string; value: number | string }[]; actionHref: string };
+export type DashboardViewData = DashboardViewModel & {
+  trend: Array<{ date: string; received: number; converted: number }>;
+  units: Array<{ id: string; name: string; received: number; converted: number }>;
+  brokers: Array<{ id: string; name: string; received: number; converted: number; rate: number }>;
+  qualifications: Array<{ status: string; count: number }>;
+  recentLeads: Array<{ id: string; name: string; status: string; branchName: string | null; createdAt: string }>;
+  recentSales: Array<{ id: string; leadName: string; value: number; saleDate: string }>;
+};
 
 export async function getDomainDashboard(context: TenantContext, domain: "team" | "tasks" | "conversations" | "distribution" | "sales"): Promise<DomainDashboard> {
   const db = getDatabase();
@@ -48,12 +57,22 @@ export async function getDomainDashboard(context: TenantContext, domain: "team" 
 }
 
 /** Single server-side aggregator for the global operational dashboard. */
-export async function getDashboardViewModel(context: TenantContext, period: PeriodValue = 7): Promise<DashboardViewModel> {
+export async function getDashboardViewModel(context: TenantContext, period: PeriodValue = 30): Promise<DashboardViewData> {
   const profile = resolveDashboardProfile(context);
-  const [commercial, attention, funnel] = await Promise.all([
+  const scope = await resolveReportDataScope(context);
+  const db = getDatabase();
+  const since = periodStart(period);
+  const leadWhere = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, since), scope.leadScope);
+  const [commercial, attention, funnel, trend, unitRows, brokerRows, qualificationRows, recentLeads, recentSales] = await Promise.all([
     getCommercialOverview(context, period, { includeFinancial: false }),
     getAttentionSnapshot(context, period),
     getFunnelSnapshot(context, period),
+    getLeadTimeline(context, period),
+    db.select({ id: schema.branches.id, name: schema.branches.name, received: count(), converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')` }).from(schema.leads).innerJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).where(leadWhere).groupBy(schema.branches.id, schema.branches.name).orderBy(desc(count())).limit(8),
+    db.select({ id: schema.user.id, name: schema.user.name, received: count(), converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')` }).from(schema.leads).innerJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(leadWhere).groupBy(schema.user.id, schema.user.name).orderBy(desc(count())).limit(8),
+    db.select({ status: schema.leads.qualificationStatus, count: count() }).from(schema.leads).where(leadWhere).groupBy(schema.leads.qualificationStatus).orderBy(desc(count())),
+    db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, branchName: schema.branches.name, createdAt: schema.leads.createdAt }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).where(leadWhere).orderBy(desc(schema.leads.createdAt)).limit(6),
+    db.select({ id: schema.sales.id, leadName: schema.leads.nome, value: schema.sales.saleValue, saleDate: schema.sales.saleDate }).from(schema.sales).innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id)).where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.status, "active"), gte(schema.sales.saleDate, since), scope.leadScope, scope.salesBrokerScope)).orderBy(desc(schema.sales.saleDate)).limit(6),
   ]);
   const attentionCount = attention.items.reduce((total, item) => total + item.count, 0);
   return {
@@ -74,5 +93,11 @@ export async function getDashboardViewModel(context: TenantContext, period: Peri
       description: `Resumo operacional dos últimos ${period} dias.`,
     },
     secondary: { id: "funnel", title: "Funil compacto", description: `${funnel.received} leads recebidos no período.` },
+    trend: trend.map((point) => ({ date: point.date, received: point.received, converted: point.converted })),
+    units: unitRows.map((row) => ({ id: row.id, name: row.name, received: Number(row.received), converted: Number(row.converted) })),
+    brokers: brokerRows.map((row) => { const received = Number(row.received); const converted = Number(row.converted); return { id: row.id, name: row.name ?? "Sem nome", received, converted, rate: received ? Math.round((converted / received) * 1000) / 10 : 0 }; }),
+    qualifications: qualificationRows.map((row) => ({ status: row.status ?? "Não informado", count: Number(row.count) })),
+    recentLeads: recentLeads.map((row) => ({ id: row.id, name: row.name, status: row.status, branchName: row.branchName, createdAt: row.createdAt.toISOString() })),
+    recentSales: recentSales.map((row) => ({ id: row.id, leadName: row.leadName, value: Number(row.value ?? 0), saleDate: row.saleDate.toISOString() })),
   };
 }

@@ -7,6 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 import { getDashboardViewModel } from "@/features/dashboard/service";
 import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
+import { parsePeriod } from "@/shared/period";
 
 /**
  * The reporting center is the canonical operational dashboard. The old
@@ -20,6 +21,8 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
+  const period = parsePeriod(resolvedSearchParams.period);
   const { result } = await withRequestTiming("/dashboard", async () => {
     const context = await getRequiredTenantContext();
 
@@ -39,8 +42,8 @@ export default async function DashboardPage({
       return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
     }
 
-    const model = await getDashboardViewModel(context, 7);
-    return <OperationalDashboard model={model} period={7} />;
+    const model = await getDashboardViewModel(context, period);
+    return <OperationalDashboard model={model} period={period} />;
   });
 
   return result;
