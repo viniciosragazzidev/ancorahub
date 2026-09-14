@@ -72,6 +72,9 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
   // status vira "ready", atualiza o badge imediatamente e pede um refresh
   // do Server Component — a página é force-dynamic, então isso re-renderiza
   // a árvore com o estado real sem reload manual.
+  // O primeiro tick também busca a conexão (sessionName/status) — sem isso o
+  // botão de conectar ficava preso em "Carregando" porque nada populava o
+  // estado `connection`.
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
@@ -96,6 +99,7 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
       } catch {
         /* transient error — next tick retries */
       }
+      if (!cancelled) await refreshConnection();
     };
     const timer = window.setInterval(() => void tick(), 5_000);
     void tick();
@@ -103,7 +107,7 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [router]);
+  }, [router, refreshConnection]);
 
   if (live.connected) {
     return (
@@ -155,8 +159,12 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
           onConnectionChanged={refreshConnection}
         />
       ) : (
-        <Button size="xs" variant="outline" disabled>
-          Carregando
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => void refreshConnection()}
+        >
+          Carregar conexão
         </Button>
       )}
     </div>
