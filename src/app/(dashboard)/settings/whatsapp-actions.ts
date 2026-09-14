@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { wahaActionCodeFromMessage } from "@/lib/waha-error-codes";
+import { normalizeWahaUiStatus } from "@/features/waha-cadence/status";
 
 // ── WAHA via Fastify ──────────────────────────────────────────────────
 
@@ -119,24 +120,6 @@ async function getOwnConnection() {
   return { context, db, connection };
 }
 
-/**
- * Normaliza o status devolvido pelo Fastify/WAHA para os estados da UI.
- * A janela pós-scan (AUTHENTICATING/AUTHENTICATED/OPENING) deve manter a UI
- * em "initializing" — mapeá-la para "disconnected" dava a impressão de falha
- * exatamente no momento em que o celular confirmava o pareamento.
- */
-function normalizeWahaStatus(raw: string): string {
-  const s = raw.trim().toUpperCase();
-  if (["WORKING", "CONNECTED", "READY", "AUTHENTICATED", "OPEN", "ONLINE"].includes(s)) return "ready";
-  if (["FAILED", "ERROR", "INVALID", "UNAVAILABLE"].includes(s)) return "error";
-  if (
-    ["SCAN_QR_CODE", "STARTING", "WAITING_QR", "WAITING_FOR_QR", "QR", "QR_READY", "CREATED", "INITIALIZING", "CONNECTING", "LOADING", "AUTHENTICATING", "OPENING"].includes(s)
-  ) {
-    return "initializing";
-  }
-  return "disconnected";
-}
-
 // ── Public server actions ─────────────────────────────────────────────
 
 export async function getWhatsAppConnection() {
@@ -186,7 +169,7 @@ export async function startWhatsAppConnection() {
       },
     });
 
-    const status = normalizeWahaStatus(result.status ?? "STARTING");
+    const status = normalizeWahaUiStatus(result.status ?? "STARTING");
     const isReady = status === "ready";
 
     // Se a sessão já estava CONNECTED, não buscar QR
@@ -196,7 +179,7 @@ export async function startWhatsAppConnection() {
         const qrResult = await vpsRequest(
           `/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`,
         );
-        const qrStatus = normalizeWahaStatus(qrResult.status ?? status);
+        const qrStatus = normalizeWahaUiStatus(qrResult.status ?? status);
         qrCode = qrStatus === "ready" ? null : (qrResult.qr ?? null);
       } catch {
         // QR pode não estar disponível ainda — o polling vai buscar depois
@@ -258,7 +241,7 @@ export async function refreshWhatsAppQr() {
     const result = await vpsRequest(
       `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`,
     );
-    const status = normalizeWahaStatus(result.status ?? connection.status);
+    const status = normalizeWahaUiStatus(result.status ?? connection.status);
     const qrCode = status === "ready" ? null : (result.qr ?? null);
 
     await db
@@ -317,7 +300,7 @@ export async function getWhatsAppSessionStatus() {
     const result = await vpsRequest(
       `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/status`,
     );
-    const status = normalizeWahaStatus(result.status ?? connection.status);
+    const status = normalizeWahaUiStatus(result.status ?? connection.status);
 
     await db
       .update(schema.whatsappConnections)
@@ -480,7 +463,7 @@ export async function recoverWhatsAppFailedSessionAction() {
         method: "POST",
       },
     );
-    const status = normalizeWahaStatus(result.status ?? "STARTING");
+    const status = normalizeWahaUiStatus(result.status ?? "STARTING");
     const qrResult =
       status === "ready"
         ? null

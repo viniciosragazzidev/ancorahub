@@ -42,3 +42,14 @@ export function getWahaConfig() {
 export function getServerAddress() {
     return { host: process.env.HOST?.trim() || "0.0.0.0", port: Number(process.env.PORT || 3333) };
 }
+/**
+ * Internal callers historically used either the service-specific token or
+ * the VPS token. Resolve the aliases in one place so a correctly configured
+ * deployment cannot fail authentication merely because the variable name
+ * differs between the CRM and Fastify service.
+ */
+export function getInternalApiToken() {
+    return (process.env.WHATSAPP_API_INTERNAL_TOKEN ||
+        process.env.VPS_INTERNAL_API_TOKEN ||
+        process.env.VPS_API_TOKEN)?.trim() || "";
+}

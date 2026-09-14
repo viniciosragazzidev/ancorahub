@@ -8,6 +8,7 @@ import {
   relaySessionStateSchema,
   relaySignature,
 } from "./contract";
+import { normalizeWahaRelayStatus } from "./status";
 
 export type WahaTransport = "relay" | "fastify";
 
@@ -267,14 +268,12 @@ async function relaySessionRequest(path: string, method: "GET" | "POST" | "DELET
       displayPhoneNumber?: string | null;
       qr?: string | null;
       qrCode?: string | null;
+      session?: { status?: string | null } | null;
     } | null;
 
     if (fbData && fbData.ok !== false) {
-      const rawStatus = String(fbData.status || "STARTING").toUpperCase();
-      let status: "pending" | "connecting" | "active" | "paused" | "offline" | "error" = "connecting";
-      if (rawStatus === "WORKING" || rawStatus === "CONNECTED") status = "active";
-      else if (rawStatus === "STOPPED") status = "offline";
-      else if (rawStatus === "FAILED" || rawStatus === "ERROR") status = "error";
+      const rawStatus = fbData.status ?? fbData.session?.status ?? "STARTING";
+      const status = normalizeWahaRelayStatus(rawStatus);
 
       let qrCode = fbData.qr ?? fbData.qrCode ?? null;
 

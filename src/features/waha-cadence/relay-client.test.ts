@@ -54,4 +54,18 @@ describe("resolveWahaRelayBaseUrl", () => {
       userId: "user-1",
     }));
   });
+
+  it.each(["working", "OPEN", "AUTHENTICATED"]) (
+    "normalizes provider status %s as an active session",
+    async (providerStatus) => {
+      vi.stubEnv("VPS_API_URL", "https://working-api.example.com");
+      vi.stubEnv("WHATSAPP_API_INTERNAL_TOKEN", "test-token");
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, status: providerStatus }), { status: 200 }),
+      ));
+
+      await expect(createWahaRelaySession("ancora-status-test", { tenantId: "tenant-1", userId: "user-1" }))
+        .resolves.toMatchObject({ status: "active" });
+    },
+  );
 });

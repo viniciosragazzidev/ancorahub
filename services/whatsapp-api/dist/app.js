@@ -1,6 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import Fastify from "fastify";
-import { getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
+import { getInternalApiToken, getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
 import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/client.js";
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
 import { WahaClient } from "./integrations/waha/client.js";
@@ -120,7 +120,7 @@ export function buildApp() {
                 error: "WAHA_INTERNAL_ERROR",
             });
         }
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         const client = new WahaClient(wahaConfig);
         const result = await client.health();
@@ -148,7 +148,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: Start ────────────────────────────────────────
     app.post("/internal/waha/test-session/start", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -200,7 +200,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: Status ────────────────────────────────────────
     app.get("/internal/waha/test-session/status", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -233,7 +233,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: QR Code ───────────────────────────────────────
     app.get("/internal/waha/test-session/qr", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -282,7 +282,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: Reset ─────────────────────────────────────────
     app.post("/internal/waha/test-session/reset", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -328,7 +328,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -480,7 +480,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -540,7 +540,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -582,7 +582,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -637,7 +637,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -756,7 +756,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {

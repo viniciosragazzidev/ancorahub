@@ -76,6 +76,9 @@ export function LeadsFilters({
   // States
   const [search, setSearch] = useState(initialSearch ?? "");
   const [status, setStatus] = useState(initialStatus ?? "");
+  // Keep the clicked pill responsive while the server-rendered table is
+  // revalidating. The URL remains the source of truth once navigation lands.
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
   const [branch, setBranch] = useState(initialBranch ?? "");
   const [tipo, setTipo] = useState(initialTipo ?? "");
   const [origem, setOrigem] = useState(initialOrigem ?? "");
@@ -90,7 +93,8 @@ export function LeadsFilters({
   });
 
   function buildUrl(preferences: LeadFilterPreferences) {
-    const params = new URLSearchParams(searchParams.toString());
+    const currentQuery = typeof window === "undefined" ? searchParams.toString() : window.location.search;
+    const params = new URLSearchParams(currentQuery);
     params.delete("page");
 
     if (preferences.search) params.set("search", preferences.search); else params.delete("search");
@@ -124,8 +128,10 @@ export function LeadsFilters({
   const serializedSearchParams = searchParams.toString();
   useEffect(() => {
     const params = new URLSearchParams(serializedSearchParams);
+    const nextStatus = params.get("status") ?? "";
     setSearch(params.get("search") ?? "");
-    setStatus(params.get("status") ?? "");
+    setStatus(nextStatus);
+    setOptimisticStatus(null);
     setBranch(params.get("branch") ?? "");
     setTipo(params.get("tipo") ?? "");
     setOrigem(params.get("origem") ?? "");
@@ -134,6 +140,17 @@ export function LeadsFilters({
     setEligibleCampaigns(params.get("eligibleCampaigns") === "1");
     setPageSize(params.get("pageSize") ?? "20");
   }, [serializedSearchParams]);
+
+  function navigateTo(target: string) {
+    // Update the address bar immediately so rapid filter changes cannot appear
+    // stuck while the App Router waits for the next server payload.
+    if (`${window.location.pathname}${window.location.search}` !== target) {
+      window.history.replaceState(window.history.state, "", target);
+    }
+    startTransition(() => {
+      router.replace(target, { scroll: false });
+    });
+  }
 
   const activeCount = [
     status,
@@ -152,9 +169,7 @@ export function LeadsFilters({
     const preferences = overridePrefs ?? currentPreferences();
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
     setOpen(false);
-    startTransition(() => {
-      router.replace(buildUrl(preferences), { scroll: false });
-    });
+    navigateTo(buildUrl(preferences));
   }
 
   function handleReset() {
@@ -169,9 +184,7 @@ export function LeadsFilters({
     setPageSize("20");
 
     window.localStorage.removeItem(storageKey);
-    startTransition(() => {
-      router.replace("/leads", { scroll: false });
-    });
+    navigateTo("/leads");
   }
 
   // Active filter chips (status is displayed in the quick pills bar above, so omitted here to avoid duplication)
@@ -197,9 +210,7 @@ export function LeadsFilters({
     if (chipId === "pageSize") { setPageSize("20"); updated.pageSize = "20"; }
 
     window.localStorage.setItem(storageKey, JSON.stringify(updated));
-    startTransition(() => {
-      router.replace(buildUrl(updated), { scroll: false });
-    });
+    navigateTo(buildUrl(updated));
   }
 
   return (
@@ -486,14 +497,16 @@ export function LeadsFilters({
           { id: "converted", label: "Convertidos", dot: "bg-success" },
           { id: "lost", label: "Perdidos", dot: "bg-destructive" },
         ].map((pill) => {
-          const isSelected = status === pill.id;
+          const isSelected = (optimisticStatus ?? status) === pill.id;
           return (
             <Button
               key={pill.id}
               size="sm"
               type="button"
               variant="ghost"
+              aria-pressed={isSelected}
               onClick={() => {
+                setOptimisticStatus(pill.id);
                 setStatus(pill.id);
                 applyFilters({ ...currentPreferences(), status: pill.id });
               }}
