@@ -8,6 +8,22 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-14 — `/leads/distribuicao` hierarquia visual
+
+### Resultado
+
+- A área recebeu um cabeçalho canônico com contexto, estado do motor e resumo operacional.
+- O fundo de trabalho e a navegação por abas ganharam superfícies e contraste próprios,
+  mantendo os componentes compartilhados e sem alterar regras de negócio.
+- A navegação permanece acessível em telas estreitas e fixa abaixo do cabeçalho global.
+
+### Validação
+
+Type-check executado após a alteração. A validação autenticada nas larguras previstas
+permanece pendente conforme o gate M1.10.
+
+---
+
 ## 2026-09-14 — `/leads/distribuicao` refinamento operacional
 
 ### Resultado

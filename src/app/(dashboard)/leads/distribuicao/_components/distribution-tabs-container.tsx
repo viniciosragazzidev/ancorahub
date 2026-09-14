@@ -44,8 +44,8 @@ export function DistributionTabsContainer({
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={handleValueChange} variant="segment" className="w-full space-y-6">
-      <TabsList className="sticky top-0 z-20 w-full justify-start overflow-x-auto bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <Tabs value={activeTab} onValueChange={handleValueChange} variant="segment" className="w-full space-y-5">
+      <TabsList className="sticky top-[var(--header-height)] z-20 w-full justify-start overflow-x-auto rounded-xl border border-border/80 bg-card/95 p-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]">
         <TabsTrigger value="roteamento" className="gap-1.5"><ArrowsDownUp aria-hidden="true" className="size-4" />Matriz de Roteamento</TabsTrigger>
         <TabsTrigger value="resumo_dia" className="gap-1.5"><ChartLineUp aria-hidden="true" className="size-4" />Resumo do Dia</TabsTrigger>
         {showQueueDefinition ? <TabsTrigger value="filas" className="gap-1.5"><Buildings aria-hidden="true" className="size-4" />Filas & Unidades</TabsTrigger> : null}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { DashboardHeader } from "@/components/dashboard-header";
+import { PageHeader } from "@/components/foundations/page-header";
 import { DistributionMetrics, DistributionPanel } from "./_components/distribution-dashboard";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -459,7 +460,25 @@ export default async function LeadDistributionPage({
   return (
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="flex min-h-full flex-col gap-6 bg-muted/20 p-4 lg:p-6">
+        <PageHeader
+          title="Central de distribuição"
+          breadcrumb="Operação comercial / Distribuição"
+          description="Configure o caminho completo do lead — entrada, unidade, fila, corretor e redistribuição — em um único lugar."
+          context={
+            <Badge variant={jobHealth.available && jobHealth.failed === 0 ? "success" : "warning"}>
+              {jobHealth.available && jobHealth.failed === 0 ? "Motor operacional" : "Atenção no motor"}
+            </Badge>
+          }
+          actions={
+            <div className="flex items-center gap-2 rounded-lg border border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
+              <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
+              <span>{totalAvailable} corretores disponíveis</span>
+              <span className="text-border" aria-hidden="true">·</span>
+              <span>{totalNewLeads} aguardando ação</span>
+            </div>
+          }
+        />
         <DistributionTabsContainer
           initialView={view}
           showQueueDefinition={context.role === "director"}
