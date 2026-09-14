@@ -2,19 +2,20 @@
 
 **Objetivo:** transformar o inventário do sistema em uma forma segura de decidir,
 alterar e publicar mudanças.
-**Baseline:** grafo `graphify-out/graph.json` gerado no commit `b83178f` em 2026-09-14.
+**Baseline:** grafo `graphify-out/graph.json` atualizado em 2026-09-14 com exclusão de `.agents/`, `.github/` e `node_modules/`.
 **Princípio:** uma regra, um dono, uma fonte canônica, consumidores rastreáveis.
 
 ## 1. Leitura do estado atual
 
-O grafo encontrou 12.910 nós, 37.555 relações e 467 comunidades. Os hubs mais
+O grafo encontrou 12.910 nós, 37.555 relações e 473 comunidades. Os hubs mais
 importantes são `db/schema.ts`, `tenant-context.ts`, `getRequiredTenantContext`,
 `leads/[id]/page.tsx`, `leads-workspace.tsx`, `create-lead-from-webhook-sync.ts`,
 `outbound-service.ts`, `lead-distribution/service.ts`, `lead-distribution/jobs.ts`,
 `change-lead-status.ts` e `metrics-service.ts`.
 
-Há ruído de ferramentas em `.agents/` e `.github/`; o próximo grafo de produto deve
-excluí-los para que comunidades e dependências reflitam o sistema entregue.
+O grafo de produto foi reprocessado excluindo `.agents/`, `.github/` e `node_modules/`.
+Os nomes das comunidades ainda são derivados dos hubs (não há backend LLM configurado),
+mas a topologia e as relações são determinísticas e utilizáveis para a auditoria.
 
 ## 2. Estrutura de autoridade aprovada para investigação
 
