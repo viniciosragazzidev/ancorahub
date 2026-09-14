@@ -1,10 +1,12 @@
 # ADR-0037 — Cadência WAHA por relay isolado
 
-**Estado:** Aceita em 2026-08-04
+**Estado:** Substituído para hospedagem por ADR-0045 em 2026-09-14
 
-O AncoraHub permanece na Vercel. O WAHA roda em uma VPS exclusiva e é acessado por
-uma API privada autenticada por HMAC, timestamp, nonce e chave de idempotência. A VPS
-não recebe acesso direto ao banco nem às credenciais do canal oficial Meta.
+Na decisão original, o AncoraHub permanecia na Vercel. Essa parte foi substituída:
+produção agora usa Coolify em VPSs separadas para frontend e API. O WAHA continua
+em uma VPS exclusiva e é acessado por uma API privada autenticada por HMAC,
+timestamp, nonce e chave de idempotência. A VPS não recebe acesso direto ao banco
+nem às credenciais do canal oficial Meta.
 
 Os números WAHA pertencem à frota central da Ancora e são administrados apenas pelo
 Super-admin. Cadências são criadas e publicadas por Diretores no próprio tenant. O

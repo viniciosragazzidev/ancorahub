@@ -1051,3 +1051,13 @@ roteamento, elegibilidade, plantões, SLA e recuperação pertencem à Central
 essa central; não oferecem mutações concorrentes. Se a unidade primária não
 possuir corretor elegível, o motor tenta a próxima unidade ativa permitida pela
 política, mantendo a ordem e registrando o motivo.
+
+## DEC-099 — Produção Coolify com frontend e API em VPSs separadas
+
+**Decisão aprovada em 2026-09-14.** O AncoraHub não usa mais a Vercel em produção.
+O frontend Next.js é executado pelo Coolify em uma VPS própria e a API Fastify,
+incluindo integrações, webhooks, WAHA e workers, é executada pelo Coolify em uma
+VPS separada. A comunicação entre as camadas é HTTPS autenticado, com secrets
+configurados por serviço. Deploy, health check, observabilidade e rollback devem
+identificar cada serviço independentemente; referências anteriores à Vercel são
+históricas e não devem orientar novas implementações.

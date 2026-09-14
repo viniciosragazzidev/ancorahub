@@ -4,6 +4,10 @@
 **Data:** Julho/2026
 **Escopo:** Guia técnico de como o sistema deve ser construído — estrutura, convenções, fluxo de trabalho e processos. Complementa o Documento de Requisitos (funcional/UX/negócio).
 
+> Atualização de produção (2026-09-14): a Vercel não é mais utilizada. O frontend
+> roda no Coolify em uma VPS e a API Fastify roda no Coolify em uma VPS separada;
+> as referências antigas à Vercel neste documento são históricas.
+
 ---
 
 ## 1. Visão Geral
@@ -30,9 +34,9 @@ Princípio orientador: **processo leve o suficiente para não travar um dev solo
 | Comunicação frontend-backend | Server Actions (mutações simples) + API Routes (webhooks externos, integrações) | Ver critério de escolha na Seção 6 |
 | Testes unitários | Vitest | Colocado junto ao código (`*.test.ts`) |
 | Testes E2E | Playwright | Fluxos críticos apenas (ver Seção 9) |
-| CI/CD | GitHub Actions + deploy automático via Vercel | Pipeline detalhado na Seção 8 |
+| CI/CD | GitHub Actions + deploy via Coolify | Pipeline detalhado na Seção 8 |
 | Monitoramento de erros | Sentry | Erros de frontend e backend no mesmo painel |
-| Hospedagem | Vercel | Aplicação |
+| Hospedagem | Coolify em VPS separada para frontend e API | Next.js no frontend; Fastify em `services/whatsapp-api` |
 | Storage de documentos | S3-compatible (Cloudflare R2 ou storage do Supabase) | — |
 | Comunicação com lead | Meta Cloud API (integração direta, sem BSP) | Conta Meta Business única e verificada da CorreTop; números de cada tenant adicionados manualmente pela equipe |
 
@@ -174,14 +178,14 @@ Já que a decisão foi usar ambos conforme o caso, aqui está o critério práti
 | Ambiente | Propósito | Branch correspondente | Banco de dados |
 |---|---|---|---|
 | Desenvolvimento (local) | Máquina do desenvolvedor | qualquer `feature/*` local | Banco local ou branch de banco isolado (Neon suporta branching de banco) |
-| Staging/Homologação | Testar antes de produção, validar com o cliente-piloto se necessário | `develop` (deploy automático da Vercel em preview) | Banco de staging separado, com dados de teste |
+| Staging/Homologação | Testar antes de produção, validar com o cliente-piloto se necessário | `develop` (ambiente Coolify de staging) | Banco de staging separado, com dados de teste |
 | Produção | Ambiente real dos tenants | `main` | Banco de produção |
 
-**Gestão de variáveis de ambiente:** arquivo `.env.example` no repositório documentando todas as chaves necessárias (sem valores reais). Segredos reais configurados diretamente no painel da Vercel por ambiente (Development/Preview/Production), nunca commitados.
+**Gestão de variáveis de ambiente:** arquivo `.env.example` no repositório documentando todas as chaves necessárias (sem valores reais). Segredos reais são configurados como secrets nos serviços correspondentes do Coolify, nunca commitados.
 
 ---
 
-## 8. Pipeline de CI/CD (GitHub Actions + Vercel)
+## 8. Pipeline de CI/CD (GitHub Actions + Coolify)
 
 **Estágios do workflow (`.github/workflows/ci.yml`):**
 
@@ -192,11 +196,12 @@ Já que a decisão foi usar ambos conforme o caso, aqui está o critério práti
 5. **Testes E2E** (apenas em PRs para `main`, ou noturno) — Playwright, cobrindo os fluxos críticos (Seção 9)
 
 **Deploy:**
-- Push em `feature/*` ou PR aberto → Vercel gera um **preview deploy** automático (URL única por PR).
-- Merge em `develop` → deploy automático no ambiente de **staging**.
-- Merge em `main` → deploy automático em **produção**.
+- Push em `feature/*` ou PR aberto → CI valida o código; preview é opcional no ambiente Coolify.
+- Merge em `develop` → Coolify publica o ambiente de **staging** conforme a política do projeto.
+- Merge em `main` → Coolify publica frontend e API em seus serviços de **produção**.
 
-O CI (GitHub Actions) atua como **gate de qualidade antes do merge**; a Vercel cuida do deploy em si — os dois se complementam, sem sobreposição de responsabilidade.
+O CI (GitHub Actions) atua como **gate de qualidade antes do merge**; o Coolify
+cuida da publicação, health checks e rollback de cada serviço separadamente.
 
 ---
 

@@ -1,5 +1,10 @@
 # Infraestrutura de escala do CorreTop
 
+> **Runtime de produção (2026-09-14):** o projeto não usa mais a Vercel. O
+> frontend e a API Fastify são serviços independentes publicados pelo Coolify em
+> VPSs separadas. As referências históricas à Vercel abaixo não são instruções de
+> deploy atuais.
+
 ## Objetivo
 
 Preparar o sistema para a entrada concentrada de cinco unidades e crescimento
