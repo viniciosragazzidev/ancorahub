@@ -19,7 +19,7 @@ import {
 } from "./official-broker-conversations";
 import { ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
-import { isMediaKindSupported } from "@/features/conversations/components/media-bubble";
+import { isMediaKindSupported } from "@/features/conversations/media-kinds";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";

@@ -14,6 +14,9 @@ import {
   Video,
   WarningCircle,
 } from "@/components/huge-icons";
+import { isMediaKindSupported } from "../media-kinds";
+
+export { isMediaKindSupported } from "../media-kinds";
 
 export type MediaBubbleData = {
   kind: string;
@@ -24,10 +27,6 @@ export type MediaBubbleData = {
   url: string;
   caption?: string | null;
 };
-
-export function isMediaKindSupported(kind: string | null | undefined) {
-  return kind === "image" || kind === "audio" || kind === "video" || kind === "document";
-}
 
 export function formatMediaSize(sizeBytes: number | null | undefined) {
   if (!sizeBytes || sizeBytes <= 0) return "";
