@@ -29,6 +29,14 @@ function readLeadFormValue(formData: unknown, keys: string[]) {
 
 export type LeadOfferStatus = "PENDING" | "SENT" | "DELIVERED" | "READ" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "LOST" | "CANCELLED";
 
+const ACTIVE_OFFER_STATUSES: LeadOfferStatus[] = ["PENDING", "SENT", "DELIVERED", "READ"];
+
+/** Responses without a provider message id are safe only when unambiguous. */
+export function selectUnambiguousActiveOffer<T extends { status: string }>(offers: T[]) {
+  const active = offers.filter((offer) => ACTIVE_OFFER_STATUSES.includes(offer.status as LeadOfferStatus));
+  return active.length === 1 ? active[0] : null;
+}
+
 export async function createLeadOffersForBrokers(input: {
   tenantId: string;
   leadId: string;
@@ -327,7 +335,14 @@ export async function handleLeadOfferWebhookResponse(input: {
         eq(schema.brokerProfiles.tenantId, input.tenantId),
       ),
     )
-    .where(and(eq(schema.tenantMemberships.tenantId, input.tenantId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker")));
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, input.tenantId),
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.jobTitle, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      eq(schema.user.active, true),
+      eq(schema.user.status, "active"),
+    ));
 
   const broker = allUsers.find((u) => u.phone && samePhone(u.phone, phone));
   if (!broker) return { processed: false, reason: "broker_not_found" };
@@ -351,7 +366,7 @@ export async function handleLeadOfferWebhookResponse(input: {
   }
 
   if (!offer) {
-    const [recentOffer] = await db
+    const activeOffers = await db
       .select()
       .from(schema.leadOffers)
       .where(
@@ -362,8 +377,11 @@ export async function handleLeadOfferWebhookResponse(input: {
         ),
       )
       .orderBy(sql`${schema.leadOffers.createdAt} DESC`)
-      .limit(1);
-    offer = recentOffer;
+      .limit(10);
+    offer = selectUnambiguousActiveOffer(activeOffers) ?? undefined;
+    if (!offer && activeOffers.length > 1) {
+      return { processed: false, reason: "ambiguous_offer" };
+    }
   }
 
   if (!offer) return { processed: false, reason: "offer_not_found" };
@@ -385,7 +403,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         and(
           eq(schema.leadOffers.id, offer.id),
           eq(schema.leadOffers.tenantId, input.tenantId),
-          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+          inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES),
         ),
       )
       .returning({ id: schema.leadOffers.id });
@@ -663,7 +681,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         and(
           eq(schema.leadOffers.id, offer.id),
           eq(schema.leadOffers.tenantId, offer.tenantId),
-          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+          inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES),
         ),
       )
       .returning({ id: schema.leadOffers.id });
