@@ -36,6 +36,7 @@ import {
   updateUserProfileSettingsAction,
   updateReportingCenterSettingsAction,
   updateUnlinkedConversationDeletionSettingsAction,
+  updateConversationMediaSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
@@ -132,6 +133,7 @@ export default async function SuperAdminSettingsPage() {
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
   const reportingCenterEnabled = settingMap.get("feature_reporting_center_enabled") !== "false";
+  const conversationMediaEnabled = settingMap.get("feature_conversation_media_enabled") !== "false";
   const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const realtimeSyncEnabled = settingMap.get("feature_realtime_sync_enabled") !== "false";
@@ -405,6 +407,37 @@ export default async function SuperAdminSettingsPage() {
                     </span>
                   </label>
                   <Button type="submit" variant="outline">Salvar controle</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Mídia nas conversas oficiais</CardTitle>
+                <CardDescription>
+                  Receber e enviar imagem, áudio, documento e vídeo pelo canal Meta com armazenamento privado e acesso autenticado. Desativar interrompe novos downloads e envios sem apagar histórico ou objetos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateConversationMediaSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="conversationMediaEnabled"
+                      value="true"
+                      defaultChecked={conversationMediaEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Habilitar mídia oficial nas conversas</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Cada acesso a mídia é auditado; desativado, o workspace informa a indisponibilidade.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={conversationMediaEnabled ? "outline" : "default"}>
+                    {conversationMediaEnabled ? "Salvar controle" : "Liberar mídia"}
+                  </Button>
                 </form>
               </CardContent>
             </Card>

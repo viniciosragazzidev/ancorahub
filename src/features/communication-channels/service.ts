@@ -10,6 +10,14 @@ import { publishConversationInvalidation } from "@/features/notifications/realti
 import { decryptChannelSecret } from "./secret-crypto";
 import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
+import {
+  CONVERSATION_MEDIA_KINDS,
+  downloadMetaMediaObject,
+  isConversationMediaEnabled,
+  normalizeMediaKind,
+  storeConversationMedia,
+  type ConversationMediaKind,
+} from "./conversation-media";
 import { META_CLOUD_PROVIDER } from "./types";
 import type { MetaWebhookPayload } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
@@ -67,6 +75,16 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
 
 import { normalizePhone } from "@/shared/utils/phone";
 export { normalizePhone };
+
+/** Extracts the provider media id for any supported inbound media type. */
+function getMetaInboundMediaId(message: import("./types").MetaWebhookMessage, kind: string): string | null {
+  if (kind === "audio") return (message.audio as { id?: string } | undefined)?.id ?? null;
+  if (kind === "image") return (message.image as { id?: string } | undefined)?.id ?? null;
+  if (kind === "video") return (message.video as { id?: string } | undefined)?.id ?? null;
+  if (kind === "document") return (message.document as { id?: string; filename?: string } | undefined)?.id ?? null;
+  if (kind === "sticker") return (message.sticker as { id?: string } | undefined)?.id ?? null;
+  return null;
+}
 
 export function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
@@ -151,6 +169,49 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           text = buttonText || buttonPayload || text;
         }
 
+        // DEC-098: download official conversation media inbound and persist it
+        // in the tenant's private R2 prefix. A failed download never drops the
+        // message: it is stored with media metadata but no storage key and the
+        // workspace renders it as unavailable.
+        const inboundMediaKind = normalizeMediaKind(message.type === "sticker" ? "image" : message.type);
+        const inboundMediaId = inboundMediaKind ? getMetaInboundMediaId(message, message.type ?? "") : null;
+        let mediaColumns: {
+          kind: ConversationMediaKind;
+          mimeType: string;
+          filename: string | null;
+          sizeBytes: number;
+          storageKey: string | null;
+        } | null = null;
+        if (inboundMediaKind && inboundMediaId && (await isConversationMediaEnabled())) {
+          try {
+            const mediaId = inboundMediaId;
+            const downloaded = await downloadMetaMediaObject({ channel, mediaId });
+            const persistedMessageId = randomUUID();
+            const stored = await storeConversationMedia({
+              tenantId: channel.tenantId,
+              messageId: persistedMessageId,
+              kind: inboundMediaKind,
+              mimeType: downloaded.mimeType,
+              filename: downloaded.filename,
+              body: downloaded.body,
+            });
+            mediaColumns = {
+              kind: stored.kind,
+              mimeType: stored.mimeType,
+              filename: stored.filename,
+              sizeBytes: stored.sizeBytes,
+              storageKey: stored.storageKey,
+            };
+          } catch (mediaError) {
+            console.error("[whatsapp] media.download_failed", {
+              tenantId: channel.tenantId,
+              providerMessageId: message.id,
+              kind: inboundMediaKind,
+              error: mediaError instanceof Error ? mediaError.message.slice(0, 240) : "unknown_error",
+            });
+          }
+        }
+
         const phone = normalizePhone(message.from);
         const brokerProfile = brokerProfiles.find((profile) => matchesKnownBrokerPhone(phone, [profile.phone]));
 
@@ -179,6 +240,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             phone,
             direction: "incoming",
             body: text || `[${messageKind}]`,
+            ...(mediaColumns ? { mediaKind: mediaColumns.kind, mediaMimeType: mediaColumns.mimeType, mediaFilename: mediaColumns.filename, mediaSizeBytes: mediaColumns.sizeBytes, mediaStorageKey: mediaColumns.storageKey, mediaProviderId: inboundMediaId } : {}),
             sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
           }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
           console.info("[whatsapp/broker-channel] inbound.received", { tenantId: channel.tenantId, brokerProfileId: brokerProfile.id, messageKind });
@@ -188,7 +250,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           continue;
         }
 
-        if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
+        if (!text && messageKind === "text" && message.type !== "text" && !mediaColumns) { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         // OPTIMIZED: Query only leads matching the incoming phone (last 8 digits) instead of fetching ALL leads
         const incomingDigits = normalizePhone(phone);
         const suffix8 = incomingDigits.slice(-8);
@@ -231,6 +293,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           phone,
           direction: "incoming",
           body: text || `[${messageKind}]`,
+          ...(mediaColumns ? { mediaKind: mediaColumns.kind, mediaMimeType: mediaColumns.mimeType, mediaFilename: mediaColumns.filename, mediaSizeBytes: mediaColumns.sizeBytes, mediaStorageKey: mediaColumns.storageKey, mediaProviderId: inboundMediaId } : {}),
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
         void publishConversationInvalidation({

@@ -146,6 +146,22 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
   });
 }
 
+export async function updateConversationMediaSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("conversationMediaEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_conversation_media_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "conversation_media.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "conversation_media",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateBrokerAvailabilityOnboardingSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("brokerAvailabilityOnboardingEnabled") === "true" ? "true" : "false";

@@ -67,6 +67,7 @@ import {
   ThermometerCold,
   WarningCircle,
   Trash,
+  X,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -91,6 +92,14 @@ import { manuallyChangeQualificationStageAction } from "@/features/leads/qualifi
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
 import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
 import { deleteConversationHistoryAction } from "@/features/conversations/actions";
+import {
+  MediaBubble,
+  MediaUnavailable,
+  formatMediaSize,
+  isMediaKindSupported,
+  type MediaBubbleData,
+} from "@/features/conversations/components/media-bubble";
+import { MediaAttachButton } from "@/features/conversations/components/media-attach-button";
 
 export type ConversationMessage = {
   id: string;
@@ -104,6 +113,14 @@ export type ConversationMessage = {
     code: string;
     title: string;
     message: string;
+  } | null;
+  /** DEC-098: official conversation media metadata; binaries stream via the authenticated route. */
+  media?: {
+    kind: string;
+    mimeType: string | null;
+    filename: string | null;
+    sizeBytes: number | null;
+    url: string | null;
   } | null;
 };
 
@@ -368,6 +385,19 @@ export function ConversationsWorkspace({
               <ConversationHistory client={selected} />
               <ChatInput
                 leadId={selected.id}
+                onMediaSent={(msg) => {
+                  setConversations((prev) =>
+                    prev.map((item) =>
+                      item.id === selected.id
+                        ? {
+                            ...item,
+                            latestMessage: { body: msg.body, direction: msg.direction, sentAt: msg.sentAt.toISOString() },
+                            messages: [...item.messages, { ...msg, sentAt: msg.sentAt.toISOString(), leadId: selected.id }],
+                          }
+                        : item,
+                    ),
+                  );
+                }}
                 onMessageSent={(msg) => {
                   setConversations((prev) =>
                     prev.map((item) =>
@@ -379,12 +409,11 @@ export function ConversationsWorkspace({
                           }
                         : item,
                     ),
-                  );
-                }}
-              />
-            </>
-          ) : (
-            <EmptyConversation />
+                  );                    }}
+                  />
+                </>
+              ) : (
+                <EmptyConversation />
           )}
         </section>
 
@@ -865,9 +894,17 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
 function ChatInput({
   leadId,
   onMessageSent,
+  onMediaSent,
 }: {
   leadId: string;
   onMessageSent: (msg: ConversationMessage) => void;
+  onMediaSent?: (msg: {
+    id: string;
+    body: string;
+    direction: string;
+    sentAt: Date;
+    media: { kind: string; mimeType: string; filename: string | null; sizeBytes: number; url: string };
+  }) => void;
 }) {
   const [text, setText] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -908,6 +945,7 @@ function ChatInput({
   return (
     <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
       <form onSubmit={handleSend} className="flex gap-2 items-center">
+        <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} />
         <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
         <div className="relative flex-1">
           <Input
@@ -1045,6 +1083,8 @@ function MessageRow({
   showHeader: boolean;
 }) {
   const isOutbound = message.direction === "outgoing" || message.direction === "outbound";
+  const mediaData = message.media ?? null;
+  const [fullscreenMedia, setFullscreenMedia] = useState<MediaBubbleData | null>(null);
 
   return (
     <Message align={isOutbound ? "end" : "start"} className="ct-reveal-fast">
@@ -1068,7 +1108,24 @@ function MessageRow({
               isOutbound ? "bg-primary text-primary-foreground" : "bg-card",
             )}
           >
-            <p className="whitespace-pre-wrap leading-5">{message.body}</p>
+            {mediaData && mediaData.url ? (
+              <MediaBubble
+                media={{
+                  kind: mediaData.kind,
+                  mimeType: mediaData.mimeType,
+                  filename: mediaData.filename,
+                  sizeBytes: mediaData.sizeBytes,
+                  url: mediaData.url,
+                  caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body,
+                }}
+                isOutbound={isOutbound}
+                onOpenFullscreen={setFullscreenMedia}
+              />
+            ) : mediaData && !mediaData.url ? (
+              <MediaUnavailable isOutbound={isOutbound} />
+            ) : (
+              <p className="whitespace-pre-wrap leading-5">{message.body}</p>
+            )}
           </BubbleContent>
         </Bubble>
 
@@ -1094,7 +1151,50 @@ function MessageRow({
           </p>
         ) : null}
       </MessageContent>
+      {fullscreenMedia ? (
+        <MediaLightbox media={fullscreenMedia} onClose={() => setFullscreenMedia(null)} />
+      ) : null}
     </Message>
+  );
+}
+
+function MediaLightbox({ media, onClose }: { media: MediaBubbleData; onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={media.caption || media.filename || "Visualização de mídia"}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        aria-label="Fechar visualização"
+        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        onClick={onClose}
+      >
+        <X className="size-5" />
+      </button>
+      <figure className="flex max-h-full max-w-4xl flex-col gap-2" onClick={(event) => event.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- authenticated one-off blob from private storage */}
+        <img
+          src={media.url}
+          alt={media.caption || media.filename || "Mídia da conversa"}
+          className="max-h-[80vh] w-auto rounded-lg object-contain"
+        />
+        <figcaption className="text-center text-xs text-white/80">
+          {media.caption || media.filename || ""} {formatMediaSize(media.sizeBytes)}
+        </figcaption>
+      </figure>
+    </div>
   );
 }
 

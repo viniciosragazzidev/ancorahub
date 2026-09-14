@@ -20,11 +20,11 @@ export type MetaWebhookMessage = {
     button_reply?: { id?: string; title?: string };
   };
   context?: { id?: string };
-  audio?: unknown;
-  image?: unknown;
-  document?: unknown;
-  video?: unknown;
-  sticker?: unknown;
+  audio?: { id?: string; mime_type?: string } | unknown;
+  image?: { id?: string; mime_type?: string; sha256?: string } | unknown;
+  document?: { id?: string; mime_type?: string; filename?: string; sha256?: string } | unknown;
+  video?: { id?: string; mime_type?: string; sha256?: string } | unknown;
+  sticker?: { id?: string; mime_type?: string } | unknown;
 };
 
 export type MetaWebhookStatus = {

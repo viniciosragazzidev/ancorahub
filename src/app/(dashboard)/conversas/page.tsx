@@ -19,6 +19,7 @@ import {
 } from "./official-broker-conversations";
 import { ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
+import { isMediaKindSupported } from "@/features/conversations/components/media-bubble";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
@@ -152,6 +153,11 @@ export default async function ConversationsPage({
               messageId: schema.whatsappMessages.messageId,
               communicationChannelId: schema.whatsappMessages.communicationChannelId,
               sentAt: schema.whatsappMessages.sentAt,
+              mediaKind: schema.whatsappMessages.mediaKind,
+              mediaMimeType: schema.whatsappMessages.mediaMimeType,
+              mediaFilename: schema.whatsappMessages.mediaFilename,
+              mediaSizeBytes: schema.whatsappMessages.mediaSizeBytes,
+              mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
             })
             .from(schema.whatsappMessages)
             .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
@@ -288,6 +294,27 @@ export default async function ConversationsPage({
           providerStatus: msg.providerStatus,
           providerFailure,
           sentAt: msg.sentAt.toISOString(),
+          ...(isMediaKindSupported(msg.mediaKind) && msg.mediaStorageKey
+            ? {
+                media: {
+                  kind: msg.mediaKind as string,
+                  mimeType: msg.mediaMimeType,
+                  filename: msg.mediaFilename,
+                  sizeBytes: msg.mediaSizeBytes,
+                  url: `/api/conversations/media/${msg.id}`,
+                },
+              }
+            : isMediaKindSupported(msg.mediaKind)
+              ? {
+                  media: {
+                    kind: msg.mediaKind as string,
+                    mimeType: msg.mediaMimeType,
+                    filename: msg.mediaFilename,
+                    sizeBytes: msg.mediaSizeBytes,
+                    url: null,
+                  },
+                }
+              : {}),
         });
       }
 
@@ -400,6 +427,17 @@ export default async function ConversationsPage({
           providerStatus: m.providerStatus,
           providerFailure: m.messageId ? failureByProviderMessageId.get(m.messageId) ?? null : null,
           sentAt: m.sentAt.toISOString(),
+          ...(m.mediaKind && m.mediaStorageKey
+            ? {
+                media: {
+                  kind: m.mediaKind,
+                  mimeType: m.mediaMimeType,
+                  filename: m.mediaFilename,
+                  sizeBytes: m.mediaSizeBytes,
+                  url: `/api/conversations/media/${m.id}`,
+                },
+              }
+            : {}),
         })),
         documents: [],
         latestMessage: latest
@@ -612,6 +650,11 @@ export default async function ConversationsPage({
                 body: schema.whatsappMessages.body,
                 providerStatus: schema.whatsappMessages.providerStatus,
                 sentAt: schema.whatsappMessages.sentAt,
+                mediaKind: schema.whatsappMessages.mediaKind,
+                mediaMimeType: schema.whatsappMessages.mediaMimeType,
+                mediaFilename: schema.whatsappMessages.mediaFilename,
+                mediaSizeBytes: schema.whatsappMessages.mediaSizeBytes,
+                mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
               })
               .from(schema.whatsappMessages)
               .where(
@@ -702,6 +745,17 @@ export default async function ConversationsPage({
           body: cleanBody && cleanBody !== "[text]" ? cleanBody : "Mensagem recebida do corretor",
           sentAt: message.sentAt.toISOString(),
           status: "received",
+          ...(message.mediaKind && message.mediaStorageKey
+            ? {
+                media: {
+                  kind: message.mediaKind,
+                  mimeType: message.mediaMimeType,
+                  filename: message.mediaFilename,
+                  sizeBytes: message.mediaSizeBytes,
+                  url: `/api/conversations/media/${message.id}`,
+                },
+              }
+            : {}),
         });
       }
 

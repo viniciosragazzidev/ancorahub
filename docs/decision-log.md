@@ -1,5 +1,32 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-098 — Mídia oficial nas conversas (áudio, imagem, documento e vídeo)
+
+**Estado:** Aceita
+**Data:** 2026-09-14
+
+As conversas de `/conversas` passam a suportar mídia oficial nos dois sentidos pelo
+canal Meta Cloud: receber mídia inbound do cliente/corretor pelo webhook e permitir
+que gestão envie mídia outbound. A capacidade cobre a aba principal (leads/clientes)
+e a aba Corretores, incluindo a rota Lite `/conversas/broker` em modo somente leitura
+conforme DEC-091.
+
+Os binários são gravados no bucket privado Cloudflare R2 sob o prefixo
+`whatsapp-media/<tenantId>/`, seguindo a DEC-069: o banco mantém autoridade sobre
+metadados em `whatsapp_messages` (kind, mime, nome, tamanho, key e referência de
+id do provedor) e o download acontece somente pela rota autenticada e escopada por
+tenant, sem URL pública. Os limites seguem o padrão Meta (imagem 5 MB; áudio,
+vídeo e documento 16 MB). A rota valida papel/escopo, aplica auditoria de acesso a
+mídia e nunca depende de `tenant_id` do cliente. Uma mensagem de mídia sem objeto
+armazenado é exibida como indisponível com motivo, nunca quebra a conversa.
+
+A capacidade é governada pelo kill switch global
+`feature_conversation_media_enabled`, controlado e auditado pelo Super-admin;
+desativada, novas mídias deixam de ser baixadas/enviadas sem apagar histórico ou
+objetos, e a interface informa a indisponibilidade. Envio permanece restrito a
+diretor/gestor conforme DEC-091 para a conexão pessoal do corretor. Detalhes
+técnicos em ADR-0044.
+
 ## DEC-092 — Políticas de mensagem por situação na Qualificação
 
 **Estado:** Aceita

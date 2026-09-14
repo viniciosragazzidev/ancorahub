@@ -168,6 +168,15 @@ export const FEATURE_FLAGS = {
     description: "Permite que Diretores excluam qualquer histórico do WhatsApp e Gestores excluam somente conversas sem vínculo.",
   },
 
+  CONVERSATION_MEDIA: {
+    key: "feature_conversation_media_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Habilita mídia oficial nas conversas (DEC-098): receber e enviar imagem, áudio, documento e vídeo pelo canal Meta, com armazenamento privado e acesso autenticado. Desativar interrompe novos downloads e envios sem apagar histórico.",
+  },
+
   AGENT_TRAINING_CENTER: {
     key: "feature_agent_training_center_enabled",
     scope: "global",

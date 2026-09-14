@@ -35,6 +35,12 @@ import {
 } from "@/components/huge-icons";
 import { FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  MediaBubble,
+  MediaUnavailable,
+  isMediaKindSupported,
+  type MediaBubbleData,
+} from "@/features/conversations/components/media-bubble";
 
 import {
   sendBrokerTemplateAction,
@@ -55,6 +61,14 @@ export type OfficialBrokerMessage = {
   templateName?: string;
   attempts?: number;
   error?: string | null;
+  /** DEC-098: inbound broker media streamed through the authenticated route. */
+  media?: {
+    kind: string;
+    mimeType: string | null;
+    filename: string | null;
+    sizeBytes: number | null;
+    url: string | null;
+  } | null;
 };
 
 export type OfficialBrokerConversation = {
@@ -843,6 +857,7 @@ function MessageBubble({
   brokerName: string;
 }) {
   const isOutgoing = message.direction === "outgoing";
+  const hasMedia = Boolean(message.media && isMediaKindSupported(message.media?.kind));
 
   return (
     <div
@@ -857,8 +872,24 @@ function MessageBubble({
 
       <div className={cn("flex max-w-[85%] sm:max-w-[75%] flex-col gap-1", isOutgoing && "items-end")}>
         <Bubble variant={isOutgoing ? "default" : "muted"}>
-          <BubbleContent className="text-xs leading-relaxed whitespace-pre-wrap">
-            {message.body}
+          <BubbleContent className="text-xs leading-relaxed">
+            {hasMedia && message.media?.url ? (
+              <MediaBubble
+                media={{
+                  kind: message.media.kind,
+                  mimeType: message.media.mimeType,
+                  filename: message.media.filename,
+                  sizeBytes: message.media.sizeBytes,
+                  url: message.media.url,
+                  caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body,
+                }}
+                isOutbound={isOutgoing}
+              />
+            ) : hasMedia ? (
+              <MediaUnavailable isOutbound={isOutgoing} />
+            ) : (
+              <span className="whitespace-pre-wrap">{message.body}</span>
+            )}
           </BubbleContent>
         </Bubble>
 
