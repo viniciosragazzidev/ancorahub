@@ -499,3 +499,20 @@ de métricas entre tenants.
   operacionais foram reenfileirados ou por que nenhum estava pronto.
 - A ação reutiliza o botão, o toast e os tokens existentes; não cria uma segunda Home de
   distribuição nem substitui o aceite do corretor por atribuição direta.
+
+## 2026-09-14 — refinamento visual do dashboard gerencial
+
+- `/dashboard` passou a compor todos os blocos com `DashboardGrid` e
+  `DashboardCard` (piloto Efferd, DEC-017): KPIs, tendência, atenção, rankings,
+  qualificações e atividade recente compartilham a mesma superfície contínua
+  com divisores de 1 px, raio canônico na borda externa e sombra zero.
+- O cabeçalho ganhou hierarquia de leitura (kicker em versalete, título com
+  tracking apertado, linha de status semântica com exceções e pico do período)
+  e uma única ação primária "Abrir leads", conforme DEC-002.
+- A tendência virou gráfico em camadas: barra de recebidos com sobreposição de
+  convertidos, tooltip por barra, eixo de dias separado e legenda com pico.
+- Atenção, rankings e listas recentes usam listas divididas com números
+  tabulares/monoespaçados, badges semânticos e estados vazios compostos.
+- Nenhuma métrica, consulta, permissão, escopo ou integração foi alterada; o
+  Corretor Lite permanece preservado pela DEC-015. Validações: tsc, ESLint
+  dirigido e build de produção.
