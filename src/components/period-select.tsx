@@ -20,7 +20,7 @@ import {
  * Seletor de período 7/14/30/90 persistido em `?period=N`.
  *
  * Espelha o comportamento do LeadsFilters: preserva os demais query params e
- * apenas sobrescreve `period`, fazendo `router.push`. Requer estar num Client
+ * apenas sobrescreve `period`, fazendo `router.replace`. Requer estar num Client
  * Component sob `<Suspense>` (uso de `useSearchParams`), conforme o padrão das
  * páginas / leia o guia de linking/navigating.
  */
