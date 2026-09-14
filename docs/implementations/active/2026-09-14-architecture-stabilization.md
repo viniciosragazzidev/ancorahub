@@ -2,12 +2,14 @@
 
 ## Tipo
 
-Auditoria/documentação. Nenhum comportamento de produção foi alterado.
+Auditoria/documentação e refinamento visual do dashboard. As ondas comportamentais
+de distribuição, autorização e integrações continuam bloqueadas pelos gates P0/P1.
 
 ## Evidências
 
 - Inventário atual: 342 arquivos em `src/app`, 526 em `src/features` e 65 rotas API.
-- Grafo existente em `.ua/knowledge-graph.json` está datado de 2026-08-20 e deve ser atualizado.
+- Grafo `graphify-out/graph.json` atualizado com exclusões de ferramentas: 12.938 nós,
+  37.589 relações e 488 comunidades, no commit `b2c898fb`.
 - `docs/architecture/AUTHORITY_MAP.md` registra fragmentação crítica no motor de distribuição e adoção parcial do RBAC canônico.
 
 ## Entrega
@@ -16,5 +18,6 @@ Auditoria/documentação. Nenhum comportamento de produção foi alterado.
 
 ## Próximo passo seguro
 
-Executar somente a Onda 0 (cartografia), sem mover arquivos ou alterar regras. A primeira
-mudança de código só deve começar após registrar as decisões P0/P1 e adicionar testes de contrato.
+Executar a Onda 2 (distribuição) somente em uma mudança isolada, após registrar a
+decisão do executor único e adicionar testes de concorrência, idempotência e lead
+sem corretor. O dashboard refinado aguarda QA visual/responsivo antes de publicar.

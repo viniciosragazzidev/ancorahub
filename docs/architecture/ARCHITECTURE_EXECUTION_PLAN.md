@@ -7,7 +7,7 @@ alterar e publicar mudanças.
 
 ## 1. Leitura do estado atual
 
-O grafo encontrou 12.910 nós, 37.555 relações e 473 comunidades. Os hubs mais
+O grafo encontrou 12.938 nós, 37.589 relações e 488 comunidades. Os hubs mais
 importantes são `db/schema.ts`, `tenant-context.ts`, `getRequiredTenantContext`,
 `leads/[id]/page.tsx`, `leads-workspace.tsx`, `create-lead-from-webhook-sync.ts`,
 `outbound-service.ts`, `lead-distribution/service.ts`, `lead-distribution/jobs.ts`,
@@ -16,6 +16,20 @@ importantes são `db/schema.ts`, `tenant-context.ts`, `getRequiredTenantContext`
 O grafo de produto foi reprocessado excluindo `.agents/`, `.github/` e `node_modules/`.
 Os nomes das comunidades ainda são derivados dos hubs (não há backend LLM configurado),
 mas a topologia e as relações são determinísticas e utilizáveis para a auditoria.
+
+### Status das ondas em 14/09/2026
+
+| Onda | Estado | Evidência |
+|---|---|---|
+| O0 — Cartografia | Concluída | `graphify-out/graph.json` e `GRAPH_REPORT.md` sincronizados com `b2c898fb` |
+| O1 — Contratos e autoridade | Concluída | mapa de autoridade, riscos, gates e rollback documentados |
+| O2 — Distribuição | Aguardando | requer decisão sobre o executor único e testes de concorrência/idempotência |
+| O3 — Autorização/múltiplas unidades | Aguardando | requer matriz allow/deny e validação de escopo derivado no servidor |
+| O4 — Dados/pipeline/integrações | Aguardando | depende dos contratos de O2/O3 e da estratégia de outbox |
+| O5 — Limpeza controlada | Aguardando | somente após evidência de ausência de tráfego legado |
+
+As ondas aguardando não foram aplicadas em lote: os riscos P0/P1 identificados
+exigem mudanças isoladas, testes de contrato e rollback verificável.
 
 ## 2. Estrutura de autoridade aprovada para investigação
 
