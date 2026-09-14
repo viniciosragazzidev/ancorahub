@@ -8,6 +8,34 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-14 — UX-H1 Design engineering hardening
+
+### Resultado
+
+- Os botões canônicos passaram a usar feedback de pressão `scale(0.96)`, com
+  transição interrompível e preservação de `prefers-reduced-motion`.
+- As fundações de seções e abas deixaram `transition-all` e passaram a declarar
+  somente propriedades visuais, com curva e duração rápidas e consistentes.
+- O utilitário legado `transition-all` recebeu uma contenção global para não
+  animar propriedades de layout ou dimensões não intencionais nas rotas existentes.
+- A correção é transversal e não altera regras de negócio, permissões, escopo,
+  consultas ou integrações.
+
+### Componentes afetados
+
+- `src/components/ui/button-variants.ts`
+- `src/components/foundations/section.tsx`
+- `src/components/foundations/page-tabs.tsx`
+- `src/app/globals.css`
+
+### Validação
+
+Testes das fundações: 14 aprovados. Auditoria estrutural de componentes: sem novas
+divergências. QA autenticado em dispositivos reais permanece o gate M1.10 do
+Controle de Execução.
+
+---
+
 ## 2026-09-05 — UX-M1 Mobile Experience
 
 ### Resultado

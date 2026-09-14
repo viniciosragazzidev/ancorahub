@@ -53,7 +53,7 @@ export function PageTabs({
               onFocus={() => onTabIntent?.(tab.id)}
               aria-current={isCurrent ? "page" : undefined}
               className={cn(
-                "group relative flex shrink-0 snap-start items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all select-none max-[559px]:min-h-(--mobile-touch-target)",
+                "group relative flex shrink-0 snap-start items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-[background-color,color,box-shadow,opacity] duration-150 ease-[var(--ease-smooth-out)] select-none max-[559px]:min-h-(--mobile-touch-target)",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isCurrent
                   ? "bg-primary text-primary-foreground shadow-xs cursor-default"
@@ -87,7 +87,7 @@ export function PageTabs({
             disabled={tab.disabled || isCurrent}
             aria-current={isCurrent ? "page" : undefined}
             className={cn(
-              "group relative flex shrink-0 snap-start items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all select-none max-[559px]:min-h-(--mobile-touch-target)",
+              "group relative flex shrink-0 snap-start items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-[background-color,color,box-shadow,opacity] duration-150 ease-[var(--ease-smooth-out)] select-none max-[559px]:min-h-(--mobile-touch-target)",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isCurrent
                 ? "bg-primary text-primary-foreground shadow-xs cursor-default"

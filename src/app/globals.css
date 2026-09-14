@@ -813,7 +813,23 @@ body {
 
 /* Status badge smooth transition */
 .ct-status-badge {
-  transition: all 300ms var(--ease-smooth-out);
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+/* Legacy utility hardening: keep existing screens responsive without allowing
+ * transition-all to animate layout or unrelated properties. New components
+ * should still name their properties explicitly. */
+.transition-all {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, width;
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transition-all {
+    transition-duration: 0ms !important;
+  }
 }
 
 /* Lock icon gentle breathing while waiting */

@@ -78,7 +78,7 @@ export function CollapsibleSection({
   return (
     <div
       data-slot="canonical-collapsible-section"
-      className={cn("rounded-xl border border-border/70 bg-card/50 transition-all", className)}
+      className={cn("rounded-xl border border-border/70 bg-card/50 transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-[var(--ease-smooth-out)]", className)}
     >
       <button
         type="button"
