@@ -132,7 +132,10 @@ function ToggleCell({
 
 function HubToggleCell({ branchId, enabled }: { branchId: string; enabled: boolean }) {
   const formKey = useId();
-  const [state, formAction, pending] = useActionState<BranchActionState, FormData>(toggleDistributionHubAction, {});
+  const [state, formAction, pending] = useActionState<BranchActionState, FormData>(
+    toggleDistributionHubAction,
+    {},
+  );
   const [formVersion, setFormVersion] = useState(0);
   const previousResult = useRef(`${state.success ?? false}:${state.error ?? ""}`);
   useEffect(() => {
@@ -144,7 +147,12 @@ function HubToggleCell({ branchId, enabled }: { branchId: string; enabled: boole
   return (
     <form key={`${formKey}-${formVersion}`} action={formAction}>
       <input type="hidden" name="branchId" value={branchId} />
-      <Button type="submit" disabled={pending} size="xs" variant={enabled ? "secondary" : "outline"}>
+      <Button
+        type="submit"
+        disabled={pending}
+        size="xs"
+        variant={enabled ? "secondary" : "outline"}
+      >
         {enabled ? "Central" : "Distribui"}
       </Button>
       <ActionFeedback state={state} />
@@ -364,7 +372,7 @@ function BrokerDirectory({ brokers }: { brokers: BrokerItem[] }) {
                   <TableHead className="pr-4 text-right">Ação</TableHead>
                 </TableRow>
               </TableHeader>
-      <TableBody>
+              <TableBody>
                 {visible.map((broker) => (
                   <TableRow key={broker.id}>
                     <TableCell className="pl-4">
@@ -476,7 +484,7 @@ export function DistributionMetrics({ metrics }: { metrics: Metrics }) {
 
   return (
     <motion.div
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
       initial="hidden"
       animate="visible"
       variants={{
@@ -539,11 +547,8 @@ export function DistributionMetrics({ metrics }: { metrics: Metrics }) {
               visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
             }}
           >
-            <Card
-              variant="compact"
-              className="group/card"
-            >
-              <CardContent className="flex flex-col gap-3">
+            <Card variant="compact" className="group/card">
+              <CardContent className="flex flex-col gap-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-medium text-muted-foreground transition-colors duration-200 group-hover/card:text-foreground">
                     {metric.label}
@@ -583,20 +588,26 @@ export function DistributionPanel({
     <>
       {/* Branch Table */}
       <Card variant="overview">
-        <CardHeader className="flex flex-col gap-3 border-b border-border px-5 pb-4 pt-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+        <CardHeader className="flex flex-col gap-3 border-b border-border/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <CardTitle>Filiais</CardTitle>
-            <CardDescription>
-              Controle individual de recebimento e distribuição automática por unidade.
+            <CardDescription className="mt-1 max-w-2xl leading-5">
+              Controle recebimento, distribuição automática e capacidade por unidade.
             </CardDescription>
           </div>
-          <Button render={<Link href="/filiais" />} size="sm" variant="outline">
-            <Buildings />
-            Gerenciar filiais
-          </Button>
-          <Button render={<Link href="/leads/distribuicao/plantao" />} size="sm" variant="outline">
-            Plantões
-          </Button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Button render={<Link href="/filiais" />} size="sm" variant="outline">
+              <Buildings />
+              Gerenciar filiais
+            </Button>
+            <Button
+              render={<Link href="/leads/distribuicao/plantao" />}
+              size="sm"
+              variant="outline"
+            >
+              Plantões
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {branches.length === 0 ? (
@@ -709,7 +720,7 @@ export function DistributionPanel({
       <BrokerDirectory brokers={brokers} />
 
       {/* Summary / Legend */}
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/70 px-5 py-3 text-[11px] leading-5 text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <CheckCircle className="size-3.5 text-emerald-600 dark:text-emerald-400" />
           <span>

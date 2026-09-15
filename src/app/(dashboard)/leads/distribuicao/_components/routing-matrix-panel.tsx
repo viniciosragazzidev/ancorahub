@@ -1,15 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ArrowUp, ArrowDown, Trash2, Edit3, ShieldAlert, CheckCircle2, Sliders, Zap, Tag } from "lucide-react";
+import {
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Edit3,
+  ShieldAlert,
+  CheckCircle2,
+  Sliders,
+  Zap,
+  Tag,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogPopup, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogPopup,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import {
   saveRoutingRuleAction,
@@ -66,7 +90,9 @@ export function RoutingMatrixPanel({
 
   // Form states
   const [name, setName] = useState("");
-  const [targetType, setTargetType] = useState<"queue" | "branch" | "broker_group" | "specific_broker">("queue");
+  const [targetType, setTargetType] = useState<
+    "queue" | "branch" | "broker_group" | "specific_broker"
+  >("queue");
   const [targetId, setTargetId] = useState("");
   const [fallbackQueueId, setFallbackQueueId] = useState<string>("");
   const [selectedPlans, setSelectedPlans] = useState<string[]>([]);
@@ -250,7 +276,8 @@ export function RoutingMatrixPanel({
   const resolveTargetName = (type: string, id: string) => {
     if (type === "queue") return queues.find((q) => q.id === id)?.name ?? `Fila #${id}`;
     if (type === "branch") return branches.find((b) => b.id === id)?.name ?? `Filial #${id}`;
-    if (type === "specific_broker") return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
+    if (type === "specific_broker")
+      return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
     if (type === "broker_group") return `Grupo de Corretores (#${id})`;
     return id;
   };
@@ -264,16 +291,16 @@ export function RoutingMatrixPanel({
   };
 
   return (
-    <Card variant="overview" className="space-y-6 p-6">
-      <CardHeader className="p-0">
+    <Card variant="overview" className="shadow-sm">
+      <CardHeader className="gap-1.5 border-b border-border/70 px-5 py-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="flex items-center gap-2">
               <Sliders className="h-5 w-5 text-primary" />
               Matriz Inteligente de Roteamento de Leads
             </CardTitle>
-            <CardDescription className="mt-1 text-xs">
-              Defina visualmente qual tipo de lead deve ir para cada fila, filial ou grupo de corretores em ordem de prioridade.
+            <CardDescription className="mt-1 max-w-3xl leading-5">
+              Defina, em ordem de prioridade, para onde cada tipo de lead deve ser encaminhado.
             </CardDescription>
           </div>
           {canEdit && (
@@ -285,16 +312,22 @@ export function RoutingMatrixPanel({
         </div>
       </CardHeader>
 
-      <CardContent className="p-0 space-y-4">
+      <CardContent className="space-y-4 px-5 py-4">
         {rules.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
             <Zap className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
             <p className="text-sm font-semibold">Nenhuma regra de roteamento configurada</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-              Todos os novos leads seguirão o fluxo padrão da Fila Geral da Unidade. Crie a primeira regra para direcionar por Tipo de Plano, Origem ou Localidade.
+              Todos os novos leads seguirão o fluxo padrão da Fila Geral da Unidade. Crie a primeira
+              regra para direcionar por Tipo de Plano, Origem ou Localidade.
             </p>
             {canEdit && (
-              <Button onClick={handleOpenCreateModal} size="sm" variant="outline" className="mt-4 gap-2">
+              <Button
+                onClick={handleOpenCreateModal}
+                size="sm"
+                variant="outline"
+                className="mt-4 gap-2"
+              >
                 <Plus className="h-4 w-4" /> Criar Primeira Regra
               </Button>
             )}
@@ -315,7 +348,9 @@ export function RoutingMatrixPanel({
                 <div
                   key={rule.id}
                   className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors ${
-                    rule.enabled ? "bg-card border-border/80" : "bg-muted/30 border-dashed opacity-75"
+                    rule.enabled
+                      ? "bg-card border-border/80"
+                      : "bg-muted/30 border-dashed opacity-75"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -326,16 +361,24 @@ export function RoutingMatrixPanel({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-sm truncate">{rule.name}</h4>
-                          <Badge variant={rule.enabled ? "success" : "outline"} className="text-[10px]">
+                          <Badge
+                            variant={rule.enabled ? "success" : "outline"}
+                            className="text-[10px]"
+                          >
                             {rule.enabled ? "Ativa" : "Pausada"}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
                           <span>Destino:</span>
-                          <strong className="text-foreground">{resolveTargetName(rule.targetType, rule.targetId)}</strong>
+                          <strong className="text-foreground">
+                            {resolveTargetName(rule.targetType, rule.targetId)}
+                          </strong>
                           {rule.fallbackQueueId && (
                             <span className="text-[11px] text-muted-foreground ml-1">
-                              (Fallback: {queues.find((q) => q.id === rule.fallbackQueueId)?.name ?? "Fila Geral"})
+                              (Fallback:{" "}
+                              {queues.find((q) => q.id === rule.fallbackQueueId)?.name ??
+                                "Fila Geral"}
+                              )
                             </span>
                           )}
                         </p>
@@ -376,7 +419,9 @@ export function RoutingMatrixPanel({
                           onClick={() => toggleRuleEnabled(rule)}
                           title={rule.enabled ? "Pausar regra" : "Ativar regra"}
                         >
-                          <CheckCircle2 className={`h-3.5 w-3.5 ${rule.enabled ? "text-emerald-500" : "text-muted-foreground"}`} />
+                          <CheckCircle2
+                            className={`h-3.5 w-3.5 ${rule.enabled ? "text-emerald-500" : "text-muted-foreground"}`}
+                          />
                         </Button>
                         <Button
                           size="icon-xs"
@@ -415,7 +460,8 @@ export function RoutingMatrixPanel({
                             Cidade: {ct}
                           </Badge>
                         ))}
-                        {(typeof cond.minLives === "number" || typeof cond.maxLives === "number") && (
+                        {(typeof cond.minLives === "number" ||
+                          typeof cond.maxLives === "number") && (
                           <Badge variant="secondary" className="text-[10px]">
                             Vidas: {cond.minLives ?? 1} a {cond.maxLives ?? "∞"}
                           </Badge>
@@ -444,7 +490,8 @@ export function RoutingMatrixPanel({
               {editingRule ? "Editar Regra de Roteamento" : "Nova Regra de Roteamento"}
             </DialogTitle>
             <DialogDescription>
-              Configure os filtros e selecione o destino exato para onde os leads correspondentes devem ser enviados.
+              Configure os filtros e selecione o destino exato para onde os leads correspondentes
+              devem ser enviados.
             </DialogDescription>
           </DialogHeader>
 
@@ -531,7 +578,8 @@ export function RoutingMatrixPanel({
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                Se os corretores do destino primário estiverem lotados ou ausentes, o lead irá para esta fila.
+                Se os corretores do destino primário estiverem lotados ou ausentes, o lead irá para
+                esta fila.
               </p>
             </div>
 
@@ -588,7 +636,9 @@ export function RoutingMatrixPanel({
 
               {/* Cities */}
               <div className="space-y-2">
-                <Label htmlFor="cities-input" className="text-xs font-medium">Cidades / Localidades (Separadas por vírgula)</Label>
+                <Label htmlFor="cities-input" className="text-xs font-medium">
+                  Cidades / Localidades (Separadas por vírgula)
+                </Label>
                 <Input
                   id="cities-input"
                   placeholder="Ex: São Paulo, Campinas, Guarulhos"
@@ -600,7 +650,9 @@ export function RoutingMatrixPanel({
               {/* Number of Lives */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="min-lives" className="text-xs font-medium">Mínimo de Vidas</Label>
+                  <Label htmlFor="min-lives" className="text-xs font-medium">
+                    Mínimo de Vidas
+                  </Label>
                   <Input
                     id="min-lives"
                     type="number"
@@ -610,7 +662,9 @@ export function RoutingMatrixPanel({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="max-lives" className="text-xs font-medium">Máximo de Vidas</Label>
+                  <Label htmlFor="max-lives" className="text-xs font-medium">
+                    Máximo de Vidas
+                  </Label>
                   <Input
                     id="max-lives"
                     type="number"
@@ -633,7 +687,9 @@ export function RoutingMatrixPanel({
                         type="button"
                         size="xs"
                         variant={isSelected ? "primary" : "outline"}
-                        onClick={() => toggleArrayItem(selectedIAStatuses, st.id, setSelectedIAStatuses)}
+                        onClick={() =>
+                          toggleArrayItem(selectedIAStatuses, st.id, setSelectedIAStatuses)
+                        }
                       >
                         {st.label}
                       </Button>

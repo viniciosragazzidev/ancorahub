@@ -22,13 +22,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { AvailabilityToggle } from "@/components/availability-toggle";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getBrokerDailySummaryAction } from "@/features/lead-distribution/broker-summary-actions";
-import type { BrokerDailySummaryAggregate, BrokerDailySummaryItem } from "@/features/lead-distribution/broker-summary-service";
+import type {
+  BrokerDailySummaryAggregate,
+  BrokerDailySummaryItem,
+} from "@/features/lead-distribution/broker-summary-service";
 
 type BranchOption = { id: string; name: string };
 
@@ -138,7 +154,9 @@ export function BrokerDailySummaryPanel({
       item.avgOfferResponseMinutes !== null ? item.avgOfferResponseMinutes : "N/A",
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -168,9 +186,15 @@ export function BrokerDailySummaryPanel({
         const offset = value.getTimezoneOffset() * 60_000;
         return new Date(value.getTime() - offset).toISOString().slice(0, 10);
       };
-      const query = new URLSearchParams({ start: `${formatDate(start)}T00:00:00.000Z`, end: `${formatDate(end)}T23:59:59.999Z`, format: "pdf" });
+      const query = new URLSearchParams({
+        start: `${formatDate(start)}T00:00:00.000Z`,
+        end: `${formatDate(end)}T23:59:59.999Z`,
+        format: "pdf",
+      });
       if (selectedBranchId !== "all") query.set("branchId", selectedBranchId);
-      const response = await fetch(`/api/reports/distribution-summary?${query.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/reports/distribution-summary?${query.toString()}`, {
+        cache: "no-store",
+      });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error ?? "Não foi possível gerar o PDF.");
@@ -206,20 +230,25 @@ export function BrokerDailySummaryPanel({
     if (status === "available") return <Badge variant="success">Disponível</Badge>;
     if (status === "busy") return <Badge variant="warning">Em Atendimento</Badge>;
     if (status === "break") return <Badge variant="outline">Pausa</Badge>;
-    return <Badge variant="outline" className="opacity-60">Offline</Badge>;
+    return (
+      <Badge variant="outline" className="opacity-60">
+        Offline
+      </Badge>
+    );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* FILTER BAR & PERIOD SELECTOR */}
-      <Card variant="overview" className="p-4 sm:p-6 space-y-4">
+      <Card variant="overview" className="space-y-4 p-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-primary" />
             <div>
               <h3 className="font-semibold text-base">Resumo de Desempenho dos Corretores</h3>
               <p className="text-xs text-muted-foreground">
-                Acompanhe o volume de leads recebidos, perdas, atendimento ativo e conversão por período.
+                Acompanhe o volume de leads recebidos, perdas, atendimento ativo e conversão por
+                período.
               </p>
             </div>
           </div>
@@ -266,7 +295,13 @@ export function BrokerDailySummaryPanel({
               <Download className="h-3.5 w-3.5" />
               Exportar CSV
             </Button>
-            <Button size="xs" variant="outline" onClick={handleExportPDF} disabled={isExportingPdf} className="gap-1.5">
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={isExportingPdf}
+              className="gap-1.5"
+            >
               <Download className="h-3.5 w-3.5" />
               {isExportingPdf ? "Gerando PDF..." : "Exportar PDF"}
             </Button>
@@ -334,7 +369,7 @@ export function BrokerDailySummaryPanel({
       </Card>
 
       {/* KPI METRIC CARDS */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card variant="overview" className="p-4 space-y-1">
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-primary" /> Corretores Ativos
@@ -353,9 +388,13 @@ export function BrokerDailySummaryPanel({
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <UserCheck className="h-3.5 w-3.5 text-emerald-500" /> Em Atendimento
           </p>
-          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{data.totalActive}</p>
+          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+            {data.totalActive}
+          </p>
           {data.totalUnstarted > 0 && (
-            <p className="text-[10px] text-amber-500 font-semibold">{data.totalUnstarted} sem 1º contato</p>
+            <p className="text-[10px] text-amber-500 font-semibold">
+              {data.totalUnstarted} sem 1º contato
+            </p>
           )}
         </Card>
 
@@ -363,14 +402,18 @@ export function BrokerDailySummaryPanel({
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <UserX className="h-3.5 w-3.5 text-rose-500" /> Leads Perdidos
           </p>
-          <p className="text-xl font-bold tabular-nums text-rose-600 dark:text-rose-400">{data.totalLost}</p>
+          <p className="text-xl font-bold tabular-nums text-rose-600 dark:text-rose-400">
+            {data.totalLost}
+          </p>
         </Card>
 
         <Card variant="overview" className="p-4 space-y-1">
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Vendas Concluídas
           </p>
-          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{data.totalConverted}</p>
+          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+            {data.totalConverted}
+          </p>
         </Card>
 
         <Card variant="overview" className="p-4 space-y-1">
@@ -418,19 +461,31 @@ export function BrokerDailySummaryPanel({
                   <TableRow key={item.brokerId}>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-foreground text-sm">{item.brokerName}</span>
-                        <span className="text-[11px] text-muted-foreground">{item.brokerEmail}</span>
+                        <span className="font-semibold text-foreground text-sm">
+                          {item.brokerName}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {item.brokerEmail}
+                        </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{item.branchName || "Matriz"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.branchName || "Matriz"}
+                    </TableCell>
                     <TableCell className="text-center">
                       {canFilterBranch ? (
-                        <AvailabilityToggle initialStatus={item.availabilityStatus as "available" | "paused" | "offline"} />
+                        <AvailabilityToggle
+                          initialStatus={
+                            item.availabilityStatus as "available" | "paused" | "offline"
+                          }
+                        />
                       ) : (
                         getStatusBadge(item.availabilityStatus)
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">{item.leadsReceived}</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {item.leadsReceived}
+                    </TableCell>
                     <TableCell className="text-right font-medium tabular-nums text-success">
                       {item.activeAttending}
                     </TableCell>
@@ -447,11 +502,15 @@ export function BrokerDailySummaryPanel({
                       {item.conversionRate}%
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {item.avgFirstContactMinutes !== null ? `${item.avgFirstContactMinutes} min` : "N/A"}
+                      {item.avgFirstContactMinutes !== null
+                        ? `${item.avgFirstContactMinutes} min`
+                        : "N/A"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       <span className="font-semibold">{item.redistributionRate}%</span>
-                      <span className="ml-1 text-xs text-muted-foreground">({item.redistributedLeads})</span>
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({item.redistributedLeads})
+                      </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <Button

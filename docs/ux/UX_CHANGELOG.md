@@ -8,6 +8,23 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-15 — `/distribuicao` refinamento geral da superfície
+
+### Resultado
+
+- shell da página limitado e centralizado, com padding e ritmo vertical consistentes;
+- fluxo de distribuição condensado em uma faixa única com cinco etapas e textos objetivos;
+- Matriz, Simulador, Filiais, filas e Saúde/Auditoria passaram a usar cabeçalho, divisor e espaçamento canônicos;
+- ações de unidades agrupadas e métricas reorganizadas por breakpoint, reduzindo quebras e ruído visual;
+- nenhuma regra de negócio, consulta, permissão ou estado operacional foi alterado.
+
+### Validação
+
+`git diff --check` e lint direcionado aos arquivos da rota concluídos sem erros.
+O type-check global continua com o bloqueio preexistente em `src/features/waha-cadence/sync.ts`; QA autenticado em larguras reais permanece o gate M1.10.
+
+---
+
 ## 2026-09-14 — `/leads/distribuicao` hierarquia visual
 
 ### Resultado

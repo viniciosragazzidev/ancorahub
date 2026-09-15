@@ -8,7 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { simulateRoutingAction } from "@/features/lead-distribution/routing-actions";
 
@@ -47,7 +53,9 @@ export function RoutingSimulatorPanel({
       if (res.matchedRule) {
         toast.success(`Match encontrado: Regra "${res.matchedRule.name}"`);
       } else {
-        toast.info("Nenhuma regra de filtro correspondeu. O lead será direcionado para o fluxo padrão.");
+        toast.info(
+          "Nenhuma regra de filtro correspondeu. O lead será direcionado para o fluxo padrão.",
+        );
       }
     } catch {
       toast.error("Erro ao executar simulação de roteamento.");
@@ -59,24 +67,25 @@ export function RoutingSimulatorPanel({
   const resolveTargetName = (type: string, id: string) => {
     if (type === "queue") return queues.find((q) => q.id === id)?.name ?? `Fila #${id}`;
     if (type === "branch") return branches.find((b) => b.id === id)?.name ?? `Filial #${id}`;
-    if (type === "specific_broker") return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
+    if (type === "specific_broker")
+      return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
     return id;
   };
 
   return (
-    <Card variant="overview" className="space-y-6 p-6">
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2 text-lg">
+    <Card variant="overview" className="shadow-sm">
+      <CardHeader className="gap-1.5 border-b border-border/70 px-5 py-4">
+        <CardTitle className="flex items-center gap-2">
           <Play className="h-5 w-5 text-primary" />
-          Simulador de Roteamento de Leads (Dry-Run Test)
+          Simulador de roteamento
         </CardTitle>
-        <CardDescription className="mt-1 text-xs">
-          Informe parâmetros hipotéticos de um lead para testar em tempo real qual regra da Matriz será ativada e para onde ele será enviado.
+        <CardDescription className="max-w-3xl leading-5">
+          Teste uma combinação de dados antes de alterar uma regra ou enviar um lead.
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="p-0 space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 bg-muted/20 p-4 rounded-xl border">
+      <CardContent className="space-y-4 px-5 py-4">
+        <div className="grid gap-4 rounded-lg border border-border/70 bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <Label className="text-xs">Tipo de Plano</Label>
             <Select value={planType} onValueChange={setPlanType}>
@@ -111,12 +120,21 @@ export function RoutingSimulatorPanel({
 
           <div className="space-y-1.5">
             <Label className="text-xs">Cidade</Label>
-            <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex: São Paulo" />
+            <Input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Ex: São Paulo"
+            />
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs">Qtd. Vidas</Label>
-            <Input type="number" value={lives} onChange={(e) => setLives(e.target.value)} placeholder="Ex: 10" />
+            <Input
+              type="number"
+              value={lives}
+              onChange={(e) => setLives(e.target.value)}
+              placeholder="Ex: 10"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -135,7 +153,11 @@ export function RoutingSimulatorPanel({
           </div>
         </div>
 
-        <Button onClick={handleRunSimulation} disabled={isSimulating} className="w-full sm:w-auto gap-2">
+        <Button
+          onClick={handleRunSimulation}
+          disabled={isSimulating}
+          className="w-full sm:w-auto gap-2"
+        >
           <Play className="h-4 w-4" />
           {isSimulating ? "Executando Simulação..." : "Simular Roteamento do Lead"}
         </Button>
@@ -150,20 +172,25 @@ export function RoutingSimulatorPanel({
             {simulationResult.matchedRule ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
-                  <CheckCircle2 className="h-5 w-5" /> Regra Vencedora: "{simulationResult.matchedRule.name}"
+                  <CheckCircle2 className="h-5 w-5" /> Regra Vencedora: "
+                  {simulationResult.matchedRule.name}"
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                   Destino Calculado:
                   <Badge variant="success" className="gap-1 font-bold">
                     <ArrowRight className="h-3 w-3" />
-                    {resolveTargetName(simulationResult.matchedRule.targetType, simulationResult.matchedRule.targetId)}
+                    {resolveTargetName(
+                      simulationResult.matchedRule.targetType,
+                      simulationResult.matchedRule.targetId,
+                    )}
                   </Badge>
                 </p>
               </div>
             ) : (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
                 <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-sm">
-                  <HelpCircle className="h-5 w-5" /> Nenhuma regra de prioridade correspondeu a estes parâmetros.
+                  <HelpCircle className="h-5 w-5" /> Nenhuma regra de prioridade correspondeu a
+                  estes parâmetros.
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   O lead entrará no fluxo normal da Fila Geral da Unidade por Roleta/Capacidade.
@@ -173,13 +200,17 @@ export function RoutingSimulatorPanel({
 
             {/* EVALUATIONS BREAKDOWN */}
             <div className="space-y-2 mt-4">
-              <p className="text-xs font-semibold text-muted-foreground">Detalhamento da avaliação por regra:</p>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Detalhamento da avaliação por regra:
+              </p>
               <div className="space-y-2">
                 {simulationResult.evaluations.map((ev) => (
                   <div
                     key={ev.ruleId}
                     className={`rounded-lg border p-3 text-xs flex flex-col gap-1 ${
-                      ev.matches ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/10 border-border/60"
+                      ev.matches
+                        ? "bg-emerald-500/5 border-emerald-500/20"
+                        : "bg-muted/10 border-border/60"
                     }`}
                   >
                     <div className="flex items-center justify-between">

@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowsDownUp, Buildings, CalendarBlank, ChartBar, ChartLineUp, FileArrowDown } from "@/components/huge-icons";
+import {
+  ArrowsDownUp,
+  Buildings,
+  CalendarBlank,
+  ChartBar,
+  ChartLineUp,
+  FileArrowDown,
+} from "@/components/huge-icons";
 
 export function DistributionTabsContainer({
   initialView,
@@ -44,22 +51,64 @@ export function DistributionTabsContainer({
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={handleValueChange} variant="segment" className="w-full space-y-5">
-      <TabsList className="sticky top-[var(--header-height)] z-20 w-full justify-start overflow-x-auto rounded-xl border border-border/80 bg-card/95 p-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]">
-        <TabsTrigger value="roteamento" className="gap-1.5"><ArrowsDownUp aria-hidden="true" className="size-4" />Matriz de Roteamento</TabsTrigger>
-        <TabsTrigger value="resumo_dia" className="gap-1.5"><ChartLineUp aria-hidden="true" className="size-4" />Resumo do Dia</TabsTrigger>
-        {showQueueDefinition ? <TabsTrigger value="filas" className="gap-1.5"><Buildings aria-hidden="true" className="size-4" />Filas & Unidades</TabsTrigger> : null}
-        <TabsTrigger value="operar" className="gap-1.5"><FileArrowDown aria-hidden="true" className="size-4" />Operar & Inbox</TabsTrigger>
-        <TabsTrigger value="plantao" className="gap-1.5"><CalendarBlank aria-hidden="true" className="size-4" />Plantão & Escala</TabsTrigger>
-        <TabsTrigger value="saude_historico" className="gap-1.5"><ChartBar aria-hidden="true" className="size-4" />Saúde & Auditoria</TabsTrigger>
+    <Tabs
+      value={activeTab}
+      onValueChange={handleValueChange}
+      variant="segment"
+      className="w-full space-y-5"
+    >
+      <TabsList
+        aria-label="Áreas da distribuição"
+        className="sticky top-[var(--header-height)] z-20 w-full justify-start gap-0.5 overflow-x-auto rounded-xl border border-border/80 bg-card/95 p-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]"
+      >
+        <TabsTrigger value="roteamento" className="gap-1.5">
+          <ArrowsDownUp aria-hidden="true" className="size-4" />
+          Matriz de Roteamento
+        </TabsTrigger>
+        <TabsTrigger value="resumo_dia" className="gap-1.5">
+          <ChartLineUp aria-hidden="true" className="size-4" />
+          Resumo do Dia
+        </TabsTrigger>
+        {showQueueDefinition ? (
+          <TabsTrigger value="filas" className="gap-1.5">
+            <Buildings aria-hidden="true" className="size-4" />
+            Filas & Unidades
+          </TabsTrigger>
+        ) : null}
+        <TabsTrigger value="operar" className="gap-1.5">
+          <FileArrowDown aria-hidden="true" className="size-4" />
+          Operar & Inbox
+        </TabsTrigger>
+        <TabsTrigger value="plantao" className="gap-1.5">
+          <CalendarBlank aria-hidden="true" className="size-4" />
+          Plantão & Escala
+        </TabsTrigger>
+        <TabsTrigger value="saude_historico" className="gap-1.5">
+          <ChartBar aria-hidden="true" className="size-4" />
+          Saúde & Auditoria
+        </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="roteamento" className="space-y-6">{roteamentoContent}</TabsContent>
-      <TabsContent value="resumo_dia" className="space-y-6">{resumoDiaContent}</TabsContent>
-      {showQueueDefinition ? <TabsContent value="filas" className="space-y-6">{filasContent}</TabsContent> : null}
-      <TabsContent value="operar" className="space-y-6">{operarContent}</TabsContent>
-      <TabsContent value="plantao" className="space-y-6">{plantaoContent}</TabsContent>
-      <TabsContent value="saude_historico" className="space-y-6">{saudeHistoricoContent}</TabsContent>
+      <TabsContent value="roteamento" className="space-y-5">
+        {roteamentoContent}
+      </TabsContent>
+      <TabsContent value="resumo_dia" className="space-y-5">
+        {resumoDiaContent}
+      </TabsContent>
+      {showQueueDefinition ? (
+        <TabsContent value="filas" className="space-y-5">
+          {filasContent}
+        </TabsContent>
+      ) : null}
+      <TabsContent value="operar" className="space-y-5">
+        {operarContent}
+      </TabsContent>
+      <TabsContent value="plantao" className="space-y-5">
+        {plantaoContent}
+      </TabsContent>
+      <TabsContent value="saude_historico" className="space-y-5">
+        {saudeHistoricoContent}
+      </TabsContent>
     </Tabs>
   );
 }
