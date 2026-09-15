@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PeriodSelect } from "@/components/period-select";
+import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardGrid } from "@/components/dashboard";
 import { DashboardCard } from "@/components/dashboard-card";
 import { cn } from "@/lib/utils";
@@ -29,17 +30,33 @@ export function OperationalDashboard({ model, period }: { model: DashboardViewDa
   const hasAttention = Number(attentionMetric?.value ?? 0) > 0;
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-6 bg-background p-(--mobile-page-padding) lg:p-8">
-      <header className="flex flex-col gap-5 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            <span>Operação comercial</span>
+    <>
+      <DashboardHeader
+        breadcrumb="Operação comercial"
+        title="Dashboard"
+        rightSlot={(
+          <>
+            <Button render={<Link href="/leads" />} size="sm">
+              Abrir leads
+              <ArrowUpRight className="size-3.5" />
+            </Button>
+            <Button render={<Link href="/relatorios" />} variant="outline" size="sm">
+              Relatórios
+              <ArrowUpRight className="size-3.5" />
+            </Button>
+            <PeriodSelect value={period as 7 | 14 | 30 | 90} label="Período do dashboard" />
+          </>
+        )}
+      />
+      <main className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-6 bg-background p-(--mobile-page-padding) lg:p-8">
+        <div className="flex flex-col gap-1 border-b border-border pb-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <span>{model.header.title}</span>
             <span aria-hidden="true" className="h-3 w-px bg-border" />
             <span>Últimos {period} dias</span>
           </div>
-          <h1 className="mt-1.5 text-3xl font-semibold tracking-tight text-foreground">{model.header.title}</h1>
-          <p className="mt-1 max-w-[65ch] text-sm leading-relaxed text-muted-foreground">{model.header.description}</p>
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <p className="max-w-[65ch] text-sm leading-relaxed text-muted-foreground">{model.header.description}</p>
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <span aria-hidden="true" className={cn("inline-block size-1.5 rounded-full", hasAttention ? "bg-warning" : "bg-success")} />
             {hasAttention
               ? `${attentionMetric?.value ?? 0} exceções aguardando decisão`
@@ -48,18 +65,6 @@ export function OperationalDashboard({ model, period }: { model: DashboardViewDa
             {bestDay?.date ? `Pico de ${bestDay.received} leads em ${fmtDayLabel(bestDay.date)}` : "Sem pico no período"}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button render={<Link href="/leads" />} size="sm">
-            Abrir leads
-            <ArrowUpRight className="size-3.5" />
-          </Button>
-          <Button render={<Link href="/relatorios" />} variant="outline" size="sm">
-            Relatórios
-            <ArrowUpRight className="size-3.5" />
-          </Button>
-          <PeriodSelect value={period as 7 | 14 | 30 | 90} label="Período do dashboard" />
-        </div>
-      </header>
 
       <section aria-label="Indicadores do período">
         <SectionLabel icon={<ChartBar className="size-3.5" aria-hidden="true" />} title="Resumo do período" hint={`${model.trend.length} dias no ciclo`} />
@@ -129,7 +134,8 @@ export function OperationalDashboard({ model, period }: { model: DashboardViewDa
           <RecentCard href="/vendas" rows={model.recentSales.map((row) => ({ id: row.id, label: row.leadName, detail: row.value ? row.value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Venda registrada", date: fmtDate(row.saleDate) }))} emptyLabel="Nenhuma venda no período." />
         </div>
       </section>
-    </main>
+      </main>
+    </>
   );
 }
 

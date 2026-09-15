@@ -251,7 +251,19 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
-    if (!nextOpen && connection.sessionId && connection.status !== "ready") {
+    if (nextOpen) {
+      // Toda nova abertura precisa começar de um estado confiável. Para uma
+      // sessão ainda não conectada, a ação `start` usa forceNew quando já
+      // existe uma sessão e, assim, invalida o QR anterior antes de gerar
+      // outro. Sessões prontas não são interrompidas só por abrir o diálogo.
+      if (connection.status === "ready") {
+        void pollStatus();
+      } else {
+        start();
+      }
+      return;
+    }
+    if (connection.sessionId && connection.status !== "ready") {
       void pollStatus().then(() => router.refresh());
     }
   }
@@ -271,11 +283,18 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   /** Inicia ou força a rotação da sessão atual para obter um QR novo. */
   function start() {
     if (shouldBlockQrOnMobile()) return;
+    setConnection((current) => ({
+      ...current,
+      status: "initializing",
+      qrCode: null,
+      connectedAt: null,
+    }));
     startTransition(async () => {
       try {
         const result = await startWhatsAppConnection({ forceNew: Boolean(connection.sessionId) });
         if (!result.success) {
           const code = (result as { code?: string }).code;
+          updateStatus("error");
           toast.error(errorMessage(code), { duration: 8000 });
           return;
         }
@@ -296,6 +315,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         }
         await pollStatus();
       } catch (error) {
+        updateStatus("error");
         showUnexpectedActionError(error);
       }
     });
@@ -340,6 +360,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
 
         const started = await startWhatsAppConnection({ forceNew: true });
         if (!started.success) {
+          updateStatus("error");
           toast.error(errorMessage(started.code));
           return;
         }
@@ -354,6 +375,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         toast.success("Novo QR Code gerado. Escaneie no WhatsApp.");
         await pollStatus();
       } catch (error) {
+        updateStatus("error");
         showUnexpectedActionError(error);
       }
     });
@@ -577,9 +599,9 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
                 <Button disabled={pending} onClick={hasError ? resetAndRetry : start}>
                   {connection.sessionId ? "Conectar novamente" : "Conectar WhatsApp"}
                 </Button>
-                {initializing && (
+                {!ready && connection.sessionId && (
                   <Button disabled={pending} onClick={regenerateQr} variant="outline">
-                    Gerar novo QR
+                    Invalidar e gerar QR
                   </Button>
                 )}
                 {!ready && connection.sessionId && (
