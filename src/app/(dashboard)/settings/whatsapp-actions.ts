@@ -150,23 +150,24 @@ export async function getWhatsAppConnection() {
 /**
  * Inicia ou retoma conexão WhatsApp.
  *
- * Idempotente: se a sessão já existe no WAHA, reutiliza em vez de destruir.
- * NÃO remove sessão existente — isso invalidava QR em pareamento.
+ * Por padrão é idempotente. Com `forceNew`, a sessão remota é removida e
+ * recriada antes de buscar o QR, invalidando qualquer código anterior.
  */
-export async function startWhatsAppConnection() {
+export async function startWhatsAppConnection(options: { forceNew?: boolean } = {}) {
   const { context, db } = await getOwnConnection();
   const sessionName = generateWahaSessionName(context.tenantId, context.userId);
 
   try {
-    // Chamar Fastify para criar/iniciar sessão WAHA (idempotente)
-    // O endpoint /connections já trata: CONNECTED→retorna, WAITING_QR→retorna, STOPPED→reinicia
-    const result = await vpsRequest("/internal/waha/connections", {
+    const result = await vpsRequest(options.forceNew
+      ? `/internal/waha/connections/${encodeURIComponent(sessionName)}/reconnect`
+      : "/internal/waha/connections", {
       method: "POST",
-      body: {
+      ...(options.forceNew ? {} : { body: {
         tenantId: context.tenantId,
         userId: context.userId,
         sessionName,
-      },
+      } }),
+      timeoutMs: options.forceNew ? 30_000 : 15_000,
     });
 
     const status = normalizeWahaUiStatus(result.status ?? "STARTING");
@@ -174,7 +175,9 @@ export async function startWhatsAppConnection() {
 
     // Se a sessão já estava CONNECTED, não buscar QR
     let qrCode: string | null = null;
-    if (!isReady) {
+    if (!isReady && result.qr) {
+      qrCode = result.qr;
+    } else if (!isReady) {
       try {
         const qrResult = await vpsRequest(
           `/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`,

@@ -160,7 +160,8 @@ export class WahaClient {
 
     const obj = data as Record<string, unknown> | null;
     if (obj && typeof obj === "object") {
-      const qrData = typeof obj.data === "string" ? obj.data : null;
+      const qrCandidate = obj.data ?? obj.qr ?? obj.base64;
+      const qrData = typeof qrCandidate === "string" ? qrCandidate : null;
       const sessionStatus = typeof obj.status === "string" ? obj.status : null;
       return { base64: qrData, status: sessionStatus };
     }
@@ -424,6 +425,25 @@ export class WahaClient {
   }
 
   /**
+   * Rotaciona uma sessão de forma atômica para gerar um QR novo.
+   * A sessão antiga é parada, desconectada e removida; a criação só acontece
+   * depois de confirmar que o nome deixou de existir no WAHA.
+   */
+  async reconnectSession(name: string): Promise<{ session: WahaSession; cleanup: WahaRecoveryCleanup[] }> {
+    const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name))];
+    const remaining = await this.getSession(name);
+    if (remaining) {
+      throw new WahaClientError("SESSION_EXISTS", 502, "A sessão anterior não foi removida com segurança.");
+    }
+
+    const created = await this.createSession(name);
+    if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") {
+      await this.startSession(name);
+    }
+    return { session: (await this.getSession(name)) ?? created, cleanup };
+  }
+
+  /**
    * Garante que uma sessão de teste existe e está pronta.
    * Reutiliza sessão existente ou cria nova.
    */
@@ -482,6 +502,21 @@ export class WahaClient {
     if (Array.isArray(result)) return result;
     if (result && typeof result === "object" && Array.isArray((result as { messages?: unknown[] }).messages)) {
       return (result as { messages: unknown[] }).messages;
+    }
+    return [];
+  }
+
+  /** Lista conversas para reconciliar números cujo DDD cadastrado está desatualizado. */
+  async getChats(sessionName: string, limit = 500): Promise<unknown[]> {
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
+    const query = new URLSearchParams({ limit: String(safeLimit) });
+    const result = await this.request<unknown>(
+      `/api/${encodeURIComponent(sessionName)}/chats?${query.toString()}`,
+      { timeoutMs: 10_000 },
+    );
+    if (Array.isArray(result)) return result;
+    if (result && typeof result === "object" && Array.isArray((result as { chats?: unknown[] }).chats)) {
+      return (result as { chats: unknown[] }).chats;
     }
     return [];
   }

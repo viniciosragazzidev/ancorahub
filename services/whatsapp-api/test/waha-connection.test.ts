@@ -216,6 +216,72 @@ test("POST /recover concorrente para sessão FAILED recria somente uma sessão",
   }
 });
 
+test("POST /reconnect invalida QR anterior antes de criar a sessão nova", async () => {
+  configure();
+  const originalFetch = globalThis.fetch;
+  let exists = true;
+  let status = "SCAN_QR_CODE";
+  let deleteCalls = 0;
+  let createCalls = 0;
+  const calls: string[] = [];
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${target}`);
+    if (target.endsWith("/api/sessions/waha_reconnect123") && method === "GET") {
+      return exists
+        ? new Response(JSON.stringify({ name: "waha_reconnect123", status }), { status: 200 })
+        : new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+    }
+    if (target.endsWith("/api/sessions/waha_reconnect123/stop")) {
+      status = "STOPPED";
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    if (target.endsWith("/api/sessions/waha_reconnect123/logout")) {
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    if (target.endsWith("/api/sessions/waha_reconnect123") && method === "DELETE") {
+      deleteCalls++;
+      exists = false;
+      return new Response(null, { status: 204 });
+    }
+    if (target.endsWith("/api/sessions/") && method === "POST") {
+      createCalls++;
+      assert.equal(exists, false, "a sessão antiga deve ser removida antes da criação");
+      exists = true;
+      status = "STOPPED";
+      return new Response(JSON.stringify({}), { status: 201 });
+    }
+    if (target.endsWith("/api/sessions/waha_reconnect123/start")) {
+      status = "SCAN_QR_CODE";
+      return new Response(JSON.stringify({}), { status: 200 });
+    }
+    if (target.includes("/api/waha_reconnect123/auth/qr")) {
+      return new Response(JSON.stringify({ data: "new-qr" }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+  }) as typeof globalThis.fetch;
+
+  const app = buildApp();
+  try {
+    const [first, second] = await Promise.all([
+      app.inject({ method: "POST", url: "/internal/waha/connections/waha_reconnect123/reconnect", headers: AUTH_HEADERS }),
+      app.inject({ method: "POST", url: "/internal/waha/connections/waha_reconnect123/reconnect", headers: AUTH_HEADERS }),
+    ]);
+    assert.equal(first.statusCode, 200);
+    assert.equal(second.statusCode, 200);
+    assert.equal(first.json().status, "WAITING_QR");
+    assert.equal(first.json().qr, "new-qr");
+    assert.equal(second.json().status, "WAITING_QR");
+    assert.equal(deleteCalls, 1);
+    assert.equal(createCalls, 1);
+    assert.ok(calls.findIndex((call) => call.startsWith("DELETE ")) < calls.findIndex((call) => call.endsWith("/api/sessions/")), "delete deve ocorrer antes de create");
+  } finally {
+    globalThis.fetch = originalFetch;
+    await app.close();
+  }
+});
+
 // ── /health continua independente ──────────────────────────────────────
 
 test("GET /health continua retornando 200 mesmo com rotas de conexão", async () => {

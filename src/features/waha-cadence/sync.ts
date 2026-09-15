@@ -7,7 +7,8 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { WAHA_CONNECTIONS_FEATURE } from "./connection-service";
 import { ingestWahaWebhook } from "./inbound";
 import { normalizeWahaWebhookPayload, wahaWebhookSchema } from "./contract";
-import { getWahaMessageHistory } from "./relay-client";
+import { getWahaChats, getWahaMessageHistory } from "./relay-client";
+import { phoneSubscriberSuffix } from "./phone-matching";
 
 const MAX_CONNECTIONS_PER_RUN = 20;
 const MAX_LEADS_PER_CONNECTION = 50;
@@ -18,6 +19,19 @@ function providerMessageId(value: unknown): string | null {
   const id = value as Record<string, unknown>;
   const serialized = id._serialized ?? id.id;
   return typeof serialized === "string" && serialized.trim() ? serialized.trim() : null;
+}
+
+function providerChatId(value: unknown): string | null {
+  if (typeof value === "string" && value.includes("@")) return value;
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  const id = row.id ?? row.chatId;
+  if (typeof id === "string" && id.includes("@")) return id;
+  if (id && typeof id === "object") {
+    const serialized = (id as Record<string, unknown>)._serialized;
+    if (typeof serialized === "string" && serialized.includes("@")) return serialized;
+  }
+  return null;
 }
 
 /**
@@ -51,7 +65,21 @@ export async function syncBrokerWahaMessages(input: { limit?: number } = {}) {
       .from(schema.leads)
       .where(and(eq(schema.leads.tenantId, connection.tenantId), eq(schema.leads.corretorId, connection.userId), isNull(schema.leads.deletedAt)))
       .limit(MAX_LEADS_PER_CONNECTION);
-    const chatIds = [...new Set(leads.map((lead) => lead.phone.replace(/\D/g, "")).filter((phone) => /^\d{10,15}$/.test(phone)).map((phone) => `${phone}@c.us`))];
+    const leadSuffixes = new Set(leads.map((lead) => phoneSubscriberSuffix(lead.phone)).filter(Boolean));
+    let chatIds = [...new Set(leads.map((lead) => lead.phone.replace(/\D/g, "")).filter((phone) => /^\d{10,15}$/.test(phone)).map((phone) => `${phone}@c.us`))];
+    // O cadastro pode ter DDD antigo. Quando possível, liste os chats do
+    // WAHA e selecione pelo número móvel (últimos 9 dígitos), preservando o
+    // fallback pelo telefone cadastrado para instalações sem esse endpoint.
+    try {
+      const providerChats = await getWahaChats({ sessionName: connection.sessionName, limit: 500 });
+      const resolvedChatIds = providerChats.map(providerChatId).filter((chatId): chatId is string => {
+        const digits = chatId.split("@")[0].replace(/\D/g, "");
+        return leadSuffixes.has(phoneSubscriberSuffix(digits));
+      });
+      if (resolvedChatIds.length) chatIds = [...new Set(resolvedChatIds)];
+    } catch (error) {
+      console.warn("[waha/sync] chats_list_failed", { session: connection.sessionName, errorCode: error instanceof Error ? error.message.slice(0, 80) : "unknown" });
+    }
     if (!chatIds.length) continue;
 
     sessions += 1;

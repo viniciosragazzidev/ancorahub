@@ -161,6 +161,21 @@ export async function getWahaMessageHistory(input: {
   return data.chats;
 }
 
+/** Lista conversas WAHA para reconciliar o chat real pelo sufixo do telefone. */
+export async function getWahaChats(input: { sessionName: string; limit?: number }) {
+  const config = relayConfig();
+  if (config.transport !== "fastify") throw new Error("WAHA_CHATS_REQUIRES_FASTIFY");
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? 500), 1), 500);
+  const response = await fetch(`${config.url}/internal/waha/connections/${encodeURIComponent(input.sessionName)}/chats?limit=${limit}`, {
+    headers: getFastifyHeaders(config.secret, false),
+    cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
+  });
+  const data = await response.json().catch(() => null) as { ok?: boolean; chats?: unknown[]; error?: string } | null;
+  if (!response.ok || !data?.ok || !Array.isArray(data.chats)) throw new Error(`WAHA_CHATS_FAILED:${data?.error ?? response.status}`);
+  return data.chats;
+}
+
 export async function getWahaRelayHealth() {
   const config = relayConfig();
 

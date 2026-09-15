@@ -12,6 +12,8 @@ type HistorySyncBody = { sessionName: string; chatIds: string[]; limit?: number 
 
 type FailedSessionRecovery = Awaited<ReturnType<WahaClient["recoverFailedSession"]>>;
 const failedSessionRecoveries = new Map<string, Promise<FailedSessionRecovery>>();
+type ForcedSessionReconnect = Awaited<ReturnType<WahaClient["reconnectSession"]>>;
+const forcedSessionReconnects = new Map<string, Promise<ForcedSessionReconnect>>();
 
 function recoverFailedSessionOnce(client: WahaClient, sessionName: string) {
   const existing = failedSessionRecoveries.get(sessionName);
@@ -22,6 +24,17 @@ function recoverFailedSessionOnce(client: WahaClient, sessionName: string) {
   });
   failedSessionRecoveries.set(sessionName, recovery);
   return recovery;
+}
+
+function reconnectSessionOnce(client: WahaClient, sessionName: string) {
+  const existing = forcedSessionReconnects.get(sessionName);
+  if (existing) return existing;
+
+  const reconnect = client.reconnectSession(sessionName).finally(() => {
+    if (forcedSessionReconnects.get(sessionName) === reconnect) forcedSessionReconnects.delete(sessionName);
+  });
+  forcedSessionReconnects.set(sessionName, reconnect);
+  return reconnect;
 }
 
 function logRecoveryCleanup(
@@ -519,6 +532,70 @@ export function buildApp() {
     },
   );
 
+  // ── WAHA Connection: Force QR rotation ───────────────────────────────
+  app.post<{ Params: { id: string } }>(
+    "/internal/waha/connections/:id/reconnect",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!requireInternalAuth(request, reply, getInternalApiToken())) return;
+
+      let wahaConfig;
+      try {
+        wahaConfig = getWahaConfig();
+      } catch {
+        return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+      }
+
+      const { id: sessionName } = request.params;
+      const client = new WahaClient(wahaConfig);
+      const startedAt = Date.now();
+
+      try {
+        const reconnected = await reconnectSessionOnce(client, sessionName);
+        const status = reconnected.session.status;
+        let qr: string | null = null;
+        if (status === "WAITING_QR") {
+          try {
+            qr = await client.getQr(sessionName);
+          } catch (error) {
+            request.log.info({
+              operation: "waha.connection.reconnect.qr_pending",
+              session: sessionName,
+              normalizedError: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR",
+            });
+          }
+        }
+
+        logRecoveryCleanup(request, sessionName, status, reconnected.cleanup);
+        request.log.info({
+          operation: "waha.connection.reconnect",
+          session: sessionName,
+          status,
+          hasQr: qr !== null,
+          durationMs: Date.now() - startedAt,
+        });
+        return reply.code(200).send({ ok: true, sessionName, status, qr, reused: false, timestamp: new Date().toISOString() });
+      } catch (error) {
+        request.log.warn({
+          operation: "waha.connection.reconnect",
+          session: sessionName,
+          normalizedError: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR",
+          providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
+          durationMs: Date.now() - startedAt,
+        });
+        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR" });
+      }
+    },
+  );
+
   // ── WAHA Connection: Recover failed session ──────────────────────────
   app.post<{ Params: { id: string } }>(
     "/internal/waha/connections/:id/recover",
@@ -627,6 +704,46 @@ export function buildApp() {
           session: sessionName,
           errorCode: error instanceof Error ? error.message : "unknown",
         });
+        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+      }
+    },
+  );
+
+  // ── WAHA Connection: Chats (bounded history reconciliation) ──────────
+  app.get<{ Params: { id: string }; Querystring: { limit?: string } }>(
+    "/internal/waha/connections/:id/chats",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+        },
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: { limit: { type: "string", pattern: "^[1-9][0-9]{0,2}$" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!requireInternalAuth(request, reply, getInternalApiToken())) return;
+
+      let wahaConfig;
+      try {
+        wahaConfig = getWahaConfig();
+      } catch {
+        return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+      }
+
+      const { id: sessionName } = request.params;
+      const limit = Math.min(Math.max(Number(request.query.limit ?? "500"), 1), 500);
+      try {
+        const chats = await new WahaClient(wahaConfig).getChats(sessionName, limit);
+        request.log.info({ operation: "waha.connection.chats", session: sessionName, chats: chats.length });
+        return reply.code(200).send({ ok: true, sessionName, chats });
+      } catch (error) {
+        request.log.warn({ operation: "waha.connection.chats", session: sessionName, errorCode: error instanceof Error ? error.message : "unknown" });
         return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
       }
     },

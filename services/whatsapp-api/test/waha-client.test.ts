@@ -95,6 +95,17 @@ test("getMessages: consulta histórico limitado usando o chatId normalizado", as
   assert.equal(messages.length, 1);
 });
 
+test("getChats: lista conversas limitadas para reconciliação", async () => {
+  const requested: string[] = [];
+  const client = new WahaClient({ baseUrl: "http://waha.test", apiKey: "key", healthTimeoutMs: 1000 }, async (url) => {
+    requested.push(String(url));
+    return new Response(JSON.stringify({ chats: [{ id: "5521998765432@c.us" }] }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  const chats = await client.getChats("broker-session", 20);
+  assert.deepEqual(chats, [{ id: "5521998765432@c.us" }]);
+  assert.match(requested[0], /\/api\/broker-session\/chats\?limit=20/);
+});
+
 test("health: WAHA retorna 500 → unavailable", async () => {
   const client = new WahaClient(config, mockFetch(async () => {
     return new Response("Internal Server Error", { status: 500 });

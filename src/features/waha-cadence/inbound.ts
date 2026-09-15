@@ -13,7 +13,6 @@ import {
 import { WAHA_CONNECTIONS_FEATURE } from "@/features/waha-cadence/connection-service";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
-import { samePhone } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence";
 import {
@@ -23,6 +22,7 @@ import {
   WAHA_AI_FEATURE,
   WAHA_CADENCE_FEATURE,
 } from "./contract";
+import { phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
 
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
@@ -58,18 +58,19 @@ export function shouldPersistBrokerConnectionMessage(input: {
 
 /**
  * SQL pre-filter for tolerant phone matching. Generates LIKE conditions on the
- * last 8 digits of the normalized incoming phone so candidates stored with
- * formatting or country codes are retrieved; exact matching is then confirmed
- * in memory with `samePhone` (suffix semantics up to 11 digits).
+ * last 9 digits of the normalized incoming phone so candidates stored with
+ * formatting, country codes or a stale DDD are retrieved; exact matching is
+ * then confirmed in memory with `samePhoneSubscriber`.
  */
 function phoneSuffixConditions(
   column: AnyPgColumn,
   normalizedPhone: string,
 ) {
-  const last4 = normalizedPhone.slice(-4);
+  const last9 = phoneSubscriberSuffix(normalizedPhone);
+  if (!last9) return eq(column, normalizedPhone);
   return or(
     eq(column, normalizedPhone),
-    like(column, `%${last4}`),
+    like(column, `%${last9}`),
   );
 }
 
@@ -483,7 +484,7 @@ async function resolveContact(
       .limit(5);
     const lead = candidates.find(
       (candidate) =>
-        samePhone(candidate.telefone, normalizedPhone) &&
+        samePhoneSubscriber(candidate.telefone, normalizedPhone) &&
         (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
     );
     if (lead) leadId = lead.id;
@@ -507,7 +508,7 @@ async function resolveContact(
       .limit(5);
     const client = candidates.find(
       (candidate) =>
-        samePhone(candidate.telefone, normalizedPhone) &&
+        samePhoneSubscriber(candidate.telefone, normalizedPhone) &&
         (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
     );
     if (client) clientId = client.id;
@@ -572,7 +573,7 @@ export async function isBrokerOrTeamPhone(
     .where(eq(schema.brokerProfiles.tenantId, tenantId));
 
   return brokers
-    .some((entry) => Boolean(entry.phone) && samePhone(entry.phone!, normalizedPhone));
+    .some((entry) => Boolean(entry.phone) && samePhoneSubscriber(entry.phone!, normalizedPhone));
 }
 
 /**
@@ -607,6 +608,6 @@ async function isTenantOfficialNumberPhone(
       ),
   ]);
   return [...numbers, ...channels]
-    .some((entry) => Boolean(entry.phone) && samePhone(entry.phone!, normalizedPhone));
+    .some((entry) => Boolean(entry.phone) && samePhoneSubscriber(entry.phone!, normalizedPhone));
 }
 

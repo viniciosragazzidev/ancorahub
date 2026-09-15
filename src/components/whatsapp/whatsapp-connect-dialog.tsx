@@ -230,23 +230,12 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     window.open(destination, "_blank", "noopener,noreferrer");
   }
 
-  /**
-   * Iniciar conexão WhatsApp.
-   * 
-   * CRÍTICO: NÃO destruir sessão existente antes de criar nova.
-   * O endpoint Fastify /connections é idempotente — se a sessão já existe,
-   * ele retorna o status atual sem recriar. Destruir antes causava:
-   * 1. QR em pareamento era invalidado instantaneamente
-   * 2. Erros de Server Component quando WAHA retornava erro durante destruição
-   */
+  /** Inicia ou força a rotação da sessão atual para obter um QR novo. */
   function start() {
     if (shouldBlockQrOnMobile()) return;
     startTransition(async () => {
       try {
-        // Chamada direta e idempotente: evita verificações de saúde redundantes antes do QR.
-        // O Fastify devolve erro tipado caso WAHA/VPS esteja indisponível.
-        // NÃO chamar resetWhatsAppSessionAction() antes!
-        const result = await startWhatsAppConnection();
+        const result = await startWhatsAppConnection({ forceNew: Boolean(connection.sessionId) });
         if (!result.success) {
           const code = (result as { code?: string }).code;
           toast.error(errorMessage(code), { duration: 8000 });
@@ -298,27 +287,20 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     });
   }
 
-  /** Encerra a sessão atual e cria uma nova para invalidar o QR anterior. */
+  /** Invalida a sessão remota anterior e solicita um QR novo atomically. */
   function regenerateQr() {
     if (shouldBlockQrOnMobile()) return;
     startTransition(async () => {
       try {
-        const disconnected = await resetWhatsAppSessionAction();
-        if (!disconnected.success) {
-          toast.error(errorMessage(disconnected.code));
-          return;
-        }
-
+        // A rotação é uma única operação no Fastify: não há janela em que o
+        // botão crie uma sessão nova enquanto a antiga ainda está viva.
         setConnection((current) => ({
           ...current,
-          sessionId: null,
-          sessionName: null,
           qrCode: null,
-          status: "disconnected",
-          connectedAt: null,
+          status: "initializing",
         }));
 
-        const started = await startWhatsAppConnection();
+        const started = await startWhatsAppConnection({ forceNew: true });
         if (!started.success) {
           toast.error(errorMessage(started.code));
           return;
