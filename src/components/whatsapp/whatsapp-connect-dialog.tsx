@@ -87,6 +87,8 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   const [pending, startTransition] = useTransition();
   const previousStatus = useRef(initial.status);
   const polling = useRef(false);
+  const qrCodeRef = useRef(initial.qrCode);
+  const lastQrRefreshAt = useRef(0);
   const ready = connection.status === "ready";
   const initializing = connection.status === "initializing" || connection.status === "recovering";
   const hasError = connection.status === "error";
@@ -97,6 +99,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   const qrShownAt = useRef<number | null>(null);
 
   useEffect(() => {
+    qrCodeRef.current = connection.qrCode;
     if (initializing && connection.qrCode && !qrShownAt.current) {
       qrShownAt.current = Date.now();
     } else if (!initializing || !connection.qrCode) {
@@ -113,7 +116,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     tick();
     const timer = window.setInterval(tick, 1_000);
     return () => window.clearInterval(timer);
-  }, [!!qrShownAt.current]);
+  }, [connection.qrCode, initializing]);
 
   useEffect(() => {
     setConnection((current) =>
@@ -167,20 +170,28 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         if (returnTo) router.replace(returnTo);
       } else {
         updateStatus(result.status);
-        // Buscar QR code quando estiver aguardando pareamento.
-        // IMPORTANTE: qrCode null com success true significa que o WAHA
-        // rotacionou o QR (ou ainda não regenerou). Manter a imagem antiga
-        // fazia o usuário escanear um código morto — limpar para exibir
-        // "Gerando QR Code…" até o próximo ciclo trazer o código atual.
-        if (result.status === "initializing") {
-          const qr = await refreshWhatsAppQr();
-          if (qr.success) {
+        // O status é a leitura crítica após o scan. Não bloqueie o próximo
+        // polling esperando o endpoint de QR (que pode levar vários segundos
+        // enquanto o WAHA troca AUTHENTICATING por WORKING). Atualize o QR
+        // apenas quando ele ainda não existe e no máximo uma vez por 4s.
+        if (
+          result.status === "initializing" &&
+          !qrCodeRef.current &&
+          Date.now() - lastQrRefreshAt.current >= 4_000
+        ) {
+          lastQrRefreshAt.current = Date.now();
+          void refreshWhatsAppQr().then((qr) => {
+            if (!qr.success) return;
+            qrCodeRef.current = qr.qrCode ?? null;
             setConnection((current) => ({
               ...current,
               qrCode: qr.qrCode ?? null,
               status: qr.status ?? current.status,
             }));
-          }
+          }).catch(() => {
+            // Falhas transitórias do QR não podem interromper a reconciliação
+            // do status, que continuará no próximo ciclo.
+          });
         }
       }
     } catch (error) {

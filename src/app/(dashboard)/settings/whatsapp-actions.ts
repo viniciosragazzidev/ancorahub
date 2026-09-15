@@ -167,7 +167,10 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
         userId: context.userId,
         sessionName,
       } }),
-      timeoutMs: options.forceNew ? 30_000 : 15_000,
+      // A rotação precisa parar, sair, remover e só então recriar a sessão.
+      // Cada etapa tem timeout próprio no Fastify; 60s evita que a Server
+      // Action abandone o processo enquanto o WAHA ainda confirma a remoção.
+      timeoutMs: options.forceNew ? 60_000 : 15_000,
     });
 
     const status = normalizeWahaUiStatus(result.status ?? "STARTING");
