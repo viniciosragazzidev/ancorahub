@@ -133,6 +133,34 @@ export async function sendWahaRelayMessage(input: {
   return { messageId: fbData.messageId };
 }
 
+/** Recupera histórico limitado via Fastify; usado pelo cron de reconciliação. */
+export async function getWahaMessageHistory(input: {
+  sessionName: string;
+  chatIds: string[];
+  limit?: number;
+}) {
+  const config = relayConfig();
+  if (config.transport !== "fastify") {
+    throw new Error("WAHA_HISTORY_REQUIRES_FASTIFY");
+  }
+  const response = await fetch(`${config.url}/internal/waha/messages/history`, {
+    method: "POST",
+    headers: getFastifyHeaders(config.secret, true),
+    body: JSON.stringify({
+      sessionName: input.sessionName,
+      chatIds: input.chatIds,
+      limit: Math.min(Math.max(Math.trunc(input.limit ?? 100), 1), 100),
+    }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
+  });
+  const data = await response.json().catch(() => null) as { ok?: boolean; chats?: Array<{ chatId: string; messages: unknown[] }>; error?: string } | null;
+  if (!response.ok || !data?.ok || !Array.isArray(data.chats)) {
+    throw new Error(`WAHA_HISTORY_FAILED:${data?.error ?? response.status}`);
+  }
+  return data.chats;
+}
+
 export async function getWahaRelayHealth() {
   const config = relayConfig();
 

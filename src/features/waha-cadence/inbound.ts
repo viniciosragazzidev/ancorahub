@@ -314,7 +314,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     }).catch(() => undefined);
   }
 
-  // ── 7.1 Agendar análise de inteligência conversacional com debounce de 45s ──
+  // ── 7.1 Agendar análise de inteligência conversacional com debounce de 60s ──
   if (leadId && tenantId) {
     scheduleLeadConversationAnalysis(leadId, tenantId);
   }

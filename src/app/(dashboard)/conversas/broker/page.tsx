@@ -93,7 +93,11 @@ export default async function BrokerConversationsPage({ searchParams }: { search
       const messages = (byClient.get(client.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
       return { id: `client:${client.id}`, kind: "client" as const, name: client.nome, phone: client.telefone, status: "Cliente", href: client.leadId ? `/leads/${client.leadId}` : "/clientes", latestMessage: messages.at(-1) ?? null, messages, intelligence: null };
     }),
-  ].sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
+  ]
+    // A conversa só existe depois da primeira mensagem sincronizada. Leads
+    // atribuídos sem mensagem continuam disponíveis na fila, não nesta central.
+    .filter((item) => item.messages.length > 0)
+    .sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
 
   const connection = connectionRows[0];
   return (

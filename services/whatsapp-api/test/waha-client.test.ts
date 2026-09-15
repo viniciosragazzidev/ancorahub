@@ -82,6 +82,19 @@ test("health: WAHA retorna 401 → status unavailable (auth details hidden)", as
   assert.equal(result.error, "WAHA_UNAUTHORIZED");
 });
 
+test("getMessages: consulta histórico limitado usando o chatId normalizado", async () => {
+  let requestedUrl = "";
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    requestedUrl = url;
+    return new Response(JSON.stringify({ messages: [{ id: { _serialized: "true_5511999999999@c.us_abc" }, fromMe: true }] }), { status: 200 });
+  }));
+
+  const messages = await client.getMessages("broker-session", "5511999999999", 250);
+
+  assert.match(requestedUrl, /\/api\/broker-session\/chats\/5511999999999%40c\.us\/messages\?limit=100/);
+  assert.equal(messages.length, 1);
+});
+
 test("health: WAHA retorna 500 → unavailable", async () => {
   const client = new WahaClient(config, mockFetch(async () => {
     return new Response("Internal Server Error", { status: 500 });

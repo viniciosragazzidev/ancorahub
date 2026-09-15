@@ -2,6 +2,7 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
+| 2026-09-15 | `completed/2026-09-15-waha-mobile-history-reconciliation.md` | concluído | Normalização de mensagens móveis, reconciliação autenticada de histórico e instruções do cron Coolify. |
 | 2026-09-15 | `completed/2026-09-15-leads-pagination-navigation-performance.md` | concluído | Paginação atômica e troca instantânea das categorias locais em `/leads`, sem RSC duplicado. |
 | 2026-09-14 | `completed/2026-09-14-coolify-separated-runtime.md` | concluído | Registro da produção atual no Coolify, com frontend e API em VPSs separadas e sem Vercel. |
 | 2026-08-26 | `active/2026-08-26-vps-performance-local-first.md` | ativo | Telemetria segura, redução de refresh duplicado e scheduler VPS desligado por padrão, aguardando corte controlado da Vercel Cron. |

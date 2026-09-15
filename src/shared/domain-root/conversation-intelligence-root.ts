@@ -19,7 +19,8 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
   criticality: "CRITICAL",
   defaults: {
     enabled: true,
-    analysisDebounceSeconds: 45,
+    // Aguarda um minuto após a última mensagem para analisar o bloco completo.
+    analysisDebounceSeconds: 60,
     periodicReconciliationMinutes: 120,
     confidenceThresholdAuto: 0.90,
     confidenceThresholdSuggest: 0.70,

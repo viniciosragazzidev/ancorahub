@@ -382,6 +382,23 @@ export class WahaClient {
         return { messageId };
     }
     /**
+     * Lê uma janela limitada do histórico de uma conversa. É usado apenas pelo
+     * sincronizador interno como recuperação quando o webhook do WAHA não chega
+     * (por exemplo, mensagens enviadas pelo aplicativo móvel).
+     */
+    async getMessages(sessionName, chatId, limit = 100) {
+        const normalizedChatId = chatId.includes("@") ? chatId : `${chatId.replace(/\D/g, "")}@c.us`;
+        const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+        const query = new URLSearchParams({ limit: String(safeLimit) });
+        const result = await this.request(`/api/${encodeURIComponent(sessionName)}/chats/${encodeURIComponent(normalizedChatId)}/messages?${query.toString()}`, { timeoutMs: 10_000 });
+        if (Array.isArray(result))
+            return result;
+        if (result && typeof result === "object" && Array.isArray(result.messages)) {
+            return result.messages;
+        }
+        return [];
+    }
+    /**
      * Resolve um telefone para o identificador de conversa que o WAHA/WebJS
      * reconhece. Em algumas contas o WhatsApp usa @lid, não <telefone>@c.us;
      * enviar diretamente para o telefone causa "No LID for user".

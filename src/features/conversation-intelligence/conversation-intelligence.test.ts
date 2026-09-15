@@ -43,6 +43,7 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
     it("Root definition has contract version 1 and safe defaults", () => {
       expect(conversationIntelligenceDomainRoot.key).toBe("conversation-intelligence");
       expect(conversationIntelligenceDomainRoot.contractVersion).toBe(1);
+      expect(conversationIntelligenceDomainRoot.defaults.analysisDebounceSeconds).toBe(60);
       expect(conversationIntelligenceDomainRoot.defaults.confidenceThresholdAuto).toBe(0.90);
       expect(conversationIntelligenceDomainRoot.defaults.confidenceThresholdSuggest).toBe(0.70);
     });

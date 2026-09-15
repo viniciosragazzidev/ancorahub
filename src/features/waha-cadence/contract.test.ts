@@ -87,6 +87,32 @@ describe("WAHA cadence contract", () => {
     expect(event.message?.source).toBe("app");
   });
 
+  it("reads fromMe and the serialized message id from the native WAHA id object", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message.any",
+      session: "broker-session",
+      id: "event-1",
+      payload: {
+        id: {
+          fromMe: true,
+          remote: "5511999999999@c.us",
+          id: "3EB0C1234567890",
+          _serialized: "true_5511999999999@c.us_3EB0C1234567890",
+        },
+        timestamp: 1692113399,
+        from: "5521999999999@c.us",
+        to: "5511999999999@c.us",
+        body: "Mensagem enviada pelo celular",
+        type: "chat",
+      },
+    }));
+
+    expect(event.message?.fromMe).toBe(true);
+    expect(event.message?.id).toBe("true_5511999999999@c.us_3EB0C1234567890");
+    expect(event.message?.from).toBe("5521999999999");
+    expect(event.message?.to).toBe("5511999999999");
+  });
+
   it("accepts source metadata forwarded for an outgoing CRM reconciliation", () => {
     const event = wahaWebhookSchema.parse({
       eventId: "evt-message-any-api",

@@ -728,6 +728,68 @@ export function buildApp() {
         }
     });
     // ────────────────────────────────────────────────────────────────────────
+    // POST /internal/waha/messages/history — bounded history recovery
+    // ────────────────────────────────────────────────────────────────────────
+    app.post("/internal/waha/messages/history", {
+        schema: {
+            body: {
+                type: "object",
+                required: ["sessionName", "chatIds"],
+                additionalProperties: false,
+                properties: {
+                    sessionName: { type: "string", minLength: 1, maxLength: 120 },
+                    chatIds: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", minLength: 10, maxLength: 40 } },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { sessionName, chatIds, limit } = request.body;
+        const normalizedChatIds = [...new Set(chatIds)]
+            .map((chatId) => chatId.includes("@") ? chatId : `${chatId.replace(/\D/g, "")}@c.us`)
+            .filter((chatId) => /^\d{10,15}@(c\.us|lid)$/.test(chatId));
+        if (!normalizedChatIds.length)
+            return reply.code(400).send({ ok: false, error: "INVALID_CHAT_IDS" });
+        const client = new WahaClient(wahaConfig);
+        try {
+            const session = await client.getSession(sessionName);
+            if (!session || session.status !== "CONNECTED") {
+                return reply.code(400).send({ ok: false, error: session ? `SESSION_${session.status}` : "SESSION_NOT_FOUND" });
+            }
+            const chats = [];
+            let failedChats = 0;
+            for (const chatId of normalizedChatIds) {
+                try {
+                    const messages = await client.getMessages(sessionName, chatId, limit);
+                    chats.push({ chatId, messages });
+                }
+                catch (error) {
+                    failedChats += 1;
+                    request.log.warn({
+                        operation: "waha.message.history_chat_failed",
+                        session: sessionName,
+                        errorCode: error instanceof Error ? error.message : "unknown",
+                    });
+                }
+            }
+            request.log.info({ operation: "waha.message.history_sync", session: sessionName, chats: chats.length, failedChats, messages: chats.reduce((sum, chat) => sum + chat.messages.length, 0) });
+            return reply.code(200).send({ ok: true, chats, failedChats });
+        }
+        catch (error) {
+            request.log.warn({ operation: "waha.message.history_sync", session: sessionName, errorCode: error instanceof Error ? error.message : "unknown" });
+            return reply.code(502).send({ ok: false, error: "WAHA_HISTORY_FAILED" });
+        }
+    });
+    // ────────────────────────────────────────────────────────────────────────
     // POST /internal/waha/messages/text — Send text message via WAHA
     // ────────────────────────────────────────────────────────────────────────
     app.post("/internal/waha/messages/text", {

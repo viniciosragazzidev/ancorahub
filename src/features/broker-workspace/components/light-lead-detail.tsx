@@ -11,9 +11,7 @@ import {
   Check,
   CheckCircle,
   Clock,
-  Copy,
   FileText,
-  Phone,
   Share,
   Sparkle,
   UserCheck,
@@ -150,8 +148,6 @@ export function LightLeadDetail({
   const router = useRouter();
   const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
   const [leadStatus, setLeadStatus] = useState(lead.status);
-  const [phoneUnlocked, setPhoneUnlocked] = useState(Boolean(accepted && lead.telefone));
-  const [copiedPhone, setCopiedPhone] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   const [accepting, startAcceptTransition] = useTransition();
@@ -216,14 +212,6 @@ export function LightLeadDetail({
   const rejectedDocument = useMemo(() => documents.find((d) => d.status === "rejected"), [documents]);
 
   const isDistributed = leadStatus === "distributed" || leadStatus === "new";
-
-  function handleCopyPhone() {
-    if (!lead.telefone) return;
-    navigator.clipboard.writeText(lead.telefone);
-    setCopiedPhone(true);
-    toast.success("Telefone copiado ✓");
-    setTimeout(() => setCopiedPhone(false), 2000);
-  }
 
   function handleOpenUpdateModal() {
     if (leadStatus === "in_contact") setSelectedStep("quote_sent");
@@ -292,7 +280,6 @@ export function LightLeadDetail({
 
       setAccepted(true);
       setLeadStatus("in_contact");
-      setPhoneUnlocked(true);
 
       const firstName = lead.nome.split(" ")[0] || lead.nome;
       toast.success(`Lead aceito! Agora inicie o atendimento com ${firstName}.`, {
@@ -580,36 +567,13 @@ export function LightLeadDetail({
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">{lead.nome}</h1>
 
-            {/* Telefone com botão de cópia com 1 toque */}
-            {phoneUnlocked && lead.telefone ? (
-              <div className="mt-1.5 flex items-center gap-2">
-                <p className="font-mono text-base font-semibold text-primary">{lead.telefone}</p>
-                <button
-                  type="button"
-                  onClick={handleCopyPhone}
-                  aria-label="Copiar telefone"
-                  className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/30 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                >
-                  {copiedPhone ? (
-                    <>
-                      <Check className="size-3 text-emerald-600" />
-                      Copiado
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="size-3" />
-                      Copiar
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : isDistributed ? (
+            {isDistributed ? (
               <p className="mt-1 text-xs text-muted-foreground italic">
-                Contato liberado imediatamente após o aceite.
+                O número do cliente não é exibido no computador. Aceite o lead e abra o atendimento pelo WhatsApp.
               </p>
             ) : null}
 
-            {phoneUnlocked && lead.email ? (
+            {!isDistributed && lead.email ? (
               <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
                 <Share className="size-3" />
                 {lead.email}
@@ -650,6 +614,17 @@ export function LightLeadDetail({
           ) : (
             /* State 2: EM ATENDIMENTO */
             <div className="pt-2 space-y-3 border-t border-border/50">
+              <Card variant="subtle" className="border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <WhatsappLogo className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                  <p>
+                    Para proteger os dados do cliente, o número fica oculto no computador. Conecte seu WhatsApp por QR Code em{" "}
+                    <Link className="font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-400" href="/integrations/whatsapp">Integrações → WhatsApp</Link>{" "}
+                    e continue o atendimento pelo aplicativo.
+                  </p>
+                </div>
+              </Card>
+
               <Button
                 render={externalWhatsAppUrl ? <a href={externalWhatsAppUrl} rel="noreferrer" target="_blank" /> : undefined}
                 disabled={!externalWhatsAppUrl}
@@ -666,17 +641,6 @@ export function LightLeadDetail({
                 <WhatsappLogo className="size-5" />
                 ABRIR WHATSAPP
               </Button>
-
-              {externalWhatsAppUrl ? (
-                <Button
-                  className="w-full text-xs"
-                  render={<a href={externalWhatsAppUrl} rel="noreferrer" target="_blank" />}
-                  size="sm"
-                  variant="outline"
-                >
-                  <WhatsappLogo className="size-4" /> Abrir no app do WhatsApp
-                </Button>
-              ) : null}
 
               {whatsappOpenedAt ? (
                 <p className="text-center text-[11px] text-emerald-600 font-medium">

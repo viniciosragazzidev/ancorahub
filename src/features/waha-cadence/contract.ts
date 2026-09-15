@@ -161,18 +161,38 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
         ? innerPayload.source.trim().slice(0, 64)
         : undefined;
 
+      const rawMessageId = innerPayload.id;
+      const messageId =
+        typeof rawMessageId === "string"
+          ? rawMessageId
+          : rawMessageId && typeof rawMessageId === "object"
+            ? String(
+                (rawMessageId as Record<string, unknown>)._serialized ??
+                  (rawMessageId as Record<string, unknown>).id ??
+                  eventId,
+              )
+            : eventId;
+      const fromMe =
+        typeof innerPayload.fromMe === "boolean"
+          ? innerPayload.fromMe
+          : Boolean(
+              rawMessageId &&
+                typeof rawMessageId === "object" &&
+                (rawMessageId as Record<string, unknown>).fromMe === true,
+            );
+
       return {
         eventId,
         type: "message.inbound",
         sessionId,
         occurredAt,
         message: {
-          id: String(innerPayload.id || eventId),
+          id: messageId,
           from: normalizeJid(innerPayload.from),
           to: normalizeJid(innerPayload.to) || undefined,
           body: bodyText,
           type: mappedType,
-          fromMe: Boolean(innerPayload.fromMe),
+          fromMe,
           source,
           caption: innerPayload.caption ? String(innerPayload.caption) : undefined,
           replyToId: (innerPayload.replyTo as Record<string, unknown>)?.id
