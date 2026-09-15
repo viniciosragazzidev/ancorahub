@@ -57,19 +57,26 @@ function DistributionRulesOverview() {
   ];
   return (
     <Card variant="overview">
-      <CardHeader>
+      <CardHeader className="gap-2 border-b border-border px-5 pb-4 pt-5">
         <CardTitle>Regra única de distribuição</CardTitle>
         <CardDescription>
           Este é o único centro de configuração. Os canais de entrada apenas entregam o lead; unidade, fila, corretor, ordem e redistribuição são decididos aqui.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {stages.map((stage) => (
-          <div key={stage.title} className="rounded-lg border border-border bg-muted/20 p-3">
-            <p className="text-sm font-semibold text-foreground">{stage.title}</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">{stage.text}</p>
-          </div>
-        ))}
+      <CardContent className="p-5 pt-4">
+        <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {stages.map((stage, index) => (
+            <li key={stage.title} className="min-w-0 border-l-2 border-primary/25 pl-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {stage.title}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-foreground/80">{stage.text}</p>
+              <span className="mt-2 inline-flex size-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary" aria-hidden="true">
+                {index + 1}
+              </span>
+            </li>
+          ))}
+        </ol>
       </CardContent>
     </Card>
   );
@@ -608,15 +615,15 @@ export default async function LeadDistributionPage({
           saudeHistoricoContent={
             <div className="grid gap-6 lg:grid-cols-2">
               <Card variant="overview">
-                <CardHeader>
+                <CardHeader className="gap-2 border-b border-border px-5 pb-4 pt-5">
                   <CardTitle>Histórico auditável de decisões</CardTitle>
                   <CardDescription>Registro de atribuições, redistribuições e intervenções manuais.</CardDescription>
                 </CardHeader>
-                <CardContent className="p-0 max-h-[500px] overflow-y-auto">
+                <CardContent className="max-h-[500px] overflow-y-auto p-5 pt-0">
                   {recentEvents.length ? (
-                    <div className="divide-y divide-border">
+                    <div className="divide-y divide-border rounded-lg border border-border/70">
                       {recentEvents.map((event) => (
-                        <div key={event.id} className="flex flex-col gap-1 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                        <div key={event.id} className="flex flex-col gap-1 px-3 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-medium text-foreground">
                               {event.leadName} <span className="font-normal text-muted-foreground">→</span> {event.brokerName ?? "Aguardando corretor"}

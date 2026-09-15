@@ -210,6 +210,8 @@ export function LeadsWorkspace({
   branches = [],
   pageSize = 20,
   pagination,
+  unassignedLeads = [],
+  unassignedPagination,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -225,6 +227,13 @@ export function LeadsWorkspace({
   branches?: Array<{ id: string; name: string }>;
   pageSize?: number;
   pagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  unassignedLeads?: LeadWorkspaceItem[];
+  unassignedPagination?: {
     currentPage: number;
     pageSize: number;
     totalItems: number;
@@ -331,8 +340,11 @@ export function LeadsWorkspace({
     viewport.scrollTo({ left: 0, behavior: "smooth" });
   }, []);
 
-  const leadsIds = useMemo(() => workspaceLeads.map((l) => l.id), [workspaceLeads]);
-  const multiSelect = useMultiSelect(leadsIds);
+  const activeLeadIds = useMemo(
+    () => (activeTab === "sem-atribuicao" ? unassignedLeads : workspaceLeads).map((lead) => lead.id),
+    [activeTab, unassignedLeads, workspaceLeads],
+  );
+  const multiSelect = useMultiSelect(activeLeadIds);
   const isMarketing = contextJobTitle === "marketing";
   const shouldMask = (lead: LeadWorkspaceItem) => {
     return isMarketing && lead.branchId !== contextBranchId;
@@ -349,8 +361,8 @@ export function LeadsWorkspace({
     return brokers.filter((b) => b.branchId === selectedLead.branchId);
   }, [selectedLead, brokers]);
 
-  const unassignedLeads = useMemo(() => workspaceLeads.filter((lead) => !lead.corretorId), [workspaceLeads]);
-  const unassignedCount = unassignedLeads.length;
+  const unassignedCount = unassignedPagination?.totalItems ?? unassignedLeads.length;
+  const leadCount = pagination?.totalItems ?? workspaceLeads.length;
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
 
@@ -547,9 +559,9 @@ export function LeadsWorkspace({
               <UserList className="size-4" />
               <span className="hidden sm:inline">Todos os Leads</span>
               <span className="sm:hidden">Lista</span>
-              {workspaceLeads.length > 0 ? (
+              {leadCount > 0 ? (
                 <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {workspaceLeads.length}
+                  {leadCount}
                 </Badge>
               ) : null}
             </TabsTrigger>
@@ -588,9 +600,9 @@ export function LeadsWorkspace({
                 <UserSwitch className="size-4 text-warning" />
                 <span className="hidden sm:inline">Sem Atribuição</span>
                 <span className="sm:hidden">Sem atrib.</span>
-                {activeTab === "sem-atribuicao" && unassignedCount > 0 ? (
+                {unassignedCount > 0 ? (
                   <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                    {pagination?.totalItems ?? unassignedCount}
+                    {unassignedCount}
                   </Badge>
                 ) : null}
               </TabsTrigger>
@@ -641,7 +653,7 @@ export function LeadsWorkspace({
                 isAllSelected={multiSelect.isAllSelected}
                 onToggleRow={multiSelect.toggle}
                 onSelectAll={(checked: boolean) => {
-                  if (checked) multiSelect.setSelected(leadsIds);
+                  if (checked) multiSelect.setSelected(workspaceLeads.map((lead) => lead.id));
                   else multiSelect.clear();
                 }}
                 onRowClick={setSelectedLead}
@@ -812,8 +824,8 @@ export function LeadsWorkspace({
                     shouldMask={shouldMask}
                     slaFirstContactMinutes={slaFirstContactMinutes}
                     slaStagnantDays={slaStagnantDays}
-                    pageSize={pageSize}
-                    pagination={pagination}
+                    pageSize={unassignedPagination?.pageSize ?? pageSize}
+                    pagination={unassignedPagination ?? pagination}
                     selectedIds={multiSelect.selectedIds}
                     isAllSelected={unassignedLeads.every((lead) => multiSelect.isSelected(lead.id))}
                     onToggleRow={multiSelect.toggle}

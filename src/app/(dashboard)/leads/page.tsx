@@ -299,9 +299,6 @@ async function LeadsPageContent({
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
-  const unassignedFilter = canViewUnassigned && initialView === "sem-atribuicao"
-    ? isNull(schema.leads.corretorId)
-    : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
   const metaCampaignEligibility = eligibleCampaignsOnly
       ? await withPerfSpan("leads.campaign_eligibility", () => Promise.all([
@@ -359,7 +356,10 @@ async function LeadsPageContent({
     inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "converted", "lost"])
   );
 
-  const where = and(
+  // Keep the common scope independent from the active projection. The
+  // unassigned tab is a server-backed dataset of its own; deriving it from the
+  // current page would produce a partial list and a misleading total.
+  const commonWhere = and(
     buildLeadScopeWhere(context, { requestedBranchId: filters.branch }),
     isNull(schema.leads.deletedAt),
     qualifiedOrDistributedFilter,
@@ -371,10 +371,19 @@ async function LeadsPageContent({
     ...(origemFilter ? [origemFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),
     ...(corretorFilter ? [corretorFilter] : []),
-    ...(unassignedFilter ? [unassignedFilter] : []),
     ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
     ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
   );
+
+  const where = and(
+    commonWhere,
+    ...(canViewUnassigned && initialView === "sem-atribuicao"
+      ? [isNull(schema.leads.corretorId)]
+      : []),
+  );
+  const unassignedWhere = canViewUnassigned
+    ? and(commonWhere, isNull(schema.leads.corretorId))
+    : null;
 
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
 
@@ -393,10 +402,14 @@ async function LeadsPageContent({
     rawQualifyingLeads,
     activeQueues,
     urgentLead,
+    unassignedCountResult,
+    unassignedRows,
   ] = await withPerfSpan("leads.data_loader", () => Promise.all([
     withPerfSpan("leads.count", () => db.select({ total: count() }).from(schema.leads).where(where)),
     withPerfSpan("leads.catalog_plans", () => listAvailableCatalogPlans(context)),
-    withPerfSpan("leads.list", () => db
+    withPerfSpan("leads.list", () => canViewUnassigned && initialView === "sem-atribuicao"
+      ? Promise.resolve([])
+      : db
       .select({
         id: schema.leads.id,
         nome: schema.leads.nome,
@@ -424,8 +437,8 @@ async function LeadsPageContent({
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
       .where(where)
       .orderBy(...finalOrderBy)
-      .limit(pageSize)
-      .offset(offset)),
+        .limit(pageSize)
+        .offset(offset)),
     withPerfSpan("leads.legacy_plans", () => db
       .select({ id: schema.carrierPlans.id, name: schema.carrierPlans.name, carrierName: schema.carriers.name })
       .from(schema.carrierPlans)
@@ -523,10 +536,47 @@ async function LeadsPageContent({
         isNull(schema.leadQueues.deletedAt),
       ))),
     withPerfSpan("leads.urgent", () => getUrgentLeadForUser().catch(() => null)),
+    withPerfSpan("leads.unassigned_count", () => unassignedWhere
+      ? db.select({ total: count() }).from(schema.leads).where(unassignedWhere)
+      : Promise.resolve([{ total: 0 } as { total: number }])),
+    withPerfSpan("leads.unassigned_list", () => unassignedWhere && initialView === "sem-atribuicao"
+      ? db
+        .select({
+          id: schema.leads.id,
+          nome: schema.leads.nome,
+          telefone: schema.leads.telefone,
+          status: schema.leads.status,
+          qualificationStatus: schema.leads.qualificationStatus,
+          qualificationState: schema.leads.qualificationState,
+          distributionStatus: schema.leads.distributionStatus,
+          origem: schema.leads.origem,
+          sourceCampaign: schema.leads.sourceCampaign,
+          tipo: schema.leads.tipo,
+          createdAt: schema.leads.createdAt,
+          assignedAt: schema.leads.assignedAt,
+          stageEnteredAt: schema.leads.stageEnteredAt,
+          serviceStartedAt: schema.leads.serviceStartedAt,
+          firstContactAt: schema.leads.firstContactAt,
+          corretorId: schema.leads.corretorId,
+          corretorNome: schema.user.name,
+          branchId: schema.leads.branchId,
+          branchName: schema.branches.name,
+          qualificationDetails: schema.leads.qualificationDetails,
+        })
+        .from(schema.leads)
+        .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+        .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+        .where(unassignedWhere)
+        .orderBy(...finalOrderBy)
+        .limit(pageSize)
+        .offset(offset)
+      : Promise.resolve([])),
   ]));
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const unassignedTotalItems = Number(unassignedCountResult[0]?.total ?? 0);
+  const unassignedTotalPages = Math.ceil(unassignedTotalItems / pageSize) || 1;
 
   // Merge legacy carrier plans with global + private catalog plans
   const seen = new Set<string>();
@@ -578,7 +628,7 @@ async function LeadsPageContent({
     filters.tipo ||
     filters.qualification ||
     eligibleCampaignsOnly
-    || unassignedFilter
+    || (canViewUnassigned && initialView === "sem-atribuicao")
   );
   return (
     <>
@@ -643,7 +693,7 @@ async function LeadsPageContent({
         />
 
         {/* Workspace or RCD Directional Empty State */}
-        {leads.length || qualifyingLeads.length ? (
+        {leads.length || qualifyingLeads.length || unassignedRows.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
               leads={leads.map((lead) => ({
@@ -667,11 +717,26 @@ async function LeadsPageContent({
               brokers={brokers}
               branches={branches}
               pageSize={pageSize}
+              unassignedLeads={unassignedRows.map((lead) => ({
+                ...lead,
+                createdAt: lead.createdAt.toISOString(),
+                assignedAt: lead.assignedAt?.toISOString() ?? null,
+                stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
+                serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
+                firstContactAt: lead.firstContactAt?.toISOString() ?? null,
+                qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
+              }))}
               pagination={{
                 currentPage: page,
                 pageSize,
                 totalItems,
                 totalPages,
+              }}
+              unassignedPagination={{
+                currentPage: page,
+                pageSize,
+                totalItems: unassignedTotalItems,
+                totalPages: unassignedTotalPages,
               }}
             />
           </div>
