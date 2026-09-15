@@ -10,7 +10,7 @@ import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-eff
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 
 import { normalizePhone } from "@/shared/utils/phone";
-import { isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
+import { buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
 
 function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
@@ -61,6 +61,7 @@ export async function createLeadOffersForBrokers(input: {
       nome: schema.leads.nome,
       branchId: schema.leads.branchId,
       tipo: schema.leads.tipo,
+      formData: schema.leads.formData,
     })
     .from(schema.leads)
     .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
@@ -68,20 +69,10 @@ export async function createLeadOffersForBrokers(input: {
 
   if (!lead) throw new Error("Lead não encontrado.");
 
-  // Fetch branch & tenant company name
-  let branchName = "Unidade Principal";
-  if (lead.branchId) {
-    const [branch] = await db
-      .select({ name: schema.branches.name })
-      .from(schema.branches)
-      .where(and(eq(schema.branches.id, lead.branchId), eq(schema.branches.tenantId, input.tenantId)))
-      .limit(1);
-    if (branch) branchName = branch.name;
-  }
-
-  const [tenant] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, input.tenantId)).limit(1);
-  const companyName = tenant?.name || "CorreTop";
   const leadTypeLabel = lead.tipo === "pme" ? "PME" : lead.tipo === "pj" ? "Empresarial" : "Pessoa Física";
+  const produtoInteresse = readLeadFormValue(lead.formData, [
+    "produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse", "interesse",
+  ]) ?? leadTypeLabel;
 
   // 2. Fetch brokers info
   const brokers = await db
@@ -174,26 +165,18 @@ export async function createLeadOffersForBrokers(input: {
       });
       if (destinationPhone) {
         const assignmentEventId = randomUUID();
-        await tx.update(schema.leads).set({
-          branchId: input.targetBranchId,
-          corretorId: broker.id,
-          status: "distributed",
-          distributionStatus: "assigned",
-          assignedAt: now,
-          assignmentSource: "automatic_offer",
-          assignmentStrategy: "whatsapp_offer",
-          distributionUpdatedAt: now,
-          stageEnteredAt: now,
-          firstContactAt: null,
-          serviceStartedAt: null,
-          serviceStartedBy: null,
-          motivoPerda: null,
-          updatedAt: now,
-        }).where(and(
+        // An offer is not an assignment. Keep the lead unowned until the
+        // broker explicitly accepts it in `handleLeadOfferWebhookResponse`.
+        // The unit can still be resolved here so the next rotation uses the
+        // correct roster without exposing the lead in the broker's wallet.
+        await tx.update(schema.leads).set(buildPendingLeadOfferLeadUpdate({
+          targetBranchId: input.targetBranchId,
+          now,
+        })).where(and(
           eq(schema.leads.id, input.leadId),
           eq(schema.leads.tenantId, input.tenantId),
-          // DEC-027B: the provisional owner only changes after a confirmed
-          // transactional claim; a concurrent accept must not be overwritten.
+          // A concurrent manual assignment or offer acceptance must not be
+          // overwritten while this offer is being recorded.
           lockedLead.corretorId === null
             ? isNull(schema.leads.corretorId)
             : eq(schema.leads.corretorId, lockedLead.corretorId),
@@ -205,15 +188,15 @@ export async function createLeadOffersForBrokers(input: {
           fromBranchId: lead.branchId,
           toBranchId: input.targetBranchId,
           previousOwnerId: input.expectedCurrentBrokerId ?? null,
-          newOwnerId: broker.id,
+          newOwnerId: null,
           action: "offer_sent",
           source: input.expectedCurrentBrokerId ? "redistribution" : "automatic",
           strategy: "automatic",
           reason: input.expectedCurrentBrokerId
-            ? "Responsabilidade provisória transferida ao próximo corretor elegível."
-            : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
+            ? "Oferta enviada ao próximo corretor elegível; titularidade permanece com o owner atual até o aceite."
+            : "Oferta enviada ao primeiro corretor elegível; titularidade será criada somente após o aceite.",
           actorId: input.requestedBy ?? broker.id,
-          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true },
+          metadata: { offeredBrokerId: broker.id, ownershipConfirmed: false },
           createdAt: now,
         });
         if (input.requestedBy) {
@@ -222,7 +205,7 @@ export async function createLeadOffersForBrokers(input: {
             userId: input.requestedBy,
             entidade: "lead_distribution",
             entidadeId: input.leadId,
-            acao: "lead.provisional_owner_assigned",
+            acao: "lead.offer_sent_before_assignment",
           });
         }
       }
@@ -247,9 +230,9 @@ export async function createLeadOffersForBrokers(input: {
     const idempotencyKey = `lead-offer:${input.leadId}:${broker.id}:${now.getTime()}`;
     const brokerName = broker.name || "Corretor(a)";
 
-    // Enqueue approved offer template: novo_lead_
-    // The synchronized template may use the lead name, but never receives its phone before acceptance.
-    // The lead id is reserved for the text fallback link.
+    // Pending offers use the same approved `new_lead_broker` contract as a
+    // confirmed assignment. The lead phone is never included before acceptance;
+    // only the dynamic CRM URL button carries the lead id.
     let outbound: Awaited<ReturnType<typeof enqueueMetaTemplateMessage>>;
     try {
       outbound = await enqueueMetaTemplateMessage({
@@ -259,12 +242,10 @@ export async function createLeadOffersForBrokers(input: {
         destinationPhone,
         purpose: "newLeadAssignment",
         variables: buildLeadOfferVariables({
+          cargo: "Corretor(a)",
           corretorNome: brokerName,
           leadNome: lead.nome,
-          empresa: companyName,
-          tipoLead: leadTypeLabel,
-          unidade: branchName,
-          tempoResposta: String(timeoutMinutes),
+          produtoInteresse,
           leadId: lead.id,
         }),
         requestedBy: input.requestedBy,
@@ -539,8 +520,9 @@ export async function handleLeadOfferWebhookResponse(input: {
 
     if (!currentOffer) return { won: false, reason: "offer_not_found" };
 
-    // Accept decision shared with the domain seam (incl. the 60s provisional
-    // owner grace) so the webhook and the rotation agree on expiry semantics.
+    // Accept decision shared with the domain seam. The short legacy grace is
+    // retained only for offers created before DEC-102; new offers never have a
+    // provisional owner to rely on.
     const decision = resolveLeadOfferAcceptance(
       { offerStatus: currentOffer.status, expiresAt: currentOffer.expiresAt, leadCorretorId: lead.corretorId, brokerId: broker.id },
       now,

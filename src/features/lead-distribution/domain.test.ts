@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
+import { buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
 
 describe("automatic unit routing", () => {
   it("selects the least loaded unit with a stable tie break", () => {
@@ -10,6 +10,22 @@ describe("automatic unit routing", () => {
     ];
     expect(selectDistributionBranch(branches)?.id).toBe("unit-a");
     expect(selectDistributionBranch([])).toBeNull();
+  });
+});
+
+describe("lead offer ownership", () => {
+  it("keeps the lead unassigned until the broker accepts the offer", () => {
+    const now = new Date("2026-09-15T15:00:00Z");
+    const pendingUpdate = buildPendingLeadOfferLeadUpdate({ targetBranchId: "unit-a", now });
+
+    expect(pendingUpdate).toEqual({
+      branchId: "unit-a",
+      distributionStatus: "queued",
+      distributionUpdatedAt: now,
+      updatedAt: now,
+    });
+    expect("corretorId" in pendingUpdate).toBe(false);
+    expect("assignedAt" in pendingUpdate).toBe(false);
   });
 });
 

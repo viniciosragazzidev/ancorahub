@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { buildLeadOfferVariables } from "@/features/communication-channels/templates";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -136,7 +137,13 @@ export const leadAssignedNotificationPlugin: ServerPluginDefinition<{
             recipientId: broker.id,
             destinationPhone: broker.phone,
             purpose: "newLeadAssignment",
-            variables: [broker.name ?? "Corretor(a)", tenant?.name ?? "Âncora Corretora", leadType, branch?.name ?? "Unidade Principal", "3", lead.id],
+            variables: buildLeadOfferVariables({
+              cargo: "Corretor(a)",
+              corretorNome: broker.name ?? "Corretor(a)",
+              leadNome: lead.nome,
+              produtoInteresse: leadType,
+              leadId: lead.id,
+            }),
             requestedBy: context.userId,
             idempotencyKey: `${executionKey}:whatsapp`,
           });

@@ -1,12 +1,14 @@
 # Sistema de distribuição de leads — estado da implementação
 
-## Titularidade provisória e autoridade única (DEC-097) — 11/09/2026
+## Oferta pendente e autoridade única (DEC-096) — 15/09/2026
 
 - `src/features/lead-distribution` resolve unidade, fila, elegibilidade, ordem,
   oferta, redistribuição e SLA; os canais de entrada não escolhem corretor.
-- A criação durável da oferta já persiste o corretor como owner provisório.
-- Recusa, expiração e SLA fazem troca direta para o próximo elegível, sem limpar o
-  owner antes da substituição.
+- A criação durável da oferta persiste somente a tentativa pendente; o lead fica sem
+  `corretorId` até o aceite atômico do corretor.
+- Recusa, expiração e SLA fazem a rotação direta para o próximo elegível sem expor
+  uma oferta pendente como carteira confirmada. Registros legados com owner
+  provisório continuam recuperáveis pelo worker.
 - Leads sem unidade usam a unidade automática de menor carga com desempate estável.
 - Cooldown, menor fila sem contato e menor carga evitam sequências no mesmo corretor;
   capacidade é meta e não deixa o lead órfão quando todos atingem o alvo.
@@ -60,8 +62,8 @@ O servidor resolve tenant, papel, unidade e elegibilidade. IDs enviados pelo nav
 
 1. O canal de entrada registra o lead e a intenção durável.
 2. O motor resolve unidade e fila pelas regras configuradas em `/distribuicao`.
-3. O corretor elegível melhor ranqueado recebe a oferta e vira owner provisório.
-4. Aceite confirma; recusa, expiração ou SLA trocam para o próximo elegível.
+3. O corretor elegível melhor ranqueado recebe uma oferta pendente, sem virar owner.
+4. Aceite cria a atribuição definitiva; recusa, expiração ou SLA trocam para o próximo elegível.
 5. As tasks recuperam qualquer pendência e o histórico permanece auditável.
 
 ## Próxima camada

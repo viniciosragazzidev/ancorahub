@@ -9,17 +9,18 @@ tentado.
 
 ## Comportamento entregue
 
-- O corretor selecionado vira owner provisório na mesma transação que registra a oferta; o aceite apenas confirma a titularidade.
+- O corretor selecionado recebe uma oferta pendente na mesma transação que registra a tentativa; o lead permanece sem `corretorId` até o aceite atômico.
 - Existe no máximo uma oferta ativa por lead, serializada com row lock no próprio
   lead antes da inserção da oferta.
-- Recusa, expiração e estouro de SLA retornam ao mesmo processador e trocam
-  diretamente para o próximo corretor elegível, sem limpar o owner antes da troca.
+- Recusa, expiração e estouro de SLA retornam ao mesmo processador e avançam
+  diretamente para o próximo corretor elegível, sem criar owner para uma oferta
+  ainda pendente.
 - Corretor sem canal corporativo utilizável e falha ao enfileirar a mensagem ficam
   registrados como tentativa cancelada e o motor avança imediatamente.
 - O job de distribuição espera exatamente até `expiresAt` sem consumir a contagem de
   tentativas enquanto aguarda resposta.
 - Ao esgotar um ciclo, outro ciclo automático é aberto; pausas explícitas ou falta
-  real de elegíveis mantêm o owner anterior e ficam recuperáveis pelas tasks.
+  real de elegíveis mantêm o estado de fila e ficam recuperáveis pelas tasks.
 - O aceite continua atômico com `SELECT FOR UPDATE`, completa jobs pendentes e só
   então dispara os efeitos pós-atribuição.
 - Consultas e mutações de oferta/canal foram reforçadas com escopo explícito de
@@ -30,7 +31,7 @@ tentado.
   exatamente as mensagens recém-criadas, reportando como enviadas apenas as ofertas
   confirmadas pelo provedor.
 - Campos de qualificação nulos não excluem leads antigos do re-seed. A task também
-  recupera owners provisórios cujas ofertas expiraram.
+  recupera registros legados que ainda tenham owner provisório após a expiração.
 - Entradas manual, CSV, webhook, Meta Ads e qualificação delegam a escolha ao mesmo
   serviço de distribuição; o algoritmo legado não possui mais consumidores.
 

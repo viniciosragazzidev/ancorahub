@@ -49,7 +49,8 @@ a mensagem. O resultado possível é redistribuição anterior à entrega tardia
 ### Fase 2 — Faixa prioritária de entrega imediata
 
 - Criar uma operação canônica `dispatchLeadOfferNow` que, na mesma orquestração:
-  persiste oferta + owner provisório + outbox, faz claim do ID exato e chama Meta/WAHA.
+  persiste oferta pendente + outbox, faz claim do ID exato e chama Meta; o owner
+  só é gravado depois do aceite atômico.
 - O job de distribuição só entra em `AWAITING_BROKER_ACCEPTANCE` depois de confirmar
   `sent`; antes disso permanece `AWAITING_OFFER_DELIVERY`.
 - Dar prioridade máxima ao propósito `newLeadAssignment`, com índice de claim por
@@ -68,7 +69,7 @@ sintética e nenhuma duplicidade em execução concorrente.
 - Iniciar `firstContactDeadlineAt` apenas no aceite atômico do corretor.
 - O verificador de SLA ignora `awaiting_delivery` e ofertas sem confirmação do
   provedor.
-- Antes de redistribuir, revalidar a versão ativa da oferta e o owner provisório na
+- Antes de redistribuir, revalidar a versão ativa da oferta e o owner confirmado na
   mesma transação, evitando que um webhook tardio vença a rotação atual.
 - Se a entrega falhar definitivamente, cancelar a oferta e chamar imediatamente o
   motor central para o próximo elegível, sem deixar o lead sem owner.
@@ -108,4 +109,3 @@ uma oferta pelo ID sem expor dados pessoais.
 - Zero início de SLA de primeiro contato antes do aceite do corretor.
 - Zero mensagem duplicada ou enviada para corretor que deixou de ser o owner ativo.
 - Queda entre persistência e envio é recuperada automaticamente sem ação humana.
-

@@ -1,5 +1,9 @@
 # ADR-0042 — Titularidade provisória e autoridade única (DEC-097)
 
+> **Semântica de owner supersedida pela DEC-102 (15/09/2026):** ofertas novas não
+> gravam titularidade antes do aceite. Este ADR permanece como histórico da decisão
+> anterior; o fluxo atual segue `docs/decision-log.md`/DEC-102.
+
 **Estado:** Aceita
 **Data:** 2026-09-10
 **Relacionadas:** DEC-049 (ofertas sequenciais), DEC-059 (fila geral), DEC-082 (Matriz), DEC-083 (janela comercial), DEC-027B (handoff SLA)

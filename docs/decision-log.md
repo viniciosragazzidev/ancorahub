@@ -82,6 +82,34 @@ recuperação. O motor roda 24/7; a janela da Meta regula a entrega da mensagem,
 a persistência do owner. Nunca há fallback para corretor pausado, outra unidade já
 definida ou outro tenant.
 
+## DEC-102 — Oferta não atribui owner antes do aceite
+
+**Estado:** Aceita e supersede a semântica de titularidade provisória da DEC-097
+**Data:** 2026-09-15
+
+O corretor escolhido pelo motor automático recebe uma oferta exclusiva, mas não se
+torna proprietário do lead enquanto a oferta estiver `PENDING`, `SENT`, `DELIVERED`
+ou `READ`. `leads.corretorId`, `assignedAt` e `distributionStatus=assigned` só são
+gravados pela transação de aceite com row lock. Unidade e fila podem ser resolvidas
+antes do aceite para manter a rotação e a recuperação determinísticas. Recusa,
+expiração, canal indisponível ou falha de enqueue mantêm o lead na fila e avançam a
+tentativa; registros antigos com owner provisório são tratados como legado pelo
+worker até sua conclusão segura.
+
+## DEC-103 — Template canônico para oferta de novo lead
+
+**Estado:** Aceita
+**Data:** 2026-09-15
+
+As situações `LEAD_OFFER` (oferta pendente) e `LEAD_ASSIGNMENT` (atribuição
+confirmada) usam o template Meta aprovado `new_lead_broker`, com o contrato nomeado
+`cargo`, `corretor_nome`, `lead_nome`, `produto_interesse` e o `lead_id` somente no
+botão de URL. Os nomes legados `novo_lead_` e `new_lead_assignment` não são mais
+resolvidos: vínculos antigos na área de Situações são tratados como ausentes e
+caem para o template canônico aprovado da WABA ativa. A escolha de outro template
+aprovado para eventos distintos continua editável e auditável; uma situação de
+oferta não pode publicar um dos nomes legados.
+
 ## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
 
 **Estado:** Aceita
@@ -713,7 +741,7 @@ O plano executável e o inventário de capacidades estão em
 **Data:** 2026-07-22
 
 O CorreTop adota o fluxo de ofertas em duas etapas para distribuição de novos leads por WhatsApp:
-1. **Oferta Privada (`new_lead_assignment`):** O nome do lead e os metadados gerais (empresa, tipo de lead, unidade, tempo de resposta) podem ser enviados no primeiro template com botões de resposta rápida ("Aceitar lead" / "Recusar"). O telefone e os demais dados de contato do cliente não são expostos antes do aceite.
+1. **Oferta Privada (`new_lead_broker`):** O nome do lead e o produto de interesse podem ser enviados no primeiro template com o botão de aceite. O telefone e os demais dados de contato do cliente não são expostos antes do aceite.
 2. **Confirmação Atômica com Row Locking:** O clique no botão aciona a transação no servidor (`SELECT FOR UPDATE`), que garante que apenas o primeiro corretor elegível assuma o lead.
 3. **Template de Confirmação (`lead_assignment_confirmed`):** Enviado somente após confirmação do aceite, com o link direto para o atendimento no CRM (`https://corretop.vercel.app/leads/{{lead_id}}`).
 4. **Rotação Sequencial até Aceite:** existe no máximo uma oferta ativa por lead. Recusa, expiração ou impossibilidade de enfileirar a oferta consome aquela tentativa e devolve o lead imediatamente ao mesmo motor, que escolhe o próximo corretor elegível ainda não tentado. O lead permanece sem `corretorId` durante todo esse ciclo e só ganha owner após aceite atômico. A distribuição manual é o fallback terminal somente quando todos os corretores elegíveis foram tentados sem aceite ou quando não existe caminho automático utilizável sob as regras canônicas da fila.

@@ -104,7 +104,26 @@ export function MessagePoliciesPanel({
       ]);
       setData(result);
       setSelectedEventKey((current) => current ?? result.events[0]?.key ?? null);
-      setDrafts(Object.fromEntries(result.events.map((event) => [event.key, policyToDraft(event.policy)])));
+      const canonicalOfferTemplate = result.metaTemplates.find(
+        (template) => template.name === "new_lead_broker" && template.status === "APPROVED",
+      );
+      setDrafts(Object.fromEntries(result.events.map((event) => {
+        const draft = policyToDraft(event.policy);
+        const configuredTemplate = event.policy?.metaTemplateId
+          ? result.metaTemplates.find((template) => template.id === event.policy?.metaTemplateId)
+          : null;
+        const staleOfferTemplate = configuredTemplate
+          ? ["novo_lead_", "new_lead_assignment"].includes(configuredTemplate.name)
+          : false;
+        // Keep the Situations panel aligned with the runtime fallback: a
+        // tenant without a saved LEAD_OFFER policy still previews the approved
+        // canonical template instead of an empty configuration or a legacy
+        // binding that would resolve to a retired name.
+        if (event.key === "LEAD_OFFER" && canonicalOfferTemplate && (!event.policy || staleOfferTemplate)) {
+          return [event.key, { ...draft, primaryKind: "meta_template", metaTemplateId: canonicalOfferTemplate.id, fallbackKind: "none", active: true }];
+        }
+        return [event.key, draft];
+      })));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Não foi possível carregar as situações.";
       setLoadError(message);

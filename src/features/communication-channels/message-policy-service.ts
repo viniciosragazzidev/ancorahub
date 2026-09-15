@@ -18,7 +18,7 @@ import {
   renderEventFreeMessage,
   type MessageResourceKind,
 } from "./message-event-catalog";
-import { META_WHATSAPP_TEMPLATE_PURPOSES } from "./templates";
+import { isLegacyLeadOfferTemplateName, META_WHATSAPP_TEMPLATE_PURPOSES } from "./templates";
 import { listTenantTemplates } from "./template-sync-service";
 import { META_CLOUD_PROVIDER } from "./types";
 
@@ -225,6 +225,9 @@ export async function saveMessageEventPolicy(tenantId: string, userId: string, i
     loadMetaResource(tenantId, parsed.metaTemplateId),
     loadFreeResource(tenantId, parsed.freeMessageTemplateId),
   ]);
+  if (event.key === "LEAD_OFFER" && isLegacyLeadOfferTemplateName(metaTemplate?.name)) {
+    throw new Error("A situação Oferta de lead usa o template padrão new_lead_broker.");
+  }
   if ((parsed.primaryKind === "meta_template" || parsed.fallbackKind === "meta_template") && !metaTemplate) {
     throw new Error("O template Meta precisa estar aprovado e pertencer à WABA ativa desta empresa.");
   }
@@ -355,7 +358,11 @@ async function resolveLegacyMetaResource(tenantId: string, eventKey: string, pur
         eq(schema.metaWhatsAppTemplateUsages.active, true),
       )).limit(1);
     const configured = await loadMetaResource(tenantId, usage?.templateId ?? null);
-    if (configured) return configured;
+    // `novo_lead_` and `new_lead_assignment` were retired names for the offer
+    // event. Keeping an old situation binding active makes the outbox send a
+    // template whose variable contract no longer matches the producer. Treat
+    // those bindings as absent and use the canonical approved fallback below.
+    if (configured && !(purpose === "newLeadAssignment" && isLegacyLeadOfferTemplateName(configured.name))) return configured;
   }
   const fallback = META_WHATSAPP_TEMPLATE_PURPOSES[purpose as keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES];
   if (!fallback) return null;
@@ -427,10 +434,13 @@ export async function resolveEventMessagePlan(input: {
     };
   }
 
-  const [metaResource, freeResource] = await Promise.all([
+  const [configuredMetaResource, freeResource] = await Promise.all([
     loadMetaResource(input.tenantId, policy.metaTemplateId),
     loadFreeResource(input.tenantId, policy.freeMessageTemplateId),
   ]);
+  const metaResource = event.key === "LEAD_OFFER" && isLegacyLeadOfferTemplateName(configuredMetaResource?.name)
+    ? null
+    : configuredMetaResource;
   const mappings = asStringRecord(policy.metaVariableMappingsJson);
   const metaMessage = metaResource ? makeMetaMessage(event, metaResource, mappings, input.variables) : null;
   const freeMessage = freeResource ? makeFreeMessage(event, freeResource, input.variables) : null;

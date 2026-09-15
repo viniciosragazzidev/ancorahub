@@ -4,7 +4,10 @@ import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables, getMeta
 
 describe("approved Meta WhatsApp templates", () => {
   it("uses the approved new-lead template for broker offers", () => {
-    expect(getMetaWhatsAppTemplate("newLeadAssignment")).toEqual({ name: "novo_lead_", language: "pt_BR" });
+    expect(getMetaWhatsAppTemplate("newLeadAssignment")).toEqual({ name: "new_lead_broker", language: "pt_BR" });
+    expect(getMetaWhatsAppTemplateVariableNames("newLeadAssignment")).toEqual([
+      "cargo", "corretor_nome", "lead_nome", "produto_interesse",
+    ]);
   });
 
   it("maps the named body variables configured for the broker invitation template", () => {
@@ -21,26 +24,20 @@ describe("approved Meta WhatsApp templates", () => {
     expect(getMetaWhatsAppTemplateVariableNames("leadQualification")).toBeUndefined();
   });
 
-  it("keeps positional templates without named parameter metadata", () => {
-    expect(getMetaWhatsAppTemplateVariableNames("newLeadAssignment")).toBeUndefined();
-  });
-
-  it("keeps the lead name available to offer policies without leaking it into the legacy positional contract", () => {
+  it("uses the same named contract for a pending offer and a confirmed assignment", () => {
     const variables = buildLeadOfferVariables({
+      cargo: "Corretor(a)",
       corretorNome: "Edvania",
       leadNome: "Seu Romário",
-      empresa: "Âncora Saúde",
-      tipoLead: "Pessoa Física",
-      unidade: "Matriz",
-      tempoResposta: "3",
+      produtoInteresse: "Plano Familiar",
       leadId: "lead-id",
     });
 
     expect(variables).toEqual([
-      "Edvania", "Seu Romário", "Âncora Saúde", "Pessoa Física", "Matriz", "3", "lead-id",
+      "Corretor(a)", "Edvania", "Seu Romário", "Plano Familiar", "lead-id",
     ]);
     expect(splitMetaWhatsAppTemplateVariables("newLeadAssignment", variables)).toEqual({
-      bodyVariables: ["Edvania", "Âncora Saúde", "Pessoa Física", "Matriz", "3"],
+      bodyVariables: ["Corretor(a)", "Edvania", "Seu Romário", "Plano Familiar"],
       urlButtonParameter: "lead-id",
     });
   });

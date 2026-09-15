@@ -79,9 +79,13 @@ Meta webhook assinado
 
 `handleLeadOfferWebhookResponse` primeiro procura por `whatsappMessageId`, mas, se não encontrar, escolhe a oferta ativa mais recente do corretor. Se duas ofertas estiverem pendentes, uma resposta atrasada ou sem ID pode aceitar outro lead. O fallback deve exigir uma correlação inequívoca (payload/ID da oferta, token assinado ou janela + destinatário + mensagem) e rejeitar a resposta ambígua.
 
-### P1-02 — Titularidade pré-aceite diverge da regra BR-023
+### P1-02 — Titularidade pré-aceite diverge da regra BR-023 — resolvido em 15/09/2026
 
-`createLeadOffersForBrokers` grava `leads.corretorId` e `distributionStatus=assigned` no envio da oferta. Isso corresponde à DEC-097 (titularidade provisória), mas contradiz BR-023, que diz que `corretorId` só é gravado após aceite. É necessário escolher uma decisão normativa única e atualizar `docs/business-rules.md`, telas e relatórios para não interpretar owner provisório como aceite confirmado.
+`createLeadOffersForBrokers` gravava `leads.corretorId` e `distributionStatus=assigned`
+no envio da oferta. A DEC-102 tornou a regra única: ofertas novas permanecem sem
+owner até o aceite atômico; o patch foi aplicado em `offers.ts`, com regressão de
+ownership pendente e documentação alinhada. Registros legados continuam cobertos
+pela recuperação do worker.
 
 ### P1-03 — Motor de regras paralelo sem integração
 

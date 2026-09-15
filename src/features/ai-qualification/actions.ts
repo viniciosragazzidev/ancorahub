@@ -181,6 +181,7 @@ export async function fetchMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { listTenantTemplates, syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
+  const { isLegacyLeadOfferTemplateName } = await import("@/features/communication-channels/templates");
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, eq } = await import("drizzle-orm");
 
@@ -221,7 +222,10 @@ export async function fetchMetaTemplatesAction() {
 
   return templates.map((t) => {
     const assignedSituations = activeUsages
-      .filter((u) => u.templateId === t.id)
+      .filter((u) => {
+        if (u.templateId !== t.id) return false;
+        return !(u.eventKey === "LEAD_OFFER" && isLegacyLeadOfferTemplateName(t.name));
+      })
       .map((u) => u.eventKey);
 
     return {
@@ -241,6 +245,20 @@ export async function setMetaTemplateSituationsAction(templateId: string, eventK
 
   const db = getDatabase();
   const now = new Date();
+
+  if (eventKeys.includes("LEAD_OFFER")) {
+    const [template] = await db
+      .select({ name: schema.metaWhatsAppTemplates.name })
+      .from(schema.metaWhatsAppTemplates)
+      .where(and(
+        eq(schema.metaWhatsAppTemplates.id, templateId),
+        eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+      ))
+      .limit(1);
+    if (template?.name === "novo_lead_" || template?.name === "new_lead_assignment") {
+      throw new Error("A situação Oferta de lead usa o template padrão new_lead_broker.");
+    }
+  }
 
   // 1. Fetch current active usages for this template
   const currentUsages = await db

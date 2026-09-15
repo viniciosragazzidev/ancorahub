@@ -7,7 +7,10 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
   brokerLeadNotification: { name: "new_lead_broker", language: "pt_BR" },
   leadQualification: { name: "lead_qualification_start", language: "pt_BR" },
   lead_qualification: { name: "lead_qualification_start", language: "pt_BR" },
-  newLeadAssignment: { name: "novo_lead_", language: "pt_BR" },
+  // The offer and the confirmed assignment use the same Meta-approved
+  // template. Keeping two different names here made pending offers resolve to
+  // the retired `novo_lead_` template and fail before reaching Meta.
+  newLeadAssignment: { name: "new_lead_broker", language: "pt_BR" },
   leadAssignmentConfirmed: { name: "lead_assignment_confirmed", language: "pt_BR" },
   leadAssignmentUnavailable: { name: "lead_assignment_unavailable", language: "pt_BR" },
   leadAssignmentExpired: { name: "lead_assignment_expired", language: "pt_BR" },
@@ -16,6 +19,12 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
 } as const;
 
 export type MetaWhatsAppTemplatePurpose = keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES;
+
+const LEGACY_LEAD_OFFER_TEMPLATE_NAMES = new Set(["novo_lead_", "new_lead_assignment"]);
+
+export function isLegacyLeadOfferTemplateName(name?: string | null) {
+  return Boolean(name && LEGACY_LEAD_OFFER_TEMPLATE_NAMES.has(name));
+}
 
 /**
  * Assignment and lifecycle notices are part of the official Meta channel.
@@ -48,7 +57,7 @@ export function getMetaWhatsAppTemplate(purpose: string) {
  */
 export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
   if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo", "unidade"];
-  if (purpose === "brokerLeadNotification") {
+  if (purpose === "brokerLeadNotification" || purpose === "newLeadAssignment") {
     return ["cargo", "corretor_nome", "lead_nome", "produto_interesse"];
   }
   if (purpose === "leadAssignmentConfirmed") {
@@ -80,21 +89,17 @@ export function buildLeadAssignmentConfirmedVariables(input: {
 }
 
 export function buildLeadOfferVariables(input: {
+  cargo: string;
   corretorNome: string;
   leadNome: string;
-  empresa: string;
-  tipoLead: string;
-  unidade: string;
-  tempoResposta: string;
+  produtoInteresse: string;
   leadId: string;
 }) {
   return [
+    input.cargo,
     input.corretorNome,
     input.leadNome,
-    input.empresa,
-    input.tipoLead,
-    input.unidade,
-    input.tempoResposta,
+    input.produtoInteresse,
     input.leadId,
   ];
 }
@@ -104,7 +109,7 @@ export function buildLeadOfferVariables(input: {
  * dynamic URL button. It is not a body parameter.
  */
 export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: string[]) {
-  if (purpose === "brokerLeadNotification") {
+  if (purpose === "brokerLeadNotification" || purpose === "newLeadAssignment") {
     const [cargo, corretorNome, leadNome, produtoInteresse, leadId] = variables;
     return {
       bodyVariables: [
@@ -130,14 +135,6 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
         cidade?.trim() || "Não informada",
       ],
       urlButtonParameter: leadId || undefined,
-    };
-  }
-
-  if (purpose === "newLeadAssignment") {
-    const [brokerName, , companyName, leadTypeLabel, branchName, timeoutMinutes, leadId] = variables;
-    return {
-      bodyVariables: [brokerName ?? "", companyName ?? "", leadTypeLabel ?? "", branchName ?? "", timeoutMinutes ?? ""],
-      urlButtonParameter: leadId,
     };
   }
 

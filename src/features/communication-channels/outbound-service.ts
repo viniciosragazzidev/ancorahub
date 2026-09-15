@@ -391,13 +391,12 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
 
   if (purpose === "newLeadAssignment") {
     const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
-    const brokerName = split.bodyVariables[0] || rawVariables[0] || "Corretor(a)";
-    const leadType = split.bodyVariables[2] || rawVariables[2] || "Lead";
-    const branchName = split.bodyVariables[3] || rawVariables[3] || "Unidade";
-    const timeout = split.bodyVariables[4] || rawVariables[4] || "15";
+    const brokerName = split.bodyVariables[1] || rawVariables[1] || "Corretor(a)";
+    const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
+    const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
     const leadId = urlButtonParameter || split.urlButtonParameter;
     const link = leadId ? `\n\n👉 *Aceitar Lead:* ${baseUrl}/conversas?lead=${leadId}` : "";
-    return `🚨 *Novo Lead Disponível!*\n\nOlá *${brokerName}*, há um lead de *${leadType}* disponível em *${branchName}*.\n\n⏱️ Você tem *${timeout} minutos* para aceitar o atendimento.${link}`;
+    return `🚨 *Novo Lead Disponível!*\n\nOlá *${brokerName}*, o lead *${leadNome}* está disponível para atendimento.\n\n🏥 *Interesse:* ${produto}${link}`;
   }
 
   if (purpose === "taskReminder") {

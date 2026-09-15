@@ -148,9 +148,24 @@ export function isDeferredDistributionReason(reason: string) {
 export const OFFER_ENQUEUE_GRACE_MS = 2 * 60 * 1000;
 
 /**
- * DEC-049/DEC-027B: the provisional owner keeps the lead until another broker
- * confirms transactionally. A slightly-late accept from the current provisional
- * owner is honored while the rotation has not claimed another broker yet.
+ * A lead offer is not an assignment. The lead remains unowned while the offer
+ * is pending; only the acceptance transaction may set `corretorId`.
+ */
+export function buildPendingLeadOfferLeadUpdate(input: { targetBranchId: string; now: Date }) {
+  return {
+    // Unit routing is independent from broker ownership and can be resolved
+    // before acceptance so the next rotation uses the correct roster.
+    branchId: input.targetBranchId,
+    distributionStatus: "queued" as const,
+    distributionUpdatedAt: input.now,
+    updatedAt: input.now,
+  };
+}
+
+/**
+ * Legacy rows created before the no-owner-before-acceptance rule may still
+ * contain a provisional owner. Keep the short grace window only to finish
+ * those in-flight offers safely; new offers never rely on it.
  */
 export const LEAD_OFFER_ACCEPT_GRACE_MS = 60 * 1000;
 
