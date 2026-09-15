@@ -704,7 +704,14 @@ export function buildApp() {
           session: sessionName,
           errorCode: error instanceof Error ? error.message : "unknown",
         });
-        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+        return reply.code(502).send({
+          ok: false,
+          service: "waha",
+          status: "unavailable",
+          // Preserve the normalized provider error so the CRM can distinguish
+          // network instability from an invalid WAHA API key.
+          error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+        });
       }
     },
   );
@@ -806,7 +813,12 @@ export function buildApp() {
           session: sessionName,
           errorCode: error instanceof Error ? error.message : "unknown",
         });
-        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+        return reply.code(502).send({
+          ok: false,
+          service: "waha",
+          status: "unavailable",
+          error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+        });
       }
     },
   );

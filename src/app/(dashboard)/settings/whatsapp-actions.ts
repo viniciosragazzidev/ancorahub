@@ -62,7 +62,7 @@ async function vpsRequest<T extends WahaConnectionResponse>(
 ): Promise<T> {
   const base = vpsBaseUrl();
   if (!base)
-    throw new Error("VPS_API_URL não configurada no Vercel. Verifique as variáveis de ambiente.");
+    throw new Error("VPS_API_URL não configurada no serviço de frontend. Verifique as variáveis de ambiente do Coolify.");
 
   const url = `${base}${path}`;
   try {
@@ -334,7 +334,7 @@ export async function getWhatsAppSessionStatus() {
  */
 export async function diagnoseWahaConnection() {
   const base = vpsBaseUrl();
-  if (!base) return { ok: false, step: "config", error: "VPS_API_URL não configurada no Vercel." };
+  if (!base) return { ok: false, step: "config", error: "VPS_API_URL não configurada no serviço de frontend." };
 
   try {
     const healthRes = await fetch(`${base}/health`, {

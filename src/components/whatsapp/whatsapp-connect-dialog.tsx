@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { wahaActionErrorMessage } from "@/lib/waha-error-codes";
+import { wahaActionCodeFromMessage, wahaActionErrorMessage } from "@/lib/waha-error-codes";
 import {
   forceDisconnectWhatsAppSession,
   getWhatsAppConnection,
@@ -87,6 +87,8 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   const [pending, startTransition] = useTransition();
   const previousStatus = useRef(initial.status);
   const polling = useRef(false);
+  const pollingFailures = useRef(0);
+  const lastPollingNoticeAt = useRef(0);
   const qrCodeRef = useRef(initial.qrCode);
   const lastQrRefreshAt = useRef(0);
   const ready = connection.status === "ready";
@@ -141,6 +143,22 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     }
   }
 
+  function notePollingFailure(code?: string | null) {
+    pollingFailures.current += 1;
+    // A leitura de status acontece em alta frequência durante o pareamento.
+    // Indisponibilidade/timeout transitórios não devem gerar um toast a cada
+    // 500 ms, mas uma falha persistente ainda precisa ser visível.
+    const now = Date.now();
+    if (pollingFailures.current < 3 || now - lastPollingNoticeAt.current < 15_000) return;
+    lastPollingNoticeAt.current = now;
+    toast.info(
+      code === "WAHA_UNAUTHORIZED"
+        ? "A conexão com o WhatsApp precisa de atenção do administrador. Continuando a verificar…"
+        : "Ainda aguardando resposta do servidor WhatsApp. Continuando a verificar…",
+      { duration: 6_000 },
+    );
+  }
+
   function updateStatus(status: string) {
     previousStatus.current = status;
     setConnection((current) => ({
@@ -157,9 +175,13 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     try {
       const result = await getWhatsAppSessionStatus();
       if (!result.success || !result.status) {
-        // Se falhou ao consultar status, não atualizar UI — manter estado atual
+        // Se falhou ao consultar status, não atualizar UI — manter estado atual.
+        // A action retorna falhas transitórias como dados serializáveis; tratar
+        // aqui evita que o polling pareça um erro definitivo ao usuário.
+        if (result.code !== "NO_SESSION") notePollingFailure(result.code);
         return;
       }
+      pollingFailures.current = 0;
       if (result.status === "ready") {
         updateStatus("ready");
         // Notificar o parent ANTES de fechar — o parent faz fetch do server
@@ -195,7 +217,12 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
         }
       }
     } catch (error) {
-      showUnexpectedActionError(error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (/WAHA_(?:UNREACHABLE|TIMEOUT|UNAVAILABLE)\b/i.test(message)) {
+        notePollingFailure(wahaActionCodeFromMessage(message));
+      } else {
+        showUnexpectedActionError(error);
+      }
     } finally {
       polling.current = false;
     }
