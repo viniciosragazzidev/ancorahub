@@ -90,6 +90,7 @@ export async function enqueueBrokerBatchSummaryNotification(input: {
     recipientId: input.brokerId,
     destinationPhone: input.destinationPhone,
     body: messageBody,
+    purpose: "brokerLeadNotification",
     requestedBy,
     idempotencyKey,
   });

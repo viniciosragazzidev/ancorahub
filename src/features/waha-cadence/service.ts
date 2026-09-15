@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSettings } from "@/features/system-settings/queries";
@@ -22,7 +22,11 @@ export async function getWahaCadenceConfig() {
   const rows = await getSystemSettings([WAHA_CADENCE_FEATURE, "waha_cadence_max_attempts", "waha_cadence_retry_base_seconds", "waha_cadence_lease_seconds"]);
   const values = new Map(rows.map((row) => [row.key, row.value]));
   return {
-    enabled: values.get(WAHA_CADENCE_FEATURE) === "true",
+    // WAHA is intentionally limited to the broker's personal connection and
+    // read-only synchronization. Corporate cadences must use the official
+    // Meta outbox; keeping this hard-disabled also prevents legacy queued
+    // rows from being sent after a deployment.
+    enabled: false,
     maxAttempts: bounded(values.get("waha_cadence_max_attempts"), defaults.maxAttempts, 1, 10),
     retryBaseSeconds: bounded(values.get("waha_cadence_retry_base_seconds"), defaults.retryBaseSeconds, 15, 3600),
     leaseSeconds: bounded(values.get("waha_cadence_lease_seconds"), defaults.leaseSeconds, 30, 900),
@@ -32,6 +36,7 @@ export async function getWahaCadenceConfig() {
 
 function assertDirector(actor: Actor) {
   if (actor.role !== "director") throw new Error("Apenas o Diretor pode administrar cadências.");
+  throw new Error("Cadências WAHA corporativas foram desativadas. Use templates e automações pelo canal oficial Meta.");
 }
 
 async function audit(actor: Pick<Actor, "userId">, entity: string, entityId: string, action: string) {
@@ -170,7 +175,7 @@ async function claimNext(workerId: string, leaseSeconds: number) {
   return claimed ?? null;
 }
 
-async function processDelivery(row: typeof schema.wahaDeliveryOutbox.$inferSelect, config: Awaited<ReturnType<typeof getWahaCadenceConfig>>) {
+async function processDelivery(row: typeof schema.wahaDeliveryOutbox.$inferSelect) {
   const db = getDatabase();
   const [run] = await db.select().from(schema.wahaCadenceRuns).where(and(eq(schema.wahaCadenceRuns.id, row.runId), eq(schema.wahaCadenceRuns.tenantId, row.tenantId), inArray(schema.wahaCadenceRuns.status, ["queued", "active"]))).limit(1);
   if (!run) throw new Error("Execução não está disponível.");
@@ -209,7 +214,7 @@ export async function runWahaCadenceProcessor(input: { limit?: number } = {}) {
     if (!row) break;
     result.claimed += 1;
     try {
-      const outcome = await processDelivery(row, config);
+      const outcome = await processDelivery(row);
       if (outcome === "sent") result.sent += 1; else result.deferred += 1;
     } catch (error) {
       const exhausted = row.attemptCount >= row.maxAttempts;

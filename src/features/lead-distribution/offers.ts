@@ -7,6 +7,7 @@ import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "@/features/communication-channels/templates";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 
 import { normalizePhone } from "@/shared/utils/phone";
 import { isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
@@ -442,17 +443,34 @@ export async function handleLeadOfferWebhookResponse(input: {
 
   // Handle DECLINE
   if (isDecline) {
-    const [declined] = await db
-      .update(schema.leadOffers)
-      .set({ status: "DECLINED", declinedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          eq(schema.leadOffers.id, offer.id),
-          eq(schema.leadOffers.tenantId, input.tenantId),
-          inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES),
-        ),
-      )
-      .returning({ id: schema.leadOffers.id });
+    const declinedAt = new Date();
+    const declined = await db.transaction(async (tx) => {
+      const [updatedOffer] = await tx
+        .update(schema.leadOffers)
+        .set({ status: "DECLINED", declinedAt, updatedAt: declinedAt })
+        .where(
+          and(
+            eq(schema.leadOffers.id, offer.id),
+            eq(schema.leadOffers.tenantId, input.tenantId),
+            inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES),
+          ),
+        )
+        .returning({ id: schema.leadOffers.id });
+
+      if (!updatedOffer) return false;
+
+      await tx.update(schema.leads)
+        .set(buildDeclinedLeadReleaseUpdate(declinedAt))
+        .where(and(
+          eq(schema.leads.id, offer.leadId),
+          eq(schema.leads.tenantId, input.tenantId),
+          eq(schema.leads.corretorId, broker.id),
+          eq(schema.leads.assignmentSource, "automatic_offer"),
+          isNull(schema.leads.deletedAt),
+        ));
+
+      return true;
+    });
 
     if (!declined) return { processed: true, action: "declined", leadId: offer.leadId };
 

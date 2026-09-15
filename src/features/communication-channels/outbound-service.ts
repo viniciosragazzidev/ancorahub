@@ -13,9 +13,7 @@ import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
-import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS } from "@/features/notifications/broker-lead-cadence";
-import { getInternalBrokerNotificationPolicy, getSelectedInternalWahaNumber, isInternalBrokerNotice } from "./internal-notification-policy";
 import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-policy-service";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
@@ -31,27 +29,15 @@ export function selectInternalBrokerDeliveryRoute(input: {
   deliveryMode: "meta_then_waha" | "waha_direct";
   configuredWahaNumberId: string | null;
   activeWahaNumberId: string | null;
+  messageType?: "template" | "text";
 }): { route: DeliveryRoute; wahaNumberId: string | null } {
-  if (!input.enabled) return { route: "meta_only", wahaNumberId: null };
-  if (input.deliveryMode === "waha_direct") {
-    return { route: "waha_direct", wahaNumberId: input.configuredWahaNumberId };
-  }
-  if (!input.activeWahaNumberId) return { route: "meta_only", wahaNumberId: null };
-  return { route: "meta_then_waha", wahaNumberId: input.activeWahaNumberId };
+  void input;
+  return { route: "meta_only", wahaNumberId: null };
 }
 
-async function resolveInternalBrokerDeliveryRoute(input: { tenantId: string; recipientType: string; purpose: string }) {
-  if (!isInternalBrokerNotice(input)) return { route: "meta_only" as const, wahaNumberId: null };
-  const policy = await getInternalBrokerNotificationPolicy(input.tenantId);
-  const selected = await getSelectedInternalWahaNumber(input.tenantId, policy.wahaNumberId);
-  // Preserve the director's explicit choice. A paused or unavailable direct
-  // number is blocked later by the outbox instead of silently changing channel.
-  return selectInternalBrokerDeliveryRoute({
-    enabled: policy.enabled,
-    deliveryMode: policy.deliveryMode,
-    configuredWahaNumberId: policy.wahaNumberId,
-    activeWahaNumberId: selected?.id ?? null,
-  });
+function resolveInternalBrokerDeliveryRoute(input: { tenantId: string; recipientType: string; purpose: string }) {
+  void input;
+  return { route: "meta_only" as const, wahaNumberId: null };
 }
 
 export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean; attempts: number }) {
@@ -159,25 +145,19 @@ export async function enqueueMetaTemplateMessage(input: {
   const db = getDatabase();
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
-  const configuredDelivery = await resolveInternalBrokerDeliveryRoute(input);
-  const delivery = messagePlan?.preferWahaDirect
-    ? { route: "waha_direct" as const, wahaNumberId: configuredDelivery.wahaNumberId }
-    : configuredDelivery;
-  const channelQuery = input.channelId
-    ? and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId))
-    : and(
-        eq(schema.communicationChannels.tenantId, input.tenantId),
-        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-        eq(schema.communicationChannels.status, "active"),
-      );
-  const [channel] = delivery.route === "waha_direct"
-    ? []
-    : await db.select({ id: schema.communicationChannels.id })
-        .from(schema.communicationChannels)
-        .where(channelQuery)
-        .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
-        .limit(1);
-  if (delivery.route !== "waha_direct" && !channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
+  const delivery = resolveInternalBrokerDeliveryRoute(input);
+  const channelQuery = and(
+    input.channelId ? eq(schema.communicationChannels.id, input.channelId) : undefined,
+    eq(schema.communicationChannels.tenantId, input.tenantId),
+    inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+    eq(schema.communicationChannels.status, "active"),
+  );
+  const [channel] = await db.select({ id: schema.communicationChannels.id })
+    .from(schema.communicationChannels)
+    .where(channelQuery)
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+    .limit(1);
+  if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const id = randomUUID();
   const now = new Date();
   await db.insert(schema.whatsappOutboundMessages).values({
@@ -254,26 +234,23 @@ export async function enqueueMetaTextMessage(input: {
   const destinationPhone = phoneSchema.parse(input.destinationPhone);
   const body = z.string().trim().min(1).max(4096).parse(input.body);
   const db = getDatabase();
-  const delivery = await resolveInternalBrokerDeliveryRoute({
+  const delivery = resolveInternalBrokerDeliveryRoute({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
     purpose: input.purpose ?? "directText",
   });
-  const channelQuery = input.channelId
-    ? and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, input.tenantId))
-    : and(
-        eq(schema.communicationChannels.tenantId, input.tenantId),
-        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-        eq(schema.communicationChannels.status, "active"),
-      );
-  const [channel] = delivery.route === "waha_direct"
-    ? []
-    : await db.select({ id: schema.communicationChannels.id })
-        .from(schema.communicationChannels)
-        .where(channelQuery)
-        .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
-        .limit(1);
-  if (delivery.route !== "waha_direct" && !channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
+  const channelQuery = and(
+    input.channelId ? eq(schema.communicationChannels.id, input.channelId) : undefined,
+    eq(schema.communicationChannels.tenantId, input.tenantId),
+    inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+    eq(schema.communicationChannels.status, "active"),
+  );
+  const [channel] = await db.select({ id: schema.communicationChannels.id })
+    .from(schema.communicationChannels)
+    .where(channelQuery)
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+    .limit(1);
+  if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
   const id = randomUUID();
@@ -368,118 +345,6 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
   return rawVariables.filter(Boolean).join("\n") || "Notificação Âncora CRM";
 }
 
-export async function findActiveWahaFallbackNumber(tenantId: string, branchId?: string | null, capability: "brokerFallback" | "qualificationFallback" = "brokerFallback") {
-  const db = getDatabase();
-  const numbers = await db
-    .select({
-      id: schema.wahaNumbers.id,
-      relaySessionId: schema.wahaNumbers.relaySessionId,
-      displayPhoneNumber: schema.wahaNumbers.displayPhoneNumber,
-      capabilities: schema.wahaNumbers.capabilities,
-      status: schema.wahaNumbers.status,
-    })
-    .from(schema.wahaNumbers)
-    .where(
-      and(
-        eq(schema.wahaNumbers.tenantId, tenantId),
-        inArray(schema.wahaNumbers.status, ["WORKING", "active", "ready", "CONNECTED"]),
-        ...(branchId ? [or(eq(schema.wahaNumbers.branchId, branchId), isNull(schema.wahaNumbers.branchId))] : []),
-      ),
-    )
-    .orderBy(desc(schema.wahaNumbers.updatedAt))
-    .limit(5);
-
-  return numbers.find((n) => n.capabilities?.[capability] !== false) ?? null;
-}
-
-type WahaDeliveryRow = {
-  id: string;
-  tenantId: string;
-  wahaNumberId: string | null;
-  idempotencyKey: string;
-  destinationPhone: string;
-  messageType: string;
-  variables: unknown;
-  renderedBody?: string | null;
-  fallbackRenderedBody?: string | null;
-  purpose: string;
-  attempts: number;
-};
-
-export function resolveWahaNoticeBody(row: Pick<WahaDeliveryRow, "messageType" | "variables" | "renderedBody" | "fallbackRenderedBody" | "purpose">, mode: "direct" | "fallback") {
-  const variables = Array.isArray(row.variables)
-    ? row.variables.filter((value): value is string => typeof value === "string")
-    : [];
-  const baseBody = row.renderedBody
-    ?? (row.messageType === "text" ? variables[0] ?? "" : resolveTemplateTextBody(row.purpose, variables));
-  return mode === "fallback" ? row.fallbackRenderedBody ?? baseBody : baseBody;
-}
-
-async function sendSelectedWahaInternalNotice(row: WahaDeliveryRow, mode: "direct" | "fallback") {
-  const number = await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId);
-  if (!number) {
-    const error = new Error("O número WAHA selecionado para avisos internos está pausado ou indisponível.") as Error & { code?: string };
-    error.code = "WAHA_INTERNAL_NUMBER_UNAVAILABLE";
-    throw error;
-  }
-  const body = resolveWahaNoticeBody(row, mode);
-  console.info("[waha_internal_outbound] sending notice", {
-    outboundId: row.id,
-    mode,
-    relaySessionId: number.relaySessionId,
-  });
-  const sent = await sendWahaRelayMessage({
-    idempotencyKey: `waha-${mode}-${row.id}-${row.attempts}`,
-    sessionId: number.relaySessionId,
-    destination: row.destinationPhone,
-    body,
-  });
-  const now = new Date();
-  const db = getDatabase();
-  await db.update(schema.whatsappOutboundMessages).set({
-    status: "sent",
-    providerMessageId: sent.messageId,
-    providerErrorCode: null,
-    providerErrorMessage: mode === "direct" ? "Enviado diretamente pelo WAHA interno." : "Enviado pela contingência WAHA interna.",
-    sentAt: now,
-    failedAt: null,
-    nextAttemptAt: null,
-    updatedAt: now,
-  }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
-
-  return sent;
-}
-
-/** Used by the Meta delivery webhook after a persisted internal notice is refused. */
-export async function dispatchWahaFallbackAfterMetaDeliveryFailure(outboundId: string, tenantId: string) {
-  const db = getDatabase();
-  const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", updatedAt: new Date() }).where(and(
-    eq(schema.whatsappOutboundMessages.id, outboundId),
-    eq(schema.whatsappOutboundMessages.tenantId, tenantId),
-    eq(schema.whatsappOutboundMessages.deliveryRoute, "meta_then_waha"),
-    eq(schema.whatsappOutboundMessages.status, "failed"),
-  )).returning({
-    id: schema.whatsappOutboundMessages.id,
-    tenantId: schema.whatsappOutboundMessages.tenantId,
-    wahaNumberId: schema.whatsappOutboundMessages.wahaNumberId,
-    idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey,
-    destinationPhone: schema.whatsappOutboundMessages.destinationPhone,
-    messageType: schema.whatsappOutboundMessages.messageType,
-    variables: schema.whatsappOutboundMessages.variables,
-    purpose: schema.whatsappOutboundMessages.purpose,
-    attempts: schema.whatsappOutboundMessages.attempts,
-  });
-  if (!claimed) return false;
-  try {
-    await sendSelectedWahaInternalNotice(claimed, "fallback");
-    return true;
-  } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 240) : "Falha no fallback WAHA interno.";
-    await db.update(schema.whatsappOutboundMessages).set({ status: "failed", providerErrorMessage: message, failedAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, claimed.id));
-    return false;
-  }
-}
-
 export async function processMetaOutboundBatch(limit = 10, tenantId?: string, outboundId?: string): Promise<{ processed: number; sent: number; failed: number; retried: number }> {
   const db = getDatabase();
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 50);
@@ -488,7 +353,6 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
     tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined,
     outboundId ? eq(schema.whatsappOutboundMessages.id, outboundId) : undefined,
     or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")),
-    or(isNull(schema.whatsappOutboundMessages.providerErrorCode), ne(schema.whatsappOutboundMessages.providerErrorCode, "WAHA_INTERNAL_NUMBER_UNAVAILABLE")),
     or(lte(schema.whatsappOutboundMessages.scheduledAt, now), isNull(schema.whatsappOutboundMessages.scheduledAt)),
     or(lte(schema.whatsappOutboundMessages.nextAttemptAt, now), isNull(schema.whatsappOutboundMessages.nextAttemptAt)),
   )).orderBy(asc(schema.whatsappOutboundMessages.createdAt)).limit(safeLimit);
@@ -501,6 +365,18 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
     const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", attempts: row.attempts + 1, updatedAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")))).returning({ id: schema.whatsappOutboundMessages.id });
     if (!claimed) return;
     try {
+      if (row.deliveryRoute !== "meta_only" || row.wahaNumberId) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          deliveryRoute: "meta_only",
+          wahaNumberId: null,
+          providerErrorCode: null,
+          providerErrorMessage: "Envio corporativo migrado para a API oficial Meta.",
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.whatsappOutboundMessages.id, row.id),
+          eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+        ));
+      }
       if (row.purpose === "brokerLeadNotification" && !isWithinBusinessHours()) {
         await db.update(schema.whatsappOutboundMessages).set({
           status: "pending",
@@ -541,26 +417,6 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         return;
       }
 
-      if (row.deliveryRoute === "waha_direct") {
-        try {
-          await sendSelectedWahaInternalNotice({ ...row, attempts: row.attempts + 1 }, "direct");
-          sent += 1;
-        } catch (error) {
-          const message = error instanceof Error ? error.message.slice(0, 240) : "Número WAHA interno indisponível.";
-          const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code ?? "WAHA_DIRECT_SEND_FAILED") : "WAHA_DIRECT_SEND_FAILED";
-          await db.update(schema.whatsappOutboundMessages).set({
-            status: "pending",
-            attempts: row.attempts,
-            nextAttemptAt: null,
-            providerErrorCode: code,
-            providerErrorMessage: message,
-            updatedAt: new Date(),
-          }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-          failed += 1;
-        }
-        return;
-      }
-
       if (row.purpose === "brokerInvitation" && row.recipientId) {
         const [loadedInvitation] = await db.select({ tokenCiphertext: schema.brokerInvitations.tokenCiphertext, expiresAt: schema.brokerInvitations.expiresAt, status: schema.brokerInvitations.status }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, row.recipientId), eq(schema.brokerInvitations.tenantId, row.tenantId))).limit(1);
         invitation = loadedInvitation;
@@ -595,14 +451,26 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         }
       }
 
-      if (!row.channelId) throw new Error("Canal Meta ausente para este envio.");
+      // Always resolve an active Meta channel. Legacy rows may point to a
+      // removed WAHA channel, so that id must never make the migrated send
+      // fail with a false "channel unavailable" error.
       const [channel] = await db.select().from(schema.communicationChannels).where(and(
-        eq(schema.communicationChannels.id, row.channelId),
         eq(schema.communicationChannels.tenantId, row.tenantId),
         inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
         eq(schema.communicationChannels.status, "active"),
-      )).limit(1);
+      )).orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt)).limit(1);
       if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
+      if (row.channelId !== channel.id || row.deliveryRoute !== "meta_only" || row.wahaNumberId) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          channelId: channel.id,
+          deliveryRoute: "meta_only",
+          wahaNumberId: null,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.whatsappOutboundMessages.id, row.id),
+          eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+        ));
+      }
       const phoneNumberId = channel.phoneNumberId;
       const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
 
@@ -733,103 +601,22 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           : "META_OUTBOUND_FAILED";
       const terminalInvitationFailure = row.purpose === "brokerInvitation" && terminalBrokerInvitationErrorCodes.has(code);
 
-      if (row.deliveryRoute === "waha_direct") {
-        const nextAttemptAt = row.attempts < 3 ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000) : null;
-        await db.update(schema.whatsappOutboundMessages).set({
-          status: nextAttemptAt ? "pending" : "failed",
-          providerErrorCode: "WAHA_INTERNAL_FAILED",
-          providerErrorMessage: message.slice(0, 240),
-          nextAttemptAt,
-          failedAt: nextAttemptAt ? null : new Date(),
-          updatedAt: new Date(),
-        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-        if (nextAttemptAt) retried += 1; else failed += 1;
-        return;
+      const nextAttemptAt = !terminalInvitationFailure && row.attempts < 3
+        ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000)
+        : null;
+      const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
+      await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, deliveryRoute: "meta_only", wahaNumberId: null, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      if (row.purpose === "brokerInvitation" && row.recipientId) {
+        const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
+        await db.update(schema.brokerInvitations).set({
+          ...failureUpdate,
+          deliveryError: terminalInvitationFailure ? message.slice(0, 240) : failureUpdate.deliveryError,
+        }).where(and(
+          eq(schema.brokerInvitations.id, row.recipientId),
+          eq(schema.brokerInvitations.tenantId, row.tenantId),
+        ));
       }
-
-      let sentViaWaha = false;
-      try {
-        if (terminalInvitationFailure) {
-          throw brokerInvitationError(code, message);
-        }
-        const isQualificationFirstContact = row.purpose === "aiQualification"
-          || row.purpose === "leadQualification"
-          || row.purpose === "lead_qualification";
-        const qualificationWindowOpen = isQualificationFirstContact
-          ? await isCustomerServiceWindowOpen({
-              tenantId: row.tenantId,
-              recipientType: row.recipientType as "lead" | "client" | "user",
-              recipientId: row.recipientId ?? undefined,
-              destinationPhone: row.destinationPhone,
-            })
-          : true;
-        const hasEligibleQualificationFallback = !isQualificationFirstContact
-          || (qualificationWindowOpen && row.fallbackMessageType === "text" && Boolean(row.fallbackRenderedBody));
-        const capability = isQualificationFirstContact
-          ? "qualificationFallback"
-          : "brokerFallback";
-        const internalNotice = isInternalBrokerNotice({ recipientType: row.recipientType, purpose: row.purpose });
-        const wahaFallbackNumber = hasEligibleQualificationFallback
-          ? internalNotice
-            ? row.deliveryRoute === "meta_then_waha"
-              ? await getSelectedInternalWahaNumber(row.tenantId, row.wahaNumberId)
-              : null
-            : await findActiveWahaFallbackNumber(row.tenantId, null, capability)
-          : null;
-        if (wahaFallbackNumber) {
-          const bodyText = row.fallbackRenderedBody
-            ?? row.renderedBody
-            ?? (row.messageType === "text"
-              ? (Array.isArray(row.variables) && typeof row.variables[0] === "string" ? row.variables[0] : "")
-              : resolveTemplateTextBody(row.purpose, Array.isArray(row.variables) ? row.variables.filter((v): v is string => typeof v === "string") : [], urlButtonParameter));
-
-          const wahaRes = await sendWahaRelayMessage({
-            idempotencyKey: `waha-fallback-${row.id}-${row.attempts}`,
-            sessionId: wahaFallbackNumber.relaySessionId,
-            destination: row.destinationPhone,
-            body: bodyText,
-          });
-
-          const providerMessageId = wahaRes.messageId || "waha_fallback_sent";
-          await db.update(schema.whatsappOutboundMessages).set({
-            status: "sent",
-            providerMessageId,
-            providerErrorCode: null,
-            providerErrorMessage: "Enviado via contingência WAHA",
-            sentAt: new Date(),
-            updatedAt: new Date(),
-          }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-
-          if (invitation && row.recipientId) {
-            await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts, deliveryError: null }).where(eq(schema.brokerInvitations.id, row.recipientId));
-          }
-          sent += 1;
-          sentViaWaha = true;
-        }
-      } catch (wahaError) {
-        if (!terminalInvitationFailure) {
-          console.warn("[meta-outbox] WAHA fallback attempt failed:", wahaError);
-        }
-      }
-
-      if (!sentViaWaha) {
-        const nextAttemptAt = !terminalInvitationFailure && row.attempts < 3
-          ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000)
-          : null;
-        const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
-        await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-        if (row.purpose === "brokerInvitation" && row.recipientId) {
-          const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
-          await db.update(schema.brokerInvitations).set({
-            ...failureUpdate,
-            deliveryError: terminalInvitationFailure ? message.slice(0, 240) : failureUpdate.deliveryError,
-          }).where(and(
-            eq(schema.brokerInvitations.id, row.recipientId),
-            eq(schema.brokerInvitations.tenantId, row.tenantId),
-          ));
-        }
-        if (nextAttemptAt) retried += 1; else failed += 1;
-      }
+      if (nextAttemptAt) retried += 1; else failed += 1;
     }
   };
 

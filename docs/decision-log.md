@@ -1061,3 +1061,20 @@ VPS separada. A comunicação entre as camadas é HTTPS autenticado, com secrets
 configurados por serviço. Deploy, health check, observabilidade e rollback devem
 identificar cada serviço independentemente; referências anteriores à Vercel são
 históricas e não devem orientar novas implementações.
+
+## DEC-100 — WAHA restrito à conexão pessoal do corretor
+
+**Decisão aprovada em 2026-09-15.** O tenant oficial não usa WAHA para envio,
+fallback, cadências ou notificações internas. Templates, mensagens automáticas,
+convites, ofertas, atribuições e reatribuições passam exclusivamente pela
+outbox da API oficial Meta. O WAHA fica restrito à conexão pessoal do corretor
+e à sincronização autorizada de mensagens, sem transformar mensagens recebidas
+em leads ou iniciar distribuição.
+
+Registros antigos da outbox com rota WAHA são normalizados para `meta_only` no
+próximo processamento; nenhum envio corporativo é feito pelo relay. O endpoint
+de compatibilidade `/api/internal/cron/whatsapp` aponta para o worker oficial
+para que o scheduler do Coolify não produza 404 durante a migração. Cadências
+WAHA corporativas e configurações de fallback são recusadas no servidor e a
+recusa de uma oferta libera atomicamente o lead para a fila, sem manter o
+corretor como proprietário.

@@ -2,11 +2,9 @@
 
 
 import { changeOwnWahaConnection, createOwnWahaConnection, refreshOwnWahaConnection, updateOwnWahaCapabilities } from "@/features/waha-cadence/connection-service";
-import { saveInternalBrokerNotificationPolicy } from "@/features/communication-channels/internal-notification-policy";
 
 function done() {
 }
-
 export async function createWahaConnectionAction(formData: FormData) {
   try {
     const result = await createOwnWahaConnection({ label: String(formData.get("label") ?? "") });
@@ -16,7 +14,6 @@ export async function createWahaConnectionAction(formData: FormData) {
     return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível iniciar a conexão." };
   }
 }
-
 export async function refreshWahaConnectionAction(id: string) {
   try { const result = await refreshOwnWahaConnection(id); done(); return { success: true as const, result }; }
   catch (error) { return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível atualizar a conexão." }; }
@@ -43,16 +40,3 @@ export async function updateWahaCapabilitiesAction(id: string, formData: FormDat
   }
 }
 
-export async function updateInternalBrokerNotificationPolicyAction(formData: FormData) {
-  try {
-    const result = await saveInternalBrokerNotificationPolicy({
-      enabled: formData.get("enabled") === "true",
-      deliveryMode: formData.get("deliveryMode") === "waha_direct" ? "waha_direct" : "meta_then_waha",
-      wahaNumberId: String(formData.get("wahaNumberId") ?? "").trim() || null,
-    });
-    done();
-    return { success: true as const, result };
-  } catch (error) {
-    return { success: false as const, error: error instanceof Error ? error.message : "Não foi possível atualizar os avisos internos." };
-  }
-}

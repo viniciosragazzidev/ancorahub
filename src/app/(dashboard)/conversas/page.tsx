@@ -24,7 +24,6 @@ import { shouldCreateSyntheticCustomerConversation } from "@/features/communicat
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
-import { getInternalBrokerNotificationPolicy } from "@/features/communication-channels/internal-notification-policy";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
@@ -544,22 +543,10 @@ export default async function ConversationsPage({
 
   let officialBrokerConversations: OfficialBrokerConversation[] = [];
   let officialBrokerMessagesEnabled = false;
-  let internalBrokerDeliveryChannel: "meta" | "waha_direct" = "meta";
+  const internalBrokerDeliveryChannel = "meta" as const;
 
   if (officialBrokerTab) {
-    const [metaCloudEnabled, internalBrokerPolicy] = await Promise.all([
-      isMetaCloudWhatsAppEnabled(),
-      getInternalBrokerNotificationPolicy(context.tenantId),
-    ]);
-    officialBrokerMessagesEnabled = metaCloudEnabled || Boolean(
-      internalBrokerPolicy?.enabled && internalBrokerPolicy.deliveryMode === "waha_direct" && internalBrokerPolicy.wahaNumberId,
-    );
-    internalBrokerDeliveryChannel =
-      internalBrokerPolicy?.enabled &&
-      internalBrokerPolicy.deliveryMode === "waha_direct" &&
-      internalBrokerPolicy.wahaNumberId
-        ? "waha_direct" as const
-        : "meta" as const;
+    officialBrokerMessagesEnabled = await isMetaCloudWhatsAppEnabled();
 
     if (officialBrokerMessagesEnabled) {
       const brokers = await db

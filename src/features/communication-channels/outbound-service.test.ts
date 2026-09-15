@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, resolveWahaNoticeBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
+import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS, scheduleBrokerLeadNotification } from "@/features/notifications/broker-lead-cadence";
 
 vi.mock("server-only", () => ({}));
@@ -23,26 +23,36 @@ describe("outboundService", () => {
     });
   });
 
-  it("uses only the selected WAHA number in direct mode and Meta in every other mode", () => {
+  it("routes every official notification through Meta Cloud", () => {
     expect(selectInternalBrokerDeliveryRoute({
       enabled: true,
       deliveryMode: "waha_direct",
       configuredWahaNumberId: "selected-waha",
       activeWahaNumberId: null,
-    })).toEqual({ route: "waha_direct", wahaNumberId: "selected-waha" });
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
 
     expect(selectInternalBrokerDeliveryRoute({
       enabled: true,
       deliveryMode: "meta_then_waha",
       configuredWahaNumberId: "selected-waha",
       activeWahaNumberId: "selected-waha",
-    })).toEqual({ route: "meta_then_waha", wahaNumberId: "selected-waha" });
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
 
     expect(selectInternalBrokerDeliveryRoute({
       enabled: false,
       deliveryMode: "waha_direct",
       configuredWahaNumberId: "selected-waha",
       activeWahaNumberId: "selected-waha",
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
+  });
+
+  it("always routes official template messages through Meta Cloud", () => {
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: true,
+      deliveryMode: "waha_direct",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: "selected-waha",
+      messageType: "template",
     })).toEqual({ route: "meta_only", wahaNumberId: null });
   });
 
@@ -80,15 +90,4 @@ describe("outboundService", () => {
     expect(qualifText).toContain("Como podemos te ajudar");
   });
 
-  it("keeps the selected free primary in direct WAHA mode and uses fallback only after a Meta failure", () => {
-    const row = {
-      messageType: "text",
-      variables: ["legacy"],
-      renderedBody: "Mensagem principal configurada",
-      fallbackRenderedBody: "Mensagem de contingência configurada",
-      purpose: "brokerLeadNotification",
-    };
-    expect(resolveWahaNoticeBody(row, "direct")).toBe("Mensagem principal configurada");
-    expect(resolveWahaNoticeBody(row, "fallback")).toBe("Mensagem de contingência configurada");
-  });
 });

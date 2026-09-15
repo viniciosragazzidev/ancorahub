@@ -3,21 +3,13 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 
-import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { hasCapability } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 
 import { createWahaRelaySession, disconnectWahaRelaySession, getWahaRelaySession, pauseWahaRelaySession, resumeWahaRelaySession } from "./relay-client";
 
 export const WAHA_CONNECTIONS_FEATURE = "feature_waha_connections_enabled";
 type Scope = "tenant" | "branch";
-
-function canConfigure(context: Awaited<ReturnType<typeof getRequiredTenantContext>>) {
-  return context.role === "director" || context.role === "manager"
-    ? hasCapability(context.role, "acessar_configuracoes_unidade", context.jobTitle)
-    : false;
-}
 
 function scopeFor(context: Awaited<ReturnType<typeof getRequiredTenantContext>>): Scope {
   if (context.role === "director") return "tenant";
@@ -26,8 +18,8 @@ function scopeFor(context: Awaited<ReturnType<typeof getRequiredTenantContext>>)
 }
 
 async function assertAvailable(context: Awaited<ReturnType<typeof getRequiredTenantContext>>) {
-  if (!canConfigure(context)) throw new Error("Sem permissão para configurar números WAHA.");
-  if (await getSystemSetting(WAHA_CONNECTIONS_FEATURE) === "false") throw new Error("A conexão WAHA está desativada pela plataforma.");
+  void context;
+  throw new Error("Conexões WAHA corporativas foram desativadas. Use o canal oficial Meta; o WAHA permanece disponível somente para a conta pessoal do corretor.");
 }
 
 function whereOwnNumber(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, id: string) {

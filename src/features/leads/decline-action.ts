@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { buildDeclinedLeadReleaseUpdate } from "./decline-policy";
 
 export type DeclineLeadState = { success?: boolean; error?: string };
 
@@ -41,17 +42,9 @@ export async function declineLeadAction(leadId: string, reason: string): Promise
     const now = new Date();
 
     const result = await db.transaction(async (tx) => {
-      // Keep the current owner visible until the distribution engine commits
-      // the next eligible broker. assignmentSource authorizes that atomic swap.
       const updated = await tx
         .update(schema.leads)
-        .set({
-          status: "distributed",
-          distributionStatus: "assigned",
-          assignmentSource: "automatic_offer",
-          distributionUpdatedAt: now,
-          stageEnteredAt: now,
-        })
+        .set(buildDeclinedLeadReleaseUpdate(now))
         .where(
           and(
             eq(schema.leads.id, lead.id),

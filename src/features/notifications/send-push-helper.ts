@@ -5,8 +5,7 @@ import { and, count, eq, isNull, or } from "drizzle-orm";
 import webpush from "web-push";
 
 import { enqueueBrokerLeadNotification } from "./broker-lead-whatsapp";
-import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
+import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isNotificationCapabilityEnabled } from "./queries";
@@ -379,7 +378,7 @@ export async function notifyLeadArrived(leadId: string, tenantId: string, branch
   );
 }
 
-async function sendBrokerReassignedWhatsAppMessage(tenantId: string, brokerId: string, leadId: string, leadName: string) {
+async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: string, leadId: string) {
   try {
     const db = getDatabase();
     const [broker] = await db
@@ -400,50 +399,19 @@ async function sendBrokerReassignedWhatsAppMessage(tenantId: string, brokerId: s
     const brokerPhone = broker?.phone?.replace(/\D/g, "");
     if (!brokerPhone || brokerPhone.length < 10) return;
 
-    const [waha] = await db
-      .select({
-        id: schema.wahaNumbers.id,
-        relaySessionId: schema.wahaNumbers.relaySessionId,
-      })
-      .from(schema.wahaNumbers)
-      .where(
-        and(
-          or(eq(schema.wahaNumbers.tenantId, tenantId), eq(schema.wahaNumbers.scope, "platform")),
-          eq(schema.wahaNumbers.status, "active"),
-        )
-      )
-      .limit(1);
-
-    if (!waha?.relaySessionId) return;
-
-    const messageText = `⚠️ *Aviso de Redistribuição - CorreTop*\n\nOlá, ${broker?.name || "Corretor"}!\nO lead *${leadName}* foi redistribuído para outro corretor por falta de interação / primeiro contato no tempo limite.\n\nFique atento aos próximos leads na sua fila!\n\nCaso esteja tendo um problema, envie mensagem para o suporte (5521959307782).`;
-
-    const messageId = randomUUID();
-    const sent = await sendWahaRelayMessage({
-      idempotencyKey: `lead-reassigned-waha:${leadId}:${brokerId}:${Date.now()}`,
-      sessionId: waha.relaySessionId,
-      destination: brokerPhone,
-      body: messageText,
-    }).catch((err) => {
-      console.warn("[notifyLeadReassigned] Falha ao enviar mensagem WAHA ao corretor:", err instanceof Error ? err.message : err);
-      return null;
+    await enqueueMetaTemplateMessage({
+      tenantId,
+      recipientType: "user",
+      recipientId: brokerId,
+      destinationPhone: brokerPhone,
+      purpose: "leadAssignmentExpired",
+      variables: [broker?.name || "Corretor(a)"],
+      requestedBy: brokerId,
+      idempotencyKey: `lead-reassigned-meta:${leadId}:${brokerId}:${Date.now()}`,
     });
-
-    if (sent?.messageId) {
-      await db.insert(schema.whatsappMessages).values({
-        id: messageId,
-        tenantId,
-        phone: brokerPhone,
-        direction: "outgoing",
-        body: messageText,
-        senderRole: "system",
-        providerStatus: "sent",
-        messageId: sent.messageId,
-        sentAt: new Date(),
-      }).catch(() => {});
-    }
+    await processMetaOutboundBatch(1, tenantId);
   } catch (err) {
-    console.error("[sendBrokerReassignedWhatsAppMessage] erro inesperado:", err);
+    console.error("[sendBrokerReassignedOfficialMessage] erro inesperado:", err);
   }
 }
 
@@ -451,8 +419,7 @@ async function sendBrokerReassignedWhatsAppMessage(tenantId: string, brokerId: s
  * Notify the previous broker when a lead is reassigned.
  */
 export async function notifyLeadReassigned(leadId: string, tenantId: string, previousOwnerId: string, leadName: string) {
-  // Dispara WhatsApp livre (sem template) ao corretor informando sobre a redistribuição
-  void sendBrokerReassignedWhatsAppMessage(tenantId, previousOwnerId, leadId, leadName).catch(console.error);
+  void sendBrokerReassignedOfficialMessage(tenantId, previousOwnerId, leadId).catch(console.error);
 
   if (!(await isNotificationCapabilityEnabled("lead_reassigned"))) return;
 

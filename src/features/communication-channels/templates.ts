@@ -17,6 +17,25 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
 
 export type MetaWhatsAppTemplatePurpose = keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES;
 
+/**
+ * Assignment and lifecycle notices are part of the official Meta channel.
+ * They must never be redirected to a tenant WAHA number, even when an older
+ * internal-notification policy still has a WAHA fallback configured.
+ */
+const META_ONLY_INTERNAL_PURPOSES = new Set([
+  "brokerInvitation",
+  "brokerLeadNotification",
+  "newLeadAssignment",
+  "leadAssignmentConfirmed",
+  "leadAssignmentUnavailable",
+  "leadAssignmentExpired",
+  "leadFeedbackReminder",
+]);
+
+export function isMetaOnlyOutboundPurpose(purpose?: string) {
+  return Boolean(purpose && META_ONLY_INTERNAL_PURPOSES.has(purpose));
+}
+
 export function getMetaWhatsAppTemplate(purpose: string) {
   if (!(purpose in META_WHATSAPP_TEMPLATE_PURPOSES)) return null;
   return META_WHATSAPP_TEMPLATE_PURPOSES[purpose as MetaWhatsAppTemplatePurpose];

@@ -18,7 +18,6 @@ import {
   renderEventFreeMessage,
   type MessageResourceKind,
 } from "./message-event-catalog";
-import { getInternalBrokerNotificationPolicy, getSelectedInternalWahaNumber } from "./internal-notification-policy";
 import { META_WHATSAPP_TEMPLATE_PURPOSES } from "./templates";
 import { listTenantTemplates } from "./template-sync-service";
 import { META_CLOUD_PROVIDER } from "./types";
@@ -438,7 +437,7 @@ export async function resolveEventMessagePlan(input: {
   const byKind = (kind: MessageResourceKind | null) => kind === "meta_template" ? metaMessage : kind === "free_message" ? freeMessage : null;
   let primary = byKind(policy.primaryKind);
   let fallback = byKind(policy.fallbackKind as MessageResourceKind | null);
-  let preferWahaDirect = false;
+  const preferWahaDirect = false;
 
   if (event.windowRule === "meta_required_without_window" && !serviceWindowOpen && primary?.type === "text") {
     const automaticMappings = legacyMeta
@@ -452,10 +451,7 @@ export async function resolveEventMessagePlan(input: {
   if (event.windowRule === "meta_required_without_window" && !serviceWindowOpen && fallback?.type === "text") fallback = null;
 
   if (event.windowRule === "corporate_internal" && primary?.type === "text") {
-    const internalPolicy = await getInternalBrokerNotificationPolicy(input.tenantId);
-    const wahaNumber = await getSelectedInternalWahaNumber(input.tenantId, internalPolicy.wahaNumberId);
-    if (internalPolicy.enabled && wahaNumber) preferWahaDirect = true;
-    else if (!serviceWindowOpen) {
+    if (!serviceWindowOpen) {
       const automaticMappings = legacyMeta
         ? buildAutomaticMetaVariableMappings(event, legacyMeta.variables)
         : null;
