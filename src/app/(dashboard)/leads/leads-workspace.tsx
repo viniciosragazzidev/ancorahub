@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
+import { leadsViewRequiresServerData } from "./leads-view-navigation";
 
 export type QualifyingLeadItem = {
   id: string;
@@ -239,6 +240,7 @@ export function LeadsWorkspace({
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isDistributingAll, startDistribution] = useTransition();
+  const [, startViewTransition] = useTransition();
 
   const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
     const saved = loadKanbanConfig();
@@ -276,12 +278,28 @@ export function LeadsWorkspace({
 
   const handleViewChange = useCallback((view: string) => {
     setActiveTab(view);
-    const params = new URLSearchParams(searchParams.toString());
+    const currentQuery = typeof window === "undefined" ? searchParams.toString() : window.location.search;
+    const currentView = new URLSearchParams(currentQuery).get("view");
+    const requiresServerData = leadsViewRequiresServerData(view, currentView);
+    const params = new URLSearchParams(currentQuery);
     params.delete("page");
     if (view === "list") params.delete("view");
     else params.set("view", view);
     const query = params.toString();
-    router.replace(`/leads${query ? `?${query}` : ""}`, { scroll: false });
+    const target = `/leads${query ? `?${query}` : ""}`;
+
+    // List, Kanban, qualification, radar and lost views all use the data that
+    // is already in this payload. Updating only the address bar keeps those
+    // tabs instant instead of re-running the full /leads server loader.
+    if (!requiresServerData) {
+      window.history.replaceState(window.history.state, "", target);
+      return;
+    }
+
+    window.history.replaceState(window.history.state, "", target);
+    startViewTransition(() => {
+      router.replace(target, { scroll: false });
+    });
   }, [router, searchParams]);
 
   const sensors = useSensors(

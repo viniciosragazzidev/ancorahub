@@ -19,6 +19,7 @@ import {
 import {
   parseAsInteger,
   parseAsStringEnum,
+  useQueryStates,
   useQueryState,
 } from "nuqs";
 
@@ -58,13 +59,16 @@ export function useDataTable<TData>({
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>(initialState?.columnVisibility ?? {});
 
-  const [page, setPage] = useQueryState(
-    "page",
-    parseAsInteger.withOptions({ history: queryHistory, shallow: false, startTransition }).withDefault(1)
-  );
-  const [pageSize, setPageSize] = useQueryState(
-    "pageSize",
-    parseAsInteger.withOptions({ history: queryHistory, shallow: false, startTransition }).withDefault(20)
+  // Pagination values always change together from TanStack's perspective.
+  // Keep them in one nuqs state so a page click produces a single URL update
+  // and, consequently, a single RSC request. Two independent setters here
+  // used to race and make /leads appear stuck in its loading state.
+  const [{ page, pageSize }, setPaginationQuery] = useQueryStates(
+    {
+      page: parseAsInteger.withDefault(1),
+      pageSize: parseAsInteger.withDefault(20),
+    },
+    { history: queryHistory, shallow: false, startTransition },
   );
 
   const [sorting, setSorting] = useQueryState(
@@ -93,10 +97,10 @@ export function useDataTable<TData>({
   // server render (all DB queries re-execute). We only wait for the URL
   // params to commit; the Next.js router handles the rest.
   const refreshAfterUrlCommit = React.useCallback(
-    (updates: Array<Promise<URLSearchParams>>) => {
-      void Promise.all(updates).catch(() => undefined);
+    (updates: Partial<{ page: number; pageSize: number }>) => {
+      void setPaginationQuery(updates).catch(() => undefined);
     },
-    []
+    [setPaginationQuery],
   );
 
   const pagination: PaginationState = React.useMemo(
@@ -111,30 +115,32 @@ export function useDataTable<TData>({
     (updaterOrValue: PaginationState | ((old: PaginationState) => PaginationState)) => {
       if (typeof updaterOrValue === "function") {
         const newPagination = updaterOrValue(pagination);
-        refreshAfterUrlCommit([
-          setPage(newPagination.pageIndex + 1),
-          setPageSize(newPagination.pageSize),
-        ]);
+        refreshAfterUrlCommit({
+          page: newPagination.pageIndex + 1,
+          pageSize: newPagination.pageSize,
+        });
       } else {
-        refreshAfterUrlCommit([
-          setPage(updaterOrValue.pageIndex + 1),
-          setPageSize(updaterOrValue.pageSize),
-        ]);
+        refreshAfterUrlCommit({
+          page: updaterOrValue.pageIndex + 1,
+          pageSize: updaterOrValue.pageSize,
+        });
       }
     },
-    [pagination, refreshAfterUrlCommit, setPage, setPageSize]
+    [pagination, refreshAfterUrlCommit]
   );
 
   const onSortingChange = React.useCallback(
     (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
       if (typeof updaterOrValue === "function") {
         const newSorting = updaterOrValue(sorting as SortingState) as ExtendedColumnSort<TData>[];
-        refreshAfterUrlCommit([setPage(1), setSorting(newSorting)]);
+        void setPaginationQuery({ page: 1 }).catch(() => undefined);
+        void setSorting(newSorting).catch(() => undefined);
       } else {
-        refreshAfterUrlCommit([setPage(1), setSorting(updaterOrValue as ExtendedColumnSort<TData>[])]);
+        void setPaginationQuery({ page: 1 }).catch(() => undefined);
+        void setSorting(updaterOrValue as ExtendedColumnSort<TData>[]).catch(() => undefined);
       }
     },
-    [refreshAfterUrlCommit, setPage, setSorting, sorting]
+    [setPaginationQuery, setSorting, sorting]
   );
 
   const table = useReactTable({
