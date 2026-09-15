@@ -32,6 +32,7 @@ import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/cl
 import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -370,12 +371,14 @@ export async function updateLeadEffectOutboxSettingsAction(formData: FormData) {
     maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 8, 1, 20),
     retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
     leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
+    staleAfterHours: boundedDistributionSetting(formData.get("staleAfterHours"), DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, 1, 168),
   };
   await Promise.all([
     setSystemSetting("feature_lead_intake_outbox_enabled", values.enabled, now),
     setSystemSetting("lead_intake_outbox_max_attempts", values.maxAttempts, now),
     setSystemSetting("lead_intake_outbox_retry_base_seconds", values.retryBaseSeconds, now),
     setSystemSetting("lead_intake_outbox_lease_seconds", values.leaseSeconds, now),
+    setSystemSetting(META_OUTBOUND_STALE_AFTER_HOURS_SETTING, values.staleAfterHours, now),
   ]);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.settings_updated", targetType: "system_settings", targetId: "lead_effect_outbox", metadata: values, createdAt: now });
 }

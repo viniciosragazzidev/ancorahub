@@ -304,6 +304,20 @@ export async function createLeadOffersForBrokers(input: {
         .update(schema.leadOffers)
         .set({ outboundMessageId: outbound.id, updatedAt: new Date() })
         .where(eq(schema.leadOffers.id, offerId));
+
+      // Deliver the exact offer just created instead of waiting behind an
+      // unrelated backlog. The durable outbox remains the source of truth and
+      // the cron worker continues to recover transient provider failures.
+      const delivery = await processMetaOutboundBatch(1, input.tenantId, outbound.id);
+      if (delivery.sent !== 1) {
+        console.warn("[createLeadOffersForBrokers] Oferta enfileirada para recuperação do worker.", {
+          tenantId: input.tenantId,
+          outboundMessageId: outbound.id,
+          sent: delivery.sent,
+          failed: delivery.failed,
+          retried: delivery.retried,
+        });
+      }
     }
 
     if (input.requestedBy) {

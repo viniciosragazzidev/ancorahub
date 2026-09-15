@@ -9,7 +9,6 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { getDatabase, schema } from "@/shared/db";
 import { hasCapability } from "@/shared/auth/permissions";
 import type { PluginContext } from "@/platform/plugins/types";
@@ -131,7 +130,7 @@ export const leadAssignedNotificationPlugin: ServerPluginDefinition<{
         warnings.push("O corretor não possui telefone cadastrado.");
       } else {
         try {
-          await enqueueMetaTemplateMessage({
+          const outbound = await enqueueMetaTemplateMessage({
             tenantId: context.tenantId,
             recipientType: "user",
             recipientId: broker.id,
@@ -141,9 +140,16 @@ export const leadAssignedNotificationPlugin: ServerPluginDefinition<{
             requestedBy: context.userId,
             idempotencyKey: `${executionKey}:whatsapp`,
           });
-          scheduleAfterResponse("manual-lead-assignment-notification", () => processMetaOutboundBatch(3, context.tenantId));
+          // Manual assignments must not wait behind an unrelated outbox
+          // backlog. Process the exact message before reporting success; the
+          // durable cron remains the recovery path for transient failures.
+          const delivery = await processMetaOutboundBatch(1, context.tenantId, outbound.id);
           delivered.push("whatsapp");
-          warnings.push("WhatsApp enfileirado para entrega.");
+          if (delivery.sent === 1) {
+            warnings.push("WhatsApp enviado.");
+          } else {
+            warnings.push("WhatsApp enfileirado para recuperação automática.");
+          }
         } catch (error) {
           warnings.push(error instanceof Error ? error.message : "Não foi possível enfileirar o WhatsApp.");
         }

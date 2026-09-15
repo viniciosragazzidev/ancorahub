@@ -407,7 +407,10 @@ async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: s
       purpose: "leadAssignmentExpired",
       variables: [broker?.name || "Corretor(a)"],
       requestedBy: brokerId,
-      idempotencyKey: `lead-reassigned-meta:${leadId}:${brokerId}:${Date.now()}`,
+      // The reassignment event is retried asynchronously. Keep the key stable
+      // so a retry cannot create another WhatsApp message for the same lead and
+      // previous owner.
+      idempotencyKey: `lead-reassigned-meta:${leadId}:${brokerId}`,
     });
     await processMetaOutboundBatch(1, tenantId);
   } catch (err) {

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -15,12 +15,75 @@ import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/b
 import { WhatsAppTemplateResolver } from "./template-sync-service";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS } from "@/features/notifications/broker-lead-cadence";
 import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-policy-service";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
 
 export const whatsappOutboundStatusValues = ["pending", "queued", "processing", "sent", "delivered", "read", "failed", "cancelled", "expired"] as const;
 export type WhatsAppOutboundStatus = (typeof whatsappOutboundStatusValues)[number];
+
+export const META_OUTBOUND_STALE_AFTER_HOURS_SETTING = "whatsapp_outbox_stale_after_hours";
+export const DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS = 24;
+const MAX_META_OUTBOUND_STALE_AFTER_HOURS = 168;
+
+export function parseMetaOutboundStaleAfterHours(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= MAX_META_OUTBOUND_STALE_AFTER_HOURS
+    ? parsed
+    : DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS;
+}
+
+async function getMetaOutboundStaleAfterHours() {
+  const configured = await getSystemSetting(META_OUTBOUND_STALE_AFTER_HOURS_SETTING).catch(() => undefined);
+  return parseMetaOutboundStaleAfterHours(configured ?? process.env.META_OUTBOUND_STALE_AFTER_HOURS);
+}
+
+async function cancelStaleMetaOutboundRows(tenantId: string | undefined, now: Date) {
+  const staleAfterHours = await getMetaOutboundStaleAfterHours();
+  const cutoff = new Date(now.getTime() - staleAfterHours * 60 * 60 * 1000);
+  const db = getDatabase();
+  const staleRows = await db.select({ id: schema.whatsappOutboundMessages.id, tenantId: schema.whatsappOutboundMessages.tenantId })
+    .from(schema.whatsappOutboundMessages)
+    .where(and(
+      tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined,
+      inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
+      lt(schema.whatsappOutboundMessages.createdAt, cutoff),
+    ))
+    .orderBy(asc(schema.whatsappOutboundMessages.createdAt))
+    .limit(200);
+
+  let cancelled = 0;
+  for (const row of staleRows) {
+    const [updated] = await db.update(schema.whatsappOutboundMessages).set({
+      status: "cancelled",
+      providerErrorCode: "STALE_OUTBOX_MESSAGE",
+      providerErrorMessage: `Mensagem pendente há mais de ${staleAfterHours}h; cancelada para evitar envio tardio.`,
+      failedAt: now,
+      updatedAt: now,
+    }).where(and(
+      eq(schema.whatsappOutboundMessages.id, row.id),
+      eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+      inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
+    )).returning({ id: schema.whatsappOutboundMessages.id });
+    if (!updated) continue;
+    cancelled += 1;
+    const systemUserId = await resolveSystemUserId(row.tenantId);
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: systemUserId,
+      entidade: "whatsapp_outbound_message",
+      entidadeId: row.id,
+      acao: "whatsapp_message_stale_cancelled",
+      createdAt: now,
+    });
+  }
+  if (cancelled > 0) {
+    console.info("[meta-outbox] stale_messages_cancelled", { tenantId: tenantId ?? "global", cancelled, staleAfterHours });
+  }
+  return cancelled;
+}
 
 type DeliveryRoute = "meta_only" | "meta_then_waha" | "waha_direct";
 
@@ -86,6 +149,29 @@ async function isCurrentBrokerLeadNotification(row: {
     ))
     .limit(1);
   return Boolean(lead && lead.status !== "lost" && !/^Lead WhatsApp\s*\(/i.test(lead.nome?.trim() ?? ""));
+}
+
+async function isCurrentLeadOffer(row: {
+  id: string;
+  tenantId: string;
+  purpose: string;
+}, now: Date) {
+  if (row.purpose !== "newLeadAssignment") return true;
+  const [offer] = await getDatabase().select({
+    status: schema.leadOffers.status,
+    expiresAt: schema.leadOffers.expiresAt,
+  }).from(schema.leadOffers).where(and(
+    eq(schema.leadOffers.tenantId, row.tenantId),
+    eq(schema.leadOffers.outboundMessageId, row.id),
+  )).limit(1);
+  // The manual-assignment notification reuses the same approved Meta
+  // template but is not backed by a leadOffers row. Only linked offer rows
+  // require the active-offer guard below.
+  if (!offer) return true;
+  return Boolean(
+    ["PENDING", "SENT", "DELIVERED", "READ"].includes(offer.status)
+      && offer.expiresAt > now,
+  );
 }
 
 async function getBrokerLeadNotificationCadenceAt(row: {
@@ -349,6 +435,10 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
   const db = getDatabase();
   const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 50);
   const now = new Date();
+  // Exact dispatches are the latency-critical path for a newly offered lead.
+  // Stale-row cleanup belongs to the cron/batch pass; doing it here could
+  // walk and audit hundreds of old rows before the fresh message is sent.
+  if (!outboundId) await cancelStaleMetaOutboundRows(tenantId, now);
   const rows = await db.select().from(schema.whatsappOutboundMessages).where(and(
     tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined,
     outboundId ? eq(schema.whatsappOutboundMessages.id, outboundId) : undefined,
@@ -410,6 +500,31 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           updatedAt: new Date(),
         }).where(eq(schema.whatsappOutboundMessages.id, row.id));
         console.info("[meta-outbox] broker_notification_cancelled", {
+          outboundMessageId: row.id,
+          tenantId: row.tenantId,
+          purpose: row.purpose,
+        });
+        return;
+      }
+      if (!await isCurrentLeadOffer(row, now)) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "cancelled",
+          providerErrorCode: "OFFER_NO_LONGER_ACTIVE",
+          providerErrorMessage: "A oferta não está mais ativa; envio cancelado.",
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.whatsappOutboundMessages.id, row.id),
+          eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+        ));
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: await resolveSystemUserId(row.tenantId),
+          entidade: "whatsapp_outbound_message",
+          entidadeId: row.id,
+          acao: "whatsapp_offer_message_cancelled_inactive",
+          createdAt: new Date(),
+        });
+        console.info("[meta-outbox] lead_offer_cancelled_before_send", {
           outboundMessageId: row.id,
           tenantId: row.tenantId,
           purpose: row.purpose,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, getInvitationDeliveryFailureUpdate, parseMetaOutboundStaleAfterHours, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
 import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS, scheduleBrokerLeadNotification } from "@/features/notifications/broker-lead-cadence";
 
 vi.mock("server-only", () => ({}));
@@ -44,6 +44,13 @@ describe("outboundService", () => {
       configuredWahaNumberId: "selected-waha",
       activeWahaNumberId: "selected-waha",
     })).toEqual({ route: "meta_only", wahaNumberId: null });
+  });
+
+  it("bounds the stale outbox safety window", () => {
+    expect(parseMetaOutboundStaleAfterHours(undefined)).toBe(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
+    expect(parseMetaOutboundStaleAfterHours("24")).toBe(24);
+    expect(parseMetaOutboundStaleAfterHours("0")).toBe(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
+    expect(parseMetaOutboundStaleAfterHours("999")).toBe(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
   });
 
   it("always routes official template messages through Meta Cloud", () => {

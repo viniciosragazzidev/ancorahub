@@ -1078,3 +1078,17 @@ para que o scheduler do Coolify não produza 404 durante a migração. Cadência
 WAHA corporativas e configurações de fallback são recusadas no servidor e a
 recusa de uma oferta libera atomicamente o lead para a fila, sem manter o
 corretor como proprietário.
+
+## DEC-101 — Proteção contra drenagem tardia da outbox
+
+**Decisão aprovada em 2026-09-15.** Mensagens oficiais que permanecerem em
+`queued` ou `pending` além do prazo configurado pelo Super-admin não podem ser
+enviadas retroativamente. O worker cancela esses registros com código seguro,
+registra auditoria e preserva o histórico. O padrão é 24 horas e o limite
+administrativo é de 1 a 168 horas. Ofertas de novo lead também são revalidadas
+no momento do envio: somente ofertas ainda ativas e não expiradas podem chegar
+ao corretor. Uma oferta recém-criada é processada pelo próprio identificador da
+outbox, sem esperar atrás de mensagens antigas; o cron continua como recuperação
+de falhas transitórias. O caminho de atribuição manual segue a mesma entrega
+exata. A limpeza de pendências antigas não roda durante uma entrega exata, para
+que a fila crítica não seja bloqueada por auditoria de um lote histórico.

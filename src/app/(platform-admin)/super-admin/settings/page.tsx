@@ -38,6 +38,7 @@ import {
   updateUnlinkedConversationDeletionSettingsAction,
   updateConversationMediaSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import {
@@ -93,6 +94,7 @@ export default async function SuperAdminSettingsPage() {
     "lead_intake_outbox_max_attempts",
     "lead_intake_outbox_retry_base_seconds",
     "lead_intake_outbox_lease_seconds",
+    META_OUTBOUND_STALE_AFTER_HOURS_SETTING,
     "feature_lead_management_actions_enabled",
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
@@ -161,6 +163,8 @@ export default async function SuperAdminSettingsPage() {
   const leadEffectOutboxRetryBaseSeconds =
     settingMap.get("lead_intake_outbox_retry_base_seconds") ?? "60";
   const leadEffectOutboxLeaseSeconds = settingMap.get("lead_intake_outbox_lease_seconds") ?? "120";
+  const whatsappOutboxStaleAfterHours = settingMap.get(META_OUTBOUND_STALE_AFTER_HOURS_SETTING)
+    ?? String(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
   const wahaCadenceEnabled = settingMap.get("feature_waha_cadence_enabled") === "true";
   const wahaConnectionsEnabled = settingMap.get("feature_waha_connections_enabled") === "true";
   const wahaAiEnabled = settingMap.get("feature_waha_ai_enabled") === "true";
@@ -1336,7 +1340,7 @@ export default async function SuperAdminSettingsPage() {
               <CardContent className="space-y-4">
                 <form
                   action={updateLeadEffectOutboxSettingsAction}
-                  className="grid gap-4 lg:grid-cols-3"
+                  className="grid gap-4 lg:grid-cols-4"
                 >
                   <label className="flex items-center gap-2 text-sm lg:col-span-3">
                     <input
@@ -1382,6 +1386,19 @@ export default async function SuperAdminSettingsPage() {
                       type="number"
                       defaultValue={leadEffectOutboxLeaseSeconds}
                     />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium">
+                    Cancelar pendentes após (horas)
+                    <Input
+                      name="staleAfterHours"
+                      min={1}
+                      max={168}
+                      type="number"
+                      defaultValue={whatsappOutboxStaleAfterHours}
+                    />
+                    <span className="font-normal text-muted-foreground">
+                      Evita que mensagens antigas sejam entregues em lote depois de uma indisponibilidade.
+                    </span>
                   </label>
                   <div className="flex items-end">
                     <Button type="submit">Salvar outbox</Button>
