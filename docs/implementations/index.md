@@ -2,6 +2,7 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
+| 2026-09-15 | `completed/2026-09-15-routing-rule-persistence-fix.md` | concluído | Migration idempotente da tabela `lead_routing_rules`, que faltava para salvar regras da Matriz de Roteamento. |
 | 2026-09-15 | `completed/2026-09-15-distribution-surface-refinement.md` | concluído | Hierarquia visual, espaçamento, padding, textos e organização refinados na central `/distribuicao`, sem alterar regras de negócio. |
 | 2026-09-15 | `completed/2026-09-15-waha-qr-rotation-and-phone-reconciliation.md` | concluído | Rotação atômica do QR no WAHA e reconciliação de mensagens pelos 9 últimos dígitos para cobrir DDD divergente. |
 | 2026-09-15 | `completed/2026-09-15-unassigned-leads-and-distribution-surface.md` | concluído | Dataset e paginação independentes para Sem atribuição em `/leads`, pageSize sincronizado pela URL e cards de `/leads/distribuicao` padronizados. |

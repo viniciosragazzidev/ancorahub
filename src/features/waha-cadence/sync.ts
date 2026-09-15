@@ -73,6 +73,7 @@ export async function syncBrokerWahaMessages(input: { limit?: number } = {}) {
     try {
       const providerChats = await getWahaChats({ sessionName: connection.sessionName, limit: 500 });
       const resolvedChatIds = providerChats.map(providerChatId).filter((chatId): chatId is string => {
+        if (!chatId) return false;
         const digits = chatId.split("@")[0].replace(/\D/g, "");
         return leadSuffixes.has(phoneSubscriberSuffix(digits));
       });
