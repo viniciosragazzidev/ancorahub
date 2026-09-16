@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, count, eq, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { resolveMetaCapturePolicy } from "./meta-capture-policy";
 import type { MetaCampaignItem } from "./types";
 
 /**
@@ -77,13 +79,14 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
   const leadsPerCampaign = await db
     .select({
       metaCampaignId: schema.leads.metaCampaignId,
+      metaAdId: schema.leads.metaAdId,
       sourceCampaign: schema.leads.sourceCampaign,
       status: schema.leads.status,
       totalCount: count(),
     })
     .from(schema.leads)
     .where(eq(schema.leads.tenantId, tenantId))
-    .groupBy(schema.leads.metaCampaignId, schema.leads.sourceCampaign, schema.leads.status);
+    .groupBy(schema.leads.metaCampaignId, schema.leads.metaAdId, schema.leads.sourceCampaign, schema.leads.status);
 
   // 3. Buscar propostas / vendas fechadas
   const salesPerCampaign = await db
@@ -113,11 +116,30 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     .select({
       campaignId: schema.metaCampaignQueueRoutes.campaignId,
       enabled: schema.metaCampaignQueueRoutes.enabled,
+      queueId: schema.metaCampaignQueueRoutes.queueId,
+      queueName: schema.leadQueues.name,
     })
     .from(schema.metaCampaignQueueRoutes)
+    .leftJoin(schema.leadQueues, and(eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaCampaignQueueRoutes.tenantId, schema.leadQueues.tenantId)))
     .where(eq(schema.metaCampaignQueueRoutes.tenantId, tenantId));
   const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
-  const hasTenantRules = campaignRoutes.length > 0;
+  const [adRoutes, formRoutes, storedGlobalMode] = await Promise.all([
+    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled, queueId: schema.metaAdQueueRoutes.queueId, queueName: schema.leadQueues.name })
+      .from(schema.metaAdQueueRoutes)
+      .leftJoin(schema.leadQueues, and(eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaAdQueueRoutes.tenantId, schema.leadQueues.tenantId)))
+      .where(eq(schema.metaAdQueueRoutes.tenantId, tenantId)),
+    db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled, queueId: schema.metaFormQueueRoutes.queueId, queueName: schema.leadQueues.name })
+      .from(schema.metaFormQueueRoutes)
+      .leftJoin(schema.leadQueues, and(eq(schema.metaFormQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaFormQueueRoutes.tenantId, schema.leadQueues.tenantId)))
+      .where(eq(schema.metaFormQueueRoutes.tenantId, tenantId)),
+    getSystemSetting(`meta_lead_capture_mode_${tenantId}`).catch(() => null),
+  ]);
+  const adRouteMap = new Map(adRoutes.map((r) => [r.adId, r.enabled]));
+  const adRouteDetailMap = new Map(adRoutes.map((r) => [r.adId, r]));
+  const hasTenantRules = campaignRoutes.length > 0 || adRoutes.length > 0 || formRoutes.length > 0;
+  const globalMode = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
+    ? storedGlobalMode
+    : (hasTenantRules ? "selective" : "all");
 
   // 5. Buscar anúncios vinculados às campanhas do tenant
   const adsWithCampaign = await db
@@ -160,7 +182,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
   }
 
   const adsByCampaignMap = new Map<string, Array<{ id: string; adId: string; name: string; status: string; leadsCount: number; activeLeadsCount: number }>>();
+  const adToCampaignMap = new Map<string, string>();
   for (const ad of adsWithCampaign) {
+    adToCampaignMap.set(ad.adId, ad.campaignId);
     const list = adsByCampaignMap.get(ad.campaignId) || [];
     const adStats = leadsByAdMap.get(ad.adId) || { total: 0, active: 0 };
     list.push({
@@ -177,7 +201,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
   // Mapear agregações
   const leadsMap = new Map<string, { total: number; active: number; converted: number }>();
   for (const item of leadsPerCampaign) {
-    const key = item.metaCampaignId || item.sourceCampaign || "unknown";
+    const key = item.metaCampaignId || (item.metaAdId ? adToCampaignMap.get(item.metaAdId) : null) || item.sourceCampaign || "unknown";
     const current = leadsMap.get(key) || { total: 0, active: 0, converted: 0 };
     current.total += Number(item.totalCount);
     if (item.status === "converted") {
@@ -218,11 +242,26 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     const allAds = adsByCampaignMap.get(c.campaignId) || [];
     const visibleAds = allAds.filter((ad) => shouldDisplayAd(ad.status, ad.activeLeadsCount));
 
-    const isEligibleForCapture = campaignRouteMap.has(c.campaignId)
-      ? Boolean(campaignRouteMap.get(c.campaignId))
+    const campaignRoute = campaignRouteMap.has(c.campaignId)
+      ? { enabled: Boolean(campaignRouteMap.get(c.campaignId)), queueId: null, queueStatus: null }
       : campaignRouteMap.has(c.id)
-        ? Boolean(campaignRouteMap.get(c.id))
-        : !hasTenantRules;
+        ? { enabled: Boolean(campaignRouteMap.get(c.id)), queueId: null, queueStatus: null }
+        : undefined;
+    const hasEnabledAdOverride = allAds.some((ad) => adRouteMap.get(ad.adId) === true);
+    const isEligibleForCapture = hasEnabledAdOverride || resolveMetaCapturePolicy({ campaignRoute, globalMode, hasTenantRules }).action === "capture";
+    const campaignRouteDetail = campaignRoutes.find((route) => route.campaignId === c.campaignId || route.campaignId === c.id);
+    const adRouteDetail = allAds
+      .map((ad) => adRouteDetailMap.get(ad.adId))
+      .find((route) => route?.enabled === true);
+    const distributionRule: MetaCampaignItem["distributionRule"] = !isEligibleForCapture
+      ? "none"
+      : adRouteDetail
+        ? "ad"
+        : campaignRouteDetail?.enabled
+          ? "campaign"
+          : "global";
+    const distributionQueueId = adRouteDetail?.queueId ?? campaignRouteDetail?.queueId ?? null;
+    const distributionQueueName = adRouteDetail?.queueName ?? campaignRouteDetail?.queueName ?? null;
 
     return [{
       id: c.id,
@@ -242,6 +281,9 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       revenueTotal,
       conversionRate,
       isEligibleForCapture,
+      distributionQueueId,
+      distributionQueueName,
+      distributionRule,
       ads: visibleAds,
     }];
   });

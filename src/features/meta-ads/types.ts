@@ -23,7 +23,7 @@ export type MetaConnectionAssets = {
   datasets: Array<{ id: string; name: string; status: string }>;
   leadForms: Array<{ id: string; name: string; status: string; pageId: string; isEligibleForCapture?: boolean }>;
   campaigns: Array<{ id: string; name: string; status: string; adAccountId: string; isEligibleForCapture?: boolean }>;
-  ads: Array<{ id: string; name: string; status: string; adSetId: string; isEligibleForCapture?: boolean }>;
+  ads: Array<{ id: string; name: string; status: string; adSetId: string; campaignId?: string | null; isEligibleForCapture?: boolean }>;
 };
 
 export type MetaDiscoveredAssets = {
@@ -94,6 +94,9 @@ export type MetaCampaignItem = {
   revenueTotal?: number;
   conversionRate?: number;
   isEligibleForCapture?: boolean;
+  distributionQueueId?: string | null;
+  distributionQueueName?: string | null;
+  distributionRule?: "campaign" | "ad" | "form" | "global" | "none";
   ads?: MetaAdSummaryItem[];
 };
 

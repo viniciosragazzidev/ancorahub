@@ -31,7 +31,9 @@ export type CreateLeadFromWebhookSyncInput = {
     externalId: string;
     campaign?: string | null;
     ad?: string | null;
+    adSet?: string | null;
     form?: string | null;
+    page?: string | null;
     /** Hora real de captura no anúncio (ex.: created_time da Meta). Fallback: receivedAt. */
     capturedAt?: Date;
     metadata?: Record<string, string | number | boolean | null>;
@@ -130,6 +132,10 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
             metaCampaignId: input.leadSource.campaign ?? null,
             sourceAd: input.leadSource.ad ?? null,
             sourceForm: input.leadSource.form ?? null,
+            metaAdId: input.leadSource.ad ?? null,
+            metaAdSetId: input.leadSource.adSet ?? null,
+            metaFormId: input.leadSource.form ?? null,
+            metaPageId: input.leadSource.page ?? null,
             capturedAt: input.leadSource.capturedAt ?? receivedAt,
           } : {}),
           updatedAt: now,
@@ -151,6 +157,10 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         metaCampaignId: input.leadSource.campaign ?? null,
         sourceAd: input.leadSource.ad ?? null,
         sourceForm: input.leadSource.form ?? null,
+        metaAdId: input.leadSource.ad ?? null,
+        metaAdSetId: input.leadSource.adSet ?? null,
+        metaFormId: input.leadSource.form ?? null,
+        metaPageId: input.leadSource.page ?? null,
         sourceMetadata: input.leadSource.metadata ?? null,
         capturedAt: input.leadSource.capturedAt ?? receivedAt,
       } : {}),

@@ -118,13 +118,13 @@ export function CampaignsDashboardView({
 
       {/* ─── TABELA DE CAMPANHAS AGRUPADA POR CONTA DE ANÚNCIOS ─── */}
       <Card className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
           <div>
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <Megaphone className="size-5 text-primary" /> Desempenho por Conta de Anúncios, Campanha & Anúncio
             </CardTitle>
             <CardDescription className="text-xs">
-              Campanhas ativas e campanhas pausadas com leads ativos em atendimento, agrupadas por conta de anúncios.
+              Cada linha mostra o caminho do lead: ativo recuperado da Meta, captura no CRM e fila de distribuição.
             </CardDescription>
           </div>
           <div className="relative w-64">
@@ -217,6 +217,11 @@ export function CampaignsDashboardView({
                                 <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground bg-muted/20">
                                   Objetivo: {camp.objective || "LEAD_GENERATION"}
                                 </Badge>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                                <span><strong className="font-medium text-foreground">Entrada:</strong> Meta Lead Ads</span>
+                                <span><strong className="font-medium text-foreground">Captura:</strong> {camp.isEligibleForCapture ? "Ativa" : "Ignorada"}</span>
+                                <span><strong className="font-medium text-foreground">Destino:</strong> {formatDistributionDestination(camp)}</span>
                               </div>
                             </div>
                           </TableCell>
@@ -311,4 +316,12 @@ export function CampaignsDashboardView({
       </Card>
     </div>
   );
+}
+
+function formatDistributionDestination(campaign: MetaCampaignItem): string {
+  if (!campaign.isEligibleForCapture || campaign.distributionRule === "none") return "Não distribuído";
+  if (campaign.distributionQueueName) return campaign.distributionQueueName;
+  if (campaign.distributionRule === "ad") return "Fila padrão (regra do anúncio)";
+  if (campaign.distributionRule === "campaign") return "Fila padrão (regra da campanha)";
+  return "Fila padrão da distribuição";
 }

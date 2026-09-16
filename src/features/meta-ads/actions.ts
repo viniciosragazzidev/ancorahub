@@ -10,6 +10,7 @@ import { startMetaMarketingConnection } from "./meta-marketing-connection-servic
 import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
 import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
+import { resolveMetaCapturePolicy } from "./meta-capture-policy";
 import type { MetaConnectionAssets, MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem, MetaSyncWarning } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
@@ -68,28 +69,46 @@ export async function getMetaConnectionState(): Promise<{
     ? storedGlobalMode
     : (hasTenantRules ? "selective" : "all");
 
-  const activeCampaigns = campaigns
-    .filter((campaign) => activeAccountIds.has(campaign.adAccountId))
-    .map((c) => ({
-      ...c,
-      isEligibleForCapture: globalCaptureMode === "disabled" ? false : campaignRouteMap.has(c.id) ? Boolean(campaignRouteMap.get(c.id)) : globalCaptureMode === "all",
-    }));
+  const activeCampaignCandidates = campaigns.filter((campaign) => activeAccountIds.has(campaign.adAccountId));
+  const activeCampaignCandidateIds = new Set(activeCampaignCandidates.map((campaign) => campaign.id));
+  const activeAdSets = adSets.filter((adSet) => activeCampaignCandidateIds.has(adSet.campaignId));
+  const activeAdSetIds = new Set(activeAdSets.map((adSet) => adSet.id));
+  const adSetCampaignMap = new Map(activeAdSets.map((adSet) => [adSet.id, adSet.campaignId]));
+  const enabledAdCampaignIds = new Set(ads
+    .filter((ad) => activeAdSetIds.has(ad.adSetId) && adRouteMap.get(ad.id) === true)
+    .map((ad) => adSetCampaignMap.get(ad.adSetId))
+    .filter((campaignId): campaignId is string => Boolean(campaignId)));
 
-  const activeCampaignIds = new Set(activeCampaigns.map((campaign) => campaign.id));
-  const activeAdSetIds = new Set(adSets.filter((adSet) => activeCampaignIds.has(adSet.campaignId)).map((adSet) => adSet.id));
+  const activeCampaigns = activeCampaignCandidates.map((c) => ({
+    ...c,
+    isEligibleForCapture: enabledAdCampaignIds.has(c.id) || resolveMetaCapturePolicy({
+      campaignRoute: campaignRouteMap.has(c.id) ? { enabled: Boolean(campaignRouteMap.get(c.id)), queueId: null, queueStatus: null } : undefined,
+      globalMode: globalCaptureMode,
+      hasTenantRules,
+    }).action === "capture",
+  }));
 
   const filteredAds = ads
     .filter((ad) => activeAdSetIds.has(ad.adSetId))
     .map((ad) => ({
       ...ad,
-      isEligibleForCapture: globalCaptureMode === "disabled" ? false : adRouteMap.has(ad.id) ? Boolean(adRouteMap.get(ad.id)) : globalCaptureMode === "all",
+      campaignId: adSetCampaignMap.get(ad.adSetId) ?? null,
+      isEligibleForCapture: resolveMetaCapturePolicy({
+        adRoute: adRouteMap.has(ad.id) ? { enabled: Boolean(adRouteMap.get(ad.id)), queueId: null, queueStatus: null } : undefined,
+        globalMode: globalCaptureMode,
+        hasTenantRules,
+      }).action === "capture",
     }));
 
   const filteredLeadForms = leadForms
     .filter((form) => activePageIds.has(form.pageId))
     .map((form) => ({
       ...form,
-      isEligibleForCapture: globalCaptureMode === "disabled" ? false : formRouteMap.has(form.id) ? Boolean(formRouteMap.get(form.id)) : globalCaptureMode === "all",
+      isEligibleForCapture: resolveMetaCapturePolicy({
+        formRoute: formRouteMap.has(form.id) ? { enabled: Boolean(formRouteMap.get(form.id)), queueId: null, queueStatus: null } : undefined,
+        globalMode: globalCaptureMode,
+        hasTenantRules,
+      }).action === "capture",
     }));
 
   const assets: MetaConnectionAssets = {

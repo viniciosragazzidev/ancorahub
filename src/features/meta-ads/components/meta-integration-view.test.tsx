@@ -47,7 +47,7 @@ const connectedAssets = {
   datasets: [],
   leadForms: [{ id: "form-1", name: "Formulário principal", status: "ACTIVE", pageId: "page-1" }],
   campaigns: [{ id: "campaign-1", name: "Campanha de saúde", status: "ACTIVE", adAccountId: "act_1" }],
-  ads: [{ id: "ad-1", name: "Anúncio principal", status: "ACTIVE", adSetId: "adset-1" }],
+  ads: [{ id: "ad-1", name: "Anúncio principal", status: "ACTIVE", adSetId: "adset-1", campaignId: "campaign-1" }],
 };
 
 afterEach(() => {
@@ -58,16 +58,18 @@ describe("MetaIntegrationView", () => {
   it("paginates asset lists with up to 15 items per page", () => {
     const manyPages = Array.from({ length: 17 }, (_, index) => ({ id: `page-${index + 1}`, name: `Página ${String(index + 1).padStart(2, "0")}`, status: "active" }));
     render(<MetaIntegrationView canConfigure={false} connection={connectedConnection} assets={{ ...connectedAssets, pages: manyPages }} logs={[]} />);
-    expect(screen.getByText("Página 01")).toBeInTheDocument();
-    expect(screen.getByText("Página 15")).toBeInTheDocument();
-    expect(screen.queryByText("Página 16")).not.toBeInTheDocument();
-    expect(screen.getByText("1–15 de 17")).toBeInTheDocument();
+    const pagesList = screen.getByText("Páginas conectadas").closest("div.rounded-lg");
+    expect(pagesList).not.toBeNull();
+    expect(within(pagesList as HTMLElement).getByText("Página 01")).toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).getByText("Página 15")).toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).queryByText("Página 16")).not.toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).getByText("1–15 de 17")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Próxima" }));
-    expect(screen.getByText("Página 16")).toBeInTheDocument();
-    expect(screen.queryByText("Página 01")).not.toBeInTheDocument();
-    expect(screen.getByText("16–17 de 17")).toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).getByText("Página 16")).toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).queryByText("Página 01")).not.toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).getByText("16–17 de 17")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
-    expect(screen.getByText("Página 01")).toBeInTheDocument();
+    expect(within(pagesList as HTMLElement).getByText("Página 01")).toBeInTheDocument();
   });
 
   it("keeps WhatsApp outside the Marketing authorization flow", () => {
@@ -82,11 +84,11 @@ describe("MetaIntegrationView", () => {
     render(<MetaIntegrationView canConfigure={false} connection={connectedConnection} assets={connectedAssets} logs={[]} />);
     expect(screen.getByText("Perfil e ativos conectados")).toBeInTheDocument();
     expect(screen.getByText("Âncora Hub")).toBeInTheDocument();
-    expect(screen.getByText("Âncora Saúde")).toBeInTheDocument();
+    expect(screen.getAllByText("Âncora Saúde").length).toBeGreaterThan(0);
     expect(screen.getByText("Pixel principal")).toBeInTheDocument();
-    expect(screen.getByText("Formulário principal")).toBeInTheDocument();
-    expect(screen.getByText("Campanha de saúde")).toBeInTheDocument();
-    expect(screen.getByText("Anúncio principal")).toBeInTheDocument();
+    expect(screen.getAllByText("Formulário principal").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Campanha de saúde").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Anúncio principal").length).toBeGreaterThan(0);
   });
 
   it("asks for confirmation before disconnecting and refreshes the page state", async () => {

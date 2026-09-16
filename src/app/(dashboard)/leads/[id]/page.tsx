@@ -69,6 +69,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       sourceForm: schema.leads.sourceForm,
       capturedAt: schema.leads.capturedAt,
       metaCampaignId: schema.leads.metaCampaignId,
+      metaAdSetId: schema.leads.metaAdSetId,
+      metaAdId: schema.leads.metaAdId,
+      metaFormId: schema.leads.metaFormId,
+      metaPageId: schema.leads.metaPageId,
       tipo: schema.leads.tipo,
       status: schema.leads.status,
       qualificationStatus: schema.leads.qualificationStatus,
@@ -101,6 +105,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     .limit(1);
 
   if (!lead) notFound();
+  const [metaCampaign, metaAd, metaForm] = await Promise.all([
+    lead.metaCampaignId
+      ? db.select({ name: schema.metaCampaigns.name }).from(schema.metaCampaigns)
+        .where(and(eq(schema.metaCampaigns.tenantId, context.tenantId), eq(schema.metaCampaigns.campaignId, lead.metaCampaignId))).limit(1)
+      : Promise.resolve([]),
+    lead.metaAdId
+      ? db.select({ name: schema.metaAds.name }).from(schema.metaAds)
+        .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAds.adId, lead.metaAdId))).limit(1)
+      : Promise.resolve([]),
+    lead.metaFormId
+      ? db.select({ name: schema.metaLeadForms.name }).from(schema.metaLeadForms)
+        .where(and(eq(schema.metaLeadForms.tenantId, context.tenantId), eq(schema.metaLeadForms.formId, lead.metaFormId))).limit(1)
+      : Promise.resolve([]),
+  ]);
+  const metaCampaignName = metaCampaign[0]?.name ?? null;
+  const metaAdName = metaAd[0]?.name ?? null;
+  const metaFormName = metaForm[0]?.name ?? null;
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
 
   const [redistributionNotice] = context.role === "broker"
@@ -549,9 +570,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     </CardHeader>
                     <CardContent className="grid gap-3 text-xs sm:grid-cols-3 pt-2">
                       <div><p className="text-muted-foreground">Origem</p><p className="font-semibold text-foreground mt-0.5">Meta Ads (Lead Ads / Click to WhatsApp)</p></div>
-                      <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceCampaign || "Campanha Meta"}</p></div>
-                      <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceAd || "Anúncio Padrão"}</p></div>
-                      <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{lead.sourceForm || "Formulário Direct"}</p></div>
+                      <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{metaCampaignName || lead.sourceCampaign || lead.metaCampaignId || "Campanha Meta"}</p>{lead.metaCampaignId && metaCampaignName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaCampaignId}</p> : null}</div>
+                      <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{metaAdName || lead.sourceAd || lead.metaAdId || "Anúncio Padrão"}</p>{lead.metaAdId && metaAdName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaAdId}</p> : null}</div>
+                      <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{metaFormName || lead.sourceForm || lead.metaFormId || "Formulário Direct"}</p>{lead.metaFormId && metaFormName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaFormId}</p> : null}</div>
                       <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</p></div>
                     </CardContent>
                   </Card>

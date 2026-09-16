@@ -173,8 +173,17 @@ export function MetaIntegrationView({
                 <AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} />
               </div>
 
-              {/* Interactive Multi-Select Checkbox Asset Lists for Forms, Campaigns, and Ads */}
-              <div className="space-y-6">
+              <MetaAssetHierarchy campaigns={assets.campaigns} ads={assets.ads} forms={assets.leadForms} pages={assets.pages} />
+
+              <details className="group rounded-lg border border-border bg-muted/10">
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
+                  <span className="flex items-center justify-between gap-3">
+                    <span>Configuração avançada por ativo</span>
+                    <span className="text-xs font-normal text-muted-foreground group-open:hidden">Abrir seletores</span>
+                    <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Ocultar seletores</span>
+                  </span>
+                </summary>
+                <div className="space-y-6 border-t border-border p-4">
                 <SelectableAssetList
                   title="Formulários de Lead Ads"
                   empty="Nenhum formulário sincronizado ainda."
@@ -214,7 +223,8 @@ export function MetaIntegrationView({
                     isEligibleForCapture: ad.isEligibleForCapture,
                   }))}
                 />
-              </div>
+                </div>
+              </details>
             </CardContent>
           </Card>
         </>
@@ -248,6 +258,106 @@ export function MetaIntegrationView({
         </DialogPopup>
       </Dialog>
     </div>
+  );
+}
+
+function MetaAssetHierarchy({
+  campaigns,
+  ads,
+  forms,
+  pages,
+}: {
+  campaigns: MetaConnectionAssets["campaigns"];
+  ads: MetaConnectionAssets["ads"];
+  forms: MetaConnectionAssets["leadForms"];
+  pages: MetaConnectionAssets["pages"];
+}) {
+  const pageNameById = new Map(pages.map((page) => [page.id, page.name]));
+  const formsByPage = new Map<string, typeof forms>();
+  for (const form of forms) {
+    const pageForms = formsByPage.get(form.pageId) ?? [];
+    pageForms.push(form);
+    formsByPage.set(form.pageId, pageForms);
+  }
+
+  return (
+    <section aria-label="Mapa de ativos Meta" className="rounded-lg border border-border bg-card">
+      <div className="border-b border-border bg-muted/20 px-4 py-3">
+        <p className="text-sm font-semibold">Mapa de aquisição</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Relação operacional entre campanha, anúncio e formulário. Os IDs ficam visíveis apenas como referência técnica.
+        </p>
+      </div>
+      <div className="grid gap-4 p-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campanhas e anúncios</p>
+          {campaigns.length ? campaigns.map((campaign) => {
+            const campaignAds = ads.filter((ad) => ad.campaignId === campaign.id);
+            return (
+              <div key={campaign.id} className="rounded-md border border-border/70 bg-muted/10 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{campaign.name}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">Campanha · {campaign.id}</p>
+                  </div>
+                  <Badge variant={campaign.isEligibleForCapture ? "success" : "outline"} className="text-[10px]">
+                    {campaign.isEligibleForCapture ? "Captura ativa" : "Fora da captura"}
+                  </Badge>
+                </div>
+                {campaignAds.length ? (
+                  <div className="mt-3 space-y-1.5 border-l-2 border-primary/20 pl-3">
+                    {campaignAds.map((ad) => (
+                      <div key={ad.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{ad.name}</p>
+                          <p className="font-mono text-[10px] text-muted-foreground">Anúncio · {ad.id} · Conjunto · {ad.adSetId}</p>
+                        </div>
+                        <Badge variant={ad.isEligibleForCapture ? "success" : "outline"} className="text-[10px]">
+                          {ad.isEligibleForCapture ? "Elegível" : "Desativado"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="mt-2 text-xs text-muted-foreground">Nenhum anúncio sincronizado.</p>}
+              </div>
+            );
+          }) : <p className="text-sm text-muted-foreground">Nenhuma campanha sincronizada.</p>}
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Formulários por Página</p>
+          {formsByPage.size ? Array.from(formsByPage.entries()).map(([pageId, pageForms]) => (
+            <div key={pageId} className="rounded-md border border-border/70 bg-muted/10 p-3">
+              <p className="text-xs font-semibold">{pageNameById.get(pageId) ?? "Página sem nome"}</p>
+              <p className="font-mono text-[10px] text-muted-foreground">Página · {pageId}</p>
+              <div className="mt-2 space-y-2">
+                {pageForms.map((form) => (
+                  <div key={form.id} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium">{form.name}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">Formulário · {form.id}</p>
+                    </div>
+                    <Badge variant={form.isEligibleForCapture ? "success" : "outline"} className="text-[10px]">
+                      {form.isEligibleForCapture ? "Elegível" : "Desativado"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )) : <p className="text-sm text-muted-foreground">Nenhum formulário sincronizado.</p>}
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            A Meta mantém formulários no nível da Página. A ligação com a campanha só é exibida quando o anúncio fornece essa atribuição.
+          </p>
+        </div>
+      </div>
+      <div className="border-t border-border bg-muted/10 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fluxo operacional</p>
+        <div className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+          <p><span className="font-semibold text-foreground">1. Recuperado:</span> a Meta envia o lead pelo webhook e a atribuição é preservada.</p>
+          <p><span className="font-semibold text-foreground">2. Consumido:</span> o CRM valida o modo global e a regra mais específica ativa.</p>
+          <p><span className="font-semibold text-foreground">3. Distribuído:</span> a fila da regra recebe o lead; sem fila específica, vale a fila padrão.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -79,6 +79,24 @@ describe("Meta Lead Ads normalization", () => {
       .toMatchObject({ campaignId: "campaign_1", campaignName: "PME Salvador" });
   });
 
+  it("preserves the complete Meta attribution chain when provided", () => {
+    expect(normalizeMetaLead({
+      id: "leadgen-chain",
+      campaign_id: "campaign-1",
+      adset_id: "adset-1",
+      ad_id: "ad-1",
+      form_id: "form-1",
+      page_id: "page-1",
+      field_data: [],
+    })).toMatchObject({
+      campaignId: "campaign-1",
+      adSetId: "adset-1",
+      adId: "ad-1",
+      formId: "form-1",
+      pageId: "page-1",
+    });
+  });
+
   it("keeps createdTime null when Meta does not send created_time", () => {
     expect(normalizeMetaLead({ id: "leadgen_789", field_data: [{ name: "full_name", values: ["Leo Nunes"] }] })).toMatchObject({ externalId: "leadgen_789", createdTime: null });
   });
