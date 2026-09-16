@@ -1119,6 +1119,31 @@ WAHA corporativas e configurações de fallback são recusadas no servidor e a
 recusa de uma oferta libera atomicamente o lead para a fila, sem manter o
 corretor como proprietário.
 
+## DEC-105 — Escopo explícito e opt-in para desqualificados no roteamento
+
+**Decisão aprovada em 2026-09-16.** A Matriz de roteamento passa a comunicar
+explicitamente que o destino é condicionado pelos filtros de entrada. Origem/canal,
+plano, cidade e status são filtros combináveis; quando um filtro está vazio, ele
+aceita qualquer valor. Campanha, anúncio e formulário Meta permanecem sob o
+resolvedor de entrada de Filas e campanhas, que é a fonte de verdade para a
+atribuição de mídia.
+
+Leads com `qualificationStatus=disqualified` (incluindo o alias legado
+`not_qualified`) exigem seleção explícita do status `disqualified` para corresponder
+a uma regra. Sem essa seleção, a regra não pode enviá-los para sua fila, unidade ou
+grupo de corretores. A mudança é aplicada no resolvedor determinístico e no
+simulador, preservando regras existentes para os demais status.
+
+## DEC-106 — Modo manual por regra de roteamento
+
+**Decisão aprovada em 2026-09-16.** Cada regra pode operar em modo de oferta
+automática ou ação manual. No modo manual, o lead ainda é encaminhado ao destino
+da regra — inclusive todas as unidades ativas — mas não recebe oferta nem corretor;
+fica sem proprietário aguardando uma ação explícita da gestão. O modo automático
+preserva o ciclo normal de elegibilidade, oferta, aceite e redistribuição por SLA.
+O modo é persistido na própria regra, auditável e deve ser consumido pelo ponto
+único de distribuição antes de ser liberado em produção.
+
 ## DEC-101 — Proteção contra drenagem tardia da outbox
 
 **Decisão aprovada em 2026-09-15.** Mensagens oficiais que permanecerem em

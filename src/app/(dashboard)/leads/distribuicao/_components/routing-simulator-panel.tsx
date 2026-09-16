@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { simulateRoutingAction } from "@/features/lead-distribution/routing-actions";
+import { ALL_BRANCHES_TARGET_ID, ROUTING_QUALIFICATION_STATUS_OPTIONS, ROUTING_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 
 export function RoutingSimulatorPanel({
   queues,
@@ -28,7 +29,7 @@ export function RoutingSimulatorPanel({
   brokers: Array<{ id: string; name: string }>;
 }) {
   const [planType, setPlanType] = useState("pme");
-  const [source, setSource] = useState("meta_ads");
+  const [source, setSource] = useState("meta_lead_ads");
   const [city, setCity] = useState("São Paulo");
   const [lives, setLives] = useState("10");
   const [qualificationStatus, setQualificationStatus] = useState("hot");
@@ -67,6 +68,7 @@ export function RoutingSimulatorPanel({
   const resolveTargetName = (type: string, id: string) => {
     if (type === "queue") return queues.find((q) => q.id === id)?.name ?? `Fila #${id}`;
     if (type === "branch") return branches.find((b) => b.id === id)?.name ?? `Filial #${id}`;
+    if (type === "all_branches" && id === ALL_BRANCHES_TARGET_ID) return "Todas as unidades ativas";
     if (type === "specific_broker")
       return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
     return id;
@@ -109,11 +111,7 @@ export function RoutingSimulatorPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="meta_ads">Meta Ads</SelectItem>
-                <SelectItem value="google_ads">Google Ads</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp Direto</SelectItem>
-                <SelectItem value="indicacao">Indicação</SelectItem>
-                <SelectItem value="site">Site / Orgânico</SelectItem>
+                {ROUTING_SOURCE_OPTIONS.map((option) => <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -144,10 +142,7 @@ export function RoutingSimulatorPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="hot">Lead Quente</SelectItem>
-                <SelectItem value="warm">Lead Morno</SelectItem>
-                <SelectItem value="cold">Lead Frio</SelectItem>
-                <SelectItem value="handoff">Transf. Humana</SelectItem>
+                {ROUTING_QUALIFICATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

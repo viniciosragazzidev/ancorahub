@@ -25,7 +25,8 @@ const routingRuleSchema = z.object({
   id: z.string().optional(),
   name: z.string().trim().min(2, "Informe um nome para a regra").max(100),
   enabled: z.boolean().default(true),
-  targetType: z.enum(["queue", "branch", "broker_group", "specific_broker"]).default("queue"),
+  distributionMode: z.enum(["automatic", "manual"]).default("automatic"),
+  targetType: z.enum(["queue", "branch", "all_branches", "broker_group", "specific_broker"]).default("queue"),
   targetId: z.string().trim().min(1, "Selecione o destino"),
   fallbackQueueId: z.string().trim().optional().nullable(),
   planTypes: z.array(z.string()).optional().default([]),
@@ -53,12 +54,12 @@ export async function saveRoutingRuleAction(input: RoutingRuleInput) {
   const now = new Date();
 
   const conditions: RoutingRuleConditions = {
-    planTypes: parsed.planTypes.filter(Boolean),
-    sources: parsed.sources.filter(Boolean),
-    cities: parsed.cities.filter(Boolean),
+    planTypes: parsed.planTypes.map((value) => value.trim()).filter(Boolean),
+    sources: parsed.sources.map((value) => value.trim()).filter(Boolean),
+    cities: parsed.cities.map((value) => value.trim()).filter(Boolean),
     minLives: parsed.minLives ?? undefined,
     maxLives: parsed.maxLives ?? undefined,
-    qualificationStatuses: parsed.qualificationStatuses.filter(Boolean),
+    qualificationStatuses: parsed.qualificationStatuses.map((value) => value.trim()).filter(Boolean),
   };
 
   let ruleId = parsed.id;
@@ -69,6 +70,7 @@ export async function saveRoutingRuleAction(input: RoutingRuleInput) {
       .set({
         name: parsed.name,
         enabled: parsed.enabled,
+        distributionMode: parsed.distributionMode,
         targetType: parsed.targetType,
         targetId: parsed.targetId,
         fallbackQueueId: parsed.fallbackQueueId ?? null,
@@ -93,6 +95,7 @@ export async function saveRoutingRuleAction(input: RoutingRuleInput) {
       name: parsed.name,
       priority,
       enabled: parsed.enabled,
+      distributionMode: parsed.distributionMode,
       targetType: parsed.targetType,
       targetId: parsed.targetId,
       fallbackQueueId: parsed.fallbackQueueId ?? null,

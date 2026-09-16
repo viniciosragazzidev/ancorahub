@@ -2216,6 +2216,7 @@ export const leadRoutingRules = pgTable(
     name: text("name").notNull(),
     priority: integer("priority").notNull().default(1),
     enabled: boolean("enabled").notNull().default(true),
+    distributionMode: text("distribution_mode").notNull().default("automatic"), // "automatic" | "manual"
     conditions: jsonb("conditions").$type<{
       planTypes?: string[];
       sources?: string[];
