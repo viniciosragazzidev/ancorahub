@@ -607,7 +607,7 @@ function DutyFormSheet({
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="duty-credential">Origem de lead</Label>
+              <Label htmlFor="duty-credential">Origem de entrada</Label>
               <AppSelect
                 id="duty-credential"
                 name="webhookCredentialId"
@@ -617,6 +617,10 @@ function DutyFormSheet({
                   ...snapshot.credentials.map((c) => ({ value: c.id, label: c.name })),
                 ]}
               />
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                A origem representa a Página ou integração que recebe o lead. Campanhas da mesma Página seguem este plantão;
+                regras específicas de campanha continuam na Matriz de Roteamento.
+              </p>
             </div>
             <p className="rounded-lg border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               Fuso operacional: America/Sao_Paulo. Cada unidade conserva uma fila e uma escala

@@ -19,6 +19,11 @@ roteamento.
 - A hierarquia visual apresenta campanha → anúncio/conjunto e Página → formulário.
   Formulários são ativos de Página na Meta; a ligação com uma campanha só é
   exibida quando a atribuição do anúncio estiver disponível.
+- Na criação do plantão, “Origem de entrada” continua filtrando a credencial da
+  Página/integração (o campo persistido é `webhookCredentialId`), mas agora usa o
+  nome da Página em vez do ID técnico. Campanhas específicas devem ser definidas
+  na Matriz de Roteamento, evitando que o plantão pareça uma segunda regra de
+  campanha.
 - O webhook preserva a cadeia técnica completa (campanha, conjunto, anúncio,
   formulário e Página) nas colunas canônicas do lead. Os nomes locais são usados
   na interface e os IDs aparecem como referência técnica secundária.

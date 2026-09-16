@@ -173,8 +173,6 @@ export function MetaIntegrationView({
                 <AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} />
               </div>
 
-              <MetaAssetHierarchy campaigns={assets.campaigns} ads={assets.ads} forms={assets.leadForms} pages={assets.pages} />
-
               <details className="group rounded-lg border border-border bg-muted/10">
                 <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
                   <span className="flex items-center justify-between gap-3">
@@ -225,6 +223,8 @@ export function MetaIntegrationView({
                 />
                 </div>
               </details>
+
+              <MetaAssetHierarchy campaigns={assets.campaigns} ads={assets.ads} forms={assets.leadForms} pages={assets.pages} />
             </CardContent>
           </Card>
         </>
@@ -281,7 +281,7 @@ function MetaAssetHierarchy({
   }
 
   return (
-    <section aria-label="Mapa de ativos Meta" className="rounded-lg border border-border bg-card">
+    <section aria-label="Mapa de ativos Meta" className="max-h-[34rem] overflow-y-auto rounded-lg border border-border bg-card">
       <div className="border-b border-border bg-muted/20 px-4 py-3">
         <p className="text-sm font-semibold">Mapa de aquisição</p>
         <p className="mt-1 text-xs text-muted-foreground">

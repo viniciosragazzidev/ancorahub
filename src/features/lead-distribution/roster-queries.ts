@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -19,13 +19,24 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
   const branchIds = branches.map((branch) => branch.id);
   if (!branchIds.length) return { branches: [], queues: [], credentials: [], schedules: [], brokers: [], assignments: [], history: [] };
 
-  const [queues, credentials, schedules, brokers, assignments] = await Promise.all([
+  const [queues, credentials, schedules, brokers, assignments, campaignOrigins] = await Promise.all([
     db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, name: schema.leadQueues.name })
       .from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds), eq(schema.leadQueues.status, "active")))
       .orderBy(asc(schema.leadQueues.name)),
-    db.select({ id: schema.leadWebhookCredentials.id, name: schema.leadWebhookCredentials.name })
+    db.select({
+      id: schema.leadWebhookCredentials.id,
+      name: sql<string>`CASE WHEN ${schema.leadWebhookCredentials.source} = 'meta_lead_ads' AND ${schema.metaPages.name} IS NOT NULL THEN 'Meta Lead Ads · ' || ${schema.metaPages.name} ELSE ${schema.leadWebhookCredentials.name} END`,
+    })
       .from(schema.leadWebhookCredentials)
+      .leftJoin(schema.metaLeadAdSources, and(
+        eq(schema.metaLeadAdSources.leadWebhookCredentialId, schema.leadWebhookCredentials.id),
+        eq(schema.metaLeadAdSources.tenantId, schema.leadWebhookCredentials.tenantId),
+      ))
+      .leftJoin(schema.metaPages, and(
+        eq(schema.metaPages.pageId, schema.metaLeadAdSources.pageId),
+        eq(schema.metaPages.tenantId, schema.leadWebhookCredentials.tenantId),
+      ))
       .where(and(eq(schema.leadWebhookCredentials.tenantId, context.tenantId), eq(schema.leadWebhookCredentials.status, "active")))
       .orderBy(asc(schema.leadWebhookCredentials.name)),
     db.select({
@@ -45,12 +56,20 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       validFrom: schema.unitDutySchedules.validFrom,
       validUntil: schema.unitDutySchedules.validUntil,
       webhookCredentialId: schema.unitDutySchedules.webhookCredentialId,
-      credentialName: schema.leadWebhookCredentials.name,
+      credentialName: sql<string>`CASE WHEN ${schema.leadWebhookCredentials.source} = 'meta_lead_ads' AND ${schema.metaPages.name} IS NOT NULL THEN 'Meta Lead Ads · ' || ${schema.metaPages.name} ELSE ${schema.leadWebhookCredentials.name} END`,
     })
       .from(schema.unitDutySchedules)
       .innerJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
       .innerJoin(schema.leadQueues, eq(schema.unitDutySchedules.queueId, schema.leadQueues.id))
       .leftJoin(schema.leadWebhookCredentials, eq(schema.unitDutySchedules.webhookCredentialId, schema.leadWebhookCredentials.id))
+      .leftJoin(schema.metaLeadAdSources, and(
+        eq(schema.metaLeadAdSources.leadWebhookCredentialId, schema.leadWebhookCredentials.id),
+        eq(schema.metaLeadAdSources.tenantId, schema.unitDutySchedules.tenantId),
+      ))
+      .leftJoin(schema.metaPages, and(
+        eq(schema.metaPages.pageId, schema.metaLeadAdSources.pageId),
+        eq(schema.metaPages.tenantId, schema.unitDutySchedules.tenantId),
+      ))
       .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), inArray(schema.unitDutySchedules.branchId, branchIds)))
       .orderBy(asc(schema.unitDutySchedules.dayOfWeek), asc(schema.unitDutySchedules.startsAt)),
     db.select({
@@ -91,7 +110,47 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         eq(schema.dutyRosterAssignments.status, "active"),
       ))
       .orderBy(asc(schema.dutyRosterAssignments.dayOfWeek), asc(schema.dutyRosterAssignments.startsAt)),
+    db.select({
+      credentialId: schema.leads.webhookCredentialId,
+      campaignId: schema.leads.metaCampaignId,
+      campaignName: schema.metaCampaigns.name,
+    })
+      .from(schema.leads)
+      .innerJoin(schema.metaCampaigns, and(
+        eq(schema.metaCampaigns.tenantId, schema.leads.tenantId),
+        eq(schema.metaCampaigns.campaignId, schema.leads.metaCampaignId),
+      ))
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        isNotNull(schema.leads.webhookCredentialId),
+        isNotNull(schema.leads.metaCampaignId),
+      ))
+      .groupBy(schema.leads.webhookCredentialId, schema.leads.metaCampaignId, schema.metaCampaigns.name),
   ]);
+
+  const campaignNamesByCredential = new Map<string, string[]>();
+  for (const origin of campaignOrigins) {
+    if (!origin.credentialId || !origin.campaignName) continue;
+    const names = campaignNamesByCredential.get(origin.credentialId) ?? [];
+    if (!names.includes(origin.campaignName)) names.push(origin.campaignName);
+    campaignNamesByCredential.set(origin.credentialId, names);
+  }
+  const displayCredentialName = (credentialId: string | null, fallback: string | null) => {
+    if (!credentialId) return fallback;
+    const campaignNames = campaignNamesByCredential.get(credentialId) ?? [];
+    if (!campaignNames.length) return fallback;
+    const preview = campaignNames.slice(0, 2).join(", ");
+    const suffix = campaignNames.length > 2 ? ` +${campaignNames.length - 2}` : "";
+    return `Meta Lead Ads · ${preview}${suffix}`;
+  };
+  const displayCredentials = credentials.map((credential) => ({
+    ...credential,
+    name: displayCredentialName(credential.id, credential.name) ?? credential.name,
+  }));
+  const displaySchedules = schedules.map((schedule) => ({
+    ...schedule,
+    credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
+  }));
 
   const scheduleIds = schedules.map((schedule) => schedule.id);
   const history = scheduleIds.length
@@ -108,5 +167,5 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .limit(100)
     : [];
 
-  return { branches, queues, credentials, schedules, brokers, assignments, history };
+  return { branches, queues, credentials: displayCredentials, schedules: displaySchedules, brokers, assignments, history };
 }
