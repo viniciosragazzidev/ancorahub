@@ -11,7 +11,6 @@ import { getDatabase, schema } from "@/shared/db";
 import { notifyLeadReassigned } from "@/features/notifications/send-push-helper";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { checkBrokerScheduleAvailability } from "@/features/leads/assignment";
 import { withServerActionTiming } from "@/shared/observability/request-timing";
@@ -149,7 +148,6 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           leadId: lead.id,
           limit: 5,
         });
-        await processMetaOutboundBatch(10, context.tenantId);
       });
       return {
         success: true,

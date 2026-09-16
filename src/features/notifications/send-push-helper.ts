@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, eq, isNull, or } from "drizzle-orm";
 import webpush from "web-push";
 
-import { enqueueBrokerLeadNotification } from "./broker-lead-whatsapp";
+import { enqueueAndProcessBrokerLeadNotification } from "./broker-lead-delivery";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
@@ -205,13 +205,21 @@ export async function notifyNewLead(
 
   if (corretorId && !pushError && !options?.skipBrokerWhatsApp) {
     try {
-      await enqueueBrokerLeadNotification({
+      const brokerDelivery = await enqueueAndProcessBrokerLeadNotification({
         tenantId,
         leadId,
         brokerId: corretorId,
         idempotencyKey: idempotencyPrefix,
       });
-      void processMetaOutboundBatch(5, tenantId).catch(console.error);
+      if (brokerDelivery.delivery && brokerDelivery.delivery.sent !== 1) {
+        console.warn("[notifyNewLead] Template new_lead_broker aguardando recuperação da outbox.", {
+          tenantId,
+          leadId,
+          outboundMessageId: brokerDelivery.queued.outboundId,
+          failed: brokerDelivery.delivery.failed,
+          retried: brokerDelivery.delivery.retried,
+        });
+      }
     } catch (err) {
       whatsappError = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("[notifyNewLead] WhatsApp broker notification error:", err);
@@ -399,7 +407,7 @@ async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: s
     const brokerPhone = broker?.phone?.replace(/\D/g, "");
     if (!brokerPhone || brokerPhone.length < 10) return;
 
-    await enqueueMetaTemplateMessage({
+    const outbound = await enqueueMetaTemplateMessage({
       tenantId,
       recipientType: "user",
       recipientId: brokerId,
@@ -412,7 +420,7 @@ async function sendBrokerReassignedOfficialMessage(tenantId: string, brokerId: s
       // previous owner.
       idempotencyKey: `lead-reassigned-meta:${leadId}:${brokerId}`,
     });
-    await processMetaOutboundBatch(1, tenantId);
+    await processMetaOutboundBatch(1, tenantId, outbound.id);
   } catch (err) {
     console.error("[sendBrokerReassignedOfficialMessage] erro inesperado:", err);
   }

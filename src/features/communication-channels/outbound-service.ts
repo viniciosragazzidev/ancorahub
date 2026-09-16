@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -11,9 +11,7 @@ import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables, type MetaWhatsAppTemplatePurpose } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
-import { isWithinBusinessHours, scheduleForBusinessHours } from "@/shared/time/business-hours";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
-import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS } from "@/features/notifications/broker-lead-cadence";
 import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-policy-service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -172,30 +170,6 @@ async function isCurrentLeadOffer(row: {
     ["PENDING", "SENT", "DELIVERED", "READ"].includes(offer.status)
       && offer.expiresAt > now,
   );
-}
-
-async function getBrokerLeadNotificationCadenceAt(row: {
-  id: string;
-  tenantId: string;
-  purpose: string;
-  recipientId: string | null;
-}, now: Date) {
-  if (row.purpose !== "brokerLeadNotification" || !row.recipientId) return null;
-  const [previous] = await getDatabase().select({ sentAt: schema.whatsappOutboundMessages.sentAt })
-    .from(schema.whatsappOutboundMessages)
-    .where(and(
-      eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
-      eq(schema.whatsappOutboundMessages.recipientId, row.recipientId),
-      eq(schema.whatsappOutboundMessages.purpose, "brokerLeadNotification"),
-      ne(schema.whatsappOutboundMessages.id, row.id),
-      inArray(schema.whatsappOutboundMessages.status, ["sent", "delivered", "read"]),
-      isNotNull(schema.whatsappOutboundMessages.sentAt),
-    ))
-    .orderBy(desc(schema.whatsappOutboundMessages.sentAt))
-    .limit(1);
-  if (!previous?.sentAt) return null;
-  const nextAllowedAt = new Date(previous.sentAt.getTime() + BROKER_LEAD_NOTIFICATION_INTERVAL_MS);
-  return nextAllowedAt > now ? scheduleForBusinessHours(nextAllowedAt) : null;
 }
 
 export async function enqueueMetaTemplateMessage(input: {
@@ -465,31 +439,6 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           eq(schema.whatsappOutboundMessages.id, row.id),
           eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
         ));
-      }
-      if (row.purpose === "brokerLeadNotification" && !isWithinBusinessHours()) {
-        await db.update(schema.whatsappOutboundMessages).set({
-          status: "pending",
-          attempts: row.attempts,
-          scheduledAt: scheduleForBusinessHours(),
-          nextAttemptAt: null,
-          providerErrorCode: "OUTSIDE_BUSINESS_HOURS",
-          providerErrorMessage: "Aviso de novo lead aguarda o próximo horário comercial.",
-          updatedAt: new Date(),
-        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-        return;
-      }
-      const cadenceAt = await getBrokerLeadNotificationCadenceAt(row, now);
-      if (cadenceAt) {
-        await db.update(schema.whatsappOutboundMessages).set({
-          status: "pending",
-          attempts: row.attempts,
-          scheduledAt: cadenceAt,
-          nextAttemptAt: null,
-          providerErrorCode: "BROKER_NOTIFICATION_CADENCE",
-          providerErrorMessage: "Aviso de novo lead agendado para respeitar o intervalo do corretor.",
-          updatedAt: new Date(),
-        }).where(eq(schema.whatsappOutboundMessages.id, row.id));
-        return;
       }
       if (!await isCurrentBrokerLeadNotification(row)) {
         await db.update(schema.whatsappOutboundMessages).set({

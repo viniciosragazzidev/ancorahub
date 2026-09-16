@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables, getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
+import {
+  CANONICAL_BROKER_LEAD_TEMPLATE_NAME,
+  isBrokerLeadEventKey,
+  isBrokerLeadTemplatePurpose,
+  isCanonicalBrokerLeadTemplateName,
+} from "./broker-lead-template-contract";
 
 describe("approved Meta WhatsApp templates", () => {
+  it("keeps offer and assignment situations on one canonical contract", () => {
+    expect(CANONICAL_BROKER_LEAD_TEMPLATE_NAME).toBe("new_lead_broker");
+    expect(isBrokerLeadEventKey("LEAD_OFFER")).toBe(true);
+    expect(isBrokerLeadEventKey("LEAD_ASSIGNMENT")).toBe(true);
+    expect(isBrokerLeadTemplatePurpose("newLeadAssignment")).toBe(true);
+    expect(isBrokerLeadTemplatePurpose("brokerLeadNotification")).toBe(true);
+    expect(isCanonicalBrokerLeadTemplateName("new_lead_broker")).toBe(true);
+    expect(isCanonicalBrokerLeadTemplateName("lead_first_contact")).toBe(false);
+  });
+
   it("uses the approved new-lead template for broker offers", () => {
     expect(getMetaWhatsAppTemplate("newLeadAssignment")).toEqual({ name: "new_lead_broker", language: "pt_BR" });
     expect(getMetaWhatsAppTemplateVariableNames("newLeadAssignment")).toEqual([

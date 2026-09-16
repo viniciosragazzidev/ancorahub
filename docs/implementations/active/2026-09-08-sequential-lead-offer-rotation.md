@@ -9,12 +9,11 @@ tentado.
 
 ## Comportamento entregue
 
-- O corretor selecionado recebe uma oferta pendente na mesma transação que registra a tentativa; o lead permanece sem `corretorId` até o aceite atômico.
+- O corretor selecionado recebe uma oferta pendente e o vínculo provisório na mesma transação; o lead aparece em sua carteira até aceite, recusa ou rotação (DEC-104).
 - Existe no máximo uma oferta ativa por lead, serializada com row lock no próprio
   lead antes da inserção da oferta.
-- Recusa, expiração e estouro de SLA retornam ao mesmo processador e avançam
-  diretamente para o próximo corretor elegível, sem criar owner para uma oferta
-  ainda pendente.
+- Recusa, expiração e estouro de SLA retornam ao mesmo processador e liberam ou
+  transferem o owner provisório diretamente para o próximo corretor elegível.
 - Corretor sem canal corporativo utilizável e falha ao enfileirar a mensagem ficam
   registrados como tentativa cancelada e o motor avança imediatamente.
 - O job de distribuição espera exatamente até `expiresAt` sem consumir a contagem de

@@ -46,9 +46,9 @@ selecionado; conexão pessoal permanece somente leitura conforme DEC-091. Uma
 contingência só é executada após falha confirmada anterior ao aceite do provedor,
 nunca após um WAMID/ID WAHA aceito.
 
-A DEC-079 é emendada: `new_lead_broker` deixa de ser nome imutável e passa a ser o
-fallback homologado do evento `LEAD_ASSIGNMENT`. A atribuição, horário comercial,
-cadência, revalidação do dono, outbox e idempotência das DEC-079/083/084 não mudam.
+A DEC-079 foi inicialmente emendada para tornar `new_lead_broker` um fallback
+configurável. A DEC-103 posteriormente restringiu `LEAD_OFFER` e `LEAD_ASSIGNMENT`
+ao contrato canônico `new_lead_broker`; os demais eventos continuam configuráveis.
 O catálogo de eventos é extensível em código, mas a UI não inventa eventos sem um
 produtor real. Detalhes técnicos e rollback estão no ADR-0041.
 
@@ -84,7 +84,7 @@ definida ou outro tenant.
 
 ## DEC-102 — Oferta não atribui owner antes do aceite
 
-**Estado:** Aceita e supersede a semântica de titularidade provisória da DEC-097
+**Estado:** Supersedida pela DEC-104
 **Data:** 2026-09-15
 
 O corretor escolhido pelo motor automático recebe uma oferta exclusiva, mas não se
@@ -104,11 +104,30 @@ worker até sua conclusão segura.
 As situações `LEAD_OFFER` (oferta pendente) e `LEAD_ASSIGNMENT` (atribuição
 confirmada) usam o template Meta aprovado `new_lead_broker`, com o contrato nomeado
 `cargo`, `corretor_nome`, `lead_nome`, `produto_interesse` e o `lead_id` somente no
-botão de URL. Os nomes legados `novo_lead_` e `new_lead_assignment` não são mais
-resolvidos: vínculos antigos na área de Situações são tratados como ausentes e
-caem para o template canônico aprovado da WABA ativa. A escolha de outro template
-aprovado para eventos distintos continua editável e auditável; uma situação de
-oferta não pode publicar um dos nomes legados.
+botão de URL. Qualquer vínculo diferente de `new_lead_broker` nessas duas
+situações — inclusive `lead_first_contact`, `novo_lead_` e
+`new_lead_assignment` — é tratado como ausente e cai para o template canônico
+aprovado da WABA ativa. A escolha de outro template aprovado para eventos
+distintos continua editável e auditável; as situações de novo lead não podem
+publicar outro contrato.
+
+## DEC-104 — Oferta cria vínculo provisório visível na carteira
+
+**Estado:** Aceita e restaura a semântica de titularidade provisória da DEC-097
+**Data:** 2026-09-16
+
+Ao criar uma oferta válida, o motor vincula imediatamente o lead ao corretor
+selecionado com `assignmentSource=automatic_offer`. Esse vínculo provisório faz o
+lead aparecer na carteira do corretor e permite que ele aceite o atendimento pelo
+CRM. O aceite confirma a responsabilidade e muda a origem para
+`whatsapp_offer_accepted`; recusa, expiração ou falha ao criar a mensagem libera ou
+transfere o vínculo ao próximo corretor elegível, preservando histórico e auditoria.
+
+A oferta continua exclusiva e protegida por row lock. Um owner confirmado por ação
+manual ou aceite nunca é sobrescrito pela rotação. A mensagem atual é processada
+pelo próprio `outboundMessageId`; o processamento da oferta não drena mensagens
+antigas do tenant, e `LEAD_OFFER`/`LEAD_ASSIGNMENT` usam exclusivamente o contrato
+`new_lead_broker` da DEC-103.
 
 ## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
 
@@ -270,14 +289,13 @@ duplicação de saídas, notificações e redistribuições durante a migração
 
 ## DEC-084 — Cadência e diagnóstico seguro dos avisos de novo lead
 
-**Estado:** Aceita
+**Estado:** Parcialmente supersedida pela DEC-104; diagnóstico seguro permanece aceito
 **Data:** 2026-08-25
 
-O aviso oficial `new_lead_broker` mantém uma cadência mínima de dez minutos por
-corretor. Novas atribuições não são descartadas: entram na outbox na ordem recebida e
-são agendadas para a próxima posição disponível, sempre respeitando a janela da
-DEC-083. O processamento serializa esses avisos no lote para que itens já pendentes
-não sejam enviados juntos.
+O intervalo mínimo de dez minutos deixou de se aplicar ao aviso operacional
+`new_lead_broker`: a DEC-104 exige envio imediato do outbound exato da oferta atual,
+com alvo de até dois segundos. Itens antigos continuam duráveis para recuperação,
+mas não podem ocupar o lugar da mensagem atual.
 
 Falhas de entrega posteriores ao aceite da API são diferentes de erros de envio. O
 webhook da Meta persiste no ledger somente o código e o título seguro do primeiro erro
@@ -286,20 +304,14 @@ política ou qualidade de canal sem expor PII e sem reverter a atribuição do l
 
 ## DEC-083 — Janela comercial para distribuição automática e aviso de novo lead
 
-**Estado:** Aceita
+**Estado:** Supersedida pela DEC-097 para o motor e pela DEC-104 para `new_lead_broker`
 **Data:** 2026-08-25
 
 A distribuição automática, inclusive as retomadas por recusa, SLA e conclusão de
-qualificação, executa somente de segunda a sexta entre 08:00 (inclusivo) e 18:00
-(exclusivo), no fuso `America/Sao_Paulo`. Fora da janela, o lead continua
-persistido na fila e o job idempotente é reagendado para a próxima abertura; não há
-perda de lead nem consumo de tentativa.
-
-O template oficial `new_lead_broker` segue a mesma janela: a atribuição é durável
-imediatamente, mas a saída fica pendente até a abertura. Antes de enviar, a outbox
-revalida que o destinatário ainda é o corretor responsável e cancela o aviso se a
-atribuição foi substituída. Atribuições manuais continuam permitidas fora do horário;
-somente o efeito automático e o aviso são postergados.
+qualificação, agora roda 24/7 conforme a DEC-097. O template oficial
+`new_lead_broker` também é processado imediatamente pelo outbound exato da oferta,
+conforme a DEC-104. A outbox ainda revalida que o destinatário é o corretor
+responsável e cancela o aviso se a atribuição foi substituída.
 
 ## DEC-082 — Auto-login e passkey no primeiro acesso
 

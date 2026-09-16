@@ -165,12 +165,13 @@ export async function createLeadOffersForBrokers(input: {
       });
       if (destinationPhone) {
         const assignmentEventId = randomUUID();
-        // An offer is not an assignment. Keep the lead unowned until the
-        // broker explicitly accepts it in `handleLeadOfferWebhookResponse`.
-        // The unit can still be resolved here so the next rotation uses the
-        // correct roster without exposing the lead in the broker's wallet.
+        // The offered broker becomes the provisional owner immediately so the
+        // lead appears in the wallet and can be accepted. The source remains
+        // `automatic_offer`, allowing decline/expiration to release or rotate
+        // this link without treating it as confirmed attendance.
         await tx.update(schema.leads).set(buildPendingLeadOfferLeadUpdate({
           targetBranchId: input.targetBranchId,
+          brokerId: broker.id,
           now,
         })).where(and(
           eq(schema.leads.id, input.leadId),
@@ -188,15 +189,15 @@ export async function createLeadOffersForBrokers(input: {
           fromBranchId: lead.branchId,
           toBranchId: input.targetBranchId,
           previousOwnerId: input.expectedCurrentBrokerId ?? null,
-          newOwnerId: null,
+          newOwnerId: broker.id,
           action: "offer_sent",
           source: input.expectedCurrentBrokerId ? "redistribution" : "automatic",
           strategy: "automatic",
           reason: input.expectedCurrentBrokerId
-            ? "Oferta enviada ao próximo corretor elegível; titularidade permanece com o owner atual até o aceite."
-            : "Oferta enviada ao primeiro corretor elegível; titularidade será criada somente após o aceite.",
+            ? "Responsabilidade provisória transferida ao próximo corretor elegível."
+            : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
           actorId: input.requestedBy ?? broker.id,
-          metadata: { offeredBrokerId: broker.id, ownershipConfirmed: false },
+          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true },
           createdAt: now,
         });
         if (input.requestedBy) {
@@ -205,7 +206,7 @@ export async function createLeadOffersForBrokers(input: {
             userId: input.requestedBy,
             entidade: "lead_distribution",
             entidadeId: input.leadId,
-            acao: "lead.offer_sent_before_assignment",
+            acao: "lead.provisional_owner_assigned",
           });
         }
       }
@@ -252,16 +253,32 @@ export async function createLeadOffersForBrokers(input: {
         idempotencyKey,
       });
     } catch (error) {
-      await db
-        .update(schema.leadOffers)
-        .set({ status: "CANCELLED", updatedAt: new Date() })
-        .where(
-          and(
-            eq(schema.leadOffers.id, offerId),
-            eq(schema.leadOffers.tenantId, input.tenantId),
-            eq(schema.leadOffers.status, "PENDING"),
-          ),
-        );
+      const cancelledAt = new Date();
+      await db.transaction(async (tx) => {
+        await tx
+          .update(schema.leadOffers)
+          .set({ status: "CANCELLED", updatedAt: cancelledAt })
+          .where(
+            and(
+              eq(schema.leadOffers.id, offerId),
+              eq(schema.leadOffers.tenantId, input.tenantId),
+              eq(schema.leadOffers.status, "PENDING"),
+            ),
+          );
+        // Enqueue failure means there is no valid offer for this provisional
+        // wallet entry. Release it only if this exact broker/source still owns
+        // the lead; a concurrent manual assignment is never overwritten.
+        await tx
+          .update(schema.leads)
+          .set(buildDeclinedLeadReleaseUpdate(cancelledAt))
+          .where(and(
+            eq(schema.leads.id, input.leadId),
+            eq(schema.leads.tenantId, input.tenantId),
+            eq(schema.leads.corretorId, broker.id),
+            eq(schema.leads.assignmentSource, "automatic_offer"),
+            isNull(schema.leads.deletedAt),
+          ));
+      });
       if (input.requestedBy) {
         await db.insert(schema.auditLogs).values({
           id: randomUUID(),
@@ -520,9 +537,8 @@ export async function handleLeadOfferWebhookResponse(input: {
 
     if (!currentOffer) return { won: false, reason: "offer_not_found" };
 
-    // Accept decision shared with the domain seam. The short legacy grace is
-    // retained only for offers created before DEC-102; new offers never have a
-    // provisional owner to rely on.
+    // Accept decision shared with the domain seam. The short grace applies
+    // only while this broker still owns the pending offer provisionally.
     const decision = resolveLeadOfferAcceptance(
       { offerStatus: currentOffer.status, expiresAt: currentOffer.expiresAt, leadCorretorId: lead.corretorId, brokerId: broker.id },
       now,
@@ -631,7 +647,7 @@ export async function handleLeadOfferWebhookResponse(input: {
 
     // Enqueue confirmation template: lead_assignment_confirmed
     if (result.broker.phone) {
-      await enqueueMetaTemplateMessage({
+      const confirmationOutbound = await enqueueMetaTemplateMessage({
         tenantId: input.tenantId,
         recipientType: "user",
         recipientId: result.broker.id,
@@ -650,6 +666,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         requestedBy: broker.id,
         idempotencyKey: `lead-confirmed:${result.lead.id}:${result.broker.id}`,
       });
+      await processMetaOutboundBatch(1, input.tenantId, confirmationOutbound.id);
     }
 
     // Notify other candidate brokers that lead was assigned to someone else
@@ -677,7 +694,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         .limit(1);
 
       if (losingBroker && losingBroker.phone) {
-        await enqueueMetaTemplateMessage({
+        const unavailableOutbound = await enqueueMetaTemplateMessage({
           tenantId: input.tenantId,
           recipientType: "user",
           recipientId: losingBroker.id,
@@ -687,10 +704,9 @@ export async function handleLeadOfferWebhookResponse(input: {
           requestedBy: broker.id,
           idempotencyKey: `lead-unavailable:${result.lead.id}:${losingBroker.id}`,
         });
+        await processMetaOutboundBatch(1, input.tenantId, unavailableOutbound.id);
       }
     }
-
-    void processMetaOutboundBatch(10, input.tenantId).catch(console.error);
 
     return { processed: true, action: "accepted", won: true, leadId: result.lead.id };
   } else {
@@ -698,7 +714,7 @@ export async function handleLeadOfferWebhookResponse(input: {
     const brokerName = broker.name || "Corretor(a)";
     const destPhone = broker.phone || input.phone;
 
-    await enqueueMetaTemplateMessage({
+    const unavailableOutbound = await enqueueMetaTemplateMessage({
       tenantId: input.tenantId,
       recipientType: "user",
       recipientId: broker.id,
@@ -708,8 +724,7 @@ export async function handleLeadOfferWebhookResponse(input: {
       requestedBy: broker.id,
       idempotencyKey: `lead-dispute-lost:${offer.id}:${Date.now()}`,
     });
-
-    void processMetaOutboundBatch(10, input.tenantId).catch(console.error);
+    await processMetaOutboundBatch(1, input.tenantId, unavailableOutbound.id);
 
     return { processed: true, action: "accepted", won: false, reason: result.reason };
   }
@@ -808,16 +823,17 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         .limit(1);
 
       if (broker && broker.phone) {
-        await enqueueMetaTemplateMessage({
+        const expiredOutbound = await enqueueMetaTemplateMessage({
           tenantId: offer.tenantId,
           recipientType: "user",
           recipientId: broker.id,
           destinationPhone: broker.phone,
           purpose: "leadAssignmentExpired",
           variables: [broker.name || "Corretor(a)"],
-      requestedBy: null,
+          requestedBy: null,
           idempotencyKey: `offer-expired:${offer.id}`,
         });
+        await processMetaOutboundBatch(1, offer.tenantId, expiredOutbound.id);
       }
 
       const systemUserId = await resolveSystemUserId(offer.tenantId);
@@ -829,10 +845,6 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         acao: "lead_offer_expired",
       });
     }
-  }
-
-  if (expiredCount > 0) {
-    void processMetaOutboundBatch(10, tenantId).catch(console.error);
   }
 
   return { expired: expiredCount };

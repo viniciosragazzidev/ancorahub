@@ -148,24 +148,38 @@ export function isDeferredDistributionReason(reason: string) {
 export const OFFER_ENQUEUE_GRACE_MS = 2 * 60 * 1000;
 
 /**
- * A lead offer is not an assignment. The lead remains unowned while the offer
- * is pending; only the acceptance transaction may set `corretorId`.
+ * A pending offer gives the selected broker provisional ownership so the lead
+ * is immediately visible in the broker wallet and can be accepted there. The
+ * `automatic_offer` source distinguishes this reversible link from a confirmed
+ * attendance: decline or expiration may atomically rotate it to the next
+ * eligible broker.
  */
-export function buildPendingLeadOfferLeadUpdate(input: { targetBranchId: string; now: Date }) {
+export function buildPendingLeadOfferLeadUpdate(input: {
+  targetBranchId: string;
+  brokerId: string;
+  now: Date;
+}) {
   return {
-    // Unit routing is independent from broker ownership and can be resolved
-    // before acceptance so the next rotation uses the correct roster.
     branchId: input.targetBranchId,
-    distributionStatus: "queued" as const,
+    corretorId: input.brokerId,
+    status: "distributed" as const,
+    distributionStatus: "assigned" as const,
+    assignedAt: input.now,
+    assignmentSource: "automatic_offer" as const,
+    assignmentStrategy: "whatsapp_offer" as const,
     distributionUpdatedAt: input.now,
+    stageEnteredAt: input.now,
+    firstContactAt: null,
+    serviceStartedAt: null,
+    serviceStartedBy: null,
+    motivoPerda: null,
     updatedAt: input.now,
   };
 }
 
 /**
- * Legacy rows created before the no-owner-before-acceptance rule may still
- * contain a provisional owner. Keep the short grace window only to finish
- * those in-flight offers safely; new offers never rely on it.
+ * A short grace protects a broker who accepted at the deadline while the
+ * request was in flight. It only applies to the current provisional owner.
  */
 export const LEAD_OFFER_ACCEPT_GRACE_MS = 60 * 1000;
 

@@ -1,8 +1,8 @@
 # ADR-0042 — Titularidade provisória e autoridade única (DEC-097)
 
-> **Semântica de owner supersedida pela DEC-102 (15/09/2026):** ofertas novas não
-> gravam titularidade antes do aceite. Este ADR permanece como histórico da decisão
-> anterior; o fluxo atual segue `docs/decision-log.md`/DEC-102.
+> **Semântica restaurada pela DEC-104 (16/09/2026):** ofertas novas voltam a
+> registrar o owner provisório para aparecerem na carteira. A DEC-102 permanece
+> histórica e foi supersedida; o aceite confirma, enquanto recusa/expiração rotacionam.
 
 **Estado:** Aceita
 **Data:** 2026-09-10

@@ -181,7 +181,7 @@ export async function fetchMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { listTenantTemplates, syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
-  const { isLegacyLeadOfferTemplateName } = await import("@/features/communication-channels/templates");
+  const { isBrokerLeadEventKey, isCanonicalBrokerLeadTemplateName } = await import("@/features/communication-channels/broker-lead-template-contract");
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, eq } = await import("drizzle-orm");
 
@@ -224,7 +224,7 @@ export async function fetchMetaTemplatesAction() {
     const assignedSituations = activeUsages
       .filter((u) => {
         if (u.templateId !== t.id) return false;
-        return !(u.eventKey === "LEAD_OFFER" && isLegacyLeadOfferTemplateName(t.name));
+        return !(isBrokerLeadEventKey(u.eventKey) && !isCanonicalBrokerLeadTemplateName(t.name));
       })
       .map((u) => u.eventKey);
 
@@ -246,7 +246,8 @@ export async function setMetaTemplateSituationsAction(templateId: string, eventK
   const db = getDatabase();
   const now = new Date();
 
-  if (eventKeys.includes("LEAD_OFFER")) {
+  if (eventKeys.some((eventKey) => eventKey === "LEAD_OFFER" || eventKey === "LEAD_ASSIGNMENT")) {
+    const { isCanonicalBrokerLeadTemplateName } = await import("@/features/communication-channels/broker-lead-template-contract");
     const [template] = await db
       .select({ name: schema.metaWhatsAppTemplates.name })
       .from(schema.metaWhatsAppTemplates)
@@ -255,8 +256,8 @@ export async function setMetaTemplateSituationsAction(templateId: string, eventK
         eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
       ))
       .limit(1);
-    if (template?.name === "novo_lead_" || template?.name === "new_lead_assignment") {
-      throw new Error("A situação Oferta de lead usa o template padrão new_lead_broker.");
+    if (!isCanonicalBrokerLeadTemplateName(template?.name)) {
+      throw new Error("As situações de novo lead usam exclusivamente o template padrão new_lead_broker.");
     }
   }
 

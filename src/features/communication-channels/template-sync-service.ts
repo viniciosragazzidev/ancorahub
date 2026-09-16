@@ -14,7 +14,8 @@ import {
   type MetaGraphTemplateItem,
   type MetaTemplateCategory,
 } from "./meta-graph-templates-client";
-import { isLegacyLeadOfferTemplateName, META_WHATSAPP_TEMPLATE_PURPOSES, type MetaWhatsAppTemplatePurpose } from "./templates";
+import { isBrokerLeadTemplatePurpose, isCanonicalBrokerLeadTemplateName } from "./broker-lead-template-contract";
+import { META_WHATSAPP_TEMPLATE_PURPOSES, type MetaWhatsAppTemplatePurpose } from "./templates";
 
 export type EventKey =
   | "FIRST_CONTACT"
@@ -416,7 +417,7 @@ export class WhatsAppTemplateResolver {
           )
           .limit(1);
 
-        if (usage && !(purpose === "newLeadAssignment" && isLegacyLeadOfferTemplateName(usage.templateName))) {
+        if (usage && !(isBrokerLeadTemplatePurpose(purpose) && !isCanonicalBrokerLeadTemplateName(usage.templateName))) {
           return { name: usage.templateName, language: usage.language, isCustom: true };
         }
       }

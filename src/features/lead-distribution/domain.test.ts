@@ -14,18 +14,30 @@ describe("automatic unit routing", () => {
 });
 
 describe("lead offer ownership", () => {
-  it("keeps the lead unassigned until the broker accepts the offer", () => {
+  it("links the lead provisionally to the offered broker until acceptance or rotation", () => {
     const now = new Date("2026-09-15T15:00:00Z");
-    const pendingUpdate = buildPendingLeadOfferLeadUpdate({ targetBranchId: "unit-a", now });
+    const pendingUpdate = buildPendingLeadOfferLeadUpdate({
+      targetBranchId: "unit-a",
+      brokerId: "broker-a",
+      now,
+    });
 
     expect(pendingUpdate).toEqual({
       branchId: "unit-a",
-      distributionStatus: "queued",
+      corretorId: "broker-a",
+      status: "distributed",
+      distributionStatus: "assigned",
+      assignedAt: now,
+      assignmentSource: "automatic_offer",
+      assignmentStrategy: "whatsapp_offer",
       distributionUpdatedAt: now,
+      stageEnteredAt: now,
+      firstContactAt: null,
+      serviceStartedAt: null,
+      serviceStartedBy: null,
+      motivoPerda: null,
       updatedAt: now,
     });
-    expect("corretorId" in pendingUpdate).toBe(false);
-    expect("assignedAt" in pendingUpdate).toBe(false);
   });
 });
 

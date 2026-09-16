@@ -1,5 +1,9 @@
 # Atribuição de lead somente após aceite da oferta
 
+> **Supersedida em 16/09/2026 pela DEC-104.** O comportamento atual restaura o
+> owner provisório para que a oferta apareça na carteira do corretor; este registro
+> é mantido apenas como histórico da implementação anterior.
+
 ## Resultado
 
 Ofertas automáticas enviadas pelo canal oficial Meta não atribuem `leads.corretorId`

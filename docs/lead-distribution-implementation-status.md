@@ -1,14 +1,14 @@
 # Sistema de distribuição de leads — estado da implementação
 
-## Oferta pendente e autoridade única (DEC-096) — 15/09/2026
+## Oferta pendente, owner provisório e autoridade única (DEC-104) — 16/09/2026
 
 - `src/features/lead-distribution` resolve unidade, fila, elegibilidade, ordem,
   oferta, redistribuição e SLA; os canais de entrada não escolhem corretor.
-- A criação durável da oferta persiste somente a tentativa pendente; o lead fica sem
-  `corretorId` até o aceite atômico do corretor.
-- Recusa, expiração e SLA fazem a rotação direta para o próximo elegível sem expor
-  uma oferta pendente como carteira confirmada. Registros legados com owner
-  provisório continuam recuperáveis pelo worker.
+- A criação durável da oferta vincula o corretor como owner provisório com origem
+  `automatic_offer`, fazendo o lead aparecer imediatamente em sua carteira.
+- O aceite confirma o atendimento; recusa, expiração, falha de enqueue e SLA
+  liberam ou transferem o vínculo diretamente ao próximo elegível, sem sobrescrever
+  um owner confirmado por ação concorrente.
 - Leads sem unidade usam a unidade automática de menor carga com desempate estável.
 - Cooldown, menor fila sem contato e menor carga evitam sequências no mesmo corretor;
   capacidade é meta e não deixa o lead órfão quando todos atingem o alvo.
@@ -62,8 +62,8 @@ O servidor resolve tenant, papel, unidade e elegibilidade. IDs enviados pelo nav
 
 1. O canal de entrada registra o lead e a intenção durável.
 2. O motor resolve unidade e fila pelas regras configuradas em `/distribuicao`.
-3. O corretor elegível melhor ranqueado recebe uma oferta pendente, sem virar owner.
-4. Aceite cria a atribuição definitiva; recusa, expiração ou SLA trocam para o próximo elegível.
+3. O corretor elegível melhor ranqueado recebe a oferta e o vínculo provisório na carteira.
+4. Aceite confirma a atribuição; recusa, expiração ou SLA liberam/trocam para o próximo elegível.
 5. As tasks recuperam qualquer pendência e o histórico permanece auditável.
 
 ## Próxima camada

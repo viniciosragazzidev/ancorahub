@@ -63,7 +63,6 @@ function continueLeadDistributionAfterResponse(input: {
   );
   scheduleAfterResponse("lead-assignment-effects", async () => {
     await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 5 });
-    await processMetaOutboundBatch(10, input.tenantId);
   });
 }
 

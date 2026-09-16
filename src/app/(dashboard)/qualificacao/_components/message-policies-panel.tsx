@@ -20,6 +20,11 @@ import {
   saveFreeMessageTemplateAction,
   saveMessageEventPolicyAction,
 } from "@/features/ai-qualification/actions";
+import {
+  CANONICAL_BROKER_LEAD_TEMPLATE_NAME,
+  isBrokerLeadEventKey,
+  isCanonicalBrokerLeadTemplateName,
+} from "@/features/communication-channels/broker-lead-template-contract";
 
 type ResourceKind = "meta_template" | "free_message";
 type Policy = {
@@ -105,7 +110,7 @@ export function MessagePoliciesPanel({
       setData(result);
       setSelectedEventKey((current) => current ?? result.events[0]?.key ?? null);
       const canonicalOfferTemplate = result.metaTemplates.find(
-        (template) => template.name === "new_lead_broker" && template.status === "APPROVED",
+        (template) => template.name === CANONICAL_BROKER_LEAD_TEMPLATE_NAME && template.status === "APPROVED",
       );
       setDrafts(Object.fromEntries(result.events.map((event) => {
         const draft = policyToDraft(event.policy);
@@ -113,13 +118,20 @@ export function MessagePoliciesPanel({
           ? result.metaTemplates.find((template) => template.id === event.policy?.metaTemplateId)
           : null;
         const staleOfferTemplate = configuredTemplate
-          ? ["novo_lead_", "new_lead_assignment"].includes(configuredTemplate.name)
+          ? !isCanonicalBrokerLeadTemplateName(configuredTemplate.name)
           : false;
+        const invalidBrokerLeadPolicy = isBrokerLeadEventKey(event.key) && (
+          !event.policy
+          || staleOfferTemplate
+          || draft.primaryKind !== "meta_template"
+          || draft.fallbackKind !== "none"
+          || !draft.active
+        );
         // Keep the Situations panel aligned with the runtime fallback: a
-        // tenant without a saved LEAD_OFFER policy still previews the approved
+        // tenant without a saved broker-lead policy still previews the approved
         // canonical template instead of an empty configuration or a legacy
         // binding that would resolve to a retired name.
-        if (event.key === "LEAD_OFFER" && canonicalOfferTemplate && (!event.policy || staleOfferTemplate)) {
+        if (canonicalOfferTemplate && invalidBrokerLeadPolicy) {
           return [event.key, { ...draft, primaryKind: "meta_template", metaTemplateId: canonicalOfferTemplate.id, fallbackKind: "none", active: true }];
         }
         return [event.key, draft];

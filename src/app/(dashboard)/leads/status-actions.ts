@@ -12,7 +12,6 @@ import { getDatabase, schema } from "@/shared/db";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
 export type StatusChangeState = {
   success?: boolean;
@@ -103,7 +102,6 @@ export async function bulkReassignLeadsAction(
           tenantId: context.tenantId,
           limit: Math.max(changedLeadIds.length * 2, 10),
         });
-        await processMetaOutboundBatch(10, context.tenantId);
       });
     }
 

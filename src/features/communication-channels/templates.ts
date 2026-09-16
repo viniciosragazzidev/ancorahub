@@ -1,16 +1,18 @@
 import "server-only";
 
+import { CANONICAL_BROKER_LEAD_TEMPLATE_NAME } from "./broker-lead-template-contract";
+
 export const META_WHATSAPP_TEMPLATE_PURPOSES = {
   brokerInvitation: { name: "broker_first_access", language: "pt_BR" },
   taskReminder: { name: "ancora_lembrete_tarefa", language: "pt_BR" },
   clientNotice: { name: "ancora_aviso_cliente", language: "pt_BR" },
-  brokerLeadNotification: { name: "new_lead_broker", language: "pt_BR" },
+  brokerLeadNotification: { name: CANONICAL_BROKER_LEAD_TEMPLATE_NAME, language: "pt_BR" },
   leadQualification: { name: "lead_qualification_start", language: "pt_BR" },
   lead_qualification: { name: "lead_qualification_start", language: "pt_BR" },
   // The offer and the confirmed assignment use the same Meta-approved
   // template. Keeping two different names here made pending offers resolve to
   // the retired `novo_lead_` template and fail before reaching Meta.
-  newLeadAssignment: { name: "new_lead_broker", language: "pt_BR" },
+  newLeadAssignment: { name: CANONICAL_BROKER_LEAD_TEMPLATE_NAME, language: "pt_BR" },
   leadAssignmentConfirmed: { name: "lead_assignment_confirmed", language: "pt_BR" },
   leadAssignmentUnavailable: { name: "lead_assignment_unavailable", language: "pt_BR" },
   leadAssignmentExpired: { name: "lead_assignment_expired", language: "pt_BR" },
@@ -19,12 +21,6 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
 } as const;
 
 export type MetaWhatsAppTemplatePurpose = keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES;
-
-const LEGACY_LEAD_OFFER_TEMPLATE_NAMES = new Set(["novo_lead_", "new_lead_assignment"]);
-
-export function isLegacyLeadOfferTemplateName(name?: string | null) {
-  return Boolean(name && LEGACY_LEAD_OFFER_TEMPLATE_NAMES.has(name));
-}
 
 /**
  * Assignment and lifecycle notices are part of the official Meta channel.
