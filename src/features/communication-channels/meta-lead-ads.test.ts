@@ -46,6 +46,13 @@ describe("Meta Lead Ads normalization", () => {
     })).toEqual({ action: "capture", queueId: "queue-ad" });
   });
 
+  it("does not confuse an active Meta campaign with CRM eligibility in selective mode", () => {
+    expect(resolveMetaCampaignIntake({
+      globalMode: "selective",
+      hasTenantRules: true,
+    })).toEqual({ action: "ignore", queueId: null });
+  });
+
   it("does not let an old disabled ad or form rule discard an eligible campaign lead", () => {
     const campaignRoute = { enabled: true, queueId: "queue-campaign", queueStatus: "active" } as const;
 

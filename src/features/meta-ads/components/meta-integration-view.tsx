@@ -193,6 +193,7 @@ export function MetaIntegrationView({
                     status: f.status,
                     detail: `Página: ${f.pageId}`,
                     isEligibleForCapture: f.isEligibleForCapture,
+                    inheritedFromCampaignIds: f.inheritedFromCampaignIds,
                   }))}
                 />
                 <SelectableAssetList
@@ -219,6 +220,7 @@ export function MetaIntegrationView({
                     status: ad.status,
                     detail: `Conjunto: ${ad.adSetId}`,
                     isEligibleForCapture: ad.isEligibleForCapture,
+                    inheritedFromCampaignId: ad.inheritedFromCampaignId,
                   }))}
                 />
                 </div>
@@ -483,6 +485,8 @@ type AssetItem = {
   status: string;
   detail: string;
   isEligibleForCapture?: boolean;
+  inheritedFromCampaignId?: string | null;
+  inheritedFromCampaignIds?: string[];
 };
 
 function SelectableAssetList({
@@ -710,7 +714,9 @@ function SelectableAssetList({
                             variant="success"
                             className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold border-emerald-500/40"
                           >
-                            Elegível para captura
+                            {item.inheritedFromCampaignId || item.inheritedFromCampaignIds?.length
+                              ? "Herdado da campanha"
+                              : "Elegível para captura"}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] text-muted-foreground">
@@ -721,6 +727,11 @@ function SelectableAssetList({
                       <p className="truncate font-mono text-xs text-muted-foreground mt-0.5">
                         {item.detail} · ID: {item.id}
                       </p>
+                      {item.inheritedFromCampaignId || item.inheritedFromCampaignIds?.length ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          A campanha elegível autoriza este ativo automaticamente; uma regra específica ainda pode definir outra fila.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

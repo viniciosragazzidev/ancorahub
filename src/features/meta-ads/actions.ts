@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
@@ -11,6 +11,7 @@ import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
 import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 import { resolveMetaCapturePolicy } from "./meta-capture-policy";
+import { indexInheritedCampaignIdsByForm } from "./meta-capture-inheritance";
 import type { MetaConnectionAssets, MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem, MetaSyncWarning } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
@@ -42,7 +43,7 @@ export async function getMetaConnectionState(): Promise<{
   const { getSystemSetting } = await import("@/features/system-settings/queries");
   const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`).catch(() => null);
 
-  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes] = await Promise.all([
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes, leadAttributions] = await Promise.all([
     db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))).orderBy(schema.metaPages.name),
     db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.status, "active"))).orderBy(schema.metaAdAccounts.name),
     db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.status, "active"))).orderBy(schema.metaPixels.name),
@@ -55,6 +56,19 @@ export async function getMetaConnectionState(): Promise<{
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)).catch(() => []),
     db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled }).from(schema.metaAdQueueRoutes).where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId)).catch(() => []),
     db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled }).from(schema.metaFormQueueRoutes).where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId)).catch(() => []),
+    db.selectDistinct({ formId: schema.leads.metaFormId, campaignId: schema.leads.metaCampaignId })
+      .from(schema.leads)
+      .innerJoin(schema.metaCampaignQueueRoutes, and(
+        eq(schema.metaCampaignQueueRoutes.tenantId, schema.leads.tenantId),
+        eq(schema.metaCampaignQueueRoutes.campaignId, schema.leads.metaCampaignId),
+        eq(schema.metaCampaignQueueRoutes.enabled, true),
+      ))
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        isNotNull(schema.leads.metaFormId),
+        isNotNull(schema.leads.metaCampaignId),
+      ))
+      .catch(() => []),
   ]);
 
   const activeAccountIds = new Set(adAccounts.map((account) => account.id));
@@ -63,6 +77,10 @@ export async function getMetaConnectionState(): Promise<{
   const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
   const adRouteMap = new Map(adRoutes.map((r) => [r.adId, r.enabled]));
   const formRouteMap = new Map(formRoutes.map((r) => [r.formId, r.enabled]));
+  const inheritedCampaignIdsByForm = indexInheritedCampaignIdsByForm(
+    leadAttributions,
+    new Set(campaignRoutes.filter((route) => route.enabled).map((route) => route.campaignId)),
+  );
 
   const hasTenantRules = campaignRoutes.length > 0 || adRoutes.length > 0 || formRoutes.length > 0;
   const globalCaptureMode: "all" | "selective" | "disabled" = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
@@ -90,26 +108,45 @@ export async function getMetaConnectionState(): Promise<{
 
   const filteredAds = ads
     .filter((ad) => activeAdSetIds.has(ad.adSetId))
-    .map((ad) => ({
-      ...ad,
-      campaignId: adSetCampaignMap.get(ad.adSetId) ?? null,
-      isEligibleForCapture: resolveMetaCapturePolicy({
-        adRoute: adRouteMap.has(ad.id) ? { enabled: Boolean(adRouteMap.get(ad.id)), queueId: null, queueStatus: null } : undefined,
-        globalMode: globalCaptureMode,
-        hasTenantRules,
-      }).action === "capture",
-    }));
+    .map((ad) => {
+      const campaignId = adSetCampaignMap.get(ad.adSetId) ?? null;
+      const campaignRoute = campaignId && campaignRouteMap.has(campaignId)
+        ? { enabled: Boolean(campaignRouteMap.get(campaignId)), queueId: null, queueStatus: null }
+        : undefined;
+      const adRoute = adRouteMap.has(ad.id)
+        ? { enabled: Boolean(adRouteMap.get(ad.id)), queueId: null, queueStatus: null }
+        : undefined;
+      return {
+        ...ad,
+        campaignId,
+        isEligibleForCapture: resolveMetaCapturePolicy({
+          adRoute,
+          campaignRoute,
+          globalMode: globalCaptureMode,
+          hasTenantRules,
+        }).action === "capture",
+        inheritedFromCampaignId: campaignRoute?.enabled && !adRoute ? campaignId : null,
+      };
+    });
 
   const filteredLeadForms = leadForms
     .filter((form) => activePageIds.has(form.pageId))
-    .map((form) => ({
-      ...form,
-      isEligibleForCapture: resolveMetaCapturePolicy({
-        formRoute: formRouteMap.has(form.id) ? { enabled: Boolean(formRouteMap.get(form.id)), queueId: null, queueStatus: null } : undefined,
+    .map((form) => {
+      const inheritedCampaignIds = inheritedCampaignIdsByForm.get(form.id) ?? [];
+      const explicitFormRoute = formRouteMap.has(form.id)
+        ? { enabled: Boolean(formRouteMap.get(form.id)), queueId: null, queueStatus: null }
+        : undefined;
+      const explicitEligibility = resolveMetaCapturePolicy({
+        formRoute: explicitFormRoute,
         globalMode: globalCaptureMode,
         hasTenantRules,
-      }).action === "capture",
-    }));
+      }).action === "capture";
+      return {
+        ...form,
+        isEligibleForCapture: explicitEligibility || inheritedCampaignIds.length > 0,
+        inheritedFromCampaignIds: inheritedCampaignIds,
+      };
+    });
 
   const assets: MetaConnectionAssets = {
     pages,

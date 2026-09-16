@@ -21,9 +21,24 @@ export type MetaConnectionAssets = {
   adAccounts: Array<{ id: string; name: string; currency: string; status: string }>;
   pixels: Array<{ id: string; name: string; status: string }>;
   datasets: Array<{ id: string; name: string; status: string }>;
-  leadForms: Array<{ id: string; name: string; status: string; pageId: string; isEligibleForCapture?: boolean }>;
+  leadForms: Array<{
+    id: string;
+    name: string;
+    status: string;
+    pageId: string;
+    isEligibleForCapture?: boolean;
+    inheritedFromCampaignIds?: string[];
+  }>;
   campaigns: Array<{ id: string; name: string; status: string; adAccountId: string; isEligibleForCapture?: boolean }>;
-  ads: Array<{ id: string; name: string; status: string; adSetId: string; campaignId?: string | null; isEligibleForCapture?: boolean }>;
+  ads: Array<{
+    id: string;
+    name: string;
+    status: string;
+    adSetId: string;
+    campaignId?: string | null;
+    isEligibleForCapture?: boolean;
+    inheritedFromCampaignId?: string | null;
+  }>;
 };
 
 export type MetaDiscoveredAssets = {
