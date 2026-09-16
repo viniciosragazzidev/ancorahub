@@ -1,4 +1,4 @@
-import { count, desc, eq, and, inArray, isNull } from "drizzle-orm";
+import { count, desc, eq, and, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -31,6 +31,8 @@ import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-w
 import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
 import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
 import { resolveDistributionView } from "@/features/lead-distribution/distribution-view-access";
+import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
+import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -163,6 +165,7 @@ export default async function LeadDistributionPage({
   const [
     brokers,
     unassignedLeads,
+    queueCountsByStatus,
     activeBrokerLeads,
     brokerStatsByBranch,
     leadStatsByBranch,
@@ -183,6 +186,7 @@ export default async function LeadDistributionPage({
     brokerSummary,
     dutyRoster,
     tenantSlaSettings,
+    holdDisqualifiedLeads,
   ] = await Promise.all([
     db
       .select({
@@ -224,7 +228,17 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          // A fila é de leads SEM corretor. Um vínculo provisório da oferta
+          // (DEC-104) também já tem responsável e não volta ao inbox.
+          isNull(schema.leads.corretorId),
           inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
+          // Leads terminais não são acionáveis no inbox; o motor também os
+          // ignora (seedQueuedLeadJobs).
+          ne(schema.leads.status, "lost"),
+          or(
+            isNull(schema.leads.qualificationStatus),
+            ne(schema.leads.qualificationStatus, "disqualified"),
+          ),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
@@ -232,6 +246,30 @@ export default async function LeadDistributionPage({
       )
       .orderBy(schema.leads.createdAt)
       .limit(100),
+    db
+      .select({
+        distributionStatus: schema.leads.distributionStatus,
+        oldestAt: sql<string | null>`min(${schema.leads.createdAt})`,
+        count: count(schema.leads.id),
+      })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.corretorId),
+          inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
+          ne(schema.leads.status, "lost"),
+          or(
+            isNull(schema.leads.qualificationStatus),
+            ne(schema.leads.qualificationStatus, "disqualified"),
+          ),
+          context.role === "manager" && context.branchId
+            ? eq(schema.leads.branchId, context.branchId)
+            : undefined,
+        ),
+      )
+      .groupBy(schema.leads.distributionStatus),
     db
       .select({ brokerId: schema.leads.corretorId, count: count(schema.leads.id) })
       .from(schema.leads)
@@ -483,6 +521,7 @@ export default async function LeadDistributionPage({
       .then(
         (r) => r[0] ?? { slaFirstContactMinutes: "15", autoRedistributeOnFeedbackTimeout: true },
       ),
+    getHoldDisqualifiedLeads(context.tenantId),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -537,6 +576,10 @@ export default async function LeadDistributionPage({
   const totalAvailable = [...availableByBranch.values()].reduce((a, b) => a + b, 0);
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
 
+  const queueCounts = new Map(
+    queueCountsByStatus.map((row) => [row.distributionStatus, { count: Number(row.count), oldestAt: row.oldestAt ? new Date(row.oldestAt) : null }]),
+  );
+
   const queueCards = [
     ...(context.role === "director"
       ? [
@@ -558,11 +601,11 @@ export default async function LeadDistributionPage({
       description: "Precisam de revisão antes de uma nova atribuição.",
     },
   ].map((queue) => {
-    const leads = unassignedLeads.filter((lead) => lead.distributionStatus === queue.status);
-    const oldest = leads[0]?.createdAt;
+    const aggregate = queueCounts.get(queue.status);
+    const oldest = aggregate?.oldestAt ?? null;
     return {
       ...queue,
-      count: leads.length,
+      count: aggregate?.count ?? 0,
       oldestLabel: !oldest
         ? "Fila em dia"
         : `Item mais antigo desde ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(oldest)}`,
@@ -622,6 +665,10 @@ export default async function LeadDistributionPage({
             showQueueDefinition={context.role === "director"}
             roteamentoContent={
               <div className="space-y-5">
+                <DisqualifiedLeadsRoutingPanel
+                  initialHoldDisqualifiedLeads={holdDisqualifiedLeads}
+                  canEdit={context.role === "director"}
+                />
                 <RoutingMatrixPanel
                   rules={routingRules}
                   queues={queues.map((q) => ({ id: q.id, name: q.name }))}

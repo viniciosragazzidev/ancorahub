@@ -240,6 +240,7 @@ export const tenants = pgTable("tenants", {
   feedbackRequiredEnabled: boolean("feedback_required_enabled").notNull().default(true),
   feedbackGraceMinutes: text("feedback_grace_minutes").notNull().default("5"),
   autoRedistributeOnFeedbackTimeout: boolean("auto_redistribute_on_feedback_timeout").notNull().default(true),
+  holdDisqualifiedLeads: boolean("hold_disqualified_leads").notNull().default(false),
   feedbackReminderIntervalMinutes: text("feedback_reminder_interval_minutes").notNull().default("30"),
   feedbackReminderMaxAttempts: integer("feedback_reminder_max_attempts").notNull().default(5),
   feedbackPushEnabled: boolean("feedback_push_enabled").notNull().default(true),

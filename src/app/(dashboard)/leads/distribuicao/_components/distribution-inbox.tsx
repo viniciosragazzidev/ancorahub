@@ -80,14 +80,13 @@ const MAX_BATCH = 10;
 
 /** Toast imediato baseado no estado da action, disparado em effect (nunca no render). */
 function useActionFeedback(state: DistributionActionState, label: string) {
-  const prevSuccessRef = useRef(state.success);
-  const prevErrorRef = useRef(state.error);
+  // Keyed por mutationId: duas mutações consecutivas com o mesmo resultado
+  // (ex.: dois erros iguais ou dois sucessos) devem disparar toast em ambas.
+  const handledMutationRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    const successChanged = state.success !== prevSuccessRef.current;
-    const errorChanged = state.error !== prevErrorRef.current;
-    prevSuccessRef.current = state.success;
-    prevErrorRef.current = state.error;
-    if (!successChanged && !errorChanged) return;
+    if (!state.mutationId) return;
+    if (handledMutationRef.current === state.mutationId) return;
+    handledMutationRef.current = state.mutationId;
     if (state.error) {
       toast.error(state.error, { description: `Falha ao ${label}.` });
     } else if (state.message) {

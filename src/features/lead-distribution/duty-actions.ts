@@ -118,12 +118,25 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
   const parsed = parseCreateDutyScheduleInput(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revise os dados do plantão." };
   try {
-    validateSchedule(parsed.data);
+    for (const dayOfWeek of parsed.data.daysOfWeek) {
+      validateSchedule({ ...parsed.data, dayOfWeek });
+    }
     const { context, db } = await assertBatchDutyAccess(parsed.data.unitAssignments.map((assignment) => assignment.branchId));
-    const schedules = parsed.data.unitAssignments.map((assignment) => ({
-      ...parsed.data,
-      ...assignment,
-    }));
+    const schedules = parsed.data.unitAssignments.flatMap((assignment) =>
+      parsed.data.daysOfWeek.map((dayOfWeek) => ({
+        branchId: assignment.branchId,
+        queueId: assignment.queueId,
+        name: parsed.data.name,
+        dayOfWeek,
+        startsAt: parsed.data.startsAt,
+        endsAt: parsed.data.endsAt,
+        priority: parsed.data.priority,
+        minimumBrokers: parsed.data.minimumBrokers,
+        validFrom: parsed.data.validFrom,
+        validUntil: parsed.data.validUntil,
+        webhookCredentialId: parsed.data.webhookCredentialId,
+      })),
+    );
     for (const schedule of schedules) {
       await assertQueueInScope(db, context.tenantId, schedule.branchId, schedule.queueId);
       await assertNoScheduleConflict(db, schedule, context.tenantId);

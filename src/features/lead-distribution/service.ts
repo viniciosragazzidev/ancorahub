@@ -9,6 +9,9 @@ import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAu
 import type { AssignmentSource, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers } from "./offers";
+import { resolveLeadDestinationRule } from "./routing-engine";
+import { getHoldDisqualifiedLeads, shouldHoldDisqualifiedLead } from "./disqualified-routing-settings";
+import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -44,9 +47,7 @@ async function getRosterBrokerIds(tenantId: string, branchId: string, date = new
   if (!activeSchedules.length) return null;
 
   // 2. Filter plantões by credential if the lead has a source
-  const matchingScheduleIds = webhookCredentialId
-    ? activeSchedules.filter((s) => s.webhookCredentialId === webhookCredentialId).map((s) => s.id)
-    : activeSchedules.filter((s) => s.webhookCredentialId === null).map((s) => s.id);
+  const matchingScheduleIds = selectMatchingDutyScheduleIds(activeSchedules, webhookCredentialId);
 
   // Plantões exist for this branch but none match the credential → no brokers eligible
   if (!matchingScheduleIds.length) return new Set<string>();
@@ -394,6 +395,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     qualificationProfileKey: schema.leads.qualificationProfileKey,
     qualificationState: schema.leads.qualificationState,
     qualificationStatus: schema.leads.qualificationStatus,
+    tipo: schema.leads.tipo,
+    origem: schema.leads.origem,
+    sourceChannel: schema.leads.sourceChannel,
+    formData: schema.leads.formData,
     distributionUpdatedAt: schema.leads.distributionUpdatedAt,
     corretorId: schema.leads.corretorId,
     assignmentSource: schema.leads.assignmentSource,
@@ -408,6 +413,30 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // customer leads and must never enter the broker offer cycle.
   if (/^Lead WhatsApp\s*\(/i.test(lead.nome?.trim() ?? "")) {
     return { status: "manual_required", leadId, reason: "Mensagem interna sem lead válido; distribuição ignorada." };
+  }
+  if (lead.qualificationStatus === "disqualified" && await getHoldDisqualifiedLeads(context.tenantId)) {
+    const formData = lead.formData && typeof lead.formData === "object" && !Array.isArray(lead.formData)
+      ? lead.formData as Record<string, unknown>
+      : {};
+    const readFormValue = (keys: string[]) => keys
+      .map((key) => formData[key])
+      .find((value) => value !== null && value !== undefined && String(value).trim() !== "");
+    const rawLives = readFormValue(["vidas", "n_vidas", "dependentes", "lives"]);
+    const parsedLives = rawLives === undefined ? undefined : Number(rawLives);
+    const { matchedRule } = await resolveLeadDestinationRule(context.tenantId, {
+      planType: String(readFormValue(["tipo", "tipoPlano", "tipo_plano", "plano", "planType"]) ?? lead.tipo),
+      source: String(readFormValue(["origem", "source", "canal", "sourceChannel"]) ?? lead.sourceChannel ?? lead.origem),
+      city: String(readFormValue(["cidade", "city", "localidade"]) ?? ""),
+      lives: Number.isFinite(parsedLives) ? parsedLives : undefined,
+      qualificationStatus: lead.qualificationStatus,
+      branchId: lead.branchId,
+    });
+    if (shouldHoldDisqualifiedLead({
+      holdDisqualifiedLeads: true,
+      matchedRuleMode: matchedRule?.distributionMode,
+    })) {
+      return { status: "queued", leadId, reason: "Lead desqualificado mantido em espera pela regra global de segurança." };
+    }
   }
   const canRotateCurrentOwner = Boolean(
     lead.corretorId

@@ -9,7 +9,7 @@ const secondQueueId = "44444444-4444-4444-8444-444444444444";
 function validFormData(unitAssignments: Array<{ branchId: string; queueId: string }>) {
   const formData = new FormData();
   formData.set("name", "Plantão comercial");
-  formData.set("dayOfWeek", "1");
+  formData.set("daysOfWeek", JSON.stringify([1]));
   formData.set("startsAt", "09:00");
   formData.set("endsAt", "18:00");
   formData.set("priority", "100");
@@ -27,7 +27,40 @@ describe("parseCreateDutyScheduleInput", () => {
     ]));
 
     expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.unitAssignments).toHaveLength(2);
+    if (parsed.success) {
+      expect(parsed.data.unitAssignments).toHaveLength(2);
+      expect(parsed.data.daysOfWeek).toEqual([1]);
+    }
+  });
+
+  it("aceita vários dias da semana para cada unidade", () => {
+    const formData = validFormData([{ branchId: firstBranchId, queueId: firstQueueId }]);
+    formData.set("daysOfWeek", JSON.stringify([1, 3, 5]));
+
+    const parsed = parseCreateDutyScheduleInput(formData);
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.daysOfWeek).toEqual([1, 3, 5]);
+  });
+
+  it("mantém compatibilidade com o campo legado de um único dia", () => {
+    const formData = validFormData([{ branchId: firstBranchId, queueId: firstQueueId }]);
+    formData.delete("daysOfWeek");
+    formData.set("dayOfWeek", "2");
+
+    const parsed = parseCreateDutyScheduleInput(formData);
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.daysOfWeek).toEqual([2]);
+  });
+
+  it("recusa dias repetidos", () => {
+    const formData = validFormData([{ branchId: firstBranchId, queueId: firstQueueId }]);
+    formData.set("daysOfWeek", JSON.stringify([1, 1]));
+
+    const parsed = parseCreateDutyScheduleInput(formData);
+
+    expect(parsed.success).toBe(false);
   });
 
   it("recusa a mesma unidade duas vezes no mesmo lote", () => {

@@ -17,6 +17,7 @@ import {
 } from "./guardrails";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
+import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
@@ -170,7 +171,11 @@ export async function sendAiOutbound(input: {
 }) {
   const transport = input.transport ?? "meta";
   const db = getDatabase();
-  const last8Digits = input.phone.replace(/\D/g, "").slice(-8);
+  const deliveryPhone = await resolveCanonicalWhatsAppDestination({
+    tenantId: input.tenantId,
+    phone: input.phone,
+  });
+  const last9Digits = input.phone.replace(/\D/g, "").slice(-9);
   const [lastOutbound] = await db
     .select({ sentAt: schema.whatsappMessages.sentAt })
     .from(schema.whatsappMessages)
@@ -179,7 +184,7 @@ export async function sendAiOutbound(input: {
         eq(schema.whatsappMessages.tenantId, input.tenantId),
         or(
           eq(schema.whatsappMessages.phone, input.phone),
-          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 9) = ${last9Digits}`
         ),
         or(
           eq(schema.whatsappMessages.senderRole, "assistant"),
@@ -208,7 +213,7 @@ export async function sendAiOutbound(input: {
 
   if (input.transport === "openwa" && input.openWaSessionId) {
     try {
-      const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
+      const sent = await sendOpenWaText(input.openWaSessionId, deliveryPhone ?? input.phone, input.body);
       if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
     } catch (err) {
       console.warn("[sendAiOutbound] openwa primary failed", err);
@@ -227,7 +232,7 @@ export async function sendAiOutbound(input: {
   const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
   if (channel) {
     try {
-      const sent = await sendMetaCloudChannelText({ channel, to: input.phone, body: input.body });
+      const sent = await sendMetaCloudChannelText({ channel, to: deliveryPhone ?? input.phone, body: input.body });
       if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
     } catch (err) {
       console.warn("[sendAiOutbound] meta cloud failed", err);
@@ -242,7 +247,7 @@ export async function sendAiOutbound(input: {
     .limit(1);
   if (openWaConn?.sessionId) {
     try {
-      const sent = await sendOpenWaText(openWaConn.sessionId, input.phone, input.body);
+      const sent = await sendOpenWaText(openWaConn.sessionId, deliveryPhone ?? input.phone, input.body);
       if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
     } catch (err) {
       console.warn("[sendAiOutbound] openwa fallback failed", err);

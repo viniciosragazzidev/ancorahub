@@ -170,7 +170,7 @@ export async function assumeLeadForInvestigationAction(_prev: ManagementActionSt
     if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está ativo em atendimento e não pode ser assumido por outro usuário.");
     const now = new Date();
     await db.transaction(async (tx) => {
-      await tx.update(schema.leads).set({ corretorId: context.userId, status: "under_analysis", assignedAt: now, stageEnteredAt: now, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null }).where(eq(schema.leads.id, lead.id));
+      await tx.update(schema.leads).set({ corretorId: context.userId, status: "under_analysis", distributionStatus: "assigned", assignedAt: now, stageEnteredAt: now, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null }).where(eq(schema.leads.id, lead.id));
       await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead assumido para investigação por ${context.role === "director" ? "Diretor" : "Gestor"}. Motivo: ${reason}` });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "assumiu_lead_investigacao" });
     });
@@ -208,7 +208,7 @@ export async function assumeLeadForMessagingAction(leadId: string): Promise<Mana
     }
     const now = new Date();
     const updated = await db.transaction(async (tx) => {
-      const result = await tx.update(schema.leads).set({ corretorId: context.userId, assignedAt: now, stageEnteredAt: now, serviceStartedBy: context.userId })
+      const result = await tx.update(schema.leads).set({ corretorId: context.userId, distributionStatus: "assigned", assignedAt: now, stageEnteredAt: now, serviceStartedBy: context.userId })
         .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, currentOwnerId)))
         .returning({ id: schema.leads.id });
       if (!result.length) return false;

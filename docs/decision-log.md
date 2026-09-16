@@ -1144,6 +1144,15 @@ preserva o ciclo normal de elegibilidade, oferta, aceite e redistribuição por 
 O modo é persistido na própria regra, auditável e deve ser consumido pelo ponto
 único de distribuição antes de ser liberado em produção.
 
+## DEC-107 — Plantão com múltiplos dias da semana
+
+**Decisão aprovada em 2026-09-16.** O formulário de criação de plantão pode
+selecionar um ou mais dias da semana. Cada combinação de unidade, fila e dia gera
+uma regra independente na mesma transação; `unit_duty_schedules` continua com um
+único `day_of_week` para preservar o resolver diário, a cobertura, a escala e a
+auditoria locais. A edição permanece por regra, sem alterar plantões de outros dias.
+A vigência continua sendo o intervalo de datas em que a recorrência semanal é válida.
+
 ## DEC-101 — Proteção contra drenagem tardia da outbox
 
 **Decisão aprovada em 2026-09-15.** Mensagens oficiais que permanecerem em
@@ -1157,3 +1166,14 @@ outbox, sem esperar atrás de mensagens antigas; o cron continua como recuperaç
 de falhas transitórias. O caminho de atribuição manual segue a mesma entrega
 exata. A limpeza de pendências antigas não roda durante uma entrega exata, para
 que a fila crítica não seja bloqueada por auditoria de um lote histórico.
+
+## DEC-108 — Retenção global de leads desqualificados
+
+**Decisão aprovada em 2026-09-16.** O Diretor pode ativar uma chave global por
+tenant para manter leads com `qualificationStatus=disqualified` em espera, sem
+oferta automática a corretor, independentemente da origem, unidade ou fila. A
+chave nasce desligada para preservar o comportamento atual. Uma regra de
+roteamento criada explicitamente em modo manual e com o status `Desqualificado`
+selecionado é a única exceção: ela pode encaminhar o lead para ação humana, sem
+transformar a retenção global em distribuição automática. A alteração da chave
+é auditada e o motor aplica a decisão antes de criar ofertas.

@@ -144,3 +144,5 @@ rastreabilidade. Pendências que impedem uma implementação definitiva ficam no
 | BR-048 | Push de lembrete de feedback respeita flag por tenant e capacidade global. | Flag do tenant + capacidade global ativas → push enviado; qualquer uma desativada → apenas toast/in-app. | DEC-030 / DEC-028 |
 | BR-049 | Toast de lembrete de feedback respeita flag por tenant. | Flag desativada → notificação in-app não é criada. | DEC-030 |
 | BR-050 | Após exceder tentativas máximas, o lembrete altera título para "urgente" e avisa sobre risco de redistribuição. | Tentativas ≥ máximo → notificação com tom de urgência elevado. | DEC-030 |
+
+| BR-068 | Leads desqualificados permanecem fora da oferta automática quando a chave global do tenant está ativa; somente regra manual com o status explicitamente selecionado pode liberá-los para ação humana. | Qualificação concluída como desqualificado → fica em espera; exceção manual → encaminha sem oferta automática. | DEC-108 |

@@ -11,7 +11,7 @@ import {
   assignLeadToBroker,
   routeLeadToBranchAndAssignBroker,
 } from "./service";
-import { enqueueLeadDistributionJob, runLeadDistributionProcessor } from "./jobs";
+import { enqueueLeadDistributionJob, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -52,15 +52,36 @@ function continueLeadDistributionAfterResponse(input: {
   actorId: string;
   branchId?: string;
 }) {
+  // Confirma a mutação do commit na UI imediatamente (o commit já aconteceu).
   void publishLeadInvalidation({
     tenantId: input.tenantId,
     actorId: input.actorId,
     branchIds: input.branchId ? [input.branchId] : undefined,
   }).catch(() => {});
 
-  scheduleAfterResponse("lead-distribution-processor", () =>
-    runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
-  );
+  scheduleAfterResponse("lead-distribution-processor", async () => {
+    const result = await runLeadDistributionProcessor({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      limit: 1,
+    });
+    // Revalida com o estado PÓS-processamento para que todas as superfícies
+    // vejam a oferta/atribuição real, não o estado do commit.
+    void publishLeadInvalidation({
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      branchIds: input.branchId ? [input.branchId] : undefined,
+    }).catch(() => {});
+    console.info("[lead-distribution] after_response_processed", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      assigned: result.assigned,
+      offered: result.offered,
+      deferred: result.deferred,
+      failed: result.failed,
+      skipped: result.skipped,
+    });
+  });
   scheduleAfterResponse("lead-assignment-effects", async () => {
     await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 5 });
   });
@@ -437,9 +458,7 @@ export async function routeAndAssignLeadAction(
       error: error instanceof Error ? error.message : "Não foi possível processar a operação.",
     };
   }
-}
-
-export async function distributeLeadAutomaticallyAction(
+}export async function distributeLeadAutomaticallyAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
@@ -448,12 +467,44 @@ export async function distributeLeadAutomaticallyAction(
   if (!parsed.success) return { mutationId, error: "Lead inválido." };
   try {
     const context = await getRequiredTenantContext();
+    // Um job ativo com runAfter futuro (ex.: AWAITING_BROKER_ACCEPTANCE) faz o
+    // insert com onConflictDoNothing ser ignorado; sem o wake, o "Auto" não
+    // tem efeito nenhum. O processador roda logo após a resposta.
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data });
-    continueLeadDistributionAfterResponse({ tenantId: context.tenantId, leadId: parsed.data, actorId: context.userId });
+    await wakeLeadDistributionJob(context.tenantId, parsed.data);
+    // Confirma o enfileiramento na UI imediatamente; a reconciliação de dados
+    // revalida depois que o processador alterar o estado real do lead.
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+    }).catch(() => {});
+    scheduleAfterResponse("lead-distribution-auto", async () => {
+      const result = await runLeadDistributionProcessor({
+        tenantId: context.tenantId,
+        leadId: parsed.data,
+        limit: 1,
+      });
+      // Revalida com o estado PÓS-processamento (oferta criada, atribuído ou
+      // motivo de fila), não com o estado do commit.
+      void publishLeadInvalidation({
+        tenantId: context.tenantId,
+        actorId: context.userId,
+      }).catch(() => {});
+      console.info("[lead-distribution] auto_action_processed", {
+        tenantId: context.tenantId,
+        leadId: parsed.data,
+        actorId: context.userId,
+        assigned: result.assigned,
+        offered: result.offered,
+        deferred: result.deferred,
+        failed: result.failed,
+        skipped: result.skipped,
+      });
+    });
     return {
       success: true,
       mutationId,
-      message: "Distribuição automática iniciada em segundo plano.",
+      message: "Distribuição automática iniciada. A lista se atualiza ao concluir.",
       entity: {
         leadId: parsed.data,
         corretorId: null,

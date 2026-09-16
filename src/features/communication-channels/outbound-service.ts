@@ -15,6 +15,7 @@ import { WhatsAppTemplateResolver } from "./template-sync-service";
 import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-policy-service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
+import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -184,7 +185,12 @@ export async function enqueueMetaTemplateMessage(input: {
   idempotencyKey: string;
   scheduledAt?: Date;
 }) {
-  const destinationPhone = phoneSchema.parse(input.destinationPhone);
+  const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
+  const destinationPhone = await resolveCanonicalWhatsAppDestination({
+    tenantId: input.tenantId,
+    phone: requestedDestinationPhone,
+    leadId: input.recipientType === "lead" ? input.recipientId : null,
+  }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
   const messagePlan = await resolveEventMessagePlan({
     tenantId: input.tenantId,
@@ -291,7 +297,12 @@ export async function enqueueMetaTextMessage(input: {
   scheduledAt?: Date;
   purpose?: string;
 }) {
-  const destinationPhone = phoneSchema.parse(input.destinationPhone);
+  const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
+  const destinationPhone = await resolveCanonicalWhatsAppDestination({
+    tenantId: input.tenantId,
+    phone: requestedDestinationPhone,
+    leadId: input.recipientType === "lead" ? input.recipientId : null,
+  }) ?? requestedDestinationPhone;
   const body = z.string().trim().min(1).max(4096).parse(input.body);
   const db = getDatabase();
   const delivery = resolveInternalBrokerDeliveryRoute({

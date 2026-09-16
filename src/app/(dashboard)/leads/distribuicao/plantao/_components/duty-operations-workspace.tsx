@@ -365,12 +365,15 @@ function DutyFormSheet({
       ),
     ),
   );
+  const [selectedDays, setSelectedDays] = useState<number[]>(() => [schedule?.dayOfWeek ?? 1]);
+
   const selectedBranches = snapshot.branches.filter((branch) => branchIds.includes(branch.id));
   const queueForBranch = (branchId: string) =>
     queueIdsByBranch[branchId] ??
     snapshot.queues.find((queue) => queue.branchId === branchId)?.id ??
     "";
   const canSubmit =
+    selectedDays.length > 0 &&
     selectedBranches.length > 0 &&
     selectedBranches.every((branch) => Boolean(queueForBranch(branch.id)));
   const title = schedule ? "Editar plantão" : "Novo plantão";
@@ -382,7 +385,9 @@ function DutyFormSheet({
       formData.set("branchId", schedule.branchId);
       formData.set("queueId", queueForBranch(schedule.branchId));
       formData.set("scheduleId", schedule.id);
+      formData.set("dayOfWeek", String(selectedDays[0] ?? schedule.dayOfWeek));
     } else {
+      formData.set("daysOfWeek", JSON.stringify(selectedDays));
       formData.set(
         "unitAssignments",
         JSON.stringify(
@@ -416,8 +421,8 @@ function DutyFormSheet({
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>
             {schedule
-              ? "Edite esta regra local sem alterar os demais plantões."
-              : "Selecione uma ou mais unidades. Uma regra independente será criada para cada unidade e fila."}
+              ? "Edite esta regra local sem alterar os demais plantões. O dia desta regra permanece fixo."
+              : "Selecione uma ou mais unidades e dias. Uma regra independente será criada para cada combinação de unidade, fila e dia."}
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
@@ -499,17 +504,38 @@ function DutyFormSheet({
                 );
               })}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="duty-day">Dia</Label>
-                <AppSelect
-                  id="duty-day"
-                  name="dayOfWeek"
-                  defaultValue={String(schedule?.dayOfWeek ?? 1)}
-                  options={DAYS_FULL.map((day, index) => ({ value: String(index), label: day }))}
-                />
-              </div>
-              <div className="grid gap-2">
+            <div className="grid gap-3">
+              <fieldset className="grid gap-2">
+                <legend className="text-sm font-medium">Dias da semana</legend>
+                <p className="text-xs text-muted-foreground">
+                  {schedule ? "Esta regra vale para um único dia." : "Selecione um ou mais dias."}
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {DAYS_FULL.map((day, index) => {
+                    const selected = selectedDays.includes(index);
+                    return (
+                      <label
+                        key={day}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-2 text-xs has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                      >
+                        <Checkbox
+                          checked={selected}
+                          disabled={Boolean(schedule) || (selected && selectedDays.length === 1)}
+                          onCheckedChange={(checked) =>
+                            setSelectedDays((current) => {
+                              if (checked === true) return [...new Set([...current, index])].sort((a, b) => a - b);
+                              if (current.length === 1) return current;
+                              return current.filter((dayIndex) => dayIndex !== index);
+                            })
+                          }
+                        />
+                        <span>{day}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <div className="grid gap-2 sm:max-w-xs">
                 <Label htmlFor="duty-priority">Prioridade</Label>
                 <Input
                   id="duty-priority"

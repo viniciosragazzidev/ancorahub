@@ -155,7 +155,11 @@ export function RoutingMatrixPanel({
         qualificationStatuses: selectedIAStatuses,
       };
 
-      await saveRoutingRuleAction(payload);
+      const result = await saveRoutingRuleAction(payload);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(editingRule ? "Regra atualizada com sucesso!" : "Regra criada com sucesso!");
       setIsModalOpen(false);
 

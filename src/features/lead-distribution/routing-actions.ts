@@ -39,6 +39,11 @@ const routingRuleSchema = z.object({
 
 export type RoutingRuleInput = z.infer<typeof routingRuleSchema>;
 
+function isDistributionModeMigrationMissing(error: unknown) {
+  const candidate = error as { code?: string; message?: string } | null;
+  return candidate?.code === "42703" && /distribution_mode/i.test(candidate.message ?? "");
+}
+
 export async function getRoutingRulesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
@@ -62,13 +67,39 @@ export async function saveRoutingRuleAction(input: RoutingRuleInput) {
     qualificationStatuses: parsed.qualificationStatuses.map((value) => value.trim()).filter(Boolean),
   };
 
-  let ruleId = parsed.id;
+  try {
+    let ruleId = parsed.id;
 
-  if (ruleId) {
-    await db
-      .update(schema.leadRoutingRules)
-      .set({
+    if (ruleId) {
+      await db
+        .update(schema.leadRoutingRules)
+        .set({
+          name: parsed.name,
+          enabled: parsed.enabled,
+          distributionMode: parsed.distributionMode,
+          targetType: parsed.targetType,
+          targetId: parsed.targetId,
+          fallbackQueueId: parsed.fallbackQueueId ?? null,
+          conditions,
+          updatedBy: context.userId,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(schema.leadRoutingRules.id, ruleId),
+            eq(schema.leadRoutingRules.tenantId, context.tenantId),
+          ),
+        );
+    } else {
+      ruleId = randomUUID();
+      const existing = await fetchRoutingRules(context.tenantId);
+      const priority = existing.length + 1;
+
+      await db.insert(schema.leadRoutingRules).values({
+        id: ruleId,
+        tenantId: context.tenantId,
         name: parsed.name,
+        priority,
         enabled: parsed.enabled,
         distributionMode: parsed.distributionMode,
         targetType: parsed.targetType,
@@ -76,47 +107,32 @@ export async function saveRoutingRuleAction(input: RoutingRuleInput) {
         fallbackQueueId: parsed.fallbackQueueId ?? null,
         conditions,
         updatedBy: context.userId,
+        createdAt: now,
         updatedAt: now,
-      })
-      .where(
-        and(
-          eq(schema.leadRoutingRules.id, ruleId),
-          eq(schema.leadRoutingRules.tenantId, context.tenantId),
-        ),
-      );
-  } else {
-    ruleId = randomUUID();
-    const existing = await fetchRoutingRules(context.tenantId);
-    const priority = existing.length + 1;
+      });
+    }
 
-    await db.insert(schema.leadRoutingRules).values({
-      id: ruleId,
-      tenantId: context.tenantId,
-      name: parsed.name,
-      priority,
-      enabled: parsed.enabled,
-      distributionMode: parsed.distributionMode,
-      targetType: parsed.targetType,
-      targetId: parsed.targetId,
-      fallbackQueueId: parsed.fallbackQueueId ?? null,
-      conditions,
-      updatedBy: context.userId,
-      createdAt: now,
-      updatedAt: now,
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "lead_routing_rule",
+      entidadeId: ruleId,
+      acao: parsed.id ? "routing_rule.updated" : "routing_rule.created",
     });
+
+    revalidatePath("/distribuicao");
+    revalidatePath("/leads/distribuicao");
+    return { success: true, ruleId } as const;
+  } catch (error) {
+    if (isDistributionModeMigrationMissing(error)) {
+      return {
+        success: false,
+        error:
+          "O banco ainda não recebeu a atualização de regras de distribuição. Execute a migration 0147 no serviço da API e tente novamente.",
+      } as const;
+    }
+    throw error;
   }
-
-  await db.insert(schema.auditLogs).values({
-    id: randomUUID(),
-    userId: context.userId,
-    entidade: "lead_routing_rule",
-    entidadeId: ruleId,
-    acao: parsed.id ? "routing_rule.updated" : "routing_rule.created",
-  });
-
-  revalidatePath("/distribuicao");
-  revalidatePath("/leads/distribuicao");
-  return { success: true, ruleId };
 }
 
 export async function deleteRoutingRuleAction(ruleId: string) {
