@@ -409,10 +409,14 @@ export const getLeadsColumns = (
     header: ({ column }) => <DataTableColumnHeader column={column} title="Corretor Responsável" />,
     cell: ({ row }) => {
       const broker = row.original.assignedBrokerName;
+      const isPlantaoAtivo = row.original.isPlantaoAtivo;
       return (
-        <span className="text-xs text-foreground font-medium flex items-center gap-1.5">
-          <User className="size-3 text-muted-foreground shrink-0" />
-          {broker || <span className="text-muted-foreground/70 italic font-normal">Sem atribuição</span>}
+        <span className="flex flex-col items-start gap-1">
+          <span className={`text-xs font-medium flex items-center gap-1.5 ${isPlantaoAtivo ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
+            <User className={`size-3 shrink-0 ${isPlantaoAtivo ? "text-amber-500" : "text-muted-foreground"}`} />
+            {broker || <span className="text-muted-foreground/70 italic font-normal">Sem atribuição</span>}
+          </span>
+          {isPlantaoAtivo ? <Badge variant="warning" size="sm">Plantão ativo</Badge> : null}
         </span>
       );
     },

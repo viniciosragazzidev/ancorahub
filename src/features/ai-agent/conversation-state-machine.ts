@@ -25,6 +25,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
+import { shouldQueueLeadAfterTerminalReply } from "./quick-reply";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
@@ -1226,6 +1227,13 @@ export async function processInboundAiResponse({
         distributionStatus: "unassigned",
         updatedAt: now,
       }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+      if (shouldQueueLeadAfterTerminalReply(quickReply.intent)) {
+        await enqueueAndProcessLeadDistribution({
+          tenantId,
+          leadId,
+          source: "qualification_completed",
+        });
+      }
     }
     const waitWindowMs = (cooldownConfig?.waitWindowMinutes ?? 30) * 60 * 1000;
     const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < waitWindowMs;

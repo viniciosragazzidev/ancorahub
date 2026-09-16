@@ -87,6 +87,7 @@ const rawRoadmapDays: RoadmapDay[] = [
     item("7.14", "NOC por unidade", "P1", "partial", "Saude operacional por filial no NOC com SLA, fila sem corretor, capacidade e atalhos para os leads."),
     item("7.15", "Contexto de propriedade para Diretor", "P0", "partial", "Diretor passa a ver unidade responsavel em registros e escopo explicito em visoes consolidadas."),
   ] },
+  item("N90", "Distribuição pós-qualificação sem leads órfãos", "P0", "partial", "Reenfileirar imediatamente leads reais após conclusão ou interrupção da qualificação e sinalizar plantão ativo na carteira de leads.", "Respostas terminais da qualificação agora acordam o job durável e executam uma tentativa imediata pelo motor canônico, preservando o bloqueio de mensagens para opt-out e os critérios rígidos de elegibilidade. A memória estruturada reconhece números por extenso em respostas de quantidade de vidas, evitando repetição da mesma pergunta. A tabela /leads deriva no servidor um snapshot tenant-scoped do plantão atual e exibe o corretor em âmbar com o badge Plantão ativo. Registro: docs/implementations/active/2026-09-16-distribution-qualification-and-plantao-indicator.md. Permanecem E2E com canal real e homologação visual por papel/viewport."),
 ];
 
 const dayFiveItems: RoadmapItem[] = [

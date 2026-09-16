@@ -91,6 +91,37 @@ const NUMBER_OF_LIVES_PATTERNS = [
   /para\s*(\d+)\s*(?:pessoas?|vidas?)/i,
 ];
 
+const NUMBER_WORD_VALUES: Record<string, number> = {
+  um: 1,
+  uma: 1,
+  dois: 2,
+  duas: 2,
+  tres: 3,
+  três: 3,
+  quatro: 4,
+  cinco: 5,
+  seis: 6,
+  sete: 7,
+  oito: 8,
+  nove: 9,
+  dez: 10,
+  onze: 11,
+  doze: 12,
+  treze: 13,
+  quatorze: 14,
+  catorze: 14,
+  quinze: 15,
+  dezesseis: 16,
+  dezasseis: 16,
+  dezessete: 17,
+  dezassete: 17,
+  dezoito: 18,
+  dezenove: 19,
+  dezanove: 19,
+  vinte: 20,
+};
+const NUMBER_WORD_PATTERN = Object.keys(NUMBER_WORD_VALUES).join("|");
+
 const AGE_PATTERNS = [
   /(\d+)\s*(?:anos|anos de idade)/i,
   /(?:tenho|idade)\s*(\d+)/i,
@@ -245,6 +276,31 @@ export function extractFieldsFromMessage(
       memory.numberOfLives = { value: bareNumber[1], confidence: 1, sourceMessageId };
       addCollectedField(memory, "numberOfLives");
     }
+
+    // Short answers frequently use Portuguese number words ("só uma",
+    // "uma pessoa", "duas vidas"). Resolve them only in the context of a
+    // lives question so ordinary prose is not mistaken for a quantity.
+    if (!memory.numberOfLives) {
+      const normalizedMessage = normalizeForMatching(trimmed).replace(/\s+/g, " ").trim();
+      const normalizedQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
+      const asksForLives = /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion);
+      const livesWordPattern = new RegExp(
+        `^(?:e\\s+)?(?:(?:so|apenas|somente)\\s+)?(${NUMBER_WORD_PATTERN})(?:\\s+(?:pessoas?|vidas?|familiares?|dependentes?|pessoal|integrantes?))?$`,
+        "i",
+      );
+      const livesPhrasePattern = new RegExp(
+        `^(?:somos|seria para|sou|temos|tenho|para|minha familia tem)\\s+(?:(?:so|apenas|somente)\\s+)?(${NUMBER_WORD_PATTERN})(?:\\s+(?:pessoas?|vidas?|familiares?|dependentes?|pessoal|integrantes?))?$`,
+        "i",
+      );
+      const wordMatch = (asksForLives ? normalizedMessage.match(livesWordPattern) : null)
+        ?? normalizedMessage.match(livesPhrasePattern);
+      const parsedWordValue = wordMatch?.[1] ? NUMBER_WORD_VALUES[normalizeForMatching(wordMatch[1])] : undefined;
+      if (parsedWordValue && parsedWordValue > 0 && parsedWordValue < 100) {
+        memory.numberOfLives = { value: String(parsedWordValue), confidence: 1, sourceMessageId };
+        addCollectedField(memory, "numberOfLives");
+      }
+    }
+
     for (const pattern of NUMBER_OF_LIVES_PATTERNS) {
       if (memory.numberOfLives) break;
       const match = trimmed.match(pattern);

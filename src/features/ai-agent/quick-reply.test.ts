@@ -8,6 +8,7 @@ import {
   parseThanks,
   parseWrongNumber,
   resolveQuickReply,
+  shouldQueueLeadAfterTerminalReply,
 } from "./quick-reply";
 
 describe("QuickReplyResolver", () => {
@@ -32,6 +33,13 @@ describe("QuickReplyResolver", () => {
   it("pauses immediately for opt-out and human requests", () => {
     expect(resolveQuickReply({ body: "sair", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false })).toMatchObject({ intent: "OPT_OUT", nextState: "PAUSED" });
     expect(resolveQuickReply({ body: "atendente", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false })).toMatchObject({ intent: "REQUEST_HUMAN", nextState: "WAITING_HUMAN" });
+  });
+
+  it("keeps a terminal lead eligible for internal distribution", () => {
+    expect(shouldQueueLeadAfterTerminalReply("OPT_OUT")).toBe(true);
+    expect(shouldQueueLeadAfterTerminalReply("NO_LONGER_INTERESTED")).toBe(true);
+    expect(shouldQueueLeadAfterTerminalReply("WRONG_NUMBER")).toBe(true);
+    expect(shouldQueueLeadAfterTerminalReply("GREETING")).toBe(false);
   });
 
   it("does not interrupt a pending qualification question with a greeting", () => {

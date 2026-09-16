@@ -12,6 +12,14 @@ describe("conversation memory", () => {
     expect(updated.collectedFields).toContain("numberOfLives");
   });
 
+  it("understands Portuguese number words in short lives answers", () => {
+    const memory = { ...createEmptyMemory(), lastQuestionAsked: "Quantas pessoas serão incluídas no plano?" };
+
+    expect(extractFieldsFromMessage("É só uma pessoa", memory).numberOfLives?.value).toBe("1");
+    expect(extractFieldsFromMessage("É só uma", memory).numberOfLives?.value).toBe("1");
+    expect(extractFieldsFromMessage("Duas vidas", memory).numberOfLives?.value).toBe("2");
+  });
+
   it("understands pessoa física as an individual plan", () => {
     const updated = extractFieldsFromMessage(
       "Pessoa física",

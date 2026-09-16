@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,7 @@ import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/dri
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
 import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
 import { withPerfSpan, withRequestTiming } from "@/shared/observability/request-timing";
+import { getLocalDutyParts } from "@/features/leads/assignment";
 
 export default async function LeadsPage(props: Parameters<typeof LeadsPageContent>[0]) {
   const { result } = await withRequestTiming("/leads", () => LeadsPageContent(props));
@@ -387,6 +388,12 @@ async function LeadsPageContent({
 
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
 
+  // A single, tenant-scoped snapshot powers the plantão marker in the lead
+  // table. It is intentionally resolved on the server so the badge cannot be
+  // forged by client state and does not add an N+1 lookup per row.
+  const dutyNow = new Date();
+  const dutyLocal = getLocalDutyParts(dutyNow);
+
   const offset = (page - 1) * pageSize;
   const finalOrderBy = tablecnOrderBy.length > 0 ? tablecnOrderBy : [desc(schema.leads.createdAt)];
 
@@ -404,6 +411,7 @@ async function LeadsPageContent({
     urgentLead,
     unassignedCountResult,
     unassignedRows,
+    activeDutyAssignments,
   ] = await withPerfSpan("leads.data_loader", () => Promise.all([
     withPerfSpan("leads.count", () => db.select({ total: count() }).from(schema.leads).where(where)),
     withPerfSpan("leads.catalog_plans", () => listAvailableCatalogPlans(context)),
@@ -571,12 +579,37 @@ async function LeadsPageContent({
         .limit(pageSize)
         .offset(offset)
       : Promise.resolve([])),
+    withPerfSpan("leads.active_duty_assignments", () => db
+      .select({ branchId: schema.dutyRosterAssignments.branchId, brokerId: schema.dutyRosterAssignments.brokerId })
+      .from(schema.dutyRosterAssignments)
+      .innerJoin(schema.unitDutySchedules, eq(schema.dutyRosterAssignments.scheduleId, schema.unitDutySchedules.id))
+      .where(and(
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        eq(schema.dutyRosterAssignments.status, "active"),
+        eq(schema.unitDutySchedules.tenantId, context.tenantId),
+        eq(schema.unitDutySchedules.status, "active"),
+        eq(schema.dutyRosterAssignments.branchId, schema.unitDutySchedules.branchId),
+        eq(schema.unitDutySchedules.dayOfWeek, dutyLocal.weekday),
+        lte(schema.unitDutySchedules.startsAt, dutyLocal.time),
+        gt(schema.unitDutySchedules.endsAt, dutyLocal.time),
+        lte(schema.unitDutySchedules.validFrom, dutyNow),
+        or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, dutyNow)),
+        eq(schema.dutyRosterAssignments.dayOfWeek, dutyLocal.weekday),
+        lte(schema.dutyRosterAssignments.startsAt, dutyLocal.time),
+        gt(schema.dutyRosterAssignments.endsAt, dutyLocal.time),
+        lte(schema.dutyRosterAssignments.validFrom, dutyNow),
+        or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, dutyNow)),
+      ))),
   ]));
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const unassignedTotalItems = Number(unassignedCountResult[0]?.total ?? 0);
   const unassignedTotalPages = Math.ceil(unassignedTotalItems / pageSize) || 1;
+  const activeDutyBrokerKeys = new Set(activeDutyAssignments.map((assignment) => `${assignment.branchId}:${assignment.brokerId}`));
+  const isLeadOnActiveDuty = (lead: { branchId: string | null; corretorId: string | null }) => Boolean(
+    lead.branchId && lead.corretorId && activeDutyBrokerKeys.has(`${lead.branchId}:${lead.corretorId}`),
+  );
 
   // Merge legacy carrier plans with global + private catalog plans
   const seen = new Set<string>();
@@ -698,6 +731,7 @@ async function LeadsPageContent({
             <LeadsWorkspace
               leads={leads.map((lead) => ({
                 ...lead,
+                isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
@@ -719,6 +753,7 @@ async function LeadsPageContent({
               pageSize={pageSize}
               unassignedLeads={unassignedRows.map((lead) => ({
                 ...lead,
+                isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,

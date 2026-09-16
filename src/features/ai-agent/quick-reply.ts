@@ -10,6 +10,15 @@ export const quickReplyIntentValues = [
 ] as const;
 export type QuickReplyIntent = (typeof quickReplyIntentValues)[number];
 
+/**
+ * Terminal quick replies stop the automated conversation, but they must not
+ * orphan a real lead. The lead can still be offered internally; the opt-out
+ * guard remains responsible for preventing any outbound message to the lead.
+ */
+export function shouldQueueLeadAfterTerminalReply(intent: QuickReplyIntent | null | undefined) {
+  return intent === "OPT_OUT" || intent === "NO_LONGER_INTERESTED" || intent === "WRONG_NUMBER";
+}
+
 export const conversationAutomationStateValues = ["AI_ACTIVE", "WAITING_HUMAN", "HUMAN_IN_PROGRESS", "PAUSED", "CLOSED"] as const;
 export type ConversationAutomationState = (typeof conversationAutomationStateValues)[number];
 

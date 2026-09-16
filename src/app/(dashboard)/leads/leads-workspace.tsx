@@ -112,6 +112,7 @@ export type LeadWorkspaceItem = {
   firstContactAt: string | null;
   corretorId: string | null;
   corretorNome: string | null;
+  isPlantaoAtivo?: boolean;
   branchId: string | null;
   branchName: string | null;
   qualificationDetails?: Record<string, unknown> | null;

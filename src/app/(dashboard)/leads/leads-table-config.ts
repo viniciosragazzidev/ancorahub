@@ -13,6 +13,7 @@ export type LeadRow = {
   city: string | null;
   state: string | null;
   assignedBrokerName: string | null;
+  isPlantaoAtivo: boolean;
   branchName: string | null;
   qualificationStatus: string | null;
   createdAt: Date;
