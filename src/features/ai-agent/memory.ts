@@ -250,18 +250,19 @@ export function extractFieldsFromMessage(
 
   // Plan type extraction
   if (!memory.planType) {
+    const normalizedPlanMessage = normalizeForMatching(trimmed);
     for (const pattern of PLAN_TYPE_PATTERNS) {
-      if (pattern.test(trimmed)) {
+      if (pattern.test(trimmed) || pattern.test(normalizedPlanMessage) || /\b(?:individual|familiar|familia|empresarial|empresa|pme|pf|pj)\b/i.test(normalizedPlanMessage)) {
         const value =
-          /pessoa\s+f(?:ísica|fisica)/i.test(trimmed)
+          /pessoa\s+f(?:isica)/i.test(normalizedPlanMessage)
             ? "individual"
-            : /pessoa\s+j(?:urídica|uridica)/i.test(trimmed)
+            : /pessoa\s+j(?:uridica)/i.test(normalizedPlanMessage)
               ? "empresarial"
-              : /individual|PF|para mim|sou eu|só para mim/i.test(trimmed)
+              : /individual|\bpf\b|para mim|sou eu|so para mim/i.test(normalizedPlanMessage)
                 ? "individual"
-            : /familiar|para família|para minha família/i.test(trimmed)
-              ? "familiar"
-              : "empresarial";
+              : /familiar|familia|para minha familia/i.test(normalizedPlanMessage)
+                ? "familiar"
+                : "empresarial";
         memory.planType = { value, confidence: 1, sourceMessageId };
         addCollectedField(memory, "planType");
         break;
@@ -271,8 +272,21 @@ export function extractFieldsFromMessage(
 
   // Number of lives
   if (!memory.numberOfLives) {
+    const normalizedMessage = normalizeForMatching(trimmed).replace(/\s+/g, " ").trim();
+    const numberToken = (token: string) => {
+      const numeric = Number(token);
+      if (Number.isInteger(numeric) && numeric > 0 && numeric < 100) return numeric;
+      return NUMBER_WORD_VALUES[normalizeForMatching(token)];
+    };
+    const composition = normalizedMessage.match(/\b(\d+|[a-z]+)\s+adultos?\s*(?:e|,|mais)\s*(\d+|[a-z]+)\s+criancas?\b/i);
+    const compositionValue = composition ? (numberToken(composition[1]) ?? 0) + (numberToken(composition[2]) ?? 0) : 0;
+    if (compositionValue > 0 && compositionValue < 100) {
+      memory.numberOfLives = { value: String(compositionValue), confidence: 1, sourceMessageId };
+      addCollectedField(memory, "numberOfLives");
+    }
+
     const bareNumber = trimmed.match(/^([1-9]\d?)$/);
-    if (bareNumber && /quantas vidas|quantas pessoas|quantidade de pessoas|n[úu]mero de vidas/i.test(memory.lastQuestionAsked ?? "")) {
+    if (!memory.numberOfLives && bareNumber && /quantas vidas|quantas pessoas|quantidade de pessoas|n[úu]mero de vidas/i.test(memory.lastQuestionAsked ?? "")) {
       memory.numberOfLives = { value: bareNumber[1], confidence: 1, sourceMessageId };
       addCollectedField(memory, "numberOfLives");
     }
@@ -281,7 +295,6 @@ export function extractFieldsFromMessage(
     // "uma pessoa", "duas vidas"). Resolve them only in the context of a
     // lives question so ordinary prose is not mistaken for a quantity.
     if (!memory.numberOfLives) {
-      const normalizedMessage = normalizeForMatching(trimmed).replace(/\s+/g, " ").trim();
       const normalizedQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
       const asksForLives = /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion);
       const livesWordPattern = new RegExp(

@@ -31,6 +31,7 @@ import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
+import { applyAiMemoryUpdates, buildQualificationFallbackPrompt } from "./qualification-fallback";
 
 
 export type ConversationStatus =
@@ -1256,7 +1257,10 @@ export async function processInboundAiResponse({
     .limit(1);
 
   // 6. Extrair campos estruturados da mensagem e atualizar memória
+  const expectedQuestionBeforeMessage = getNextQualificationQuestion(currentMemory, behavior.policy);
+  const fieldsBeforeMessage = new Set(currentMemory.collectedFields);
   let updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
+  const fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
 
   // 6a. Analisar nome do cadastro do lead se for um nome valido
   if (lead?.nome && !lead.nome.startsWith("Lead WhatsApp") && !lead.nome.toLowerCase().includes("cliente") && !updatedMemory.customerName?.value) {
@@ -1346,6 +1350,88 @@ export async function processInboundAiResponse({
   if (!tenantConfig.enabled) {
     console.info("[ai-wpp] ai_disabled_by_tenant", { tenantId, leadId });
     return { status: "ignored_ai_disabled" };
+  }
+
+  // A resposta pode estar correta, mas fora do vocabulário das regras (por
+  // exemplo, "Famíliar" ou "é para a família"). Nesse caso a IA atua apenas
+  // como intérprete: ela propõe fatos estruturados e o motor determinístico
+  // continua responsável por validar a memória e escolher a próxima etapa.
+  let aiFallbackResult: Awaited<ReturnType<typeof generateAiResponse>> | undefined;
+  const pendingQuestionAfterExtraction = getNextQualificationQuestion(updatedMemory, behavior.policy, pastOutboundTexts);
+  const expectedWasAnswered = Boolean(expectedQuestionBeforeMessage && fieldsExtractedFromCurrentMessage.includes(expectedQuestionBeforeMessage.key));
+  const currentMessageAdvancedToAnotherField = Boolean(
+    expectedQuestionBeforeMessage
+      && pendingQuestionAfterExtraction
+      && pendingQuestionAfterExtraction.key !== expectedQuestionBeforeMessage.key
+      && fieldsExtractedFromCurrentMessage.length > 0,
+  );
+  if (pendingQuestionAfterExtraction && !expectedWasAnswered && !currentMessageAdvancedToAnotherField) {
+    const pendingField = pendingQuestionAfterExtraction.key as keyof ConversationMemory;
+    const pendingValue = pendingField === "age" && updatedMemory.planType?.value === "empresarial"
+      ? updatedMemory.averageAge?.value
+      : (updatedMemory[pendingField] as { value?: string } | undefined)?.value;
+
+    if (!pendingValue?.trim()) {
+      try {
+        aiFallbackResult = await generateAiResponse({
+          tenantId,
+          leadName: lead?.nome,
+          leadType: lead?.tipo,
+          messages: aiMessages,
+          customPrompt: buildQualificationFallbackPrompt(pendingQuestionAfterExtraction.key, pendingQuestionAfterExtraction.text),
+          preferredLanguage: "pt-BR",
+          memoryContext: buildMemoryContext({ ...updatedMemory, lastQuestionAsked: pendingQuestionAfterExtraction.text }),
+          tenantConfig,
+        });
+      } catch (error) {
+        console.warn("[qualification] ai_fallback_failed_open", {
+          tenantId,
+          leadId,
+          conversationId: conversation.id,
+          error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
+        });
+      }
+
+      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.structured?.memoryUpdates, sourceIdentifier ?? undefined);
+      if (applied.applied.length > 0) {
+        updatedMemory = applied.memory;
+        console.info("[qualification] ai_fallback_memory_applied", {
+          tenantId,
+          leadId,
+          conversationId: conversation.id,
+          sourceMessageId: sourceIdentifier ?? null,
+          fields: applied.applied.map((item) => item.field),
+          model: aiFallbackResult?.modelUsed ?? "unavailable",
+          latencyMs: aiFallbackResult?.latencyMs ?? 0,
+        });
+      } else {
+        console.info("[qualification] ai_fallback_no_fact", {
+          tenantId,
+          leadId,
+          conversationId: conversation.id,
+          sourceMessageId: sourceIdentifier ?? null,
+          model: aiFallbackResult?.modelUsed ?? "unavailable",
+          success: aiFallbackResult?.success ?? false,
+        });
+      }
+
+      if (aiFallbackResult) await db.insert(schema.aiAttendanceLogs).values({
+        id: `log_qualification_fallback_${crypto.randomUUID()}`,
+        tenantId,
+        conversationId: conversation.id,
+        leadId,
+        provider: "qualification_fallback",
+        modelUsed: aiFallbackResult.modelUsed,
+        promptTokens: aiFallbackResult.promptTokens,
+        completionTokens: aiFallbackResult.completionTokens,
+        totalTokens: aiFallbackResult.totalTokens,
+        estimatedCost: aiFallbackResult.estimatedCost,
+        latencyMs: aiFallbackResult.latencyMs,
+        status: aiFallbackResult.success ? "success" : "failed",
+        errorMessage: aiFallbackResult.error?.slice(0, 240) ?? null,
+        sourceMessageId: sourceIdentifier ?? null,
+      }).onConflictDoNothing().catch((error) => console.warn("[qualification] fallback_attendance_log_failed", { conversationId: conversation.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" }));
+    }
   }
 
   const deterministicTurn = resolveDeterministicQualificationTurn({
