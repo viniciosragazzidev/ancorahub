@@ -634,12 +634,12 @@ export default async function LeadDistributionPage({
   return (
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
-      <main className="min-h-full bg-muted/20 px-4 py-5 lg:px-6 lg:py-6">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <main className="min-h-full bg-muted/30 px-4 py-5 lg:px-6 lg:py-7">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
           <PageHeader
             title="Central de distribuição"
             breadcrumb="Operação comercial / Distribuição"
-            description="Configure e acompanhe o caminho do lead em um único fluxo operacional."
+            description="Configure entradas, filas e plantões; acompanhe a operação no mesmo espaço."
             context={
               <Badge
                 variant={jobHealth.available && jobHealth.failed === 0 ? "success" : "warning"}
@@ -650,13 +650,13 @@ export default async function LeadDistributionPage({
               </Badge>
             }
             actions={
-              <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-card px-3 py-2 text-xs text-muted-foreground">
-                <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                <span>{totalAvailable} disponíveis</span>
-                <span className="text-border" aria-hidden="true">
-                  ·
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                  <span><strong className="font-semibold text-foreground">{totalAvailable}</strong> disponíveis</span>
                 </span>
-                <span>{totalNewLeads} aguardando</span>
+                <span className="h-5 w-px bg-border" aria-hidden="true" />
+                <span><strong className="font-semibold text-foreground">{totalNewLeads}</strong> aguardando</span>
               </div>
             }
           />

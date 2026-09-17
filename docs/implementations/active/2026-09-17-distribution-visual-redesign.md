@@ -12,7 +12,9 @@ contexto por vez, e cada fila mostra suas campanhas Meta vinculadas no próprio 
 ## Entrega
 
 - Substituição do fluxo visual redundante por abas canônicas compactas e cabeçalho
-  contextual reutilizando `PageTabs`.
+  contextual reutilizando a primitiva compartilhada `Tabs`.
+- Ordem das abas ajustada para manter `Filas` imediatamente ao lado de `Plantões`,
+  facilitando a configuração do destino e da escala em sequência.
 - Cards de fila com métricas agrupadas, destino operacional e campanhas vinculadas
   explicitamente (com indicação de exceção por anúncio).
 - Seções de campanhas e anúncios com hierarquia mais clara, descrições curtas e

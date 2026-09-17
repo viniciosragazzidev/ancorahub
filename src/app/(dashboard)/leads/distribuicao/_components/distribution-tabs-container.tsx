@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { PageTabs } from "@/components/foundations/page-tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowsDownUp,
   Buildings,
@@ -80,8 +79,8 @@ export function DistributionTabsContainer({
   const tabs = [
     { id: "roteamento", label: "Entradas e regras", icon: ArrowsDownUp },
     { id: "resumo_dia", label: "Resumo", icon: ChartLineUp },
-    ...(showQueueDefinition ? [{ id: "filas", label: "Filas", icon: Buildings }] : []),
     { id: "operar", label: "Operação", icon: FileArrowDown },
+    ...(showQueueDefinition ? [{ id: "filas", label: "Filas", icon: Buildings }] : []),
     { id: "plantao", label: "Plantões", icon: CalendarBlank },
     { id: "saude_historico", label: "Saúde", icon: ChartBar },
   ];
@@ -97,13 +96,22 @@ export function DistributionTabsContainer({
       variant="segment"
       className="w-full space-y-6"
     >
-      <div className="sticky top-[var(--header-height)] z-20 -mx-1 rounded-xl border border-border/70 bg-background/95 px-2 py-2 shadow-xs backdrop-blur supports-[backdrop-filter]:bg-background/85 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]">
-        <PageTabs
-          tabs={tabs}
-          active={activeTab}
-          onTabChange={handleValueChange}
-          className="pb-0"
-        />
+      <div className="sticky top-[var(--header-height)] z-20 -mx-4 border-b border-border/70 bg-muted/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-muted/85 sm:-mx-6 sm:px-6 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]">
+        <TabsList aria-label="Áreas da distribuição" className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="min-h-12 shrink-0 gap-2 rounded-none border-b-2 border-transparent bg-transparent px-3 text-xs font-medium text-muted-foreground shadow-none transition-[color,border-color] duration-150 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              >
+                <Icon aria-hidden="true" className="size-4" />
+                {tab.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
       </div>
       <header className="border-b border-border/70 pb-4" aria-live="polite">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">{currentTab.title}</h2>
