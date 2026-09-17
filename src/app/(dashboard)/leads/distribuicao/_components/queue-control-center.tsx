@@ -561,7 +561,7 @@ export function QueueControlCenter({
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="grid grid-cols-3 divide-x divide-border/70 rounded-lg border border-border/60 bg-muted/20 py-2">
                       <Metric icon={Clock} label="Aguardando" value={queue.waiting} />
                       <Metric icon={UserList} label="Elegíveis" value={queue.members} />
                       <Metric icon={ChartBar} label="Ativos" value={queue.activeLeads} />
@@ -588,18 +588,14 @@ export function QueueControlCenter({
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground">Entradas desta fila</p>
-                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                          {queueCampaigns.length > 0
-                            ? `${queueCampaigns.length} campanha(s) Meta vinculada(s)`
-                            : "Nenhuma campanha vinculada"}
-                          {queueIdsWithAdExceptions.has(queue.id)
-                            ? " · há exceções por anúncio"
-                            : ""}
-                        </p>
-                      </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground">Entradas desta fila</p>
+                          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                            Campanhas vinculadas diretamente a este destino.
+                          </p>
+                        </div>
                       <Button
                         type="button"
                         size="xs"
@@ -614,6 +610,26 @@ export function QueueControlCenter({
                       >
                         Ver entradas
                       </Button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {queueCampaigns.length > 0 ? (
+                          <>
+                            {queueCampaigns.slice(0, 3).map((campaign) => (
+                              <Badge key={campaign.campaignId} variant="outline" className="max-w-full truncate text-[10px] font-medium">
+                                {campaign.name}
+                              </Badge>
+                            ))}
+                            {queueCampaigns.length > 3 ? (
+                              <Badge variant="secondary" className="text-[10px]">+{queueCampaigns.length - 3}</Badge>
+                            ) : null}
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">Fila geral — sem campanha específica</span>
+                        )}
+                        {queueIdsWithAdExceptions.has(queue.id) ? (
+                          <span className="text-[10px] text-muted-foreground">· exceção por anúncio ativa</span>
+                        ) : null}
+                      </div>
                     </div>
 
                     {canEdit ? (
@@ -624,7 +640,7 @@ export function QueueControlCenter({
                           onClick={() => handleDeleteQueue(queue)}
                           disabled={deletingId === queue.id}
                           className={cn(
-                            "text-destructive hover:bg-destructive/10 hover:text-destructive gap-1 active:scale-[0.97] transition-all duration-150",
+                            "text-destructive hover:bg-destructive/10 hover:text-destructive gap-1 active:scale-[0.96] transition-[transform,background-color,color] duration-150",
                             deletingId === queue.id && "pointer-events-none",
                           )}
                         >
@@ -639,7 +655,7 @@ export function QueueControlCenter({
                           size="xs"
                           variant="outline"
                           onClick={() => openEdit(queue)}
-                          className="active:scale-[0.97] transition-transform"
+                          className="active:scale-[0.96] transition-transform duration-150"
                         >
                           <SlidersHorizontal />
                           Editar
@@ -654,27 +670,33 @@ export function QueueControlCenter({
         )}
       </section>
 
+      <div className="border-t border-border/70 pt-6">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">Entradas e exceções</h2>
+        <p className="mt-1 mb-4 text-sm leading-6 text-muted-foreground">
+          A campanha define o destino padrão. Use uma exceção apenas quando um anúncio precisar de outra fila.
+        </p>
+      </div>
+
       {/* Meta Campaign Route Card */}
       <Card id="entradas-meta" variant="compact" className="scroll-mt-28 border-primary/20 bg-card shadow-sm">
-        <CardHeader className="pb-3">
+        <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <span>Entrada por campanha Meta</span>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span>Campanhas Meta</span>
                 <InfoTooltip
                   title="Regra de entrada por campanha"
                   description="Define para qual fila cada campanha envia os leads (Fila Geral, Unidade ou Corretor específico). Opcionalmente é possível ignorar uma campanha."
                 />
                 <Badge
                   variant="secondary"
-                  className="bg-primary/10 text-primary border-primary/20 text-xs font-normal"
+                  className="text-xs font-normal"
                 >
                   {activeCampaigns.length} ativa(s)
                 </Badge>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
-                Escolha a campanha e selecione a fila de destino desejada. Campanhas sem regra
-                explicita usam a Fila Geral.
+                Uma campanha sem regra específica usa a Fila Geral.
               </CardDescription>
             </div>
             {campaigns.length > activeCampaigns.length && (
@@ -706,7 +728,7 @@ export function QueueControlCenter({
             />
           </label>
           {displayedCampaigns.length && queues.length ? (
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
               <AppSelect
                 aria-label="Campanha Meta"
                 value={campaignRoute.campaignId}
@@ -875,11 +897,11 @@ export function QueueControlCenter({
 
       {/* Meta Ad Route Card */}
       <Card id="excecoes-anuncio" variant="compact" className="scroll-mt-28 border-border/60">
-        <CardHeader className="pb-3">
+        <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <span>Exceção por anúncio</span>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span>Exceções por anúncio</span>
                 <InfoTooltip
                   title="Prioridade da regra"
                   description="Se um anúncio tiver regra própria, ela prevalece sobre a regra da campanha. Use quando anúncios da mesma campanha precisam de filas diferentes."
@@ -889,8 +911,7 @@ export function QueueControlCenter({
                 </Badge>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
-                Configure o nível mais específico quando precisar separar anúncios dentro da mesma
-                campanha.
+                Uma exceção por anúncio prevalece sobre a regra da campanha.
               </CardDescription>
             </div>
             {ads.length > activeAds.length && (
@@ -922,7 +943,7 @@ export function QueueControlCenter({
             />
           </label>
           {displayedAds.length && queues.length ? (
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
               <AppSelect
                 aria-label="Anúncio Meta"
                 value={adRoute.adId}

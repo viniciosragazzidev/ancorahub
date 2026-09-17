@@ -1080,37 +1080,6 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
           Novo plantão
         </Button>
       </section>
-      <section
-        aria-labelledby="plantao-dependencias"
-        className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 sm:grid-cols-3"
-      >
-        <div className="sm:col-span-3">
-          <h2 id="plantao-dependencias" className="text-sm font-semibold">Antes de criar um plantão</h2>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Um plantão usa a fila da unidade e a escala de corretores. Confira estes vínculos no
-            escopo selecionado para evitar uma regra sem destino.
-          </p>
-        </div>
-        <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Filas</p>
-          <p className="mt-1 text-sm font-semibold tabular-nums">
-            {branchQueues.length} disponível(eis)
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">na unidade selecionada</p>
-        </div>
-        <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Plantão</p>
-          <p className="mt-1 text-sm font-semibold tabular-nums">{activeCount}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">regra(s) ativa(s) no escopo</p>
-        </div>
-        <div className="rounded-lg bg-muted/30 px-3 py-2.5">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cobertura</p>
-          <p className="mt-1 text-sm font-semibold tabular-nums">{gapCount ? `${gapCount} alerta(s)` : "Em dia"}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {gapCount ? "revise a escala abaixo" : "sem pendências de mínimo"}
-          </p>
-        </div>
-      </section>
       <section className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 text-sm font-medium">
