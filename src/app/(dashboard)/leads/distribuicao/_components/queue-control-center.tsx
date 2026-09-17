@@ -170,11 +170,6 @@ export function QueueControlCenter({
   const [deleteDependencies, setDeleteDependencies] = useState<QueueDependencyInfo | null>(null);
   const [loadingDependencies, setLoadingDependencies] = useState(false);
   const [forceDeleting, setForceDeleting] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<{
-    type: "campaign" | "ad";
-    id: string;
-    queueId: string;
-  } | null>(null);
   const router = useRouter();
 
   const activeCampaigns = useMemo(
@@ -208,6 +203,10 @@ export function QueueControlCenter({
       ? displayedAds.filter((ad) => ad.name.toLocaleLowerCase("pt-BR").includes(query))
       : displayedAds;
   }, [adSearch, displayedAds]);
+  const queueIdsWithAdExceptions = useMemo(
+    () => new Set(adRoutes.filter((route) => route.queueId && route.enabled).map((route) => route.queueId)),
+    [adRoutes],
+  );
 
   async function handleDeleteQueue(queue: Queue) {
     setDeleteTarget(queue);
@@ -363,29 +362,6 @@ export function QueueControlCenter({
         : `A fila "${form.name}" está pronta para receber leads.`,
     });
     setEditorOpen(false);
-    router.refresh();
-  }
-
-  async function toggleCampaignForQueue(campaignId: string, queueId: string, enabled: boolean) {
-    setSavingCampaignRoute(true);
-    const result = await saveMetaCampaignQueueRouteAction({
-      campaignId,
-      queueId: enabled ? queueId : null,
-      enabled,
-    });
-    setSavingCampaignRoute(false);
-    if (!result.success)
-      return toast.error(result.error ?? "Não foi possível atualizar a campanha.", {
-        description: "Verifique se a fila está ativa.",
-      });
-    toast.success(
-      result.message ?? (enabled ? "Campanha vinculada à fila." : "Vínculo de campanha removido."),
-      {
-        description: enabled
-          ? "Leads dessa campanha serão direcionados automaticamente."
-          : "A campanha voltará a usar a fila geral.",
-      },
-    );
     router.refresh();
   }
 
@@ -612,57 +588,32 @@ export function QueueControlCenter({
                       )}
                     </div>
 
-                    {/* Campanhas vinculadas à fila diretamente no card */}
-                    <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-                        <span className="flex items-center gap-1.5">
-                          Campanhas enviando para esta fila ({queueCampaigns.length})
-                        </span>
-                      </div>
-                      {displayedCampaigns.length > 0 ? (
-                        <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
-                          {displayedCampaigns.map((campaign) => {
-                            const route = campaignRoutes.find(
-                              (r) => r.campaignId === campaign.campaignId,
-                            );
-                            const isChecked = route?.queueId === queue.id && route.enabled;
-                            const isOtherQueue =
-                              route?.queueId && route.queueId !== queue.id && route.enabled;
-                            return (
-                              <label
-                                key={campaign.campaignId}
-                                className="flex items-center justify-between gap-2 text-xs cursor-pointer hover:bg-background/80 p-1 rounded"
-                              >
-                                <span className="flex items-center gap-1.5 min-w-0">
-                                  <Checkbox
-                                    checked={isChecked ?? false}
-                                    disabled={!canEdit || savingCampaignRoute}
-                                    onCheckedChange={(checked) =>
-                                      void toggleCampaignForQueue(
-                                        campaign.campaignId,
-                                        queue.id,
-                                        checked === true,
-                                      )
-                                    }
-                                  />
-                                  <span className="truncate text-[11px] font-medium">
-                                    {campaign.name}
-                                  </span>
-                                </span>
-                                {isOtherQueue && (
-                                  <span className="text-[9px] text-muted-foreground shrink-0 truncate max-w-[90px]">
-                                    (Em: {route.queueName})
-                                  </span>
-                                )}
-                              </label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground italic">
-                          Nenhuma campanha Meta cadastrada.
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground">Entradas desta fila</p>
+                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                          {queueCampaigns.length > 0
+                            ? `${queueCampaigns.length} campanha(s) Meta vinculada(s)`
+                            : "Nenhuma campanha vinculada"}
+                          {queueIdsWithAdExceptions.has(queue.id)
+                            ? " · há exceções por anúncio"
+                            : ""}
                         </p>
-                      )}
+                      </div>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() =>
+                          document.getElementById("entradas-meta")?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          })
+                        }
+                      >
+                        Ver entradas
+                      </Button>
                     </div>
 
                     {canEdit ? (
@@ -704,7 +655,7 @@ export function QueueControlCenter({
       </section>
 
       {/* Meta Campaign Route Card */}
-      <Card variant="compact" className="border-primary/20 bg-card shadow-sm">
+      <Card id="entradas-meta" variant="compact" className="scroll-mt-28 border-primary/20 bg-card shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -923,7 +874,7 @@ export function QueueControlCenter({
       </Card>
 
       {/* Meta Ad Route Card */}
-      <Card variant="compact" className="border-border/60">
+      <Card id="excecoes-anuncio" variant="compact" className="scroll-mt-28 border-border/60">
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1341,61 +1292,32 @@ export function QueueControlCenter({
                 </p>
               </div>
 
-              {/* Campanhas Meta vinculadas a esta fila */}
-              {campaigns.length > 0 && (
-                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    Campanhas Meta que enviam leads para esta fila
-                  </p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Marque as campanhas que direcionarão leads automaticamente para esta fila:
-                  </p>
-                  <div className="max-h-40 overflow-y-auto overflow-x-hidden space-y-1.5 pt-1 pr-1">
-                    {displayedCampaigns.map((c) => {
-                      const route = campaignRoutes.find((r) => r.campaignId === c.campaignId);
-                      const isAssignedToThisQueue = route?.queueId === editingId && route.enabled;
-                      const isAssignedToOtherQueue =
-                        route?.queueId && route.queueId !== editingId && route.enabled;
-                      return (
-                        <label
-                          key={c.campaignId}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0"
-                        >
-                          <span className="flex items-center gap-2 truncate min-w-0">
-                            <Checkbox
-                              checked={isAssignedToThisQueue ?? false}
-                              disabled={!editingId || savingCampaignRoute}
-                              onCheckedChange={(checked) => {
-                                if (editingId) {
-                                  void toggleCampaignForQueue(
-                                    c.campaignId,
-                                    editingId,
-                                    checked === true,
-                                  );
-                                }
-                              }}
-                            />
-                            <span className="truncate">{c.name}</span>
-                          </span>
-                          {isAssignedToOtherQueue && (
-                            <Badge
-                              variant="outline"
-                              className="text-[9px] shrink-0 text-muted-foreground"
-                            >
-                              Em: {route?.queueName}
-                            </Badge>
-                          )}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {!editingId && (
-                    <p className="text-[10px] text-muted-foreground italic">
-                      Você poderá selecionar as campanhas assim que salvar a criação da fila.
-                    </p>
-                  )}
-                </div>
-              )}
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                <p className="text-xs font-semibold text-foreground">Entradas da fila</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  Campanhas e exceções por anúncio são configuradas na seção “Entradas por campanha Meta”,
+                  abaixo da lista de filas. Assim, cada entrada tem um único lugar para ser revisada.
+                </p>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => {
+                    setEditorOpen(false);
+                    window.setTimeout(
+                      () =>
+                        document.getElementById("entradas-meta")?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        }),
+                      0,
+                    );
+                  }}
+                >
+                  Configurar entradas
+                </Button>
+              </div>
 
               <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                 <Checkbox

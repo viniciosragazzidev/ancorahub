@@ -622,6 +622,24 @@ function DutyFormSheet({
                 regras específicas de campanha continuam na Matriz de Roteamento.
               </p>
             </div>
+            <section
+              aria-labelledby="duty-review"
+              className="rounded-xl border border-primary/20 bg-primary/5 p-4"
+            >
+              <h3 id="duty-review" className="text-sm font-semibold">Resumo da criação</h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {selectedBranches.length * selectedDays.length || 0} regra(s) independente(s) serão
+                criadas para as combinações selecionadas de unidade, fila e dia. O plantão só
+                concorre enquanto horário, vigência e origem corresponderem.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                <Badge variant="outline">{selectedBranches.length} unidade(s)</Badge>
+                <Badge variant="outline">{selectedDays.length} dia(s)</Badge>
+                <Badge variant="outline">
+                  {selectedBranches.filter((branch) => Boolean(queueForBranch(branch.id))).length} fila(s)
+                </Badge>
+              </div>
+            </section>
             <p className="rounded-lg border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               Fuso operacional: America/Sao_Paulo. Cada unidade conserva uma fila e uma escala
               próprias; conflitos são validados antes de criar qualquer regra.
@@ -1026,6 +1044,10 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
   const branchQueues = snapshot.queues.filter((queue) => queue.branchId === selectedBranchId);
 
   function openCreate() {
+    if (!branchQueues.length) {
+      toast.error("Crie ou ative uma fila nesta unidade antes de criar um plantão.");
+      return;
+    }
     setFormSchedule(null);
     setFormOpen(true);
   }
@@ -1049,10 +1071,45 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
             manualmente.
           </p>
         </div>
-        <Button onClick={openCreate}>
+        <Button
+          onClick={openCreate}
+          disabled={!branchQueues.length}
+          title={!branchQueues.length ? "É necessário ter uma fila ativa nesta unidade" : undefined}
+        >
           <Plus />
           Novo plantão
         </Button>
+      </section>
+      <section
+        aria-labelledby="plantao-dependencias"
+        className="grid gap-3 rounded-xl border border-border/80 bg-card p-4 sm:grid-cols-3"
+      >
+        <div className="sm:col-span-3">
+          <h2 id="plantao-dependencias" className="text-sm font-semibold">Antes de criar um plantão</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Um plantão usa a fila da unidade e a escala de corretores. Confira estes vínculos no
+            escopo selecionado para evitar uma regra sem destino.
+          </p>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Filas</p>
+          <p className="mt-1 text-sm font-semibold tabular-nums">
+            {branchQueues.length} disponível(eis)
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">na unidade selecionada</p>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Plantão</p>
+          <p className="mt-1 text-sm font-semibold tabular-nums">{activeCount}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">regra(s) ativa(s) no escopo</p>
+        </div>
+        <div className="rounded-lg bg-muted/30 px-3 py-2.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Cobertura</p>
+          <p className="mt-1 text-sm font-semibold tabular-nums">{gapCount ? `${gapCount} alerta(s)` : "Em dia"}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {gapCount ? "revise a escala abaixo" : "sem pendências de mínimo"}
+          </p>
+        </div>
       </section>
       <section className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
