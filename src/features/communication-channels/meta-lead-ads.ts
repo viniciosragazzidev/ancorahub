@@ -119,7 +119,10 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
 
 export async function fetchMetaLead(leadgenId: string, tenantAccessToken: string): Promise<MetaLeadAdRecord> {
   const config = getMetaLeadAdsWebhookConfig();
-  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,adset_id,form_id,campaign_id,campaign_name,page_id,field_data`, {
+  // Keep this request limited to fields supported by the Meta Lead object.
+  // The webhook entry already identifies the Page, so requesting page_id here
+  // is unnecessary and causes Meta to reject the whole lead lookup.
+  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,adset_id,form_id,campaign_id,campaign_name,field_data`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${tenantAccessToken}` }, cache: "no-store",
   });
   const payload = await response.json().catch(() => ({})) as MetaLeadAdRecord & { error?: { message?: string; code?: number } };

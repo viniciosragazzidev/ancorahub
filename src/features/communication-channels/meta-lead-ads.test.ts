@@ -130,4 +130,24 @@ describe("Meta Lead Ads normalization", () => {
       message: "A Meta não permitiu carregar os detalhes deste lead. Ele não foi criado no CRM.",
     });
   });
+
+  it("requests only supported Lead fields so a webhook can create the lead", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: "leadgen_supported",
+      created_time: "2026-09-16T20:00:00+0000",
+      ad_id: "ad-1",
+      adset_id: "adset-1",
+      form_id: "form-1",
+      campaign_id: "campaign-1",
+      campaign_name: "Campanha teste",
+      field_data: [],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchMetaLead("leadgen_supported", "page-token");
+
+    const requestedUrl = String(fetchMock.mock.calls[0]?.[0]);
+    expect(requestedUrl).toContain("fields=id,created_time,ad_id,adset_id,form_id,campaign_id,campaign_name,field_data");
+    expect(requestedUrl).not.toContain("page_id");
+  });
 });
