@@ -47,12 +47,14 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { Loader2Icon } from "@/components/huge-icons";
 import { cn } from "@/utils/core/cn";
+import { QUEUE_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 
 type Queue = {
   id: string;
   name: string;
   branchId: string | null;
   exclusiveDutyScheduleId?: string | null;
+  exclusiveDutyScheduleIds?: string[] | null;
   branchName?: string | null;
   status: string;
   assignmentMode: string;
@@ -65,6 +67,7 @@ type Queue = {
   activeLeads: number;
   allowedBranchIds?: string[];
   allowedBrokerIds?: string[];
+  allowedSourceIds?: string[];
 };
 
 type Branch = { id: string; name: string };
@@ -104,9 +107,11 @@ type Simulation = {
 const emptyQueue = {
   branchId: "",
   exclusiveDutyScheduleId: "",
+  exclusiveDutyScheduleIds: [] as string[],
   allowedBranchIds: [] as string[],
   brokerScopeMode: "all" as "all" | "selected",
   allowedBrokerIds: [] as string[],
+  allowedSourceIds: [] as string[],
   name: "",
   assignmentMode: "automatic",
   assignmentStrategy: "capacity",
@@ -271,9 +276,11 @@ export function QueueControlCenter({
       ...emptyQueue,
       branchId: "",
       exclusiveDutyScheduleId: "",
+      exclusiveDutyScheduleIds: [],
       allowedBranchIds: branches.map((b) => b.id), // Todas marcadas por padrão
       brokerScopeMode: "all",
       allowedBrokerIds: [],
+      allowedSourceIds: [],
     });
     setEditorOpen(true);
   }
@@ -284,9 +291,14 @@ export function QueueControlCenter({
     setForm({
       branchId: queue.branchId ?? "",
       exclusiveDutyScheduleId: queue.exclusiveDutyScheduleId ?? "",
+      exclusiveDutyScheduleIds: Array.from(new Set([
+        ...(queue.exclusiveDutyScheduleIds ?? []),
+        ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : []),
+      ])),
       allowedBranchIds: queue.allowedBranchIds ?? [],
       brokerScopeMode: hasSpecificBrokers ? "selected" : "all",
       allowedBrokerIds: queue.allowedBrokerIds ?? [],
+      allowedSourceIds: queue.allowedSourceIds ?? [],
       name: queue.name,
       assignmentMode: queue.assignmentMode,
       assignmentStrategy: queue.assignmentStrategy,
@@ -334,15 +346,35 @@ export function QueueControlCenter({
     });
   }
 
+  function toggleDutySchedule(scheduleId: string) {
+    setForm((prev) => ({
+      ...prev,
+      exclusiveDutyScheduleIds: prev.exclusiveDutyScheduleIds.includes(scheduleId)
+        ? prev.exclusiveDutyScheduleIds.filter((id) => id !== scheduleId)
+        : [...prev.exclusiveDutyScheduleIds, scheduleId],
+    }));
+  }
+
+  function toggleAllowedSource(sourceId: string) {
+    setForm((prev) => ({
+      ...prev,
+      allowedSourceIds: prev.allowedSourceIds.includes(sourceId)
+        ? prev.allowedSourceIds.filter((id) => id !== sourceId)
+        : [...prev.allowedSourceIds, sourceId],
+    }));
+  }
+
   async function saveQueue() {
     setSaving(true);
     const finalAllowedBrokerIds = form.brokerScopeMode === "selected" ? form.allowedBrokerIds : [];
     const result = await saveDistributionQueueAction({
       id: editingId ?? undefined,
       branchId: form.branchId || null,
-      exclusiveDutyScheduleId: form.exclusiveDutyScheduleId || null,
+      exclusiveDutyScheduleId: form.exclusiveDutyScheduleIds[0] ?? null,
+      exclusiveDutyScheduleIds: form.exclusiveDutyScheduleIds,
       allowedBranchIds: form.allowedBranchIds,
       allowedBrokerIds: finalAllowedBrokerIds,
+      allowedSourceIds: form.allowedSourceIds,
       name: form.name,
       assignmentMode: form.assignmentMode,
       assignmentStrategy: form.assignmentStrategy,
@@ -502,15 +534,24 @@ export function QueueControlCenter({
               const multiBranchCount =
                 (queue.allowedBranchIds?.length ?? 0) + (queue.branchId ? 1 : 0);
               const hasSpecificBrokers = (queue.allowedBrokerIds?.length ?? 0) > 0;
-              const dutyScheduleName = dutySchedules.find(
-                (ds) => ds.id === queue.exclusiveDutyScheduleId,
-              )?.name;
+              const dutyScheduleIds = Array.from(new Set([
+                ...(queue.exclusiveDutyScheduleIds ?? []),
+                ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : []),
+              ]));
+              const dutyScheduleNames = dutyScheduleIds
+                .map((id) => dutySchedules.find((ds) => ds.id === id)?.name)
+                .filter((name): name is string => Boolean(name));
               const queueCampaignRoutes = campaignRoutes.filter(
                 (r) => r.queueId === queue.id && r.enabled,
               );
               const queueCampaigns = campaigns.filter((c) =>
                 queueCampaignRoutes.some((r) => r.campaignId === c.campaignId),
               );
+              const queueSourceIds = queue.allowedSourceIds ?? [];
+              const queueSourceNames = queueSourceIds.flatMap((sourceId) => {
+                const label = QUEUE_SOURCE_OPTIONS.find((source) => source.id === sourceId)?.label;
+                return label ? [label] : [];
+              });
 
               return (
                 <Card
@@ -529,13 +570,14 @@ export function QueueControlCenter({
                               +{multiBranchCount - 1} unidade(s)
                             </Badge>
                           )}
-                          {queue.exclusiveDutyScheduleId && (
+                          {dutyScheduleIds.length > 0 && (
                             <Badge
                               variant="secondary"
                               className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]"
                             >
-                              <Lightning className="size-3.5" aria-hidden="true" /> Plantão:{" "}
-                              {dutyScheduleName || "Exclusivo"}
+                              <Lightning className="size-3.5" aria-hidden="true" /> Plantão{dutyScheduleIds.length > 1 ? "ões" : ""}:{" "}
+                              {dutyScheduleNames.slice(0, 2).join(", ") || "Exclusivo"}
+                              {dutyScheduleNames.length > 2 ? ` +${dutyScheduleNames.length - 2}` : ""}
                             </Badge>
                           )}
                           {queue.aiQualificationEnabled !== false ? (
@@ -628,6 +670,19 @@ export function QueueControlCenter({
                         )}
                         {queueIdsWithAdExceptions.has(queue.id) ? (
                           <span className="text-[10px] text-muted-foreground">· exceção por anúncio ativa</span>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+                        <span className="text-[10px] font-medium text-muted-foreground">Fontes:</span>
+                        {queueSourceNames.length ? queueSourceNames.slice(0, 3).map((label) => (
+                          <Badge key={label} variant="secondary" className="text-[10px] font-normal">
+                            {label}
+                          </Badge>
+                        )) : (
+                          <span className="text-[10px] text-muted-foreground">Todas as fontes válidas</span>
+                        )}
+                        {queueSourceNames.length > 3 ? (
+                          <Badge variant="secondary" className="text-[10px]">+{queueSourceNames.length - 3}</Badge>
                         ) : null}
                       </div>
                     </div>
@@ -1147,23 +1202,30 @@ export function QueueControlCenter({
                   Plantão Agendado ou Ativo
                 </p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Se selecionado, os leads direcionados a esta fila serão entregues exclusivamente
-                  aos corretores em escala ou ativos neste plantão.
+                  Selecione um ou mais plantões. A fila só usa corretores escalados nos plantões
+                  ativos escolhidos; sem seleção, segue a disponibilidade normal da unidade.
                 </p>
-                <AppSelect
-                  aria-label="Exclusividade de Plantão"
-                  value={form.exclusiveDutyScheduleId}
-                  onValueChange={(exclusiveDutyScheduleId) =>
-                    setForm({ ...form, exclusiveDutyScheduleId })
-                  }
-                  options={[
-                    { value: "", label: "Nenhum (Fila convencional / Atendimento padrão)" },
-                    ...dutySchedules.map((ds) => ({
-                      value: ds.id,
-                      label: `Plantão: ${ds.name} (${ds.startsAt} às ${ds.endsAt}${ds.branchName ? ` · ${ds.branchName}` : ""})`,
-                    })),
-                  ]}
-                />
+                <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-emerald-500/20 bg-background/70 p-2.5">
+                  {dutySchedules.length ? dutySchedules.map((ds) => {
+                    const isChecked = form.exclusiveDutyScheduleIds.includes(ds.id);
+                    return (
+                      <label key={ds.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-xs hover:bg-emerald-500/5">
+                        <Checkbox checked={isChecked} onCheckedChange={() => toggleDutySchedule(ds.id)} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{ds.name}</span>
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {ds.startsAt}–{ds.endsAt}{ds.branchName ? ` · ${ds.branchName}` : ""}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  }) : <p className="px-2 py-2 text-xs text-muted-foreground">Nenhum plantão ativo disponível.</p>}
+                </div>
+                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                  {form.exclusiveDutyScheduleIds.length
+                    ? `${form.exclusiveDutyScheduleIds.length} plantão(ões) selecionado(s)`
+                    : "Nenhum plantão selecionado — disponibilidade padrão"}
+                </p>
               </div>
 
               {/* Multi-Unidades Adicionais */}
@@ -1198,6 +1260,32 @@ export function QueueControlCenter({
                   </div>
                 </div>
               )}
+
+              {/* Fontes aceitas pela fila */}
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
+                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <MagnifyingGlass className="size-4 text-primary shrink-0" /> Fontes aceitas
+                </p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Restrinja a fila a canais específicos. Deixe sem seleção para aceitar qualquer origem.
+                  Manual e Webhook são fontes exclusivas e não podem ser vinculadas a outra fila ativa.
+                </p>
+                <div className="grid gap-1.5 pt-1 sm:grid-cols-2">
+                  {QUEUE_SOURCE_OPTIONS.map((source) => (
+                    <label key={source.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/50 bg-background px-3 py-2 text-xs font-medium hover:bg-accent/40">
+                      <Checkbox
+                        checked={form.allowedSourceIds.includes(source.id)}
+                        onCheckedChange={() => toggleAllowedSource(source.id)}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{source.label}</span>
+                      {source.singleton ? <Badge variant="outline" className="text-[9px]">exclusiva</Badge> : null}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {form.allowedSourceIds.length ? `${form.allowedSourceIds.length} fonte(s) selecionada(s)` : "Todas as fontes válidas"}
+                </p>
+              </div>
 
               {/* Escopo e Seleção de Corretores */}
               <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">

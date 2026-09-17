@@ -7,6 +7,7 @@ export type IntelligentDistributionPolicy = {
   excludedBranchIds: string[];
   allowedBrokerIds?: string[];
   allowedBranchIds?: string[];
+  allowedSourceIds?: string[];
   ranking: { enabled: boolean; conversionWeight: number; slaWeight: number; manualPriorityWeight: number };
 };
 
@@ -22,7 +23,7 @@ export type RankedBroker = EligibleBroker & {
 };
 
 export const defaultIntelligentDistributionPolicy: IntelligentDistributionPolicy = {
-  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [],
+  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [], allowedSourceIds: [],
   ranking: { enabled: true, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 },
 };
 
@@ -34,6 +35,7 @@ export function readDistributionPolicy(value: unknown): IntelligentDistributionP
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }

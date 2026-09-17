@@ -12,6 +12,7 @@ import { createLeadOffersForBrokers } from "./offers";
 import { resolveLeadDestinationRule } from "./routing-engine";
 import { getHoldDisqualifiedLeads, shouldHoldDisqualifiedLead } from "./disqualified-routing-settings";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
+import { normalizeQueueSource } from "./routing-catalog";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -25,7 +26,7 @@ function assertBranchScope(context: TenantContext, branchId: string) {
 
 import { getLocalDutyParts } from "@/features/leads/assignment";
 
-async function getRosterBrokerIds(tenantId: string, branchId: string, date = new Date(), webhookCredentialId?: string | null) {
+async function getRosterBrokerIds(tenantId: string, branchId: string, date = new Date(), webhookCredentialId?: string | null, exclusiveScheduleIds?: string[] | null) {
   const db = getDatabase();
   const local = getLocalDutyParts(date);
 
@@ -43,11 +44,17 @@ async function getRosterBrokerIds(tenantId: string, branchId: string, date = new
       or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, date)),
     ));
 
-  // No plantões at all → fallback to all brokers (legacy behavior)
-  if (!activeSchedules.length) return null;
+  const scopedSchedules = exclusiveScheduleIds?.length
+    ? activeSchedules.filter((schedule) => exclusiveScheduleIds.includes(schedule.id))
+    : activeSchedules;
+
+  // No plantões at all → fallback to all brokers (legacy behavior). A queue
+  // with explicit exclusivity is different: no active selected schedule means
+  // no eligible broker, so the lead remains queued for a later retry.
+  if (!scopedSchedules.length) return exclusiveScheduleIds?.length ? new Set<string>() : null;
 
   // 2. Filter plantões by credential if the lead has a source
-  const matchingScheduleIds = selectMatchingDutyScheduleIds(activeSchedules, webhookCredentialId);
+  const matchingScheduleIds = selectMatchingDutyScheduleIds(scopedSchedules, webhookCredentialId);
 
   // Plantões exist for this branch but none match the credential → no brokers eligible
   if (!matchingScheduleIds.length) return new Set<string>();
@@ -89,6 +96,7 @@ function readDistributionPolicy(value: unknown): IntelligentDistributionPolicy {
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
@@ -449,7 +457,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
   }
-  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
+  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) {
     const staleQueueId = lead.queueId;
     const repairedAt = new Date();
@@ -469,6 +477,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const intelligentPolicy = await loadDistributionPolicy(context.tenantId, lead.queueId, lead.qualificationProfileKey);
   if (!intelligentPolicy.enabled) {
     return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta fila." };
+  }
+  const allowedSourceIds = intelligentPolicy.value.allowedSourceIds ?? [];
+  if (allowedSourceIds.length) {
+    const source = normalizeQueueSource(lead.sourceChannel, lead.origem, Boolean(lead.webhookCredentialId));
+    if (!allowedSourceIds.includes(source)) {
+      return { status: "queued", leadId, reason: `A origem ${source} não está habilitada nesta fila.` };
+    }
   }
   if (queue?.branchId && intelligentPolicy.value.excludedBranchIds.includes(queue.branchId)) {
     return { status: "queued", leadId, reason: "A política de distribuição está pausada para esta unidade." };
@@ -585,7 +600,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         eq(schema.user.status, "active"),
       ))
       .orderBy(asc(schema.user.createdAt));
-    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId)] as const));
+    const exclusiveScheduleIds = queue?.exclusiveDutyScheduleIds?.length
+      ? queue.exclusiveDutyScheduleIds
+      : queue?.exclusiveDutyScheduleId
+        ? [queue.exclusiveDutyScheduleId]
+        : null;
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds)] as const));
     const rosterByBranch = new Map(rosterResults);
     const brokers = allBrokers.filter((broker) => {
       const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;

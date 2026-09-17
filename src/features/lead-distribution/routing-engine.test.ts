@@ -1,8 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { evaluateLeadAgainstConditions } from "./routing-engine";
-import { ALL_ROUTING_SOURCES_ID } from "./routing-catalog";
+import { ALL_ROUTING_SOURCES_ID, normalizeQueueSource } from "./routing-catalog";
 
 describe("Routing Engine - evaluateLeadAgainstConditions", () => {
+  it("normalizes manual and webhook queue sources without losing Meta specificity", () => {
+    expect(normalizeQueueSource("bulk_import", "manual")).toBe("manual");
+    expect(normalizeQueueSource(null, "manual")).toBe("manual");
+    expect(normalizeQueueSource("landing_page", "manual")).toBe("manual");
+    expect(normalizeQueueSource("landing_page", null, true)).toBe("webhook");
+    expect(normalizeQueueSource(null, "webhook")).toBe("webhook");
+    expect(normalizeQueueSource("meta_lead_ads", null, true)).toBe("meta_lead_ads");
+  });
+
   it("returns match when lead matches planType and minLives conditions", () => {
     const conditions = {
       planTypes: ["pme", "empresarial"],

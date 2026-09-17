@@ -348,6 +348,7 @@ export default async function LeadDistributionPage({
         name: schema.leadQueues.name,
         branchId: schema.leadQueues.branchId,
         exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
+        exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds,
         branchName: schema.branches.name,
         status: schema.leadQueues.status,
         assignmentMode: schema.leadQueues.assignmentMode,
@@ -484,6 +485,9 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.unitDutySchedules.tenantId, context.tenantId),
           eq(schema.unitDutySchedules.status, "active"),
+          context.role === "manager" && context.branchId
+            ? eq(schema.unitDutySchedules.branchId, context.branchId)
+            : undefined,
         ),
       )
       .orderBy(schema.unitDutySchedules.name),
@@ -628,6 +632,7 @@ export default async function LeadDistributionPage({
       ...queue,
       allowedBranchIds: queuePolicy?.allowedBranchIds ?? [],
       allowedBrokerIds: queuePolicy?.allowedBrokerIds ?? [],
+      allowedSourceIds: queuePolicy?.allowedSourceIds ?? [],
       waiting: queueWaiting.get(queue.id) ?? 0,
       members: queue.branchId ? (countsByBranch.get(queue.branchId) ?? 0) : totalBrokers,
       activeLeads: queue.branchId ? (leadsByBranch.get(queue.branchId) ?? 0) : totalNewLeads,

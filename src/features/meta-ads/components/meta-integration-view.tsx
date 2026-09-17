@@ -383,7 +383,7 @@ function MetaMasterCaptureControl({
         if (newMode === "disabled") {
           toast.success("Captura geral desativada! Nenhum lead Meta entrará no CRM.", { description: "Todos os webhooks Meta serão ignorados até reativar." });
         } else if (newMode === "all") {
-          toast.success("Captura global ativada! Todas as campanhas e anúncios capturarão leads.", { description: "Leads de qualquer campanha entrarão no CRM." });
+          toast.success("Captura global ativada! Todos os ativos elegíveis capturarão leads.", { description: "Campanhas, anúncios e formulários ativos entrarão no CRM." });
         } else {
           toast.success("Modo seletivo ativado!", { description: "Apenas as campanhas, anúncios ou formulários selecionados capturarão leads." });
         }

@@ -680,6 +680,13 @@
                         "when":  1789573200000,
                         "tag":  "0149_custom_role_invitation",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  97,
+                        "version":  "7",
+                        "when":  1789576800000,
+                        "tag":  "0150_queue_sources_and_duty_schedules",
+                        "breakpoints":  true
                     }
                 ]
 }

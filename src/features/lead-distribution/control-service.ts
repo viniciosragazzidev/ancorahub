@@ -1,20 +1,23 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type IntelligentDistributionPolicy, type RankedBroker } from "./domain";
+import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-catalog";
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
   branchId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   exclusiveDutyScheduleId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
+  exclusiveDutyScheduleIds: z.array(z.string().uuid()).max(30).default([]),
   allowedBranchIds: z.array(z.string().uuid()).default([]),
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
+  allowedSourceIds: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   name: z.string().trim().min(3).max(60),
   assignmentMode: z.enum(["automatic", "manual"]),
   assignmentStrategy: z.enum(["round_robin", "capacity"]),
@@ -89,12 +92,50 @@ function readPolicy(value: unknown): IntelligentDistributionPolicy {
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
 
+async function assertQueueSourceConflicts(
+  db: ReturnType<typeof getDatabase>,
+  context: TenantContext,
+  sourceIds: string[],
+  editingQueueId?: string,
+) {
+  const singletonSources = sourceIds.filter((sourceId) => QUEUE_SINGLETON_SOURCE_IDS.some((candidate) => candidate === sourceId));
+  if (!singletonSources.length) return;
+
+  const existing = await db
+    .select({ queueId: schema.leadQueues.id, queueName: schema.leadQueues.name, policy: schema.leadDistributionPolicies.policy })
+    .from(schema.leadQueues)
+    .innerJoin(schema.leadDistributionPolicies, and(
+      eq(schema.leadDistributionPolicies.tenantId, schema.leadQueues.tenantId),
+      eq(schema.leadDistributionPolicies.queueId, schema.leadQueues.id),
+      eq(schema.leadDistributionPolicies.enabled, true),
+    ))
+    .where(and(
+      eq(schema.leadQueues.tenantId, context.tenantId),
+      eq(schema.leadQueues.status, "active"),
+      isNull(schema.leadQueues.deletedAt),
+      editingQueueId ? ne(schema.leadQueues.id, editingQueueId) : undefined,
+    ));
+
+  for (const row of existing) {
+    const claimed = readPolicy(row.policy).allowedSourceIds ?? [];
+    const conflict = singletonSources.find((sourceId) => claimed.includes(sourceId));
+    if (conflict) {
+      const label = conflict === "manual" ? "Manual / importação" : "Webhook";
+      throw new AuthorizationError(`A fonte ${label} já está vinculada à fila "${row.queueName}". Uma fonte exclusiva só pode pertencer a uma fila ativa.`);
+    }
+  }
+}
+
 export async function saveDistributionQueue(context: TenantContext, rawInput: unknown) {
   const input = queueInput.parse(rawInput);
+  const allowedSourceIds = Array.from(new Set(input.allowedSourceIds));
+  const invalidSource = allowedSourceIds.find((sourceId) => !QUEUE_SOURCE_OPTIONS.some((source) => source.id === sourceId));
+  if (invalidSource) throw new AuthorizationError("A fila contém uma fonte de entrada inválida.");
   if (input.branchId) {
     assertManager(context, input.branchId);
   }
@@ -104,29 +145,39 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
       .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
     if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
   }
-  if (input.exclusiveDutyScheduleId) {
-    const [schedule] = await db
+  const dutyScheduleIds = Array.from(new Set([
+    ...(input.exclusiveDutyScheduleIds ?? []),
+    ...(input.exclusiveDutyScheduleId ? [input.exclusiveDutyScheduleId] : []),
+  ]));
+  if (dutyScheduleIds.length) {
+    const schedules = await db
       .select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId })
       .from(schema.unitDutySchedules)
       .where(
         and(
-          eq(schema.unitDutySchedules.id, input.exclusiveDutyScheduleId),
           eq(schema.unitDutySchedules.tenantId, context.tenantId),
+          inArray(schema.unitDutySchedules.id, dutyScheduleIds),
         ),
-      )
-      .limit(1);
+      );
 
-    if (!schedule) throw new AuthorizationError("Plantão não encontrado no escopo desta corretora.");
-    if (input.branchId && schedule.branchId !== input.branchId) {
-      throw new AuthorizationError("O plantão selecionado precisa pertencer à mesma unidade da fila.");
+    if (schedules.length !== dutyScheduleIds.length) throw new AuthorizationError("Um dos plantões selecionados não pertence a esta corretora.");
+    if (input.branchId && schedules.some((schedule) => schedule.branchId !== input.branchId)) {
+      throw new AuthorizationError("Todos os plantões selecionados precisam pertencer à mesma unidade da fila.");
     }
-    assertManager(context, schedule.branchId);
+    for (const schedule of schedules) assertManager(context, schedule.branchId);
+  }
+
+  // Inactive queues are not consumers and therefore must not block an active
+  // queue from claiming a singleton source while being edited or staged.
+  if (input.status === "active") {
+    await assertQueueSourceConflicts(db, context, allowedSourceIds, input.id);
   }
 
   const now = new Date();
   const values = {
     branchId: input.branchId || null,
-    exclusiveDutyScheduleId: input.exclusiveDutyScheduleId || null,
+    exclusiveDutyScheduleId: dutyScheduleIds[0] ?? null,
+    exclusiveDutyScheduleIds: dutyScheduleIds,
     name: input.name,
     assignmentMode: input.assignmentMode,
     assignmentStrategy: input.assignmentStrategy,
@@ -165,6 +216,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     ...currentPolicy,
     allowedBranchIds: input.allowedBranchIds,
     allowedBrokerIds: input.allowedBrokerIds,
+    allowedSourceIds,
   };
 
   if (existingPolicy) {
@@ -203,6 +255,19 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   if (input.enabled && input.queueId && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de uma campanha no CRM.");
+  if (input.enabled && input.queueId) {
+    const [existingRoute] = await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId })
+      .from(schema.metaCampaignQueueRoutes)
+      .where(and(
+        eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
+        eq(schema.metaCampaignQueueRoutes.campaignId, campaign.campaignId),
+        eq(schema.metaCampaignQueueRoutes.enabled, true),
+      ))
+      .limit(1);
+    if (existingRoute?.queueId && existingRoute.queueId !== input.queueId) {
+      throw new AuthorizationError("Esta campanha já está vinculada a outra fila. Desative a rota atual antes de escolher um novo destino.");
+    }
+  }
   const now = new Date();
   await db.insert(schema.metaCampaignQueueRoutes).values({
     id: randomUUID(), tenantId: context.tenantId, campaignId: campaign.campaignId, queueId: queue?.id ?? null,
@@ -234,6 +299,19 @@ export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unk
   if (input.enabled && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de um anúncio no CRM.");
+  if (input.enabled && input.queueId) {
+    const [existingRoute] = await db.select({ queueId: schema.metaAdQueueRoutes.queueId })
+      .from(schema.metaAdQueueRoutes)
+      .where(and(
+        eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
+        eq(schema.metaAdQueueRoutes.adId, ad.adId),
+        eq(schema.metaAdQueueRoutes.enabled, true),
+      ))
+      .limit(1);
+    if (existingRoute?.queueId && existingRoute.queueId !== input.queueId) {
+      throw new AuthorizationError("Este anúncio já está vinculado a outra fila. Desative a rota atual antes de escolher um novo destino.");
+    }
+  }
   const now = new Date();
   await db.insert(schema.metaAdQueueRoutes).values({
     id: randomUUID(), tenantId: context.tenantId, adId: ad.adId, queueId: queue?.id ?? null,
