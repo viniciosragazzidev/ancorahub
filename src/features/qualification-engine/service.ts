@@ -287,6 +287,32 @@ export function evaluateQualification(
   };
 }
 
+/**
+ * Creates the internal context that is persisted with the lead. This is kept
+ * separate from the public qualification score so the broker can see the
+ * facts captured by the assistant without losing the original conversation
+ * memory or fields maintained by other lead intelligence features.
+ */
+export function buildPrivateQualificationContext(memory: ConversationMemory, updatedAt = new Date()) {
+  const facts = [
+    memory.planType?.value ? `tipo de plano: ${memory.planType.value}` : null,
+    memory.numberOfLives?.value ? `vidas: ${memory.numberOfLives.value}` : null,
+    memory.averageAge?.value ? `média de idade: ${memory.averageAge.value}` : memory.age?.value ? `idades: ${memory.age.value}` : null,
+    memory.city?.value ? `cidade: ${memory.city.value}` : null,
+    memory.email?.value ? `e-mail: ${memory.email.value}` : null,
+    memory.intent?.value ? `interesse: ${memory.intent.value}` : null,
+    memory.companyHasCnpj?.value ? `empresa com CNPJ: ${memory.companyHasCnpj.value}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return {
+    source: "ai_qualification",
+    summary: facts.length > 0 ? `Contexto capturado pela IA: ${facts.join(" · ")}.` : "A IA ainda não capturou dados estruturados deste atendimento.",
+    facts,
+    memory,
+    updatedAt: updatedAt.toISOString(),
+  };
+}
+
 export async function persistQualificationEvaluation(input: {
   tenantId: string;
   leadId: string;
@@ -305,6 +331,20 @@ export async function persistQualificationEvaluation(input: {
     .limit(1);
 
   await db.transaction(async (tx) => {
+    const [currentLead] = await tx
+      .select({ qualificationDetails: schema.leads.qualificationDetails })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+      .limit(1);
+    const existingDetails = currentLead?.qualificationDetails && typeof currentLead.qualificationDetails === "object" && !Array.isArray(currentLead.qualificationDetails)
+      ? currentLead.qualificationDetails as Record<string, unknown>
+      : {};
+    const privateContext = buildPrivateQualificationContext(input.memory, now);
+    const existingPrivateNotes = Array.isArray(existingDetails.privateNotes)
+      ? existingDetails.privateNotes.filter((note): note is Record<string, unknown> => Boolean(note && typeof note === "object"))
+      : [];
+    const withoutAiContext = existingPrivateNotes.filter((note) => note.source !== "ai_qualification");
+
     await tx.update(schema.leads).set({
       qualificationState: result.state,
       qualificationScore: result.score,
@@ -312,6 +352,7 @@ export async function persistQualificationEvaluation(input: {
       qualificationProfileKey: input.policy.qualification.profileKey,
       qualificationCompletedAt: ["QUALIFIED", "PARTIAL", "NOT_INTERESTED"].includes(result.state) ? now : null,
       qualificationDetails: {
+        ...existingDetails,
         completedFields: result.completedFields,
         missingFields: result.missingFields,
         profileKey: input.policy.qualification.profileKey,
@@ -323,6 +364,11 @@ export async function persistQualificationEvaluation(input: {
         averageAge: input.memory.planType?.value === "empresarial" ? input.memory.averageAge?.value ?? null : null,
         city: input.memory.city?.value ?? null,
         email: input.memory.email?.value ?? null,
+        // Private, tenant-scoped context used by the broker and by the next
+        // qualification turn. Keeping it nested avoids clobbering AI
+        // intelligence, manual notes, or other lead details.
+        aiQualificationContext: privateContext,
+        privateNotes: [...withoutAiContext, privateContext],
       },
       updatedAt: now,
     }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));

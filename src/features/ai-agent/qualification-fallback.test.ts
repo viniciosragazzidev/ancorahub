@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyAiMemoryUpdates, buildQualificationFallbackPrompt } from "./qualification-fallback";
+import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
 import { createEmptyMemory, extractFieldsFromMessage } from "./memory";
 
 describe("qualification AI fallback", () => {
@@ -62,5 +62,27 @@ describe("qualification AI fallback", () => {
     const prompt = buildQualificationFallbackPrompt("planType", "Qual tipo de plano você busca?");
     expect(prompt).toMatch(/memoryUpdates/);
     expect(prompt).toMatch(/Não escolha outra etapa/);
+  });
+
+  it("uses the fallback for a complex answer with too few deterministic facts", () => {
+    expect(shouldUseQualificationFallback({
+      hasPendingQuestion: true,
+      expectedWasAnswered: true,
+      advancedToAnotherField: true,
+      extractedFieldCount: 1,
+      messageLength: 240,
+      messageKind: "text",
+    })).toBe(true);
+  });
+
+  it("uses the fallback for an attachment without re-asking the prior stage", () => {
+    expect(shouldUseQualificationFallback({
+      hasPendingQuestion: true,
+      expectedWasAnswered: false,
+      advancedToAnotherField: false,
+      extractedFieldCount: 0,
+      messageLength: 65,
+      messageKind: "image",
+    })).toBe(true);
   });
 });

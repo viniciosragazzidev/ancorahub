@@ -94,6 +94,7 @@ export default async function ConversationsPage({
           stageEnteredAt: schema.leads.stageEnteredAt,
           planName: schema.carrierPlans.name,
           carrierName: schema.carriers.name,
+          qualificationDetails: schema.leads.qualificationDetails,
         })
         .from(schema.leads)
         .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
@@ -472,6 +473,14 @@ export default async function ConversationsPage({
         stageEnteredAt: lead.stageEnteredAt ? lead.stageEnteredAt.toISOString() : lead.createdAt.toISOString(),
         planName: lead.planName,
         carrierName: lead.carrierName,
+        privateNotes: (() => {
+          const details = lead.qualificationDetails;
+          if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+          const notes = (details as Record<string, unknown>).privateNotes;
+          if (!Array.isArray(notes)) return null;
+          const aiNote = notes.find((note) => note && typeof note === "object" && (note as Record<string, unknown>).source === "ai_qualification") as Record<string, unknown> | undefined;
+          return typeof aiNote?.summary === "string" ? aiNote.summary : null;
+        })(),
         messages,
         documents,
         aiConversation,

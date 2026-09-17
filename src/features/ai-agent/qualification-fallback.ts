@@ -109,6 +109,26 @@ export type AppliedAiMemoryUpdate = {
   confidence: 0 | 1;
 };
 
+/**
+ * Decide when the model should interpret a turn in addition to the
+ * deterministic extractor. Long answers and attachments deserve a fallback
+ * pass even when one of the expected fields was recognized, because they can
+ * contain facts for later stages as well.
+ */
+export function shouldUseQualificationFallback(input: {
+  hasPendingQuestion: boolean;
+  expectedWasAnswered: boolean;
+  advancedToAnotherField: boolean;
+  extractedFieldCount: number;
+  messageLength: number;
+  messageKind: string;
+}) {
+  if (!input.hasPendingQuestion) return false;
+  const isComplexAnswer = input.messageLength >= 120 && input.extractedFieldCount < 2;
+  const isAttachment = input.messageKind !== "text";
+  return (!input.expectedWasAnswered && !input.advancedToAnotherField) || isComplexAnswer || isAttachment;
+}
+
 export function applyAiMemoryUpdates(
   memory: ConversationMemory,
   updates: AiMemoryUpdate[] | undefined,
@@ -150,6 +170,8 @@ export function buildQualificationFallbackPrompt(expectedField: string, expected
     `A pergunta pendente é sobre o campo "${expectedField}" e foi: "${expectedQuestion}".\n` +
     `Leia o histórico e a mensagem mais recente. Extraia somente fatos que o cliente realmente informou agora, ` +
     `inclusive se houver erro de digitação ou se ele responder em linguagem natural. Não invente valores. ` +
+    `Uma única mensagem pode conter vários fatos; extraia todos os campos confiáveis de uma vez. ` +
+    `Se a mensagem indicar uma imagem ou documento, registre apenas que o arquivo foi recebido e não invente seu conteúdo. ` +
     `Retorne memoryUpdates com os campos canônicos (customerName, planType, numberOfLives, age, city, email, ` +
     `companyHasCnpj ou intent), usando planType individual, familiar ou empresarial. ` +
     `Não escolha outra etapa, não repita a pergunta e não envie uma resposta livre: a aplicação escolherá a próxima pergunta. ` +

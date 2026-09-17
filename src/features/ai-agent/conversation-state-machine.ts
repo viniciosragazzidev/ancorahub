@@ -20,7 +20,7 @@ import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/featur
 import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
-import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
@@ -31,7 +31,7 @@ import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
-import { applyAiMemoryUpdates, buildQualificationFallbackPrompt } from "./qualification-fallback";
+import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
 
 
 export type ConversationStatus =
@@ -956,11 +956,31 @@ export async function processInboundAiResponse({
   skipDebounce?: boolean;
 }) {
   const db = getDatabase();
+  // Media messages arrive without a text body. Give the qualification engine
+  // an explicit, truthful context marker so it can acknowledge the upload and
+  // continue with the next missing field instead of repeating the question
+  // that preceded the attachment. The file contents are never guessed here.
+  const inboundPlaceholderKind = userMessageBody.trim().match(/^\[(image|document|audio|video|sticker)\]$/i)?.[1]?.toLowerCase();
+  const effectiveMessageKind = (messageKind === "text" && inboundPlaceholderKind ? inboundPlaceholderKind : messageKind) as QuickReplyMessageKind;
+  const normalizedInboundMessage = (userMessageBody.trim() && !inboundPlaceholderKind ? userMessageBody.trim() : undefined) || (
+    effectiveMessageKind === "image"
+      ? "O cliente enviou uma imagem para análise (possivelmente uma carteirinha)."
+      : effectiveMessageKind === "document"
+        ? "O cliente enviou um documento para análise."
+        : effectiveMessageKind === "audio"
+          ? "O cliente enviou um áudio."
+          : effectiveMessageKind === "video"
+            ? "O cliente enviou um vídeo."
+            : effectiveMessageKind === "sticker"
+              ? "O cliente enviou uma figurinha."
+              : "O cliente enviou uma mensagem sem texto."
+  );
 
   console.info("[ai-wpp] inbound.received", {
     tenantId,
     leadId,
-    messageLength: userMessageBody.length,
+    messageLength: normalizedInboundMessage.length,
+    messageKind: effectiveMessageKind,
     providerMessageId,
   });
 
@@ -1144,7 +1164,7 @@ export async function processInboundAiResponse({
     resetMode: memoryResetMode,
     storedMemory: conversation.memory as ConversationMemory | null,
     formattedHistory,
-    currentMessage: userMessageBody,
+    currentMessage: normalizedInboundMessage,
     historyAlreadyContainsCurrentMessage,
   });
   const hasPriorMessages = pastMessages.some((message) => !sourceIdentifier || message.messageId !== sourceIdentifier);
@@ -1173,9 +1193,9 @@ export async function processInboundAiResponse({
       }
     : undefined;
 
-  const quickReply = quickReplyEnabled ? resolveQuickReply({
+  const resolvedQuickReply = quickReplyEnabled ? resolveQuickReply({
     body: userMessageBody,
-    messageKind,
+    messageKind: effectiveMessageKind,
     conversationState: automationState,
     isNewConversation: conversation.status === "NEW" && !hasPriorMessages,
     hasPriorMessages,
@@ -1183,6 +1203,13 @@ export async function processInboundAiResponse({
     cooldown: { lastTemplateKey: conversation.quickReplyLastTemplate, lastSentAt: conversation.quickReplyLastSentAt, waitWindowStartedAt: conversation.quickReplyWaitWindowStartedAt, waitResponseCount: conversation.quickReplyWaitResponseCount },
     cooldownConfig,
   }) : { resolved: false as const, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
+  const quickReply = shouldContinueQualificationAfterMedia({
+    messageKind: effectiveMessageKind,
+    hasPendingQuestion: Boolean(currentMemory.lastQuestionAsked),
+    conversationState: automationState,
+  }) && resolvedQuickReply.intent === "MEDIA_RECEIVED"
+    ? { resolved: false as const, intent: null, ruleKey: null, templateKey: null, notifyHuman: false }
+    : resolvedQuickReply;
   if (quickReply.resolved) {
     const templates = await loadQuickReplyTemplates(tenantId);
     const template = quickReply.templateKey ? templates[quickReply.templateKey] : undefined;
@@ -1365,7 +1392,14 @@ export async function processInboundAiResponse({
       && pendingQuestionAfterExtraction.key !== expectedQuestionBeforeMessage.key
       && fieldsExtractedFromCurrentMessage.length > 0,
   );
-  if (pendingQuestionAfterExtraction && !expectedWasAnswered && !currentMessageAdvancedToAnotherField) {
+  if (pendingQuestionAfterExtraction && shouldUseQualificationFallback({
+    hasPendingQuestion: Boolean(pendingQuestionAfterExtraction),
+    expectedWasAnswered,
+    advancedToAnotherField: currentMessageAdvancedToAnotherField,
+    extractedFieldCount: fieldsExtractedFromCurrentMessage.length,
+    messageLength: normalizedInboundMessage.length,
+    messageKind: effectiveMessageKind,
+  })) {
     const pendingField = pendingQuestionAfterExtraction.key as keyof ConversationMemory;
     const pendingValue = pendingField === "age" && updatedMemory.planType?.value === "empresarial"
       ? updatedMemory.averageAge?.value

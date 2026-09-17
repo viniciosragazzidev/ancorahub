@@ -838,7 +838,7 @@ export function QueueControlCenter({
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Regras de Campanhas Configuradas ({campaignRoutes.length})
               </div>
-              <ScrollArea className="max-h-64 rounded-lg border border-border/60 bg-muted/20">
+              <ScrollArea className="h-64 max-h-[50vh] min-h-0 rounded-lg border border-border/60 bg-muted/20">
                 <div className="divide-y divide-border/40">
                   {campaignRoutes
                     .filter((route) => {
@@ -1049,7 +1049,7 @@ export function QueueControlCenter({
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Exceções de Anúncios Configuradas ({adRoutes.length})
               </div>
-              <ScrollArea className="max-h-64 rounded-lg border border-border/60 bg-muted/20">
+              <ScrollArea className="h-64 max-h-[50vh] min-h-0 rounded-lg border border-border/60 bg-muted/20">
                 <div className="divide-y divide-border/40">
                   {adRoutes
                     .filter((route) => {

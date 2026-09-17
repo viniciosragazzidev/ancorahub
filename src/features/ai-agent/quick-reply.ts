@@ -25,6 +25,21 @@ export type ConversationAutomationState = (typeof conversationAutomationStateVal
 export const quickReplyMessageKindValues = ["text", "audio", "image", "document", "video", "sticker", "unknown"] as const;
 export type QuickReplyMessageKind = (typeof quickReplyMessageKindValues)[number];
 
+/** Attachments are acknowledged by a quick reply only when no qualification
+ * question is pending. During an active qualification the attachment must
+ * continue through the state machine, otherwise the generic media template
+ * short-circuits the next question. */
+export function shouldContinueQualificationAfterMedia(input: {
+  messageKind?: QuickReplyMessageKind;
+  hasPendingQuestion: boolean;
+  conversationState: ConversationAutomationState;
+}) {
+  return input.messageKind !== undefined
+    && input.messageKind !== "text"
+    && input.hasPendingQuestion
+    && input.conversationState === "AI_ACTIVE";
+}
+
 export const quickReplyTemplateSchema = z.object({
   ruleKey: z.string().trim().min(1).max(80),
   templateKey: z.string().trim().min(1).max(80),

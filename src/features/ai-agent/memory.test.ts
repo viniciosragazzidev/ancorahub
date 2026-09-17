@@ -64,6 +64,23 @@ describe("conversation memory", () => {
     expect(updated.age).toBeUndefined();
   });
 
+  it("extracts every fact from a long PME answer and uses individual ages as the average-age signal", () => {
+    const updated = extractFieldsFromMessage(
+      "No nosso caso é a empresa MEI da minha esposa. Seriam 2 vidas. Tenho 62 anos e ela 61. Gostaríamos de ver opções mais baratas, pois moramos no Recreio dos Bandeirantes.",
+      { ...createEmptyMemory(), lastQuestionAsked: "Você busca um plano individual/familiar ou para empresa (PJ)?" },
+      "msg-long-pme",
+    );
+
+    expect(updated.customerName).toBeUndefined();
+    expect(updated.planType?.value).toBe("empresarial");
+    expect(updated.numberOfLives?.value).toBe("2");
+    expect(updated.averageAge?.value).toBe("62");
+    expect(updated.age).toBeUndefined();
+    expect(updated.city?.value).toBe("Recreio dos Bandeirantes");
+    expect(updated.intent?.value).toMatch(/opções mais baratas/i);
+    expect(updated.collectedFields).toEqual(expect.arrayContaining(["planType", "numberOfLives", "age", "city", "intent"]));
+  });
+
   it("keeps the six-question qualification order and detects completion", () => {
     expect(COLLECTIBLE_FIELDS.slice(0, 6).map((field) => field.key)).toEqual([
       "customerName", "planType", "numberOfLives", "age", "city", "email",

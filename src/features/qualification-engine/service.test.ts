@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { evaluateQualification, leadMatchesQualificationEntryRules } from "./service";
+import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules } from "./service";
+import { createEmptyMemory } from "@/features/ai-agent/memory";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 
 const policy = {
@@ -26,5 +27,28 @@ describe("qualification engine", () => {
       collectedFields: ["planType", "numberOfLives", "age"],
     }, pmePolicy);
     expect(result).toMatchObject({ state: "QUALIFIED", missingFields: [] });
+  });
+
+  it("builds a private, structured context from facts captured in a long answer", () => {
+    const context = buildPrivateQualificationContext({
+      ...createEmptyMemory(),
+      planType: { value: "empresarial", confidence: 1 },
+      numberOfLives: { value: "2", confidence: 1 },
+      averageAge: { value: "62", confidence: 1 },
+      city: { value: "Recreio dos Bandeirantes", confidence: 1 },
+      intent: { value: "opções mais baratas", confidence: 1 },
+      collectedFields: ["planType", "numberOfLives", "age", "city", "intent"],
+    });
+
+    expect(context.source).toBe("ai_qualification");
+    expect(context.summary).toContain("Recreio dos Bandeirantes");
+    expect(context.facts).toEqual(expect.arrayContaining([
+      "tipo de plano: empresarial",
+      "vidas: 2",
+      "média de idade: 62",
+      "cidade: Recreio dos Bandeirantes",
+      "interesse: opções mais baratas",
+    ]));
+    expect(context.memory.planType?.value).toBe("empresarial");
   });
 });

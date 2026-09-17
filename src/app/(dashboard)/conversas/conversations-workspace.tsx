@@ -151,6 +151,8 @@ export type ConversationItem = {
   stageEnteredAt: string;
   planName: string | null;
   carrierName: string | null;
+  /** Structured private context captured by the qualification assistant. */
+  privateNotes?: string | null;
   latestMessage: Pick<ConversationMessage, "body" | "direction" | "sentAt"> | null;
   messages: ConversationMessage[];
   documents: {
@@ -1617,7 +1619,7 @@ function ClientProfile({
             leadName={client.nome}
           />
 
-          <LeadNotesSection leadId={client.id} />
+          <LeadNotesSection leadId={client.id} initialNote={client.privateNotes} />
 
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">
@@ -1777,11 +1779,11 @@ function getWhatsAppUrl(phone: string) {
   return `https://wa.me/${phone.replace(/\D/g, "")}`;
 }
 
-function LeadNotesSection({ leadId }: { leadId: string }) {
+function LeadNotesSection({ leadId, initialNote }: { leadId: string; initialNote?: string | null }) {
   const storageKey = `ancora_lead_note_${leadId}`;
   const [note, setNote] = useState(() => {
     if (typeof window === "undefined") return "";
-    return localStorage.getItem(storageKey) ?? "";
+    return localStorage.getItem(storageKey) ?? initialNote ?? "";
   });
   const [saved, setSaved] = useState(false);
 
