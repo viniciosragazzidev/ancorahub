@@ -25,6 +25,7 @@ import { TeamMemberActions } from "./member-actions";
 import type { TenantRole } from "@/shared/db/schema";
 
 type BranchOption = { id: string; name: string };
+type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
 type TeamMember = {
   id: string;
   userId: string | null;
@@ -37,6 +38,8 @@ type TeamMember = {
   branchId: string | null;
   branchName: string | null;
   customRoleScope: "none" | "own" | "branch" | "tenant" | null;
+  customRoleId: string | null;
+  customRoleName: string | null;
   canEditAuthority: boolean;
   canManage: boolean;
 };
@@ -47,10 +50,11 @@ type Props = {
   currentRole: TenantRole;
   currentBranchId: string | null;
   currentUserId: string;
+  customRoles: CustomRoleOption[];
   canViewProfile: boolean;
 };
 
-export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId, canViewProfile }: Props) {
+export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId, customRoles, canViewProfile }: Props) {
   const router = useRouter();
   const [branchFilter, setBranchFilter] = useState("all");
   const [mobileQuery, setMobileQuery] = useState("");
@@ -215,6 +219,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
             currentBranchId={currentBranchId}
             currentRole={currentRole}
             currentUserId={currentUserId}
+            customRoles={customRoles}
             member={row.original}
             allMembers={members}
             onStatusChange={handleStatusChange}
@@ -337,6 +342,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
                   currentBranchId={currentBranchId}
                   currentRole={currentRole}
                   currentUserId={currentUserId}
+                  customRoles={customRoles}
                   member={member}
                   allMembers={members}
                   onStatusChange={handleStatusChange}

@@ -25,6 +25,10 @@ export const createUserInput = z.object({
   role: z.preprocess((value) => value === "director" ? "director" : value === "manager" ? "manager" : value === "supervisor" ? "supervisor" : "broker", z.enum(["director", "manager", "supervisor", "broker"])),
   jobTitle: z.enum(["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"]).default("broker"),
   branchId: z.string().uuid(),
+  customRoleId: z.preprocess(
+    (value) => typeof value === "string" && (value.trim() === "" || value === "__none__") ? null : value,
+    z.string().uuid().nullable().optional(),
+  ),
 });
 
 export async function createTeamUser(rawInput: unknown) {
@@ -35,6 +39,15 @@ export async function createTeamUser(rawInput: unknown) {
   }
 
   const db = getDatabase();
+
+  if (input.customRoleId) {
+    if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
+    const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
+      .from(schema.customRoles)
+      .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active")))
+      .limit(1);
+    if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+  }
 
   const [branch] = await db
     .select()
@@ -106,7 +119,7 @@ export async function createTeamUser(rawInput: unknown) {
       updatedAt: new Date(),
     });
 
-    const invitation = await createBrokerInvitation(tx, context.tenantId, input.branchId, brokerProfileId, input.email, input.role, input.jobTitle);
+    const invitation = await createBrokerInvitation(tx, context.tenantId, input.branchId, brokerProfileId, input.email, input.role, input.jobTitle, input.customRoleId ?? null);
     const { token } = invitation;
     inviteToken = token;
     invitationId = invitation.id;

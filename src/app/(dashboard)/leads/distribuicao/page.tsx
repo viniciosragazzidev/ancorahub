@@ -577,7 +577,10 @@ export default async function LeadDistributionPage({
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
 
   const queueCounts = new Map(
-    queueCountsByStatus.map((row) => [row.distributionStatus, { count: Number(row.count), oldestAt: row.oldestAt ? new Date(row.oldestAt) : null }]),
+    queueCountsByStatus.map((row) => [
+      row.distributionStatus,
+      { count: Number(row.count), oldestAt: row.oldestAt ? new Date(row.oldestAt) : null },
+    ]),
   );
 
   const queueCards = [
@@ -633,8 +636,8 @@ export default async function LeadDistributionPage({
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
-      <main className="min-h-full bg-muted/30 px-4 py-5 lg:px-6 lg:py-7">
+      <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
+      <main className="min-h-full bg-muted/20 px-4 py-5 lg:px-6 lg:py-7">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
           <PageHeader
             title="Central de distribuição"
@@ -653,10 +656,16 @@ export default async function LeadDistributionPage({
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                  <span><strong className="font-semibold text-foreground">{totalAvailable}</strong> disponíveis</span>
+                  <span>
+                    <strong className="font-semibold text-foreground">{totalAvailable}</strong>{" "}
+                    disponíveis
+                  </span>
                 </span>
                 <span className="h-5 w-px bg-border" aria-hidden="true" />
-                <span><strong className="font-semibold text-foreground">{totalNewLeads}</strong> aguardando</span>
+                <span>
+                  <strong className="font-semibold text-foreground">{totalNewLeads}</strong>{" "}
+                  aguardando
+                </span>
               </div>
             }
           />

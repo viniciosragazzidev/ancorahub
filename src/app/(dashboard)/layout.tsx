@@ -22,6 +22,8 @@ import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
+import { getRouteDefinition } from "@/features/custom-roles/routes";
+import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -111,6 +113,19 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     if (isRestricted) {
       redirect("/access-denied");
     }
+  }
+
+  const routeDefinition = getRouteDefinition(pathname.split("?")[0]);
+  if (routeDefinition && pathname !== "") {
+    const canAccessRoute = await hasEffectiveRouteAccess({
+      tenantId: context.tenantId,
+      role: context.role,
+      jobTitle: context.jobTitle,
+      customRoleId: context.customRoleId ?? null,
+      routeKey: routeDefinition.key,
+      fallbackPermission: routeDefinition.fallbackPermission,
+    });
+    if (!canAccessRoute) redirect("/access-denied");
   }
 
   const [tenant] = tenantRows;

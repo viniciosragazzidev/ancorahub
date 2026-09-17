@@ -113,7 +113,7 @@ export function LightTopNavBar({
   }, [mobileMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-primary/20 bg-primary pt-(--mobile-safe-top) text-primary-foreground shadow-sm select-none">
+    <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-black pt-(--mobile-safe-top) text-white shadow-sm select-none">
       <div className="mx-auto flex h-14 w-full items-center justify-between px-3 sm:px-5 gap-3">
         {/* LADO ESQUERDO: LOGO + NAVEGAÇÃO HORIZONTAL */}
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
@@ -206,7 +206,7 @@ export function LightTopNavBar({
               className="flex items-center gap-2 rounded-lg p-1 hover:bg-white/15 transition-colors cursor-pointer outline-hidden"
               aria-label="Menu do usuário"
             >
-              <div className="grid size-7 place-items-center rounded-full bg-white text-primary font-bold text-xs shadow-xs">
+              <div className="grid size-7 place-items-center rounded-full bg-white text-black font-bold text-xs shadow-xs">
                 {userInitials || "CO"}
               </div>
               <div className="hidden xl:flex flex-col text-left text-xs leading-tight">
@@ -249,7 +249,7 @@ export function LightTopNavBar({
       {mobileMenuOpen && (
         <div
           ref={mobileMenuRef}
-          className="max-h-[calc(100dvh-3.5rem-var(--mobile-safe-top))] overflow-y-auto border-t border-white/20 bg-primary md:hidden animate-in slide-in-from-top-2 fade-in duration-150 motion-reduce:animate-none"
+          className="max-h-[calc(100dvh-3.5rem-var(--mobile-safe-top))] overflow-y-auto border-t border-white/20 bg-black md:hidden animate-in slide-in-from-top-2 fade-in duration-150 motion-reduce:animate-none"
         >
           <nav aria-label="Menu mobile" className="flex flex-col gap-0.5 p-2">
             {navItems.map((item) => {

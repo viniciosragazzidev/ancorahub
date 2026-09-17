@@ -35,6 +35,7 @@ import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 import { getPendingFeedbackCountAction } from "@/features/leads/feedback-queries";
 import { Badge } from "@/components/ui/badge";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+import { routePermissionForPath } from "@/features/custom-roles/routes";
 
 type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey; requiresFeature?: boolean };
 
@@ -113,6 +114,10 @@ export function CorretorSidebar() {
     ) {
       return false;
     }
+    const permissions = user?.permissions ?? [];
+    const routePermission = routePermissionForPath(item.url);
+    const explicitRoutes = permissions.filter((permission) => permission.startsWith("route:"));
+    if (routePermission && explicitRoutes.length > 0) return permissions.includes(routePermission);
     return hasCapability(role, item.permission, jobTitle);
   });
 

@@ -26,6 +26,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { roleScopeLabel } from "@/features/custom-roles/member-scope";
+import type { RouteDefinition } from "@/features/custom-roles/routes";
+import { isRoutePermission, routePermissionKey } from "@/features/custom-roles/routes";
 import { archiveCustomRoleAction, saveCustomRoleAction } from "./actions";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -205,6 +207,42 @@ function PermissionsTab({
   );
 }
 
+function RouteVisibilityTab({ routes, selected, onToggle }: { routes: readonly RouteDefinition[]; selected: string[]; onToggle: (key: string) => void }) {
+  const grouped = useMemo(() => Object.entries(routes.reduce<Record<string, RouteDefinition[]>>((acc, route) => {
+    (acc[route.category] ??= []).push(route);
+    return acc;
+  }, {})), [routes]);
+  const explicitRouteCount = selected.filter(isRoutePermission).length;
+  return (
+    <div className="flex flex-col gap-3 px-4 pb-4">
+      <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
+        <p className="font-semibold text-foreground">Visibilidade no menu</p>
+        <p className="mt-1 leading-relaxed">Escolha quais áreas este cargo pode enxergar. Se nenhuma rota for marcada, o acesso segue automaticamente as permissões acima.</p>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{explicitRouteCount} de {routes.length} rotas com regra explícita.</p>
+      {grouped.map(([category, items]) => (
+        <section key={category} className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="border-b border-border bg-muted/40 px-4 py-2"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{category}</p></div>
+          <div className="divide-y divide-border/60">
+            {items.map((route) => {
+              const key = routePermissionKey(route.key);
+              const switchId = `route-${route.key}`;
+              return <div key={route.key} className="flex items-start justify-between gap-4 px-4 py-3 hover:bg-muted/30">
+                <label htmlFor={switchId} className="min-w-0 flex-1 cursor-pointer">
+                  <p className="text-xs font-semibold text-foreground">{route.label}</p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{route.description}</p>
+                  <p className="mt-1 font-mono text-[10px] text-muted-foreground/70">{route.path}</p>
+                </label>
+                <PermissionToggle checked={selected.includes(key)} onChange={() => onToggle(key)} id={switchId} />
+              </div>;
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 // ── Identidade tab ────────────────────────────────────────────────────────────
 
 function IdentidadeTab({
@@ -332,6 +370,7 @@ function MembersTab({ role }: { role: Role | null }) {
 function RoleEditorDialog({
   editing,
   catalog,
+  routeCatalog,
   enabled,
   open,
   onClose,
@@ -339,6 +378,7 @@ function RoleEditorDialog({
 }: {
   editing: Role | null;
   catalog: Capability[];
+  routeCatalog: readonly RouteDefinition[];
   enabled: boolean;
   open: boolean;
   onClose: () => void;
@@ -374,7 +414,7 @@ function RoleEditorDialog({
     setScope(next);
     setSelected((current) =>
       current.filter((key) =>
-        catalog.some((item) => item.key === key && item.scopes.includes(next)),
+        isRoutePermission(key) || catalog.some((item) => item.key === key && item.scopes.includes(next)),
       ),
     );
   }
@@ -442,11 +482,15 @@ function RoleEditorDialog({
               <TabsTrigger value="identidade">Identidade</TabsTrigger>
               <TabsTrigger value="permissoes">
                 Permissões
-                {selected.length > 0 && (
+                {selected.filter((key) => !isRoutePermission(key)).length > 0 && (
                   <Badge variant="indigo" className="ml-1.5 px-1.5 py-0 h-4 min-w-4 text-[10px] flex items-center justify-center font-bold">
-                    {selected.length}
+                    {selected.filter((key) => !isRoutePermission(key)).length}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="rotas">
+                Rotas visíveis
+                {selected.filter(isRoutePermission).length > 0 && <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 h-4 min-w-4 text-[10px]">{selected.filter(isRoutePermission).length}</Badge>}
               </TabsTrigger>
               {editing && (
                 <TabsTrigger value="membros">
@@ -481,6 +525,9 @@ function RoleEditorDialog({
                   selected={selected}
                   onToggle={togglePermission}
                 />
+              </TabsContent>
+              <TabsContent value="rotas">
+                <RouteVisibilityTab routes={routeCatalog} selected={selected} onToggle={togglePermission} />
               </TabsContent>
 
               <TabsContent value="membros">
@@ -535,10 +582,12 @@ function RoleEditorDialog({
 export function CustomRolesWorkspace({
   enabled,
   catalog,
+  routeCatalog,
   roles,
 }: {
   enabled: boolean;
   catalog: Capability[];
+  routeCatalog: readonly RouteDefinition[];
   roles: Role[];
 }) {
   const [query, setQuery] = useState("");
@@ -677,7 +726,9 @@ export function CustomRolesWorkspace({
                     {role.memberCount}
                   </span>
                   <span>·</span>
-                  <span>{role.permissions.length} permissões</span>
+                  <span>{role.permissions.filter((key) => !isRoutePermission(key)).length} permissões</span>
+                  <span>·</span>
+                  <span>{role.permissions.filter(isRoutePermission).length} rotas</span>
                 </div>
                 <Badge variant="outline" className="text-[10px] font-medium tracking-wide">
                   {roleScopeLabel(role.scope)}
@@ -696,6 +747,7 @@ export function CustomRolesWorkspace({
       <RoleEditorDialog
         editing={editingRole}
         catalog={catalog}
+        routeCatalog={routeCatalog}
         enabled={enabled}
         open={selectedId !== null}
         onClose={() => setSelectedId(null)}

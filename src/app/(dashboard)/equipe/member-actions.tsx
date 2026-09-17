@@ -18,6 +18,7 @@ import { deleteTeamMemberAction, toggleTeamMemberStatusAction, updateTeamMemberA
 import type { TenantRole } from "@/shared/db/schema";
 
 type BranchOption = { id: string; name: string };
+type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
 type TeamMember = {
   id: string;
   userId: string | null;
@@ -29,6 +30,8 @@ type TeamMember = {
   branchId: string | null;
   branchName: string | null;
   customRoleScope?: "none" | "own" | "branch" | "tenant" | null;
+  customRoleId?: string | null;
+  customRoleName?: string | null;
   canEditAuthority: boolean;
   canManage: boolean;
 };
@@ -41,6 +44,7 @@ type Props = {
   currentUserId: string;
   allMembers?: TeamMember[];
   onStatusChange?: (memberId: string, status: TeamMember["status"] | null) => void;
+  customRoles?: CustomRoleOption[];
 };
 
 const roleLabel: Record<TeamMember["role"], string> = {
@@ -59,6 +63,7 @@ const statusLabel: Record<TeamMember["status"], string> = {
 const jobTitleLabel: Record<string, string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
   marketing: "Marketing",
   finance: "Financeiro",
@@ -75,6 +80,7 @@ function EditMemberDialog({
   branches,
   currentRole,
   currentBranchId,
+  customRoles = [],
 }: Props & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,7 +98,9 @@ function EditMemberDialog({
 
   const [jobTitle, setJobTitle] = useState<string>(member.jobTitle);
   const [role, setRole] = useState<string>(member.role);
-  const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || member.customRoleScope === "branch";
+  const [customRoleId, setCustomRoleId] = useState(member.customRoleId ?? "");
+  const selectedCustomRole = customRoles.find((item) => item.id === customRoleId);
+  const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || selectedCustomRole?.scope === "branch";
 
   useEffect(() => {
     if (state.success) {
@@ -111,8 +119,9 @@ function EditMemberDialog({
       formRef.current?.reset();
       setJobTitle(member.jobTitle);
       setRole(member.role);
+      setCustomRoleId(member.customRoleId ?? "");
     }
-  }, [open, member.jobTitle, member.role]);
+  }, [open, member.customRoleId, member.jobTitle, member.role]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -172,7 +181,7 @@ function EditMemberDialog({
                 if (val === "director") setJobTitle("director");
                 else if (val === "manager") setJobTitle("manager");
               }}
-              disabled={pending || currentRole !== "director"}
+              disabled={pending || currentRole !== "director" || jobTitle === "broker"}
               name="role"
             >
               <SelectTrigger className="w-full">
@@ -191,7 +200,20 @@ function EditMemberDialog({
                 )}
               </SelectContent>
             </Select>
+            {jobTitle === "broker" ? <p className="text-xs text-muted-foreground">Corretor usa Operação individual automaticamente.</p> : null}
           </Field>
+          {customRoles.length > 0 && jobTitle !== "director" ? (
+            <Field>
+              <FieldLabel>Cargo personalizado <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+              <Select name="customRoleId" value={customRoleId || "__none__"} onValueChange={(value) => setCustomRoleId(value === "__none__" ? "" : value ?? "")} disabled={pending} labels={Object.fromEntries(customRoles.map((item) => [item.id, item.name]))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Nenhum cargo personalizado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum cargo personalizado</SelectItem>
+                  {customRoles.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
           <Field>
             <FieldLabel>{requiresBranch ? "Unidade" : "Unidade (opcional)"}</FieldLabel>
             <Select
@@ -330,6 +352,7 @@ export function TeamMemberActions({
   currentUserId,
   allMembers = [],
   onStatusChange,
+  customRoles = [],
 }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -499,6 +522,7 @@ export function TeamMemberActions({
         key={member.id}
         branches={branches}
         currentBranchId={currentBranchId}
+        customRoles={customRoles}
         currentRole={currentRole}
         currentUserId={currentUserId}
         member={member}

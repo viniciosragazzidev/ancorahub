@@ -130,6 +130,7 @@ export async function completeOnboardingAction(
             branchId: invitation.branchId,
             role: invitation.role,
             jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
+            customRoleId: invitation.customRoleId,
             status: "active",
             updatedAt: new Date(),
           })
@@ -143,6 +144,7 @@ export async function completeOnboardingAction(
           branchId: invitation.branchId,
           role: invitation.role,
           jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
+          customRoleId: invitation.customRoleId,
           status: "active",
         });
       }

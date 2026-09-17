@@ -54,6 +54,7 @@ import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 import { cn } from "@/lib/utils";
+import { routePermissionForPath } from "@/features/custom-roles/routes";
 
 type NavItemConfig = {
   label: string;
@@ -190,7 +191,11 @@ function canShowItem(item: NavItemConfig, user: UserDisplayInfo | null, roleKey:
   if (roleKey === "manager" && managerHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
     return false;
   }
-  return user?.permissions?.includes(item.permission) ?? false;
+  const permissions = user?.permissions ?? [];
+  const routePermission = routePermissionForPath(item.url);
+  const explicitRoutes = permissions.filter((permission) => permission.startsWith("route:"));
+  if (routePermission && explicitRoutes.length > 0) return permissions.includes(routePermission);
+  return permissions.includes(item.permission);
 }
 
 export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {

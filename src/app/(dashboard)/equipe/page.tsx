@@ -12,6 +12,7 @@ import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
 import { canEditMemberAuthority, canManageMember } from "@/shared/auth/team-permissions";
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
+import { isCustomRolesEnabled } from "@/features/custom-roles/service";
 
 export default async function TeamPage() {
   const context = await getRequiredTenantContext();
@@ -26,7 +27,13 @@ export default async function TeamPage() {
     ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
     : undefined;
 
-  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal, memberProfileEnabled] = await Promise.all([
+  const customRolesPromise = context.role === "director"
+    ? isCustomRolesEnabled(context.tenantId).then((enabled) => enabled
+      ? getDatabase().select({ id: schema.customRoles.id, name: schema.customRoles.name, scope: schema.customRoles.scope }).from(schema.customRoles).where(and(eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active"))).orderBy(asc(schema.customRoles.name))
+      : [])
+    : Promise.resolve([] as Array<{ id: string; name: string; scope: "none" | "own" | "branch" | "tenant" }>);
+
+  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal, memberProfileEnabled, customRoles] = await Promise.all([
     getDatabase()
       .select({ name: schema.tenants.name })
       .from(schema.tenants)
@@ -47,6 +54,8 @@ export default async function TeamPage() {
         role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}::text, ${schema.brokerInvitations.role}::text, 'broker')::tenant_role`,
         jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, ${schema.brokerInvitations.jobTitle}, 'broker')`,
         customRoleScope: schema.customRoles.scope,
+        customRoleId: schema.tenantMemberships.customRoleId,
+        customRoleName: schema.customRoles.name,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.brokerProfiles.userId} is null or ${schema.user.status}::text = 'pending' or ${schema.brokerProfiles.lifecycleStatus}::text in ('DRAFT', 'INVITED', 'INVITATION_EXPIRED', 'ONBOARDING') then 'pending'
@@ -88,6 +97,8 @@ export default async function TeamPage() {
           else ${schema.tenantMemberships.jobTitle}
         end`,
         customRoleScope: schema.customRoles.scope,
+        customRoleId: schema.tenantMemberships.customRoleId,
+        customRoleName: schema.customRoles.name,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.user.status}::text = 'pending' then 'pending'
@@ -118,6 +129,7 @@ export default async function TeamPage() {
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
       .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadBranchScope)),
     isTeamMemberProfileEnabled(),
+    customRolesPromise,
   ]);
 
   // Tendências mensais (últimos 6 meses) para os cards do topo
@@ -192,7 +204,7 @@ export default async function TeamPage() {
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
         title="Equipe"
-        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} /></div>}
+        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /></div>}
       />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         {/* Contexto de página legado, preservado para eventual restauração:
@@ -218,6 +230,7 @@ export default async function TeamPage() {
           currentRole={context.role}
           currentUserId={context.userId}
           members={members}
+          customRoles={customRoles}
           canViewProfile={memberProfileEnabled}
         />
       </main>

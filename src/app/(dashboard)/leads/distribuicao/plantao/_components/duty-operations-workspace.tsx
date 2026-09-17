@@ -66,9 +66,12 @@ const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
 
 function firstSchedulableBranchId(snapshot: Snapshot) {
-  return snapshot.branches.find(
-    (branch) => !branch.isDistributionHub && snapshot.queues.some((queue) => queue.branchId === branch.id),
-  )?.id ?? "";
+  return (
+    snapshot.branches.find(
+      (branch) =>
+        !branch.isDistributionHub && snapshot.queues.some((queue) => queue.branchId === branch.id),
+    )?.id ?? ""
+  );
 }
 
 function dateInputValue(value: Date | null) {
@@ -440,35 +443,38 @@ function DutyFormSheet({
             <fieldset className="grid gap-2">
               <Label>Unidades</Label>
               <div className="grid gap-2">
-                {snapshot.branches.filter((branch) => !branch.isDistributionHub).map((branch) => {
-                  const selected = branchIds.includes(branch.id);
-                  const hasQueue = snapshot.queues.some((queue) => queue.branchId === branch.id);
-                  return (
-                    <label
-                      key={branch.id}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-                    >
-                    <Checkbox
-                      checked={selected}
-                      disabled={Boolean(schedule) || !hasQueue}
-                      onCheckedChange={(checked) =>
-                        setBranchIds((current) =>
-                          checked === true
-                            ? [...current, branch.id]
-                            : current.filter((id) => id !== branch.id),
-                        )
-                      }
-                    />
-                      <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {hasQueue ? "Fila ativa" : "Sem fila"}
-                      </span>
-                    </label>
-                  );
-                })}
+                {snapshot.branches
+                  .filter((branch) => !branch.isDistributionHub)
+                  .map((branch) => {
+                    const selected = branchIds.includes(branch.id);
+                    const hasQueue = snapshot.queues.some((queue) => queue.branchId === branch.id);
+                    return (
+                      <label
+                        key={branch.id}
+                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                      >
+                        <Checkbox
+                          checked={selected}
+                          disabled={Boolean(schedule) || !hasQueue}
+                          onCheckedChange={(checked) =>
+                            setBranchIds((current) =>
+                              checked === true
+                                ? [...current, branch.id]
+                                : current.filter((id) => id !== branch.id),
+                            )
+                          }
+                        />
+                        <span className="min-w-0 flex-1 truncate">{branch.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {hasQueue ? "Fila ativa" : "Sem fila"}
+                        </span>
+                      </label>
+                    );
+                  })}
                 {snapshot.branches.some((branch) => branch.isDistributionHub) && (
                   <p className="text-xs text-muted-foreground">
-                    A Matriz é uma central de redistribuição e não participa de plantões operacionais.
+                    A Matriz é uma central de redistribuição e não participa de plantões
+                    operacionais.
                   </p>
                 )}
               </div>
@@ -523,7 +529,8 @@ function DutyFormSheet({
                           disabled={Boolean(schedule) || (selected && selectedDays.length === 1)}
                           onCheckedChange={(checked) =>
                             setSelectedDays((current) => {
-                              if (checked === true) return [...new Set([...current, index])].sort((a, b) => a - b);
+                              if (checked === true)
+                                return [...new Set([...current, index])].sort((a, b) => a - b);
                               if (current.length === 1) return current;
                               return current.filter((dayIndex) => dayIndex !== index);
                             })
@@ -618,15 +625,18 @@ function DutyFormSheet({
                 ]}
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
-                A origem representa a Página ou integração que recebe o lead. Campanhas da mesma Página seguem este plantão;
-                regras específicas de campanha continuam na Matriz de Roteamento.
+                A origem representa a Página ou integração que recebe o lead. Campanhas da mesma
+                Página seguem este plantão; regras específicas de campanha continuam na Matriz de
+                Roteamento.
               </p>
             </div>
             <section
               aria-labelledby="duty-review"
               className="rounded-xl border border-primary/20 bg-primary/5 p-4"
             >
-              <h3 id="duty-review" className="text-sm font-semibold">Resumo da criação</h3>
+              <h3 id="duty-review" className="text-sm font-semibold">
+                Resumo da criação
+              </h3>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {selectedBranches.length * selectedDays.length || 0} regra(s) independente(s) serão
                 criadas para as combinações selecionadas de unidade, fila e dia. O plantão só
@@ -636,7 +646,8 @@ function DutyFormSheet({
                 <Badge variant="outline">{selectedBranches.length} unidade(s)</Badge>
                 <Badge variant="outline">{selectedDays.length} dia(s)</Badge>
                 <Badge variant="outline">
-                  {selectedBranches.filter((branch) => Boolean(queueForBranch(branch.id))).length} fila(s)
+                  {selectedBranches.filter((branch) => Boolean(queueForBranch(branch.id))).length}{" "}
+                  fila(s)
                 </Badge>
               </div>
             </section>
@@ -1059,16 +1070,11 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
-      <section className="flex flex-col gap-4 border-b border-border/70 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-primary">
-            <CalendarCheck className="size-4" />
-            <span className="text-xs font-semibold">Distribuição de leads</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Plantões</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Organize as regras semanais e acompanhe a cobertura dos corretores sem alterar a fila
-            manualmente.
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Plantões</h2>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Organize escalas, horários e cobertura sem perder o vínculo com a fila de destino.
           </p>
         </div>
         <Button
@@ -1080,7 +1086,7 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
           Novo plantão
         </Button>
       </section>
-      <section className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 text-sm font-medium">
             <Buildings className="size-4 text-muted-foreground" />

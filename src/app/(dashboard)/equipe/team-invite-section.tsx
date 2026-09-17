@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTeamUserAction, importBrokersAction } from "./actions";
 
-type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean; canInviteDirector?: boolean };
+type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
+type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean; canInviteDirector?: boolean; customRoles?: CustomRoleOption[] };
 
 const jobTitles = [
   { value: "director", label: "Diretor" },
@@ -24,7 +25,7 @@ const jobTitles = [
   { value: "support", label: "Suporte" },
 ] as const;
 
-export function TeamInviteSection({ branches, canInviteManager, canInviteDirector }: Props) {
+export function TeamInviteSection({ branches, canInviteManager, canInviteDirector, customRoles = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [createdLink, setCreatedLink] = useState<string | null>(null);
@@ -32,7 +33,8 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
   const [whatsappStatus, setWhatsappStatus] = useState<"queued" | "not_available" | "failed" | "sent" | null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
   const [jobTitle, setJobTitle] = useState("broker");
-  const [role, setRole] = useState(canInviteDirector ? "director" : canInviteManager ? "manager" : "broker");
+  const [role, setRole] = useState("broker");
+  const [customRoleId, setCustomRoleId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const csvFormRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
@@ -78,6 +80,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
     setOpen(false);
     setCreatedLink(null);
     setActiveTab('manual');
+    setCustomRoleId("");
   }
 
   return (
@@ -184,6 +187,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                     if (val === "director") setRole("director");
                     else if (val === "manager") setRole("manager");
                     else if (val === "supervisor") setRole("supervisor");
+                    else if (val === "broker") setRole("broker");
                   }} disabled={pending} labels={Object.fromEntries(jobTitles.map((t) => [t.value, t.label]))}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cargo" /></SelectTrigger>
                     <SelectContent>
@@ -200,7 +204,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                     setRole(val);
                     if (val === "director") setJobTitle("director");
                     else if (val === "manager" && (jobTitle === "director" || jobTitle === "broker")) setJobTitle("manager");
-                  }} disabled={pending || jobTitle === "manager" || jobTitle === "director"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
+                  }} disabled={pending || jobTitle === "manager" || jobTitle === "director" || jobTitle === "broker"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o perfil" /></SelectTrigger>
                     <SelectContent>
                       {canInviteDirector ? <SelectItem value="director">Acesso Global (Direção)</SelectItem> : null}
@@ -208,7 +212,21 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                       {jobTitle !== "manager" && jobTitle !== "director" ? <SelectItem value="broker">Operação individual</SelectItem> : null}
                     </SelectContent>
                   </Select>
+                  {jobTitle === "broker" ? <p className="text-xs text-muted-foreground">Corretor usa Operação individual automaticamente.</p> : null}
                 </Field>
+                {customRoles.length > 0 && jobTitle !== "director" ? (
+                  <Field>
+                    <FieldLabel>Cargo personalizado <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+                    <Select name="customRoleId" value={customRoleId || "__none__"} onValueChange={(value) => setCustomRoleId(value === "__none__" ? "" : value ?? "")} disabled={pending} labels={Object.fromEntries(customRoles.map((item) => [item.id, item.name]))}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Nenhum cargo personalizado" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nenhum cargo personalizado</SelectItem>
+                        {customRoles.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">O cargo define permissões e rotas visíveis; o perfil continua sendo o papel operacional.</p>
+                  </Field>
+                ) : null}
                 <Field>
                   <FieldLabel>Unidade</FieldLabel>
                   <Select name="branchId" required disabled={pending}>

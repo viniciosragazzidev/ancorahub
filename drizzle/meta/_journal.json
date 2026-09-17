@@ -673,6 +673,13 @@
                         "when":  1789569621482,
                         "tag":  "0148_hold_disqualified_leads",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  96,
+                        "version":  "7",
+                        "when":  1789573200000,
+                        "tag":  "0149_custom_role_invitation",
+                        "breakpoints":  true
                     }
                 ]
 }

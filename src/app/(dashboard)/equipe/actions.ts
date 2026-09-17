@@ -36,6 +36,10 @@ const updateMemberInput = z.object({
     (value) => value === "__tenant__" ? "" : value,
     z.string().uuid().optional().or(z.literal("")),
   ),
+  customRoleId: z.preprocess(
+    (value) => typeof value === "string" && (value.trim() === "" || value === "__none__") ? null : value,
+    z.string().uuid().nullable().optional(),
+  ),
 });
 
 const memberIdInput = z.object({
@@ -71,6 +75,7 @@ export async function updateTeamMemberAction(
         userId: schema.user.id,
         role: schema.tenantMemberships.role,
         jobTitle: schema.tenantMemberships.jobTitle,
+        customRoleId: schema.tenantMemberships.customRoleId,
         customRoleScope: schema.customRoles.scope,
         branchId: schema.tenantMemberships.branchId,
         status: schema.user.status,
@@ -91,6 +96,16 @@ export async function updateTeamMemberAction(
     }
 
     const normalizedBranchId = input.branchId || null;
+    let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
+    if (input.customRoleId) {
+      if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
+      const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
+        .from(schema.customRoles)
+        .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active")))
+        .limit(1);
+      if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+      customRoleScope = customRole.scope;
+    }
     requireCanUpdateMemberAuthority({
       actorContext: context,
       targetMember: {
@@ -101,13 +116,13 @@ export async function updateTeamMemberAction(
       proposed: {
         role: input.role,
         branchId: normalizedBranchId,
-        customRoleScope: member.customRoleScope,
+        customRoleScope,
       },
     });
 
     const requiresBranch = requiresMemberBranch({
       jobTitle: input.jobTitle,
-      customRoleScope: member.customRoleScope,
+      customRoleScope,
     });
     if (requiresBranch && !normalizedBranchId) {
       throw new Error("Gestor e Corretor, ou cargos limitados a uma unidade, precisam de uma unidade vinculada.");
@@ -153,6 +168,7 @@ export async function updateTeamMemberAction(
         role: input.role,
         jobTitle: input.jobTitle,
         branchId: normalizedBranchId,
+        customRoleId: input.customRoleId ?? null,
         updatedAt: new Date(),
       }).where(eq(schema.tenantMemberships.id, member.membershipId));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.membershipId, acao: "atualizou_membro" });
@@ -160,7 +176,8 @@ export async function updateTeamMemberAction(
       const authorityChanged =
         member.role !== input.role ||
         member.jobTitle !== input.jobTitle ||
-        member.branchId !== normalizedBranchId;
+        member.branchId !== normalizedBranchId ||
+        member.customRoleId !== (input.customRoleId ?? null);
 
       if (authorityChanged) {
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
@@ -588,6 +605,7 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
         invitation.email,
         invitation.role as "director" | "manager" | "supervisor" | "broker",
         invitation.jobTitle,
+        invitation.customRoleId,
       );
       // Re-enfileirar envio WhatsApp
       const [profile] = await tx

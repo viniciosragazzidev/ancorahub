@@ -3596,6 +3596,7 @@ export const brokerInvitations = pgTable(
     email: text("email"),
     role: tenantRole("role").notNull().default("broker"),
     jobTitle: text("job_title").notNull().default("broker"),
+    customRoleId: text("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     tokenHash: text("token_hash").notNull().unique(),
     tokenCiphertext: text("token_ciphertext"),
     status: text("status", { enum: ["PENDING", "ACCEPTED", "EXPIRED", "REVOKED", "REPLACED"] })
@@ -3614,6 +3615,7 @@ export const brokerInvitations = pgTable(
   (table) => [
     index("broker_invitations_tenant_idx").on(table.tenantId),
     index("broker_invitations_profile_idx").on(table.brokerProfileId),
+    index("broker_invitations_custom_role_idx").on(table.customRoleId),
   ],
 );
 

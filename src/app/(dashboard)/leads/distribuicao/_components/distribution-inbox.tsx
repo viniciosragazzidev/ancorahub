@@ -39,7 +39,6 @@ import {
   assignLeadToBrokerAction,
   distributeLeadBatchAction,
   distributeLeadAutomaticallyAction,
-  routeAndAssignLeadAction,
   routeLeadToBranchAction,
   type DistributionActionState,
 } from "@/features/lead-distribution/actions";
@@ -92,9 +91,7 @@ function useActionFeedback(state: DistributionActionState, label: string) {
     } else if (state.message) {
       if (state.success) {
         toast.success(state.message, {
-          description: state.processed
-            ? `${state.processed} lead(s) processado(s).`
-            : undefined,
+          description: state.processed ? `${state.processed} lead(s) processado(s).` : undefined,
         });
       } else {
         toast.warning(state.message);
@@ -103,7 +100,7 @@ function useActionFeedback(state: DistributionActionState, label: string) {
   }, [label, state]);
 }
 
-/** Botão de ação com spinner + ícone de sucesso animado */
+/** Botão de ação com estado de processamento sem duplicar o conteúdo visível. */
 function ActionButton({
   pending,
   success,
@@ -126,22 +123,24 @@ function ActionButton({
       type="submit"
       variant={variant}
       className={cn(
-        "gap-1.5 transition-all duration-150",
-        "active:scale-[0.97]",
+        "gap-1.5 transition-[color,background-color,border-color,transform] duration-150",
+        "active:scale-[0.96]",
         pending && "pointer-events-none",
         success && "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
         className,
       )}
     >
-      <span className="t-icon-swap relative inline-grid" data-state={pending ? "b" : "a"}>
-        <span className="t-icon grid place-items-center" data-icon="a">
-          {children}
-        </span>
-        <span className="t-icon absolute inset-0 grid place-items-center" data-icon="b">
-          <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" />
-        </span>
-      </span>
-      <span className="relative">{pending ? "Processando…" : (children as React.ReactNode)}</span>
+      {pending ? (
+        <>
+          <Loader2Icon
+            aria-hidden="true"
+            className="size-4 animate-spin motion-reduce:animate-none"
+          />
+          <span>Processando…</span>
+        </>
+      ) : (
+        children
+      )}
     </Button>
   );
 }
@@ -629,13 +628,13 @@ export function DistributionInbox({
                             </Badge>
                           </TableCell>
                           <TableCell className="pr-5" data-onboarding="manager-redistribute-lead">
-                            <div className="flex flex-wrap justify-end gap-2">
+                            <div className="flex min-w-[18rem] flex-wrap items-center justify-end gap-2">
                               {lead.branchId ? (
                                 <>
                                   <AppSelect
                                     aria-label={`Corretor para ${lead.name}`}
                                     size="sm"
-                                    className="w-36"
+                                    className="w-44"
                                     value={brokerByLead[lead.id] ?? ""}
                                     onValueChange={(val) =>
                                       setBrokerByLead((current) => ({ ...current, [lead.id]: val }))
