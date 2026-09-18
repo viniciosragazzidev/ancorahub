@@ -1,13 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSettings } from "@/features/system-settings/queries";
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { getLocalDutyParts } from "@/features/leads/assignment";
 
 import { processQueuedLead } from "./service";
 import { expireOutdatedLeadOffers } from "./offers";
@@ -187,6 +188,63 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
   return queuedLeads.length;
 }
 
+/**
+ * A job deferred before a duty window starts can outlive the moment when the
+ * roster becomes eligible. Wake it on every processor tick so the first lead
+ * after the start time is not delayed by the old retry timestamp.
+ */
+async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
+  const db = getDatabase();
+  const local = getLocalDutyParts(now);
+  const rows = await db
+    .select({ id: schema.leadDistributionJobs.id })
+    .from(schema.leadDistributionJobs)
+    .innerJoin(schema.leads, eq(schema.leadDistributionJobs.leadId, schema.leads.id))
+    .innerJoin(
+      schema.unitDutySchedules,
+      and(
+        eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId),
+        eq(schema.unitDutySchedules.queueId, schema.leads.queueId),
+        or(isNull(schema.leads.branchId), eq(schema.unitDutySchedules.branchId, schema.leads.branchId)),
+      ),
+    )
+    .where(and(
+      inArray(schema.leadDistributionJobs.status, ACTIVE_JOB_STATUSES),
+      inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
+      isNull(schema.leads.corretorId),
+      isNull(schema.leads.deletedAt),
+      ne(schema.leads.status, "lost"),
+      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+      or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
+      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
+      eq(schema.unitDutySchedules.status, "active"),
+      eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
+      lte(schema.unitDutySchedules.startsAt, local.time),
+      gt(schema.unitDutySchedules.endsAt, local.time),
+      lte(schema.unitDutySchedules.validFrom, now),
+      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
+      tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
+    ))
+    .limit(200);
+
+  const jobIds = Array.from(new Set(rows.map((row) => row.id)));
+  if (!jobIds.length) return 0;
+
+  await db.update(schema.leadDistributionJobs).set({
+    status: "retrying",
+    runAfter: now,
+    lockedAt: null,
+    lockedBy: null,
+    leaseExpiresAt: null,
+    completedAt: null,
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    updatedAt: now,
+  }).where(inArray(schema.leadDistributionJobs.id, jobIds));
+
+  return jobIds.length;
+}
+
 async function getAutomationContext(tenantId: string): Promise<TenantContext | null> {
   const [director] = await getDatabase().select({ userId: schema.tenantMemberships.userId })
     .from(schema.tenantMemberships)
@@ -346,6 +404,15 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   await expireOutdatedLeadOffers(input.tenantId);
   result.recoveredLeases = await recoverExpiredJobLeases(now, input.tenantId, input.leadId);
   result.recoveredAssignments = await recoverStuckLeadAssignments(now, effectiveConfig, input.tenantId, input.leadId);
+  const awakenedDutyJobs = await wakeJobsForActiveDuty(now, input.tenantId);
+  if (awakenedDutyJobs > 0) {
+    console.info("[lead-distribution] active_duty_jobs_awakened", {
+      tenantId: input.tenantId ?? "all",
+      count: awakenedDutyJobs,
+      weekday: getLocalDutyParts(now).weekday,
+      time: getLocalDutyParts(now).time,
+    });
+  }
   result.seeded = await seedQueuedLeadJobs(effectiveConfig, input.tenantId, input.leadId);
   const workerId = `distribution:${randomUUID()}`;
 

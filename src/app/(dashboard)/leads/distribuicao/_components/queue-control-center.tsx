@@ -55,6 +55,8 @@ type Queue = {
   branchId: string | null;
   exclusiveDutyScheduleId?: string | null;
   exclusiveDutyScheduleIds?: string[] | null;
+  dutyFallbackPolicy?: string | null;
+  dutyFallbackQueueId?: string | null;
   branchName?: string | null;
   status: string;
   assignmentMode: string;
@@ -108,6 +110,8 @@ const emptyQueue = {
   branchId: "",
   exclusiveDutyScheduleId: "",
   exclusiveDutyScheduleIds: [] as string[],
+  dutyFallbackPolicy: "unit_roster" as "unit_roster" | "wait_next_duty" | "fallback_queue",
+  dutyFallbackQueueId: "",
   allowedBranchIds: [] as string[],
   brokerScopeMode: "all" as "all" | "selected",
   allowedBrokerIds: [] as string[],
@@ -277,6 +281,8 @@ export function QueueControlCenter({
       branchId: "",
       exclusiveDutyScheduleId: "",
       exclusiveDutyScheduleIds: [],
+      dutyFallbackPolicy: "unit_roster",
+      dutyFallbackQueueId: "",
       allowedBranchIds: branches.map((b) => b.id), // Todas marcadas por padrão
       brokerScopeMode: "all",
       allowedBrokerIds: [],
@@ -295,6 +301,10 @@ export function QueueControlCenter({
         ...(queue.exclusiveDutyScheduleIds ?? []),
         ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : []),
       ])),
+      dutyFallbackPolicy: queue.dutyFallbackPolicy === "fallback_queue" || queue.dutyFallbackPolicy === "wait_next_duty" || queue.dutyFallbackPolicy === "unit_roster"
+        ? queue.dutyFallbackPolicy
+        : (queue.exclusiveDutyScheduleIds?.length || queue.exclusiveDutyScheduleId ? "wait_next_duty" : "unit_roster"),
+      dutyFallbackQueueId: queue.dutyFallbackQueueId ?? "",
       allowedBranchIds: queue.allowedBranchIds ?? [],
       brokerScopeMode: hasSpecificBrokers ? "selected" : "all",
       allowedBrokerIds: queue.allowedBrokerIds ?? [],
@@ -355,6 +365,14 @@ export function QueueControlCenter({
     }));
   }
 
+  function setDutyFallbackPolicy(policy: "unit_roster" | "wait_next_duty" | "fallback_queue") {
+    setForm((prev) => ({
+      ...prev,
+      dutyFallbackPolicy: policy,
+      dutyFallbackQueueId: policy === "fallback_queue" ? prev.dutyFallbackQueueId : "",
+    }));
+  }
+
   function toggleAllowedSource(sourceId: string) {
     setForm((prev) => ({
       ...prev,
@@ -372,6 +390,8 @@ export function QueueControlCenter({
       branchId: form.branchId || null,
       exclusiveDutyScheduleId: form.exclusiveDutyScheduleIds[0] ?? null,
       exclusiveDutyScheduleIds: form.exclusiveDutyScheduleIds,
+      dutyFallbackPolicy: form.exclusiveDutyScheduleIds.length ? form.dutyFallbackPolicy : "unit_roster",
+      dutyFallbackQueueId: form.exclusiveDutyScheduleIds.length && form.dutyFallbackPolicy === "fallback_queue" ? form.dutyFallbackQueueId || null : null,
       allowedBranchIds: form.allowedBranchIds,
       allowedBrokerIds: finalAllowedBrokerIds,
       allowedSourceIds: form.allowedSourceIds,
@@ -388,11 +408,15 @@ export function QueueControlCenter({
       return toast.error(result.error ?? "Não foi possível salvar a fila.", {
         description: "Verifique os dados e tente novamente.",
       });
-    toast.success(result.message, {
-      description: editingId
-        ? `A fila "${form.name}" foi atualizada.`
-        : `A fila "${form.name}" está pronta para receber leads.`,
-    });
+    if (result.warning) {
+      toast.warning(result.message, { description: result.warning });
+    } else {
+      toast.success(result.message, {
+        description: editingId
+          ? `A fila "${form.name}" foi atualizada.`
+          : `A fila "${form.name}" está pronta para receber leads.`,
+      });
+    }
     setEditorOpen(false);
     router.refresh();
   }
@@ -1226,6 +1250,85 @@ export function QueueControlCenter({
                     ? `${form.exclusiveDutyScheduleIds.length} plantão(ões) selecionado(s)`
                     : "Nenhum plantão selecionado — disponibilidade padrão"}
                 </p>
+
+                {form.exclusiveDutyScheduleIds.length ? (
+                  <fieldset className="space-y-2 border-t border-emerald-500/20 pt-3">
+                    <legend className="text-xs font-semibold text-foreground">
+                      Quando nenhum plantão selecionado estiver ativo
+                    </legend>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Escolha o destino do lead fora dos horários dessas escalas. A primeira opção é a recomendada para manter a distribuição contínua.
+                    </p>
+                    <div className="grid gap-2">
+                      {[
+                        {
+                          value: "unit_roster" as const,
+                          title: "Usar disponibilidade normal da unidade",
+                          description: "Continua distribuindo para corretores disponíveis da unidade.",
+                        },
+                        {
+                          value: "wait_next_duty" as const,
+                          title: "Aguardar o próximo plantão selecionado",
+                          description: "Mantém o lead na fila até uma escala escolhida ficar ativa.",
+                        },
+                        {
+                          value: "fallback_queue" as const,
+                          title: "Enviar para uma fila de contingência",
+                          description: "Encaminha o lead para outra fila ativa, com o mesmo motor de distribuição.",
+                        },
+                      ].map((option) => (
+                        <label
+                          key={option.value}
+                          className={cn(
+                            "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors motion-reduce:transition-none",
+                            form.dutyFallbackPolicy === option.value
+                              ? "border-primary/60 bg-primary/5"
+                              : "border-border/70 bg-background hover:bg-accent/40",
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="duty-fallback-policy"
+                            value={option.value}
+                            checked={form.dutyFallbackPolicy === option.value}
+                            onChange={() => setDutyFallbackPolicy(option.value)}
+                            className="mt-0.5 size-4 accent-primary"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-xs font-medium">{option.title}</span>
+                            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">{option.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {form.dutyFallbackPolicy === "fallback_queue" ? (
+                      <label className="grid gap-1.5 pt-1 text-xs font-medium">
+                        Fila de contingência
+                        <AppSelect
+                          aria-label="Fila de contingência"
+                          value={form.dutyFallbackQueueId}
+                          onValueChange={(value) => setForm((prev) => ({ ...prev, dutyFallbackQueueId: value }))}
+                          options={[
+                            { value: "", label: "Selecione uma fila ativa" },
+                            ...queues
+                              .filter((queue) => queue.id !== editingId && queue.status === "active")
+                              .map((queue) => ({ value: queue.id, label: `${queue.name}${queue.branchName ? ` · ${queue.branchName}` : ""}` })),
+                          ]}
+                        />
+                        <span className="text-[10px] font-normal text-muted-foreground">
+                          A fila não pode apontar para ela mesma nem formar um ciclo de contingência.
+                        </span>
+                      </label>
+                    ) : null}
+
+                    {form.dutyFallbackPolicy === "wait_next_duty" ? (
+                      <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
+                        Sem plantão ativo agora, os leads permanecerão aguardando nesta fila e serão reavaliados automaticamente no próximo ciclo.
+                      </p>
+                    ) : null}
+                  </fieldset>
+                ) : null}
               </div>
 
               {/* Multi-Unidades Adicionais */}

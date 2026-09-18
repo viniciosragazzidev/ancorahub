@@ -618,6 +618,8 @@ export const leadQueues = pgTable(
     branchId: text("branch_id").references(() => branches.id, { onDelete: "cascade" }),
     exclusiveDutyScheduleId: text("exclusive_duty_schedule_id"),
     exclusiveDutyScheduleIds: jsonb("exclusive_duty_schedule_ids").$type<string[]>().notNull().default([]),
+    dutyFallbackPolicy: text("duty_fallback_policy").notNull().default("unit_roster"),
+    dutyFallbackQueueId: text("duty_fallback_queue_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: text("status").notNull().default("active"),

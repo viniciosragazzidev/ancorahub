@@ -183,7 +183,12 @@ export async function saveDistributionPolicyAction(
 export async function saveDistributionQueueAction(input: unknown) {
   try {
     const result = await saveDistributionQueue(await getRequiredTenantContext(), input);
-    return { success: true, id: result.id, message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada." };
+    return {
+      success: true,
+      id: result.id,
+      warning: result.warning,
+      message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada.",
+    };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
   }

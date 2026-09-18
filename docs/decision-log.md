@@ -1177,3 +1177,17 @@ roteamento criada explicitamente em modo manual e com o status `Desqualificado`
 selecionado é a única exceção: ela pode encaminhar o lead para ação humana, sem
 transformar a retenção global em distribuição automática. A alteração da chave
 é auditada e o motor aplica a decisão antes de criar ofertas.
+
+## DEC-109 — Continuidade de distribuição fora do horário de plantão
+
+**Decisão aprovada em 2026-09-18.** Filas com plantões selecionados passam a
+declarar explicitamente o comportamento quando nenhuma dessas escalas está
+ativa: usar a disponibilidade normal da unidade (`unit_roster`), aguardar o
+próximo plantão (`wait_next_duty`) ou encaminhar para uma fila de contingência
+(`fallback_queue`). Filas novas usam `unit_roster` por padrão para evitar que a
+operação pare; filas legadas também recebem esse padrão contínuo. O modo
+`wait_next_duty` continua disponível quando a gestão quiser exclusividade
+estrita. Fila de contingência é validada no servidor dentro do mesmo tenant, não pode
+ser a própria fila nem formar ciclos e cada encaminhamento é auditado. O
+processador também acorda jobs adiados assim que detecta um plantão ativo, sem
+relaxar unidade, disponibilidade, capacidade ou elegibilidade do corretor.

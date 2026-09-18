@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
+import { buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
 
 describe("automatic unit routing", () => {
   it("selects the least loaded unit with a stable tie break", () => {
@@ -10,6 +10,40 @@ describe("automatic unit routing", () => {
     ];
     expect(selectDistributionBranch(branches)?.id).toBe("unit-a");
     expect(selectDistributionBranch([])).toBeNull();
+  });
+});
+
+describe("duty fallback policy", () => {
+  it("uses the normal unit roster when an explicit duty is inactive and continuity is selected", () => {
+    expect(resolveDutyFallbackDecision({
+      policy: "unit_roster",
+      hasExplicitSchedule: true,
+      hasActiveSelectedSchedule: false,
+    })).toBe("use_unit_roster");
+  });
+
+  it("keeps strict queues waiting when no selected duty is active", () => {
+    expect(resolveDutyFallbackDecision({
+      policy: "wait_next_duty",
+      hasExplicitSchedule: true,
+      hasActiveSelectedSchedule: false,
+    })).toBe("wait_next_duty");
+  });
+
+  it("does not apply a fallback while one of the selected duties is active", () => {
+    expect(resolveDutyFallbackDecision({
+      policy: "fallback_queue",
+      hasExplicitSchedule: true,
+      hasActiveSelectedSchedule: true,
+    })).toBe("use_selected_duty");
+  });
+
+  it("keeps queues without an explicit duty on the normal roster", () => {
+    expect(resolveDutyFallbackDecision({
+      policy: "wait_next_duty",
+      hasExplicitSchedule: false,
+      hasActiveSelectedSchedule: false,
+    })).toBe("use_selected_duty");
   });
 });
 

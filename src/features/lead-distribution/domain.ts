@@ -1,4 +1,4 @@
-import type { AssignmentStrategy } from "./types";
+import type { AssignmentStrategy, DutyFallbackPolicy } from "./types";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
 
@@ -263,6 +263,24 @@ export function isAutomaticDistributionBranch(branch: {
   isDistributionHub: boolean;
 }) {
   return branch.status === "active" && branch.acceptingLeads && branch.autoDistribute && !branch.isDistributionHub;
+}
+
+export type DutyFallbackDecision = "use_selected_duty" | "use_unit_roster" | "wait_next_duty" | "fallback_queue";
+
+/**
+ * Resolves what a queue should do when an explicit plantão restriction has no
+ * active schedule at this instant. The queue policy is the authority; an
+ * inactive/archived schedule never silently broadens a strict queue.
+ */
+export function resolveDutyFallbackDecision(input: {
+  policy: DutyFallbackPolicy;
+  hasExplicitSchedule: boolean;
+  hasActiveSelectedSchedule: boolean;
+}): DutyFallbackDecision {
+  if (!input.hasExplicitSchedule || input.hasActiveSelectedSchedule) return "use_selected_duty";
+  if (input.policy === "unit_roster") return "use_unit_roster";
+  if (input.policy === "fallback_queue") return "fallback_queue";
+  return "wait_next_duty";
 }
 
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {

@@ -349,6 +349,8 @@ export default async function LeadDistributionPage({
         branchId: schema.leadQueues.branchId,
         exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
         exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds,
+        dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy,
+        dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId,
         branchName: schema.branches.name,
         status: schema.leadQueues.status,
         assignmentMode: schema.leadQueues.assignmentMode,

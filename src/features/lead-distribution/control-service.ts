@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import type { TenantContext } from "@/shared/auth/types";
@@ -9,12 +9,16 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type IntelligentDistributionPolicy, type RankedBroker } from "./domain";
 import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-catalog";
+import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
+import { getLocalDutyParts } from "@/features/leads/assignment";
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
   branchId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   exclusiveDutyScheduleId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   exclusiveDutyScheduleIds: z.array(z.string().uuid()).max(30).default([]),
+  dutyFallbackPolicy: z.enum(dutyFallbackPolicyValues).default("unit_roster"),
+  dutyFallbackQueueId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   allowedBranchIds: z.array(z.string().uuid()).default([]),
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
   allowedSourceIds: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
@@ -25,6 +29,16 @@ const queueInput = z.object({
   capacityPerBroker: z.number().int().min(1).max(200).nullable(),
   aiQualificationEnabled: z.boolean().default(true),
   status: z.enum(["active", "inactive"]),
+}).superRefine((input, refinement) => {
+  if (input.dutyFallbackPolicy === "fallback_queue" && !input.dutyFallbackQueueId) {
+    refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "Selecione a fila de contingência." });
+  }
+  if (input.dutyFallbackPolicy !== "fallback_queue" && input.dutyFallbackQueueId) {
+    refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "A fila de contingência só pode ser usada com essa política." });
+  }
+  if (input.id && input.dutyFallbackQueueId === input.id) {
+    refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "A fila não pode apontar para ela mesma." });
+  }
 });
 
 const simulationInput = z.object({
@@ -131,6 +145,91 @@ async function assertQueueSourceConflicts(
   }
 }
 
+async function assertDutyFallbackQueue(
+  db: ReturnType<typeof getDatabase>,
+  context: TenantContext,
+  queueId: string | undefined,
+  fallbackQueueId: string | null | undefined,
+  policy: DutyFallbackPolicy,
+) {
+  if (policy !== "fallback_queue" || !fallbackQueueId) return;
+  const queues = await db
+    .select({
+      id: schema.leadQueues.id,
+      branchId: schema.leadQueues.branchId,
+      status: schema.leadQueues.status,
+      deletedAt: schema.leadQueues.deletedAt,
+      dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy,
+      dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId,
+    })
+    .from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, fallbackQueueId)))
+    .limit(1);
+  const fallbackQueue = queues[0];
+  if (!fallbackQueue || fallbackQueue.status !== "active" || fallbackQueue.deletedAt) {
+    throw new AuthorizationError("A fila de contingência precisa ser uma fila ativa desta corretora.");
+  }
+  if (queueId && fallbackQueue.id === queueId) {
+    throw new AuthorizationError("A fila não pode apontar para ela mesma.");
+  }
+  if (context.role === "manager") assertManager(context, fallbackQueue.branchId);
+
+  // Follow the configured chain with the edited queue overlaid in memory. A
+  // cycle would make a lead move forever without ever reaching a broker.
+  const visited = new Set<string>(queueId ? [queueId] : []);
+  let current: typeof fallbackQueue | undefined = fallbackQueue;
+  while (current?.dutyFallbackPolicy === "fallback_queue" && current.dutyFallbackQueueId) {
+    if (visited.has(current.dutyFallbackQueueId)) {
+      throw new AuthorizationError("As filas de contingência formam um ciclo. Escolha uma fila sem esse encadeamento.");
+    }
+    visited.add(current.dutyFallbackQueueId);
+    const [next] = await db
+      .select({
+        id: schema.leadQueues.id,
+        branchId: schema.leadQueues.branchId,
+        status: schema.leadQueues.status,
+        deletedAt: schema.leadQueues.deletedAt,
+        dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy,
+        dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId,
+      })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, current.dutyFallbackQueueId)))
+      .limit(1);
+    if (!next || next.status !== "active" || next.deletedAt) {
+      throw new AuthorizationError("Todas as filas de contingência precisam permanecer ativas.");
+    }
+    current = next;
+  }
+}
+
+async function getDutyFallbackWarning(
+  db: ReturnType<typeof getDatabase>,
+  tenantId: string,
+  branchId: string | null,
+  scheduleIds: string[],
+  policy: DutyFallbackPolicy,
+) {
+  if (policy !== "wait_next_duty" || !scheduleIds.length) return undefined;
+  const local = getLocalDutyParts(new Date());
+  const schedules = await db
+    .select({ id: schema.unitDutySchedules.id })
+    .from(schema.unitDutySchedules)
+    .where(and(
+      eq(schema.unitDutySchedules.tenantId, tenantId),
+      inArray(schema.unitDutySchedules.id, scheduleIds),
+      branchId ? eq(schema.unitDutySchedules.branchId, branchId) : undefined,
+      eq(schema.unitDutySchedules.status, "active"),
+      eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
+      lte(schema.unitDutySchedules.startsAt, local.time),
+      gt(schema.unitDutySchedules.endsAt, local.time),
+      lte(schema.unitDutySchedules.validFrom, new Date()),
+      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, new Date())),
+    ));
+  return schedules.length
+    ? undefined
+    : "Nenhum plantão selecionado está ativo agora; os leads aguardarão o próximo plantão.";
+}
+
 export async function saveDistributionQueue(context: TenantContext, rawInput: unknown) {
   const input = queueInput.parse(rawInput);
   const allowedSourceIds = Array.from(new Set(input.allowedSourceIds));
@@ -167,6 +266,8 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     for (const schedule of schedules) assertManager(context, schedule.branchId);
   }
 
+  await assertDutyFallbackQueue(db, context, input.id, input.dutyFallbackQueueId ?? null, input.dutyFallbackPolicy);
+
   // Inactive queues are not consumers and therefore must not block an active
   // queue from claiming a singleton source while being edited or staged.
   if (input.status === "active") {
@@ -178,6 +279,8 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     branchId: input.branchId || null,
     exclusiveDutyScheduleId: dutyScheduleIds[0] ?? null,
     exclusiveDutyScheduleIds: dutyScheduleIds,
+    dutyFallbackPolicy: input.dutyFallbackPolicy,
+    dutyFallbackQueueId: input.dutyFallbackPolicy === "fallback_queue" ? input.dutyFallbackQueueId ?? null : null,
     name: input.name,
     assignmentMode: input.assignmentMode,
     assignmentStrategy: input.assignmentStrategy,
@@ -236,7 +339,14 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     });
   }
 
-  return { id: queueId, created };
+  const warning = await getDutyFallbackWarning(
+    db,
+    context.tenantId,
+    input.branchId ?? null,
+    dutyScheduleIds,
+    input.dutyFallbackPolicy,
+  );
+  return { id: queueId, created, warning };
 }
 
 export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInput: unknown) {

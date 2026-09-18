@@ -5,8 +5,8 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, not, or } fro
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
-import type { AssignmentSource, LeadAssignmentResult, LeadRoutingResult } from "./types";
+import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
+import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers } from "./offers";
 import { resolveLeadDestinationRule } from "./routing-engine";
@@ -26,7 +26,19 @@ function assertBranchScope(context: TenantContext, branchId: string) {
 
 import { getLocalDutyParts } from "@/features/leads/assignment";
 
-async function getRosterBrokerIds(tenantId: string, branchId: string, date = new Date(), webhookCredentialId?: string | null, exclusiveScheduleIds?: string[] | null) {
+type RosterResolution = {
+  brokerIds: Set<string> | null;
+  hasActiveSelectedSchedule: boolean;
+};
+
+async function getRosterBrokerIds(
+  tenantId: string,
+  branchId: string,
+  date = new Date(),
+  webhookCredentialId?: string | null,
+  exclusiveScheduleIds?: string[] | null,
+  dutyFallbackPolicy: DutyFallbackPolicy = "unit_roster",
+): Promise<RosterResolution> {
   const db = getDatabase();
   const local = getLocalDutyParts(date);
 
@@ -51,13 +63,19 @@ async function getRosterBrokerIds(tenantId: string, branchId: string, date = new
   // No plantões at all → fallback to all brokers (legacy behavior). A queue
   // with explicit exclusivity is different: no active selected schedule means
   // no eligible broker, so the lead remains queued for a later retry.
-  if (!scopedSchedules.length) return exclusiveScheduleIds?.length ? new Set<string>() : null;
+  const fallbackDecision = resolveDutyFallbackDecision({
+    policy: dutyFallbackPolicy,
+    hasExplicitSchedule: Boolean(exclusiveScheduleIds?.length),
+    hasActiveSelectedSchedule: scopedSchedules.length > 0,
+  });
+  if (fallbackDecision === "use_unit_roster") return { brokerIds: null, hasActiveSelectedSchedule: false };
+  if (!scopedSchedules.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: false };
 
   // 2. Filter plantões by credential if the lead has a source
   const matchingScheduleIds = selectMatchingDutyScheduleIds(scopedSchedules, webhookCredentialId);
 
   // Plantões exist for this branch but none match the credential → no brokers eligible
-  if (!matchingScheduleIds.length) return new Set<string>();
+  if (!matchingScheduleIds.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: true };
 
   // 3. Get brokers assigned to matching plantões right now
   const assignments = await db.select({ brokerId: schema.dutyRosterAssignments.brokerId })
@@ -76,7 +94,7 @@ async function getRosterBrokerIds(tenantId: string, branchId: string, date = new
 
   // A matching plantão without escalated brokers has no eligible broker. It must
   // remain queued instead of silently falling back to the whole unit roster.
-  return new Set(assignments.map((a) => a.brokerId));
+  return { brokerIds: new Set(assignments.map((a) => a.brokerId)), hasActiveSelectedSchedule: true };
 }
 
 async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: string) {
@@ -391,8 +409,9 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 
-export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null): Promise<LeadAssignmentResult> {
+export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null, fallbackDepth = 0): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Você não pode executar a distribuição automática.");
+  if (fallbackDepth > 3) return { status: "queued", leadId, reason: "O encadeamento de filas de contingência excedeu o limite seguro." };
   const db = getDatabase();
   const [lead] = await db.select({
     id: schema.leads.id,
@@ -457,7 +476,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
   }
-  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
+  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy, dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) {
     const staleQueueId = lead.queueId;
     const repairedAt = new Date();
@@ -573,6 +592,11 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
   }
   const allowedBrokerSet = intelligentPolicy.value.allowedBrokerIds?.length ? new Set(intelligentPolicy.value.allowedBrokerIds) : null;
+  const exclusiveScheduleIds = queue?.exclusiveDutyScheduleIds?.length
+    ? queue.exclusiveDutyScheduleIds
+    : queue?.exclusiveDutyScheduleId
+      ? [queue.exclusiveDutyScheduleId]
+      : null;
   const loadEligibleBrokers = async (branchIds: string[]) => {
     const allBrokers = await db
       .select({
@@ -600,21 +624,64 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         eq(schema.user.status, "active"),
       ))
       .orderBy(asc(schema.user.createdAt));
-    const exclusiveScheduleIds = queue?.exclusiveDutyScheduleIds?.length
-      ? queue.exclusiveDutyScheduleIds
-      : queue?.exclusiveDutyScheduleId
-        ? [queue.exclusiveDutyScheduleId]
-        : null;
-    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds)] as const));
-    const rosterByBranch = new Map(rosterResults);
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"))] as const));
+    const rosterByBranch = new Map(rosterResults.map(([branchId, result]) => [branchId, result.brokerIds] as const));
+    const hasActiveSelectedSchedule = rosterResults.some(([, result]) => result.hasActiveSelectedSchedule);
     const brokers = allBrokers.filter((broker) => {
       const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
-    return { brokers, rosterByBranch };
+    return { brokers, rosterByBranch, hasActiveSelectedSchedule };
   };
 
-  let { brokers, rosterByBranch } = await loadEligibleBrokers(targetBranchIds);
+  let { brokers, rosterByBranch, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
+  const dutyFallbackPolicy = (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined)
+    ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster");
+  if (!brokers.length && exclusiveScheduleIds?.length && !hasActiveSelectedSchedule && dutyFallbackPolicy === "fallback_queue") {
+    const fallbackQueueId = queue?.dutyFallbackQueueId;
+    if (!fallbackQueueId || fallbackQueueId === lead.queueId) {
+      return { status: "queued", leadId, reason: "A fila de contingência não está configurada corretamente." };
+    }
+    const fallbackQueue = await db
+      .select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId })
+      .from(schema.leadQueues)
+      .where(and(
+        eq(schema.leadQueues.id, fallbackQueueId),
+        eq(schema.leadQueues.tenantId, context.tenantId),
+        eq(schema.leadQueues.status, "active"),
+        isNull(schema.leadQueues.deletedAt),
+      ))
+      .limit(1);
+    if (!fallbackQueue[0]) return { status: "queued", leadId, reason: "A fila de contingência não está ativa." };
+    const routedAt = new Date();
+    await db.transaction(async (tx) => {
+      await tx.update(schema.leads)
+        .set({ queueId: fallbackQueue[0].id, distributionUpdatedAt: routedAt, updatedAt: routedAt })
+        .where(and(
+          eq(schema.leads.id, leadId),
+          eq(schema.leads.tenantId, context.tenantId),
+          lead.queueId ? eq(schema.leads.queueId, lead.queueId) : isNull(schema.leads.queueId),
+        ));
+      await tx.insert(schema.leadDistributionEvents).values({
+        id: randomUUID(),
+        tenantId: context.tenantId,
+        leadId,
+        fromBranchId: lead.branchId,
+        toBranchId: fallbackQueue[0].branchId ?? lead.branchId,
+        fromQueueId: lead.queueId,
+        toQueueId: fallbackQueue[0].id,
+        action: "queue_duty_fallback",
+        source: "automatic",
+        strategy: "automatic",
+        reason: "Nenhum plantão selecionado está ativo; lead encaminhado para a fila de contingência.",
+        actorId: context.userId,
+        metadata: { dutyFallbackPolicy, sourceQueueId: lead.queueId, fallbackQueueId: fallbackQueue[0].id },
+        createdAt: routedAt,
+      });
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.queue_duty_fallback" });
+    });
+    return processQueuedLead(context, leadId, excludeBrokerId, fallbackDepth + 1);
+  }
   let fallbackUnitUsed = false;
   if (!brokers.length && context.role === "director") {
     // A unit with no available eligible broker must not strand the lead. Expand
@@ -642,6 +709,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         targetBranchIds = fallbackIds;
         brokers = fallback.brokers;
         rosterByBranch = fallback.rosterByBranch;
+        hasActiveSelectedSchedule = fallback.hasActiveSelectedSchedule;
         fallbackUnitUsed = true;
       }
     }
