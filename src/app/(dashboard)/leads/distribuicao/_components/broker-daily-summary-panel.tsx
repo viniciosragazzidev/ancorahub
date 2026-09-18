@@ -431,7 +431,7 @@ export function BrokerDailySummaryPanel({
 
       {/* BROKER SUMMARY TABLE */}
       <Card variant="overview" className="border-0 p-0">
-        <DataTableFrame className="min-h-[250px]">
+        <DataTableFrame>
           <Table>
             <TableHeader>
               <TableRow>

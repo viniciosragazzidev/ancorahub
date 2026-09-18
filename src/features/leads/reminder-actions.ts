@@ -13,7 +13,7 @@ export type ReminderState = { success?: boolean; error?: string };
 
 const reminderInput = z.object({
   leadId: z.string().min(1),
-  /** "today", "tomorrow", or an ISO date string */
+  /** Preset key or an ISO date string */
   when: z.string().min(1),
 });
 
@@ -59,6 +59,13 @@ export async function quickReminderAction(
       case "tomorrow": {
         // Tomorrow at 09:00 BRT
         dueAt = new Date(now.getTime() + 24 * 60 * 60 * 1000 + brasilOffset * 60 * 1000);
+        dueAt.setUTCHours(12, 0, 0, 0); // 09:00 BRT = 12:00 UTC
+        break;
+      }
+      case "in_2_days":
+      case "in_3_days": {
+        const days = parsed.data.when === "in_2_days" ? 2 : 3;
+        dueAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000 + brasilOffset * 60 * 1000);
         dueAt.setUTCHours(12, 0, 0, 0); // 09:00 BRT = 12:00 UTC
         break;
       }

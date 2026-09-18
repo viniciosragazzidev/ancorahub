@@ -14,7 +14,12 @@ import {
   type MetaGraphTemplateItem,
   type MetaTemplateCategory,
 } from "./meta-graph-templates-client";
-import { isBrokerLeadTemplatePurpose, isCanonicalBrokerLeadTemplateName } from "./broker-lead-template-contract";
+import {
+  isBrokerLeadTemplatePurpose,
+  isBrokerWelcomeEventKey,
+  isCanonicalBrokerInvitationTemplateName,
+  isCanonicalBrokerLeadTemplateName,
+} from "./broker-lead-template-contract";
 import { META_WHATSAPP_TEMPLATE_PURPOSES, type MetaWhatsAppTemplatePurpose } from "./templates";
 
 export type EventKey =
@@ -417,7 +422,9 @@ export class WhatsAppTemplateResolver {
           )
           .limit(1);
 
-        if (usage && !(isBrokerLeadTemplatePurpose(purpose) && !isCanonicalBrokerLeadTemplateName(usage.templateName))) {
+        if (usage
+          && !(isBrokerLeadTemplatePurpose(purpose) && !isCanonicalBrokerLeadTemplateName(usage.templateName))
+          && !(isBrokerWelcomeEventKey(eventKey) && !isCanonicalBrokerInvitationTemplateName(usage.templateName))) {
           return { name: usage.templateName, language: usage.language, isCustom: true };
         }
       }

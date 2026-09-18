@@ -24,6 +24,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AppSelect } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogPopup,
@@ -45,6 +46,9 @@ import { PersonRecordDetails } from "@/features/customer-record/components/perso
 import { RegisterSalePanel } from "@/app/(dashboard)/leads/[id]/register-sale-panel";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence/components/ai-conversation-insight-card";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
+import { quickReminderAction } from "@/features/leads/reminder-actions";
+import { buildFollowUpWhen, FOLLOW_UP_OPTIONS, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
+import { MOTIVOS_PERDA, MOTIVO_PERDA_LABELS } from "@/features/leads/lead-status-constants";
 
 type ConfirmationDocument = { id: string; filename: string; status: string };
 type CarrierOption = { id: string; name: string };
@@ -157,9 +161,10 @@ export function LightLeadDetail({
 
   const [showUpdateSheet, setShowUpdateSheet] = useState(false);
   const [selectedStep, setSelectedStep] = useState<string>("quote_sent");
-  const [followupOption, setFollowupOption] = useState<string>("tomorrow");
+  const [followupOption, setFollowupOption] = useState<FollowUpOptionValue>("tomorrow");
+  const [customFollowupDate, setCustomFollowupDate] = useState("");
   const [observation, setObservation] = useState<string>("");
-  const [lossReason, setLossReason] = useState<string>("Preço");
+  const [lossReason, setLossReason] = useState<string>("preco");
   const [regressionJustification, setRegressionJustification] = useState<string>("");
   const [saleSuccessAnim, setSaleSuccessAnim] = useState(false);
   const [updatingStep, startUpdateTransition] = useTransition();
@@ -218,6 +223,8 @@ export function LightLeadDetail({
     else if (leadStatus === "quote_sent") setSelectedStep("negotiation");
     else setSelectedStep("quote_sent");
 
+    setFollowupOption("tomorrow");
+    setCustomFollowupDate("");
     setObservation("");
     setRegressionJustification("");
     setShowUpdateSheet(true);
@@ -227,6 +234,7 @@ export function LightLeadDetail({
     setShowUpdateSheet(false);
     setObservation("");
     setRegressionJustification("");
+    setCustomFollowupDate("");
   }
 
   // Check if lead is unavailable for this broker
@@ -322,6 +330,15 @@ export function LightLeadDetail({
 
     const stepInfo = STEP_OPTIONS.find((s) => s.id === selectedStep);
     const targetStatus = stepInfo?.targetStatus || "in_contact";
+    const shouldScheduleFollowup = selectedStep === "no_contact" || selectedStep === "quote_sent";
+    const followupWhen = shouldScheduleFollowup
+      ? buildFollowUpWhen(followupOption, customFollowupDate)
+      : null;
+
+    if (shouldScheduleFollowup && !followupWhen) {
+      toast.error("Escolha uma data para o próximo acompanhamento.");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("leadId", lead.id);
@@ -330,7 +347,7 @@ export function LightLeadDetail({
 
     if (selectedStep === "no_interest" || selectedStep === "no_contact") {
       const reason =
-        selectedStep === "no_contact" ? "Sem contato / Não atende" : lossReason || "Sem interesse";
+        selectedStep === "no_contact" ? "sem_contato" : lossReason || "sem_interesse";
       formData.append("motivoPerda", reason);
       formData.append("lossReason", reason);
     }
@@ -370,7 +387,20 @@ export function LightLeadDetail({
         }
 
         setLeadStatus(targetStatus);
-        toast.success("Etapa atualizada.");
+        if (followupWhen) {
+          const reminderForm = new FormData();
+          reminderForm.set("leadId", lead.id);
+          reminderForm.set("when", followupWhen);
+          const reminder = await quickReminderAction({}, reminderForm);
+          if (!reminder.success) {
+            toast.warning("Etapa atualizada, mas não foi possível agendar o acompanhamento.", {
+              description: reminder.error ?? "Tente criar o lembrete pelo painel do lead.",
+            });
+            resetStepDialog();
+            return;
+          }
+        }
+        toast.success(followupWhen ? "Etapa e acompanhamento registrados." : "Etapa atualizada.");
       } catch {
         resetStepDialog();
         toast.error("Não foi possível atualizar no momento.");
@@ -958,22 +988,35 @@ export function LightLeadDetail({
                     Quando deseja tentar novamente?
                   </span>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {["Mais tarde", "Amanhã", "Em 2 dias", "Escolher data"].map((opt) => (
+                    {FOLLOW_UP_OPTIONS.no_contact.map((opt) => (
                       <button
-                        key={opt}
+                        key={opt.value}
                         type="button"
-                        onClick={() => setFollowupOption(opt)}
+                        onClick={() => setFollowupOption(opt.value)}
                         className={cn(
                           "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors text-center cursor-pointer",
-                          followupOption === opt
+                          followupOption === opt.value
                             ? "border-primary bg-primary text-primary-foreground font-semibold"
                             : "border-border bg-card text-muted-foreground",
                         )}
                       >
-                        {opt}
+                        {opt.label}
                       </button>
                     ))}
                   </div>
+                  {followupOption === "custom" && (
+                    <label className="mt-2 grid gap-1.5 text-[11px] font-medium text-foreground" htmlFor="broker-followup-date-no-contact">
+                      Data do próximo acompanhamento
+                      <Input
+                        id="broker-followup-date-no-contact"
+                        type="date"
+                        value={customFollowupDate}
+                        min={new Date().toISOString().slice(0, 10)}
+                        onChange={(event) => setCustomFollowupDate(event.target.value)}
+                        className="h-9 bg-card text-xs"
+                      />
+                    </label>
+                  )}
                 </div>
               )}
 
@@ -983,22 +1026,35 @@ export function LightLeadDetail({
                     Quando deseja acompanhar novamente?
                   </span>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {["Amanhã", "Em 2 dias", "Em 3 dias", "Escolher data"].map((opt) => (
+                    {FOLLOW_UP_OPTIONS.quote_sent.map((opt) => (
                       <button
-                        key={opt}
+                        key={opt.value}
                         type="button"
-                        onClick={() => setFollowupOption(opt)}
+                        onClick={() => setFollowupOption(opt.value)}
                         className={cn(
                           "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors text-center cursor-pointer",
-                          followupOption === opt
+                          followupOption === opt.value
                             ? "border-primary bg-primary text-primary-foreground font-semibold"
                             : "border-border bg-card text-muted-foreground",
                         )}
                       >
-                        {opt}
+                        {opt.label}
                       </button>
                     ))}
                   </div>
+                  {followupOption === "custom" && (
+                    <label className="mt-2 grid gap-1.5 text-[11px] font-medium text-foreground" htmlFor="broker-followup-date-quote">
+                      Data do próximo acompanhamento
+                      <Input
+                        id="broker-followup-date-quote"
+                        type="date"
+                        value={customFollowupDate}
+                        min={new Date().toISOString().slice(0, 10)}
+                        onChange={(event) => setCustomFollowupDate(event.target.value)}
+                        className="h-9 bg-card text-xs"
+                      />
+                    </label>
+                  )}
                 </div>
               )}
 
@@ -1028,12 +1084,9 @@ export function LightLeadDetail({
                     onChange={(e) => setLossReason(e.target.value)}
                     className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs"
                   >
-                    <option value="Preço">Preço alto</option>
-                    <option value="Já contratou">Já contratou com outro</option>
-                    <option value="Desistiu">Desistiu de contratar</option>
-                    <option value="Escolheu concorrente">Escolheu concorrente</option>
-                    <option value="Sem interesse">Sem interesse</option>
-                    <option value="Outro">Outro motivo</option>
+                    {MOTIVOS_PERDA.map((motivo) => (
+                      <option key={motivo} value={motivo}>{MOTIVO_PERDA_LABELS[motivo]}</option>
+                    ))}
                   </select>
                 </div>
               )}

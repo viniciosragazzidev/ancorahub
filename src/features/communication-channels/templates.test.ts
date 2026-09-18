@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables, getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 import {
+  CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
+  CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
   CANONICAL_BROKER_LEAD_TEMPLATE_NAME,
   isBrokerLeadEventKey,
   isBrokerLeadTemplatePurpose,
@@ -27,6 +29,10 @@ describe("approved Meta WhatsApp templates", () => {
   });
 
   it("maps the named body variables configured for the broker invitation template", () => {
+    expect(getMetaWhatsAppTemplate("brokerInvitation")).toEqual({
+      name: CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
+      language: CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
+    });
     expect(getMetaWhatsAppTemplateVariableNames("brokerInvitation")).toEqual(["nome", "empresa", "cargo", "unidade"]);
   });
 

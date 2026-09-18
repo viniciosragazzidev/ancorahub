@@ -19,6 +19,16 @@ type BrokerInvitationDeliveryInput = {
   scheduleDelivery?: boolean;
 };
 
+export function getBrokerInvitationDispatchTarget(input: {
+  status: "queued" | "failed";
+  scheduleDelivery?: boolean;
+  tenantId: string;
+  outboundId: string;
+}) {
+  if (input.status !== "queued" || input.scheduleDelivery === false) return null;
+  return { limit: 1 as const, tenantId: input.tenantId, outboundId: input.outboundId };
+}
+
 export async function enqueueBrokerInvitation(
   input: BrokerInvitationDeliveryInput,
 ): Promise<"queued" | "not_available" | "failed"> {
@@ -71,8 +81,21 @@ export async function enqueueBrokerInvitation(
     await db.update(schema.brokerInvitations)
       .set({ deliveryStatus: status, deliveryError: status === "failed" ? "Não foi possível enfileirar o convite." : null })
       .where(and(eq(schema.brokerInvitations.id, input.invitationId), eq(schema.brokerInvitations.tenantId, input.tenantId)));
-    if (status === "queued" && input.scheduleDelivery !== false) {
-      scheduleAfterResponse("team-invitation-outbound", () => processMetaOutboundBatch(3, input.tenantId));
+    const dispatchTarget = getBrokerInvitationDispatchTarget({
+      status,
+      scheduleDelivery: input.scheduleDelivery,
+      tenantId: input.tenantId,
+      outboundId: queued.id,
+    });
+    if (dispatchTarget) {
+      // Dispatch this invitation by id so an old, repeatedly failing outbox row
+      // cannot starve a newly-created team member. The scheduled worker remains
+      // the recovery path for transient failures and older queued messages.
+      scheduleAfterResponse("team-invitation-outbound", () => processMetaOutboundBatch(
+        dispatchTarget.limit,
+        dispatchTarget.tenantId,
+        dispatchTarget.outboundId,
+      ));
     }
     return status;
   } catch {

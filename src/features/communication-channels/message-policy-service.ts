@@ -19,8 +19,10 @@ import {
   type MessageResourceKind,
 } from "./message-event-catalog";
 import {
+  isBrokerWelcomeEventKey,
   isBrokerLeadEventKey,
   isBrokerLeadTemplatePurpose,
+  isCanonicalBrokerInvitationTemplateName,
   isCanonicalBrokerLeadTemplateName,
 } from "./broker-lead-template-contract";
 import { META_WHATSAPP_TEMPLATE_PURPOSES } from "./templates";
@@ -238,6 +240,14 @@ export async function saveMessageEventPolicy(tenantId: string, userId: string, i
       throw new Error("As situações de novo lead usam exclusivamente o template padrão new_lead_broker.");
     }
   }
+  if (isBrokerWelcomeEventKey(event.key)) {
+    if (parsed.primaryKind !== "meta_template" || parsed.fallbackKind !== null) {
+      throw new Error("O primeiro acesso usa exclusivamente o template Meta broker_first_access, sem contingência livre.");
+    }
+    if (!metaTemplate || !isCanonicalBrokerInvitationTemplateName(metaTemplate.name)) {
+      throw new Error("O primeiro acesso usa exclusivamente o template padrão broker_first_access.");
+    }
+  }
   if ((parsed.primaryKind === "meta_template" || parsed.fallbackKind === "meta_template") && !metaTemplate) {
     throw new Error("O template Meta precisa estar aprovado e pertencer à WABA ativa desta empresa.");
   }
@@ -371,7 +381,9 @@ async function resolveLegacyMetaResource(tenantId: string, eventKey: string, pur
     // Both broker lead events share one approved contract. Any other binding
     // (including lead_first_contact and retired aliases) is ignored so a stale
     // situation can never replace the operational new-lead notification.
-    if (configured && !(isBrokerLeadTemplatePurpose(purpose) && !isCanonicalBrokerLeadTemplateName(configured.name))) {
+    if (configured
+      && !(isBrokerLeadTemplatePurpose(purpose) && !isCanonicalBrokerLeadTemplateName(configured.name))
+      && !(purpose === "brokerInvitation" && !isCanonicalBrokerInvitationTemplateName(configured.name))) {
       return configured;
     }
   }
@@ -438,7 +450,7 @@ export async function resolveEventMessagePlan(input: {
   // This operational contract is intentionally not configurable per tenant:
   // a stale policy (for example lead_first_contact or a free message) must not
   // replace the immediate new-lead offer/assignment notification.
-  if (isBrokerLeadEventKey(event.key)) {
+  if (isBrokerLeadEventKey(event.key) || isBrokerWelcomeEventKey(event.key)) {
     if (!legacyMeta) return null;
     const auto = buildAutomaticMetaVariableMappings(event, legacyMeta.variables);
     return {
@@ -467,7 +479,9 @@ export async function resolveEventMessagePlan(input: {
   ]);
   const metaResource = isBrokerLeadEventKey(event.key) && !isCanonicalBrokerLeadTemplateName(configuredMetaResource?.name)
     ? null
-    : configuredMetaResource;
+    : isBrokerWelcomeEventKey(event.key) && !isCanonicalBrokerInvitationTemplateName(configuredMetaResource?.name)
+      ? null
+      : configuredMetaResource;
   const mappings = asStringRecord(policy.metaVariableMappingsJson);
   const metaMessage = metaResource ? makeMetaMessage(event, metaResource, mappings, input.variables) : null;
   const freeMessage = freeResource ? makeFreeMessage(event, freeResource, input.variables) : null;

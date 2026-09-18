@@ -1,4 +1,6 @@
 export const CANONICAL_BROKER_LEAD_TEMPLATE_NAME = "new_lead_broker";
+export const CANONICAL_BROKER_INVITATION_TEMPLATE_NAME = "broker_first_access";
+export const CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE = "pt_BR";
 
 const BROKER_LEAD_EVENT_KEYS = new Set(["LEAD_OFFER", "LEAD_ASSIGNMENT"]);
 const BROKER_LEAD_PURPOSES = new Set(["newLeadAssignment", "brokerLeadNotification"]);
@@ -13,4 +15,12 @@ export function isBrokerLeadTemplatePurpose(purpose?: string | null) {
 
 export function isCanonicalBrokerLeadTemplateName(name?: string | null) {
   return name === CANONICAL_BROKER_LEAD_TEMPLATE_NAME;
+}
+
+export function isBrokerWelcomeEventKey(eventKey?: string | null) {
+  return eventKey === "BROKER_WELCOME";
+}
+
+export function isCanonicalBrokerInvitationTemplateName(name?: string | null) {
+  return name === CANONICAL_BROKER_INVITATION_TEMPLATE_NAME;
 }

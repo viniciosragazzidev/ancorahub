@@ -3,6 +3,7 @@ import {
   LEAD_STATUS_LABELS,
   MOTIVOS_PERDA,
   MOTIVO_PERDA_LABELS,
+  normalizeMotivoPerda,
 } from "../lead-status-constants";
 
 describe("LEAD_STATUS_LABELS", () => {
@@ -27,10 +28,22 @@ describe("LEAD_STATUS_LABELS", () => {
 });
 
 describe("MOTIVOS_PERDA", () => {
-  it("contains 7 loss reasons", () => {
-    expect(MOTIVOS_PERDA).toHaveLength(7);
+  it("contains the canonical loss reasons used by broker and management flows", () => {
+    expect(MOTIVOS_PERDA).toHaveLength(10);
     expect(MOTIVOS_PERDA).toContain("preco");
+    expect(MOTIVOS_PERDA).toContain("sem_interesse");
+    expect(MOTIVOS_PERDA).toContain("sem_contato");
     expect(MOTIVOS_PERDA).toContain("outro");
+  });
+});
+
+describe("normalizeMotivoPerda", () => {
+  it("accepts labels from older clients and returns canonical codes", () => {
+    expect(normalizeMotivoPerda("Preço")).toBe("preco");
+    expect(normalizeMotivoPerda("Sem interesse")).toBe("sem_interesse");
+    expect(normalizeMotivoPerda("Sem contato / Não atende")).toBe("sem_contato");
+    expect(normalizeMotivoPerda("preco")).toBe("preco");
+    expect(normalizeMotivoPerda("  ")).toBeNull();
   });
 });
 

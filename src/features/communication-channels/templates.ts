@@ -1,9 +1,16 @@
 import "server-only";
 
-import { CANONICAL_BROKER_LEAD_TEMPLATE_NAME } from "./broker-lead-template-contract";
+import {
+  CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
+  CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
+  CANONICAL_BROKER_LEAD_TEMPLATE_NAME,
+} from "./broker-lead-template-contract";
 
 export const META_WHATSAPP_TEMPLATE_PURPOSES = {
-  brokerInvitation: { name: "broker_first_access", language: "pt_BR" },
+  brokerInvitation: {
+    name: CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
+    language: CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
+  },
   taskReminder: { name: "ancora_lembrete_tarefa", language: "pt_BR" },
   clientNotice: { name: "ancora_aviso_cliente", language: "pt_BR" },
   brokerLeadNotification: { name: CANONICAL_BROKER_LEAD_TEMPLATE_NAME, language: "pt_BR" },

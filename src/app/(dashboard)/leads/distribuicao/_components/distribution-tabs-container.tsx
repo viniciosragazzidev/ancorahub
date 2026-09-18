@@ -65,9 +65,14 @@ export function DistributionTabsContainer({
       variant="underline"
       className="w-full gap-6"
     >
+      {/* Was `top-[var(--header-height)]`, offset to sit right below the old
+          sticky DashboardHeader. That header is gone (replaced by DsPageHeader,
+          which isn't sticky), so this nav is now the only sticky element and
+          sticks to the real top of the scroll container instead of floating
+          with a gap above it. */}
       <nav
         aria-label="Áreas da distribuição"
-        className="sticky top-[var(--header-height)] z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]"
+        className="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 max-[559px]:top-[var(--mobile-safe-top)]"
       >
         <TabsList
           aria-label="Áreas da distribuição"

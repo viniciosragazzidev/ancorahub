@@ -4,6 +4,10 @@
 @import "../styles/theme.css";
 @import "../styles/typography.css";
 @import "../styles/operational-ui.css";
+/* Foundation-only design system (docs/design-system.md). Namespaced `ds`,
+   not yet consumed by any existing route — see src/components/ui/ds-*.tsx
+   and /dev/component-preview. */
+@import "../styles/design-system/tokens.css";
 
 
 @custom-variant dark (&:is(.dark *));

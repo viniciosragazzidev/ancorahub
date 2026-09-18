@@ -22,7 +22,9 @@ import {
 } from "@/features/ai-qualification/actions";
 import {
   CANONICAL_BROKER_LEAD_TEMPLATE_NAME,
+  isBrokerWelcomeEventKey,
   isBrokerLeadEventKey,
+  isCanonicalBrokerInvitationTemplateName,
   isCanonicalBrokerLeadTemplateName,
 } from "@/features/communication-channels/broker-lead-template-contract";
 
@@ -112,6 +114,9 @@ export function MessagePoliciesPanel({
       const canonicalOfferTemplate = result.metaTemplates.find(
         (template) => template.name === CANONICAL_BROKER_LEAD_TEMPLATE_NAME && template.status === "APPROVED",
       );
+      const canonicalInvitationTemplate = result.metaTemplates.find(
+        (template) => isCanonicalBrokerInvitationTemplateName(template.name) && template.status === "APPROVED",
+      );
       setDrafts(Object.fromEntries(result.events.map((event) => {
         const draft = policyToDraft(event.policy);
         const configuredTemplate = event.policy?.metaTemplateId
@@ -133,6 +138,19 @@ export function MessagePoliciesPanel({
         // binding that would resolve to a retired name.
         if (canonicalOfferTemplate && invalidBrokerLeadPolicy) {
           return [event.key, { ...draft, primaryKind: "meta_template", metaTemplateId: canonicalOfferTemplate.id, fallbackKind: "none", active: true }];
+        }
+        const configuredInvitationTemplate = event.policy?.metaTemplateId
+          ? result.metaTemplates.find((template) => template.id === event.policy?.metaTemplateId)
+          : null;
+        const invalidBrokerWelcomePolicy = isBrokerWelcomeEventKey(event.key) && (
+          !event.policy
+          || !configuredInvitationTemplate
+          || !isCanonicalBrokerInvitationTemplateName(configuredInvitationTemplate.name)
+          || draft.primaryKind !== "meta_template"
+          || draft.fallbackKind !== "none"
+        );
+        if (canonicalInvitationTemplate && invalidBrokerWelcomePolicy) {
+          return [event.key, { ...draft, primaryKind: "meta_template", metaTemplateId: canonicalInvitationTemplate.id, fallbackKind: "none", active: true }];
         }
         return [event.key, draft];
       })));
@@ -156,6 +174,9 @@ export function MessagePoliciesPanel({
     const eventKey = preferredEventKey && data.events.some((event) => event.key === preferredEventKey)
       ? preferredEventKey
       : selectedEventKey ?? data.events[0].key;
+    const canonicalInvitationTemplateId = eventKey === "BROKER_WELCOME"
+      ? data.metaTemplates.find((template) => isCanonicalBrokerInvitationTemplateName(template.name) && template.status === "APPROVED")?.id
+      : undefined;
     setSelectedEventKey(eventKey);
 
     setDrafts((current) => ({
@@ -163,7 +184,7 @@ export function MessagePoliciesPanel({
       [eventKey]: {
         ...(current[eventKey] ?? emptyDraft),
         primaryKind: "meta_template",
-        metaTemplateId: preferredMetaTemplateId,
+        metaTemplateId: canonicalInvitationTemplateId ?? preferredMetaTemplateId,
         active: true,
       },
     }));
@@ -181,6 +202,8 @@ export function MessagePoliciesPanel({
   const selectedEvent = data?.events.find((event) => event.key === selectedEventKey) ?? null;
   const selectedDraft = selectedEventKey ? drafts[selectedEventKey] ?? emptyDraft : emptyDraft;
   const approvedTemplates = useMemo(() => data?.metaTemplates.filter((template) => template.status === "APPROVED") ?? [], [data]);
+  const isBrokerWelcome = selectedEvent ? isBrokerWelcomeEventKey(selectedEvent.key) : false;
+  const brokerInvitationTemplate = approvedTemplates.find((template) => isCanonicalBrokerInvitationTemplateName(template.name)) ?? null;
 
   function patchDraft(patch: Partial<Draft>) {
     if (!selectedEventKey) return;
@@ -286,7 +309,7 @@ export function MessagePoliciesPanel({
                       <span className="block truncate font-medium">{event.label}</span>
                       <span className="block truncate text-xs">{event.audience === "user" ? "Equipe" : "Cliente"}</span>
                     </span>
-                    <span className={`size-2 shrink-0 rounded-full ${event.policy?.active ? "bg-success" : "bg-muted-foreground/30"}`} aria-label={event.policy?.active ? "Ativa" : "Inativa"} />
+                    <span className={`size-2 shrink-0 rounded-full ${(drafts[event.key]?.active ?? event.policy?.active) ? "bg-success" : "bg-muted-foreground/30"}`} aria-label={(drafts[event.key]?.active ?? event.policy?.active) ? "Ativa" : "Inativa"} />
                   </button>
                 ))}
               </nav>
@@ -306,7 +329,9 @@ export function MessagePoliciesPanel({
 
                   <div className="rounded-lg border bg-muted/15 p-3 text-xs text-muted-foreground">
                     <Info className="mr-2 inline-block size-4 align-text-bottom text-primary" aria-hidden="true" />
-                    {selectedEvent.windowRule === "meta_required_without_window"
+                    {isBrokerWelcome
+                      ? "O primeiro acesso é enviado exclusivamente pelo template Meta aprovado broker_first_access. Esse contrato evita que um convite seja substituído por uma mensagem livre ou por outro modelo."
+                      : selectedEvent.windowRule === "meta_required_without_window"
                       ? "Sem inbound nas últimas 24 horas, o sistema força um template Meta aprovado. Texto livre nunca abre uma conversa fora da janela."
                       : "Mensagem livre só será enviada dentro da janela de 24 horas do WhatsApp. Fora dela, o sistema não envia texto livre; use um template Meta aprovado. O WhatsApp pessoal do corretor nunca envia pelo CRM."}
                   </div>
@@ -314,14 +339,25 @@ export function MessagePoliciesPanel({
                   <div className="grid gap-4 lg:grid-cols-2">
                     <div className="grid gap-2">
                       <Label>Mensagem principal</Label>
-                      <Select disabled={!canManage} value={selectedDraft.primaryKind} onValueChange={(value) => value && patchDraft({ primaryKind: value as ResourceKind, fallbackKind: value === selectedDraft.fallbackKind ? "none" : selectedDraft.fallbackKind })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="meta_template">Template Meta oficial</SelectItem>
-                          <SelectItem value="free_message">Mensagem livre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {selectedDraft.primaryKind === "meta_template" ? (
+                      {isBrokerWelcome ? (
+                        <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                          <span className="font-mono font-medium">broker_first_access</span>
+                          <span className="ml-2 text-muted-foreground">· pt_BR · padrão protegido</span>
+                        </div>
+                      ) : (
+                        <Select disabled={!canManage} value={selectedDraft.primaryKind} onValueChange={(value) => value && patchDraft({ primaryKind: value as ResourceKind, fallbackKind: value === selectedDraft.fallbackKind ? "none" : selectedDraft.fallbackKind })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="meta_template">Template Meta oficial</SelectItem>
+                            <SelectItem value="free_message">Mensagem livre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {isBrokerWelcome ? (
+                        <p className="text-xs text-muted-foreground">
+                          {brokerInvitationTemplate ? "Template aprovado e pronto para os convites." : "Sincronize com a Meta para disponibilizar o template aprovado."}
+                        </p>
+                      ) : selectedDraft.primaryKind === "meta_template" ? (
                         <Select disabled={!canManage} value={selectedDraft.metaTemplateId} onValueChange={(value) => value && patchDraft({ metaTemplateId: value })}>
                           <SelectTrigger><SelectValue placeholder="Escolha um template aprovado" /></SelectTrigger>
                           <SelectContent>{approvedTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name} · {template.language}</SelectItem>)}</SelectContent>
@@ -336,20 +372,20 @@ export function MessagePoliciesPanel({
 
                     <div className="grid gap-2">
                       <Label>Contingência antes do aceite</Label>
-                      <Select disabled={!canManage} value={selectedDraft.fallbackKind} onValueChange={(value) => value && patchDraft({ fallbackKind: value as Draft["fallbackKind"] })}>
+                      {isBrokerWelcome ? <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">Sem contingência — envio oficial obrigatório</div> : <Select disabled={!canManage} value={selectedDraft.fallbackKind} onValueChange={(value) => value && patchDraft({ fallbackKind: value as Draft["fallbackKind"] })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Sem contingência</SelectItem>
                           {selectedDraft.primaryKind !== "meta_template" ? <SelectItem value="meta_template">Template Meta oficial</SelectItem> : null}
                           {selectedDraft.primaryKind !== "free_message" ? <SelectItem value="free_message">Mensagem livre</SelectItem> : null}
                         </SelectContent>
-                      </Select>
-                      {selectedDraft.fallbackKind === "meta_template" ? (
+                      </Select>}
+                      {!isBrokerWelcome && selectedDraft.fallbackKind === "meta_template" ? (
                         <Select disabled={!canManage} value={selectedDraft.metaTemplateId} onValueChange={(value) => value && patchDraft({ metaTemplateId: value })}>
                           <SelectTrigger><SelectValue placeholder="Escolha o template de contingência" /></SelectTrigger>
                           <SelectContent>{approvedTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name} · {template.language}</SelectItem>)}</SelectContent>
                         </Select>
-                      ) : selectedDraft.fallbackKind === "free_message" ? (
+                      ) : !isBrokerWelcome && selectedDraft.fallbackKind === "free_message" ? (
                         <Select disabled={!canManage} value={selectedDraft.freeMessageTemplateId} onValueChange={(value) => value && patchDraft({ freeMessageTemplateId: value })}>
                           <SelectTrigger><SelectValue placeholder="Escolha a mensagem de contingência" /></SelectTrigger>
                           <SelectContent>{data.freeMessages.map((message) => <SelectItem key={message.id} value={message.id}>{message.name}</SelectItem>)}</SelectContent>

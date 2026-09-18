@@ -17,6 +17,7 @@ import {
   LEAD_STATUS_ORDER,
   MOTIVOS_PERDA,
   MOTIVO_PERDA_LABELS,
+  normalizeMotivoPerda,
   VALID_TRANSITIONS,
 } from "./lead-status-constants";
 import type { MotivoPerda } from "./lead-status-constants";
@@ -175,6 +176,7 @@ export async function changeLeadStatus(
 
   const previousStatus = lead.status;
   const newStatus = input.newStatus;
+  const canonicalMotivoPerda = normalizeMotivoPerda(input.motivoPerda);
   if (input.expectedVersion !== undefined && input.expectedVersion !== lead.version) {
     throw new Error("CONFLICT_VERSION");
   }
@@ -198,7 +200,7 @@ export async function changeLeadStatus(
 
   // 4. perdido: exige motivo
   if (newStatus === "lost") {
-    if (!input.motivoPerda || !(MOTIVOS_PERDA as readonly string[]).includes(input.motivoPerda)) {
+    if (!canonicalMotivoPerda || !(MOTIVOS_PERDA as readonly string[]).includes(canonicalMotivoPerda)) {
       throw new Error(
         "É obrigatório informar um motivo de perda válido para marcar o lead como perdido.",
       );
@@ -234,7 +236,7 @@ export async function changeLeadStatus(
 
   // ─── Executar mudança ───────────────────────────────────────────────
   const now = new Date();
-  const motivoPerda = newStatus === "lost" ? input.motivoPerda! : null;
+  const motivoPerda = newStatus === "lost" ? canonicalMotivoPerda! : null;
 
   await db.transaction(async (tx) => {
     // Atualizar lead
@@ -257,7 +259,7 @@ export async function changeLeadStatus(
     const interactionContent = isReopening
       ? `Lead reaberto (${previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}) por ${context.role === "director" ? "Diretor" : "Gestor"}.`
       : newStatus === "lost"
-        ? `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → Perdido. Motivo: ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}`
+        ? `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → Perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`
         : `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}.`;
 
     await tx.insert(schema.leadInteractions).values({
@@ -358,9 +360,9 @@ export async function changeLeadStatus(
             leadId: lead.id,
             type: "lead_lost",
             title: "Lead perdido",
-            message: `${lead.nome} foi marcado como perdido. Motivo: ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}`,
+            message: `${lead.nome} foi marcado como perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`,
             pushTitle: "Lead Perdido 💔",
-            pushBody: `${lead.nome} — ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}.`,
+            pushBody: `${lead.nome} — ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}.`,
             url: `/leads/${lead.id}`,
             tag: `lead-${lead.id}`,
           })]
@@ -374,9 +376,9 @@ export async function changeLeadStatus(
           leadId: lead.id,
           type: "lead_lost",
           title: "Lead perdido",
-          message: `${lead.nome} foi perdido. Motivo: ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}`,
+          message: `${lead.nome} foi perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`,
           pushTitle: "Lead Perdido! 📉",
-          pushBody: `${lead.nome} foi perdido — ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}.`,
+          pushBody: `${lead.nome} foi perdido — ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}.`,
           url: `/leads/${lead.id}`,
           tag: `lead-${lead.id}`,
         }),
