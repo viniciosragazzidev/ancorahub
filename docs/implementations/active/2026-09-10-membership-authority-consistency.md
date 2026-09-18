@@ -17,9 +17,9 @@ no servidor e não deixem sessões com autoridade anterior.
   auditoria, exigindo nova autenticação com a autoridade atualizada.
 - Excluir um membro remove o vínculo do tenant e revoga suas sessões; a
   identidade global não é apagada porque pode pertencer a outro tenant.
-- Diretor de unidade pode editar dados, cargo e perfil de outro Diretor da mesma
-  unidade. A permissão não se estende a autoedição, mudança de unidade,
-  desativação ou exclusão, e a interface consome a decisão calculada no servidor.
+- Diretor pode editar dados, cargo e perfil, desativar e excluir outro Diretor do
+  mesmo tenant, mesmo quando os vínculos estão em unidades diferentes. A regra
+  não permite autoedição, e a interface consome a decisão calculada no servidor.
 
 ## Verificação esperada
 

@@ -1038,9 +1038,14 @@ global que possa ser usada por outro tenant.
 **Emenda aprovada em 2026-09-11.** Um Diretor vinculado a uma unidade pode editar
 os dados, o cargo e o perfil de acesso de outro Diretor vinculado à mesma unidade.
 A exceção não permite autoedição, alvo geral ou de outra unidade, mudança de unidade,
-desativação ou exclusão do outro Diretor. O servidor revalida o vínculo do tenant e
-a unidade atual antes de aplicar a alteração; mudanças de autoridade continuam
-auditadas e revogam as sessões do alvo.
+desativação ou exclusão do outro Diretor.
+
+**Emenda aprovada em 2026-09-18.** Um Diretor pode editar, desativar e excluir
+outro Diretor do mesmo tenant, mesmo que estejam vinculados a unidades diferentes
+ou que o alvo tenha escopo geral. A autoedição permanece bloqueada. O servidor
+revalida o vínculo ativo dentro do tenant antes de aplicar a alteração; mudanças
+de autoridade continuam auditadas e revogam as sessões do alvo, enquanto a
+exclusão remove somente o vínculo do tenant e revoga as sessões.
 
 ## DEC-096 — Importação de leads usa a fila e o motor canônico de ofertas
 

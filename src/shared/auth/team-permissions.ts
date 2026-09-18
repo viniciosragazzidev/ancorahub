@@ -46,8 +46,8 @@ export function canManageMember(
   target: TeamMemberAuthorityTarget,
 ): boolean {
   if (context.userId === target.userId) return false;
-  if (target.role === "director") return false;
   if (context.role === "director") return true;
+  if (target.role === "director") return false;
 
   // Escopo de unidades autorizadas do gestor / supervisor
   const authorizedUnitIds: readonly string[] =
@@ -72,8 +72,9 @@ export function canManageMember(
 
 /**
  * A edição de autoridade é menos destrutiva que desativar/excluir um membro.
- * Um Diretor pode editar outro Diretor somente quando ambos pertencem à mesma
- * unidade explícita. A autoedição e Diretores gerais continuam bloqueados.
+ * Diretores podem administrar outro Diretor dentro do mesmo tenant. A
+ * autoedição continua bloqueada para impedir que o próprio ator altere sua
+ * autoridade ou remova seu acesso.
  */
 export function canEditMemberAuthority(
   context: TeamMemberAuthorityContext,
@@ -81,11 +82,7 @@ export function canEditMemberAuthority(
 ): boolean {
   if (canManageMember(context, target)) return true;
   if (context.userId === target.userId) return false;
-
-  return context.role === "director" &&
-    target.role === "director" &&
-    context.branchId !== null &&
-    target.branchId === context.branchId;
+  return false;
 }
 
 export function requireCanManageMember(
@@ -124,15 +121,6 @@ export function requireCanUpdateMemberAuthority(params: {
 
   const isDirector = actorContext.role === "director";
 
-  // A exceção Diretor -> Diretor é estritamente local: a mesma ação não pode
-  // mover o alvo para outra unidade nem transformá-lo em um acesso geral.
-  if (
-    isDirector &&
-    targetMember.role === "director" &&
-    proposed.branchId !== targetMember.branchId
-  ) {
-    throw new AuthorizationError("Diretores só podem editar outro Diretor mantendo-o na mesma unidade.");
-  }
   const actorAllowedUnits: readonly string[] =
     "scope" in actorContext && actorContext.scope?.unitIds
       ? actorContext.scope.unitIds

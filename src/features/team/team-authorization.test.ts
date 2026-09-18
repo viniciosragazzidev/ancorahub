@@ -188,10 +188,18 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
         }),
       ).toBe(false);
     });
+
+    it("Director can manage another Director in any unit of the same tenant", () => {
+      expect(canManageMember(directorContext, {
+        userId: "director-unit-b",
+        role: "director",
+        branchId: unitB,
+      })).toBe(true);
+    });
   });
 
   describe("canEditMemberAuthority", () => {
-    it("allows a Director to edit another Director in the same explicit unit", () => {
+    it("allows a Director to edit another Director in any unit", () => {
       const localDirector = {
         ...directorContext,
         branchId: unitA,
@@ -200,11 +208,11 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
       expect(canEditMemberAuthority(localDirector, {
         userId: "director-2",
         role: "director",
-        branchId: unitA,
+        branchId: unitB,
       })).toBe(true);
     });
 
-    it("keeps self-edit, cross-unit Directors and tenant-wide Directors blocked", () => {
+    it("keeps self-edit blocked", () => {
       const localDirector = {
         ...directorContext,
         branchId: unitA,
@@ -214,16 +222,6 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
         userId: localDirector.userId,
         role: "director",
         branchId: unitA,
-      })).toBe(false);
-      expect(canEditMemberAuthority(localDirector, {
-        userId: "director-unit-b",
-        role: "director",
-        branchId: unitB,
-      })).toBe(false);
-      expect(canEditMemberAuthority(directorContext, {
-        userId: "director-global",
-        role: "director",
-        branchId: null,
       })).toBe(false);
     });
   });
@@ -333,7 +331,7 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
       }).not.toThrow();
     });
 
-    it("prevents editing a same-unit Director while moving them to another unit", () => {
+    it("allows a Director to move another Director to another unit", () => {
       expect(() => {
         requireCanUpdateMemberAuthority({
           actorContext: { ...directorContext, branchId: unitA },
@@ -347,7 +345,7 @@ describe("Team Authorization & Privilege Escalation Hardening", () => {
             branchId: unitB,
           },
         });
-      }).toThrow(AuthorizationError);
+      }).not.toThrow();
     });
   });
 });
