@@ -249,6 +249,14 @@ export function QueueControlCenter({
       ? displayedAds.filter((ad) => ad.name.toLocaleLowerCase("pt-BR").includes(query))
       : displayedAds;
   }, [adSearch, displayedAds]);
+  const activeCampaignRoutes = useMemo(
+    () => campaignRoutes.filter((route) => campaigns.some((campaign) => campaign.campaignId === route.campaignId && (campaign.status ?? "").toUpperCase() === "ACTIVE")),
+    [campaignRoutes, campaigns],
+  );
+  const activeAdRoutes = useMemo(
+    () => adRoutes.filter((route) => ads.some((ad) => ad.adId === route.adId && (ad.status ?? "").toUpperCase() === "ACTIVE")),
+    [adRoutes, ads],
+  );
   const queueIdsWithAdExceptions = useMemo(
     () => new Set(adRoutes.filter((route) => route.queueId && route.enabled).map((route) => route.queueId)),
     [adRoutes],
@@ -935,14 +943,14 @@ export function QueueControlCenter({
             </p>
           )}
 
-          {campaignRoutes.length ? (
+          {activeCampaignRoutes.length ? (
             <div className="space-y-2 border-t border-border/60 pt-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Regras de Campanhas Configuradas ({campaignRoutes.length})
+                Regras de Campanhas Ativas ({activeCampaignRoutes.length})
               </div>
               <ScrollArea className="h-64 max-h-[50vh] min-h-0 rounded-lg border border-border/60 bg-muted/20">
                 <div className="divide-y divide-border/40">
-                  {campaignRoutes
+                  {activeCampaignRoutes
                     .filter((route) => {
                       const campaign = campaigns.find(
                         (item) => item.campaignId === route.campaignId,
@@ -1145,14 +1153,14 @@ export function QueueControlCenter({
             </p>
           )}
 
-          {adRoutes.length ? (
+          {activeAdRoutes.length ? (
             <div className="space-y-2 border-t border-border/60 pt-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Exceções de Anúncios Configuradas ({adRoutes.length})
+                Exceções de Anúncios Ativos ({activeAdRoutes.length})
               </div>
               <ScrollArea className="h-64 max-h-[50vh] min-h-0 rounded-lg border border-border/60 bg-muted/20">
                 <div className="divide-y divide-border/40">
-                  {adRoutes
+                  {activeAdRoutes
                     .filter((route) => {
                       const ad = ads.find((item) => item.adId === route.adId);
                       return (

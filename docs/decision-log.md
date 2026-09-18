@@ -1203,3 +1203,13 @@ estrita. Fila de contingência é validada no servidor dentro do mesmo tenant, n
 ser a própria fila nem formar ciclos e cada encaminhamento é auditado. O
 processador também acorda jobs adiados assim que detecta um plantão ativo, sem
 relaxar unidade, disponibilidade, capacidade ou elegibilidade do corretor.
+
+## DEC-110 — Plantão global por corretora
+
+**Decisão aprovada em 2026-09-18.** Novos plantões são regras globais do tenant:
+não recebem unidade, fila ou prioridade na criação e abrangem corretores escalados
+em todas as unidades. As filas continuam sendo a autoridade para selecionar quais
+leads podem usar um plantão por origem, enquanto a escala mantém a unidade real de
+cada corretor para autorização e distribuição. Plantões legados com unidade/fila
+continuam compatíveis até serem editados. O arquivamento permanece reversível e a
+exclusão permanente é uma ação separada, confirmada e auditada.

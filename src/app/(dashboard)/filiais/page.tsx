@@ -19,6 +19,7 @@ export default async function BranchesPage() {
     .select({
       id: schema.branches.id,
       name: schema.branches.name,
+      externalId: schema.branches.externalId,
       status: schema.branches.status,
       acceptingLeads: schema.branches.acceptingLeads,
       isDistributionHub: schema.branches.isDistributionHub,
@@ -80,7 +81,7 @@ export default async function BranchesPage() {
         </section>
         */}
         <BranchesManager
-          branches={branches.map((branch) => ({ ...branch, externalId: null, memberCount: countsByBranch.get(branch.id) ?? 0, acceptingLeads: branch.acceptingLeads }))}
+          branches={branches.map((branch) => ({ ...branch, memberCount: countsByBranch.get(branch.id) ?? 0, acceptingLeads: branch.acceptingLeads }))}
           branchesTrend={branchesTrend}
           membersTrend={membersTrend}
         />

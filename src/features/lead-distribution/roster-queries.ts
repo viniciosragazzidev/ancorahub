@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -59,8 +59,8 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       credentialName: sql<string>`CASE WHEN ${schema.leadWebhookCredentials.source} = 'meta_lead_ads' AND ${schema.metaPages.name} IS NOT NULL THEN 'Meta Lead Ads · ' || ${schema.metaPages.name} ELSE ${schema.leadWebhookCredentials.name} END`,
     })
       .from(schema.unitDutySchedules)
-      .innerJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
-      .innerJoin(schema.leadQueues, eq(schema.unitDutySchedules.queueId, schema.leadQueues.id))
+      .leftJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
+      .leftJoin(schema.leadQueues, eq(schema.unitDutySchedules.queueId, schema.leadQueues.id))
       .leftJoin(schema.leadWebhookCredentials, eq(schema.unitDutySchedules.webhookCredentialId, schema.leadWebhookCredentials.id))
       .leftJoin(schema.metaLeadAdSources, and(
         eq(schema.metaLeadAdSources.leadWebhookCredentialId, schema.leadWebhookCredentials.id),
@@ -70,17 +70,25 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         eq(schema.metaPages.pageId, schema.metaLeadAdSources.pageId),
         eq(schema.metaPages.tenantId, schema.unitDutySchedules.tenantId),
       ))
-      .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), inArray(schema.unitDutySchedules.branchId, branchIds)))
+      .where(and(
+        eq(schema.unitDutySchedules.tenantId, context.tenantId),
+        or(inArray(schema.unitDutySchedules.branchId, branchIds), isNull(schema.unitDutySchedules.branchId)),
+      ))
       .orderBy(asc(schema.unitDutySchedules.dayOfWeek), asc(schema.unitDutySchedules.startsAt)),
     db.select({
       id: schema.user.id,
       name: schema.user.name,
       email: schema.user.email,
+      internalCode: schema.brokerProfiles.internalCode,
       branchId: schema.tenantMemberships.branchId,
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
     })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .leftJoin(schema.brokerProfiles, and(
+        eq(schema.brokerProfiles.userId, schema.user.id),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+      ))
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         inArray(schema.tenantMemberships.branchId, branchIds),
@@ -149,6 +157,8 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
   }));
   const displaySchedules = schedules.map((schedule) => ({
     ...schedule,
+    branchName: schedule.branchName ?? "Todas as unidades",
+    queueName: schedule.queueName ?? "Todas as filas",
     credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
   }));
 

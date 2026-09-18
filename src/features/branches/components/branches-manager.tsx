@@ -23,11 +23,12 @@ function ActionFeedback({ state }: { state?: BranchActionState }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!state?.message) return;
-    if (state.error) {
-      toast.error(state.message);
+    const feedback = state?.error ?? state?.message;
+    if (!feedback) return;
+    if (state?.error) {
+      toast.error(feedback);
     } else {
-      toast.success(state.message);
+      toast.success(feedback);
       router.refresh();
     }
   }, [state, router]);

@@ -35,14 +35,25 @@ async function assertRosterScope(scheduleId: string, brokerId: string) {
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule || schedule.status !== "active") throw new Error("O plantão selecionado não está ativo.");
-  if (context.role === "manager" && context.branchId !== schedule.branchId) throw new Error("Você só pode editar a escala da sua unidade.");
+  if (context.role === "manager" && schedule.branchId && context.branchId !== schedule.branchId) throw new Error("Você só pode editar a escala da sua unidade.");
+  if (!schedule.branchId && context.role === "manager" && !context.branchId) throw new Error("Unidade do corretor não identificada.");
   const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-    .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), eq(schema.tenantMemberships.branchId, schedule.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active")))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.userId, brokerId),
+      schedule.branchId ? eq(schema.tenantMemberships.branchId, schedule.branchId) : undefined,
+      context.role === "manager" && context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : undefined,
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.jobTitle, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      eq(schema.user.active, true),
+      eq(schema.user.status, "active"),
+    ))
     .limit(1);
   if (!broker) throw new Error("O corretor não pertence a uma unidade ativa elegível.");
-  return { context, db, schedule };
+  return { context, db, schedule, broker };
 }
 
 async function assertNoOverlap(db: ReturnType<typeof getDatabase>, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, excludedId?: string) {
@@ -65,10 +76,11 @@ async function assertNoOverlap(db: ReturnType<typeof getDatabase>, tenantId: str
 export async function createRosterAssignmentAction(_previous: RosterActionState, formData: FormData): Promise<RosterActionState> {
   try {
     const input = parseInput(formData);
-    const { context, db, schedule } = await assertRosterScope(input.scheduleId, input.brokerId);
+    const { context, db, schedule, broker } = await assertRosterScope(input.scheduleId, input.brokerId);
     await assertNoOverlap(db, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt);
     const now = new Date();
-    await db.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: schedule.branchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
+    if (!broker.branchId) throw new Error("O corretor não está vinculado a uma unidade ativa.");
+    await db.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: broker.branchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
     return { success: true };
   } catch (error) {
@@ -88,7 +100,7 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
       .limit(1);
     if (!assignment || assignment.brokerId !== input.brokerId) throw new Error("A alocação não pertence a este corretor.");
     await assertNoOverlap(db, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, assignment.id);
-    await db.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, branchId: schedule.branchId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
+    await db.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
     return { success: true };
   } catch (error) {

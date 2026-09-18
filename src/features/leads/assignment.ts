@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, eq, gt, inArray, isNotNull, lte, not } from "drizzle-orm";
+import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, not, or } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
@@ -119,7 +119,7 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
     .from(schema.unitDutySchedules)
     .where(and(
       eq(schema.unitDutySchedules.tenantId, tenantId),
-      eq(schema.unitDutySchedules.branchId, branchId),
+      or(eq(schema.unitDutySchedules.branchId, branchId), isNull(schema.unitDutySchedules.branchId)),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       eq(schema.unitDutySchedules.status, "active"),
       lte(schema.unitDutySchedules.startsAt, local.time),

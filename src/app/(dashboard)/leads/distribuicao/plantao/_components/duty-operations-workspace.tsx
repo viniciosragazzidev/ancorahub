@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { toast } from "@/components/ui/sonner";
 import {
   ArrowLeft,
-  Buildings,
   CalendarCheck,
   CheckCircle,
   Clock,
@@ -45,6 +44,7 @@ import type { DutyRosterSnapshot } from "@/features/lead-distribution/roster-que
 import {
   archiveDutyScheduleAction,
   createDutyScheduleAction,
+  deleteDutyScheduleAction,
   duplicateDutyScheduleAction,
   restoreDutyScheduleAction,
   toggleDutyScheduleAction,
@@ -64,15 +64,6 @@ type DutyAction = (previous: DutyActionState, formData: FormData) => Promise<Dut
 
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
-
-function firstSchedulableBranchId(snapshot: Snapshot) {
-  return (
-    snapshot.branches.find(
-      (branch) =>
-        !branch.isDistributionHub && snapshot.queues.some((queue) => queue.branchId === branch.id),
-    )?.id ?? ""
-  );
-}
 
 function dateInputValue(value: Date | null) {
   if (!value) return "";
@@ -189,7 +180,6 @@ function DutyCard({
         {schedule.queueName} · {schedule.credentialName ?? "Todas as origens"}
       </p>
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/60 pt-2">
-        <Badge variant="outline">P{schedule.priority}</Badge>
         <Badge variant={coverage.covered || schedule.status !== "active" ? "outline" : "warning"}>
           {coverage.assigned}/{coverage.minimum} escalados
         </Badge>
@@ -353,53 +343,18 @@ function DutyFormSheet({
   snapshot: Snapshot;
 }) {
   const [pending, startTransition] = useTransition();
-  const [branchIds, setBranchIds] = useState<string[]>(
-    schedule ? [schedule.branchId] : [firstSchedulableBranchId(snapshot)].filter(Boolean),
-  );
-  const [queueIdsByBranch, setQueueIdsByBranch] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      (schedule ? [schedule.branchId] : [firstSchedulableBranchId(snapshot)].filter(Boolean)).map(
-        (branchId) => [
-          branchId,
-          schedule && schedule.branchId === branchId
-            ? schedule.queueId
-            : (snapshot.queues.find((queue) => queue.branchId === branchId)?.id ?? ""),
-        ],
-      ),
-    ),
-  );
   const [selectedDays, setSelectedDays] = useState<number[]>(() => [schedule?.dayOfWeek ?? 1]);
-
-  const selectedBranches = snapshot.branches.filter((branch) => branchIds.includes(branch.id));
-  const queueForBranch = (branchId: string) =>
-    queueIdsByBranch[branchId] ??
-    snapshot.queues.find((queue) => queue.branchId === branchId)?.id ??
-    "";
-  const canSubmit =
-    selectedDays.length > 0 &&
-    selectedBranches.length > 0 &&
-    selectedBranches.every((branch) => Boolean(queueForBranch(branch.id)));
+  const canSubmit = selectedDays.length > 0;
   const title = schedule ? "Editar plantão" : "Novo plantão";
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     if (schedule) {
-      formData.set("branchId", schedule.branchId);
-      formData.set("queueId", queueForBranch(schedule.branchId));
       formData.set("scheduleId", schedule.id);
       formData.set("dayOfWeek", String(selectedDays[0] ?? schedule.dayOfWeek));
     } else {
       formData.set("daysOfWeek", JSON.stringify(selectedDays));
-      formData.set(
-        "unitAssignments",
-        JSON.stringify(
-          selectedBranches.map((branch) => ({
-            branchId: branch.id,
-            queueId: queueForBranch(branch.id),
-          })),
-        ),
-      );
     }
     const action: DutyAction = schedule ? updateDutyScheduleAction : createDutyScheduleAction;
     startTransition(async () => {
@@ -424,8 +379,8 @@ function DutyFormSheet({
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>
             {schedule
-              ? "Edite esta regra local sem alterar os demais plantões. O dia desta regra permanece fixo."
-              : "Selecione uma ou mais unidades e dias. Uma regra independente será criada para cada combinação de unidade, fila e dia."}
+              ? "Edite o horário e a cobertura deste plantão global. O dia desta regra permanece fixo."
+              : "Este plantão será compartilhado por todas as unidades e corretores da corretora."}
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
@@ -440,75 +395,11 @@ function DutyFormSheet({
                 required
               />
             </div>
-            <fieldset className="grid gap-2">
-              <Label>Unidades</Label>
-              <div className="grid gap-2">
-                {snapshot.branches
-                  .filter((branch) => !branch.isDistributionHub)
-                  .map((branch) => {
-                    const selected = branchIds.includes(branch.id);
-                    const hasQueue = snapshot.queues.some((queue) => queue.branchId === branch.id);
-                    return (
-                      <label
-                        key={branch.id}
-                        className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-                      >
-                        <Checkbox
-                          checked={selected}
-                          disabled={Boolean(schedule) || !hasQueue}
-                          onCheckedChange={(checked) =>
-                            setBranchIds((current) =>
-                              checked === true
-                                ? [...current, branch.id]
-                                : current.filter((id) => id !== branch.id),
-                            )
-                          }
-                        />
-                        <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {hasQueue ? "Fila ativa" : "Sem fila"}
-                        </span>
-                      </label>
-                    );
-                  })}
-                {snapshot.branches.some((branch) => branch.isDistributionHub) && (
-                  <p className="text-xs text-muted-foreground">
-                    A Matriz é uma central de redistribuição e não participa de plantões
-                    operacionais.
-                  </p>
-                )}
-              </div>
-              {schedule && (
-                <p className="text-xs text-muted-foreground">
-                  A edição mantém a unidade atual. Para replicar a regra, crie um novo plantão com
-                  várias unidades.
-                </p>
-              )}
-            </fieldset>
-            <div className="grid gap-3">
-              {selectedBranches.map((branch) => {
-                const queues = snapshot.queues.filter((queue) => queue.branchId === branch.id);
-                const queueId = queueForBranch(branch.id);
-                return (
-                  <div key={branch.id} className="grid gap-2">
-                    <Label htmlFor={`duty-queue-${branch.id}`}>Fila · {branch.name}</Label>
-                    <AppSelect
-                      id={`duty-queue-${branch.id}`}
-                      value={queueId}
-                      onValueChange={(val) =>
-                        setQueueIdsByBranch((current) => ({ ...current, [branch.id]: val }))
-                      }
-                      disabled={!queues.length}
-                      options={queues.map((q) => ({ value: q.id, label: q.name }))}
-                    />
-                    {!queues.length && (
-                      <p className="text-xs text-warning">
-                        Esta unidade não possui uma fila ativa.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-foreground">
+              <p className="font-medium">Escopo global da corretora</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                O mesmo horário e a mesma regra serão aplicados aos corretores escalados em todas as unidades. A fila de entrada continua definindo quais leads podem usar este plantão.
+              </p>
             </div>
             <div className="grid gap-3">
               <fieldset className="grid gap-2">
@@ -542,18 +433,6 @@ function DutyFormSheet({
                   })}
                 </div>
               </fieldset>
-              <div className="grid gap-2 sm:max-w-xs">
-                <Label htmlFor="duty-priority">Prioridade</Label>
-                <Input
-                  id="duty-priority"
-                  name="priority"
-                  type="number"
-                  min={1}
-                  max={999}
-                  defaultValue={schedule?.priority ?? 100}
-                  required
-                />
-              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
@@ -638,29 +517,23 @@ function DutyFormSheet({
                 Resumo da criação
               </h3>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {selectedBranches.length * selectedDays.length || 0} regra(s) independente(s) serão
-                criadas para as combinações selecionadas de unidade, fila e dia. O plantão só
-                concorre enquanto horário, vigência e origem corresponderem.
+                {selectedDays.length} regra(s) global(is) serão criadas para todas as unidades e corretores. O plantão só concorre enquanto horário, vigência e origem corresponderem.
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                <Badge variant="outline">{selectedBranches.length} unidade(s)</Badge>
                 <Badge variant="outline">{selectedDays.length} dia(s)</Badge>
-                <Badge variant="outline">
-                  {selectedBranches.filter((branch) => Boolean(queueForBranch(branch.id))).length}{" "}
-                  fila(s)
-                </Badge>
+                <Badge variant="outline">Todas as unidades</Badge>
               </div>
             </section>
             <p className="rounded-lg border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Fuso operacional: America/Sao_Paulo. Cada unidade conserva uma fila e uma escala
-              próprias; conflitos são validados antes de criar qualquer regra.
+              Fuso operacional: America/Sao_Paulo. A fila de entrada seleciona os leads; a escala
+              do plantão reúne corretores de todas as unidades.
             </p>
             <Button type="submit" disabled={pending || !canSubmit}>
               {pending
                 ? "Salvando…"
                 : schedule
                   ? "Salvar alterações"
-                  : `Criar em ${selectedBranches.length || 0} unidade(s)`}
+                  : "Criar plantão global"}
             </Button>
           </form>
         </SheetBody>
@@ -684,17 +557,24 @@ function DutyInspector({
 }) {
   const [pending, startTransition] = useTransition();
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedBrokerId, setSelectedBrokerId] = useState("");
+  const [brokerSearch, setBrokerSearch] = useState("");
   const assignments = schedule
     ? snapshot.assignments.filter((assignment) => assignment.scheduleId === schedule.id)
     : [];
   const eligibleBrokers = schedule
     ? snapshot.brokers.filter(
         (broker) =>
-          broker.branchId === schedule.branchId &&
+          (schedule.branchId === null || broker.branchId === schedule.branchId) &&
           !assignments.some((assignment) => assignment.brokerId === broker.id),
       )
     : [];
+  const filteredEligibleBrokers = eligibleBrokers.filter((broker) => {
+    const query = brokerSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return true;
+    return `${broker.name} ${broker.internalCode ?? ""}`.toLocaleLowerCase("pt-BR").includes(query);
+  });
   const history = schedule
     ? snapshot.history.filter((event) => event.scheduleId === schedule.id).slice(0, 6)
     : [];
@@ -761,7 +641,7 @@ function DutyInspector({
               <>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={schedule.status} />
-                  <span className="text-xs text-muted-foreground">{schedule.branchName}</span>
+                  <span className="text-xs text-muted-foreground">{schedule.branchName ?? "Todas as unidades"}</span>
                 </div>
                 <SheetTitle>{schedule.name}</SheetTitle>
                 <SheetDescription>
@@ -808,10 +688,6 @@ function DutyInspector({
                   </SheetSectionHeader>
                   <dl className="grid gap-3 p-4 text-sm">
                     <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Prioridade</dt>
-                      <dd>P{schedule.priority}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
                       <dt className="text-muted-foreground">Origem</dt>
                       <dd className="text-right">
                         {schedule.credentialName ?? "Todas as origens"}
@@ -840,6 +716,13 @@ function DutyInspector({
                   </SheetSectionHeader>
                   <div className="grid gap-3 p-4">
                     <form className="flex gap-2" onSubmit={assignBroker}>
+                      <Input
+                        value={brokerSearch}
+                        onChange={(event) => setBrokerSearch(event.target.value)}
+                        placeholder="Pesquisar por nome ou código"
+                        aria-label="Pesquisar corretor por nome ou código"
+                        disabled={pending || schedule.status !== "active"}
+                      />
                       <AppSelect
                         name="brokerId"
                         value={selectedBrokerId}
@@ -850,13 +733,13 @@ function DutyInspector({
                         options={[
                           {
                             value: "",
-                            label: eligibleBrokers.length
+                            label: filteredEligibleBrokers.length
                               ? "Selecionar corretor"
                               : "Nenhum corretor elegível",
                           },
-                          ...eligibleBrokers.map((b) => ({
+                          ...filteredEligibleBrokers.map((b) => ({
                             value: b.id,
-                            label: `${b.name} · ${b.availabilityStatus === "available" ? "Disponível" : "Pausado"}`,
+                            label: `${b.name}${b.internalCode ? ` · ${b.internalCode}` : ""} · ${b.availabilityStatus === "available" ? "Disponível" : "Pausado"}`,
                           })),
                         ]}
                       />
@@ -866,8 +749,9 @@ function DutyInspector({
                         disabled={
                           pending ||
                           !selectedBrokerId ||
+                          !filteredEligibleBrokers.some((broker) => broker.id === selectedBrokerId) ||
                           schedule.status !== "active" ||
-                          !eligibleBrokers.length
+                          !filteredEligibleBrokers.length
                         }
                       >
                         Adicionar
@@ -942,15 +826,25 @@ function DutyInspector({
               </SheetBody>
               <SheetFooter>
                 {schedule.status === "archived" ? (
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      runAction(restoreDutyScheduleAction, "Plantão restaurado como inativo.")
-                    }
-                    disabled={pending}
-                  >
-                    Restaurar
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        runAction(restoreDutyScheduleAction, "Plantão restaurado como inativo.")
+                      }
+                      disabled={pending}
+                    >
+                      Restaurar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setConfirmDelete(true)}
+                      disabled={pending}
+                    >
+                      Excluir
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button
@@ -987,6 +881,14 @@ function DutyInspector({
                       <Trash />
                       Arquivar
                     </Button>
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setConfirmDelete(true)}
+                      disabled={pending}
+                    >
+                      Excluir
+                    </Button>
                   </>
                 )}
               </SheetFooter>
@@ -1017,48 +919,47 @@ function DutyInspector({
           </DialogFooter>
         </DialogPopup>
       </Dialog>
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>Excluir este plantão permanentemente?</DialogTitle>
+            <DialogDescription>
+              Esta ação remove a regra e a escala de corretores de forma definitiva. O registro de auditoria será preservado, mas o plantão não poderá ser restaurado.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={pending}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => runAction(deleteDutyScheduleAction, "Plantão excluído permanentemente.", true)} disabled={pending}>Excluir plantão</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </>
   );
 }
 
 export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
-  const [selectedBranchId, setSelectedBranchId] = useState(snapshot.branches[0]?.id ?? "");
-  const [selectedQueueId, setSelectedQueueId] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [formSchedule, setFormSchedule] = useState<Schedule | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const selectedQueue = selectedQueueId === "all" ? null : selectedQueueId;
   const scopedSchedules = useMemo(
     () =>
       snapshot.schedules.filter(
         (schedule) =>
-          schedule.branchId === selectedBranchId &&
-          (!selectedQueue || schedule.queueId === selectedQueue) &&
           (showArchived || schedule.status !== "archived"),
       ),
-    [selectedBranchId, selectedQueue, showArchived, snapshot.schedules],
+    [showArchived, snapshot.schedules],
   );
-  const scopedAssignments = useMemo(
-    () => snapshot.assignments.filter((assignment) => assignment.branchId === selectedBranchId),
-    [selectedBranchId, snapshot.assignments],
-  );
+  const scopedAssignments = snapshot.assignments;
   const activeCount = scopedSchedules.filter((schedule) => schedule.status === "active").length;
   const inactiveCount = scopedSchedules.filter((schedule) => schedule.status === "inactive").length;
-  const archivedCount = snapshot.schedules.filter(
-    (schedule) => schedule.branchId === selectedBranchId && schedule.status === "archived",
-  ).length;
+  const archivedCount = snapshot.schedules.filter((schedule) => schedule.status === "archived").length;
   const gapCount = scopedSchedules.filter(
     (schedule) =>
       schedule.status === "active" && !coverageLabel(schedule, scopedAssignments).covered,
   ).length;
-  const branchQueues = snapshot.queues.filter((queue) => queue.branchId === selectedBranchId);
 
   function openCreate() {
-    if (!branchQueues.length) {
-      toast.error("Crie ou ative uma fila nesta unidade antes de criar um plantão.");
-      return;
-    }
     setFormSchedule(null);
     setFormOpen(true);
   }
@@ -1079,38 +980,15 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
         </div>
         <Button
           onClick={openCreate}
-          disabled={!branchQueues.length}
-          title={!branchQueues.length ? "É necessário ter uma fila ativa nesta unidade" : undefined}
         >
           <Plus />
           Novo plantão
         </Button>
       </section>
       <section className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-2 text-sm font-medium">
-            <Buildings className="size-4 text-muted-foreground" />
-            Unidade
-          </span>
-          <AppSelect
-            className="w-48"
-            value={selectedBranchId}
-            onValueChange={(val) => {
-              setSelectedBranchId(val);
-              setSelectedQueueId("all");
-              setSelectedSchedule(null);
-            }}
-            options={snapshot.branches.map((b) => ({ value: b.id, label: b.name }))}
-          />
-          <AppSelect
-            className="w-48"
-            value={selectedQueueId}
-            onValueChange={setSelectedQueueId}
-            options={[
-              { value: "all", label: "Todas as filas" },
-              ...branchQueues.map((q) => ({ value: q.id, label: q.name })),
-            ]}
-          />
+        <div>
+          <p className="text-sm font-medium">Escopo: todas as unidades</p>
+          <p className="mt-1 text-xs text-muted-foreground">Os plantões são globais; as filas apenas escolhem quando uma origem usa a regra.</p>
         </div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <Checkbox
@@ -1183,8 +1061,8 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
             </span>
             <div>
               <p className="text-sm font-semibold">Nenhum plantão neste escopo</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Crie uma regra para que a unidade comece a organizar sua cobertura.
+          <p className="mt-1 text-xs text-muted-foreground">
+                Crie uma regra para organizar a cobertura de todas as unidades.
               </p>
             </div>
             <Button onClick={openCreate}>
@@ -1195,6 +1073,7 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
         </Card>
       )}
       <DutyInspector
+        key={`${selectedSchedule?.id ?? "closed"}-${selectedSchedule ? "open" : "closed"}`}
         schedule={selectedSchedule}
         open={Boolean(selectedSchedule)}
         onOpenChange={(open) => {

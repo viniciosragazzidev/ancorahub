@@ -717,8 +717,10 @@ export const unitDutySchedules = pgTable(
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    branchId: text("branch_id").notNull().references(() => branches.id, { onDelete: "cascade" }),
-    queueId: text("queue_id").notNull().references(() => leadQueues.id, { onDelete: "cascade" }),
+    // Null means this is a tenant-wide plantão. Legacy rows may still keep
+    // their historical unit and queue references until they are edited.
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+    queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     dayOfWeek: integer("day_of_week").notNull(),
     startsAt: text("starts_at").notNull(),

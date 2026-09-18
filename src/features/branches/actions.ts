@@ -53,9 +53,10 @@ export async function createBranchAction(
       id: randomUUID(),
       tenantId: context.tenantId,
       name: parsed.data.name,
+      externalId: parsed.data.externalId || null,
       status: "active",
     });
-    return { success: true };
+    return { success: true, message: "Filial criada." };
   } catch (error) {
     return actionError(error);
   }
@@ -75,15 +76,32 @@ export async function updateBranchAction(
 
   try {
     const context = await getDirectorContext();
-    const result = await getDatabase()
-      .update(schema.branches)
-      .set({ name: parsed.data.name })
-      .where(
-        and(eq(schema.branches.id, branchId.data), eq(schema.branches.tenantId, context.tenantId)),
-      )
-      .returning({ id: schema.branches.id });
+    const db = getDatabase();
+    const result = await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(schema.branches)
+        .set({
+          name: parsed.data.name,
+          externalId: parsed.data.externalId || null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(eq(schema.branches.id, branchId.data), eq(schema.branches.tenantId, context.tenantId)),
+        )
+        .returning({ id: schema.branches.id });
+      if (updated.length) {
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "branch",
+          entidadeId: branchId.data,
+          acao: "branch.updated",
+        });
+      }
+      return updated;
+    });
     if (result.length === 0) return { error: "Filial não encontrada." };
-    return { success: true };
+    return { success: true, message: "Filial atualizada." };
   } catch (error) {
     return actionError(error);
   }
@@ -110,7 +128,7 @@ export async function toggleBranchAction(
       .update(schema.branches)
       .set({ status: branch.status === "active" ? "inactive" : "active" })
       .where(eq(schema.branches.id, branch.id));
-    return { success: true };
+    return { success: true, message: branch.status === "active" ? "Filial desativada." : "Filial ativada." };
   } catch (error) {
     return actionError(error);
   }
@@ -137,7 +155,7 @@ export async function toggleAcceptingLeadsAction(
       .update(schema.branches)
       .set({ acceptingLeads: !branch.acceptingLeads })
       .where(eq(schema.branches.id, branch.id));
-    return { success: true };
+    return { success: true, message: branch.acceptingLeads ? "Recebimento de leads pausado." : "Recebimento de leads ativado." };
   } catch (error) {
     return actionError(error);
   }

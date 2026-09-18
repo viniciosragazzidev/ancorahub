@@ -19,6 +19,10 @@ export const createUserInput = z.object({
   ),
   phone: z.string().trim().min(8).max(30),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
+  brokerCode: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9._-]+$/, "Use apenas letras, números, ponto, hífen ou sublinhado no código.").optional(),
+  ),
   // The UI sends the job title and profile separately. Older clients could
   // accidentally send the title (e.g. "marketing") as role; normalize that
   // value server-side so only the two supported access profiles reach the
@@ -48,6 +52,10 @@ export async function createTeamUser(rawInput: unknown) {
       .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active")))
       .limit(1);
     if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+  }
+
+  if (input.brokerCode && (input.role !== "broker" || input.jobTitle !== "broker")) {
+    throw new Error("O código do corretor só pode ser informado para membros com cargo de corretor.");
   }
 
   const [branch] = await db
@@ -122,7 +130,20 @@ export async function createTeamUser(rawInput: unknown) {
   let invitationId = "";
 
   await db.transaction(async (tx) => {
-    const internalCode = await generateNextInternalCode(tx, context.tenantId);
+    let internalCode = input.brokerCode ?? null;
+    if (internalCode) {
+      const [existingCode] = await tx
+        .select({ id: schema.brokerProfiles.id })
+        .from(schema.brokerProfiles)
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          eq(schema.brokerProfiles.internalCode, internalCode),
+        ))
+        .limit(1);
+      if (existingCode) throw new Error("Já existe um corretor com este código nesta corretora.");
+    } else {
+      internalCode = await generateNextInternalCode(tx, context.tenantId);
+    }
 
     await tx.insert(schema.brokerProfiles).values({
       id: brokerProfileId,

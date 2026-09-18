@@ -56,6 +56,10 @@ const STATUS_DEFAULT_LABEL: Record<DsStatusBadgeStatus, string> = {
  * the spacing scale), not the doc's literal 6px/10px — confirmed with the
  * user. Pending/completed and warning/success share the same tone pair by
  * design; destructive is the system's only red — don't introduce another.
+ *
+ * `text-ds-caption` carries a 1.5 line-height meant for body copy, which
+ * made the badge read as too tall/large in practice — overridden to
+ * `leading-none` here, and the dot/gap tightened to match, per user feedback.
  */
 export const DsStatusBadge = React.forwardRef<HTMLSpanElement, DsStatusBadgeProps>(
   function DsStatusBadge({ className, status, label, ...props }, ref) {
@@ -64,14 +68,14 @@ export const DsStatusBadge = React.forwardRef<HTMLSpanElement, DsStatusBadgeProp
         ref={ref}
         data-slot="ds-status-badge"
         className={cn(
-          "inline-flex items-center gap-ds-8 rounded-ds-tags px-ds-8 py-ds-4 font-ds-inter text-ds-caption font-medium",
+          "inline-flex items-center gap-ds-4 rounded-ds-tags px-ds-8 py-ds-4 font-ds-inter text-ds-caption leading-none font-medium",
           STATUS_CLASS[status],
           className,
         )}
         {...props}
       >
         <span
-          className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT_CLASS[status])}
+          className={cn("size-1 shrink-0 rounded-full", STATUS_DOT_CLASS[status])}
           aria-hidden="true"
         />
         {label ?? STATUS_DEFAULT_LABEL[status]}

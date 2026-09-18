@@ -514,7 +514,7 @@ export default async function LeadDistributionPage({
           eq(schema.unitDutySchedules.tenantId, context.tenantId),
           eq(schema.unitDutySchedules.status, "active"),
           context.role === "manager" && context.branchId
-            ? eq(schema.unitDutySchedules.branchId, context.branchId)
+            ? or(isNull(schema.unitDutySchedules.branchId), eq(schema.unitDutySchedules.branchId, context.branchId))
             : undefined,
         ),
       )

@@ -217,7 +217,7 @@ async function getDutyFallbackWarning(
     .where(and(
       eq(schema.unitDutySchedules.tenantId, tenantId),
       inArray(schema.unitDutySchedules.id, scheduleIds),
-      branchId ? eq(schema.unitDutySchedules.branchId, branchId) : undefined,
+      branchId ? or(isNull(schema.unitDutySchedules.branchId), eq(schema.unitDutySchedules.branchId, branchId)) : undefined,
       eq(schema.unitDutySchedules.status, "active"),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       lte(schema.unitDutySchedules.startsAt, local.time),
@@ -260,10 +260,15 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
       );
 
     if (schedules.length !== dutyScheduleIds.length) throw new AuthorizationError("Um dos plantões selecionados não pertence a esta corretora.");
-    if (input.branchId && schedules.some((schedule) => schedule.branchId !== input.branchId)) {
+    if (input.branchId && schedules.some((schedule) => schedule.branchId && schedule.branchId !== input.branchId)) {
       throw new AuthorizationError("Todos os plantões selecionados precisam pertencer à mesma unidade da fila.");
     }
-    for (const schedule of schedules) assertManager(context, schedule.branchId);
+    for (const schedule of schedules) {
+      if (schedule.branchId) assertManager(context, schedule.branchId);
+      else if (context.role !== "director" && !input.branchId) {
+        throw new AuthorizationError("Plantões globais precisam estar vinculados a uma fila da unidade.");
+      }
+    }
   }
 
   await assertDutyFallbackQueue(db, context, input.id, input.dutyFallbackQueueId ?? null, input.dutyFallbackPolicy);

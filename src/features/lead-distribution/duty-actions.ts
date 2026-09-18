@@ -1,47 +1,23 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, lt, ne } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
 
-export type DutyActionState = { success?: boolean; error?: string; scheduleId?: string; scheduleIds?: string[] };
+export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
 
-async function assertBatchDutyAccess(branchIds: string[]) {
+async function assertBatchDutyAccess() {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director" && context.role !== "manager") {
-    throw new Error("Apenas Gestores e Diretores podem configurar plantões.");
-  }
-  if (context.role === "manager" && branchIds.some((branchId) => branchId !== context.branchId)) {
-    throw new Error("Você só pode configurar plantões da sua unidade.");
-  }
+  if (context.role !== "director") throw new Error("Apenas Diretores podem configurar plantões globais.");
   return { context, db: getDatabase() };
 }
 
-async function assertQueueInScope(
-  db: ReturnType<typeof getDatabase>,
-  tenantId: string,
-  branchId: string,
-  queueId: string,
-) {
-  const [queue] = await db
-    .select({ id: schema.leadQueues.id })
-    .from(schema.leadQueues)
-    .where(and(
-      eq(schema.leadQueues.id, queueId),
-      eq(schema.leadQueues.tenantId, tenantId),
-      eq(schema.leadQueues.branchId, branchId),
-      eq(schema.leadQueues.status, "active"),
-    ))
-    .limit(1);
-  if (!queue) throw new Error("Fila não encontrada nesta unidade.");
-}
-
-type ScheduleConflictInput = Pick<z.infer<typeof dutyScheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "priority" | "startsAt" | "endsAt">;
+type ScheduleConflictInput = Pick<z.infer<typeof dutyScheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "startsAt" | "endsAt">;
 
 async function assertNoScheduleConflict(
   db: ReturnType<typeof getDatabase>,
@@ -51,13 +27,13 @@ async function assertNoScheduleConflict(
 ) {
   const conditions = [
     eq(schema.unitDutySchedules.tenantId, tenantId),
-    eq(schema.unitDutySchedules.branchId, input.branchId),
-    eq(schema.unitDutySchedules.queueId, input.queueId),
     eq(schema.unitDutySchedules.dayOfWeek, input.dayOfWeek),
-    eq(schema.unitDutySchedules.priority, input.priority),
     eq(schema.unitDutySchedules.status, "active"),
     lt(schema.unitDutySchedules.startsAt, input.endsAt),
     gt(schema.unitDutySchedules.endsAt, input.startsAt),
+    input.branchId === null || input.branchId === undefined
+      ? and(isNull(schema.unitDutySchedules.branchId), isNull(schema.unitDutySchedules.queueId))
+      : and(eq(schema.unitDutySchedules.branchId, input.branchId), input.queueId ? eq(schema.unitDutySchedules.queueId, input.queueId) : isNull(schema.unitDutySchedules.queueId)),
   ];
   if (excludedScheduleId) conditions.push(ne(schema.unitDutySchedules.id, excludedScheduleId));
 
@@ -67,7 +43,7 @@ async function assertNoScheduleConflict(
     .where(and(...conditions))
     .limit(1);
   if (conflict) {
-    throw new Error("Já existe um plantão ativo com a mesma prioridade e horário nesta fila.");
+    throw new Error("Já existe um plantão ativo com o mesmo horário neste escopo.");
   }
 }
 
@@ -105,7 +81,7 @@ async function findScheduleForMutation(scheduleId: string) {
     .limit(1);
   if (!schedule) throw new Error("Plantão não encontrado.");
   if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
-  if (context.role === "manager" && context.branchId !== schedule.branchId) {
+  if (context.role === "manager" && schedule.branchId && context.branchId !== schedule.branchId) {
     throw new Error("Plantão fora do seu escopo.");
   }
   return { context, db, schedule };
@@ -121,24 +97,20 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
     for (const dayOfWeek of parsed.data.daysOfWeek) {
       validateSchedule({ ...parsed.data, dayOfWeek });
     }
-    const { context, db } = await assertBatchDutyAccess(parsed.data.unitAssignments.map((assignment) => assignment.branchId));
-    const schedules = parsed.data.unitAssignments.flatMap((assignment) =>
-      parsed.data.daysOfWeek.map((dayOfWeek) => ({
-        branchId: assignment.branchId,
-        queueId: assignment.queueId,
+    const { context, db } = await assertBatchDutyAccess();
+    const schedules = parsed.data.daysOfWeek.map((dayOfWeek) => ({
+        branchId: null,
+        queueId: null,
         name: parsed.data.name,
         dayOfWeek,
         startsAt: parsed.data.startsAt,
         endsAt: parsed.data.endsAt,
-        priority: parsed.data.priority,
         minimumBrokers: parsed.data.minimumBrokers,
         validFrom: parsed.data.validFrom,
         validUntil: parsed.data.validUntil,
         webhookCredentialId: parsed.data.webhookCredentialId,
-      })),
-    );
+      }));
     for (const schedule of schedules) {
-      await assertQueueInScope(db, context.tenantId, schedule.branchId, schedule.queueId);
       await assertNoScheduleConflict(db, schedule, context.tenantId);
     }
     const scheduleIds = schedules.map(() => randomUUID());
@@ -153,7 +125,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         dayOfWeek: schedule.dayOfWeek,
         startsAt: schedule.startsAt,
         endsAt: schedule.endsAt,
-        priority: schedule.priority,
+        priority: 100,
         minimumBrokers: schedule.minimumBrokers,
         validFrom: schedule.validFrom,
         validUntil: schedule.validUntil ?? null,
@@ -167,7 +139,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       })));
     });
     revalidateDutyWorkspace();
-    return { success: true, scheduleId: scheduleIds[0], scheduleIds };
+    return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.` };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível criar o plantão." };
   }
@@ -181,10 +153,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
     validateSchedule(parsed.data);
     const { context, db, schedule } = await findScheduleForMutation(scheduleId.data);
     if (schedule.status === "archived") throw new Error("Restaure o plantão antes de editá-lo.");
-    await assertQueueInScope(db, context.tenantId, parsed.data.branchId, parsed.data.queueId);
-    if (parsed.data.branchId !== schedule.branchId && context.role === "manager") {
-      throw new Error("Você não pode mover o plantão para outra unidade.");
-    }
+    if (context.role === "manager") throw new Error("Apenas Diretores podem editar plantões globais.");
     await assertNoScheduleConflict(db, parsed.data, context.tenantId, schedule.id);
     await db.transaction(async (tx) => {
       await tx.update(schema.unitDutySchedules).set({
@@ -198,7 +167,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
       });
     });
     revalidateDutyWorkspace();
-    return { success: true, scheduleId: schedule.id };
+    return { success: true, scheduleId: schedule.id, message: "Plantão atualizado." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível editar o plantão." };
   }
@@ -278,6 +247,35 @@ export async function archiveDutyScheduleAction(_previous: DutyActionState, form
     return { success: true, scheduleId: schedule.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível arquivar o plantão." };
+  }
+}
+
+export async function deleteDutyScheduleAction(_previous: DutyActionState, formData: FormData): Promise<DutyActionState> {
+  const scheduleId = z.string().uuid().safeParse(formData.get("scheduleId"));
+  if (!scheduleId.success) return { error: "Plantão inválido." };
+  try {
+    const { context, db, schedule } = await findScheduleForMutation(scheduleId.data);
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "unit_duty_schedule",
+        entidadeId: schedule.id,
+        acao: "duty_schedule.deleted",
+      });
+      await tx.delete(schema.dutyRosterAssignments).where(and(
+        eq(schema.dutyRosterAssignments.scheduleId, schedule.id),
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+      ));
+      await tx.delete(schema.unitDutySchedules).where(and(
+        eq(schema.unitDutySchedules.id, schedule.id),
+        eq(schema.unitDutySchedules.tenantId, context.tenantId),
+      ));
+    });
+    revalidateDutyWorkspace();
+    return { success: true, scheduleId: schedule.id, message: "Plantão excluído permanentemente." };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Não foi possível excluir o plantão." };
   }
 }
 

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,15 @@ import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
 import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
 import { withPerfSpan, withRequestTiming } from "@/shared/observability/request-timing";
 import { getLocalDutyParts } from "@/features/leads/assignment";
+import {
+  getCachedLeadsBranches,
+  getCachedPausedBranchCount,
+  getCachedSlaSettings,
+  getCachedLegacyPlans,
+  getCachedActiveQueues,
+  getCachedLeadsBrokers,
+  getCachedActiveDutyAssignments,
+} from "@/features/leads/reference-data";
 
 export default async function LeadsPage(props: Parameters<typeof LeadsPageContent>[0]) {
   const { result } = await withRequestTiming("/leads", () => LeadsPageContent(props));
@@ -447,47 +456,13 @@ async function LeadsPageContent({
       .orderBy(...finalOrderBy)
         .limit(pageSize)
         .offset(offset)),
-    withPerfSpan("leads.legacy_plans", () => db
-      .select({ id: schema.carrierPlans.id, name: schema.carrierPlans.name, carrierName: schema.carriers.name })
-      .from(schema.carrierPlans)
-      .innerJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
-      .where(
-        and(
-          eq(schema.carrierPlans.tenantId, context.tenantId),
-          eq(schema.carrierPlans.active, true),
-          eq(schema.carriers.status, "active")
-        )
-      )
-      .orderBy(schema.carriers.name, schema.carrierPlans.name)),
-    withPerfSpan("leads.branches", () => db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(eq(schema.branches.tenantId, context.tenantId))),
+    withPerfSpan("leads.legacy_plans", () => getCachedLegacyPlans(context.tenantId)),
+    withPerfSpan("leads.branches", () => getCachedLeadsBranches(context.tenantId)),
     isDirector
-      ? db
-          .select({ count: count() })
-          .from(schema.branches)
-          .where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.acceptingLeads, false)))
-          .then((r) => Number(r[0]?.count ?? 0))
+      ? withPerfSpan("leads.paused_branch_count", () => getCachedPausedBranchCount(context.tenantId))
       : Promise.resolve(0),
-    withPerfSpan("leads.sla_settings", () => db
-      .select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes, slaStagnantDays: schema.tenants.slaStagnantDays })
-      .from(schema.tenants)
-      .where(eq(schema.tenants.id, context.tenantId))
-      .then((r) => r[0] ?? { slaFirstContactMinutes: "15", slaStagnantDays: "3" })),
-    context.role === "manager" || context.role === "director"
-      ? db
-          .select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId })
-          .from(schema.tenantMemberships)
-          .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-          .where(
-            and(
-              eq(schema.tenantMemberships.tenantId, context.tenantId),
-              eq(schema.tenantMemberships.role, "broker"),
-              eq(schema.tenantMemberships.jobTitle, "broker"),
-              eq(schema.tenantMemberships.status, "active"),
-              eq(schema.user.active, true),
-              context.role === "manager" && context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : undefined
-            )
-          )
-      : Promise.resolve([]),
+    withPerfSpan("leads.sla_settings", () => getCachedSlaSettings(context.tenantId)),
+    withPerfSpan("leads.brokers", () => getCachedLeadsBrokers(context.tenantId, context.role, context.branchId ?? null)),
     withPerfSpan("leads.qualifying_list", () => db
       .select({
         id: schema.leads.id,
@@ -530,19 +505,7 @@ async function LeadsPageContent({
       )
       .orderBy(desc(schema.leads.createdAt))
       .limit(50)),
-    withPerfSpan("leads.active_queues", () => db
-      .select({
-        id: schema.leadQueues.id,
-        name: schema.leadQueues.name,
-        branchId: schema.leadQueues.branchId,
-        assignmentMode: schema.leadQueues.assignmentMode,
-      })
-      .from(schema.leadQueues)
-      .where(and(
-        eq(schema.leadQueues.tenantId, context.tenantId),
-        eq(schema.leadQueues.status, "active"),
-        isNull(schema.leadQueues.deletedAt),
-      ))),
+    withPerfSpan("leads.active_queues", () => getCachedActiveQueues(context.tenantId)),
     withPerfSpan("leads.urgent", () => getUrgentLeadForUser().catch(() => null)),
     withPerfSpan("leads.unassigned_count", () => unassignedWhere
       ? db.select({ total: count() }).from(schema.leads).where(unassignedWhere)
@@ -579,27 +542,7 @@ async function LeadsPageContent({
         .limit(pageSize)
         .offset(offset)
       : Promise.resolve([])),
-    withPerfSpan("leads.active_duty_assignments", () => db
-      .select({ branchId: schema.dutyRosterAssignments.branchId, brokerId: schema.dutyRosterAssignments.brokerId })
-      .from(schema.dutyRosterAssignments)
-      .innerJoin(schema.unitDutySchedules, eq(schema.dutyRosterAssignments.scheduleId, schema.unitDutySchedules.id))
-      .where(and(
-        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
-        eq(schema.dutyRosterAssignments.status, "active"),
-        eq(schema.unitDutySchedules.tenantId, context.tenantId),
-        eq(schema.unitDutySchedules.status, "active"),
-        eq(schema.dutyRosterAssignments.branchId, schema.unitDutySchedules.branchId),
-        eq(schema.unitDutySchedules.dayOfWeek, dutyLocal.weekday),
-        lte(schema.unitDutySchedules.startsAt, dutyLocal.time),
-        gt(schema.unitDutySchedules.endsAt, dutyLocal.time),
-        lte(schema.unitDutySchedules.validFrom, dutyNow),
-        or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, dutyNow)),
-        eq(schema.dutyRosterAssignments.dayOfWeek, dutyLocal.weekday),
-        lte(schema.dutyRosterAssignments.startsAt, dutyLocal.time),
-        gt(schema.dutyRosterAssignments.endsAt, dutyLocal.time),
-        lte(schema.dutyRosterAssignments.validFrom, dutyNow),
-        or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, dutyNow)),
-      ))),
+    withPerfSpan("leads.active_duty_assignments", () => getCachedActiveDutyAssignments(context.tenantId, dutyLocal, dutyNow)),
   ]));
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);

@@ -204,7 +204,7 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       schema.unitDutySchedules,
       and(
         eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId),
-        eq(schema.unitDutySchedules.queueId, schema.leads.queueId),
+        or(isNull(schema.unitDutySchedules.queueId), eq(schema.unitDutySchedules.queueId, schema.leads.queueId)),
         or(isNull(schema.leads.branchId), eq(schema.unitDutySchedules.branchId, schema.leads.branchId)),
       ),
     )

@@ -21,7 +21,7 @@ async function checkBrokerOnDuty(tenantId: string, branchId: string, userId: str
     .from(schema.unitDutySchedules)
     .where(and(
       eq(schema.unitDutySchedules.tenantId, tenantId),
-      eq(schema.unitDutySchedules.branchId, branchId),
+      or(eq(schema.unitDutySchedules.branchId, branchId), isNull(schema.unitDutySchedules.branchId)),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       eq(schema.unitDutySchedules.status, "active"),
       lte(schema.unitDutySchedules.startsAt, local.time),

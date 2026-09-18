@@ -214,6 +214,13 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                   </Select>
                   {jobTitle === "broker" ? <p className="text-xs text-muted-foreground">Corretor usa Operação individual automaticamente.</p> : null}
                 </Field>
+                {jobTitle === "broker" ? (
+                  <Field>
+                    <FieldLabel htmlFor="user-broker-code">Código do corretor <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+                    <Input id="user-broker-code" name="brokerCode" placeholder="Ex.: COR-001" autoComplete="off" disabled={pending} />
+                    <p className="text-xs text-muted-foreground">Se ficar vazio, o sistema gera um código automaticamente. O código deve ser único nesta corretora.</p>
+                  </Field>
+                ) : null}
                 {customRoles.length > 0 && jobTitle !== "director" ? (
                   <Field>
                     <FieldLabel>Cargo personalizado <span className="text-muted-foreground">(opcional)</span></FieldLabel>

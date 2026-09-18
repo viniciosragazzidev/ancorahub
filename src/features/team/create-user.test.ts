@@ -24,6 +24,13 @@ describe("createUserInput", () => {
     expect(createUserInput.safeParse({ ...validInput, email: "email-invalido" }).success)
       .toBe(false);
   });
+
+  it("aceita e preserva o código informado para um corretor", () => {
+    expect(createUserInput.parse({ ...validInput, email: "", brokerCode: " COR-001 " }).brokerCode)
+      .toBe("COR-001");
+    expect(createUserInput.safeParse({ ...validInput, email: "", brokerCode: "código inválido" }).success)
+      .toBe(false);
+  });
 });
 
 describe("classifyExistingTeamIdentity", () => {
