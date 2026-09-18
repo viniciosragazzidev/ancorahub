@@ -2,8 +2,7 @@ import * as React from "react";
 import { cn } from "@/utils/core/cn";
 import { dsButtonVariants } from "@/components/ui/ds-button-variants";
 
-export interface DsGhostNavButtonProps
-  extends React.ComponentPropsWithoutRef<"button"> {}
+export type DsGhostNavButtonProps = React.ComponentPropsWithoutRef<"button">;
 
 /**
  * Ghost Nav Button — docs/design-system.md § Components.

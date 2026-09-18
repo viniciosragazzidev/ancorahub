@@ -28,10 +28,13 @@ export function PeriodSelect({
   value,
   includeAll = false,
   label = "Período",
+  triggerClassName,
 }: {
   value: PeriodValue | "all";
   includeAll?: boolean;
   label?: string;
+  /** Additive visual override — leave unset for the existing default look. */
+  triggerClassName?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -63,7 +66,11 @@ export function PeriodSelect({
         }
       }}
     >
-      <SelectTrigger className="w-32 bg-card text-xs max-[559px]:h-(--mobile-touch-target)" aria-label={label} disabled={isPending}>
+      <SelectTrigger
+        className={triggerClassName ?? "w-32 bg-card text-xs max-[559px]:h-(--mobile-touch-target)"}
+        aria-label={label}
+        disabled={isPending}
+      >
         <SelectValue placeholder="Selecione o período" />
       </SelectTrigger>
       <SelectContent>

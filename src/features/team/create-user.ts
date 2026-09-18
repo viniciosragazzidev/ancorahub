@@ -9,6 +9,7 @@ import { requireCanCreateRole } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "./onboarding-helpers";
 import { enqueueBrokerInvitation } from "./broker-invitation-delivery";
+import { classifyExistingTeamIdentity } from "./identity-reuse-policy";
 
 export const createUserInput = z.object({
   name: z.string().trim().min(2).max(120),
@@ -91,8 +92,29 @@ export async function createTeamUser(rawInput: unknown) {
     .where(eq(schema.user.email, input.email))
     .limit(1) : [];
 
+  let reusableUserId: string | null = null;
   if (existingUser) {
-    throw new Error("Este e-mail já pertence a uma conta existente. Use outro e-mail para criar o novo acesso.");
+    const [identity] = await db
+      .select({ id: schema.user.id, active: schema.user.active, status: schema.user.status })
+      .from(schema.user)
+      .where(eq(schema.user.id, existingUser.id))
+      .limit(1);
+    const [tenantMembership] = await db
+      .select({ id: schema.tenantMemberships.id })
+      .from(schema.tenantMemberships)
+      .where(and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, existingUser.id),
+      ))
+      .limit(1);
+    const identityDecision = classifyExistingTeamIdentity(identity ?? null, tenantMembership ?? null);
+    if (identityDecision.kind === "tenant-conflict") {
+      throw new Error("Este e-mail já pertence a um membro desta corretora. Reative o acesso existente ou use outro e-mail.");
+    }
+    if (identityDecision.kind === "disabled") {
+      throw new Error("Este e-mail pertence a uma conta desativada. Reative a conta antes de criar um novo acesso.");
+    }
+    if (identityDecision.kind === "reuse") reusableUserId = identityDecision.userId;
   }
 
   const brokerProfileId = randomUUID();
@@ -106,7 +128,10 @@ export async function createTeamUser(rawInput: unknown) {
       id: brokerProfileId,
       tenantId: context.tenantId,
       branchId: input.branchId,
-      userId: null,
+      // A identidade pode ter sido preservada após uma exclusão. Vinculá-la
+      // ao novo perfil permite que o aceite do convite conclua o onboarding
+      // sem tentar criar uma segunda identidade global com o mesmo e-mail.
+      userId: reusableUserId,
       internalCode,
       professionalName: input.name,
       phone: normalizedPhone,
@@ -129,8 +154,17 @@ export async function createTeamUser(rawInput: unknown) {
       userId: context.userId,
       entidade: "broker_profile",
       entidadeId: brokerProfileId,
-      acao: "criou_corretor_onboarding",
+      acao: reusableUserId ? "recriou_corretor_onboarding" : "criou_corretor_onboarding",
     });
+    if (reusableUserId) {
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "user",
+        entidadeId: reusableUserId,
+        acao: "reutilizou_identidade_global_em_reconvite",
+      });
+    }
   });
 
   const whatsappStatus = await enqueueBrokerInvitation({

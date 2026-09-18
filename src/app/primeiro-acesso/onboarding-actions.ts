@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
 import { buildCredentialAccount } from "@/shared/auth/credential-account";
+import { classifyExistingTeamIdentity } from "@/features/team/identity-reuse-policy";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -86,30 +87,59 @@ export async function completeOnboardingAction(
       .where(eq(schema.user.email, accessEmail))
       .limit(1);
 
-    if (existingUser) {
-      throw new Error("Este e-mail já pertence a uma conta existente. Informe outro e-mail para concluir o cadastro.");
+    const [identity] = existingUser ? await db
+      .select({ id: schema.user.id, active: schema.user.active, status: schema.user.status })
+      .from(schema.user)
+      .where(eq(schema.user.id, existingUser.id))
+      .limit(1) : [];
+    const [membershipForIdentity] = existingUser ? await db
+      .select({ id: schema.tenantMemberships.id })
+      .from(schema.tenantMemberships)
+      .where(and(
+        eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+        eq(schema.tenantMemberships.userId, existingUser.id),
+      ))
+      .limit(1) : [];
+    const identityDecision = classifyExistingTeamIdentity(identity ?? null, membershipForIdentity ?? null);
+    if (identityDecision.kind === "tenant-conflict") {
+      throw new Error("Este e-mail já pertence a outro membro desta corretora.");
     }
-    const userId = randomUUID();
+    if (identityDecision.kind === "disabled") {
+      throw new Error("Esta conta está desativada. Solicite a reativação antes de aceitar o convite.");
+    }
+    const userId = identityDecision.kind === "reuse" ? identityDecision.userId : randomUUID();
 
     const hashedPassword = await hashPassword(input.password);
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
-      await tx.insert(schema.user).values({
-        id: userId,
-        name: input.name,
-        email: accessEmail,
-        emailVerified: true,
-        active: true,
-        status: "active",
-      });
+      if (!existingUser) {
+        await tx.insert(schema.user).values({
+          id: userId,
+          name: input.name,
+          email: accessEmail,
+          emailVerified: true,
+          active: true,
+          status: "active",
+        });
+      }
 
-      // Create credential account
-      await tx.insert(schema.account).values(buildCredentialAccount({
-        id: randomUUID(),
-        userId,
-        password: hashedPassword,
-      }));
+      // A deleted tenant member may still have a valid global credential.
+      // Preserve that credential so re-adding the member does not change
+      // access in another tenant. Only brand-new identities receive a
+      // password account here.
+      const [credentialAccount] = await tx
+        .select({ id: schema.account.id })
+        .from(schema.account)
+        .where(eq(schema.account.userId, userId))
+        .limit(1);
+      if (!credentialAccount) {
+        await tx.insert(schema.account).values(buildCredentialAccount({
+          id: randomUUID(),
+          userId,
+          password: hashedPassword,
+        }));
+      }
 
       // Upsert tenant membership
       const [existingMembership] = await tx

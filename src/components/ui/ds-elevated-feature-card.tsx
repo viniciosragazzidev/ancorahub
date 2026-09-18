@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@/utils/core/cn";
 
-export interface DsElevatedFeatureCardProps
-  extends React.ComponentPropsWithoutRef<"div"> {}
+export type DsElevatedFeatureCardProps = React.ComponentPropsWithoutRef<"div">;
 
 /**
  * Elevated Feature Card — docs/design-system.md § Components.

@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { notFound } from "next/navigation";
 import {
   Link2,
@@ -42,16 +45,37 @@ export default function ComponentPreviewPage() {
     notFound();
   }
 
+  const [dark, setDark] = useState(false);
+
+  // Toggles the same `.dark` class the real app applies to <html> (see
+  // app/layout.tsx) — not a locally-scoped class — so portaled content
+  // (Dialog, dropdowns) inherits it correctly too, exactly like production.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    return () => {
+      document.documentElement.classList.remove("dark");
+    };
+  }, [dark]);
+
   return (
     <div className="h-screen overflow-y-auto bg-ds-canvas-white px-ds-24 py-ds-48 font-ds-inter text-ds-charcoal">
       <div className="mx-auto flex max-w-[var(--ds-layout-page-max-width)] flex-col gap-ds-64">
-        <header>
-          <h1 className="font-ds-satoshi text-ds-display font-medium tracking-ds-satoshi text-ds-charcoal">
-            Component Preview
-          </h1>
-          <p className="mt-ds-8 text-ds-body-lg text-ds-fog">
-            Fundação isolada de docs/design-system.md — não integrada a nenhuma rota do produto.
-          </p>
+        <header className="flex items-start justify-between gap-ds-16">
+          <div>
+            <h1 className="font-ds-satoshi text-ds-display font-medium tracking-ds-satoshi text-ds-charcoal">
+              Component Preview
+            </h1>
+            <p className="mt-ds-8 text-ds-body-lg text-ds-fog">
+              Fundação isolada de docs/design-system.md — não integrada a nenhuma rota do produto.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDark((v) => !v)}
+            className="shrink-0 rounded-ds-buttons border border-ds-ash bg-ds-canvas-white px-ds-16 py-ds-8 font-ds-inter text-ds-body text-ds-charcoal hover:bg-ds-paper-mist"
+          >
+            {dark ? "☀️ Light" : "🌙 Dark"}
+          </button>
         </header>
 
         <Section title="Filled Dark CTA">

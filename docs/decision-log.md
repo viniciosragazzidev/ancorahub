@@ -1023,6 +1023,13 @@ Para `/vendas`, a navegação principal passa a antecipar o payload parcial, exi
 
 O convite usa exclusivamente o propósito `brokerInvitation`, resolvido para o template Meta `broker_first_access`, com idempotência por convite e entrega gradual pela outbox oficial existente. O processamento nunca usa WhatsApp pessoal. Links de templates Meta legados podem conter placeholders codificados antes ou depois do token; a entrada pública remove somente os sufixos/prefixos conhecidos e mantém a validação pelo hash como autoridade. A entrega automática exige o token cifrado recuperável: o worker não pode usar `invitationId` como substituto do token nem enviar fallback sem um token válido.
 
+**Emenda aprovada em 2026-09-18.** A regra de identidade nova continua valendo
+para um e-mail que já possui vínculo no tenant ou uma conta desativada. Quando um
+membro foi excluído, porém, a exclusão remove somente o vínculo e preserva a
+identidade global; um novo convite no mesmo tenant pode reutilizar essa identidade
+ativa sem vínculo local, mantendo a credencial existente e criando um novo perfil,
+convite e vínculo apenas após o aceite.
+
 ## DEC-095 — Autoridade de membro é derivada do vínculo ativo do tenant
 
 **Decisão aprovada em 2026-09-10.** A identidade global pode conservar vínculos

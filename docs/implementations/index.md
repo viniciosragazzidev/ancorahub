@@ -3,6 +3,7 @@
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
 | 2026-09-15 | `completed/2026-09-15-routing-rule-persistence-fix.md` | concluído | Migration idempotente da tabela `lead_routing_rules`, que faltava para salvar regras da Matriz de Roteamento. |
+| 2026-09-18 | `active/2026-09-18-team-member-recreation.md` | em validação | Recriação de membro excluído com o mesmo e-mail reutiliza somente uma identidade global ativa sem vínculo no tenant. |
 | 2026-09-15 | `completed/2026-09-15-distribution-surface-refinement.md` | concluído | Hierarquia visual, espaçamento, padding, textos e organização refinados na central `/distribuicao`, sem alterar regras de negócio. |
 | 2026-09-17 | `active/2026-09-17-distribution-visual-redesign.md` | em validação | Redesign da composição de `/distribuicao`, com abas compactas, campanhas visíveis nos cards de filas e menos duplicação visual. |
 | 2026-09-15 | `completed/2026-09-15-waha-qr-rotation-and-phone-reconciliation.md` | concluído | Rotação atômica do QR no WAHA e reconciliação de mensagens pelos 9 últimos dígitos para cobrir DDD divergente. |

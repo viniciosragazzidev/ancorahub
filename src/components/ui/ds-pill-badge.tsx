@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@/utils/core/cn";
 
-export interface DsPillBadgeProps
-  extends React.ComponentPropsWithoutRef<"span"> {}
+export type DsPillBadgeProps = React.ComponentPropsWithoutRef<"span">;
 
 /**
  * Pill Badge — docs/design-system.md § Components.

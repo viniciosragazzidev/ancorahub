@@ -29,12 +29,12 @@ export function AvailabilityToggle({
   };
 
   return (
-    <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border/50 text-xs">
+    <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border/50 text-[11px]">
       <button
         type="button"
         disabled={isPending}
         onClick={() => handleToggle("available")}
-        className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+        className={`px-1.5 py-0.5 rounded-md font-medium transition-all ${
           status === "available"
             ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
             : "text-muted-foreground hover:text-foreground"
@@ -46,7 +46,7 @@ export function AvailabilityToggle({
         type="button"
         disabled={isPending}
         onClick={() => handleToggle("paused")}
-        className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+        className={`px-1.5 py-0.5 rounded-md font-medium transition-all ${
           status === "paused"
             ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
             : "text-muted-foreground hover:text-foreground"
@@ -58,7 +58,7 @@ export function AvailabilityToggle({
         type="button"
         disabled={isPending}
         onClick={() => handleToggle("offline")}
-        className={`px-2 py-0.5 rounded-md font-medium transition-all ${
+        className={`px-1.5 py-0.5 rounded-md font-medium transition-all ${
           status === "offline"
             ? "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border border-zinc-500/30"
             : "text-muted-foreground hover:text-foreground"

@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@/utils/core/cn";
 
-export interface DsDashboardCardProps
-  extends React.ComponentPropsWithoutRef<"div"> {}
+export type DsDashboardCardProps = React.ComponentPropsWithoutRef<"div">;
 
 /**
  * Dashboard Card — docs/design-system.md § Components.
@@ -19,7 +18,7 @@ export const DsDashboardCard = React.forwardRef<
       ref={ref}
       data-slot="ds-dashboard-card"
       className={cn(
-        "rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-8 font-ds-inter text-ds-body text-ds-charcoal shadow-none",
+        "rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-8 font-ds-inter text-ds-body text-ds-charcoal shadow-none transition-colors duration-150 ease-out hover:border-ds-smoke",
         className,
       )}
       {...props}

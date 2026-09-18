@@ -694,7 +694,7 @@ export default async function LeadDistributionPage({
           </div>
         }
       />
-      <main className="min-h-full bg-ds-paper-mist px-4 py-5 lg:px-6 lg:py-7">
+      <main className="min-h-full px-4 py-5 lg:px-6 lg:py-7">
         <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
           <DistributionTabsContainer
             initialView={view}

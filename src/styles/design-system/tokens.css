@@ -119,3 +119,56 @@
   --ds-layout-card-padding: 16px;
   --ds-layout-element-gap: 8px;
 }
+
+/* ---------------------------------------------------------------------------
+ * Dark mode — mirrors the existing `.dark` mechanism already used by the
+ * rest of the app (see globals.css / theme.css), so no new toggle logic is
+ * needed. Because every Ds component reads colors through these custom
+ * properties (bg-ds-canvas-white → var(--color-ds-canvas-white)), redefining
+ * them here is enough for the whole Ds catalog to support dark — no
+ * component file needs to change.
+ *
+ * Neutral ramp: the light ramp (canvas-white → midnight-ink, 12 steps) is
+ * mirrored end-to-end using the SAME 12 hex values, just swapping which
+ * token name maps to which step — no new neutral color invented.
+ *
+ * Chromatic: Electric Blue brightens for legibility on dark; Deep Sapphire
+ * (the single CTA color) is promoted to light mode's Electric Blue value so
+ * it stays distinctly more saturated than the accent, same as in light mode.
+ * Primary Action Fill flips black→white, which — combined with the ramp
+ * mirror — makes the Filled Dark CTA automatically render as a light-fill/
+ * dark-text button in dark mode via the same token, no variant needed.
+ * Status tint/ink pairs (soft-mint, amber, rose, powder-blue) are genuinely
+ * new values here — a light tint doesn't work as a dark-mode wash, so these
+ * follow the standard dark-mode convention (near-950 wash + 400-ish ink).
+ * --------------------------------------------------------------------------- */
+.dark {
+  --color-ds-canvas-white: #0a0a0a;
+  --color-ds-paper-mist: #171717;
+  --color-ds-ash: #262626;
+  --color-ds-smoke: #404040;
+  --color-ds-pebble: #525252;
+  --color-ds-silver: #737373;
+  --color-ds-fog: #a3a3a3;
+  --color-ds-steel: #c8c8c8;
+  --color-ds-slate: #d4d4d4;
+  --color-ds-graphite: #e5e5e5;
+  --color-ds-charcoal: #f5f5f5;
+  --color-ds-midnight-ink: #ffffff;
+
+  --color-ds-electric-blue: #3b82f6;
+  --color-ds-deep-sapphire: #2563eb;
+  --color-ds-primary-action-fill: #ffffff;
+
+  --color-ds-soft-mint: #052e1a;
+  --color-ds-vivid-green: #4ade80;
+  --color-ds-forest-ink: #4ade80;
+  --color-ds-tangerine: #fb923c;
+  --color-ds-lavender: #a78bfa;
+
+  --color-ds-powder-blue: #16243d;
+  --color-ds-amber-wash: #3a2408;
+  --color-ds-amber-ink: #fbbf24;
+  --color-ds-rose-wash: #3d0e0e;
+  --color-ds-rose-ink: #f87171;
+}

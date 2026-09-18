@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@/utils/core/cn";
 
-export interface DsInputFieldProps
-  extends React.ComponentPropsWithoutRef<"input"> {}
+export type DsInputFieldProps = React.ComponentPropsWithoutRef<"input">;
 
 /**
  * Input Field — docs/design-system.md § Components.

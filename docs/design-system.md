@@ -1,7 +1,7 @@
 # Dub — Style Reference
 > frosted link dashboard on rice paper
 
-**Theme:** light
+**Theme:** light, with a dark companion (Fase 2 extension — see "Dark Mode" below)
 
 Dub's visual system is a quiet, almost editorial SaaS aesthetic — a near-white canvas held together by hairline borders rather than elevation, with dense monochrome typography doing the structural work and one electric blue (#2563eb) doing the talking. Surfaces stay flat and borderless-looking at a glance, but every container carries a 1px #e5e5e5 edge that creates a printed-document feel. The personality comes from a small vocabulary of colored 'feature pill' accents (orange, green, violet) that float above the otherwise neutral palette, and from Satoshi-weight-500 display headlines that read as confident and contemporary without being loud. Components are compact and dense: 8px gaps, 12px card radius, pill-shaped tags at 9999px, and ghost controls instead of heavy filled buttons.
 
@@ -37,6 +37,52 @@ Dub's visual system is a quiet, almost editorial SaaS aesthetic — a near-white
 | Forest Ink | `#166534` | `--color-forest-ink` | Success/completed status text, paired with Soft Mint. Darker than Vivid Green for AA contrast at small sizes |
 
 > Added in the Fase 1 extension (docs/implementations — /dashboard and /distribuicao pilots) to cover semantic status states the original palette didn't name. Same rule applies: don't invent a new pairing without adding it here first.
+
+## Dark Mode
+
+Added in the Fase 2 extension (docs/implementations — /dashboard pilot), after the user asked to support both themes. Applies via the same `.dark` class the rest of the app already uses on `<html>` — no new toggle mechanism.
+
+**Neutral ramp:** the light-mode neutral ramp (Canvas White → Midnight Ink, 12 steps from `#ffffff` to `#0a0a0a`) is mirrored end-to-end for dark mode — same 12 hex values, roles reassigned in reverse. No new neutral color introduced.
+
+| Token | Light value | Dark value |
+|---|---|---|
+| Canvas White | `#ffffff` | `#0a0a0a` (was Midnight Ink) |
+| Paper Mist | `#f5f5f5` | `#171717` (was Charcoal) |
+| Ash | `#e5e5e5` | `#262626` (was Graphite) |
+| Smoke | `#d4d4d4` | `#404040` (was Slate) |
+| Pebble | `#c8c8c8` | `#525252` (was Steel) |
+| Silver | `#a3a3a3` | `#737373` (was Fog) |
+| Fog | `#737373` | `#a3a3a3` (was Silver) |
+| Steel | `#525252` | `#c8c8c8` (was Pebble) |
+| Slate | `#404040` | `#d4d4d4` (was Smoke) |
+| Graphite | `#262626` | `#e5e5e5` (was Ash) |
+| Charcoal | `#171717` | `#f5f5f5` (was Paper Mist) |
+| Midnight Ink | `#0a0a0a` | `#ffffff` (was Canvas White) |
+
+**Chromatic:** Electric Blue brightens to `#3b82f6` for legibility on dark surfaces. Deep Sapphire (the single reserved CTA color) is promoted to light mode's Electric Blue value (`#2563eb`) in dark mode, so it stays the more saturated of the two blues — same relative hierarchy as light mode, not a coincidence. Primary Action Fill flips `#000000` → `#ffffff`; combined with the neutral mirror, this makes the Filled Dark CTA automatically render as a light-fill/dark-text button in dark mode and the Input Field's black-border exception automatically become a white-border exception — through the existing tokens, no component-level dark variant needed.
+
+| Token | Light value | Dark value |
+|---|---|---|
+| Electric Blue | `#2563eb` | `#3b82f6` |
+| Deep Sapphire | `#1e40af` | `#2563eb` |
+| Primary Action Fill | `#000000` | `#ffffff` |
+| Vivid Green | `#16a34a` | `#4ade80` |
+| Tangerine | `#ea580c` | `#fb923c` |
+| Lavender | `#7c3aed` | `#a78bfa` |
+
+**Status tint/ink pairs:** a light tint doesn't work as a dark-mode wash (too bright against a dark canvas), so these six are genuinely new values — following the standard dark-mode convention of a near-950 wash paired with a 400-ish ink:
+
+| Token | Light value | Dark value |
+|---|---|---|
+| Soft Mint | `#dcfce7` | `#052e1a` |
+| Forest Ink | `#166534` | `#4ade80` (aliases dark Vivid Green) |
+| Powder Blue | `#dbeaff` | `#16243d` |
+| Amber Wash | `#fef3c7` | `#3a2408` |
+| Amber Ink | `#92400e` | `#fbbf24` |
+| Rose Wash | `#fee2e2` | `#3d0e0e` |
+| Rose Ink | `#991b1b` | `#f87171` |
+
+**Shadows:** left as literal `rgba(0,0,0,…)` values in dark mode rather than inverted — a black shadow is naturally quieter against an already-dark canvas, which matches the common dark-UI convention of leaning on border/lightness contrast over shadow for elevation. Not a gap, a deliberate non-change.
 
 ## Tokens — Typography
 
