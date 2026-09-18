@@ -6,6 +6,9 @@
   oferta, redistribuição e SLA; os canais de entrada não escolhem corretor.
 - A criação durável da oferta vincula o corretor como owner provisório com origem
   `automatic_offer`, fazendo o lead aparecer imediatamente em sua carteira.
+- A carteira do corretor também consulta ofertas ativas (`PENDING`, `SENT`,
+  `DELIVERED` e `READ`) diretamente, garantindo que a aba “Aguardando aceite” não
+  dependa apenas do status comercial ou do vínculo provisório do lead.
 - O aceite confirma o atendimento; recusa, expiração, falha de enqueue e SLA
   liberam ou transferem o vínculo diretamente ao próximo elegível, sem sobrescrever
   um owner confirmado por ação concorrente.

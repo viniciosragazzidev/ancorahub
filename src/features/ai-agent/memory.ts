@@ -244,7 +244,7 @@ export function extractFieldsFromMessage(
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const city = match[1].trim();
-        if (city.length >= 3 && !commonWords.has(city.toLowerCase())) {
+        if (isLikelyCityAnswer(city)) {
           memory.city = { value: city, confidence: 1, sourceMessageId };
           addCollectedField(memory, "city");
           break;
@@ -256,7 +256,7 @@ export function extractFieldsFromMessage(
     // A city answer may include a neighbourhood/region after a comma
     // ("Rio de Janeiro, centro"). Keep the city segment only.
     const bareCity = trimmed.split(",")[0]?.trim() ?? "";
-    if (!memory.city && asksForCity && /^[\p{L}][\p{L} .'-]{2,59}$/u.test(bareCity) && !commonWords.has(normalizeForMatching(bareCity))) {
+    if (!memory.city && asksForCity && isLikelyCityAnswer(bareCity)) {
       memory.city = { value: bareCity, confidence: 1, sourceMessageId };
       addCollectedField(memory, "city");
     }
@@ -448,6 +448,32 @@ const commonWords = new Set([
   "bom", "dia", "tarde", "noite", "sim", "não", "nao", "oi", "ola", "olá",
   "obrigado", "obrigada", "ok", "tudo", "bem", "aqui", "ali", "la", "lá",
 ]);
+
+/**
+ * A bare answer to the city question is intentionally conservative. Long
+ * answers can contain a sentence such as "Estou saindo p dar aulas"; treating
+ * that sentence as a city makes the engine believe the qualification is
+ * complete and can trigger a premature handoff. Explicit location phrases
+ * ("moro em ...") are handled above, while this guard is used for short,
+ * context-only answers such as "Cabo Frio, RJ".
+ */
+function isLikelyCityAnswer(value: string): boolean {
+  const normalized = normalizeForMatching(value).trim();
+  if (!/^[\p{L}][\p{L} .'-]{2,59}$/u.test(value.trim())) return false;
+  if (commonWords.has(normalized)) return false;
+
+  const nonCityWords = new Set([
+    "aulas", "aqui", "anos", "bem", "busco", "cidade", "cnpj", "com",
+    "acima", "aulas", "como", "empresa", "estou", "eu", "familiar", "gostaria", "idade",
+    "individual", "leia", "ler", "logo", "mei", "nao", "não", "obgda", "obrigada", "obrigado",
+    "pessoas", "pf", "pj", "plano", "por", "porem", "porque", "procuro", "quero", "saindo",
+    "sem", "seria", "sim", "tenho", "vidas", "vou", "voltarei",
+  ]);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 5) return false;
+  if (words.some((word) => nonCityWords.has(word))) return false;
+  return true;
+}
 
 const NON_NAME_PREFIXES = new Set([
   "empresa", "plano", "caso", "nosso", "nossa", "seriam", "tenho",

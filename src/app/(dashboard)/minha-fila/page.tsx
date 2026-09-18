@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,39 @@ export default async function MinhaFilaPage() {
     .limit(1);
   const availabilityStatus = membership?.availabilityStatus ?? "available";
 
+  // A pending offer is the broker's actionable lead even before the WhatsApp
+  // acceptance is confirmed. Read the durable offer row as a second source of
+  // truth so a provisional ownership/status mismatch cannot hide it from the
+  // "Aguardando aceite" tab.
+  const offerNow = new Date();
+  const pendingOfferRows = await db
+    .select({ leadId: schema.leadOffers.leadId })
+    .from(schema.leadOffers)
+    .where(and(
+      eq(schema.leadOffers.tenantId, context.tenantId),
+      eq(schema.leadOffers.brokerId, context.userId),
+      inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+      gt(schema.leadOffers.expiresAt, offerNow),
+    ));
+  const pendingOfferLeadIds = Array.from(new Set(pendingOfferRows.map((row) => row.leadId)));
+  const brokerLeadScope = pendingOfferLeadIds.length > 0
+    ? or(eq(schema.leads.corretorId, context.userId), inArray(schema.leads.id, pendingOfferLeadIds))
+    : eq(schema.leads.corretorId, context.userId);
+  const brokerLeadVisibility = pendingOfferLeadIds.length > 0
+    ? or(
+      inArray(schema.leads.id, pendingOfferLeadIds),
+      ne(schema.leads.status, "distributed"),
+      isNotNull(schema.leads.firstContactAt),
+      isNull(schema.leads.assignedAt),
+      gte(schema.leads.assignedAt, sql`now() - (COALESCE(NULLIF(${schema.tenants.slaFirstContactMinutes}, ''), '15')::integer * interval '1 minute')`),
+    )
+    : or(
+      ne(schema.leads.status, "distributed"),
+      isNotNull(schema.leads.firstContactAt),
+      isNull(schema.leads.assignedAt),
+      gte(schema.leads.assignedAt, sql`now() - (COALESCE(NULLIF(${schema.tenants.slaFirstContactMinutes}, ''), '15')::integer * interval '1 minute')`),
+    );
+
   // ─── Leads ───
   const leads = await db
     .select({
@@ -63,14 +96,9 @@ export default async function MinhaFilaPage() {
     .where(
       and(
         eq(schema.leads.tenantId, context.tenantId),
-        eq(schema.leads.corretorId, context.userId),
+        brokerLeadScope,
         isNull(schema.leads.deletedAt),
-        or(
-          ne(schema.leads.status, "distributed"),
-          isNotNull(schema.leads.firstContactAt),
-          isNull(schema.leads.assignedAt),
-          gte(schema.leads.assignedAt, sql`now() - (COALESCE(NULLIF(${schema.tenants.slaFirstContactMinutes}, ''), '15')::integer * interval '1 minute')`),
-        ),
+        brokerLeadVisibility,
       ),
     )
     .innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id))
@@ -271,6 +299,7 @@ export default async function MinhaFilaPage() {
       createdAt: l.createdAt,
       updatedAt: l.stageEnteredAt,
       isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
+      isAwaitingAcceptance: pendingOfferLeadIds.includes(l.id),
       isOverdue:
         (activeLeadStatuses as readonly string[]).includes(l.status) &&
         l.stageEnteredAt != null &&

@@ -136,23 +136,43 @@ const memoryFieldByPolicyField: Record<string, keyof ConversationMemory> = {
   email: "email",
 };
 
+const clarificationByQuestionKey: Partial<Record<QualificationQuestionDefinition["key"], string>> = {
+  customerName: "Para continuar, qual é o seu nome completo?",
+  planType: "Só para confirmar: você busca um plano individual/familiar ou para empresa (PJ)?",
+  numberOfLives: "Para eu registrar corretamente, quantas pessoas serão incluídas no plano?",
+  age: "Para eu registrar corretamente, quais são as idades dos beneficiários (ou a média de idade, se for empresa)?",
+  city: "Para eu registrar corretamente, em qual cidade você pretende utilizar o plano de saúde?",
+  email: "Para eu enviar a cotação, qual é o seu melhor e-mail?",
+};
+
+function buildQualificationQuestionReply(
+  question: QualificationQuestionDefinition,
+  firstName?: string,
+  repeated = false,
+) {
+  const greeting = firstName ? `Perfeito, ${firstName}. ` : "";
+  const text = repeated ? clarificationByQuestionKey[question.key] ?? question.text : question.text;
+  return `${greeting}${text}`;
+}
+
 export function getNextQualificationQuestion(
   memory: ConversationMemory,
   policy?: AgentBehaviorPolicy,
-  pastOutboundTexts?: Set<string>
+  _pastOutboundTexts?: Set<string>
 ): QualificationQuestionDefinition | null {
+  void _pastOutboundTexts;
   const required = policy?.requiredFields ?? ["customerName", "planType", "numberOfLives", "age", "city", "email"];
-  let fallbackQuestion: QualificationQuestionDefinition | null = null;
 
   for (const field of required) {
     if (field === "age" && memory.planType?.value === "empresarial") {
       if (!memory.averageAge?.value) {
         const qDef = ALL_QUESTIONS_DEFINITIONS[field] ?? null;
         if (qDef) {
-          if (!pastOutboundTexts || !pastOutboundTexts.has(qDef.text.trim().toLowerCase())) {
-            return qDef;
-          }
-          if (!fallbackQuestion) fallbackQuestion = qDef;
+          // Keep the first missing field as the source of truth. If the client
+          // did not answer it, later fields must not be skipped just because
+          // the same question was already sent; the caller turns that case
+          // into a contextual clarification.
+          return qDef;
         }
       }
     } else {
@@ -161,15 +181,12 @@ export function getNextQualificationQuestion(
       if (!val || !val.trim()) {
         const qDef = ALL_QUESTIONS_DEFINITIONS[field] ?? null;
         if (qDef) {
-          if (!pastOutboundTexts || !pastOutboundTexts.has(qDef.text.trim().toLowerCase())) {
-            return qDef;
-          }
-          if (!fallbackQuestion) fallbackQuestion = qDef;
+          return qDef;
         }
       }
     }
   }
-  return fallbackQuestion;
+  return null;
 }
 
 export function resolveDeterministicQualificationTurn(input: {
@@ -192,11 +209,15 @@ export function resolveDeterministicQualificationTurn(input: {
 
   const firstName = input.memory.customerFirstName?.value
     ?? input.memory.customerName?.value?.split(/\s+/)[0];
-  const greeting = firstName ? `Perfeito, ${firstName}. ` : "";
+  const repeatedQuestion = Boolean(
+    Array.from(input.pastOutboundTexts ?? []).some((text) =>
+      text.includes(nextQuestion.text.trim().toLowerCase()),
+    ),
+  );
 
   return {
     kind: "collecting",
-    reply: `${greeting}${nextQuestion.text}`,
+    reply: buildQualificationQuestionReply(nextQuestion, firstName, repeatedQuestion),
     evaluation,
     nextQuestion,
   };

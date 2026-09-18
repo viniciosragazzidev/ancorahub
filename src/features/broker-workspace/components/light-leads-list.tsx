@@ -31,6 +31,7 @@ export type LightLeadItem = {
   dueAt?: Date | string | null;
   isOverdue?: boolean;
   isAwaitingResponse?: boolean;
+  isAwaitingAcceptance?: boolean;
   isLost?: boolean;
   lostReason?: string | null;
 };
@@ -56,13 +57,8 @@ export function LightLeadsList({
   const [filter, setFilter] = useState<FilterTab>(initialFilter);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const awaitingResponseCount = useMemo(
-    () => leads.filter((l) => l.isAwaitingResponse).length,
-    [leads],
-  );
-
   const criticalCount = useMemo(
-    () => leads.filter((l) => l.isOverdue || l.status === "distributed" || l.status === "new").length,
+    () => leads.filter((l) => l.isOverdue || l.isAwaitingAcceptance || l.status === "distributed" || l.status === "new").length,
     [leads],
   );
 
@@ -82,7 +78,7 @@ export function LightLeadsList({
 
     // Status filter
     if (filter === "awaiting") {
-      list = list.filter((l) => (l.status === "distributed" || l.status === "new") && !l.isLost);
+      list = list.filter((l) => (l.isAwaitingAcceptance || l.status === "distributed" || l.status === "new") && !l.isLost);
     } else if (filter === "active") {
       list = list.filter(
         (l) =>
@@ -104,7 +100,7 @@ export function LightLeadsList({
     list.sort((a, b) => {
       const rank = (item: LightLeadItem) => {
         if (item.isAwaitingResponse) return 0;
-        if (item.status === "distributed" || item.status === "new") return 1;
+        if (item.isAwaitingAcceptance || item.status === "distributed" || item.status === "new") return 1;
         if (item.isOverdue) return 2;
         if (item.dueAt) return 3;
         if (
@@ -186,7 +182,7 @@ export function LightLeadsList({
           >
             Aguardando aceite
             <Badge variant="warning" className="h-4 min-w-4 rounded-full px-1 text-[9px] font-bold">
-              {leads.filter((l) => (l.status === "distributed" || l.status === "new") && !l.isLost).length}
+              {leads.filter((l) => (l.isAwaitingAcceptance || l.status === "distributed" || l.status === "new") && !l.isLost).length}
             </Badge>
           </button>
 
@@ -272,7 +268,7 @@ export function LightLeadsList({
         <div className="space-y-3">
           {filteredAndSortedLeads.length > 0 ? (
             filteredAndSortedLeads.map((lead) => {
-              const isDistributed = (lead.status === "distributed" || lead.status === "new") && !lead.isLost;
+              const isDistributed = (lead.isAwaitingAcceptance || lead.status === "distributed" || lead.status === "new") && !lead.isLost;
               const isConverted = lead.status === "converted" && !lead.isLost;
               const isLost = lead.status === "lost" || lead.isLost;
 

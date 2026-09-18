@@ -43,6 +43,27 @@ describe("conversation memory", () => {
     expect(updated.collectedFields).toContain("city");
   });
 
+  it("does not mistake a sentence about leaving for lessons as a city", () => {
+    const memory = { ...createEmptyMemory(), lastQuestionAsked: "Em qual cidade você pretende utilizar o plano de saúde?" };
+
+    const updated = extractFieldsFromMessage(
+      "Estou saindo p dar aulas, logo voltarei a ler.",
+      memory,
+      "msg-non-city",
+    );
+
+    expect(updated.city).toBeUndefined();
+    expect(updated.collectedFields).not.toContain("city");
+  });
+
+  it("keeps a valid multi-word city answer after a comma", () => {
+    const memory = { ...createEmptyMemory(), lastQuestionAsked: "Em qual cidade você pretende utilizar o plano de saúde?" };
+
+    const updated = extractFieldsFromMessage("Cabo Frio, RJ", memory, "msg-cabo-frio");
+
+    expect(updated.city?.value).toBe("Cabo Frio");
+  });
+
   it("captures all ages supplied together for a family", () => {
     const memory = { ...createEmptyMemory(), lastQuestionAsked: "Qual é a idade da pessoa que será incluída?" };
     const updated = extractFieldsFromMessage("13,33,36", memory, "msg-ages");

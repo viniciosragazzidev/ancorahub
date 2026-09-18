@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChartBar,
@@ -125,6 +125,8 @@ const emptyQueue = {
   status: "active",
 };
 
+const QUEUE_DRAFT_STORAGE_KEY = "ancorahub:distribution:queue-draft:v1";
+
 export function QueueControlCenter({
   queues,
   branches,
@@ -180,6 +182,41 @@ export function QueueControlCenter({
   const [loadingDependencies, setLoadingDependencies] = useState(false);
   const [forceDeleting, setForceDeleting] = useState(false);
   const router = useRouter();
+
+  const persistQueueDraft = useCallback((nextForm = form) => {
+    if (typeof window === "undefined" || editingId) return;
+    window.localStorage.setItem(
+      QUEUE_DRAFT_STORAGE_KEY,
+      JSON.stringify({ version: 1, form: nextForm, savedAt: new Date().toISOString() }),
+    );
+  }, [editingId, form]);
+
+  function readQueueDraft() {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(QUEUE_DRAFT_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { version?: number; form?: Record<string, unknown> };
+      if (parsed.version !== 1 || !parsed.form || typeof parsed.form !== "object") return null;
+      const draft = parsed.form;
+      if (typeof draft.name !== "string") return null;
+      return {
+        ...emptyQueue,
+        ...draft,
+        exclusiveDutyScheduleIds: Array.isArray(draft.exclusiveDutyScheduleIds) ? draft.exclusiveDutyScheduleIds.filter((id): id is string => typeof id === "string") : [],
+        allowedBranchIds: Array.isArray(draft.allowedBranchIds) ? draft.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+        allowedBrokerIds: Array.isArray(draft.allowedBrokerIds) ? draft.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
+        allowedSourceIds: Array.isArray(draft.allowedSourceIds) ? draft.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
+      };
+    } catch {
+      window.localStorage.removeItem(QUEUE_DRAFT_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    if (editorOpen && !editingId) persistQueueDraft();
+  }, [editorOpen, editingId, persistQueueDraft]);
 
   const activeCampaigns = useMemo(
     () => campaigns.filter((c) => (c.status ?? "").toUpperCase() === "ACTIVE"),
@@ -276,6 +313,16 @@ export function QueueControlCenter({
 
   function openCreate() {
     setEditingId(null);
+    const draft = readQueueDraft();
+    if (draft) {
+      setForm({
+        ...draft,
+        allowedBranchIds: draft.branchId ? draft.allowedBranchIds : (draft.allowedBranchIds.length ? draft.allowedBranchIds : branches.map((b) => b.id)),
+      });
+      toast.info("Rascunho restaurado", { description: "Continuamos a criação da fila de onde você parou." });
+      setEditorOpen(true);
+      return;
+    }
     setForm({
       ...emptyQueue,
       branchId: "",
@@ -416,6 +463,9 @@ export function QueueControlCenter({
           ? `A fila "${form.name}" foi atualizada.`
           : `A fila "${form.name}" está pronta para receber leads.`,
       });
+    }
+    if (!editingId && typeof window !== "undefined") {
+      window.localStorage.removeItem(QUEUE_DRAFT_STORAGE_KEY);
     }
     setEditorOpen(false);
     router.refresh();
@@ -1516,6 +1566,7 @@ export function QueueControlCenter({
                   variant="outline"
                   className="mt-3"
                   onClick={() => {
+                    persistQueueDraft();
                     setEditorOpen(false);
                     window.setTimeout(
                       () =>
