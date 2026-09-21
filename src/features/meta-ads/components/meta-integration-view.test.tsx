@@ -82,10 +82,15 @@ describe("MetaIntegrationView", () => {
 
   it("shows the tenant-owned business profile, pixels, forms, campaigns and ads", () => {
     render(<MetaIntegrationView canConfigure={false} connection={connectedConnection} assets={connectedAssets} logs={[]} />);
-    expect(screen.getByText("Perfil e ativos conectados")).toBeInTheDocument();
+    expect(screen.getByText("Ativos conectados")).toBeInTheDocument();
     expect(screen.getByText("Âncora Hub")).toBeInTheDocument();
     expect(screen.getAllByText("Âncora Saúde").length).toBeGreaterThan(0);
     expect(screen.getByText("Pixel principal")).toBeInTheDocument();
+    // O mapa de aquisição (campanha › anúncio › formulário) só entra no DOM quando aberto.
+    expect(screen.queryByText("Campanha de saúde")).not.toBeInTheDocument();
+    const map = screen.getByText("Mapa de aquisição").closest("details") as HTMLDetailsElement;
+    map.open = true;
+    fireEvent(map, new Event("toggle"));
     expect(screen.getAllByText("Formulário principal").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Campanha de saúde").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Anúncio principal").length).toBeGreaterThan(0);
@@ -119,26 +124,40 @@ describe("MetaIntegrationView", () => {
     expect(toastSuccessMock).not.toHaveBeenCalled();
   });
 
-  it("updates campaign eligibility locally and refreshes the route tree", async () => {
-    toggleCampaignMock.mockResolvedValue({ success: true });
-    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
-
-    fireEvent.click(within(screen.getByRole("region", { name: "Campanhas & Captura CRM" })).getByRole("button", { name: "Tornar Elegível" }));
-
-    await waitFor(() => expect(toggleCampaignMock).toHaveBeenCalledWith({ campaignId: "campaign-1", enabled: true }));
-    expect(screen.getByText("Elegível para captura")).toBeInTheDocument();
-    expect(refreshMock).toHaveBeenCalled();
+  it("shows one sync badge instead of a list of recent syncs", () => {
+    const now = Date.now();
+    const logs = [
+      { id: "l1", syncType: "full", status: "error", itemsSynced: 0, durationMs: 1000, startedAt: new Date(now - 3 * 3600_000), completedAt: new Date(now - 3 * 3600_000 + 1000), errorDetails: "boom" },
+      { id: "l2", syncType: "full", status: "success", itemsSynced: 12, durationMs: 60000, startedAt: new Date(now - 5 * 60_000), completedAt: new Date(now - 4 * 60_000), errorDetails: null },
+    ];
+    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={logs} />);
+    expect(screen.queryByText("Sincronizações recentes")).not.toBeInTheDocument();
+    const badges = document.querySelectorAll("[data-slot=\"meta-sync-badge\"]");
+    expect(badges).toHaveLength(1);
+    expect(badges[0]).toHaveTextContent("Última sincronização: Concluída");
   });
 
-  it("updates the master capture mode locally and refreshes the route tree", async () => {
-    setGlobalModeMock.mockResolvedValue({ success: true });
+  it("says when the Meta was never synchronized", () => {
+    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
+    expect(screen.getByText("Última sincronização: Nunca sincronizada")).toBeInTheDocument();
+  });
+
+  it("does not render the sync badge before the Meta is connected", () => {
+    render(<MetaIntegrationView connection={null} assets={null} logs={[]} />);
+    expect(document.querySelector("[data-slot=\"meta-sync-badge\"]")).toBeNull();
+  });
+
+  it("reads the capture mode and links to Campanhas, without offering any capture control", () => {
     render(<MetaIntegrationView canConfigure connection={{ ...connectedConnection, globalCaptureMode: "all" }} assets={connectedAssets} logs={[]} />);
+    expect(document.querySelector("[data-slot=\"capture-mode\"]")).toHaveTextContent("Captura em todos os ativos");
+    expect(screen.getByRole("link", { name: /Gerenciar captura e filas/ })).toHaveAttribute("href", "/marketing/campanhas");
+    expect(screen.queryByLabelText("Controle Mestre de Captura Meta Lead Ads")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tornar Elegível" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pausar Todos os Leads" })).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByLabelText("Controle Mestre de Captura Meta Lead Ads"));
-    fireEvent.click(screen.getByRole("option", { name: /Capturar apenas selecionados/i }));
-
-    await waitFor(() => expect(setGlobalModeMock).toHaveBeenCalledWith({ mode: "selective" }));
-    expect(screen.getByText(/Modo seletivo/i)).toBeInTheDocument();
-    expect(refreshMock).toHaveBeenCalled();
+  it("counts the synchronized forms next to campaigns and ads", () => {
+    render(<MetaIntegrationView canConfigure connection={connectedConnection} assets={connectedAssets} logs={[]} />);
+    expect(screen.getByText("Formulários sincronizados").nextElementSibling).toHaveTextContent("1");
   });
 });

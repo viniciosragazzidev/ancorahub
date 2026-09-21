@@ -1,44 +1,27 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
-import {
-  ArrowLeft,
-  ArrowRight,
-  ArrowsClockwise,
-  Check,
-  CheckCircle,
-  Globe,
-  Lightning,
-  MagnifyingGlass,
-  Power,
-  SlidersHorizontal,
-  XCircle,
-} from "@/components/huge-icons";
+import { ArrowRight, ArrowsClockwise, Globe, Lightning, Power } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { AppSelect } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 
-import {
-  batchSetMetaCaptureEligibilityAction,
-  disconnectMetaConnection,
-  setMetaGlobalCaptureModeAction,
-  toggleMetaAdCaptureEligibilityAction,
-  toggleMetaCampaignCaptureEligibilityAction,
-  toggleMetaFormCaptureEligibilityAction,
-  triggerManualMetaSync,
-} from "../actions";
+import { disconnectMetaConnection, triggerManualMetaSync } from "../actions";
 import type { MetaConnectionAssets, MetaConnectionInfo, MetaSyncLogItem } from "../types";
+import { CAPTURE_MODE_LABEL } from "../meta-sync-status";
+import { PaginationFooter, usePaged } from "./meta-asset-paging";
 import { MetaMarketingWizard } from "./meta-marketing-wizard";
+import { MetaSyncBadge } from "./meta-sync-badge";
 
+/**
+ * Visão, conexão e sincronização da Meta. O CONTROLE (modo de captura, o que
+ * captura, fila) vive em /marketing/campanhas; aqui só se lê o estado.
+ */
 export function MetaIntegrationView({
   connection,
   assets,
@@ -53,6 +36,8 @@ export function MetaIntegrationView({
   const [syncing, setSyncing] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  // O mapa pode ter centenas de campanhas: só entra no DOM quando aberto.
+  const [mapOpen, setMapOpen] = useState(false);
   const [disconnecting, startDisconnecting] = useTransition();
   const router = useRouter();
   const connected = connection?.status === "connected";
@@ -105,7 +90,24 @@ export function MetaIntegrationView({
           </div>
           <Badge variant={connected ? "success" : "outline"}>{connected ? "Conectada" : "Não conectada"}</Badge>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
+          {connected ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <MetaSyncBadge logs={logs} lastSyncedAt={connection?.lastSyncedAt} />
+                <Badge variant="outline" data-slot="capture-mode">
+                  {CAPTURE_MODE_LABEL[connection?.globalCaptureMode ?? "selective"]}
+                </Badge>
+              </div>
+              <Link
+                href="/marketing/campanhas"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+              >
+                Gerenciar captura e filas
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {connected ? (
               <>
@@ -140,106 +142,54 @@ export function MetaIntegrationView({
       </Card>
 
       {connected && assets && connection ? (
-        <>
-          {/* Master Lead Capture Control Card */}
-          <MetaMasterCaptureControl globalMode={connection.globalCaptureMode ?? "selective"} canConfigure={canConfigure} />
+        <Card className="border-border bg-card shadow-none">
+          <CardHeader>
+            <CardTitle>Ativos conectados</CardTitle>
+            <CardDescription>
+              Visão dos ativos autorizados para esta corretora. Para escolher o que captura leads e para qual fila,
+              use Marketing › Campanhas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">Portfólio empresarial</p>
+                <p className="mt-1 truncate text-sm font-semibold">{connection.businessName ?? "Nome não informado"}</p>
+                <p className="mt-1 font-mono text-xs text-muted-foreground">{connection.businessId}</p>
+              </div>
+              <MetricCard label="Páginas autorizadas" value={assets.pages.length} />
+              <MetricCard label="Campanhas sincronizadas" value={assets.campaigns.length} />
+              <MetricCard label="Anúncios sincronizados" value={assets.ads.length} />
+              <MetricCard label="Formulários sincronizados" value={assets.leadForms.length} />
+            </div>
 
-          {/* Connected Assets Card & Management */}
-          <Card className="border-border bg-card shadow-none">
-            <CardHeader>
-              <CardTitle>Perfil e ativos conectados</CardTitle>
-              <CardDescription>
-                Veja os ativos autorizados para esta corretora. Escolha abaixo ou em Marketing/Campanhas quais campanhas capturam leads no CRM.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-xs text-muted-foreground">Portfólio empresarial</p>
-                  <p className="mt-1 truncate text-sm font-semibold">{connection.businessName ?? "Nome não informado"}</p>
-                  <p className="mt-1 font-mono text-xs text-muted-foreground">{connection.businessId}</p>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AssetList title="Páginas conectadas" empty="Nenhuma página selecionada." items={assets.pages.map((asset) => ({ ...asset, detail: asset.id }))} />
+              <AssetList title="Contas de anúncios" empty="Nenhuma conta de anúncios selecionada." items={assets.adAccounts.map((asset) => ({ ...asset, detail: `${asset.id} · ${asset.currency}` }))} />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AssetList title="Pixels" empty="Nenhum pixel sincronizado ainda." items={assets.pixels.map((asset) => ({ ...asset, detail: asset.id }))} />
+              <AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} />
+            </div>
+
+            <details className="group rounded-lg border border-border bg-muted/10" onToggle={(event) => setMapOpen(event.currentTarget.open)}>
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
+                <span className="flex items-center justify-between gap-3">
+                  <span>Mapa de aquisição</span>
+                  <span className="text-xs font-normal text-muted-foreground group-open:hidden">Mostrar</span>
+                  <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Ocultar</span>
+                </span>
+              </summary>
+              {mapOpen ? (
+                <div className="border-t border-border p-4">
+                  <MetaAssetHierarchy campaigns={assets.campaigns} ads={assets.ads} forms={assets.leadForms} pages={assets.pages} />
                 </div>
-                <MetricCard label="Páginas autorizadas" value={assets.pages.length} />
-                <MetricCard label="Campanhas sincronizadas" value={assets.campaigns.length} />
-                <MetricCard label="Anúncios sincronizados" value={assets.ads.length} />
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <AssetList title="Páginas conectadas" empty="Nenhuma página selecionada." items={assets.pages.map((asset) => ({ ...asset, detail: asset.id }))} />
-                <AssetList title="Contas de anúncios" empty="Nenhuma conta de anúncios selecionada." items={assets.adAccounts.map((asset) => ({ ...asset, detail: `${asset.id} · ${asset.currency}` }))} />
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <AssetList title="Pixels" empty="Nenhum pixel sincronizado ainda." items={assets.pixels.map((asset) => ({ ...asset, detail: asset.id }))} />
-                <AssetList title="Fontes" empty="Nenhuma fonte sincronizada ainda." items={assets.datasets.map((asset) => ({ ...asset, detail: asset.id }))} />
-              </div>
-
-              <details className="group rounded-lg border border-border bg-muted/10">
-                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
-                  <span className="flex items-center justify-between gap-3">
-                    <span>Configuração avançada por ativo</span>
-                    <span className="text-xs font-normal text-muted-foreground group-open:hidden">Abrir seletores</span>
-                    <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Ocultar seletores</span>
-                  </span>
-                </summary>
-                <div className="space-y-6 border-t border-border p-4">
-                <SelectableAssetList
-                  title="Formulários de Lead Ads"
-                  empty="Nenhum formulário sincronizado ainda."
-                  assetType="forms"
-                  canConfigure={canConfigure}
-                  items={assets.leadForms.map((f) => ({
-                    id: f.id,
-                    name: f.name,
-                    status: f.status,
-                    detail: `Página: ${f.pageId}`,
-                    isEligibleForCapture: f.isEligibleForCapture,
-                    inheritedFromCampaignIds: f.inheritedFromCampaignIds,
-                  }))}
-                />
-                <SelectableAssetList
-                  title="Campanhas & Captura CRM"
-                  empty="Nenhuma campanha sincronizada ainda."
-                  assetType="campaigns"
-                  canConfigure={canConfigure}
-                  items={assets.campaigns.map((c) => ({
-                    id: c.id,
-                    name: c.name,
-                    status: c.status,
-                    detail: `Conta: ${c.adAccountId}`,
-                    isEligibleForCapture: c.isEligibleForCapture,
-                  }))}
-                />
-                <SelectableAssetList
-                  title="Anúncios & Captura CRM"
-                  empty="Nenhum anúncio sincronizado ainda."
-                  assetType="ads"
-                  canConfigure={canConfigure}
-                  items={assets.ads.map((ad) => ({
-                    id: ad.id,
-                    name: ad.name,
-                    status: ad.status,
-                    detail: `Conjunto: ${ad.adSetId}`,
-                    isEligibleForCapture: ad.isEligibleForCapture,
-                    inheritedFromCampaignId: ad.inheritedFromCampaignId,
-                  }))}
-                />
-                </div>
-              </details>
-
-              <MetaAssetHierarchy campaigns={assets.campaigns} ads={assets.ads} forms={assets.leadForms} pages={assets.pages} />
-            </CardContent>
-          </Card>
-        </>
+              ) : null}
+            </details>
+          </CardContent>
+        </Card>
       ) : null}
 
-      <Card className="border-border bg-card shadow-none">
-        <CardHeader>
-          <CardTitle>Sincronizações recentes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {logs.length ? <SyncLogsList logs={logs} /> : <p className="text-muted-foreground">Nenhuma sincronização registrada.</p>}
-        </CardContent>
-      </Card>
       {wizardOpen ? <MetaMarketingWizard onClose={() => setWizardOpen(false)} /> : null}
       <Dialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
         <DialogPopup key={disconnectOpen ? "open" : "closed"} className="sm:max-w-md">
@@ -363,413 +313,6 @@ function MetaAssetHierarchy({
   );
 }
 
-function MetaMasterCaptureControl({
-  globalMode,
-  canConfigure,
-}: {
-  globalMode: "all" | "selective" | "disabled";
-  canConfigure: boolean;
-}) {
-  const [updating, setUpdating] = useState(false);
-  const [currentMode, setCurrentMode] = useState(globalMode);
-  const router = useRouter();
-
-  const handleModeChange = async (newMode: "all" | "selective" | "disabled") => {
-    setUpdating(true);
-    try {
-      const res = await setMetaGlobalCaptureModeAction({ mode: newMode });
-      if (res.success) {
-        setCurrentMode(newMode);
-        if (newMode === "disabled") {
-          toast.success("Captura geral desativada! Nenhum lead Meta entrará no CRM.", { description: "Todos os webhooks Meta serão ignorados até reativar." });
-        } else if (newMode === "all") {
-          toast.success("Captura global ativada! Todos os ativos elegíveis capturarão leads.", { description: "Campanhas, anúncios e formulários ativos entrarão no CRM." });
-        } else {
-          toast.success("Modo seletivo ativado!", { description: "Apenas as campanhas, anúncios ou formulários selecionados capturarão leads." });
-        }
-        router.refresh();
-      } else {
-        toast.error(res.error || "Erro ao alterar modo de captura.");
-      }
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  return (
-    <Card className="border-2 border-primary/20 bg-card shadow-none">
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <SlidersHorizontal className="size-5 text-primary" />
-              Controle Mestre de Captura Meta Lead Ads
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Defina a regra global para o recebimento de leads do Facebook e Instagram no CRM.
-            </CardDescription>
-          </div>
-          <div>
-            {currentMode === "disabled" ? (
-              <Badge variant="destructive" className="px-3 py-1 text-xs font-semibold">
-                Captura geral desativada
-              </Badge>
-            ) : currentMode === "all" ? (
-              <Badge variant="success" className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 px-3 py-1 text-xs font-semibold">
-                Captura global ativa
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 px-3 py-1 text-xs font-semibold">
-                Modo seletivo
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-0">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <AppSelect
-              aria-label="Controle Mestre de Captura Meta Lead Ads"
-              disabled={!canConfigure || updating}
-              value={currentMode}
-              onValueChange={(val) => void handleModeChange(val as "all" | "selective" | "disabled")}
-              options={[
-                {
-                  value: "selective",
-                  label: "Capturar apenas selecionados (recomendado)",
-                },
-                {
-                  value: "all",
-                  label: "Ativar todos os ativos",
-                },
-                {
-                  value: "disabled",
-                  label: "Desativar toda a captura",
-                },
-              ]}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            {currentMode !== "disabled" ? (
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={!canConfigure || updating}
-                onClick={() => void handleModeChange("disabled")}
-                className="w-full text-xs font-medium"
-              >
-                Pausar Todos os Leads
-              </Button>
-            ) : (
-              <Button
-                variant="default"
-                size="sm"
-                disabled={!canConfigure || updating}
-                onClick={() => void handleModeChange("selective")}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
-              >
-                Ativar Captura Seletiva
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-type AssetItem = {
-  id: string;
-  name: string;
-  status: string;
-  detail: string;
-  isEligibleForCapture?: boolean;
-  inheritedFromCampaignId?: string | null;
-  inheritedFromCampaignIds?: string[];
-};
-
-function SelectableAssetList({
-  title,
-  empty,
-  assetType,
-  canConfigure,
-  items,
-}: {
-  title: string;
-  empty: string;
-  assetType: "campaigns" | "ads" | "forms";
-  canConfigure: boolean;
-  items: AssetItem[];
-}) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [eligibilityOverrides, setEligibilityOverrides] = useState<Map<string, boolean>>(new Map());
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [batchUpdating, setBatchUpdating] = useState(false);
-  const router = useRouter();
-
-  const effectiveItems = useMemo(
-    () => items.map((item) => ({
-      ...item,
-      isEligibleForCapture: eligibilityOverrides.get(item.id) ?? item.isEligibleForCapture,
-    })),
-    [eligibilityOverrides, items],
-  );
-
-  const filteredItems = effectiveItems.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // ELEGIBLE ITEMS AT THE VERY TOP
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    const aEligible = a.isEligibleForCapture ? 1 : 0;
-    const bEligible = b.isEligibleForCapture ? 1 : 0;
-    if (bEligible !== aEligible) return bEligible - aEligible;
-
-    const aActive = a.status === "active" || a.status === "ACTIVE";
-    const bActive = b.status === "active" || b.status === "ACTIVE";
-    if (aActive && !bActive) return -1;
-    if (!aActive && bActive) return 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  const { page, totalPages, total, start, end, visible, setPage } = usePaged(sortedItems);
-
-  const toggleSelectAllVisible = (checked: boolean) => {
-    const next = new Set(selectedIds);
-    if (checked) {
-      visible.forEach((item) => next.add(item.id));
-    } else {
-      visible.forEach((item) => next.delete(item.id));
-    }
-    setSelectedIds(next);
-  };
-
-  const toggleSelectItem = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
-  };
-
-  const allVisibleSelected =
-    visible.length > 0 && visible.every((item) => selectedIds.has(item.id));
-
-  const handleBatchToggle = async (enabled: boolean) => {
-    if (selectedIds.size === 0) return;
-    setBatchUpdating(true);
-    try {
-      const ids = Array.from(selectedIds);
-      const res = await batchSetMetaCaptureEligibilityAction({
-        assetType,
-        assetIds: ids,
-        enabled,
-      });
-      if (res.success) {
-        toast.success(
-          enabled
-            ? `${ids.length} item(s) ativado(s) para captura de leads!`
-            : `Captura desativada para ${ids.length} item(s).`
-        );
-        setSelectedIds(new Set());
-        setEligibilityOverrides((current) => {
-          const next = new Map(current);
-          ids.forEach((id) => next.set(id, enabled));
-          return next;
-        });
-      } else {
-        toast.error(res.error || "Erro na atualização em lote.");
-      }
-    } finally {
-      setBatchUpdating(false);
-    }
-  };
-
-  const handleSingleToggle = async (item: AssetItem) => {
-    setUpdatingId(item.id);
-    try {
-      const nextEligible = !item.isEligibleForCapture;
-      let res: { success: boolean; error?: string };
-
-      if (assetType === "campaigns") {
-        res = await toggleMetaCampaignCaptureEligibilityAction({ campaignId: item.id, enabled: nextEligible });
-      } else if (assetType === "ads") {
-        res = await toggleMetaAdCaptureEligibilityAction({ adId: item.id, enabled: nextEligible });
-      } else {
-        res = await toggleMetaFormCaptureEligibilityAction({ formId: item.id, enabled: nextEligible });
-      }
-
-      if (res.success) {
-        toast.success(
-          nextEligible
-            ? "Ativado para captura de leads no CRM!"
-            : "Captura desativada para este item."
-        );
-        setEligibilityOverrides((current) => new Map(current).set(item.id, nextEligible));
-        router.refresh();
-      } else {
-        toast.error(res.error || "Erro ao atualizar elegibilidade.");
-      }
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const eligibleCount = effectiveItems.filter((i) => i.isEligibleForCapture).length;
-
-  return (
-    <section aria-label={title} className="rounded-lg border border-border bg-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between border-b border-border bg-muted/30 px-4 py-3 gap-3">
-        <div>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="text-xs text-muted-foreground">Elegíveis no topo. Pesquise e marque com checkbox os itens ativados.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="success" className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
-            {eligibleCount} elegível{eligibleCount === 1 ? "" : "s"}
-          </Badge>
-          <span className="font-mono text-xs text-muted-foreground">{items.length} total</span>
-        </div>
-      </div>
-
-      {/* Search & Bulk Checkbox Action Bar */}
-      <div className="p-3 border-b border-border bg-muted/10 space-y-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[220px]">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar por nome ou ID..."
-              className="pl-9 h-8 text-xs"
-            />
-          </div>
-          {selectedIds.size > 0 ? (
-            <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-md px-2.5 py-1">
-              <span className="text-xs font-semibold text-primary">
-                {selectedIds.size} selecionado(s)
-              </span>
-              <Button
-                size="sm"
-                disabled={!canConfigure || batchUpdating}
-                onClick={() => void handleBatchToggle(true)}
-                className="h-6 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-2"
-              >
-                <Check className="size-3 mr-1" />
-                Ativar Captura
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!canConfigure || batchUpdating}
-                onClick={() => void handleBatchToggle(false)}
-                className="h-6 text-[11px] text-destructive hover:bg-destructive/10 px-2"
-              >
-                <XCircle className="size-3 mr-1" />
-                Desativar
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="divide-y divide-border">
-        {visible.length ? (
-          <>
-            <div className="flex items-center gap-3 px-4 py-2 bg-muted/40 text-[11px] text-muted-foreground font-medium">
-              <Checkbox
-                checked={allVisibleSelected}
-                onCheckedChange={(chk) => toggleSelectAllVisible(Boolean(chk))}
-              />
-              <span className="flex-1">Selecione para ação em lote (Elegíveis no topo)</span>
-              <span className="w-24 text-right">Status</span>
-            </div>
-            {visible.map((item) => {
-              const isEligible = Boolean(item.isEligibleForCapture);
-              const isChecked = selectedIds.has(item.id);
-              const isUpdating = updatingId === item.id;
-              return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors",
-                    isEligible
-                      ? "bg-emerald-500/5 dark:bg-emerald-500/10 border-l-4 border-l-emerald-500"
-                      : "hover:bg-muted/20"
-                  )}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <Checkbox
-                      checked={isChecked}
-                      onCheckedChange={() => toggleSelectItem(item.id)}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="truncate text-sm font-semibold">{item.name}</p>
-                        {isEligible ? (
-                          <Badge
-                            variant="success"
-                            className="text-[10px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-bold border-emerald-500/40"
-                          >
-                            {item.inheritedFromCampaignId || item.inheritedFromCampaignIds?.length
-                              ? "Herdado da campanha"
-                              : "Elegível para captura"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                            Captura desativada
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="truncate font-mono text-xs text-muted-foreground mt-0.5">
-                        {item.detail} · ID: {item.id}
-                      </p>
-                      {item.inheritedFromCampaignId || item.inheritedFromCampaignIds?.length ? (
-                        <p className="mt-1 text-[11px] text-muted-foreground">
-                          A campanha elegível autoriza este ativo automaticamente; uma regra específica ainda pode definir outra fila.
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={item.status === "active" || item.status === "ACTIVE" ? "outline" : "secondary"}
-                      className="text-[10px]"
-                    >
-                      {item.status === "active" || item.status === "ACTIVE" ? "Ativo" : item.status}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant={isEligible ? "outline" : "default"}
-                      disabled={!canConfigure || isUpdating}
-                      onClick={() => void handleSingleToggle(item)}
-                      className={cn(
-                        "h-7 text-xs font-medium",
-                        !isEligible && "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      )}
-                    >
-                      {isUpdating ? "Salvando…" : isEligible ? "Desativar Captura" : "Tornar Elegível"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </>
-        ) : (
-          <p className="px-4 py-4 text-sm text-muted-foreground">{empty}</p>
-        )}
-      </div>
-
-      <div className="border-t border-border px-4 py-2.5">
-        <PaginationFooter page={page} totalPages={totalPages} total={total} start={start} end={end} onPageChange={setPage} />
-      </div>
-    </section>
-  );
-}
-
 function getPermissionWarning(lastError: string | null | undefined) {
   if (!lastError) return null;
   try {
@@ -778,59 +321,6 @@ function getPermissionWarning(lastError: string | null | undefined) {
   } catch {
     return null;
   }
-}
-
-const PAGE_SIZE = 15;
-
-function usePaged<T>(items: T[]) {
-  const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const start = (safePage - 1) * PAGE_SIZE;
-  return {
-    page: safePage,
-    totalPages,
-    total: items.length,
-    start,
-    end: Math.min(start + PAGE_SIZE, items.length),
-    visible: items.slice(start, start + PAGE_SIZE),
-    setPage,
-  };
-}
-
-function PaginationFooter({
-  page,
-  totalPages,
-  total,
-  start,
-  end,
-  onPageChange,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-  start: number;
-  end: number;
-  onPageChange: (page: number) => void;
-}) {
-  if (total <= PAGE_SIZE) return null;
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <p className="font-mono text-xs text-muted-foreground">
-        {start + 1}–{end} de {total}
-      </p>
-      <div className="flex items-center gap-1">
-        <Button disabled={page <= 1} onClick={() => onPageChange(page - 1)} size="sm" variant="outline">
-          <ArrowLeft className="size-4" />
-          Anterior
-        </Button>
-        <Button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} size="sm" variant="outline">
-          Próxima
-          <ArrowRight className="size-4" />
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 function AssetList({
@@ -880,25 +370,6 @@ function AssetList({
         <PaginationFooter page={page} totalPages={totalPages} total={total} start={start} end={end} onPageChange={setPage} />
       </div>
     </div>
-  );
-}
-
-function SyncLogsList({ logs }: { logs: MetaSyncLogItem[] }) {
-  const { page, totalPages, total, start, end, visible, setPage } = usePaged(logs);
-  return (
-    <>
-      <div className="space-y-2">
-        {visible.map((log) => (
-          <div className="flex justify-between rounded-md border border-border p-3" key={log.id}>
-            <span>{log.syncType}</span>
-            <span>
-              {log.status} · {log.itemsSynced} itens
-            </span>
-          </div>
-        ))}
-      </div>
-      <PaginationFooter page={page} totalPages={totalPages} total={total} start={start} end={end} onPageChange={setPage} />
-    </>
   );
 }
 

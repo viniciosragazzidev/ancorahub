@@ -100,7 +100,7 @@ export function CampaignsDashboardView({
         ].map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="ui-metric-card text-left">
+            <div key={item.label} className="ui-metric-card p-4 text-left">
               <div className="flex items-center justify-between gap-2">
                 <span className={`ui-metric-card-icon flex size-8 shrink-0 items-center justify-center ${item.bg} ${item.color}`}>
                   <Icon className="size-4" />
@@ -118,7 +118,7 @@ export function CampaignsDashboardView({
 
       {/* ─── TABELA DE CAMPANHAS AGRUPADA POR CONTA DE ANÚNCIOS ─── */}
       <Card className="rounded-2xl border-0 shadow-none bg-card/40 dark:bg-card/60 p-0 overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 border-b border-border/50 p-3.5 sm:px-4">
           <div>
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <Megaphone className="size-5 text-primary" /> Desempenho por Conta de Anúncios, Campanha & Anúncio
@@ -127,7 +127,7 @@ export function CampaignsDashboardView({
               Cada linha mostra o caminho do lead: ativo recuperado da Meta, captura no CRM e fila de distribuição.
             </CardDescription>
           </div>
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <MagnifyingGlass className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="h-8 bg-muted pl-8 text-xs"
@@ -158,142 +158,165 @@ export function CampaignsDashboardView({
                 </div>
               </div>
 
-              <Table>
+              {/* Larguras fixas: a tabela sempre cabe no card; abaixo de 900px rola na horizontal. */}
+              <Table className="min-w-[900px] table-fixed">
+                <colgroup>
+                  <col className="w-10" />
+                  <col />
+                  <col className="w-24" />
+                  <col className="w-16" />
+                  <col className="w-28" />
+                  <col className="w-16" />
+                  <col className="w-28" />
+                  <col className="w-20" />
+                  <col className="w-44" />
+                </colgroup>
                 <TableHeader>
                   <TableRow className="bg-muted/10 border-b border-border/30">
-                    <TableHead className="w-10 pl-4"></TableHead>
-                    <TableHead className="text-xs font-semibold">Campanha Meta & Tags de Identificação</TableHead>
+                    <TableHead className="pl-4"></TableHead>
+                    <TableHead className="text-xs font-semibold">Campanha</TableHead>
                     <TableHead className="text-xs font-semibold">Status</TableHead>
                     <TableHead className="text-right text-xs font-semibold">Leads</TableHead>
-                    <TableHead className="text-right text-xs font-semibold">Em atendimento</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Atendimento</TableHead>
                     <TableHead className="text-right text-xs font-semibold">Vendas</TableHead>
-                    <TableHead className="text-right text-xs font-semibold">Receita Vendida</TableHead>
-                    <TableHead className="text-right text-xs font-semibold">Conversão %</TableHead>
-                    <TableHead className="pr-4 text-right text-xs font-semibold">Ação</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Receita</TableHead>
+                    <TableHead className="text-right text-xs font-semibold">Conv.</TableHead>
+                    <TableHead className="pr-4 text-right text-xs font-semibold">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {group.campaigns.map((camp) => {
                     const isExpanded = expandedCampaignIds.has(camp.id);
                     const hasAds = (camp.ads?.length ?? 0) > 0;
+                    const href = campaignDetailHref(camp);
+                    const isActive = camp.status === "ACTIVE" || camp.status === "active";
                     return (
                       <Fragment key={camp.id}>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                          <TableCell className="pl-4 py-2.5">
+                        <TableRow
+                          className="cursor-pointer transition-colors hover:bg-muted/30"
+                          onClick={(e) => {
+                            // Clique na linha abre o detalhe, salvo em controles ou ao selecionar texto.
+                            if ((e.target as HTMLElement).closest("a, button")) return;
+                            if (window.getSelection()?.toString()) return;
+                            router.push(href);
+                          }}
+                        >
+                          <TableCell className="py-3 pl-4 align-top">
                             {hasAds && (
                               <button
                                 type="button"
                                 onClick={() => toggleExpand(camp.id)}
-                                className="grid size-6 place-items-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                className="grid size-6 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                aria-label={isExpanded ? "Ocultar anúncios" : "Ver anúncios"}
+                                aria-expanded={isExpanded}
                                 title={isExpanded ? "Ocultar anúncios" : "Ver anúncios"}
                               >
                                 {isExpanded ? <ChevronDownIcon className="size-4 text-primary" /> : <ChevronRightIcon className="size-4" />}
                               </button>
                             )}
                           </TableCell>
-                          <TableCell className="py-2.5">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-semibold text-xs text-foreground">{camp.name}</span>
+                          <TableCell className="min-w-0 py-3 align-top whitespace-normal">
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <Link
+                                  href={href}
+                                  className="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-2 hover:text-primary hover:underline"
+                                >
+                                  {camp.name}
+                                </Link>
+                                {camp.isEligibleForCapture ? (
+                                  <Badge variant="success" className="h-4 shrink-0 px-1.5 text-[9px] font-bold">
+                                    Captura ativa
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="h-4 shrink-0 px-1.5 text-[9px] text-muted-foreground">
+                                    Ignorar leads
+                                  </Badge>
+                                )}
                                 {hasAds && (
-                                  <Badge variant="secondary" className="text-[9px] h-4 px-1.5 font-normal">
+                                  <Badge variant="secondary" className="h-4 shrink-0 px-1.5 text-[9px] font-normal">
                                     {camp.ads!.length} {camp.ads!.length === 1 ? "anúncio" : "anúncios"}
                                   </Badge>
                                 )}
-                                {camp.isEligibleForCapture ? (
-                                  <Badge variant="success" className="text-[9px] h-4 px-1.5 font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40">
-                              Captura ativa
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-muted-foreground">
-                              Ignorar leads
-                                  </Badge>
-                                )}
                               </div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground bg-muted/20">
-                                  ID Campanha: {camp.campaignId}
-                                </Badge>
-                                <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground bg-muted/20">
-                                  Objetivo: {camp.objective || "LEAD_GENERATION"}
-                                </Badge>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-                                <span><strong className="font-medium text-foreground">Entrada:</strong> Meta Lead Ads</span>
-                                <span><strong className="font-medium text-foreground">Captura:</strong> {camp.isEligibleForCapture ? "Ativa" : "Ignorada"}</span>
-                                <span><strong className="font-medium text-foreground">Destino:</strong> {formatDistributionDestination(camp)}</span>
-                              </div>
+                              <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                                <span className="font-mono" title={`Objetivo: ${camp.objective || "LEAD_GENERATION"}`}>
+                                  ID {camp.campaignId}
+                                </span>
+                                <span>
+                                  <strong className="font-medium text-foreground">Destino:</strong> {formatDistributionDestination(camp)}
+                                </span>
+                              </p>
                             </div>
                           </TableCell>
 
-                          <TableCell className="py-2.5">
-                            <Badge variant={camp.status === "ACTIVE" || camp.status === "active" ? "success" : "outline"} className="text-[10px]">
-                              {camp.status === "ACTIVE" || camp.status === "active" ? "Ativa" : "Pausada"}
+                          <TableCell className="py-3 align-top">
+                            <Badge variant={isActive ? "success" : "outline"} className="text-[10px]">
+                              {isActive ? "Ativa" : "Pausada"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.leadsCount || 0}</TableCell>
-                          <TableCell className="text-right font-mono text-xs font-medium tabular-nums py-2.5">{camp.conversationsCount || 0}</TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums py-2.5">{camp.salesCount || 0}</TableCell>
-                          <TableCell className="text-right font-mono text-xs font-bold text-foreground tabular-nums py-2.5">
+                          <TableCell className="py-3 text-right align-top font-mono text-xs font-medium tabular-nums">{camp.leadsCount || 0}</TableCell>
+                          <TableCell className="py-3 text-right align-top font-mono text-xs font-medium tabular-nums">{camp.conversationsCount || 0}</TableCell>
+                          <TableCell className="py-3 text-right align-top font-mono text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{camp.salesCount || 0}</TableCell>
+                          <TableCell className="py-3 text-right align-top font-mono text-xs font-bold tabular-nums text-foreground">
                             {formatCurrency(camp.revenueTotal || 0, { maximumFractionDigits: 0 })}
                           </TableCell>
-                          <TableCell className="text-right font-mono text-xs font-semibold text-chart-2 tabular-nums py-2.5">{camp.conversionRate || 0}%</TableCell>
-                          <TableCell className="pr-4 text-right py-2.5">
+                          <TableCell className="py-3 text-right align-top font-mono text-xs font-semibold tabular-nums text-chart-2">{camp.conversionRate || 0}%</TableCell>
+                          <TableCell className="py-3 pr-4 align-top">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
                                 variant={camp.isEligibleForCapture ? "outline" : "default"}
                                 disabled={togglingId === camp.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void handleToggleEligibility(camp.campaignId, Boolean(camp.isEligibleForCapture));
-                                }}
+                                onClick={() => void handleToggleEligibility(camp.campaignId, Boolean(camp.isEligibleForCapture))}
                                 className={cn(
-                                  "h-7 text-[11px] px-2 font-medium",
-                                  !camp.isEligibleForCapture && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  "h-7 whitespace-nowrap px-2 text-[11px] font-medium",
+                                  !camp.isEligibleForCapture && "bg-emerald-600 text-white hover:bg-emerald-700",
                                 )}
                               >
-                                {togglingId === camp.id ? "…" : camp.isEligibleForCapture ? "Desativar Captura" : "Capturar Leads"}
+                                {togglingId === camp.id ? "…" : camp.isEligibleForCapture ? "Pausar captura" : "Capturar leads"}
                               </Button>
                               <Link
-                                href={`/marketing/campanhas/${encodeURIComponent(camp.id || camp.campaignId)}`}
-                                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 text-xs px-2 gap-1")}
-                                onClick={(e) => e.stopPropagation()}
+                                href={href}
+                                aria-label={`Ver detalhes de ${camp.name}`}
+                                title="Ver detalhes"
+                                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "size-7 shrink-0 p-0")}
                               >
-                                Detalhes <ArrowRight className="size-3.5" />
+                                <ArrowRight className="size-4" />
                               </Link>
                             </div>
                           </TableCell>
                         </TableRow>
 
-                        {/* Sub-tabela expansível de Anúncios da Campanha com Tags de Identificação */}
+                        {/* Sub-tabela expansível de anúncios da campanha */}
                         {isExpanded && hasAds && (
                           <TableRow className="bg-muted/15 hover:bg-muted/20">
-                            <TableCell colSpan={9} className="p-0 pl-12 pr-4 py-3">
-                              <div className="rounded-lg border border-border/50 bg-background/80 p-3 space-y-2">
-                                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                                  <Megaphone className="size-3.5 text-primary" /> Anúncios vinculados com tags de identificação:
+                            <TableCell colSpan={9} className="p-0 py-3 pl-12 pr-4">
+                              <div className="space-y-2 rounded-lg border border-border/50 bg-background/80 p-3">
+                                <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                                  <Megaphone className="size-3.5 text-primary" /> Anúncios desta campanha
                                 </p>
-                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                  {camp.ads!.map((ad) => (
-                                    <div key={ad.id} className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-card p-2.5 text-xs">
-                                      <div className="min-w-0 space-y-1">
-                                        <p className="font-medium truncate text-foreground text-xs">{ad.name}</p>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <Badge variant={ad.status === "ACTIVE" || ad.status === "active" ? "success" : "outline"} className="text-[9px] px-1 py-0 h-4">
-                                            {ad.status === "ACTIVE" || ad.status === "active" ? "Ativo" : "Pausado"}
-                                          </Badge>
-                                          <Badge variant="outline" className="text-[9px] font-mono text-muted-foreground px-1 py-0 h-4">
-                                            ID Anúncio: {ad.adId}
-                                          </Badge>
+                                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                  {camp.ads!.map((ad) => {
+                                    const adActive = ad.status === "ACTIVE" || ad.status === "active";
+                                    return (
+                                      <div key={ad.id} className="flex items-center justify-between gap-2 rounded-md border border-border/40 bg-card p-2.5 text-xs">
+                                        <div className="min-w-0 space-y-1">
+                                          <p className="truncate text-xs font-medium text-foreground" title={ad.name}>{ad.name}</p>
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            <Badge variant={adActive ? "success" : "outline"} className="h-4 px-1 py-0 text-[9px]">
+                                              {adActive ? "Ativo" : "Pausado"}
+                                            </Badge>
+                                            <span className="truncate font-mono text-[10px] text-muted-foreground">ID {ad.adId}</span>
+                                          </div>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                          <span className="block font-mono text-[10px] text-muted-foreground">Leads</span>
+                                          <span className="font-mono text-xs font-bold text-primary">{ad.leadsCount || 0}</span>
                                         </div>
                                       </div>
-                                      <div className="text-right shrink-0">
-                                        <span className="text-[10px] font-mono text-muted-foreground block">Leads</span>
-                                        <span className="font-mono font-bold text-xs text-primary">{ad.leadsCount || 0}</span>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </TableCell>
@@ -316,6 +339,10 @@ export function CampaignsDashboardView({
       </Card>
     </div>
   );
+}
+
+function campaignDetailHref(campaign: MetaCampaignItem): string {
+  return `/marketing/campanhas/${encodeURIComponent(campaign.id || campaign.campaignId)}`;
 }
 
 function formatDistributionDestination(campaign: MetaCampaignItem): string {

@@ -10,6 +10,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("motion/react", () => ({
   motion: new Proxy({}, { get: (_target, property) => String(property) }),
   AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
+  MotionConfig: ({ children }: { children: React.ReactNode }) => children,
   useAnimation: () => ({ start: vi.fn(), stop: vi.fn(), set: vi.fn() }),
   useReducedMotion: () => false,
 }));
