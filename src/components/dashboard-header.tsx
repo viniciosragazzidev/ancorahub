@@ -27,7 +27,7 @@ export function DashboardHeader({
   return (
     <header
       data-slot="dashboard-header"
-      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-[calc(var(--mobile-header-height)+var(--mobile-safe-top))] max-[559px]:gap-2 max-[559px]:pt-(--mobile-safe-top) max-[559px]:pl-[max(var(--mobile-page-padding),var(--mobile-safe-left))] max-[559px]:pr-[max(var(--mobile-page-padding),var(--mobile-safe-right))]"
+      className="sticky top-0 z-30 flex h-(--header-height) min-w-0 shrink-0 items-center gap-3 border-b border-border/80 bg-background/92 px-5 backdrop-blur-md lg:px-6 max-[559px]:h-auto max-[559px]:min-h-[calc(var(--mobile-header-height)+var(--mobile-safe-top))] max-[559px]:flex-wrap max-[559px]:gap-x-2 max-[559px]:gap-y-1.5 max-[559px]:pb-2 max-[559px]:pt-(--mobile-safe-top) max-[559px]:pl-[max(var(--mobile-page-padding),var(--mobile-safe-left))] max-[559px]:pr-[max(var(--mobile-page-padding),var(--mobile-safe-right))]"
       style={{ viewTransitionName: "ct-shell-header" }}
     >
       {showSidebarTrigger ? (
@@ -39,9 +39,9 @@ export function DashboardHeader({
       <div className="min-w-0 flex-1">
         <AnimatedPageTitle breadcrumb={breadcrumb} title={title} />
       </div>
-      <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
+      <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5 max-[559px]:contents">
         {rightSlot ? (
-          <div aria-label="Ações da página" className="flex min-w-0 max-w-[calc(100vw-8rem)] items-center gap-1.5 overflow-x-auto whitespace-nowrap pr-0.5 [scrollbar-width:none] sm:max-w-[min(58vw,48rem)] sm:gap-2 lg:max-w-[min(62vw,58rem)]" data-slot="page-actions">
+          <div aria-label="Ações da página" className="flex min-w-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap pr-0.5 [scrollbar-width:none] max-[559px]:order-last max-[559px]:basis-full sm:max-w-[min(58vw,48rem)] sm:gap-2 lg:max-w-[min(62vw,58rem)]" data-slot="page-actions">
             {rightSlot}
           </div>
         ) : null}

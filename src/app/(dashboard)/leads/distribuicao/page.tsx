@@ -7,7 +7,7 @@ import { DistributionMetrics, DistributionPanel } from "./_components/distributi
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { DsPageHeader } from "@/components/ui/ds-page-header";
+import { AppPageHeader } from "@/components/app-page-header";
 import { DsDashboardCard } from "@/components/ui/ds-dashboard-card";
 import { DsStatusBadge } from "@/components/ui/ds-status-badge";
 import { DsStatTile } from "@/components/ui/ds-stat-tile";
@@ -130,7 +130,7 @@ export default async function LeadDistributionPage({
   if (context.role === "manager" && !context.branchId) {
     return (
       <>
-        <DsPageHeader title="Distribuição" breadcrumb="Operação comercial" />
+        <AppPageHeader title="Distribuição" breadcrumb="Operação comercial" />
         <main className="flex min-h-full flex-col items-center justify-center bg-ds-canvas-white p-ds-48">
           <DsEmptyState
             icon={<InboxIcon size={20} />}
@@ -169,7 +169,7 @@ export default async function LeadDistributionPage({
   if (!branchIds.length) {
     return (
       <>
-        <DsPageHeader title="Distribuição" breadcrumb="Operação comercial" />
+        <AppPageHeader title="Distribuição" breadcrumb="Operação comercial" />
         <main className="flex min-h-full flex-col items-center justify-center bg-ds-canvas-white p-ds-48">
           <DsEmptyState
             icon={<InboxIcon size={20} />}
@@ -669,7 +669,7 @@ export default async function LeadDistributionPage({
 
   return (
     <>
-      <DsPageHeader
+      <AppPageHeader
         title="Central de distribuição"
         breadcrumb="Operação comercial / Distribuição"
         description="Configure entradas, filas e plantões; acompanhe a operação no mesmo espaço."
