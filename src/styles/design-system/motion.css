@@ -1,0 +1,82 @@
+/* ---------------------------------------------------------------------------
+ * Design System motion — small, purposeful, and always optional.
+ *
+ * Movement here only ever explains a change (something appeared, moved, or
+ * finished); it is never decoration. Every rule is disabled under
+ * `prefers-reduced-motion`, and durations stay short (≤ 250ms) so the UI feels
+ * quick, not animated.
+ * --------------------------------------------------------------------------- */
+
+@theme {
+  --ease-ds-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-ds-rise: ds-rise 260ms var(--ease-ds-out) both;
+  --animate-ds-fade: ds-fade 180ms ease-out both;
+  --animate-ds-shimmer: ds-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Item entering a list/section: rises 6px while fading in. Stagger by setting
+ * `--ds-i` (index) on the element: each item waits 32ms more, capped at 8. */
+@keyframes ds-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ds-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ds-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.ds-rise {
+  animation: var(--animate-ds-rise);
+  animation-delay: calc(min(var(--ds-i, 0), 8) * 32ms);
+}
+
+.ds-fade {
+  animation: var(--animate-ds-fade);
+}
+
+/* Skeleton block: Paper Mist with a soft moving highlight. */
+.ds-skeleton {
+  background-image: linear-gradient(90deg,
+      var(--color-ds-paper-mist) 0%,
+      var(--color-ds-canvas-white) 50%,
+      var(--color-ds-paper-mist) 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-ds-shimmer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .ds-rise,
+  .ds-fade {
+    animation: none;
+  }
+
+  .ds-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--color-ds-paper-mist);
+  }
+}

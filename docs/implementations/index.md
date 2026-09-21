@@ -2,6 +2,7 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
+| 2026-09-21 | `active/2026-09-21-distribuicao-redesign-plan.md` | em validação | Plano de redesign da Central de Distribuição (5 áreas, drawer lateral, kit `ds-*` com movimento) e Lote 0 do kit. |
 | 2026-09-21 | `active/2026-09-21-dashboard-erp-composition.md` | em validação | Composição ERP premium do `/dashboard` com widgets shadcn reutilizáveis, gráficos, estados de carregamento e motion acessível. |
 | 2026-09-21 | `active/2026-09-21-waha-lite-connection-flow.md` | em validação | Conexão WhatsApp Lite: QR renovado em tempo real, sessão nunca recriada ao abrir o diálogo, status por fases e verificação contínua com feedback visual. |
 | 2026-09-15 | `completed/2026-09-15-routing-rule-persistence-fix.md` | concluído | Migration idempotente da tabela `lead_routing_rules`, que faltava para salvar regras da Matriz de Roteamento. |

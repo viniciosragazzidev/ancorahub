@@ -8,6 +8,7 @@
    not yet consumed by any existing route — see src/components/ui/ds-*.tsx
    and /dev/component-preview. */
 @import "../styles/design-system/tokens.css";
+@import "../styles/design-system/motion.css";
 
 
 @custom-variant dark (&:is(.dark *));
