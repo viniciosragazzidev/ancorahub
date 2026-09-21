@@ -11,6 +11,7 @@ export const META_WHATSAPP_TEMPLATE_PURPOSES = {
     name: CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
     language: CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
   },
+  brokerAccountActivated: { name: "broker_account_activated", language: "pt_BR" },
   taskReminder: { name: "ancora_lembrete_tarefa", language: "pt_BR" },
   clientNotice: { name: "ancora_aviso_cliente", language: "pt_BR" },
   brokerLeadNotification: { name: CANONICAL_BROKER_LEAD_TEMPLATE_NAME, language: "pt_BR" },
@@ -36,6 +37,7 @@ export type MetaWhatsAppTemplatePurpose = keyof typeof META_WHATSAPP_TEMPLATE_PU
  */
 const META_ONLY_INTERNAL_PURPOSES = new Set([
   "brokerInvitation",
+  "brokerAccountActivated",
   "brokerLeadNotification",
   "newLeadAssignment",
   "leadAssignmentConfirmed",
@@ -60,6 +62,7 @@ export function getMetaWhatsAppTemplate(purpose: string) {
  */
 export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
   if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo", "unidade"];
+  if (purpose === "brokerAccountActivated") return ["nome", "empresa", "login_url"];
   if (purpose === "brokerLeadNotification" || purpose === "newLeadAssignment") {
     return ["cargo", "corretor_nome", "lead_nome", "produto_interesse"];
   }

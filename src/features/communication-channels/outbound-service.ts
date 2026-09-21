@@ -8,7 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { MetaCloudApiError, sendMetaCloudTemplate, sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
-import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables, type MetaWhatsAppTemplatePurpose } from "./templates";
+import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
@@ -127,6 +127,48 @@ function brokerInvitationError(code: string, message: string) {
   return error;
 }
 
+function outboundChannelError(code: string, message: string) {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
+async function resolveMetaOutboundChannel(row: {
+  tenantId: string;
+  channelId: string | null;
+  purpose: string;
+}) {
+  const db = getDatabase();
+  const providerFilter = inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]);
+  if (row.channelId) {
+    const [boundChannel] = await db.select().from(schema.communicationChannels).where(and(
+      eq(schema.communicationChannels.id, row.channelId),
+      eq(schema.communicationChannels.tenantId, row.tenantId),
+      providerFilter,
+      eq(schema.communicationChannels.status, "active"),
+    )).limit(1);
+    if (boundChannel) return boundChannel;
+    if (row.purpose === "brokerAccountActivated") {
+      throw outboundChannelError(
+        "BROKER_ACTIVATION_CHANNEL_UNAVAILABLE",
+        "O canal usado no convite não está mais disponível; o aviso de ativação não será enviado por outro número.",
+      );
+    }
+  } else if (row.purpose === "brokerAccountActivated") {
+    throw outboundChannelError(
+      "BROKER_ACTIVATION_CHANNEL_UNAVAILABLE",
+      "O convite original não possui um canal corporativo vinculado; o aviso de ativação não será enviado por outro número.",
+    );
+  }
+
+  const [fallbackChannel] = await db.select().from(schema.communicationChannels).where(and(
+    eq(schema.communicationChannels.tenantId, row.tenantId),
+    providerFilter,
+    eq(schema.communicationChannels.status, "active"),
+  )).orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt)).limit(1);
+  return fallbackChannel ?? null;
+}
+
 async function isCurrentBrokerLeadNotification(row: {
   tenantId: string;
   purpose: string;
@@ -179,7 +221,7 @@ export async function enqueueMetaTemplateMessage(input: {
   recipientType: "lead" | "client" | "user";
   recipientId?: string;
   destinationPhone: string;
-  purpose: MetaWhatsAppTemplatePurpose;
+  purpose: string;
   variables?: string[];
   requestedBy?: string | null;
   idempotencyKey: string;
@@ -200,8 +242,13 @@ export async function enqueueMetaTemplateMessage(input: {
     purpose: input.purpose,
     variables,
   });
-  const resolvedTemplate = messagePlan ? null : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
-  const template = resolvedTemplate ?? getMetaWhatsAppTemplate(input.purpose);
+  // Activation notices are allowed to use only the governed event plan or a
+  // synchronized approved resource. Do not let the generic legacy resolver
+  // invent a template name when an active policy is incomplete.
+  const resolvedTemplate = messagePlan || input.purpose === "brokerAccountActivated"
+    ? null
+    : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
+  const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" ? null : getMetaWhatsAppTemplate(input.purpose));
   const primary = messagePlan?.primary ?? (template ? {
     type: "template" as const,
     templateName: template.name,
@@ -348,6 +395,13 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
       ? (urlButtonParameter.startsWith("http") ? urlButtonParameter : `${baseUrl}/convite/${urlButtonParameter}`)
       : baseUrl;
     return `Olá *${nome}*! 👋\n\nVocê recebeu um convite para criar seu acesso no sistema *${empresa}*.\n\nAcesse o link abaixo para definir sua senha e entrar no sistema:\n${link}\n\n_Este link é individual e seguro._`;
+  }
+
+  if (purpose === "brokerAccountActivated") {
+    const nome = rawVariables[0]?.trim() || "Corretor(a)";
+    const empresa = rawVariables[1]?.trim() || "Âncora";
+    const loginUrl = rawVariables[2]?.trim() || process.env.CRM_LOGIN_URL?.trim() || "https://crm.ancorasaude.cloud/login";
+    return `Olá *${nome}*! 👋\n\nSua conta no *${empresa}* foi ativada com sucesso.\n\nAcesse o CRM pelo link:\n${loginUrl}`;
   }
 
   if (purpose === "brokerLeadNotification") {
@@ -525,14 +579,11 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         }
       }
 
-      // Always resolve an active Meta channel. Legacy rows may point to a
-      // removed WAHA channel, so that id must never make the migrated send
-      // fail with a false "channel unavailable" error.
-      const [channel] = await db.select().from(schema.communicationChannels).where(and(
-        eq(schema.communicationChannels.tenantId, row.tenantId),
-        inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-        eq(schema.communicationChannels.status, "active"),
-      )).orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt)).limit(1);
+      // Preserve the channel selected when the outbox row was created. This
+      // is mandatory for the post-activation notice: it must use the same
+      // corporate number that delivered the original invitation. Legacy rows
+      // without a usable binding may still fall back to the tenant default.
+      const channel = await resolveMetaOutboundChannel(row);
       if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
       if (row.channelId !== channel.id || row.deliveryRoute !== "meta_only" || row.wahaNumberId) {
         await db.update(schema.whatsappOutboundMessages).set({

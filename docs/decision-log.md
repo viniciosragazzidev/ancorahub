@@ -1204,6 +1204,18 @@ ser a própria fila nem formar ciclos e cada encaminhamento é auditado. O
 processador também acorda jobs adiados assim que detecta um plantão ativo, sem
 relaxar unidade, disponibilidade, capacidade ou elegibilidade do corretor.
 
+## DEC-111 — Confirmação de ativação no mesmo canal do convite
+
+**Decisão aprovada em 2026-09-21.** Depois que o primeiro acesso concluir a
+transação de ativação, o CRM enfileira uma confirmação idempotente com o link de
+login. O outbox reutiliza o canal e o número de destino registrados na mensagem
+de convite; se esse canal não estiver mais disponível, o aviso não troca
+silenciosamente para outro número e fica auditado como indisponível. A mensagem
+é configurável em `/qualificacao?tab=meta_templates`, com uma versão livre
+segura como padrão e template Meta aprovado como contingência quando a janela de
+atendimento não estiver aberta. O Super-admin pode desligar o comportamento pela
+flag `feature_broker_account_activation_notice_enabled`.
+
 ## DEC-110 — Plantão global por corretora
 
 **Decisão aprovada em 2026-09-18.** Novos plantões são regras globais do tenant:

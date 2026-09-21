@@ -99,4 +99,15 @@ describe("message event catalog", () => {
     expect(getFreeMessageUnknownVariables(confirmed!, ["nome", "telefone", "interesse", "n_dependentes", "cidade"]))
       .toEqual([]);
   });
+
+  it("registers the post-activation notice with a safe login URL variable", () => {
+    const event = getMessageEventByPurpose("brokerAccountActivated");
+    expect(event?.key).toBe("BROKER_ACCOUNT_ACTIVATED");
+    expect(renderEventFreeMessage(
+      event!,
+      event!.defaultFreeMessage!,
+      ["Ana", "Âncora", "https://crm.ancorasaude.cloud/login"],
+    )).toContain("https://crm.ancorasaude.cloud/login");
+    expect(getFreeMessageUnknownVariables(event!, ["nome", "empresa", "login_url"])).toEqual([]);
+  });
 });

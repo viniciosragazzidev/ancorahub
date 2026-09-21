@@ -416,6 +416,10 @@ async function resolveLegacyMetaResource(tenantId: string, eventKey: string, pur
     }
   }
 
+  // Activation notices must not pretend that a static fallback is approved:
+  // without a synchronized Meta template the resolver uses the governed free
+  // message default instead of sending a guaranteed provider rejection.
+  if (purpose === "brokerAccountActivated") return null;
   return { id: "legacy", name: fallback.name, language: fallback.language, status: "APPROVED", bodyText: null, variables: [] };
 }
 
@@ -464,6 +468,34 @@ export async function resolveEventMessagePlan(input: {
     };
   }
   if (!policy) {
+    if (event.defaultFreeMessage) {
+      // The activation notice has a safe, versioned default so a newly
+      // provisioned tenant can notify the member immediately. If an approved
+      // Meta resource is already bound to the event, prefer it for internal
+      // recipients because Meta requires a template outside a service window.
+      if (!serviceWindowOpen && legacyMeta) {
+        const auto = buildAutomaticMetaVariableMappings(event, legacyMeta.variables);
+        return {
+          eventKey: event.key, policyId: null, policyVersion: null,
+          primary: makeMetaMessage(event, legacyMeta, auto.valid ? auto.mappings : {}, input.variables),
+          fallback: null, preferWahaDirect: false, serviceWindowOpen,
+        };
+      }
+      return {
+        eventKey: event.key, policyId: null, policyVersion: null,
+        primary: {
+          type: "text",
+          templateName: "__text__",
+          templateLanguage: "pt_BR",
+          renderedBody: renderEventFreeMessage(event, event.defaultFreeMessage, input.variables),
+        },
+        fallback: legacyMeta
+          ? makeMetaMessage(event, legacyMeta, buildAutomaticMetaVariableMappings(event, legacyMeta.variables).mappings, input.variables)
+          : null,
+        preferWahaDirect: false,
+        serviceWindowOpen,
+      };
+    }
     if (!legacyMeta) return null;
     const auto = buildAutomaticMetaVariableMappings(event, legacyMeta.variables);
     return {

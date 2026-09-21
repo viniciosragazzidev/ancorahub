@@ -36,6 +36,11 @@ describe("approved Meta WhatsApp templates", () => {
     expect(getMetaWhatsAppTemplateVariableNames("brokerInvitation")).toEqual(["nome", "empresa", "cargo", "unidade"]);
   });
 
+  it("defines the activation template fallback contract", () => {
+    expect(getMetaWhatsAppTemplate("brokerAccountActivated")).toEqual({ name: "broker_account_activated", language: "pt_BR" });
+    expect(getMetaWhatsAppTemplateVariableNames("brokerAccountActivated")).toEqual(["nome", "empresa", "login_url"]);
+  });
+
   it("uses the approved notification template and names its body variables", () => {
     expect(getMetaWhatsAppTemplate("brokerLeadNotification")).toEqual({ name: "new_lead_broker", language: "pt_BR" });
     expect(getMetaWhatsAppTemplateVariableNames("brokerLeadNotification")).toEqual(["cargo", "corretor_nome", "lead_nome", "produto_interesse"]);

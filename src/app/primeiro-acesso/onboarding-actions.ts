@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { buildCredentialAccount } from "@/shared/auth/credential-account";
 import { classifyExistingTeamIdentity } from "@/features/team/identity-reuse-policy";
+import { enqueueBrokerAccountActivationNotice, type BrokerAccountActivationNoticeStatus } from "@/features/team/broker-account-activation-delivery";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -20,7 +21,7 @@ const completeOnboardingSchema = z.object({
   termsAccepted: z.literal("on"),
 });
 
-export type OnboardingResult = { success?: boolean; error?: string; email?: string };
+export type OnboardingResult = { success?: boolean; error?: string; email?: string; activationNoticeStatus?: BrokerAccountActivationNoticeStatus };
 
 export async function completeOnboardingAction(
   _prev: OnboardingResult,
@@ -245,7 +246,22 @@ export async function completeOnboardingAction(
       });
     });
 
-    return { success: true, email: accessEmail };
+    // Activation is already committed at this point. The notification is a
+    // durable, idempotent follow-up and can never roll back a valid account.
+    let activationNoticeStatus: BrokerAccountActivationNoticeStatus = "failed";
+    try {
+      activationNoticeStatus = await enqueueBrokerAccountActivationNotice({
+        tenantId: invitation.tenantId,
+        invitationId: invitation.id,
+        memberName: input.name,
+        requestedBy: userId,
+      });
+    } catch {
+      // Keep onboarding successful if the optional communication follow-up is
+      // unavailable; the audit/outbox path records the operational failure.
+    }
+
+    return { success: true, email: accessEmail, activationNoticeStatus };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao concluir o onboarding.";
     return { success: false, error: message };

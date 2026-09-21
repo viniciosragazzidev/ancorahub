@@ -70,6 +70,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita as políticas versionadas de mensagens por situação; desativar restaura os templates homologados legados.",
   },
 
+  BROKER_ACCOUNT_ACTIVATION_NOTICE: {
+    key: "feature_broker_account_activation_notice_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Envia ao membro a confirmação de conta ativa e o link de acesso após concluir o primeiro acesso.",
+  },
+
   // ── IA / Qualificação ─────────────────────────────────────────────────────
   AI_ENABLED: {
     key: "ai_enabled",

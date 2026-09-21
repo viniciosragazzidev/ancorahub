@@ -89,4 +89,9 @@ describe("outboundService", () => {
     expect(qualifText).toContain("Como podemos te ajudar");
   });
 
+  it("formats the activation notice with the configured CRM login URL", () => {
+    expect(resolveTemplateTextBody("brokerAccountActivated", ["Ana", "Âncora", "https://crm.ancorasaude.cloud/login"]))
+      .toContain("https://crm.ancorasaude.cloud/login");
+  });
+
 });

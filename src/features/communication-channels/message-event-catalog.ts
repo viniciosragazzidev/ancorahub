@@ -20,6 +20,7 @@ export type MessageEventDefinition = {
   audience: MessageEventAudience;
   windowRule: MessageWindowRule;
   variables: readonly MessageEventVariable[];
+  defaultFreeMessage?: string;
 };
 
 const brokerName = {
@@ -152,6 +153,20 @@ export const MESSAGE_EVENT_CATALOG = [
     ],
   },
   {
+    key: "BROKER_ACCOUNT_ACTIVATED",
+    purpose: "brokerAccountActivated",
+    label: "Conta do membro ativada",
+    description: "Confirma a ativação do acesso e envia o link de login depois do primeiro acesso.",
+    audience: "user",
+    windowRule: "corporate_internal",
+    variables: [
+      { key: "nome", label: "Nome do membro", aliases: ["corretor_nome", "nome_usuario"], fallback: "Corretor(a)" },
+      { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "Âncora" },
+      { key: "login_url", label: "Link de login", aliases: ["crm_login_url"], fallback: "https://crm.ancorasaude.cloud/login", urlOnly: true },
+    ],
+    defaultFreeMessage: "Olá *{{nome}}*!\n\nSua conta no *{{empresa}}* foi ativada com sucesso.\n\nAcesse o CRM pelo link:\n{{login_url}}",
+  },
+  {
     key: "TASK_REMINDER",
     purpose: "taskReminder",
     label: "Lembrete de tarefa comercial",
@@ -180,11 +195,11 @@ export const MESSAGE_EVENT_CATALOG = [
 
 export type MessageEventKey = (typeof MESSAGE_EVENT_CATALOG)[number]["key"];
 
-export function getMessageEventByKey(key: string) {
+export function getMessageEventByKey(key: string): MessageEventDefinition | null {
   return MESSAGE_EVENT_CATALOG.find((event) => event.key === key) ?? null;
 }
 
-export function getMessageEventByPurpose(purpose: string) {
+export function getMessageEventByPurpose(purpose: string): MessageEventDefinition | null {
   return MESSAGE_EVENT_CATALOG.find((event) => event.purpose === purpose) ?? null;
 }
 
