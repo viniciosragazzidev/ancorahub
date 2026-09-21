@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
 import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
+import { aggregateBranchDistributionStats, type BranchDistributionStats } from "./distribution-stats";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -289,4 +290,40 @@ export async function getBranchProfileData(
   }
 
   return { branch, metrics, members, topBrokers };
+}
+
+// ─── Distribuição por filial ─────────────────────────────────────────────
+
+/** Corretores disponíveis, leads ativos e novos por filial (para a tabela de /filiais). */
+export async function getBranchDistributionStats(
+  tenantId: string,
+  branchIds: string[],
+): Promise<Map<string, BranchDistributionStats>> {
+  if (!branchIds.length) return new Map();
+  const db = getDatabase();
+  const [brokerRows, leadRows] = await Promise.all([
+    db
+      .select({
+        branchId: schema.tenantMemberships.branchId,
+        availabilityStatus: schema.tenantMemberships.availabilityStatus,
+        count: count(schema.tenantMemberships.id),
+      })
+      .from(schema.tenantMemberships)
+      .where(
+        and(
+          eq(schema.tenantMemberships.tenantId, tenantId),
+          eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.jobTitle, "broker"),
+          eq(schema.tenantMemberships.status, "active"),
+          inArray(schema.tenantMemberships.branchId, branchIds),
+        ),
+      )
+      .groupBy(schema.tenantMemberships.branchId, schema.tenantMemberships.availabilityStatus),
+    db
+      .select({ branchId: schema.leads.branchId, status: schema.leads.status, count: count(schema.leads.id) })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), inArray(schema.leads.branchId, branchIds)))
+      .groupBy(schema.leads.branchId, schema.leads.status),
+  ]);
+  return aggregateBranchDistributionStats(brokerRows, leadRows);
 }

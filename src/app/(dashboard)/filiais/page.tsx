@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { BranchesManager } from "@/features/branches/components/branches-manager";
+import { getBranchDistributionStats } from "@/features/branches/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -22,10 +23,13 @@ export default async function BranchesPage() {
       externalId: schema.branches.externalId,
       status: schema.branches.status,
       acceptingLeads: schema.branches.acceptingLeads,
+      autoDistribute: schema.branches.autoDistribute,
       isDistributionHub: schema.branches.isDistributionHub,
     })
     .from(schema.branches)
     .where(eq(schema.branches.tenantId, context.tenantId));
+
+  const distributionStats = await getBranchDistributionStats(context.tenantId, branches.map((branch) => branch.id));
 
   const memberCounts = await db
     .select({ branchId: schema.tenantMemberships.branchId, count: count(schema.tenantMemberships.id) })
@@ -81,7 +85,16 @@ export default async function BranchesPage() {
         </section>
         */}
         <BranchesManager
-          branches={branches.map((branch) => ({ ...branch, memberCount: countsByBranch.get(branch.id) ?? 0, acceptingLeads: branch.acceptingLeads }))}
+          branches={branches.map((branch) => {
+            const stats = distributionStats.get(branch.id);
+            return {
+              ...branch,
+              memberCount: countsByBranch.get(branch.id) ?? 0,
+              availableBrokers: stats?.availableBrokers ?? 0,
+              activeLeads: stats?.activeLeads ?? 0,
+              newLeads: stats?.newLeads ?? 0,
+            };
+          })}
           branchesTrend={branchesTrend}
           membersTrend={membersTrend}
         />

@@ -7,7 +7,6 @@ import Link from "next/link";
 import { ArrowSquareOut, PencilSimple, Plus, Power } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { Input } from "@/components/ui/input";
@@ -16,8 +15,27 @@ import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTit
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Section, StatusBadge, EmptyState } from "@/components/foundations";
 import { createBranchAction, toggleBranchAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
+import {
+  BranchAcceptingToggle,
+  BranchAutoDistributeToggle,
+  BranchDistributionLegend,
+  BranchHubToggle,
+} from "@/features/branches/components/branch-distribution-controls";
 
-type Branch = { id: string; name: string; externalId: string | null; status: "active" | "inactive"; memberCount: number; acceptingLeads: boolean; isDistributionHub: boolean };
+type Branch = {
+  id: string;
+  name: string;
+  externalId: string | null;
+  status: "active" | "inactive";
+  memberCount: number;
+  acceptingLeads: boolean;
+  autoDistribute: boolean;
+  isDistributionHub: boolean;
+  /** Corretores disponíveis, leads em andamento e leads novos (métricas de distribuição). */
+  availableBrokers: number;
+  activeLeads: number;
+  newLeads: number;
+};
 
 function ActionFeedback({ state }: { state?: BranchActionState }) {
   const router = useRouter();
@@ -97,16 +115,26 @@ function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
       <TableCell className="min-w-40"><Input form={updateFormId} aria-label={`Identificador de ${branch.name}`} name="externalId" defaultValue={branch.externalId ?? ""} placeholder="Sem ID" /></TableCell>
       <TableCell><span className="text-sm">{branch.memberCount}</span><span className="ml-1 text-xs text-muted-foreground">membro(s)</span></TableCell>
       <TableCell>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <StatusBadge
-            label={branch.status === "active" ? "Ativa" : "Inativa"}
-            tone={branch.status === "active" ? "success" : "neutral"}
-            dot
-          />
-          {branch.isDistributionHub ? <Badge variant="secondary">Central</Badge> : null}
-        </div>
+        <StatusBadge
+          label={branch.status === "active" ? "Ativa" : "Inativa"}
+          tone={branch.status === "active" ? "success" : "neutral"}
+          dot
+        />
       </TableCell>
-      <TableCell><Badge variant={branch.acceptingLeads ? "success" : "secondary"}>{branch.acceptingLeads ? "Recebendo" : "Pausado"}</Badge></TableCell>
+      <TableCell><BranchAcceptingToggle branchId={branch.id} enabled={branch.acceptingLeads} /></TableCell>
+      <TableCell><BranchAutoDistributeToggle branchId={branch.id} enabled={branch.autoDistribute} /></TableCell>
+      <TableCell><BranchHubToggle branchId={branch.id} enabled={branch.isDistributionHub} /></TableCell>
+      <TableCell>
+        <span className={`font-mono text-sm tabular-nums ${branch.availableBrokers > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+          {branch.availableBrokers}
+        </span>
+      </TableCell>
+      <TableCell><span className="font-mono text-sm tabular-nums">{branch.activeLeads}</span></TableCell>
+      <TableCell>
+        <span className={`font-mono text-sm tabular-nums ${branch.newLeads > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+          {branch.newLeads}
+        </span>
+      </TableCell>
       <TableCell className="pr-5 text-right">
         <div className="flex items-center justify-end gap-1">
           <Button render={<Link href={`/unidades/${branch.id}`} />} size="sm" variant="ghost" className="gap-1.5 text-xs">
@@ -197,8 +225,15 @@ export function BranchesManager({
 
       <Section
         title="Filiais da corretora"
-        description="Edite dados, acompanhe a equipe vinculada e controle quais filiais recebem leads."
-        actions={<CreateBranchSheet />}
+        description="Edite dados, acompanhe a equipe vinculada e controle recebimento, distribuição automática e papel de cada filial."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline">
+              Plantões
+            </Button>
+            <CreateBranchSheet />
+          </div>
+        }
         variant="card"
         className="p-0 overflow-hidden"
       >
@@ -218,7 +253,12 @@ export function BranchesManager({
                   <TableHead>Identificador</TableHead>
                   <TableHead>Equipe</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Receber leads</TableHead>
+                  <TableHead className="min-w-[120px]">Receber leads</TableHead>
+                  <TableHead className="min-w-[140px]">Distrib. automática</TableHead>
+                  <TableHead className="min-w-[110px]">Papel da unidade</TableHead>
+                  <TableHead>Disponíveis</TableHead>
+                  <TableHead>Leads ativos</TableHead>
+                  <TableHead>Novos</TableHead>
                   <TableHead className="pr-5 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -233,6 +273,7 @@ export function BranchesManager({
             </Table>
           </div>
         )}
+        {branches.length > 0 ? <BranchDistributionLegend /> : null}
       </Section>
     </>
   );
