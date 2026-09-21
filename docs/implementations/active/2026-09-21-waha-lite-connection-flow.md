@@ -61,22 +61,56 @@ destaque. **Todo texto/tom/ícone por fase fica em
 `src/features/waha-cadence/pairing-copy.ts`** — é o único lugar a editar para mudar um
 feedback. Revisão sem WAHA em `/dev/whatsapp-connect` (somente `next dev`).
 
-## Operação necessária (Coolify)
+## Onde o servidor realmente roda (correção)
 
-| Serviço | Variável | Observação |
-| --- | --- | --- |
-| Fastify | `WHATSAPP_HOOK_URL` | URL **pública** do próprio Fastify + `/internal/webhooks/waha`. Sem ela o fallback `http://api:3000` só funciona na mesma rede Docker; com serviços em VPS separadas o WAHA descarta o webhook. |
-| Fastify | `CRM_WEBHOOK_URL`, `WAHA_RELAY_SHARED_SECRET` | Destino/assinatura do encaminhamento ao CRM (mesmo segredo no CRM). |
-| Fastify | `WAHA_BASE_URL`, `WAHA_API_KEY` | Conferir a chave (`WAHA_UNAUTHORIZED` agora aparece como aviso no diálogo). |
-| Frontend | `VPS_API_URL`, `WHATSAPP_API_INTERNAL_TOKEN` | Mesmo token do Fastify. |
+A API de produção **não é** `services/whatsapp-api` deste repositório: ela é publicada pelo
+Coolify a partir do repositório **`corretop-infra`** (`api/waha-client.js`,
+`api/waha-routes.js`, `docker-compose.coolify.yml`). Por isso as rotas novas davam 404 em
+produção mesmo com o código neste repo. As mesmas correções foram portadas para lá (branch
+`fix/waha-pairing-state`); a cópia em `services/whatsapp-api` fica só como referência/testes e
+**não é o que roda** (avaliar removê-la para não divergir de novo).
 
-Sessões já criadas mantêm o webhook configurado na criação: depois de corrigir
-`WHATSAPP_HOOK_URL`, use “Gerar novo QR” para recriá-las.
+No stack de produção o WAHA já recebe o webhook global `WHATSAPP_HOOK_URL=http://api:3000/...`
+(mesma rede do compose) e a criação de sessão **não** configura webhook por sessão — então
+`WHATSAPP_HOOK_URL` no Fastify **não** é necessária para produção (orientação anterior nesta
+nota era válida apenas para a cópia deste repositório).
 
-1. Redeploy do **Fastify** (obrigatório para `/state` e o reconnect sem logout) e do frontend.
-2. Homologar: conectar → QR renova sozinho → escanear → ver “finalizando” → “conectado” sem
+## Operação necessária
+
+Ordem importa:
+
+1. **Deploy do CRM** (esta branch): o schema do webhook passa a aceitar `connecting`.
+2. **Deploy da API** (`corretop-infra`, branch `fix/waha-pairing-state`): habilita `/state`,
+   reconnect sem logout indevido, sem segundo `/start` e `/diagnostics`. Se a API for
+   publicada antes do CRM, os eventos `session.status` de pareamento são recusados (400).
+3. Homologar: conectar → QR renova sozinho → escanear → "finalizando" → "conectado" sem
    recarregar; reabrir com WhatsApp conectado **não** deve desvincular o celular.
-3. Acompanhar `waha.connection.state` nos logs (`providerStatus`, `hasQr`, `durationMs`).
+4. Logs da API: `waha.connection.state` (`providerStatus`, `hasQr`) e
+   `waha.webhook.session_status` (linha do tempo do pareamento).
+
+O token do CRM (`VPS_INTERNAL_API_TOKEN`) deve ser igual ao `INTERNAL_API_TOKEN` da API.
+
+## Diagnóstico quando o celular recusa o QR ("Não foi possível conectar o dispositivo")
+
+Esse erro aparece no aparelho, no instante do scan, e não é visível pelo CRM. Depois do
+deploy da API (corretop-infra):
+
+```bash
+node --env-file=.env.local scripts/diagnose-waha-live.mjs
+```
+
+O script chama `GET /internal/waha/diagnostics` (versão/engine/tier do WAHA, uptime, sessões
+com só o final do número) e aponta: WAHA Core (só sessão `default`), reinício recente
+(Chromium/OOM derrubando QR), sessões `FAILED/STOPPED` e excesso de sessões. O compose usa
+`devlikeapro/waha:latest`: um redeploy do stack pode trazer uma versão nova do WAHA/WhatsApp
+Web que quebra o pareamento — depois de achar uma versão que funciona, fixe-a com
+`WAHA_IMAGE_TAG`. Se o servidor estiver normal, as causas restantes
+são do aparelho: limite de 4 dispositivos vinculados (remova os antigos em *Dispositivos
+conectados*, inclusive vínculos órfãos de tentativas anteriores) e o limite temporário de
+tentativas do WhatsApp (aguardar algumas horas ou usar outro número).
+
+O Fastify também registra `waha.webhook.session_status` (sessão + status) a cada evento do
+WAHA, formando a linha do tempo SCAN_QR_CODE → STARTING → WORKING/FAILED nos logs do Coolify.
 
 ## Validação
 

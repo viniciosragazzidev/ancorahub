@@ -65,12 +65,19 @@ type WahaConnectionResponse = {
  * responde 404: cai para status + qr separados, mantendo o fluxo funcional
  * até o serviço ser redeployado.
  */
+/** Quando o Fastify respondeu 404 em /state, não insiste até esta data (um redeploy volta a ser detectado). */
+let stateRouteRetryAt = 0;
+
 async function readConnectionState(sessionName: string): Promise<WahaConnectionResponse> {
   const id = encodeURIComponent(sessionName);
   try {
+    if (Date.now() < stateRouteRetryAt) throw new Error("A rota /state não foi encontrada (cache).");
     return await vpsRequest(`/internal/waha/connections/${id}/state`, { timeoutMs: 12_000 });
   } catch (error) {
     if (!(error instanceof Error) || !/\b404\b|não foi encontrada/i.test(error.message)) throw error;
+    // Sem o cache, cada ciclo de polling gastaria uma ida ao servidor só para
+    // tomar 404 enquanto o Fastify ainda não foi redeployado.
+    stateRouteRetryAt = Date.now() + 60_000;
     const status = await vpsRequest(`/internal/waha/connections/${id}/status`);
     const qr = normalizeWahaUiStatus(status.status) === "initializing"
       ? await vpsRequest(`/internal/waha/connections/${id}/qr`).catch(() => null)

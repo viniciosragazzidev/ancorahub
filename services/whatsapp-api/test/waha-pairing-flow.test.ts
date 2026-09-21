@@ -44,6 +44,11 @@ async function startFakeWaha(): Promise<FakeWaha> {
       fake.session = { status: fake.createStatus };
       return json(201, {});
     }
+    if (path === "/api/server/version") return json(200, { version: "2026.9.1", engine: "WEBJS", tier: "PLUS", browser: "/usr/bin/chromium", secret: "nao-deve-sair" });
+    if (path === "/api/server/status") return json(200, { startTime: 1, uptime: 12_345, worker: { id: "w1" } });
+    if (path === "/api/sessions" && method === "GET") {
+      return json(200, fake.session ? [{ name: "s1", ...fake.session }] : []);
+    }
     if (path === "/api/sessions/s1" && method === "GET") {
       return fake.session ? json(200, { name: "s1", ...fake.session }) : json(404, {});
     }
@@ -176,4 +181,28 @@ test("sessão ausente no WAHA aparece como inexistente (CRM pode recriar)", asyn
     assert.equal(state.exists, false);
     assert.equal(state.status, "DISCONNECTED");
   });
+});
+
+test("diagnóstico: versão, engine, uptime e sessões sem expor telefone inteiro nem campos extras", async () => {
+  await withFlow(async ({ waha, get }) => {
+    waha.session = { status: "WORKING", me: { id: "5511999998821@c.us" } };
+    const diagnostics = await get("/internal/waha/diagnostics");
+    assert.equal(diagnostics.ok, true);
+    assert.deepEqual(diagnostics.version, { version: "2026.9.1", engine: "WEBJS", tier: "PLUS", browser: "/usr/bin/chromium" });
+    assert.deepEqual(diagnostics.server, { startTime: 1, uptime: 12_345, worker: { id: "w1" } });
+    assert.deepEqual(diagnostics.sessions, [{ name: "s1", status: "WORKING", phoneSuffix: "8821" }]);
+    assert.equal(diagnostics.webhookUrl, "https://api.exemplo.com");
+    assert.ok(!JSON.stringify(diagnostics).includes("nao-deve-sair"));
+    assert.ok(!JSON.stringify(diagnostics).includes("5511999998821"));
+  });
+});
+
+test("diagnóstico exige o token interno", async () => {
+  process.env.WHATSAPP_API_INTERNAL_TOKEN = "flow-token";
+  process.env.WAHA_BASE_URL = "http://127.0.0.1:9";
+  process.env.WAHA_API_KEY = "waha-key";
+  const app = buildApp();
+  const response = await app.inject({ method: "GET", url: "/internal/waha/diagnostics" });
+  assert.equal(response.statusCode, 401);
+  await app.close();
 });

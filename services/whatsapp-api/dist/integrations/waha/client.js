@@ -460,6 +460,52 @@ export class WahaClient {
         }
         return [];
     }
+    /**
+     * Retrato do servidor WAHA para diagnóstico de pareamento: versão/engine
+     * (WhatsApp Web desatualizado é causa clássica de "Não foi possível conectar
+     * o dispositivo"), uptime (reinícios frequentes derrubam QR e sessões) e as
+     * sessões existentes. Cada consulta é independente: uma indisponível não
+     * esconde as demais. Nunca devolve o número por inteiro.
+     */
+    async getDiagnostics() {
+        const errors = [];
+        const attempt = async (label, run) => {
+            try {
+                return await run();
+            }
+            catch (error) {
+                errors.push(`${label}: ${error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE"}${error instanceof WahaClientError && error.providerStatusCode ? ` (${error.providerStatusCode})` : ""}`);
+                return null;
+            }
+        };
+        const pick = (raw, keys) => {
+            if (!raw || typeof raw !== "object")
+                return null;
+            const source = raw;
+            return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]));
+        };
+        const [version, server, sessions] = await Promise.all([
+            attempt("version", () => this.request("/api/server/version", { timeoutMs: 5_000 })),
+            attempt("status", () => this.request("/api/server/status", { timeoutMs: 5_000 })),
+            attempt("sessions", () => this.request("/api/sessions?all=true", { timeoutMs: 8_000 })),
+        ]);
+        return {
+            version: pick(version, ["version", "engine", "tier", "browser"]),
+            server: pick(server, ["startTime", "uptime", "worker"]),
+            sessions: Array.isArray(sessions)
+                ? sessions.map((raw) => {
+                    const item = raw;
+                    const id = typeof item.me?.id === "string" ? item.me.id.replace(/@.+$/, "") : null;
+                    return {
+                        name: String(item.name ?? ""),
+                        status: String(item.status ?? "UNKNOWN"),
+                        phoneSuffix: id ? id.slice(-4) : null,
+                    };
+                })
+                : null,
+            errors,
+        };
+    }
     /** Lista conversas para reconciliar números cujo DDD cadastrado está desatualizado. */
     async getChats(sessionName, limit = 500) {
         const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);

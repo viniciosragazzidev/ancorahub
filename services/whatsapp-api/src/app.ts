@@ -4,7 +4,7 @@ import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
 import { getInternalApiToken, getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
 import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/client.js";
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
-import { WahaClient, type WahaRecoveryCleanup } from "./integrations/waha/client.js";
+import { WahaClient, resolveWebhookUrl, type WahaRecoveryCleanup } from "./integrations/waha/client.js";
 import { WahaClientError } from "./integrations/waha/types.js";
 
 type SendBody = { to: string; message: string };
@@ -177,6 +177,37 @@ export function buildApp() {
       ok: true,
       service: "waha",
       status: "healthy",
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // ── WAHA Diagnostics ───────────────────────────────────────────────────
+  // Retrato do servidor WAHA (versão/engine, uptime, sessões) para investigar
+  // falhas de pareamento sem acesso ao container. Sem segredos nem telefones.
+  app.get("/internal/waha/diagnostics", async (request, reply) => {
+    if (!requireInternalAuth(request, reply, getInternalApiToken())) return;
+
+    let wahaConfig;
+    try {
+      wahaConfig = getWahaConfig();
+    } catch {
+      return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+    }
+
+    const client = new WahaClient(wahaConfig);
+    const [health, diagnostics] = await Promise.all([client.health(), client.getDiagnostics()]);
+    request.log.info({
+      operation: "waha.diagnostics",
+      health: health.status,
+      sessions: diagnostics.sessions?.length ?? null,
+      errors: diagnostics.errors,
+    });
+
+    return reply.code(200).send({
+      ok: true,
+      health: { status: health.status, durationMs: health.durationMs, ...(health.error ? { error: health.error } : {}) },
+      webhookUrl: (() => { try { return new URL(resolveWebhookUrl()).origin; } catch { return "invalid"; } })(),
+      ...diagnostics,
       timestamp: new Date().toISOString(),
     });
   });
@@ -968,6 +999,18 @@ export function buildApp() {
           error: !CRM_WEBHOOK_URL ? "CRM_WEBHOOK_URL not configured" : "WAHA_RELAY_SHARED_SECRET not configured",
         });
         return reply.code(503).send({ accepted: false, error: "CRM webhook not configured" });
+      }
+
+      // Linha do tempo do pareamento nos logs do Fastify (só metadados — nunca
+      // conteúdo de mensagem): sem ela não dá para saber se o WAHA está
+      // entregando os eventos de status.
+      const envelope = request.body as { event?: unknown; session?: unknown; payload?: { status?: unknown } };
+      if (envelope?.event === "session.status") {
+        request.log.info({
+          operation: "waha.webhook.session_status",
+          session: typeof envelope.session === "string" ? envelope.session : undefined,
+          status: typeof envelope.payload?.status === "string" ? envelope.payload.status : undefined,
+        });
       }
 
       const rawBody = JSON.stringify(request.body);
