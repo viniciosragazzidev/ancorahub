@@ -49,12 +49,35 @@ type WahaConnectionResponse = {
   ok: boolean;
   sessionName?: string;
   status?: string;
+  /** Status bruto do WAHA (SCAN_QR_CODE, STARTING, WORKING…). Ausente em Fastify antigo. */
+  providerStatus?: string;
+  /** Falso quando a sessão não existe mais no WAHA (ex.: WAHA reiniciado sem volume). */
+  exists?: boolean;
   reused?: boolean;
   qr?: string | null;
   phoneNumber?: string | null;
   error?: string;
   timestamp?: string;
 };
+
+/**
+ * Leitura única de estado + QR. Fastify sem a rota `/state` (deploy antigo)
+ * responde 404: cai para status + qr separados, mantendo o fluxo funcional
+ * até o serviço ser redeployado.
+ */
+async function readConnectionState(sessionName: string): Promise<WahaConnectionResponse> {
+  const id = encodeURIComponent(sessionName);
+  try {
+    return await vpsRequest(`/internal/waha/connections/${id}/state`, { timeoutMs: 12_000 });
+  } catch (error) {
+    if (!(error instanceof Error) || !/\b404\b|não foi encontrada/i.test(error.message)) throw error;
+    const status = await vpsRequest(`/internal/waha/connections/${id}/status`);
+    const qr = normalizeWahaUiStatus(status.status) === "initializing"
+      ? await vpsRequest(`/internal/waha/connections/${id}/qr`).catch(() => null)
+      : null;
+    return { ...status, qr: qr?.qr ?? null };
+  }
+}
 
 async function vpsRequest<T extends WahaConnectionResponse>(
   path: string,
@@ -173,24 +196,24 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
       timeoutMs: options.forceNew ? 60_000 : 15_000,
     });
 
-    const status = normalizeWahaUiStatus(result.status ?? "STARTING");
-    const isReady = status === "ready";
+    let status = normalizeWahaUiStatus(result.status ?? "STARTING");
+    let providerStatus: string | null = result.providerStatus ?? null;
 
-    // Se a sessão já estava CONNECTED, não buscar QR
-    let qrCode: string | null = null;
-    if (!isReady && result.qr) {
-      qrCode = result.qr;
-    } else if (!isReady) {
+    // Sessão já conectada: nada de QR. Caso contrário, uma leitura de estado
+    // devolve status bruto + QR (quando o WAHA já está em SCAN_QR_CODE). Um QR
+    // ainda inexistente não é erro — o polling do dialog o busca em seguida.
+    let qrCode: string | null = status === "ready" ? null : (result.qr ?? null);
+    if (status !== "ready" && !qrCode) {
       try {
-        const qrResult = await vpsRequest(
-          `/internal/waha/connections/${encodeURIComponent(sessionName)}/qr`,
-        );
-        const qrStatus = normalizeWahaUiStatus(qrResult.status ?? status);
-        qrCode = qrStatus === "ready" ? null : (qrResult.qr ?? null);
+        const state = await readConnectionState(sessionName);
+        status = normalizeWahaUiStatus(state.status ?? result.status);
+        providerStatus = state.providerStatus ?? providerStatus;
+        qrCode = status === "ready" ? null : (state.qr ?? null);
       } catch {
-        // QR pode não estar disponível ainda — o polling vai buscar depois
+        // mantém o status devolvido pelo start
       }
     }
+    const isReady = status === "ready";
 
     // Upsert no banco local
     const [connection] = await db
@@ -211,7 +234,9 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
       sessionId: sessionName,
       sessionName,
       status,
-      qrCode,
+      // O QR nunca é persistido: ele rotaciona a cada 20s no WAHA e uma cópia
+      // no banco só serviria para reexibir um código já expirado.
+      qrCode: null,
       webhookSecret: connection?.webhookSecret ?? randomUUID(),
       chatInternoAtivo: status === "ready" ? true : (connection?.chatInternoAtivo ?? true),
       connectedAt: isReady
@@ -229,7 +254,7 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
       await db.insert(schema.whatsappConnections).values(values);
     }
 
-    return { success: true, sessionId: sessionName, qrCode, status };
+    return { success: true, sessionId: sessionName, qrCode, status, providerStatus };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível iniciar o WhatsApp.";
     // Normalizar código de erro para o frontend decidir UI
@@ -238,36 +263,51 @@ export async function startWhatsAppConnection(options: { forceNew?: boolean } = 
   }
 }
 
-export async function refreshWhatsAppQr() {
+/**
+ * Leitura de pareamento usada pelo polling do dialog: UMA ida ao Fastify traz
+ * status, status bruto do WAHA e o QR atual. Cada QR vem direto do provider —
+ * ele rotaciona (60s o primeiro, 20s os demais) e nunca é reaproveitado.
+ *
+ * O banco só é escrito quando o status muda; escrever a cada 500 ms era o
+ * maior custo do polling e disputava linha com o webhook de status.
+ */
+export async function pollWhatsAppConnection() {
   const { db, connection } = await getOwnConnection();
   if (!connection?.sessionName)
-    return { success: false, error: "Inicie uma sessão primeiro.", code: "NO_SESSION" };
+    return { success: false as const, error: "Sessão não configurada.", code: "NO_SESSION" };
 
   try {
-    const result = await vpsRequest(
-      `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`,
-    );
-    const status = normalizeWahaUiStatus(result.status ?? connection.status);
-    const qrCode = status === "ready" ? null : (result.qr ?? null);
+    const result = await readConnectionState(connection.sessionName);
+    // Sessão inexistente no WAHA (reinício sem volume, remoção manual):
+    // o CRM não pode continuar afirmando "conectando".
+    const status = result.exists === false ? "disconnected" : normalizeWahaUiStatus(result.status ?? connection.status);
+    const qrCode = status === "initializing" ? (result.qr ?? null) : null;
 
-    await db
-      .update(schema.whatsappConnections)
-      .set({
-        qrCode,
-        status,
-        connectedAt:
-          status === "ready" ? (connection.connectedAt ?? new Date()) : connection.connectedAt,
-        chatInternoAtivo: status === "ready" ? true : connection.chatInternoAtivo,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.whatsappConnections.id, connection.id));
+    const becameReady = status === "ready" && !connection.connectedAt;
+    if (connection.status !== status || becameReady || connection.qrCode) {
+      await db
+        .update(schema.whatsappConnections)
+        .set({
+          status,
+          qrCode: null,
+          connectedAt: status === "ready" ? (connection.connectedAt ?? new Date()) : connection.connectedAt,
+          chatInternoAtivo: status === "ready" ? true : connection.chatInternoAtivo,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.whatsappConnections.id, connection.id));
+    }
 
-    return { success: true, qrCode, status };
+    return {
+      success: true as const,
+      status,
+      providerStatus: result.providerStatus ?? null,
+      qrCode,
+      phone: result.phoneNumber ?? null,
+      sessionExists: result.exists !== false,
+    };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Não foi possível atualizar o QR Code.";
-    const code = /QR|qr/i.test(message) ? "QR_ERROR" : wahaActionErrorCode(message);
-    return { success: false, error: message, code };
+    const message = error instanceof Error ? error.message : "Não foi possível consultar a conexão.";
+    return { success: false as const, error: message, code: wahaActionErrorCode(message) };
   }
 }
 
@@ -308,19 +348,29 @@ export async function getWhatsAppSessionStatus() {
     );
     const status = normalizeWahaUiStatus(result.status ?? connection.status);
 
-    await db
-      .update(schema.whatsappConnections)
-      .set({
-        status,
-        qrCode: status === "ready" ? null : connection.qrCode,
-        connectedAt:
-          status === "ready" ? (connection.connectedAt ?? new Date()) : connection.connectedAt,
-        chatInternoAtivo: status === "ready" ? true : connection.chatInternoAtivo,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.whatsappConnections.id, connection.id));
+    // Só escreve quando algo mudou: o badge consulta a cada 5 s e cada escrita
+    // desnecessária disputava a linha com o webhook de status.
+    const becameReady = status === "ready" && !connection.connectedAt;
+    if (connection.status !== status || becameReady || connection.qrCode) {
+      await db
+        .update(schema.whatsappConnections)
+        .set({
+          status,
+          qrCode: null,
+          connectedAt:
+            status === "ready" ? (connection.connectedAt ?? new Date()) : connection.connectedAt,
+          chatInternoAtivo: status === "ready" ? true : connection.chatInternoAtivo,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.whatsappConnections.id, connection.id));
+    }
 
-    return { success: true, status, phone: result.phoneNumber ?? null };
+    return {
+      success: true,
+      status,
+      providerStatus: result.providerStatus ?? null,
+      phone: result.phoneNumber ?? null,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Não foi possível consultar o status.";
     const code = wahaActionErrorCode(message);
@@ -470,25 +520,29 @@ export async function recoverWhatsAppFailedSessionAction() {
       },
     );
     const status = normalizeWahaUiStatus(result.status ?? "STARTING");
-    const qrResult =
+    const state =
       status === "ready"
         ? null
-        : await vpsRequest(
-            `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/qr`,
-          ).catch(() => null);
-    const qrCode = status === "ready" ? null : (qrResult?.qr ?? null);
+        : await readConnectionState(connection.sessionName).catch(() => null);
+    const qrCode = status === "ready" ? null : (state?.qr ?? null);
 
     await db
       .update(schema.whatsappConnections)
       .set({
         status,
-        qrCode,
+        qrCode: null,
         connectedAt: status === "ready" ? (connection.connectedAt ?? new Date()) : null,
         updatedAt: new Date(),
       })
       .where(eq(schema.whatsappConnections.id, connection.id));
 
-    return { success: true, sessionId: connection.sessionName, status, qrCode };
+    return {
+      success: true,
+      sessionId: connection.sessionName,
+      status,
+      providerStatus: state?.providerStatus ?? result.providerStatus ?? null,
+      qrCode,
+    };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Não foi possível recuperar a sessão WhatsApp.";

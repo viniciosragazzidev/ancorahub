@@ -30,6 +30,8 @@ export interface DsBarChartProps<T extends Record<string, unknown>> {
   xTickFormatter?: (value: string) => string;
   height?: number;
   className?: string;
+  /** Sparkline mode for KPI cards — no axes/grid/tooltip legend, thin bars. */
+  compact?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function DsBarChart<T extends Record<string, unknown>>({
   xTickFormatter,
   height = 220,
   className,
+  compact = false,
 }: DsBarChartProps<T>) {
   const config = React.useMemo<ChartConfig>(() => {
     const entries: ChartConfig = {};
@@ -62,31 +65,36 @@ export function DsBarChart<T extends Record<string, unknown>>({
       className={className ?? "aspect-auto w-full"}
       style={{ height }}
     >
-      <BarChart data={data} margin={{ left: -16, right: 4, top: 4, bottom: 0 }}>
-        <CartesianGrid stroke="var(--color-ds-ash)" vertical={false} />
-        <XAxis
-          dataKey={xKey}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          tickFormatter={xTickFormatter}
-          fontSize={11}
-          stroke="var(--color-ds-fog)"
-        />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          tickMargin={4}
-          allowDecimals={false}
-          fontSize={11}
-          width={28}
-          stroke="var(--color-ds-fog)"
-        />
+      <BarChart data={data} margin={compact ? { left: 0, right: 0, top: 2, bottom: 0 } : { left: -16, right: 4, top: 4, bottom: 0 }}>
+        {compact ? null : <CartesianGrid stroke="var(--color-ds-ash)" vertical={false} />}
+        {compact ? null : (
+          <XAxis
+            dataKey={xKey}
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={xTickFormatter}
+            fontSize={11}
+            stroke="var(--color-ds-fog)"
+          />
+        )}
+        {compact ? null : (
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickMargin={4}
+            allowDecimals={false}
+            fontSize={11}
+            width={28}
+            stroke="var(--color-ds-fog)"
+          />
+        )}
         <ChartTooltip
-          cursor={{ fill: "var(--color-ds-paper-mist)" }}
+          cursor={compact ? false : { fill: "var(--color-ds-paper-mist)" }}
           content={
             <ChartTooltipContent
               indicator="dot"
+              hideLabel={compact}
               className="rounded-ds-buttons border-ds-ash shadow-ds-md"
             />
           }
@@ -96,11 +104,11 @@ export function DsBarChart<T extends Record<string, unknown>>({
             key={s.key}
             dataKey={s.key}
             fill={`var(--color-${s.key})`}
-            radius={[6, 6, 0, 0]}
-            maxBarSize={32}
+            radius={compact ? [2, 2, 0, 0] : [6, 6, 0, 0]}
+            maxBarSize={compact ? 8 : 32}
           />
         ))}
-        {series.length > 1 ? (
+        {!compact && series.length > 1 ? (
           <ChartLegend content={<ChartLegendContent className="font-ds-inter text-ds-caption text-ds-fog" />} />
         ) : null}
       </BarChart>

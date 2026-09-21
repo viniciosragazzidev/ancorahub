@@ -311,3 +311,24 @@ test("GET /health continua retornando 200 mesmo com rotas de conexão", async ()
   assert.deepEqual(response.json(), { status: "ok" });
   await app.close();
 });
+
+// ── GET /connections/:id/state ─────────────────────────────────────────
+
+test("GET /connections/:id/state sem token retorna 401", async () => {
+  configure();
+  const app = buildApp();
+  const response = await app.inject({ method: "GET", url: "/internal/waha/connections/waha_abc/state" });
+  assert.equal(response.statusCode, 401);
+  await app.close();
+});
+
+test("GET /connections/:id/state com WAHA fora do ar devolve erro normalizado (502)", async () => {
+  configure();
+  // Porta 9 (discard) recusa a conexão: independe do que roda em localhost:3000.
+  process.env.WAHA_BASE_URL = "http://127.0.0.1:9";
+  const app = buildApp();
+  const response = await app.inject({ method: "GET", url: "/internal/waha/connections/waha_abc/state", headers: AUTH_HEADERS });
+  assert.equal(response.statusCode, 502);
+  assert.equal(response.json().ok, false);
+  await app.close();
+});

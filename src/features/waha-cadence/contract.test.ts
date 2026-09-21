@@ -148,5 +148,19 @@ describe("WAHA cadence contract", () => {
     expect(event.sessionId).toBe("default");
     expect(event.sessionStatus).toBe("active");
   });
+  it.each([
+    ['STARTING', 'connecting'],
+    ['SCAN_QR_CODE', 'connecting'],
+    ['WORKING', 'active'],
+    ['FAILED', 'error'],
+    ['STOPPED', 'offline'],
+    ['ALGO_NOVO', 'offline'],
+  ])('maps native session.status %s to %s without treating pairing as offline', (status, expected) => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: 'session.status',
+      session: 'waha_abc',
+      payload: { status },
+    }));
+    expect(event.sessionStatus).toBe(expected);
+  });
 });
-

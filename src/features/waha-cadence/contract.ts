@@ -87,7 +87,7 @@ export const wahaWebhookSchema = z.object({
     providerMessageId: z.string().min(1).max(200).optional(),
     status: z.enum(["sent", "delivered", "read", "failed"]),
   }).strict().optional(),
-  sessionStatus: z.enum(["active", "paused", "offline", "error"]).optional(),
+  sessionStatus: z.enum(["active", "connecting", "paused", "offline", "error"]).optional(),
 }).strict();
 
 export type WahaWebhookEvent = z.infer<typeof wahaWebhookSchema>;
@@ -214,13 +214,17 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
       // Fail-safe: status desconhecido nunca é "active". O default otimista
       // marcava sessões em pareamento (SCAN_QR_CODE/AUTHENTICATING) como
       // prontas no banco, fazendo a conexão oscilar ready↔disconnected.
-      let sessionStatus: "active" | "paused" | "offline" | "error" = "offline";
+      // Pareamento também não é "offline": marcar SCAN_QR_CODE/STARTING como
+      // desconectado sobrescrevia "conectando" no banco e derrubava a UI.
+      let sessionStatus: "active" | "connecting" | "paused" | "offline" | "error" = "offline";
       if (rawStatus === "WORKING" || rawStatus === "CONNECTED" || rawStatus === "ACTIVE") {
         sessionStatus = "active";
       } else if (rawStatus === "PAUSED") {
         sessionStatus = "paused";
       } else if (rawStatus === "FAILED" || rawStatus === "ERROR") {
         sessionStatus = "error";
+      } else if (["STARTING", "SCAN_QR_CODE", "AUTHENTICATING", "OPENING", "CONNECTING"].includes(rawStatus)) {
+        sessionStatus = "connecting";
       }
 
       return {

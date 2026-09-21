@@ -29,6 +29,10 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
     Awaited<ReturnType<typeof getWhatsAppConnection>> | null
   >(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Enquanto o dialog de conexão está aberto ele precisa continuar montado,
+  // mesmo que o polling do badge já tenha visto "conectado": senão a tela de
+  // sucesso seria cortada no meio da animação.
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const wasConnected = useRef(initialConnected);
 
@@ -109,7 +113,7 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
     };
   }, [router, refreshConnection]);
 
-  if (live.connected) {
+  if (live.connected && !dialogOpen) {
     return (
       <>
         <div className="flex items-center gap-2">
@@ -143,20 +147,28 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
 
   return (
     <div className="flex items-center gap-2">
-      <Badge variant={live.status === "error" ? "destructive" : "warning"} className="gap-1.5 px-2.5 py-1">
-        <TriangleAlert className="size-3.5" />
-        {live.status === "error"
-          ? "Conexão requer atenção"
-          : live.status === "paused"
-            ? "Sincronização pausada"
-            : "WhatsApp não conectado"}
-      </Badge>
+      {live.connected ? (
+        <Badge variant="success" className="gap-1.5 px-2.5 py-1">
+          <ShieldCheck className="size-3.5" />
+          Sincronização ativa
+        </Badge>
+      ) : (
+        <Badge variant={live.status === "error" ? "destructive" : "warning"} className="gap-1.5 px-2.5 py-1">
+          <TriangleAlert className="size-3.5" />
+          {live.status === "error"
+            ? "Conexão requer atenção"
+            : live.status === "paused"
+              ? "Sincronização pausada"
+              : "WhatsApp não conectado"}
+        </Badge>
+      )}
       {connection ? (
         <WhatsAppConnectDialog
           initial={connection}
           triggerLabel="Conectar"
           connectedLabel="Gerenciar"
           onConnectionChanged={refreshConnection}
+          onOpenChange={setDialogOpen}
         />
       ) : (
         <Button

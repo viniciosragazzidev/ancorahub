@@ -149,7 +149,11 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       paused: "paused",
       offline: "disconnected",
       error: "error",
-    };    const normalizedStatus = event.sessionStatus
+      // Conexões de corretor usam "initializing" para o pareamento; a tabela
+      // de números da plataforma mantém o vocabulário "connecting" do relay.
+      connecting: source.kind === "connection" ? "initializing" : "connecting",
+    };
+    const normalizedStatus = event.sessionStatus
       ? (statusMap[event.sessionStatus] ?? event.sessionStatus)
       : "disconnected";
 

@@ -2,131 +2,146 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, LockKey, Monitor, WarningCircle, WhatsappLogo } from "@/components/huge-icons";
-import { cn } from "@/lib/utils";
+import { Monitor, WhatsappLogo } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { wahaActionCodeFromMessage, wahaActionErrorMessage } from "@/lib/waha-error-codes";
 import {
+  derivePairingPhase,
+  FIRST_QR_LIFETIME_SECONDS,
+  PAIRING_STALL_SECONDS,
+  ROTATED_QR_LIFETIME_SECONDS,
+  type PairingPhase,
+} from "@/features/waha-cadence/pairing-phase";
+import {
   forceDisconnectWhatsAppSession,
   getWhatsAppConnection,
-  getWhatsAppSessionStatus,
-  recoverWhatsAppFailedSessionAction,
-  refreshWhatsAppQr,
+  pollWhatsAppConnection,
   resetWhatsAppSessionAction,
   startWhatsAppConnection,
   toggleWhatsAppChatAction,
 } from "@/app/(dashboard)/settings/whatsapp-actions";
+import { PAIRING_BADGE_LABELS, PAIRING_TOASTS } from "@/features/waha-cadence/pairing-copy";
+import { PairingCallout, PairingGuide, PairingQrPanel, PairingStepper } from "./whatsapp-pairing-panel";
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
+type PollSnapshot = Extract<Awaited<ReturnType<typeof pollWhatsAppConnection>>, { success: true }>;
 
-function statusLabel(status: string): string {
-  switch (status) {
-    case "ready": return "Conectado";
-    case "initializing": return "Conectando…";
-    case "recovering": return "Recuperando…";
-    case "error": return "Erro";
-    default: return "Desconectado";
-  }
-}
+const PHASE_BADGE_STATUS: Record<PairingPhase, DsStatusBadgeStatus> = {
+  idle: "secondary",
+  starting: "info",
+  qr: "info",
+  pairing: "info",
+  ready: "success",
+  error: "destructive",
+};
 
-/** Step indicator for the connection flow */
-function ConnectionSteps({ status, hasQr }: { status: string; hasQr: boolean }) {
-  const steps = [
-    { label: "Iniciar", done: status !== "disconnected" },
-    { label: "Escaneie", done: status === "ready" },
-    { label: "Conectado", done: status === "ready" },
-  ];
-  // If we have a QR, step 2 is in progress
-  const activeStep = status === "ready" ? 2 : hasQr ? 1 : status === "initializing" ? 0 : -1;
+/** Quanto tempo a tela de sucesso permanece antes de o dialog fechar sozinho. */
+const SUCCESS_HOLD_MS = 1_600;
+/** Um QR ausente por mais que isto além da validade estimada deixa de ser exibido. */
+const QR_GRACE_SECONDS = 15;
+/** Depois de fechado, o pareamento pendente continua sendo verificado por este tempo. */
+const BACKGROUND_WATCH_MS = 10 * 60_000;
+/** Intervalo de verificação com o dialog fechado (aberto: 1–1,5 s). */
+const BACKGROUND_INTERVAL_MS = 3_000;
+/** Reinícios automáticos de sessão sumida/expirada por tentativa de conexão. */
+const MAX_AUTO_RESTARTS = 2;
 
-  return (
-    <div className="flex items-center gap-1" role="list" aria-label="Progresso da conexão">
-      {steps.map((step, i) => (
-        <div key={step.label} className="flex items-center gap-1" role="listitem">
-          <span
-            className={cn(
-              "flex size-5 items-center justify-center rounded-full text-[10px] font-semibold transition-all duration-300",
-              step.done
-                ? "bg-emerald-500 text-white"
-                : i === activeStep
-                  ? "bg-primary text-primary-foreground animate-pulse"
-                  : "bg-muted text-muted-foreground",
-            )}
-          >
-            {step.done ? <CheckCircle className="size-3" aria-hidden="true" /> : i + 1}
-          </span>
-          <span className={cn(
-            "text-[11px] font-medium transition-colors duration-300",
-            step.done ? "text-emerald-600" : i === activeStep ? "text-foreground" : "text-muted-foreground",
-          )}>
-            {step.label}
-          </span>
-          {i < steps.length - 1 && (
-            <span className={cn(
-              "mx-1 h-px w-4 transition-colors duration-300",
-              step.done ? "bg-emerald-300" : "bg-border",
-            )} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+/** Leitura de relógio para handlers de eventos (fora do render). */
+const clock = () => Date.now();
 
 function errorMessage(code?: string | null): string {
   return wahaActionErrorMessage(code);
 }
 
-export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conectar WhatsApp", connectedLabel = "WhatsApp conectado", onConnectionChanged }: { initial: Connection; returnTo?: string; triggerLabel?: string; connectedLabel?: string; onConnectionChanged?: (connection?: Connection) => void }) {
+export function WhatsAppConnectDialog({
+  initial,
+  returnTo,
+  triggerLabel = "Conectar WhatsApp",
+  connectedLabel = "WhatsApp conectado",
+  onConnectionChanged,
+  onOpenChange,
+}: {
+  initial: Connection;
+  returnTo?: string;
+  triggerLabel?: string;
+  connectedLabel?: string;
+  onConnectionChanged?: (connection?: Connection) => void;
+  /** Permite ao pai manter o dialog montado enquanto ele estiver aberto. */
+  onOpenChange?: (open: boolean) => void;
+}) {
   const router = useRouter();
   const [connection, setConnection] = useState(initial);
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const previousStatus = useRef(initial.status);
+
+  // ── Estado do pareamento ────────────────────────────────────────────
+  const [providerStatus, setProviderStatus] = useState<string | null>(null);
+  const [sawQr, setSawQr] = useState(false);
+  const [qrKey, setQrKey] = useState(0);
+  const [qrShownAt, setQrShownAt] = useState<number | null>(null);
+  const [qrLifetime, setQrLifetime] = useState(FIRST_QR_LIFETIME_SECONDS);
+  const [pairingSince, setPairingSince] = useState<number | null>(null);
+  const [phoneSuffix, setPhoneSuffix] = useState<string | null>(null);
+  const [connectivity, setConnectivity] = useState<"unreachable" | "unauthorized" | null>(null);
+  const [renewing, setRenewing] = useState(false);
+  // Pareamento pendente com o dialog fechado: a verificação continua em segundo plano.
+  const [watching, setWatching] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Refs espelham o que o loop de polling (fechado em um efeito) precisa ler
+  // sem recriar o timer a cada render.
+  const qrRef = useRef<string | null>(null);
+  const sawQrRef = useRef(false);
+  const firstQrRef = useRef(true);
+  const connectingRef = useRef(false);
+  const acting = useRef(false);
   const polling = useRef(false);
   const pollingFailures = useRef(0);
-  const lastPollingNoticeAt = useRef(0);
-  const qrCodeRef = useRef(initial.qrCode);
-  const lastQrRefreshAt = useRef(0);
+  const autoRestarts = useRef(0);
+  const lastStartAt = useRef(0);
+  const watchDeadline = useRef(0);
+  const successTimer = useRef<number | null>(null);
+  const wake = useRef<(() => void) | null>(null);
+  const intervalMs = useRef(1_000);
+  const openRef = useRef(false);
+
   const ready = connection.status === "ready";
-  const initializing = connection.status === "initializing" || connection.status === "recovering";
-  const hasError = connection.status === "error";
-  const label = statusLabel(connection.status);
+  const secondsLeft = qrShownAt ? Math.min(qrLifetime, Math.ceil(qrLifetime - (now - qrShownAt) / 1_000)) : qrLifetime;
+  // Um QR só é considerado exibível enquanto não passou muito da validade
+  // estimada; depois disso a interface volta a "gerando" em vez de mostrar um
+  // código morto.
+  const hasQr = Boolean(connection.qrCode) && secondsLeft > -QR_GRACE_SECONDS;
+  const phase: PairingPhase = ready
+    ? "ready"
+    : derivePairingPhase({ status: connection.status, providerStatus, hasQr, sawQr });
+  const stalled = phase === "pairing" && pairingSince !== null && now - pairingSince > PAIRING_STALL_SECONDS * 1_000;
+  const badge = { status: PHASE_BADGE_STATUS[phase], label: PAIRING_BADGE_LABELS[phase] };
 
-  // Elapsed time since QR was shown
-  const [elapsed, setElapsed] = useState(0);
-  const qrShownAt = useRef<number | null>(null);
-
+  // Fase visível → ticker de 250 ms só enquanto há contagem/estagnação a exibir.
   useEffect(() => {
-    qrCodeRef.current = connection.qrCode;
-    if (initializing && connection.qrCode && !qrShownAt.current) {
-      qrShownAt.current = Date.now();
-    } else if (!initializing || !connection.qrCode) {
-      qrShownAt.current = null;
-      setElapsed(0);
-    }
-  }, [initializing, connection.qrCode]);
-
-  useEffect(() => {
-    if (!qrShownAt.current) return;
-    const tick = () => {
-      if (qrShownAt.current) setElapsed(Math.floor((Date.now() - qrShownAt.current) / 1000));
-    };
-    tick();
-    const timer = window.setInterval(tick, 1_000);
+    if (!open || (phase !== "qr" && phase !== "pairing")) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, [connection.qrCode, initializing]);
+  }, [open, phase]);
 
+  // O servidor é a autoridade inicial, mas nunca sobrescreve o estado vivo
+  // enquanto o dialog está aberto (o polling do badge lê o banco, que pode
+  // estar um ciclo atrás do que este dialog acabou de observar).
   useEffect(() => {
+    if (open) return;
     setConnection((current) =>
-      current.sessionId === initial.sessionId && current.status === initial.status
-        ? current
-        : initial,
+      current.sessionId === initial.sessionId && current.status === initial.status ? current : initial,
     );
-  }, [initial]);
+  }, [initial, open]);
+
+  useEffect(() => () => {
+    if (successTimer.current) window.clearTimeout(successTimer.current);
+  }, []);
+
+  // ── Helpers ─────────────────────────────────────────────────────────
 
   function recoverFromOutdatedAction(error: unknown): boolean {
     const message = error instanceof Error ? error.message : "";
@@ -137,89 +152,157 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
   }
 
   function showUnexpectedActionError(error: unknown) {
-    if (!recoverFromOutdatedAction(error)) {
-      const msg = error instanceof Error ? error.message : String(error);
-      toast.error(msg || "Não foi possível conectar ao WhatsApp. Tente novamente.", { duration: 8000 });
+    if (recoverFromOutdatedAction(error)) return;
+    const msg = error instanceof Error ? error.message : String(error);
+    toast.error(msg || "Não foi possível conectar ao WhatsApp. Tente novamente.", { duration: 8_000 });
+  }
+
+  function noteSuccess() {
+    pollingFailures.current = 0;
+    setConnectivity(null);
+  }
+
+  function noteFailure(code?: string | null) {
+    pollingFailures.current += 1;
+    // Falhas isoladas são ruído (rede, rotação de sessão). Só uma sequência
+    // vira aviso inline — sem um toast a cada ciclo.
+    if (pollingFailures.current >= 3) setConnectivity(code === "WAHA_UNAUTHORIZED" ? "unauthorized" : "unreachable");
+  }
+
+  function resetAttempt() {
+    qrRef.current = null;
+    sawQrRef.current = false;
+    firstQrRef.current = true;
+    setSawQr(false);
+    setQrShownAt(null);
+    setQrLifetime(FIRST_QR_LIFETIME_SECONDS);
+    setPairingSince(null);
+    setProviderStatus(null);
+    setRenewing(false);
+  }
+
+  function showQr(qr: string) {
+    if (qrRef.current === qr) return;
+    qrRef.current = qr;
+    sawQrRef.current = true;
+    setSawQr(true);
+    setQrKey((key) => key + 1);
+    setQrShownAt(Date.now());
+    setQrLifetime(firstQrRef.current ? FIRST_QR_LIFETIME_SECONDS : ROTATED_QR_LIFETIME_SECONDS);
+    firstQrRef.current = false;
+    setPairingSince(null);
+    setRenewing(false);
+    setConnection((current) => ({ ...current, status: "initializing", qrCode: qr }));
+  }
+
+  function markReady(phone?: string | null) {
+    const celebrate = connectingRef.current && open;
+    const completedInBackground = connectingRef.current && !open;
+    connectingRef.current = false;
+    setWatching(false);
+    qrRef.current = null;
+    if (phone) setPhoneSuffix(phone.slice(-4));
+    setRenewing(false);
+    setConnection((current) => ({
+      ...current,
+      status: "ready",
+      qrCode: null,
+      chatInternoAtivo: true,
+      connectedAt: current.connectedAt ?? new Date(),
+    }));
+    router.refresh();
+
+    if (!celebrate) {
+      if (completedInBackground) toast.success(PAIRING_TOASTS.connectedBackground);
+      onConnectionChanged?.();
+      return;
+    }
+    toast.success(PAIRING_TOASTS.connected);
+    // Mantém a tela de sucesso visível antes de fechar. O pai só é avisado
+    // depois: ele pode trocar de árvore ao ver "conectado" e desmontar este
+    // dialog no meio da animação.
+    successTimer.current = window.setTimeout(() => {
+      setOpen(false);
+      onOpenChange?.(false);
+      onConnectionChanged?.();
+      if (returnTo) router.replace(returnTo);
+    }, SUCCESS_HOLD_MS);
+  }
+
+  function applySnapshot(result: PollSnapshot) {
+    setProviderStatus(result.providerStatus);
+    if (result.phone) setPhoneSuffix(result.phone.slice(-4));
+
+    if (result.status === "ready") {
+      markReady(result.phone);
+      return;
+    }
+
+    if (result.status === "error") {
+      setConnection((current) => ({ ...current, status: "error", qrCode: null }));
+      qrRef.current = null;
+      // QR exibido e a sessão caiu em FAILED = expirou sem leitura. Renovar
+      // sozinho evita que o corretor precise perceber e clicar.
+      if (connectingRef.current && autoRestarts.current < MAX_AUTO_RESTARTS) {
+        autoRestarts.current += 1;
+        runStart({ forceNew: true, auto: true });
+      } else {
+        connectingRef.current = false;
+      }
+      return;
+    }
+
+    if (result.status === "disconnected") {
+      // Fora de uma tentativa de conexão, apenas reflete o estado real.
+      if (!connectingRef.current) {
+        setConnection((current) => ({ ...current, status: "disconnected", qrCode: null }));
+        return;
+      }
+      // Sessão sumiu (WAHA reiniciado) ou parou durante o pareamento: o start
+      // é idempotente e recria/retoma. A janela de 6 s evita reagir ao estado
+      // transitório logo após o próprio start.
+      if (clock() - lastStartAt.current <= 6_000) return;
+      if (autoRestarts.current < MAX_AUTO_RESTARTS) {
+        autoRestarts.current += 1;
+        runStart({ forceNew: false, auto: true });
+      } else {
+        connectingRef.current = false;
+        setConnection((current) => ({ ...current, status: "error", qrCode: null }));
+      }
+      return;
+    }
+
+    // initializing
+    connectingRef.current = true;
+    if (result.qrCode) {
+      showQr(result.qrCode);
+    } else if (result.providerStatus === "SCAN_QR_CODE") {
+      // QR em rotação: mantém o anterior até vencer a tolerância; o novo chega
+      // no próximo ciclo. Nunca reexibe um código antigo depois disso.
+      setConnection((current) => ({ ...current, status: "initializing" }));
+    } else {
+      // STARTING: sem QR válido. Se já houve QR, é o celular pareando.
+      qrRef.current = null;
+      setConnection((current) => ({ ...current, status: "initializing", qrCode: null }));
+      if (sawQrRef.current) setPairingSince((since) => since ?? Date.now());
     }
   }
 
-  function notePollingFailure(code?: string | null) {
-    pollingFailures.current += 1;
-    // A leitura de status acontece em alta frequência durante o pareamento.
-    // Indisponibilidade/timeout transitórios não devem gerar um toast a cada
-    // 500 ms, mas uma falha persistente ainda precisa ser visível.
-    const now = Date.now();
-    if (pollingFailures.current < 3 || now - lastPollingNoticeAt.current < 15_000) return;
-    lastPollingNoticeAt.current = now;
-    toast.info(
-      code === "WAHA_UNAUTHORIZED"
-        ? "A conexão com o WhatsApp precisa de atenção do administrador. Continuando a verificar…"
-        : "Ainda aguardando resposta do servidor WhatsApp. Continuando a verificar…",
-      { duration: 6_000 },
-    );
-  }
-
-  function updateStatus(status: string) {
-    previousStatus.current = status;
-    setConnection((current) => ({
-      ...current,
-      status,
-      qrCode: status === "ready" ? null : current.qrCode,
-      chatInternoAtivo: status === "ready" ? true : current.chatInternoAtivo,
-    }));
-  }
-
-  async function pollStatus() {
-    if (polling.current) return;
+  async function pollOnce() {
+    if (polling.current || acting.current) return;
     polling.current = true;
     try {
-      const result = await getWhatsAppSessionStatus();
-      if (!result.success || !result.status) {
-        // Se falhou ao consultar status, não atualizar UI — manter estado atual.
-        // A action retorna falhas transitórias como dados serializáveis; tratar
-        // aqui evita que o polling pareça um erro definitivo ao usuário.
-        if (result.code !== "NO_SESSION") notePollingFailure(result.code);
+      const result = await pollWhatsAppConnection();
+      if (!result.success) {
+        if (result.code !== "NO_SESSION") noteFailure(result.code);
         return;
       }
-      pollingFailures.current = 0;
-      if (result.status === "ready") {
-        updateStatus("ready");
-        // Notificar o parent ANTES de fechar — o parent faz fetch do server
-        // para garantir dados frescos e exibe o toast.
-        onConnectionChanged?.();
-        setOpen(false);
-        router.refresh();
-        if (returnTo) router.replace(returnTo);
-      } else {
-        updateStatus(result.status);
-        // O status é a leitura crítica após o scan. Não bloqueie o próximo
-        // polling esperando o endpoint de QR (que pode levar vários segundos
-        // enquanto o WAHA troca AUTHENTICATING por WORKING). Atualize o QR
-        // apenas quando ele ainda não existe e no máximo uma vez por 4s.
-        if (
-          result.status === "initializing" &&
-          !qrCodeRef.current &&
-          Date.now() - lastQrRefreshAt.current >= 4_000
-        ) {
-          lastQrRefreshAt.current = Date.now();
-          void refreshWhatsAppQr().then((qr) => {
-            if (!qr.success) return;
-            qrCodeRef.current = qr.qrCode ?? null;
-            setConnection((current) => ({
-              ...current,
-              qrCode: qr.qrCode ?? null,
-              status: qr.status ?? current.status,
-            }));
-          }).catch(() => {
-            // Falhas transitórias do QR não podem interromper a reconciliação
-            // do status, que continuará no próximo ciclo.
-          });
-        }
-      }
+      noteSuccess();
+      applySnapshot(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/WAHA_(?:UNREACHABLE|TIMEOUT|UNAVAILABLE)\b/i.test(message)) {
-        notePollingFailure(wahaActionCodeFromMessage(message));
+        noteFailure(wahaActionCodeFromMessage(message));
       } else {
         showUnexpectedActionError(error);
       }
@@ -228,45 +311,54 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     }
   }
 
-  // Polling adaptativo: 500ms durante tentativa de conexão, 1.5s em background
+  // O loop lê sempre a versão mais recente (closures frescas) sem reiniciar.
+  const pollRef = useRef(pollOnce);
   useEffect(() => {
-    if (!open || !connection.sessionId || connection.status === "ready") return;
-    void pollStatus();
-    const interval = connection.status === "initializing" ? 500 : 1_500;
-    const timer = window.setInterval(() => void pollStatus(), interval);
-    return () => window.clearInterval(timer);
-  }, [open, connection.sessionId, connection.status]);
+    pollRef.current = pollOnce;
+    openRef.current = open;
+    intervalMs.current = phase === "qr" ? 1_500 : 1_000;
+  });
 
-  // Quando a aba voltar ao foco, refetch imediatamente (webhook pode ter atualizado o status)
+  // ── Loop de polling ─────────────────────────────────────────────────
+  // Auto-agendado (não setInterval): uma consulta lenta nunca empilha outra, e
+  // um evento de "acordar" (aba visível, fim de uma ação) dispara na hora.
+  // Fechar o dialog no meio do pareamento não interrompe a verificação: ela
+  // segue em segundo plano (mais espaçada) até conectar ou vencer a janela.
+  const loopActive = Boolean(connection.sessionId) && !ready && (open || watching);
   useEffect(() => {
-    if (!open || !connection.sessionId || connection.status === "ready") return;
-    function onVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        void pollStatus().then(() => router.refresh());
+    if (!loopActive) return;
+    let cancelled = false;
+    void (async () => {
+      while (!cancelled) {
+        await pollRef.current();
+        if (cancelled) break;
+        if (!openRef.current && clock() > watchDeadline.current) {
+          setWatching(false);
+          break;
+        }
+        await new Promise<void>((resolve) => {
+          const timer = window.setTimeout(resolve, openRef.current ? intervalMs.current : BACKGROUND_INTERVAL_MS);
+          wake.current = () => { window.clearTimeout(timer); resolve(); };
+        });
       }
+    })();
+    return () => {
+      cancelled = true;
+      wake.current?.();
+      wake.current = null;
+    };
+  }, [loopActive]);
+
+  useEffect(() => {
+    if (!open && !watching) return;
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") wake.current?.();
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
-  }, [open, connection.sessionId, connection.status]);
+  }, [open, watching]);
 
-  function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
-    if (nextOpen) {
-      // Toda nova abertura precisa começar de um estado confiável. Para uma
-      // sessão ainda não conectada, a ação `start` usa forceNew quando já
-      // existe uma sessão e, assim, invalida o QR anterior antes de gerar
-      // outro. Sessões prontas não são interrompidas só por abrir o diálogo.
-      if (connection.status === "ready") {
-        void pollStatus();
-      } else {
-        start();
-      }
-      return;
-    }
-    if (connection.sessionId && connection.status !== "ready") {
-      void pollStatus().then(() => router.refresh());
-    }
-  }
+  // ── Ações ───────────────────────────────────────────────────────────
 
   function shouldBlockQrOnMobile() {
     if (!window.matchMedia("(max-width: 767px)").matches) return false;
@@ -276,109 +368,92 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
 
   function openWhatsAppExternal() {
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    const destination = isMobile ? "whatsapp://send" : "https://web.whatsapp.com/";
-    window.open(destination, "_blank", "noopener,noreferrer");
+    window.open(isMobile ? "whatsapp://send" : "https://web.whatsapp.com/", "_blank", "noopener,noreferrer");
   }
 
-  /** Inicia ou força a rotação da sessão atual para obter um QR novo. */
-  function start() {
-    if (shouldBlockQrOnMobile()) return;
-    setConnection((current) => ({
-      ...current,
-      status: "initializing",
-      qrCode: null,
-      connectedAt: null,
-    }));
+  /**
+   * Inicia (ou retoma) a conexão.
+   * - `forceNew: false` é idempotente: reutiliza a sessão viva, retoma uma
+   *   parada e nunca desvincula um aparelho já conectado.
+   * - `forceNew: true` recria a sessão para invalidar o QR atual; só é usado
+   *   por ação explícita do corretor ou por expiração confirmada.
+   */
+  function runStart({ forceNew, auto = false }: { forceNew: boolean; auto?: boolean }) {
+    if (!auto && shouldBlockQrOnMobile()) return;
+    if (!auto) autoRestarts.current = 0;
+    resetAttempt();
+    // Renovação automática: recomeça o ciclo do zero (senão o "já houve QR"
+    // faria a tela parecer pós-scan), mas sinaliza que é uma renovação.
+    if (auto) setRenewing(true);
+    connectingRef.current = true;
+    lastStartAt.current = clock();
+    acting.current = true;
+    setConnection((current) => ({ ...current, status: "initializing", qrCode: null, connectedAt: null }));
+
     startTransition(async () => {
       try {
-        const result = await startWhatsAppConnection({ forceNew: Boolean(connection.sessionId) });
+        const result = await startWhatsAppConnection({ forceNew });
         if (!result.success) {
-          const code = (result as { code?: string }).code;
-          updateStatus("error");
-          toast.error(errorMessage(code), { duration: 8000 });
+          connectingRef.current = false;
+          setRenewing(false);
+          setConnection((current) => ({ ...current, status: "error", qrCode: null }));
+          toast.error(errorMessage((result as { code?: string }).code), { duration: 8_000 });
           return;
         }
-        // A action já busca o QR uma vez. Não repetir a mesma chamada antes do polling.
-        // Se vier null, é porque a sessão ainda não tem QR pronto — NÃO reaproveitar
-        // um QR de uma sessão anterior (já invalidado).
-        const newQrCode = (result as { qrCode?: string | null }).qrCode ?? null;
         setConnection((current) => ({
           ...current,
           sessionId: result.sessionId ?? current.sessionId,
-          qrCode: newQrCode,
+          sessionName: result.sessionId ?? current.sessionName,
           status: result.status ?? "initializing",
         }));
-        if (newQrCode) {
-          toast.success("Escaneie o QR Code no WhatsApp.");
-        } else {
-          toast.info("Preparando conexão...");
+        setProviderStatus(result.providerStatus ?? null);
+        if (result.status === "ready") {
+          markReady();
+        } else if (result.qrCode) {
+          showQr(result.qrCode);
         }
-        await pollStatus();
       } catch (error) {
-        updateStatus("error");
+        connectingRef.current = false;
+        setRenewing(false);
+        setConnection((current) => ({ ...current, status: "error", qrCode: null }));
         showUnexpectedActionError(error);
+      } finally {
+        acting.current = false;
+        // Sem esperar o próximo tick: o QR/estado real aparece já.
+        wake.current?.();
       }
     });
   }
 
-  function refresh() {
-    if (shouldBlockQrOnMobile()) return;
-    startTransition(async () => {
-      try {
-        const result = await refreshWhatsAppQr();
-        if (!result.success) {
-          const code = (result as { code?: string }).code;
-          toast.error(errorMessage(code));
-        } else {
-          // success com qrCode null = QR rotacionado/ausente: limpar a imagem
-          // antiga em vez de reexibir um código morto.
-          setConnection((current) => ({
-            ...current,
-            qrCode: result.qrCode ?? null,
-            status: result.status ?? current.status,
-          }));
-          await pollStatus();
-        }
-      } catch (error) {
-        showUnexpectedActionError(error);
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+
+    if (nextOpen) {
+      setWatching(false);
+      // Abrir NÃO recria a sessão: o start idempotente reutiliza a sessão viva.
+      // (Recriar aqui desvinculava o aparelho de quem abria o dialog com o
+      // WAHA já conectado e o CRM ainda desatualizado.)
+      if (ready) {
+        void pollOnce();
+      } else {
+        runStart({ forceNew: false });
       }
-    });
-  }
+      return;
+    }
 
-  /** Invalida a sessão remota anterior e solicita um QR novo atomically. */
-  function regenerateQr() {
-    if (shouldBlockQrOnMobile()) return;
-    startTransition(async () => {
-      try {
-        // A rotação é uma única operação no Fastify: não há janela em que o
-        // botão crie uma sessão nova enquanto a antiga ainda está viva.
-        setConnection((current) => ({
-          ...current,
-          qrCode: null,
-          status: "initializing",
-        }));
-
-        const started = await startWhatsAppConnection({ forceNew: true });
-        if (!started.success) {
-          updateStatus("error");
-          toast.error(errorMessage(started.code));
-          return;
-        }
-
-        setConnection((current) => ({
-          ...current,
-          sessionId: started.sessionId ?? current.sessionId,
-          sessionName: started.sessionId ?? current.sessionName,
-          qrCode: started.qrCode ?? null,
-          status: started.status ?? "initializing",
-        }));
-        toast.success("Novo QR Code gerado. Escaneie no WhatsApp.");
-        await pollStatus();
-      } catch (error) {
-        updateStatus("error");
-        showUnexpectedActionError(error);
+    if (successTimer.current) {
+      window.clearTimeout(successTimer.current);
+      successTimer.current = null;
+      onConnectionChanged?.();
+    }
+    if (connection.sessionId && !ready) {
+      if (connectingRef.current) {
+        watchDeadline.current = clock() + BACKGROUND_WATCH_MS;
+        setWatching(true);
       }
-    });
+      void pollOnce().then(() => router.refresh());
+    }
   }
 
   function toggle() {
@@ -396,6 +471,20 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     });
   }
 
+  function clearLocalSession() {
+    resetAttempt();
+    connectingRef.current = false;
+    setPhoneSuffix(null);
+    setConnection((current) => ({
+      ...current,
+      sessionId: null,
+      sessionName: null,
+      qrCode: null,
+      status: "disconnected",
+      connectedAt: null,
+    }));
+  }
+
   function disconnect() {
     startTransition(async () => {
       try {
@@ -405,27 +494,14 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           if (result.code === "WAHA_UNREACHABLE" || result.code === "WAHA_TIMEOUT") {
             toast.error(
               "O servidor WhatsApp está inacessível. Você pode forçar a desconexão local, mas a sessão remota pode permanecer ativa até o timeout do servidor.",
-              {
-                duration: 10000,
-                action: {
-                  label: "Forçar desconexão",
-                  onClick: () => forceDisconnect(),
-                },
-              },
+              { duration: 10_000, action: { label: "Forçar desconexão", onClick: () => forceDisconnect() } },
             );
           } else {
             toast.error(errorMessage(result.code));
           }
           return;
         }
-        setConnection((current) => ({
-          ...current,
-          sessionId: null,
-          sessionName: null,
-          qrCode: null,
-          status: "disconnected",
-          connectedAt: null,
-        }));
+        clearLocalSession();
         onConnectionChanged?.();
         toast.success("WhatsApp desconectado.");
         router.refresh();
@@ -443,14 +519,7 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
           toast.error("Não foi possível limpar a sessão local.");
           return;
         }
-        setConnection((current) => ({
-          ...current,
-          sessionId: null,
-          sessionName: null,
-          qrCode: null,
-          status: "disconnected",
-          connectedAt: null,
-        }));
+        clearLocalSession();
         onConnectionChanged?.();
         toast.success("Sessão desconectada localmente. A sessão remota será encerrada automaticamente pelo servidor.");
         router.refresh();
@@ -460,192 +529,79 @@ export function WhatsAppConnectDialog({ initial, returnTo, triggerLabel = "Conec
     });
   }
 
-  function resetAndRetry() {
-    startTransition(async () => {
-      try {
-        updateStatus("recovering");
-        const result = await recoverWhatsAppFailedSessionAction();
-        if (!result.success) {
-          updateStatus("error");
-          toast.error(errorMessage(result.code));
-          return;
-        }
-        setConnection((current) => ({
-          ...current,
-          sessionId: result.sessionId ?? current.sessionId,
-          qrCode: result.qrCode ?? null,
-          status: result.status ?? "initializing",
-          connectedAt: result.status === "ready" ? current.connectedAt : null,
-        }));
-        if (result.qrCode) toast.success("Escaneie o novo QR Code no WhatsApp.");
-        await pollStatus();
-      } catch (error) {
-        showUnexpectedActionError(error);
-      }
-    });
-  }
+  // ── Render ──────────────────────────────────────────────────────────
+
+  const canGenerateNewQr = phase === "qr" || phase === "pairing" || phase === "starting";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
       <DialogPopup className="max-w-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
+        <div className="flex items-start justify-between gap-ds-16">
+          <div className="min-w-0 flex-1">
             <DialogTitle className="flex items-center gap-2"><WhatsappLogo className="text-success" /> WhatsApp</DialogTitle>
             <DialogDescription className="mt-2">
-              Conecte seu WhatsApp para iniciar seus atendimentos.
+              Vincule o WhatsApp do seu celular para atender seus leads por aqui.
             </DialogDescription>
-            {/* Step indicator */}
-            {connection.sessionId && (
-              <div className="mt-3">
-                <ConnectionSteps status={connection.status} hasQr={!!connection.qrCode} />
-              </div>
-            )}
+            <div className="mt-ds-12">
+              <PairingStepper phase={phase} />
+            </div>
           </div>
-          <Badge variant={ready ? "success" : "outline"} className="ct-status-badge shrink-0">{label}</Badge>
+          <DsStatusBadge status={badge.status} label={badge.label} className="shrink-0" />
         </div>
 
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_15rem]">
-          <div className="space-y-4">
-            {/* Estado: Conectado */}
-            {ready && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4 ct-connect-success">
-                <div className="flex items-center gap-2">
-                  <span className="ct-connected-pulse size-2 rounded-full bg-emerald-500" />
-                  <p className="text-sm font-semibold text-emerald-700">Online</p>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-emerald-600/80">
-                  Seu WhatsApp está pronto para os atendimentos.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+        <div className="grid gap-ds-16 md:grid-cols-[minmax(0,1fr)_16rem]">
+          <div className="space-y-ds-12">
+            <PairingGuide
+              phase={phase}
+              phoneSuffix={phoneSuffix}
+              stalled={stalled}
+              connectivity={connectivity}
+              renewing={renewing}
+            />
+
+            {/* Aviso mobile */}
+            <PairingCallout tone="info" title="Conexão somente pelo computador" icon={<Monitor className="size-4" aria-hidden />} className="md:hidden">
+              <p>Para gerar e ler o QR Code, abra esta integração em um computador. Volte ao celular depois para acompanhar o status.</p>
+            </PairingCallout>
+
+            <div className="hidden flex-wrap gap-ds-8 md:flex">
+              {phase === "idle" && (
+                <Button disabled={pending} onClick={() => runStart({ forceNew: false })}>Conectar WhatsApp</Button>
+              )}
+              {phase === "error" && (
+                <Button disabled={pending} onClick={() => runStart({ forceNew: true })}>Gerar novo QR</Button>
+              )}
+              {canGenerateNewQr && (
+                <Button disabled={pending} onClick={() => runStart({ forceNew: true })} variant="outline">
+                  Gerar novo QR
+                </Button>
+              )}
+              {phase === "ready" && (
+                <>
                   <Button disabled={pending} onClick={toggle} variant="outline" size="sm">
                     {connection.chatInternoAtivo ? "Desativar chat" : "Ativar chat"}
                   </Button>
                   <Button disabled={pending} onClick={disconnect} variant="outline" size="sm">
                     Desconectar
                   </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Estado: Erro (FAILED / ERROR no WAHA) */}
-            {!ready && hasError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                <div className="flex items-start gap-2">
-                  <WarningCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
-                  <div>
-                    <p className="text-sm font-semibold text-destructive">Falha na conexão</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Não foi possível concluir o pareamento. Verifique se o WhatsApp está instalado e tente novamente.
-                    </p>
-                    <Button disabled={pending} onClick={resetAndRetry} variant="outline" size="sm" className="mt-3">
-                      Tentar novamente
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Estado: Inicializando / Aguardando QR */}
-            {!ready && !hasError && initializing && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">
-                    {connection.qrCode ? "Escaneie o QR Code" : "Preparando sua conexão…"}
-                  </p>
-                  {connection.qrCode && elapsed > 0 && (
-                    <span className="text-[11px] tabular-nums text-muted-foreground">
-                      {elapsed}s
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {connection.qrCode
-                    ? "Abra o WhatsApp no celular, vá em Dispositivos conectados e escaneie o código."
-                    : "Gerando QR Code..."}
-                </p>
-                {connection.qrCode && elapsed > 30 && (
-                  <p className="mt-2 text-[11px] text-amber-600">
-                    QR Code pode expirar. Se não escanear em breve, gere um novo.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Estado: Desconectado (sem sessão) */}
-            {!ready && !hasError && !initializing && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm font-semibold">Chat interno {connection.chatInternoAtivo ? "ativo" : "desativado"}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Clique em Conectar para gerar um QR Code e vincular seu WhatsApp.
-                </p>
-              </div>
-            )}
-
-            {/* Aviso mobile */}
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 md:hidden" role="status">
-              <div className="flex items-start gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Monitor className="size-4" /></span>
-                <div>
-                  <p className="text-sm font-semibold">Conexão somente pelo computador</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Para gerar e ler o QR Code, abra esta integração em um computador. Volte ao celular depois para acompanhar o status.</p>
-                </div>
-              </div>
+                </>
+              )}
             </div>
 
-            {/* Botões de ação */}
-            <div className="flex flex-wrap gap-2">
-              <div className="hidden flex-wrap gap-2 md:flex">
-                <Button disabled={pending} onClick={hasError ? resetAndRetry : start}>
-                  {connection.sessionId ? "Conectar novamente" : "Conectar WhatsApp"}
-                </Button>
-                {!ready && connection.sessionId && (
-                  <Button disabled={pending} onClick={regenerateQr} variant="outline">
-                    Invalidar e gerar QR
-                  </Button>
-                )}
-                {!ready && connection.sessionId && (
-                  <Button disabled={pending} onClick={() => void pollStatus()} variant="outline">
-                    Verificar conexão
-                  </Button>
-                )}
-              </div>
-            </div>
             <Button className="w-full md:w-auto" onClick={openWhatsAppExternal} size="sm" variant="outline">
               <WhatsappLogo className="size-4" /> Abrir WhatsApp Web ou app
             </Button>
           </div>
 
-          {/* QR Code panel */}
-          <div className="hidden min-h-56 items-center justify-center rounded-lg bg-white p-3 md:flex">
-            {connection.qrCode && !ready ? (
-              <img
-                alt="QR Code para conectar o WhatsApp"
-                className="ct-qr-enter size-48"
-                src={connection.qrCode.startsWith("data:") ? connection.qrCode : `data:image/png;base64,${connection.qrCode}`}
-              />
-            ) : (
-              <div className="text-center text-slate-600">
-                {ready ? (
-                  <CheckCircle className="ct-connect-success mx-auto size-9 text-emerald-600" />
-                ) : hasError ? (
-                  <WarningCircle className="mx-auto size-7 text-destructive" />
-                ) : (
-                  <LockKey className={"mx-auto size-7" + (initializing ? " ct-waiting-breathe" : "")} />
-                )}
-                <p className="mt-2 text-xs font-medium">
-                  {ready ? (
-                    <span className="ct-qr-enter">Dispositivo conectado</span>
-                  ) : hasError ? (
-                    "Pareamento falhou"
-                  ) : initializing ? (
-                    <span className="ct-shimmer-text" data-text="Gerando QR Code…">Gerando QR Code…</span>
-                  ) : (
-                    "Clique em Conectar"
-                  )}
-                </p>
-              </div>
-            )}
+          <div className="hidden md:block">
+            <PairingQrPanel
+              phase={phase}
+              qrCode={hasQr ? connection.qrCode : null}
+              secondsLeft={secondsLeft}
+              lifetime={qrLifetime}
+              qrKey={qrKey}
+            />
           </div>
         </div>
       </DialogPopup>

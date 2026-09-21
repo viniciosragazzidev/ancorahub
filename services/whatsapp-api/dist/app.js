@@ -507,12 +507,15 @@ export function buildApp() {
         try {
             const reconnected = await reconnectSessionOnce(client, sessionName);
             const status = reconnected.session.status;
+            const providerStatus = reconnected.session.providerStatus;
             let qr = null;
-            if (status === "WAITING_QR") {
+            if (providerStatus === "SCAN_QR_CODE") {
                 try {
-                    qr = await client.getQr(sessionName);
+                    qr = await client.getQr(sessionName, reconnected.session);
                 }
                 catch (error) {
+                    // Sessão recém-criada: o QR costuma levar alguns segundos. O
+                    // polling do CRM busca o QR assim que ele existir.
                     request.log.info({
                         operation: "waha.connection.reconnect.qr_pending",
                         session: sessionName,
@@ -525,10 +528,11 @@ export function buildApp() {
                 operation: "waha.connection.reconnect",
                 session: sessionName,
                 status,
+                providerStatus,
                 hasQr: qr !== null,
                 durationMs: Date.now() - startedAt,
             });
-            return reply.code(200).send({ ok: true, sessionName, status, qr, reused: false, timestamp: new Date().toISOString() });
+            return reply.code(200).send({ ok: true, sessionName, status, providerStatus, qr, reused: false, timestamp: new Date().toISOString() });
         }
         catch (error) {
             request.log.warn({
@@ -630,6 +634,7 @@ export function buildApp() {
                 ok: true,
                 sessionName,
                 status,
+                providerStatus: session?.providerStatus ?? "STOPPED",
                 phoneNumber: session?.displayPhoneNumber ?? null,
                 timestamp: new Date().toISOString(),
             });
@@ -640,7 +645,74 @@ export function buildApp() {
                 session: sessionName,
                 errorCode: error instanceof Error ? error.message : "unknown",
             });
-            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+            return reply.code(502).send({
+                ok: false,
+                service: "waha",
+                status: "unavailable",
+                // Preserve the normalized provider error so the CRM can distinguish
+                // network instability from an invalid WAHA API key.
+                error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
+        }
+    });
+    // ── WAHA Connection: State (status + QR em uma leitura) ───────────────
+    // Rota usada pelo polling do pareamento. Substitui o par status + qr, que
+    // repetia a leitura da sessão no WAHA e dobrava a latência de cada ciclo.
+    app.get("/internal/waha/connections/:id/state", {
+        schema: {
+            params: {
+                type: "object",
+                required: ["id"],
+                properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { id: sessionName } = request.params;
+        const startedAt = Date.now();
+        try {
+            const state = await new WahaClient(wahaConfig).getConnectionState(sessionName);
+            request.log.info({
+                operation: "waha.connection.state",
+                session: sessionName,
+                status: state.status,
+                providerStatus: state.providerStatus,
+                hasQr: state.qr !== null,
+                durationMs: Date.now() - startedAt,
+            });
+            // Nunca logar o QR em si.
+            return reply.code(200).send({
+                ok: true,
+                sessionName,
+                exists: state.exists,
+                status: state.status,
+                providerStatus: state.providerStatus,
+                phoneNumber: state.phoneNumber,
+                qr: state.qr,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            request.log.warn({
+                operation: "waha.connection.state",
+                session: sessionName,
+                normalizedError: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+                durationMs: Date.now() - startedAt,
+            });
+            return reply.code(502).send({
+                ok: false,
+                service: "waha",
+                status: "unavailable",
+                error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
         }
     });
     // ── WAHA Connection: Chats (bounded history reconciliation) ──────────
@@ -704,9 +776,9 @@ export function buildApp() {
             const session = await client.getSession(sessionName);
             const status = session?.status ?? "DISCONNECTED";
             let qr = null;
-            if (status === "WAITING_QR") {
+            if (session?.providerStatus === "SCAN_QR_CODE") {
                 try {
-                    qr = await client.getQr(sessionName);
+                    qr = await client.getQr(sessionName, session);
                 }
                 catch (qrError) {
                     request.log.info({
@@ -731,7 +803,12 @@ export function buildApp() {
                 session: sessionName,
                 errorCode: error instanceof Error ? error.message : "unknown",
             });
-            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+            return reply.code(502).send({
+                ok: false,
+                service: "waha",
+                status: "unavailable",
+                error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
         }
     });
     // ── WAHA Connection: Disconnect ──────────────────────────────────────

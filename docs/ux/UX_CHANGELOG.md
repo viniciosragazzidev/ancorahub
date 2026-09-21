@@ -8,6 +8,22 @@ Este documento registra cronologicamente todas as alterações de UX/UI, estrutu
 
 ---
 
+## 2026-09-21 — Diálogo de conexão WhatsApp (Lite): feedback por fase
+
+### Resultado
+
+- fases explícitas — preparando, QR, finalizando (pós-scan), conectado e falha — com stepper de três etapas, Status Badge e Callout por tom do design system;
+- QR se renova sozinho, com contagem de validade e animação de troca; sucesso permanece visível antes de fechar;
+- aviso inline (sem toasts repetidos) quando o servidor WhatsApp não responde; recuperação automática quando o QR expira;
+- toda a copy/tom/ícone por fase em `src/features/waha-cadence/pairing-copy.ts`; revisão visual em `/dev/whatsapp-connect` (somente desenvolvimento);
+- somente tokens `ds-*`; nenhuma cor, raio ou tipografia fora do design system.
+
+### Referência
+
+`docs/implementations/active/2026-09-21-waha-lite-connection-flow.md`
+
+---
+
 ## 2026-09-15 — `/distribuicao` refinamento geral da superfície
 
 ### Resultado
@@ -596,3 +612,14 @@ de métricas entre tenants.
 - Nenhuma métrica, consulta, permissão, escopo ou integração foi alterada; o
   Corretor Lite permanece preservado pela DEC-015. Validações: tsc, ESLint
   dirigido e build de produção.
+
+## 2026-09-21 — composição ERP premium do dashboard
+
+- `/dashboard` passou a usar uma composição responsiva assimétrica: KPIs, evolução,
+  atenção, fluxo comercial, qualificação, desempenho e atividade recente.
+- Os blocos foram extraídos para widgets reutilizáveis com os primitives shadcn já
+  instalados (`Card`, `Badge`, `Chart`, `Table`, `Separator` e `Skeleton`).
+- Animações de entrada respeitam `prefers-reduced-motion`; estados vazios e loading
+  preservam a estrutura do conteúdo para reduzir deslocamento visual.
+- A fonte dos dados permaneceu no resolvedor existente; nenhuma métrica, permissão,
+  autorização, escopo ou integração foi alterada.

@@ -34,6 +34,9 @@ import {
   DsDialogDescription,
   DsDialogFooter,
 } from "@/components/ui/ds-dialog";
+import { DsTrendStatCard } from "@/components/ui/ds-trend-stat-card";
+import { DsDonutChart } from "@/components/ui/ds-donut-chart";
+import { DsBarChart } from "@/components/ui/ds-bar-chart";
 
 /**
  * Isolated preview of the docs/design-system.md foundation components.
@@ -185,6 +188,67 @@ export default function ComponentPreviewPage() {
               <DsStatTile label="Exceções" value={0} tone="success" />
               <DsStatTile label="Próximo passo" hint="Motor tentará distribuir" />
             </div>
+          </DsDashboardCard>
+        </Section>
+
+        <Section title="Trend Stat Card">
+          <Row>
+            <DsTrendStatCard
+              label="My Balance"
+              value="$125,430"
+              trendValue="12.5%"
+              trendDirection="up"
+              caption="compared to last month"
+              className="w-64"
+            />
+            <DsTrendStatCard
+              label="Expenses"
+              value="$26,450"
+              trendValue="5.5%"
+              trendDirection="down"
+              caption="compared to last month"
+              className="w-64"
+            />
+            <DsTrendStatCard
+              label="Leads novos"
+              value="184"
+              caption="Sem comparação disponível"
+              className="w-64"
+            />
+            <DsTrendStatCard
+              label="Pending Invoices"
+              value="$3,200"
+              caption="3 overdue invoices"
+              className="w-64"
+              chart={
+                <DsBarChart
+                  data={[
+                    { d: "1", v: 4 }, { d: "2", v: 7 }, { d: "3", v: 3 }, { d: "4", v: 8 },
+                    { d: "5", v: 5 }, { d: "6", v: 9 }, { d: "7", v: 6 }, { d: "8", v: 4 },
+                  ]}
+                  xKey="d"
+                  series={[{ key: "v", label: "Valor" }]}
+                  height={40}
+                  compact
+                />
+              }
+            />
+          </Row>
+        </Section>
+
+        <Section title="Donut Chart">
+          <DsDashboardCard className="w-80 p-ds-16">
+            <DsDonutChart
+              data={[
+                { key: "hot", label: "Quente", value: 12 },
+                { key: "warm", label: "Morno", value: 20 },
+                { key: "cold", label: "Frio", value: 8 },
+                { key: "qualified", label: "Qualificado", value: 15 },
+              ]}
+              centerValue={55}
+              centerLabel="total"
+              size={160}
+            />
           </DsDashboardCard>
         </Section>
 

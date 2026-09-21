@@ -170,6 +170,7 @@ export class WahaClient {
             return {
                 name: raw?.name ?? name,
                 status,
+                providerStatus: rawStatus || "UNKNOWN",
                 displayPhoneNumber,
                 qrCode: null,
             };
@@ -189,10 +190,7 @@ export class WahaClient {
      */
     async createSession(name) {
         try {
-            const webhookUrl = process.env.WHATSAPP_HOOK_URL?.trim() ||
-                (process.env.INTERNAL_API_URL
-                    ? `${process.env.INTERNAL_API_URL}/internal/webhooks/waha`
-                    : "http://api:3000/internal/webhooks/waha");
+            const webhookUrl = resolveWebhookUrl();
             await this.request(`/api/sessions/`, {
                 method: "POST",
                 timeoutMs: 8_000,
@@ -225,6 +223,7 @@ export class WahaClient {
         return session ?? {
             name,
             status: "DISCONNECTED",
+            providerStatus: "STOPPED",
             displayPhoneNumber: null,
             qrCode: null,
         };
@@ -251,9 +250,10 @@ export class WahaClient {
      * - WAHA_TIMEOUT / WAHA_UNAVAILABLE: problemas de conexão
      * - SESSION_NOT_FOUND: sessão não existe
      */
-    async getQr(name) {
-        // Verificar status da sessão antes de buscar QR
-        const session = await this.getSession(name);
+    async getQr(name, known) {
+        // Verificar status da sessão antes de buscar QR. Quem já leu a sessão
+        // passa `known` para não repetir a chamada a cada ciclo de polling.
+        const session = known === undefined ? await this.getSession(name) : known;
         if (!session) {
             throw new WahaClientError("SESSION_NOT_FOUND", 502, `Sessão '${name}' não encontrada.`);
         }
@@ -269,6 +269,39 @@ export class WahaClient {
             throw new WahaClientError("QR_EXPIRED", 200, "QR Code não disponível ou expirado.");
         }
         return base64;
+    }
+    /**
+     * Leitura única do estado de pareamento: status da sessão + QR atual quando
+     * o WAHA está em SCAN_QR_CODE. É o que o polling do CRM usa — uma ida ao
+     * WAHA para o status e, só se houver QR a mostrar, uma para a imagem.
+     *
+     * O QR rotaciona no provider (60s no primeiro, 20s nos seguintes), então
+     * ele nunca é cacheado aqui. Falha ao buscar o QR não invalida o status.
+     */
+    async getConnectionState(name) {
+        const session = await this.getSession(name);
+        if (!session) {
+            return { exists: false, status: "DISCONNECTED", providerStatus: "STOPPED", phoneNumber: null, qr: null };
+        }
+        let qr = null;
+        if (session.providerStatus === "SCAN_QR_CODE") {
+            try {
+                qr = await this.getQr(name, session);
+            }
+            catch (error) {
+                // Sem QR agora (rotação em andamento). O cliente mantém o estado
+                // "gerando" e tenta no próximo ciclo; auth/rede são tratados pelo status.
+                if (error instanceof WahaClientError && error.code === "WAHA_UNAUTHORIZED")
+                    throw error;
+            }
+        }
+        return {
+            exists: true,
+            status: session.status,
+            providerStatus: session.providerStatus,
+            phoneNumber: session.displayPhoneNumber,
+            qr,
+        };
     }
     /**
      * Para uma sessão (pause/stop).
@@ -292,21 +325,25 @@ export class WahaClient {
     /**
      * Deleta uma sessão.
      */
-    async deleteSession(name) {
+    async deleteSession(name, options = {}) {
         const cleanup = [];
-        try {
-            // Primeiro fazer logout (como o relay faz)
-            await this.request(`/api/sessions/${encodeURIComponent(name)}/logout`, {
-                method: "POST",
-                timeoutMs: 5_000,
-                headers: { "content-type": "application/json" },
-            });
-            cleanup.push({ operation: "logout", outcome: "completed" });
-        }
-        catch (error) {
-            if (!isExpectedCleanupError(error, "logout"))
-                throw error;
-            cleanup.push(cleanupIgnored("logout", error));
+        // logout desvincula o aparelho no celular. Só faz sentido quando há um
+        // vínculo a desfazer; para sessões em pareamento é uma ida ao WAHA
+        // inútil que apenas retorna 422.
+        if (options.logout ?? true) {
+            try {
+                await this.request(`/api/sessions/${encodeURIComponent(name)}/logout`, {
+                    method: "POST",
+                    timeoutMs: 5_000,
+                    headers: { "content-type": "application/json" },
+                });
+                cleanup.push({ operation: "logout", outcome: "completed" });
+            }
+            catch (error) {
+                if (!isExpectedCleanupError(error, "logout"))
+                    throw error;
+                cleanup.push(cleanupIgnored("logout", error));
+            }
         }
         try {
             await this.request(`/api/sessions/${encodeURIComponent(name)}`, {
@@ -337,7 +374,8 @@ export class WahaClient {
                 await this.startSession(name);
             return { session: (await this.getSession(name)) ?? created, cleanup: [] };
         }
-        const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name))];
+        // Sessão FAILED não tem vínculo ativo: não há o que desvincular no celular.
+        const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name, { logout: false }))];
         const remaining = await this.getSession(name);
         if (remaining) {
             throw new WahaClientError("SESSION_EXISTS", 502, "A sessão falhada não foi removida com segurança.");
@@ -353,10 +391,16 @@ export class WahaClient {
      * depois de confirmar que o nome deixou de existir no WAHA.
      */
     async reconnectSession(name) {
-        const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name))];
-        const remaining = await this.getSession(name);
-        if (remaining) {
-            throw new WahaClientError("SESSION_EXISTS", 502, "A sessão anterior não foi removida com segurança.");
+        const cleanup = [];
+        const current = await this.getSession(name);
+        if (current) {
+            cleanup.push(await this.stopSession(name));
+            // Só desvincula o aparelho (logout) se havia um vínculo ativo.
+            cleanup.push(...(await this.deleteSession(name, { logout: current.status === "CONNECTED" })));
+            const remaining = await this.getSession(name);
+            if (remaining) {
+                throw new WahaClientError("SESSION_EXISTS", 502, "A sessão anterior não foi removida com segurança.");
+            }
         }
         const created = await this.createSession(name);
         if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") {
@@ -452,6 +496,31 @@ export class WahaClient {
         }
         return resolvedChatId;
     }
+}
+const DEFAULT_WEBHOOK_URL = "http://api:3000/internal/webhooks/waha";
+let warnedDefaultWebhook = false;
+/**
+ * URL para a qual o WAHA envia eventos de sessão/mensagem desta sessão.
+ *
+ * O fallback `http://api:3000` só resolve quando WAHA e Fastify compartilham a
+ * mesma rede Docker. Com serviços em VPS/aplicações separadas no Coolify ele
+ * não resolve: o WAHA descarta o webhook, o CRM nunca recebe o status
+ * "conectado" e só o polling mantém a interface atualizada. Por isso o uso do
+ * fallback é sinalizado explicitamente.
+ */
+export function resolveWebhookUrl(env = process.env) {
+    const explicit = env.WHATSAPP_HOOK_URL?.trim();
+    if (explicit)
+        return explicit;
+    const internalBase = env.INTERNAL_API_URL?.trim().replace(/\/+$/, "");
+    if (internalBase)
+        return `${internalBase}/internal/webhooks/waha`;
+    if (!warnedDefaultWebhook) {
+        warnedDefaultWebhook = true;
+        console.warn("[waha] WHATSAPP_HOOK_URL/INTERNAL_API_URL não configuradas; usando o fallback " +
+            `${DEFAULT_WEBHOOK_URL}. Fora da rede Docker do Fastify o WAHA não entregará webhooks de status.`);
+    }
+    return DEFAULT_WEBHOOK_URL;
 }
 /**
  * Verifica se um erro é de timeout.

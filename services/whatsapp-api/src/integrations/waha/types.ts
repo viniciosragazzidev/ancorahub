@@ -42,6 +42,12 @@ export type WahaHealthResult = {
 export type WahaSession = {
   name: string;
   status: WahaSessionStatus;
+  /**
+   * Status bruto do WAHA (STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED).
+   * `status` colapsa STARTING e SCAN_QR_CODE em WAITING_QR; só o bruto
+   * diferencia "QR disponível" de "ainda iniciando/pareando".
+   */
+  providerStatus: string;
   displayPhoneNumber: string | null;
   qrCode: string | null;
 };

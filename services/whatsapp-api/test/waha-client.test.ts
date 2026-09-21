@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { WahaClient } from "../src/integrations/waha/client.js";
+import { WahaClient, resolveWebhookUrl } from "../src/integrations/waha/client.js";
 import { WahaClientError, normalizeWahaStatus } from "../src/integrations/waha/types.js";
 
 const config = {
@@ -290,7 +290,9 @@ test("recoverFailedSession: stop 400 continua com delete e recriação", async (
   const result = await client.recoverFailedSession("recover-me");
   assert.equal(result.session.status, "WAITING_QR");
   assert.equal(getCreateCalls(), 1);
-  assert.deepEqual(result.cleanup.map((item) => item.outcome), ["ignored", "ignored", "completed"]);
+  // stop ignorado + delete; sem logout (FAILED não tem vínculo a desfazer)
+  assert.deepEqual(result.cleanup.map((item) => item.operation), ["stop", "delete"]);
+  assert.deepEqual(result.cleanup.map((item) => item.outcome), ["ignored", "completed"]);
 });
 
 test("recoverFailedSession: delete 404 considera sessão ausente e recria", async () => {
@@ -442,4 +444,120 @@ test("getQr: QR data vazio → lança QR_EXPIRED", async () => {
     () => client.getQr("emptyqr"),
     (err: unknown) => err instanceof WahaClientError && err.code === "QR_EXPIRED",
   );
+});
+
+// ── WahaClient.getConnectionState ─────────────────────────────────────
+
+test("getConnectionState: SCAN_QR_CODE devolve status bruto e QR na mesma leitura", async () => {
+  let sessionReads = 0;
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/auth/qr")) {
+      return new Response(JSON.stringify({ data: "QR-ATUAL" }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (url.includes("/api/sessions/state1")) {
+      sessionReads++;
+      return new Response(JSON.stringify({ name: "state1", status: "SCAN_QR_CODE" }), { status: 200 });
+    }
+    return new Response("not found", { status: 404 });
+  }));
+  const state = await client.getConnectionState("state1");
+  assert.deepEqual(state, { exists: true, status: "WAITING_QR", providerStatus: "SCAN_QR_CODE", phoneNumber: null, qr: "QR-ATUAL" });
+  assert.equal(sessionReads, 1, "o QR não pode reler a sessão");
+});
+
+test("getConnectionState: STARTING não busca QR (pareamento em andamento)", async () => {
+  let qrCalls = 0;
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/auth/qr")) { qrCalls++; return new Response("{}", { status: 200 }); }
+    return new Response(JSON.stringify({ name: "state2", status: "STARTING" }), { status: 200 });
+  }));
+  const state = await client.getConnectionState("state2");
+  assert.equal(state.providerStatus, "STARTING");
+  assert.equal(state.status, "WAITING_QR");
+  assert.equal(state.qr, null);
+  assert.equal(qrCalls, 0);
+});
+
+test("getConnectionState: WORKING devolve telefone e nenhum QR", async () => {
+  const client = new WahaClient(config, mockFetch(async () =>
+    new Response(JSON.stringify({ name: "state3", status: "WORKING", me: { id: "5511999999999@c.us" } }), { status: 200 })));
+  const state = await client.getConnectionState("state3");
+  assert.deepEqual(state, { exists: true, status: "CONNECTED", providerStatus: "WORKING", phoneNumber: "5511999999999", qr: null });
+});
+
+test("getConnectionState: sessão ausente não é erro", async () => {
+  const client = new WahaClient(config, mockFetch(async () => new Response("{}", { status: 404 })));
+  const state = await client.getConnectionState("ghost");
+  assert.equal(state.exists, false);
+  assert.equal(state.status, "DISCONNECTED");
+});
+
+test("getConnectionState: falha transitória ao ler o QR mantém o status", async () => {
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/auth/qr")) return new Response("boom", { status: 500 });
+    return new Response(JSON.stringify({ name: "state4", status: "SCAN_QR_CODE" }), { status: 200 });
+  }));
+  const state = await client.getConnectionState("state4");
+  assert.equal(state.providerStatus, "SCAN_QR_CODE");
+  assert.equal(state.qr, null);
+});
+
+test("getConnectionState: chave de API inválida no QR é propagada", async () => {
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/auth/qr")) return new Response("no", { status: 401 });
+    return new Response(JSON.stringify({ name: "state5", status: "SCAN_QR_CODE" }), { status: 200 });
+  }));
+  await assert.rejects(
+    () => client.getConnectionState("state5"),
+    (err: unknown) => err instanceof WahaClientError && err.code === "WAHA_UNAUTHORIZED",
+  );
+});
+
+// ── WahaClient.reconnectSession ───────────────────────────────────────
+
+function reconnectClient(initialStatus: string | null) {
+  const calls: string[] = [];
+  let status = initialStatus;
+  const client = new WahaClient(config, mockFetch(async (url, init) => {
+    const method = init?.method ?? "GET";
+    const path = new URL(url).pathname;
+    calls.push(`${method} ${path}`);
+    if (path === "/api/sessions/rc" && method === "GET") {
+      return status === null ? new Response("{}", { status: 404 }) : new Response(JSON.stringify({ name: "rc", status }), { status: 200 });
+    }
+    if (path.endsWith("/stop") || path.endsWith("/logout")) return new Response("{}", { status: 200 });
+    if (path === "/api/sessions/rc" && method === "DELETE") { status = null; return new Response("{}", { status: 200 }); }
+    if (path === "/api/sessions/" && method === "POST") { status = "STARTING"; return new Response("{}", { status: 201 }); }
+    return new Response("{}", { status: 404 });
+  }));
+  return { client, calls };
+}
+
+test("reconnectSession: sessão em pareamento é recriada SEM logout", async () => {
+  const { client, calls } = reconnectClient("SCAN_QR_CODE");
+  const result = await client.reconnectSession("rc");
+  assert.ok(!calls.some((call) => call.endsWith("/logout")), "logout desvincularia o aparelho sem necessidade");
+  assert.ok(calls.includes("DELETE /api/sessions/rc"));
+  assert.ok(calls.includes("POST /api/sessions/"));
+  assert.equal(result.session.providerStatus, "STARTING");
+});
+
+test("reconnectSession: sessão CONNECTED faz logout antes de remover", async () => {
+  const { client, calls } = reconnectClient("WORKING");
+  await client.reconnectSession("rc");
+  assert.ok(calls.indexOf("POST /api/sessions/rc/logout") < calls.indexOf("DELETE /api/sessions/rc"));
+});
+
+test("reconnectSession: sessão inexistente só cria (sem stop/delete)", async () => {
+  const { client, calls } = reconnectClient(null);
+  await client.reconnectSession("rc");
+  assert.ok(!calls.some((call) => call.includes("/stop") || call.startsWith("DELETE")));
+  assert.ok(calls.includes("POST /api/sessions/"));
+});
+
+// ── resolveWebhookUrl ─────────────────────────────────────────────────
+
+test("resolveWebhookUrl: WHATSAPP_HOOK_URL tem precedência, depois INTERNAL_API_URL", () => {
+  assert.equal(resolveWebhookUrl({ WHATSAPP_HOOK_URL: "https://api.exemplo.com/hook", INTERNAL_API_URL: "https://x" }), "https://api.exemplo.com/hook");
+  assert.equal(resolveWebhookUrl({ INTERNAL_API_URL: "https://api.exemplo.com/" }), "https://api.exemplo.com/internal/webhooks/waha");
 });
