@@ -88,7 +88,7 @@ export default async function TeamPage() {
         userId: schema.user.id,
         name: schema.user.name,
         email: schema.user.email,
-        phone: sql<string | null>`null`,
+        phone: schema.brokerProfiles.phone,
         role: schema.tenantMemberships.role,
         jobTitle: sql<string>`case
           when ${schema.tenantMemberships.role}::text in ('director', 'manager', 'supervisor')
@@ -112,7 +112,10 @@ export default async function TeamPage() {
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.tenantMemberships.branchId, schema.branches.id))
-      .leftJoin(schema.brokerProfiles, eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId))
+      .leftJoin(schema.brokerProfiles, and(
+        eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+      ))
       .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
