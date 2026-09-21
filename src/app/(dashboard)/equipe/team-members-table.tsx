@@ -6,7 +6,7 @@ import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
 import { Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle, MagnifyingGlass, UsersThree, XCircle } from "@/components/huge-icons";
+import { CheckCircle, MagnifyingGlass, Pause, Play, UsersThree, XCircle } from "@/components/huge-icons";
 
 import { EmptyState } from "@/components/empty-state";
 import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
@@ -19,6 +19,7 @@ import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useMultiSelect } from "@/hooks/use-multi-select";
+import { setBrokersAvailabilityAction } from "@/features/branches/actions";
 import { bulkToggleTeamMemberStatusAction } from "./actions";
 import { TeamMemberActions } from "./member-actions";
 
@@ -64,6 +65,12 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
   const clearSelection = multiSelect.clear;
   const [bulkState, bulkFormAction, bulkPending] = useActionState(
     bulkToggleTeamMemberStatusAction,
+    {},
+  );
+  // Pausar/retomar o recebimento de leads dos corretores selecionados. Só
+  // corretores ativos são afetados; os demais selecionados são ignorados.
+  const [availabilityState, availabilityAction, availabilityPending] = useActionState(
+    setBrokersAvailabilityAction,
     {},
   );
   const [statusOverrides, setStatusOverrides] = useState<Record<string, TeamMember["status"]>>({});
@@ -128,6 +135,31 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
       toast.error(bulkState.error);
     }
   }, [bulkState, clearSelection, router]);
+
+  const selectedBrokerIds = useMemo(
+    () =>
+      displayedMembers
+        .filter(
+          (member) =>
+            multiSelect.isSelected(member.id) &&
+            member.role === "broker" &&
+            member.status === "active" &&
+            member.userId,
+        )
+        .map((member) => member.userId as string),
+    [displayedMembers, multiSelect],
+  );
+
+  useEffect(() => {
+    if (availabilityState.success) {
+      toast.success(availabilityState.message ?? "Recebimento de leads atualizado.");
+      clearSelection();
+      router.refresh();
+    }
+    if (availabilityState.error) {
+      toast.error(availabilityState.error);
+    }
+  }, [availabilityState, clearSelection, router]);
 
   const activeCount = displayedMembers.filter((member) => member.status === "active").length;
 
@@ -295,6 +327,39 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
                   >
                     <XCircle className="size-4" />
                     Desativar
+                  </Button>
+                </form>
+              )}
+              {(currentRole === "director" || currentRole === "manager") && (
+                <form action={availabilityAction} className="flex items-center gap-2">
+                  <input name="brokerIds" type="hidden" value={selectedBrokerIds.join(",")} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={availabilityPending || selectedBrokerIds.length === 0}
+                    name="target"
+                    value="paused"
+                    type="submit"
+                    title={
+                      selectedBrokerIds.length === 0
+                        ? "Selecione corretores ativos para pausar o recebimento de leads"
+                        : "Pausa o recebimento de novos leads. Leads já atribuídos continuam na carteira."
+                    }
+                  >
+                    <Pause className="size-4" />
+                    Pausar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={availabilityPending || selectedBrokerIds.length === 0}
+                    name="target"
+                    value="available"
+                    type="submit"
+                    title="Retoma o recebimento de novos leads"
+                  >
+                    <Play className="size-4" />
+                    Retomar
                   </Button>
                 </form>
               )}
