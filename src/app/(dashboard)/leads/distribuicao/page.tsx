@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { Workflow, ArrowUpRight, Inbox as InboxIcon } from "lucide-react";
-import { DistributionMetrics, DistributionPanel } from "./_components/distribution-dashboard";
+import { DistributionMetrics } from "./_components/distribution-dashboard";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -588,19 +588,6 @@ export default async function LeadDistributionPage({
     }
   });
 
-  const enrichedBranches = branches.map((branch) => ({
-    id: branch.id,
-    name: branch.name,
-    status: branch.status,
-    acceptingLeads: branch.acceptingLeads,
-    autoDistribute: branch.autoDistribute,
-    isDistributionHub: branch.isDistributionHub,
-    memberCount: countsByBranch.get(branch.id) ?? 0,
-    availableBrokers: availableByBranch.get(branch.id) ?? 0,
-    activeLeads: leadsByBranch.get(branch.id) ?? 0,
-    newLeads: newByBranch.get(branch.id) ?? 0,
-  }));
-
   const totalBranches = branches.length;
   const acceptingBranches = branches.filter((b) => b.acceptingLeads).length;
   const autoDistributeBranches = branches.filter((b) => b.autoDistribute).length;
@@ -730,19 +717,6 @@ export default async function LeadDistributionPage({
               context.role === "director" ? (
                 <>
                   <DistributionRulesDialog />
-                  <DistributionPanel
-                    branches={enrichedBranches}
-                    brokers={brokers.map((broker) => ({
-                      id: broker.id,
-                      name: broker.name,
-                      email: broker.email ?? "",
-                      branchId: broker.branchId,
-                      branchName: broker.branchName,
-                      availabilityStatus: broker.availabilityStatus,
-                      activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-                    }))}
-                    canManageAcceptingLeads
-                  />
                   <QueueControlCenter
                     queues={queuesForControl}
                     branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
