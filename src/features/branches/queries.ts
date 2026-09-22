@@ -142,6 +142,8 @@ export async function getBranchProfileData(
       and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.branchId, branchId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         lt(schema.leads.createdAt, end),
       ),
@@ -163,6 +165,8 @@ export async function getBranchProfileData(
       and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.branchId, branchId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, trendStart),
       ),
     )
@@ -233,6 +237,8 @@ export async function getBranchProfileData(
           and(
             eq(schema.leads.tenantId, context.tenantId),
             eq(schema.leads.branchId, branchId),
+            isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
             inArray(schema.leads.status, [...activeStatuses]),
             inArray(schema.leads.corretorId, brokerIds),
           ),
@@ -264,6 +270,8 @@ export async function getBranchProfileData(
           and(
             eq(schema.leads.tenantId, context.tenantId),
             eq(schema.leads.branchId, branchId),
+            isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
             gte(schema.leads.createdAt, start),
             lt(schema.leads.createdAt, end),
             inArray(schema.leads.corretorId, brokerIds),
@@ -322,7 +330,7 @@ export async function getBranchDistributionStats(
     db
       .select({ branchId: schema.leads.branchId, status: schema.leads.status, count: count(schema.leads.id) })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), inArray(schema.leads.branchId, branchIds)))
+      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.branchId, branchIds)))
       .groupBy(schema.leads.branchId, schema.leads.status),
   ]);
   return aggregateBranchDistributionStats(brokerRows, leadRows);

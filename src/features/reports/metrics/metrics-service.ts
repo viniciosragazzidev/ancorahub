@@ -58,6 +58,7 @@ function cohortWhere(scope: ReportDataScope, start: Date, end?: Date): SQL | und
   return and(
     eq(schema.leads.tenantId, scope.tenantId),
     isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
     gte(schema.leads.createdAt, start),
     end ? lt(schema.leads.createdAt, end) : undefined,
     scope.leadScope,
@@ -72,6 +73,8 @@ function salesJoinedWhere(scope: ReportDataScope, start: Date, end?: Date): SQL 
   return and(
     eq(schema.sales.tenantId, scope.tenantId),
     eq(schema.leads.tenantId, scope.tenantId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
     eq(schema.sales.status, "active"),
     gte(schema.sales.saleDate, start),
     end ? lt(schema.sales.saleDate, end) : undefined,
@@ -321,6 +324,7 @@ export async function getAttentionSnapshot(
         and(
           eq(schema.leads.tenantId, scope.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
           eq(schema.leads.qualificationStatus, "hot"),
           ne(schema.leads.status, "lost"),
@@ -335,6 +339,7 @@ export async function getAttentionSnapshot(
         and(
           eq(schema.leads.tenantId, scope.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           isNotNull(schema.leads.corretorId),
           gte(schema.leads.assignedAt, currentStart),
           sql`(
@@ -351,6 +356,7 @@ export async function getAttentionSnapshot(
         and(
           eq(schema.leads.tenantId, scope.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.status, [...NEGOTIATION_STAGES]),
           lt(schema.leads.stageEnteredAt, stagnantCutoff),
           scope.leadScope,
@@ -444,6 +450,7 @@ async function resolveBrokersOverCapacity(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         isNotNull(schema.leads.corretorId),
         inArray(schema.leads.status, [...ACTIVE_LEAD_STATUSES]),
         scope.leadScope,
@@ -544,6 +551,7 @@ export async function getTeamPerformance(
         and(
           eq(schema.leads.tenantId, scope.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           isNotNull(schema.leads.corretorId),
           inArray(schema.leads.status, [...NEGOTIATION_STAGES]),
           lt(schema.leads.stageEnteredAt, stagnantCutoff),
@@ -861,6 +869,7 @@ export async function getDrilldown(
       where = and(
         eq(schema.leads.tenantId, scope.tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         isNotNull(schema.leads.corretorId),
         gte(schema.leads.assignedAt, currentStart),
         sql`(
@@ -874,6 +883,7 @@ export async function getDrilldown(
       where = and(
         eq(schema.leads.tenantId, scope.tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.status, [...NEGOTIATION_STAGES]),
         lt(schema.leads.stageEnteredAt, stagnantCutoff),
         scope.leadScope,
@@ -883,6 +893,7 @@ export async function getDrilldown(
       where = and(
         eq(schema.leads.tenantId, scope.tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         isNull(schema.leads.corretorId),
         eq(schema.leads.qualificationStatus, "hot"),
         ne(schema.leads.status, "lost"),

@@ -40,8 +40,8 @@ export async function getDomainDashboard(context: TenantContext, domain: "team" 
   }
   if (domain === "distribution") {
     const [received, assigned] = await Promise.all([
-      db.select({ value: count() }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), scope, gte(schema.leads.createdAt, since), isNull(schema.leads.deletedAt))),
-      db.select({ value: count() }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), scope, gte(schema.leads.createdAt, since), isNull(schema.leads.deletedAt), isNotNull(schema.leads.corretorId))),
+      db.select({ value: count() }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), scope, gte(schema.leads.createdAt, since), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))),
+      db.select({ value: count() }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), scope, gte(schema.leads.createdAt, since), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), isNotNull(schema.leads.corretorId))),
     ]);
     return { title: "Visão de distribuição", description: "Fluxo de leads no período.", metrics: [{ label: "Recebidos", value: Number(received[0]?.value ?? 0) }, { label: "Atribuídos", value: Number(assigned[0]?.value ?? 0) }], actionHref: "/distribuicao" };
   }
@@ -51,7 +51,7 @@ export async function getDomainDashboard(context: TenantContext, domain: "team" 
   }
   const [members, active] = await Promise.all([
     db.select({ value: count() }).from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.status, "active"))),
-    db.select({ value: count() }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), scope, isNull(schema.leads.deletedAt), eq(schema.leads.status, "in_contact"))),
+    db.select({ value: count() }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), scope, isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), eq(schema.leads.status, "in_contact"))),
   ]);
   return { title: "Visão da equipe", description: "Pessoas e operação dentro do seu escopo.", metrics: [{ label: "Membros ativos", value: Number(members[0]?.value ?? 0) }, { label: "Em atendimento", value: Number(active[0]?.value ?? 0) }], actionHref: "/equipe" };
 }
@@ -62,7 +62,7 @@ export async function getDashboardViewModel(context: TenantContext, period: Peri
   const scope = await resolveReportDataScope(context);
   const db = getDatabase();
   const since = periodStart(period);
-  const leadWhere = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), gte(schema.leads.createdAt, since), scope.leadScope);
+  const leadWhere = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), gte(schema.leads.createdAt, since), scope.leadScope);
   const [commercial, attention, funnel, trend, unitRows, brokerRows, qualificationRows, recentLeads, recentSales] = await Promise.all([
     getCommercialOverview(context, period, { includeFinancial: false }),
     getAttentionSnapshot(context, period),

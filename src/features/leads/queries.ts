@@ -82,6 +82,7 @@ export async function getUrgentLeadForUser() {
           eq(schema.leads.corretorId, context.userId),
           eq(schema.leads.status, "distributed"),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
         ),
       )
       .orderBy(schema.leads.assignedAt)
@@ -104,6 +105,7 @@ export async function getUrgentLeadForUser() {
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, context.userId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
         ),
       )
       .orderBy(schema.leads.updatedAt)
@@ -128,6 +130,7 @@ export async function getUrgentLeadForUser() {
       and(
         eq(schema.leads.tenantId, context.tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         ...(context.role === "manager" && context.branchId ? [eq(schema.leads.branchId, context.branchId)] : []),
       ),
     )

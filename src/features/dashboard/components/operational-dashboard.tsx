@@ -69,13 +69,7 @@ export function OperationalDashboard({
   period: number;
 }) {
   const reduceMotion = useReducedMotion() ?? false;
-  const attentionMetric = model.metrics.find((metric) => metric.id === "attention");
   const conversionMetric = model.metrics.find((metric) => metric.id === "conversion");
-  const attentionCount = Number(attentionMetric?.value ?? 0);
-  const bestDay = model.trend.reduce(
-    (best, point) => (point.received > best.received ? point : best),
-    model.trend[0] ?? { date: "", received: 0, converted: 0 },
-  );
   const totalConverted = model.trend.reduce((total, point) => total + point.converted, 0);
 
   return (
@@ -103,32 +97,6 @@ export function OperationalDashboard({
       />
 
       <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <section
-          className="flex flex-col gap-3 border-b border-border/70 pb-6"
-          aria-labelledby="dashboard-context-title"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <p
-              id="dashboard-context-title"
-              className="text-base font-semibold tracking-tight text-foreground sm:text-lg"
-            >
-              {model.header.description}
-            </p>
-            <Badge variant={attentionCount ? "warning" : "success"}>
-              {attentionCount ? `${attentionCount} pontos de atenção` : "Operação saudável"}
-            </Badge>
-          </div>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span>Últimos {period} dias</span>
-            <span aria-hidden="true">·</span>
-            <span>
-              {bestDay.date
-                ? `Maior entrada: ${bestDay.received} leads em ${fmtDayLabel(bestDay.date)}`
-                : "Sem movimentação registrada"}
-            </span>
-          </p>
-        </section>
-
         <section aria-labelledby="dashboard-kpi-title">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span
@@ -329,14 +297,4 @@ function FlowStat({
       <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
-}
-
-function fmtDayLabel(value: string) {
-  try {
-    return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(
-      new Date(`${value}T12:00:00`),
-    );
-  } catch {
-    return value;
-  }
 }

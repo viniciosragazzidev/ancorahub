@@ -8,6 +8,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type IntelligentDistributionPolicy, type RankedBroker } from "./domain";
+import { pickDistinctHue, QUEUE_HUE_MAX, QUEUE_HUE_MIN } from "./queue-color";
 import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-catalog";
 import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
 import { getLocalDutyParts } from "@/features/leads/assignment";
@@ -29,6 +30,9 @@ const queueInput = z.object({
   capacityPerBroker: z.number().int().min(1).max(200).nullable(),
   aiQualificationEnabled: z.boolean().default(true),
   status: z.enum(["active", "inactive"]),
+  // Omitted/null → the server assigns one automatically (create) or keeps the
+  // queue's current color untouched (update). See saveDistributionQueue.
+  colorHue: z.number().int().min(QUEUE_HUE_MIN).max(QUEUE_HUE_MAX).nullable().optional(),
 }).superRefine((input, refinement) => {
   if (input.dutyFallbackPolicy === "fallback_queue" && !input.dutyFallbackQueueId) {
     refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "Selecione a fila de contingência." });
@@ -279,6 +283,29 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     await assertQueueSourceConflicts(db, context, allowedSourceIds, input.id);
   }
 
+  // The UI always sends a concrete hue (auto-picked when the dialog opens, or
+  // chosen from the swatch grid / "Aleatória"). This is only a safety net for
+  // callers that omit it: assign a fresh one on create, keep the existing
+  // value untouched on update.
+  let colorHue = input.colorHue ?? null;
+  if (colorHue === null) {
+    if (input.id) {
+      const [existing] = await db
+        .select({ colorHue: schema.leadQueues.colorHue })
+        .from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.id, input.id), eq(schema.leadQueues.tenantId, context.tenantId)))
+        .limit(1);
+      colorHue = existing?.colorHue ?? null;
+    }
+    if (colorHue === null) {
+      const usedHueRows = await db
+        .select({ colorHue: schema.leadQueues.colorHue })
+        .from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)));
+      colorHue = pickDistinctHue(usedHueRows.map((row) => row.colorHue));
+    }
+  }
+
   const now = new Date();
   const values = {
     branchId: input.branchId || null,
@@ -293,6 +320,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     capacityPerBroker: input.capacityEnabled ? input.capacityPerBroker : null,
     aiQualificationEnabled: input.aiQualificationEnabled,
     status: input.status,
+    colorHue,
     updatedAt: now,
   };
 

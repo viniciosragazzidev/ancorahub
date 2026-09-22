@@ -16,6 +16,8 @@ export type LeadRow = {
   isPlantaoAtivo: boolean;
   branchName: string | null;
   qualificationStatus: string | null;
+  queueName: string | null;
+  queueColorHue: number | null;
   createdAt: Date;
   updatedAt: Date;
 };

@@ -137,7 +137,8 @@ export function AppShell({
         className="min-h-dvh overflow-hidden"
         style={
           {
-            "--sidebar-width": isFinanceiro ? "16rem" : "5rem",
+            "--sidebar-width": isFinanceiro ? "16rem" : "17rem",
+            "--sidebar-width-icon": isFinanceiro ? "3.5rem" : "4.5rem",
             "--header-height": "4rem",
             ...(branding?.brandColor
               ? {

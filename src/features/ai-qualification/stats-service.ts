@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 
 export type QualificationStatsSummary = {
@@ -71,7 +71,7 @@ export async function getQualificationStats(tenantId: string): Promise<Qualifica
         waitingQueue: sql<number>`count(case when ${schema.leads.corretorId} is null and ${schema.leads.status} = 'new' then 1 end)::int`,
       })
       .from(schema.leads)
-      .where(eq(schema.leads.tenantId, tenantId));
+      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)));
 
     // 2. Agregação real de conversas de IA
     const [convStats] = await db

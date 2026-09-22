@@ -1,4 +1,4 @@
-import { and, count, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -107,6 +107,8 @@ export default async function LegacyReportsView({
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           leadScope,
           gte(schema.leads.createdAt, reportStart),
         ),
@@ -129,6 +131,8 @@ export default async function LegacyReportsView({
         and(
           eq(schema.sales.tenantId, context.tenantId),
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           leadScope,
           gte(schema.sales.saleDate, reportStart),
         ),
@@ -144,6 +148,8 @@ export default async function LegacyReportsView({
             and(
               eq(schema.sales.tenantId, context.tenantId),
               eq(schema.leads.tenantId, context.tenantId),
+              isNull(schema.leads.deletedAt),
+              isNull(schema.leads.archivedAt),
               leadScope,
               eq(schema.sales.status, "active"),
               gte(schema.sales.saleDate, reportStart),
@@ -159,6 +165,8 @@ export default async function LegacyReportsView({
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           leadScope,
           gte(schema.leads.createdAt, reportStart),
         ),
@@ -186,6 +194,8 @@ export default async function LegacyReportsView({
         and(
           eq(schema.sales.tenantId, context.tenantId),
           eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           leadScope,
           gte(schema.sales.saleDate, reportStart),
         ),
@@ -203,6 +213,8 @@ export default async function LegacyReportsView({
             and(
               eq(schema.sales.tenantId, context.tenantId),
               eq(schema.leads.tenantId, context.tenantId),
+              isNull(schema.leads.deletedAt),
+              isNull(schema.leads.archivedAt),
               leadScope,
               eq(schema.sales.status, "active"),
               gte(schema.sales.saleDate, reportStart),

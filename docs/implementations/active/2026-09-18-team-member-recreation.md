@@ -16,9 +16,13 @@ pode ser usada em outro tenant.
   duplicidade.
 - Uma identidade global ativa, sem vínculo no tenant atual, é reutilizada no
   novo perfil e o convite registra essa recuperação para auditoria.
-- Identidades pendentes ou desativadas não são reativadas silenciosamente.
-- No primeiro acesso, uma identidade reutilizada conserva sua conta e senha;
-  uma conta de credencial só é criada quando ainda não existir.
+- Uma identidade global desativada, sem vínculo no tenant atual, fica marcada
+  para reativação explícita: ela só volta a ficar ativa quando o convidado
+  conclui o onboarding e define a nova senha.
+- No primeiro acesso, uma identidade ativa conserva sua conta e senha; uma
+  identidade reativada atualiza a credencial com a senha definida no onboarding.
+- A reativação gera auditoria própria, além do registro de conclusão do
+  onboarding.
 
 ## Arquivos
 
@@ -30,7 +34,8 @@ pode ser usada em outro tenant.
 ## Validação
 
 - Testes focados do cadastro, autorização e política de identidade: 3 arquivos,
-  28 testes aprovados.
+  12 testes aprovados neste ciclo (a suíte completa do registro anterior tinha
+  28 testes).
 - ESLint dos arquivos alterados: aprovado.
 - Harness fast: documentação aprovada; evidência em
   `reports/agent/verification/2026-09-18T17-44-22.026Z.md`.

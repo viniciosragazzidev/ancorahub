@@ -114,6 +114,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         // “Recebidos” is based on the moment the lead was assigned to the
         // broker, not when the lead record was originally created/imported.
@@ -136,6 +137,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         inArray(schema.leads.status, activeStatuses),
       ),
@@ -153,6 +155,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         inArray(schema.leads.status, activeStatuses),
         isNull(schema.leads.firstContactAt),
@@ -171,6 +174,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         eq(schema.leads.status, "lost"),
         gte(schema.leads.updatedAt, options.startDate),
@@ -190,6 +194,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         eq(schema.leads.status, "converted"),
         gte(schema.leads.updatedAt, options.startDate),

@@ -61,6 +61,8 @@ type Lead = {
   phone: string;
   branchId: string | null;
   distributionStatus: string;
+  status?: string | null;
+  qualificationStatus?: string | null;
   createdAt: string;
   sourceCampaign?: string | null;
   sourceAd?: string | null;
@@ -78,6 +80,8 @@ type Broker = {
 
 const PAGE_SIZE = 10;
 const MAX_BATCH = 10;
+type ArchiveScope = "all" | "period" | "status";
+type ArchiveStatus = "all" | "operational" | "lost" | "disqualified";
 
 /** Toast imediato baseado no estado da action, disparado em effect (nunca no render). */
 function useActionFeedback(state: DistributionActionState, label: string) {
@@ -254,6 +258,9 @@ export function DistributionInbox({
   const submittedBatchLeadIdsRef = useRef<string[]>([]);
   const archiveCandidateIdsRef = useRef<string[]>([]);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveScope, setArchiveScope] = useState<ArchiveScope>("all");
+  const [archivePeriodDays, setArchivePeriodDays] = useState("30");
+  const [archiveStatus, setArchiveStatus] = useState<ArchiveStatus>("all");
 
   useEffect(() => setInboxLeads(leads), [leads]);
 
@@ -261,12 +268,29 @@ export function DistributionInbox({
     () =>
       inboxLeads.filter(
         (lead) =>
-          lead.distributionStatus === "unassigned" ||
-          lead.distributionStatus === "queued" ||
-          lead.distributionStatus === "returned_to_queue",
+          (lead.distributionStatus === "unassigned" ||
+            lead.distributionStatus === "queued" ||
+            lead.distributionStatus === "returned_to_queue") &&
+          lead.status !== "lost" &&
+          lead.qualificationStatus !== "disqualified",
       ),
     [inboxLeads],
   );
+  const archivePreview = useMemo(() => {
+    if (archiveScope === "all") return inboxLeads;
+    if (archiveScope === "period") {
+      const cutoff = Date.now() - Number(archivePeriodDays || 30) * 24 * 60 * 60 * 1000;
+      return inboxLeads.filter((lead) => new Date(lead.createdAt).getTime() >= cutoff);
+    }
+    return inboxLeads.filter((lead) => {
+      if (archiveStatus === "lost") return lead.status === "lost";
+      if (archiveStatus === "disqualified") return lead.qualificationStatus === "disqualified";
+      if (archiveStatus === "operational") {
+        return lead.status !== "lost" && lead.qualificationStatus !== "disqualified";
+      }
+      return true;
+    });
+  }, [archivePeriodDays, archiveScope, archiveStatus, inboxLeads]);
   const filtered = useMemo(
     () =>
       selectable.filter((lead) => {
@@ -443,10 +467,10 @@ export function DistributionInbox({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <UserList className="size-4 text-primary" /> Inbox geral e fila de distribuição
+                <UserList className="size-4 text-primary" /> Inbox operacional de distribuição
               </CardTitle>
               <CardDescription className="mt-1">
-                Leads sem corretor ficam aqui até serem enviados para uma unidade e uma fila.
+                Aqui ficam apenas os leads que ainda podem ser enviados para uma unidade, fila ou corretor.
               </CardDescription>
             </div>
             <div className="flex flex-col items-stretch gap-2 sm:items-end">
@@ -467,12 +491,12 @@ export function DistributionInbox({
                     className="gap-1.5 text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
                     disabled={!totalUnassigned || archivePending}
                     onClick={() => {
-                      archiveCandidateIdsRef.current = selectable.map((lead) => lead.id);
+                      archiveCandidateIdsRef.current = inboxLeads.map((lead) => lead.id);
                       setArchiveDialogOpen(true);
                     }}
                   >
                     <Archive className="size-3.5" aria-hidden="true" />
-                    Arquivar sem distribuição
+                    Arquivar todos sem corretor
                   </Button>
                 </div>
               ) : null}
@@ -786,6 +810,66 @@ export function DistributionInbox({
         </CardContent>
       </Card>
 
+      {inboxLeads.length ? (
+        <Card variant="overview" className="mt-4">
+          <CardHeader className="border-b border-border px-5 pb-4 pt-5">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Archive className="size-4 text-amber-600 dark:text-amber-400" />
+              Todos os leads sem corretor
+              <Badge variant="secondary">{totalUnassigned}</Badge>
+            </CardTitle>
+            <CardDescription>
+              Esta é a lista completa do escopo sem corretor. Leads que ainda podem ser distribuídos ficam no Inbox acima;
+              os demais também podem ser arquivados e exportados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+              <div className="max-h-[560px] overflow-auto">
+                <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="pl-5">Lead</TableHead>
+                    <TableHead>Unidade</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead className="pr-5 text-right">Entrada</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inboxLeads.map((lead) => (
+                    <TableRow key={lead.id}>
+                      <TableCell className="pl-5">
+                        <p className="font-medium">{lead.name}</p>
+                        <p className="text-xs text-muted-foreground">{lead.phone}</p>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {branches.find((branch) => branch.id === lead.branchId)?.name ?? "Inbox geral"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {lead.qualificationStatus === "disqualified"
+                            ? "Desqualificado"
+                            : lead.status === "lost"
+                              ? "Perdido"
+                              : "Fora da fila operacional"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="pr-5 text-right text-xs text-muted-foreground">
+                        {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(lead.createdAt))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {totalUnassigned > inboxLeads.length ? (
+              <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+                Mostrando {inboxLeads.length} dos {totalUnassigned} leads sem corretor. O arquivamento e o PDF consideram todos.
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Campaign Conflict Dialog */}
       <CampaignConflictDialog
         conflict={campaignConflictDialog}
@@ -800,11 +884,58 @@ export function DistributionInbox({
         <DialogPopup className="sm:max-w-md">
           <DialogPanel>
             <DialogHeader>
-              <DialogTitle>Arquivar leads sem distribuição?</DialogTitle>
+              <DialogTitle>Escolha quais leads arquivar</DialogTitle>
               <DialogDescription>
-                {totalUnassigned === 1 ? "1 lead sem corretor será retirado" : `${totalUnassigned} leads sem corretor serão retirados`} da distribuição e do recebimento. Os dados não serão apagados e poderão ser recuperados administrativamente.
+                O arquivamento remove os leads escolhidos da distribuição sem apagar os dados. A seleção é recalculada no servidor.
               </DialogDescription>
             </DialogHeader>
+            <div className="grid gap-4 py-2">
+              <p className="text-xs font-medium text-foreground">Escopo do arquivamento</p>
+              <AppSelect
+                value={archiveScope}
+                onValueChange={(value) => setArchiveScope(value as ArchiveScope)}
+                options={[
+                  { value: "all", label: `Todos os sem corretor (${totalUnassigned})` },
+                  { value: "period", label: "Por período de entrada" },
+                  { value: "status", label: "Por situação do lead" },
+                ]}
+              />
+              {archiveScope === "period" ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-medium text-foreground">Leads recebidos nos últimos</p>
+                  <AppSelect
+                    value={archivePeriodDays}
+                    onValueChange={setArchivePeriodDays}
+                    options={[
+                      { value: "7", label: "7 dias" },
+                      { value: "30", label: "30 dias" },
+                      { value: "90", label: "90 dias" },
+                      { value: "365", label: "12 meses" },
+                    ]}
+                  />
+                </div>
+              ) : null}
+              {archiveScope === "status" ? (
+                <div className="grid gap-1.5">
+                  <p className="text-xs font-medium text-foreground">Situação</p>
+                  <AppSelect
+                    value={archiveStatus}
+                    onValueChange={(value) => setArchiveStatus(value as ArchiveStatus)}
+                    options={[
+                      { value: "all", label: "Todos os status" },
+                      { value: "operational", label: "Operacionais" },
+                      { value: "lost", label: "Perdidos" },
+                      { value: "disqualified", label: "Desqualificados" },
+                    ]}
+                  />
+                </div>
+              ) : null}
+              <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                {archiveScope === "all"
+                  ? `${totalUnassigned} lead${totalUnassigned === 1 ? "" : "s"} sem corretor serão arquivados.`
+                  : `${archivePreview.length} lead${archivePreview.length === 1 ? "" : "s"} corresponde${archivePreview.length === 1 ? "" : "m"} ao filtro carregado. O servidor fará a conferência final.`}
+              </p>
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setArchiveDialogOpen(false)}>
                 Cancelar
@@ -812,12 +943,15 @@ export function DistributionInbox({
               <form
                 action={archiveAction}
                 onSubmit={() => {
-                  archiveCandidateIdsRef.current = selectable.map((lead) => lead.id);
+                  archiveCandidateIdsRef.current = archivePreview.map((lead) => lead.id);
                 }}
               >
-                <Button type="submit" disabled={archivePending || !totalUnassigned} className="gap-1.5">
+                <input type="hidden" name="archiveScope" value={archiveScope} />
+                <input type="hidden" name="archivePeriodDays" value={archivePeriodDays} />
+                <input type="hidden" name="archiveStatus" value={archiveStatus} />
+                <Button type="submit" disabled={archivePending || !archivePreview.length} className="gap-1.5">
                   {archivePending ? <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> : <Archive className="size-4" />}
-                  {archivePending ? "Arquivando…" : "Confirmar arquivamento"}
+                  {archivePending ? "Arquivando…" : "Confirmar seleção"}
                 </Button>
               </form>
             </DialogFooter>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { FileText, Lightning, MoreHorizontalIcon, Plus } from "@/components/huge-icons";
+import { Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -78,6 +79,11 @@ export function LeadsHeaderActions({
       <div className="hidden items-center gap-2 lg:flex">
         <PeriodSelect value={period} />
         {children}
+        {role === "director" ? (
+          <Button variant="outline" render={<Link href="/leads/arquivados" />}>
+            <Archive className="size-4" /> Arquivados
+          </Button>
+        ) : null}
         {canImport ? (
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <FileText /> Importar leads
@@ -121,6 +127,12 @@ export function LeadsHeaderActions({
               ))}
             </div>
             <DropdownMenuSeparator className="my-1" />
+            {role === "director" ? (
+              <DropdownMenuItem render={<Link href="/leads/arquivados" />} className="gap-2.5 px-2.5 py-2">
+                <Archive className="size-4 text-amber-600 dark:text-amber-400" />
+                Leads arquivados
+              </DropdownMenuItem>
+            ) : null}
             {canImport ? (
               <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2.5 px-2.5 py-2">
                 <FileText className="size-4 text-muted-foreground" />

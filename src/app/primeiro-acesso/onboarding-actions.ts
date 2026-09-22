@@ -105,10 +105,9 @@ export async function completeOnboardingAction(
     if (identityDecision.kind === "tenant-conflict") {
       throw new Error("Este e-mail já pertence a outro membro desta corretora.");
     }
-    if (identityDecision.kind === "disabled") {
-      throw new Error("Esta conta está desativada. Solicite a reativação antes de aceitar o convite.");
-    }
-    const userId = identityDecision.kind === "reuse" ? identityDecision.userId : randomUUID();
+    const userId = identityDecision.kind === "reuse" || identityDecision.kind === "reactivate"
+      ? identityDecision.userId
+      : randomUUID();
 
     const hashedPassword = await hashPassword(input.password);
 
@@ -123,6 +122,15 @@ export async function completeOnboardingAction(
           active: true,
           status: "active",
         });
+      } else if (identityDecision.kind === "reactivate") {
+        await tx.update(schema.user).set({
+          name: input.name,
+          email: accessEmail,
+          emailVerified: true,
+          active: true,
+          status: "active",
+          updatedAt: new Date(),
+        }).where(eq(schema.user.id, userId));
       }
 
       // A deleted tenant member may still have a valid global credential.
@@ -140,6 +148,14 @@ export async function completeOnboardingAction(
           userId,
           password: hashedPassword,
         }));
+      } else if (identityDecision.kind === "reactivate") {
+        await tx
+          .update(schema.account)
+          .set({ password: hashedPassword, updatedAt: new Date() })
+          .where(and(
+            eq(schema.account.userId, userId),
+            eq(schema.account.providerId, "credential"),
+          ));
       }
 
       // Upsert tenant membership
@@ -244,6 +260,16 @@ export async function completeOnboardingAction(
         entidadeId: onboardingId,
         acao: "concluiu_onboarding",
       });
+
+      if (identityDecision.kind === "reactivate") {
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId,
+          entidade: "user",
+          entidadeId: userId,
+          acao: "reativou_identidade_em_reconvite",
+        });
+      }
     });
 
     // Activation is already committed at this point. The notification is a

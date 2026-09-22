@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import * as XLSX from "xlsx";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
@@ -112,7 +112,7 @@ export async function generateReport(context: TenantContext, reportId: string, r
   const db = getDatabase();
   const brokerIds = await supervisedIds(context);
   const leadScope = scopeFor(context, brokerIds, effectiveBranchId);
-  const baseLeadWhere = and(eq(schema.leads.tenantId, context.tenantId), leadScope, gte(schema.leads.createdAt, input.start), lte(schema.leads.createdAt, input.end));
+  const baseLeadWhere = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), leadScope, gte(schema.leads.createdAt, input.start), lte(schema.leads.createdAt, input.end));
   let rows: Record<string, unknown>[];
 
   switch (definition.id) {
@@ -135,12 +135,12 @@ export async function generateReport(context: TenantContext, reportId: string, r
         rows = await db.select({
           fechamento: schema.sales.saleDate, lead: schema.leads.nome, responsavel: schema.user.name, status: schema.sales.status,
           produto: schema.carrierPlans.name,
-        }).from(schema.sales).innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.sales.brokerId, schema.user.id)).leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id)).where(and(eq(schema.sales.tenantId, context.tenantId), leadScope, gte(schema.sales.saleDate, input.start), lte(schema.sales.saleDate, input.end))).orderBy(asc(schema.sales.saleDate)).limit(MAX_EXPORT_ROWS);
+        }).from(schema.sales).innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.sales.brokerId, schema.user.id)).leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id)).where(and(eq(schema.sales.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), leadScope, gte(schema.sales.saleDate, input.start), lte(schema.sales.saleDate, input.end))).orderBy(asc(schema.sales.saleDate)).limit(MAX_EXPORT_ROWS);
       } else {
         rows = await db.select({
           fechamento: schema.sales.saleDate, lead: schema.leads.nome, responsavel: schema.user.name, status: schema.sales.status,
           valor: schema.sales.saleValue, produto: schema.carrierPlans.name,
-        }).from(schema.sales).innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.sales.brokerId, schema.user.id)).leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id)).where(and(eq(schema.sales.tenantId, context.tenantId), leadScope, gte(schema.sales.saleDate, input.start), lte(schema.sales.saleDate, input.end))).orderBy(asc(schema.sales.saleDate)).limit(MAX_EXPORT_ROWS);
+        }).from(schema.sales).innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.sales.brokerId, schema.user.id)).leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id)).where(and(eq(schema.sales.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), leadScope, gte(schema.sales.saleDate, input.start), lte(schema.sales.saleDate, input.end))).orderBy(asc(schema.sales.saleDate)).limit(MAX_EXPORT_ROWS);
       }
       break;
     case "broker-performance":
@@ -155,13 +155,13 @@ export async function generateReport(context: TenantContext, reportId: string, r
         origem: schema.leadDistributionEvents.source, estrategia: schema.leadDistributionEvents.strategy,
         motivo: schema.leadDistributionEvents.reason, unidade: schema.branches.name,
         responsavel: schema.user.name, primeiroContatoEm: schema.leads.firstContactAt,
-      }).from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).leftJoin(schema.branches, eq(schema.leadDistributionEvents.toBranchId, schema.branches.id)).where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), leadScope, gte(schema.leadDistributionEvents.createdAt, input.start), lte(schema.leadDistributionEvents.createdAt, input.end))).orderBy(asc(schema.leadDistributionEvents.createdAt)).limit(MAX_EXPORT_ROWS);
+      }).from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).leftJoin(schema.branches, eq(schema.leadDistributionEvents.toBranchId, schema.branches.id)).where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), leadScope, gte(schema.leadDistributionEvents.createdAt, input.start), lte(schema.leadDistributionEvents.createdAt, input.end))).orderBy(asc(schema.leadDistributionEvents.createdAt)).limit(MAX_EXPORT_ROWS);
       break;
     case "tasks":
       rows = await db.select({
         criadaEm: schema.leadTasks.createdAt, lead: schema.leads.nome, titulo: schema.leadTasks.title, prioridade: schema.leadTasks.priority,
         vencimento: schema.leadTasks.dueAt, concluidaEm: schema.leadTasks.completedAt, responsavel: schema.user.name,
-      }).from(schema.leadTasks).innerJoin(schema.leads, eq(schema.leadTasks.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.leadTasks.assignedTo, schema.user.id)).where(and(eq(schema.leadTasks.tenantId, context.tenantId), leadScope, gte(schema.leadTasks.createdAt, input.start), lte(schema.leadTasks.createdAt, input.end))).orderBy(asc(schema.leadTasks.createdAt)).limit(MAX_EXPORT_ROWS);
+      }).from(schema.leadTasks).innerJoin(schema.leads, eq(schema.leadTasks.leadId, schema.leads.id)).leftJoin(schema.user, eq(schema.leadTasks.assignedTo, schema.user.id)).where(and(eq(schema.leadTasks.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), leadScope, gte(schema.leadTasks.createdAt, input.start), lte(schema.leadTasks.createdAt, input.end))).orderBy(asc(schema.leadTasks.createdAt)).limit(MAX_EXPORT_ROWS);
       break;
   }
 

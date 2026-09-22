@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import type { LeadRow } from "./leads-table-config";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -322,6 +323,19 @@ export const getLeadsColumns = (
     },
     enableColumnFilter: true,
     enableSorting: true,
+  },
+  {
+    accessorKey: "queueName",
+    id: "queueName",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Fila" />,
+    cell: ({ row }) => (
+      <QueueColorTag name={row.original.queueName} hue={row.original.queueColorHue} />
+    ),
+    meta: {
+      label: "Fila",
+      variant: "text",
+    },
+    enableSorting: false,
   },
   {
     accessorKey: "qualificationStatus",

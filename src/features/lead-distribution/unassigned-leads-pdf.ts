@@ -94,7 +94,7 @@ export async function encodeUnassignedLeadsPdf(input: {
       `Exportado em ${dateLabel(input.generatedAt ?? new Date())} · ${input.rows.length} registro${input.rows.length === 1 ? "" : "s"}`,
       { x: margin, y: y - 19, size: 9, font: regular, color: colors.muted },
     );
-    page.drawText("Somente leads operacionais sem corretor e não arquivados.", {
+    page.drawText("Todos os leads sem corretor e não arquivados.", {
       x: margin,
       y: y - 34,
       size: 8,

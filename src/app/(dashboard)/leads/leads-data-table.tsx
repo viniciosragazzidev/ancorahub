@@ -50,6 +50,8 @@ export function LeadsDataTable({
       isPlantaoAtivo: item.isPlantaoAtivo ?? false,
       branchName: item.branchName ?? null,
       qualificationStatus: item.qualificationStatus ?? null,
+      queueName: item.queueName ?? null,
+      queueColorHue: item.queueColorHue ?? null,
       createdAt: new Date(item.createdAt),
       updatedAt: new Date(item.createdAt),
     }));
@@ -153,6 +155,8 @@ export function QualifyingLeadsDataTable({
       isPlantaoAtivo: false,
       branchName: item.branchName ?? null,
       qualificationStatus: item.qualificationStatus,
+      queueName: item.queueName ?? null,
+      queueColorHue: item.queueColorHue ?? null,
       createdAt: new Date(item.createdAt),
       updatedAt: new Date(item.createdAt),
     }));

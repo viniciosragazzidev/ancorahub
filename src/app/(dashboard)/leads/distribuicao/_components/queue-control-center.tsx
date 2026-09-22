@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowsClockwise,
   ChartBar,
   CheckCircle,
   Clock,
@@ -48,6 +49,8 @@ import { toast } from "@/components/ui/sonner";
 import { Loader2Icon } from "@/components/huge-icons";
 import { cn } from "@/utils/core/cn";
 import { QUEUE_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
+import { circularHueDistance, pickDistinctHue, QUEUE_COLOR_SWATCHES } from "@/features/lead-distribution/queue-color";
+import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
 
 type Queue = {
   id: string;
@@ -64,6 +67,7 @@ type Queue = {
   capacityEnabled: boolean;
   capacityPerBroker: number | null;
   aiQualificationEnabled?: boolean;
+  colorHue?: number | null;
   waiting: number;
   members: number;
   activeLeads: number;
@@ -123,6 +127,7 @@ const emptyQueue = {
   capacityPerBroker: "10",
   aiQualificationEnabled: true,
   status: "active",
+  colorHue: null as number | null,
 };
 
 const QUEUE_DRAFT_STORAGE_KEY = "ancorahub:distribution:queue-draft:v1";
@@ -319,12 +324,23 @@ export function QueueControlCenter({
     return brokers.filter((b) => b.branchId && formTargetBranchIds.includes(b.branchId));
   }, [brokers, formTargetBranchIds]);
 
+  /** Other queues' colors — used both to keep a fresh color distinct and to warn about near-duplicates. */
+  function otherQueueColors(queueId: string | null) {
+    return queues
+      .filter((queue) => queue.id !== queueId)
+      .map((queue) => ({ name: queue.name, hue: queue.colorHue ?? null }));
+  }
+  function usedHuesExcept(queueId: string | null) {
+    return otherQueueColors(queueId).map((entry) => entry.hue);
+  }
+
   function openCreate() {
     setEditingId(null);
     const draft = readQueueDraft();
     if (draft) {
       setForm({
         ...draft,
+        colorHue: typeof draft.colorHue === "number" ? draft.colorHue : pickDistinctHue(usedHuesExcept(null)),
         allowedBranchIds: draft.branchId ? draft.allowedBranchIds : (draft.allowedBranchIds.length ? draft.allowedBranchIds : branches.map((b) => b.id)),
       });
       toast.info("Rascunho restaurado", { description: "Continuamos a criação da fila de onde você parou." });
@@ -342,6 +358,7 @@ export function QueueControlCenter({
       brokerScopeMode: "all",
       allowedBrokerIds: [],
       allowedSourceIds: [],
+      colorHue: pickDistinctHue(usedHuesExcept(null)),
     });
     setEditorOpen(true);
   }
@@ -371,6 +388,7 @@ export function QueueControlCenter({
       capacityPerBroker: String(queue.capacityPerBroker ?? 10),
       aiQualificationEnabled: queue.aiQualificationEnabled ?? true,
       status: queue.status,
+      colorHue: queue.colorHue ?? pickDistinctHue(usedHuesExcept(queue.id)),
     });
     setEditorOpen(true);
   }
@@ -457,6 +475,7 @@ export function QueueControlCenter({
       capacityPerBroker: form.capacityEnabled ? Number(form.capacityPerBroker) : null,
       aiQualificationEnabled: form.aiQualificationEnabled,
       status: form.status,
+      colorHue: form.colorHue,
     });
     setSaving(false);
     if (!result.success)
@@ -644,7 +663,10 @@ export function QueueControlCenter({
                   <CardHeader className="gap-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <CardTitle className="truncate">{queue.name}</CardTitle>
+                        <CardTitle className="flex min-w-0 items-center gap-2 truncate">
+                          <QueueColorDot hue={queue.colorHue} />
+                          <span className="truncate">{queue.name}</span>
+                        </CardTitle>
                         <CardDescription className="mt-1 flex flex-wrap items-center gap-1.5">
                           <span>{queue.branchName || "Todas as Unidades (Geral)"}</span>
                           {multiBranchCount > 1 && (
@@ -1262,6 +1284,52 @@ export function QueueControlCenter({
                   className="w-full"
                 />
               </label>
+
+              {/* Cor da fila — diferencia os leads desta fila na tabela, no kanban e no drawer */}
+              <div className="grid gap-2 text-sm font-medium">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Cor da fila</span>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setForm({ ...form, colorHue: pickDistinctHue(usedHuesExcept(editingId), { jitter: true }) })}
+                  >
+                    <ArrowsClockwise className="size-3.5" /> Aleatória
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {QUEUE_COLOR_SWATCHES.map((hue) => (
+                    <button
+                      key={hue}
+                      type="button"
+                      aria-pressed={form.colorHue === hue}
+                      aria-label={`Usar esta cor`}
+                      title={`Matiz ${hue}°`}
+                      onClick={() => setForm({ ...form, colorHue: hue })}
+                      className={cn(
+                        "grid size-7 place-items-center rounded-full border-2 transition-transform hover:scale-110",
+                        form.colorHue === hue ? "border-foreground" : "border-transparent",
+                      )}
+                    >
+                      <QueueColorDot hue={hue} className="size-4" />
+                    </button>
+                  ))}
+                </div>
+                {(() => {
+                  if (typeof form.colorHue !== "number") return null;
+                  const nearest = otherQueueColors(editingId)
+                    .map((entry) => ({ ...entry, distance: typeof entry.hue === "number" ? circularHueDistance(form.colorHue as number, entry.hue) : Infinity }))
+                    .sort((a, b) => a.distance - b.distance)[0];
+                  if (!nearest || nearest.distance >= 18) return null;
+                  return (
+                    <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                      <QueueColorDot hue={form.colorHue} className="size-2" /> Cor parecida com a fila &ldquo;{nearest.name}&rdquo;. Pode continuar, mas fica mais fácil confundir na tabela.
+                    </p>
+                  );
+                })()}
+              </div>
 
               {/* Unidade Principal */}
               <label className="grid gap-1.5 text-sm font-medium">

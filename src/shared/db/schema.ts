@@ -632,6 +632,10 @@ export const leadQueues = pgTable(
     capacityPerBroker: integer("capacity_per_broker"),
     aiQualificationEnabled: boolean("ai_qualification_enabled").notNull().default(true),
     isDefault: boolean("is_default").notNull().default(false),
+    // Hue (0-359) on the HSL wheel used to tag this queue's leads in tables/boards.
+    // Assigned automatically (farthest from hues already in use) or picked manually
+    // from a curated swatch grid — see src/features/lead-distribution/queue-color.ts.
+    colorHue: integer("color_hue"),
     createdAt,
     updatedAt,
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

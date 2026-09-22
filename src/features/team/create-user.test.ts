@@ -44,8 +44,8 @@ describe("classifyExistingTeamIdentity", () => {
     expect(classifyExistingTeamIdentity(identity, { id: "membership-1" })).toEqual({ kind: "tenant-conflict" });
   });
 
-  it("não reativa silenciosamente uma identidade desativada", () => {
-    expect(classifyExistingTeamIdentity({ ...identity, active: false }, null)).toEqual({ kind: "disabled" });
-    expect(classifyExistingTeamIdentity({ ...identity, status: "disabled" }, null)).toEqual({ kind: "disabled" });
+  it("marca uma identidade desativada para reativação durante o novo onboarding", () => {
+    expect(classifyExistingTeamIdentity({ ...identity, active: false }, null)).toEqual({ kind: "reactivate", userId: "user-1" });
+    expect(classifyExistingTeamIdentity({ ...identity, status: "disabled" }, null)).toEqual({ kind: "reactivate", userId: "user-1" });
   });
 });

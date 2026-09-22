@@ -192,6 +192,7 @@ export default async function LeadDistributionPage({
     brokers,
     unassignedLeads,
     queueCountsByStatus,
+    unassignedArchiveCount,
     activeBrokerLeads,
     brokerStatsByBranch,
     leadStatsByBranch,
@@ -243,6 +244,8 @@ export default async function LeadDistributionPage({
         phone: schema.leads.telefone,
         branchId: schema.leads.branchId,
         distributionStatus: schema.leads.distributionStatus,
+        status: schema.leads.status,
+        qualificationStatus: schema.leads.qualificationStatus,
         createdAt: schema.leads.createdAt,
         sourceCampaign: schema.leads.sourceCampaign,
         sourceAd: schema.leads.sourceAd,
@@ -255,24 +258,13 @@ export default async function LeadDistributionPage({
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
-          // A fila é de leads SEM corretor. Um vínculo provisório da oferta
-          // (DEC-104) também já tem responsável e não volta ao inbox.
           isNull(schema.leads.corretorId),
-          inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
-          // Leads terminais não são acionáveis no inbox; o motor também os
-          // ignora (seedQueuedLeadJobs).
-          ne(schema.leads.status, "lost"),
-          or(
-            isNull(schema.leads.qualificationStatus),
-            ne(schema.leads.qualificationStatus, "disqualified"),
-          ),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
         ),
       )
-      .orderBy(schema.leads.createdAt)
-      .limit(100),
+      .orderBy(schema.leads.createdAt),
     db
       .select({
         distributionStatus: schema.leads.distributionStatus,
@@ -298,6 +290,17 @@ export default async function LeadDistributionPage({
         ),
       )
       .groupBy(schema.leads.distributionStatus),
+    db
+      .select({ count: count(schema.leads.id) })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+          isNull(schema.leads.corretorId),
+        ),
+      ),
     db
       .select({ brokerId: schema.leads.corretorId, count: count(schema.leads.id) })
       .from(schema.leads)
@@ -389,6 +392,7 @@ export default async function LeadDistributionPage({
         capacityEnabled: schema.leadQueues.capacityEnabled,
         capacityPerBroker: schema.leadQueues.capacityPerBroker,
         aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
+        colorHue: schema.leadQueues.colorHue,
       })
       .from(schema.leadQueues)
       .leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
@@ -608,7 +612,7 @@ export default async function LeadDistributionPage({
       { count: Number(row.count), oldestAt: row.oldestAt ? new Date(row.oldestAt) : null },
     ]),
   );
-  const totalUnassignedForArchive = queueCountsByStatus.reduce((total, row) => total + Number(row.count), 0);
+  const totalUnassignedForArchive = Number(unassignedArchiveCount[0]?.count ?? 0);
 
   const queueCards = [
     ...(context.role === "director"

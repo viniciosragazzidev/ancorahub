@@ -1,6 +1,6 @@
 "use server";
 
-import { aliasedTable, and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { resolveAccessContext } from "@/shared/auth/access-context";
@@ -677,7 +677,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
  */
 export async function archiveUnassignedLeadsAction(
   _previous: DistributionActionState,
-  _formData: FormData,
+  formData: FormData,
 ): Promise<DistributionActionState> {
   const mutationId = randomUUID();
 
@@ -687,22 +687,37 @@ export async function archiveUnassignedLeadsAction(
       return { mutationId, error: "Apenas o Diretor pode arquivar leads sem distribuição." };
     }
 
+    const archiveScope = z.enum(["all", "period", "status"]).catch("all").parse(
+      String(formData.get("archiveScope") ?? "all"),
+    );
+    const periodDays = z.coerce.number().int().min(1).max(3650).catch(30).parse(
+      formData.get("archivePeriodDays") ?? 30,
+    );
+    const archiveStatus = z.enum(["all", "operational", "lost", "disqualified"]).catch("all").parse(
+      String(formData.get("archiveStatus") ?? "all"),
+    );
     const db = getDatabase();
+    const archiveConditions = [
+      eq(schema.leads.tenantId, context.tenantId),
+      isNull(schema.leads.corretorId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+    ];
+    if (archiveScope === "period") {
+      archiveConditions.push(gte(schema.leads.createdAt, new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000)));
+    }
+    if (archiveScope === "status" && archiveStatus === "operational") {
+      archiveConditions.push(ne(schema.leads.status, "lost"));
+      archiveConditions.push(or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified"))!);
+    } else if (archiveScope === "status" && archiveStatus === "lost") {
+      archiveConditions.push(eq(schema.leads.status, "lost"));
+    } else if (archiveScope === "status" && archiveStatus === "disqualified") {
+      archiveConditions.push(eq(schema.leads.qualificationStatus, "disqualified"));
+    }
     const candidates = await db
       .select({ id: schema.leads.id })
       .from(schema.leads)
-      .where(and(
-        eq(schema.leads.tenantId, context.tenantId),
-        isNull(schema.leads.corretorId),
-        isNull(schema.leads.deletedAt),
-        isNull(schema.leads.archivedAt),
-        inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
-        ne(schema.leads.status, "lost"),
-        or(
-          isNull(schema.leads.qualificationStatus),
-          ne(schema.leads.qualificationStatus, "disqualified"),
-        ),
-      ));
+      .where(and(...archiveConditions));
 
     if (!candidates.length) {
       return {

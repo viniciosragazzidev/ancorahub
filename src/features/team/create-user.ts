@@ -119,10 +119,9 @@ export async function createTeamUser(rawInput: unknown) {
     if (identityDecision.kind === "tenant-conflict") {
       throw new Error("Este e-mail já pertence a um membro desta corretora. Reative o acesso existente ou use outro e-mail.");
     }
-    if (identityDecision.kind === "disabled") {
-      throw new Error("Este e-mail pertence a uma conta desativada. Reative a conta antes de criar um novo acesso.");
+    if (identityDecision.kind === "reuse" || identityDecision.kind === "reactivate") {
+      reusableUserId = identityDecision.userId;
     }
-    if (identityDecision.kind === "reuse") reusableUserId = identityDecision.userId;
   }
 
   const brokerProfileId = randomUUID();

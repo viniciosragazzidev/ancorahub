@@ -26,7 +26,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
-import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
+import { buildLeadScopeWhere, buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
 import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
@@ -118,6 +118,7 @@ async function LeadsPageContent({
           eq(schema.leads.tenantId, context.tenantId),
           eq(schema.leads.corretorId, context.userId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           or(
             ne(schema.leads.status, "distributed"),
             isNotNull(schema.leads.firstContactAt),
@@ -369,10 +370,10 @@ async function LeadsPageContent({
   // Keep the common scope independent from the active projection. The
   // unassigned tab is a server-backed dataset of its own; deriving it from the
   // current page would produce a partial list and a misleading total.
-  const commonWhere = and(
+  const baseWhere = and(
     buildLeadScopeWhere(context, { requestedBranchId: filters.branch }),
     isNull(schema.leads.deletedAt),
-    qualifiedOrDistributedFilter,
+    isNull(schema.leads.archivedAt),
     ...(tablecnFilter ? [tablecnFilter] : []),
     ...(periodFilter ? [periodFilter] : []),
     ...(statusFilter ? [statusFilter] : []),
@@ -385,6 +386,8 @@ async function LeadsPageContent({
     ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
   );
 
+  const commonWhere = and(baseWhere, qualifiedOrDistributedFilter);
+
   const where = and(
     commonWhere,
     ...(canViewUnassigned && initialView === "sem-atribuicao"
@@ -392,7 +395,19 @@ async function LeadsPageContent({
       : []),
   );
   const unassignedWhere = canViewUnassigned
-    ? and(commonWhere, isNull(schema.leads.corretorId))
+    ? and(
+        buildUnassignedLeadWhere(context, { requestedBranchId: filters.branch }),
+        ...(tablecnFilter ? [tablecnFilter] : []),
+        ...(periodFilter ? [periodFilter] : []),
+        ...(statusFilter ? [statusFilter] : []),
+        ...(searchFilter ? [searchFilter] : []),
+        ...(tipoFilter ? [tipoFilter] : []),
+        ...(origemFilter ? [origemFilter] : []),
+        ...(qualificationFilter ? [qualificationFilter] : []),
+        ...(corretorFilter ? [corretorFilter] : []),
+        ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
+        ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : []),
+      )
     : null;
 
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
@@ -448,10 +463,14 @@ async function LeadsPageContent({
         branchId: schema.leads.branchId,
         branchName: schema.branches.name,
         qualificationDetails: schema.leads.qualificationDetails,
+        queueId: schema.leads.queueId,
+        queueName: schema.leadQueues.name,
+        queueColorHue: schema.leadQueues.colorHue,
       })
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+      .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
       .where(where)
       .orderBy(...finalOrderBy)
         .limit(pageSize)
@@ -480,6 +499,7 @@ async function LeadsPageContent({
         tipo: schema.leads.tipo,
         queueId: schema.leads.queueId,
         queueName: schema.leadQueues.name,
+        queueColorHue: schema.leadQueues.colorHue,
         branchId: schema.leads.branchId,
         branchName: schema.branches.name,
         createdAt: schema.leads.createdAt,
@@ -491,6 +511,7 @@ async function LeadsPageContent({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
           or(
             eq(schema.leads.qualificationState, "IN_PROGRESS"),
@@ -533,10 +554,14 @@ async function LeadsPageContent({
           branchId: schema.leads.branchId,
           branchName: schema.branches.name,
           qualificationDetails: schema.leads.qualificationDetails,
+          queueId: schema.leads.queueId,
+          queueName: schema.leadQueues.name,
+          queueColorHue: schema.leadQueues.colorHue,
         })
         .from(schema.leads)
         .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
         .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+        .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
         .where(unassignedWhere)
         .orderBy(...finalOrderBy)
         .limit(pageSize)

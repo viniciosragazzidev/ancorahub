@@ -112,6 +112,7 @@ export default async function ConversationsPage({
           and(
             eq(schema.leads.tenantId, context.tenantId),
             isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
             ...(scope ? [scope] : []),
           ),
         )

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, count, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 
 import { type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -151,6 +151,8 @@ async function getNocKpis(
   function baseLeadWhere(start: Date, end: Date) {
     const base = and(
       eq(schema.leads.tenantId, scope.tenantId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
       gte(schema.leads.createdAt, start),
       lt(schema.leads.createdAt, end),
     );
@@ -192,6 +194,8 @@ async function getNocKpis(
       .where(
         and(
           eq(schema.leads.tenantId, scope.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.status, activeStatuses),
           ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
         ),
@@ -231,6 +235,8 @@ async function getNocKpis(
       .where(
         and(
           eq(schema.sales.tenantId, scope.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           gte(schema.sales.saleDate, start),
           lt(schema.sales.saleDate, end),
           eq(schema.sales.status, "active"),
@@ -246,6 +252,8 @@ async function getNocKpis(
       .where(
         and(
           eq(schema.sales.tenantId, scope.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           gte(schema.sales.saleDate, prevStart),
           lt(schema.sales.saleDate, start),
           eq(schema.sales.status, "active"),
@@ -285,6 +293,8 @@ async function getLeadFlow(context: TenantContext, period: PeriodValue): Promise
 
   const baseWhere = and(
     eq(schema.leads.tenantId, scope.tenantId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
     gte(schema.leads.createdAt, start),
     ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
   );
@@ -335,6 +345,8 @@ async function getStatusDistribution(context: TenantContext, period: PeriodValue
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
       ),
@@ -370,6 +382,8 @@ async function getFirstContactTrend(context: TenantContext, period: PeriodValue)
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         isNotNull(schema.leads.firstContactAt),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -406,6 +420,8 @@ async function getTicketTrend(context: TenantContext, period: PeriodValue): Prom
     .where(
       and(
         eq(schema.sales.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.sales.saleDate, start),
         eq(schema.sales.status, "active"),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -439,6 +455,8 @@ async function getHourlyActivity(context: TenantContext): Promise<HourlyBucket[]
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, today.start),
         lt(schema.leads.createdAt, today.end),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -480,6 +498,8 @@ async function getTeamPerformance(context: TenantContext): Promise<TeamMemberPer
       and(
         eq(schema.leads.corretorId, schema.tenantMemberships.userId),
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, today.start),
         lt(schema.leads.createdAt, today.end),
       ),
@@ -537,6 +557,8 @@ async function getRecentActivity(context: TenantContext, period: PeriodValue): P
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         sql`${schema.leadInteractions.tipo} = ANY(ARRAY['status_change','quote_generated','service_started']::lead_interaction_type[])`,
         gte(schema.leadInteractions.createdAt, start),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -612,7 +634,7 @@ async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> 
       activeAttendances: sql<number>`count(*) filter (where ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))`,
       unassignedLeads: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null and ${schema.leads.distributionStatus} in ('unassigned', 'queued', 'awaiting_unit', 'returned_to_queue'))`,
       slaRiskLeads: sql<number>`count(*) filter (where ${schema.leads.status} = 'distributed' and ${schema.leads.corretorId} is not null and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} is not null and ${schema.leads.assignedAt} < ${slaDeadline.toISOString()})`,
-    }).from(schema.leads).where(and(eq(schema.leads.tenantId, scope.tenantId), inArray(schema.leads.branchId, branchIds))).groupBy(schema.leads.branchId),
+    }).from(schema.leads).where(and(eq(schema.leads.tenantId, scope.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.branchId, branchIds))).groupBy(schema.leads.branchId),
     db.select({
       branchId: schema.tenantMemberships.branchId,
       totalBrokers: count(),

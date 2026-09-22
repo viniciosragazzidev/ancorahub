@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { and, asc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { encodeUnassignedLeadsPdf, type UnassignedLeadPdfRow } from "@/features/lead-distribution/unassigned-leads-pdf";
+import { buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +44,7 @@ export async function GET() {
         formData: schema.leads.formData,
       })
       .from(schema.leads)
-      .where(and(
-        eq(schema.leads.tenantId, context.tenantId),
-        isNull(schema.leads.corretorId),
-        isNull(schema.leads.deletedAt),
-        isNull(schema.leads.archivedAt),
-        inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
-        ne(schema.leads.status, "lost"),
-        or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
-      ))
+      .where(buildUnassignedLeadWhere(context))
       .orderBy(asc(schema.leads.createdAt));
 
     const pdfRows: UnassignedLeadPdfRow[] = rows.map((row) => {

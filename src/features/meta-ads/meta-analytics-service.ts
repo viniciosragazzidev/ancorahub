@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveMetaCapturePolicy } from "./meta-capture-policy";
@@ -85,7 +85,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       totalCount: count(),
     })
     .from(schema.leads)
-    .where(eq(schema.leads.tenantId, tenantId))
+    .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
     .groupBy(schema.leads.metaCampaignId, schema.leads.metaAdId, schema.leads.sourceCampaign, schema.leads.status);
 
   // 3. Buscar propostas / vendas fechadas
@@ -98,7 +98,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     })
     .from(schema.quotes)
     .innerJoin(schema.leads, eq(schema.quotes.leadId, schema.leads.id))
-    .where(and(eq(schema.quotes.tenantId, tenantId), eq(schema.quotes.status, "accepted")))
+    .where(and(eq(schema.quotes.tenantId, tenantId), eq(schema.quotes.status, "accepted"), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
     .groupBy(schema.leads.metaCampaignId, schema.leads.sourceCampaign);
 
   // 4. Buscar contas de anúncios para mapeamento de nomes
@@ -167,7 +167,7 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       totalCount: count(),
     })
     .from(schema.leads)
-    .where(and(eq(schema.leads.tenantId, tenantId), sql`${schema.leads.metaAdId} IS NOT NULL`))
+    .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), sql`${schema.leads.metaAdId} IS NOT NULL`))
     .groupBy(schema.leads.metaAdId, schema.leads.status);
 
   const leadsByAdMap = new Map<string, { total: number; active: number }>();

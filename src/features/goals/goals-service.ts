@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 
@@ -79,6 +79,12 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
       const conditions = [
         eq(schema.sales.tenantId, goal.tenantId),
         eq(schema.sales.status, "active"),
+        sql`${schema.sales.leadId} IN (
+          SELECT ${schema.leads.id} FROM ${schema.leads}
+          WHERE ${schema.leads.tenantId} = ${goal.tenantId}
+            AND ${schema.leads.deletedAt} IS NULL
+            AND ${schema.leads.archivedAt} IS NULL
+        )`,
         gte(schema.sales.saleDate, goal.startDate),
         lte(schema.sales.saleDate, goal.endDate),
       ];
@@ -87,9 +93,11 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
         conditions.push(eq(schema.sales.brokerId, goal.scopeId));
       } else if (goal.scope === "branch" && goal.scopeId) {
         conditions.push(
-          sql`${schema.sales.leadId} IN (
+        sql`${schema.sales.leadId} IN (
             SELECT ${schema.leads.id} FROM ${schema.leads}
             WHERE ${schema.leads.branchId} = ${goal.scopeId}
+              AND ${schema.leads.deletedAt} IS NULL
+              AND ${schema.leads.archivedAt} IS NULL
           )`,
         );
       } else if (goal.scope === "team") {
@@ -110,6 +118,12 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
       const conditions = [
         eq(schema.sales.tenantId, goal.tenantId),
         eq(schema.sales.status, "active"),
+        sql`${schema.sales.leadId} IN (
+          SELECT ${schema.leads.id} FROM ${schema.leads}
+          WHERE ${schema.leads.tenantId} = ${goal.tenantId}
+            AND ${schema.leads.deletedAt} IS NULL
+            AND ${schema.leads.archivedAt} IS NULL
+        )`,
         gte(schema.sales.saleDate, goal.startDate),
         lte(schema.sales.saleDate, goal.endDate),
       ];
@@ -118,9 +132,11 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
         conditions.push(eq(schema.sales.brokerId, goal.scopeId));
       } else if (goal.scope === "branch" && goal.scopeId) {
         conditions.push(
-          sql`${schema.sales.leadId} IN (
+        sql`${schema.sales.leadId} IN (
             SELECT ${schema.leads.id} FROM ${schema.leads}
             WHERE ${schema.leads.branchId} = ${goal.scopeId}
+              AND ${schema.leads.deletedAt} IS NULL
+              AND ${schema.leads.archivedAt} IS NULL
           )`,
         );
       }
@@ -136,6 +152,8 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
     case "leads_contacted": {
       const conditions = [
         eq(schema.leads.tenantId, goal.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         sql`${schema.leads.firstContactAt} IS NOT NULL`,
         gte(schema.leads.firstContactAt, goal.startDate),
         lte(schema.leads.firstContactAt, goal.endDate),
@@ -173,6 +191,8 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
         .where(
           and(
             eq(schema.leads.tenantId, goal.tenantId),
+            isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
             gte(schema.leads.createdAt, goal.startDate),
             lte(schema.leads.createdAt, goal.endDate),
             scopeCondition,

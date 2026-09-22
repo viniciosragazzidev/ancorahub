@@ -57,7 +57,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
   const [leads, clients, connectionRows] = await Promise.all([
     db.select({ id: schema.leads.id, nome: schema.leads.nome, telefone: schema.leads.telefone, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, stageEnteredAt: schema.leads.stageEnteredAt, qualificationDetails: schema.leads.qualificationDetails })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt)))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
       .orderBy(desc(schema.leads.stageEnteredAt)).limit(150),
     db.select({ id: schema.clients.id, leadId: schema.clients.leadId, nome: schema.clients.nome, telefone: schema.clients.telefone, createdAt: schema.clients.createdAt })
       .from(schema.clients)

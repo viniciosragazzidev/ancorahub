@@ -369,7 +369,13 @@ function SidebarContent({ className, children, ...props }: React.ComponentProps<
       )}
       {...props}
     >
-      <ScrollArea className="h-full w-full [&>[data-slot=scroll-area-viewport]>div]:pr-1 group-data-[collapsible=icon]:[&>[data-slot=scroll-area-viewport]>div]:pr-0">
+      {/* Radix's own viewport child defaults to `display: table; min-width: 100%`,
+          so it grows to fit its widest descendant instead of staying clamped to
+          the rail's width — collapsed to icon width, that pushed every nav icon
+          past the sidebar's right edge, where `overflow-hidden` clipped it off
+          the visible rail entirely. Forcing `block` (over Radix's inline style,
+          hence `!`) keeps it exactly as wide as this ScrollArea. */}
+      <ScrollArea className="h-full w-full [&>[data-slot=scroll-area-viewport]>div]:block! [&>[data-slot=scroll-area-viewport]>div]:min-w-0! [&>[data-slot=scroll-area-viewport]>div]:pr-1 group-data-[collapsible=icon]:[&>[data-slot=scroll-area-viewport]>div]:pr-0">
         {children}
       </ScrollArea>
     </div>

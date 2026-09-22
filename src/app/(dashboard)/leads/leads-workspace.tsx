@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
 import { distributeAllUnassignedLeadsAction } from "@/features/lead-distribution/actions";
+import { QueueColorDot, QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
@@ -89,6 +90,7 @@ export type QualifyingLeadItem = {
   tipo: string;
   queueId?: string | null;
   queueName?: string | null;
+  queueColorHue?: number | null;
   branchId?: string | null;
   branchName?: string | null;
   createdAt: string;
@@ -116,6 +118,9 @@ export type LeadWorkspaceItem = {
   branchId: string | null;
   branchName: string | null;
   qualificationDetails?: Record<string, unknown> | null;
+  queueId?: string | null;
+  queueName?: string | null;
+  queueColorHue?: number | null;
 };
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
@@ -881,6 +886,11 @@ export function LeadsWorkspace({
               <LeadHealthBadge
                 health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
               />
+              {selectedLead.queueName ? (
+                <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/30 px-2 py-0.5">
+                  <QueueColorTag name={selectedLead.queueName} hue={selectedLead.queueColorHue} />
+                </span>
+              ) : null}
             </div>
           ) : null
         }
@@ -1260,6 +1270,11 @@ function KanbanLeadCard({
               {lead.telefone}
             </p>
           </div>
+          {lead.queueName ? (
+            <span title={`Fila: ${lead.queueName}`}>
+              <QueueColorDot hue={lead.queueColorHue} />
+            </span>
+          ) : null}
         </div>
 
         <p className="mt-2 truncate text-[11px] text-muted-foreground">

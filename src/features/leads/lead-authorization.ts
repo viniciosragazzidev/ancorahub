@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import type { AccessContext } from "@/shared/auth/access-context";
 import { AuthorizationService } from "@/shared/auth/authorization-service";
 import type { ResourceScopeDescriptor, TenantContext } from "@/shared/auth/types";
@@ -122,4 +122,24 @@ export function buildLeadScopeWhere(
   }
 
   return and(...conditions)!;
+}
+
+/**
+ * Base segura para a visão de leads sem atribuição.
+ *
+ * A lista operacional, o contador da aba e os relatórios devem partir do
+ * mesmo conjunto: dentro do escopo do usuário, sem corretor, sem exclusão e
+ * sem arquivamento. Regras de fila/qualificação são projeções de distribuição
+ * e não fazem parte da definição de "sem atribuição".
+ */
+export function buildUnassignedLeadWhere(
+  context: AccessContext | TenantContext,
+  options?: { requestedBranchId?: string | null },
+): SQL {
+  return and(
+    buildLeadScopeWhere(context, options),
+    isNull(schema.leads.corretorId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+  )!;
 }
