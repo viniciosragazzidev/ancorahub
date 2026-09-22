@@ -86,6 +86,7 @@ type DutySchedule = {
   dayOfWeek?: number;
   branchName?: string | null;
 };
+const DUTY_DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 type Campaign = { campaignId: string; name: string; status: string };
 type CampaignRoute = {
   campaignId: string;
@@ -1362,7 +1363,14 @@ export function QueueControlCenter({
                       <label key={ds.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-xs hover:bg-emerald-500/5">
                         <Checkbox checked={isChecked} onCheckedChange={() => toggleDutySchedule(ds.id)} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{ds.name}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate font-medium">{ds.name}</span>
+                            {typeof ds.dayOfWeek === "number" && ds.dayOfWeek >= 0 && ds.dayOfWeek <= 6 ? (
+                              <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px] font-mono">
+                                {DUTY_DAY_LABELS[ds.dayOfWeek]}
+                              </Badge>
+                            ) : null}
+                          </span>
                           <span className="block truncate text-[10px] text-muted-foreground">
                             {ds.startsAt}–{ds.endsAt}{ds.branchName ? ` · ${ds.branchName}` : ""}
                           </span>
