@@ -314,10 +314,19 @@ export function QueueControlCenter({
     [queues, simulationForm.branchId],
   );
 
+  // "Todas as Unidades" means every unit, full stop — never trust a saved
+  // allowedBranchIds snapshot for that (a unit created after the queue was
+  // last saved wouldn't be in it, leaving the checklist half-checked even
+  // though the queue already reaches everyone).
+  const effectiveAllowedBranchIds = useMemo(
+    () => (form.branchId ? form.allowedBranchIds : branches.map((branch) => branch.id)),
+    [form.branchId, form.allowedBranchIds, branches],
+  );
+
   // Available brokers based on selected primary and additional branches
   const formTargetBranchIds = useMemo(
-    () => Array.from(new Set([form.branchId, ...form.allowedBranchIds].filter(Boolean))),
-    [form.branchId, form.allowedBranchIds],
+    () => Array.from(new Set([form.branchId, ...effectiveAllowedBranchIds].filter(Boolean))),
+    [form.branchId, effectiveAllowedBranchIds],
   );
 
   const availableBrokersForForm = useMemo(() => {
@@ -396,6 +405,9 @@ export function QueueControlCenter({
 
   function toggleAllowedBranch(branchId: string) {
     setForm((prev) => {
+      // "Todas as Unidades" already reaches everyone — the checklist is
+      // shown disabled in that state, this guard is just defense in depth.
+      if (!prev.branchId) return prev;
       const exists = prev.allowedBranchIds.includes(branchId);
       const nextBranches = exists
         ? prev.allowedBranchIds.filter((id) => id !== branchId)
@@ -466,7 +478,7 @@ export function QueueControlCenter({
       exclusiveDutyScheduleIds: form.exclusiveDutyScheduleIds,
       dutyFallbackPolicy: form.exclusiveDutyScheduleIds.length ? form.dutyFallbackPolicy : "unit_roster",
       dutyFallbackQueueId: form.exclusiveDutyScheduleIds.length && form.dutyFallbackPolicy === "fallback_queue" ? form.dutyFallbackQueueId || null : null,
-      allowedBranchIds: form.allowedBranchIds,
+      allowedBranchIds: effectiveAllowedBranchIds,
       allowedBrokerIds: finalAllowedBrokerIds,
       allowedSourceIds: form.allowedSourceIds,
       name: form.name,
@@ -1473,21 +1485,26 @@ export function QueueControlCenter({
                     atendidas por esta fila
                   </p>
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Marque outras unidades que também poderão enviar ou compartilhar corretores para
-                    esta fila.
+                    {form.branchId
+                      ? "Marque outras unidades que também poderão enviar ou compartilhar corretores para esta fila."
+                      : "Unidade principal é “Todas as Unidades”, então esta fila já atende todas — nada para marcar aqui."}
                   </p>
                   <div className="grid gap-2 pt-1 sm:grid-cols-2">
                     {branches
                       .filter((b) => b.id !== form.branchId)
                       .map((branch) => {
-                        const isChecked = form.allowedBranchIds.includes(branch.id);
+                        const isChecked = effectiveAllowedBranchIds.includes(branch.id);
                         return (
                           <label
                             key={branch.id}
-                            className="flex items-center gap-2 text-xs font-medium cursor-pointer min-w-0"
+                            className={cn(
+                              "flex items-center gap-2 text-xs font-medium min-w-0",
+                              form.branchId ? "cursor-pointer" : "cursor-not-allowed text-muted-foreground",
+                            )}
                           >
                             <Checkbox
                               checked={isChecked}
+                              disabled={!form.branchId}
                               onCheckedChange={() => toggleAllowedBranch(branch.id)}
                             />
                             <span className="truncate">{branch.name}</span>
