@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
+import { Archive, Download } from "lucide-react";
 import {
   ArrowRight,
   CheckCircle,
@@ -37,6 +38,7 @@ import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import {
   assignLeadBatchToBrokerAction,
   assignLeadToBrokerAction,
+  archiveUnassignedLeadsAction,
   distributeLeadBatchAction,
   distributeLeadAutomaticallyAction,
   routeLeadToBranchAction,
@@ -220,12 +222,14 @@ function ActionForm({
 
 export function DistributionInbox({
   role,
+  totalUnassigned,
   leads,
   branches,
   brokers,
   initialStatusFilter = "all",
 }: {
   role: string;
+  totalUnassigned: number;
   leads: Lead[];
   branches: Branch[];
   brokers: Broker[];
@@ -248,6 +252,8 @@ export function DistributionInbox({
     null,
   );
   const submittedBatchLeadIdsRef = useRef<string[]>([]);
+  const archiveCandidateIdsRef = useRef<string[]>([]);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
 
   useEffect(() => setInboxLeads(leads), [leads]);
 
@@ -332,10 +338,15 @@ export function DistributionInbox({
     assignLeadBatchToBrokerAction,
     {},
   );
+  const [archiveState, archiveAction, archivePending] = useActionState(
+    archiveUnassignedLeadsAction,
+    {},
+  );
 
   // Toasts para ações em lote
   useActionFeedback(batchState, "enviar leads em lote");
   useActionFeedback(assignState, "atribuir leads em lote");
+  useActionFeedback(archiveState, "arquivar leads sem distribuição");
 
   const [batchSuccess, setBatchSuccess] = useState(false);
   const [assignSuccess, setAssignSuccess] = useState(false);
@@ -413,6 +424,18 @@ export function DistributionInbox({
     startTransition(() => router.refresh());
   }, [assignState.mutationId, assignState.processedLeadIds, router]);
 
+  const handledArchiveMutationRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!archiveState.mutationId || handledArchiveMutationRef.current === archiveState.mutationId) return;
+    handledArchiveMutationRef.current = archiveState.mutationId;
+    if (!archiveState.success) return;
+    const archivedIds = archiveState.processedLeadIds ?? archiveCandidateIdsRef.current;
+    setInboxLeads((current) => current.filter((lead) => !archivedIds.includes(lead.id)));
+    setSelected([]);
+    setArchiveDialogOpen(false);
+    startTransition(() => router.refresh());
+  }, [archiveState.mutationId, archiveState.processedLeadIds, archiveState.success, router]);
+
   return (
     <>
       <Card variant="overview" data-onboarding="manager-team-performance">
@@ -426,8 +449,35 @@ export function DistributionInbox({
                 Leads sem corretor ficam aqui até serem enviados para uma unidade e uma fila.
               </CardDescription>
             </div>
-            {selected.length ? (
-              <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              {role === "director" ? (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    render={<a href="/api/reports/distribution-unassigned" download />}
+                    className="gap-1.5"
+                  >
+                    <Download className="size-3.5" aria-hidden="true" />
+                    Baixar lista PDF
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                    disabled={!totalUnassigned || archivePending}
+                    onClick={() => {
+                      archiveCandidateIdsRef.current = selectable.map((lead) => lead.id);
+                      setArchiveDialogOpen(true);
+                    }}
+                  >
+                    <Archive className="size-3.5" aria-hidden="true" />
+                    Arquivar sem distribuição
+                  </Button>
+                </div>
+              ) : null}
+              {selected.length ? (
+                <div className="flex flex-col items-end gap-2">
                 <form
                   action={batchAction}
                   className="flex flex-wrap items-center gap-2"
@@ -482,8 +532,9 @@ export function DistributionInbox({
                     <UserList /> Atribuir ({selected.length})
                   </ActionButton>
                 </form>
-              </div>
-            ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
@@ -744,6 +795,35 @@ export function DistributionInbox({
           setPendingOverrideFields(null);
         }}
       />
+
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogPopup className="sm:max-w-md">
+          <DialogPanel>
+            <DialogHeader>
+              <DialogTitle>Arquivar leads sem distribuição?</DialogTitle>
+              <DialogDescription>
+                {totalUnassigned === 1 ? "1 lead sem corretor será retirado" : `${totalUnassigned} leads sem corretor serão retirados`} da distribuição e do recebimento. Os dados não serão apagados e poderão ser recuperados administrativamente.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setArchiveDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <form
+                action={archiveAction}
+                onSubmit={() => {
+                  archiveCandidateIdsRef.current = selectable.map((lead) => lead.id);
+                }}
+              >
+                <Button type="submit" disabled={archivePending || !totalUnassigned} className="gap-1.5">
+                  {archivePending ? <Loader2Icon className="size-4 animate-spin motion-reduce:animate-none" /> : <Archive className="size-4" />}
+                  {archivePending ? "Arquivando…" : "Confirmar arquivamento"}
+                </Button>
+              </form>
+            </DialogFooter>
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
     </>
   );
 }

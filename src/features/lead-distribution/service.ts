@@ -201,7 +201,7 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
   } catch {
     // Unidade sem fila: roteamento continua sem fila vinculada
   }
-  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, metaCampaignId: schema.leads.metaCampaignId, sourceCampaign: schema.leads.sourceCampaign }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, metaCampaignId: schema.leads.metaCampaignId, sourceCampaign: schema.leads.sourceCampaign, archivedAt: schema.leads.archivedAt }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1);
   if (!lead) return { status: "failed", code: "LEAD_NOT_FOUND" };
   const canMovePendingAssignment = !lead.corretorId || ((lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt && !lead.serviceStartedAt);
   if (!canMovePendingAssignment) return { status: "conflict", code: "LEAD_ALREADY_IN_SERVICE" };
@@ -228,7 +228,7 @@ export async function routeLeadToBranch(context: TenantContext, leadId: string, 
     };
     // Só vincula fila quando existe; sem fila, o lead fica aguardando fila/unidade
     if (queueId) updateData.queueId = queueId;
-    const result = await tx.update(schema.leads).set(updateData).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), or(isNull(schema.leads.corretorId), and(inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.serviceStartedAt))))).returning({ id: schema.leads.id });
+    const result = await tx.update(schema.leads).set(updateData).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), or(isNull(schema.leads.corretorId), and(inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.serviceStartedAt))))).returning({ id: schema.leads.id });
     if (!result.length) return false;
     await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: branchId, previousOwnerId: lead.corretorId, toQueueId: queueId, action: "routed_to_unit", source: context.role === "director" ? "manual_director" : "manual_manager", strategy: "manual", reason, actorId: context.userId, createdAt: new Date() });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: "lead.routed_to_unit" });
@@ -259,9 +259,9 @@ export async function routeLeadToBranchAndAssignBroker(
 
   // 2. Get lead
   const [lead] = await db
-    .select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId })
+    .select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, archivedAt: schema.leads.archivedAt })
     .from(schema.leads)
-    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt)))
     .limit(1);
   if (!lead) return { status: "conflict", leadId, reason: "Lead não encontrado." };
   if (lead.corretorId) return { status: "conflict", leadId, reason: "Este lead já possui um corretor." };
@@ -313,7 +313,7 @@ export async function routeLeadToBranchAndAssignBroker(
         assignmentStrategy: "manual",
         distributionUpdatedAt: new Date(),
       })
-      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId)))
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.corretorId), isNull(schema.leads.archivedAt)))
       .returning({ id: schema.leads.id });
 
     if (!result.length) return false;
@@ -360,7 +360,7 @@ export async function routeLeadToBranchAndAssignBroker(
 export async function assignLeadToBroker(context: TenantContext, leadId: string, brokerId: string, source?: AssignmentSource, reason = "Atribuição manual", excludeBrokerId?: string | null, targetBranchId?: string): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem atribuir leads.");
   const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, queueId: schema.leads.queueId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
+  const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, queueId: schema.leads.queueId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin, archivedAt: schema.leads.archivedAt }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt))).limit(1);
   if (!lead) return { status: "conflict", leadId, reason: "Lead não encontrado." };
   if (lead.corretorId === brokerId) return { status: "conflict", leadId, reason: "O lead já está atribuído a este corretor." };
   if (!lead.branchId && !targetBranchId) return { status: "conflict", leadId, reason: "Envie o lead para uma unidade antes de atribuir um corretor." };
@@ -382,7 +382,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   const assignmentEventId = randomUUID();
   const feedbackDueAt = new Date(assignedAt.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000);
   const assigned = await db.transaction(async (tx) => {
-    const result = await tx.update(schema.leads).set({ branchId: assignmentBranchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned", distributionOrigin: source === "manual_director" ? "parent" : source === "manual_manager" ? "unit" : lead.distributionOrigin ?? (context.role === "director" ? "parent" : "unit"), assignedAt, assignmentSource: source ?? (context.role === "director" ? "manual_director" : "manual_manager"), assignmentStrategy: "manual", distributionUpdatedAt: assignedAt, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, stageEnteredAt: assignedAt, motivoPerda: null }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
+    const result = await tx.update(schema.leads).set({ branchId: assignmentBranchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned", distributionOrigin: source === "manual_director" ? "parent" : source === "manual_manager" ? "unit" : lead.distributionOrigin ?? (context.role === "director" ? "parent" : "unit"), assignedAt, assignmentSource: source ?? (context.role === "director" ? "manual_director" : "manual_manager"), assignmentStrategy: "manual", distributionUpdatedAt: assignedAt, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, stageEnteredAt: assignedAt, motivoPerda: null }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt), lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
     if (!result.length) return false;
     if (tenantPolicy?.feedbackRequiredEnabled !== false) {
       const [attemptCount] = await tx.select({ total: count(schema.leadAssignmentAttempts.id) }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), eq(schema.leadAssignmentAttempts.leadId, leadId)));
@@ -431,9 +431,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     assignmentSource: schema.leads.assignmentSource,
     status: schema.leads.status,
     deletedAt: schema.leads.deletedAt,
+    archivedAt: schema.leads.archivedAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
-  if (lead.deletedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
+  if (lead.deletedAt || lead.archivedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
     return { status: "manual_required", leadId, reason: "Lead inativo; distribuição bloqueada." };
   }
   // Synthetic records created from internal/team WhatsApp messages are not
@@ -897,9 +898,10 @@ export async function distributeQualifiedLead(input: {
       qualificationScore: schema.leads.qualificationScore,
       queueId: schema.leads.queueId,
       corretorId: schema.leads.corretorId,
+      archivedAt: schema.leads.archivedAt,
     })
     .from(schema.leads)
-    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId), isNull(schema.leads.archivedAt)))
     .limit(1);
 
   if (!lead) return { distributed: false, reason: "lead_not_found" };

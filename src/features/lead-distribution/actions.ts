@@ -1,6 +1,6 @@
 "use server";
 
-import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { resolveAccessContext } from "@/shared/auth/access-context";
@@ -18,6 +18,7 @@ import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/featur
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
+import { revalidatePath } from "next/cache";
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
 import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
@@ -547,6 +548,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
         eq(schema.leads.tenantId, context.tenantId),
         isNull(schema.leads.corretorId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         context.role === "manager" && context.branchId
           ? eq(schema.leads.branchId, context.branchId)
           : undefined,
@@ -576,6 +578,7 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
           eq(schema.leads.tenantId, context.tenantId),
           inArray(schema.leads.id, candidateIds),
           isNull(schema.leads.corretorId),
+          isNull(schema.leads.archivedAt),
         ));
 
       // A manual recovery starts a new generation of work. Supersede only
@@ -663,6 +666,121 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
       error: error instanceof Error
         ? error.message
         : "Não foi possível iniciar a distribuição dos leads.",
+    };
+  }
+}
+
+/**
+ * Removes stale operational items from the distribution surface without
+ * deleting their customer data. The server re-queries the complete tenant
+ * scope so a client cannot narrow or expand the operation with forged IDs.
+ */
+export async function archiveUnassignedLeadsAction(
+  _previous: DistributionActionState,
+  _formData: FormData,
+): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
+
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") {
+      return { mutationId, error: "Apenas o Diretor pode arquivar leads sem distribuição." };
+    }
+
+    const db = getDatabase();
+    const candidates = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.corretorId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+        inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
+        ne(schema.leads.status, "lost"),
+        or(
+          isNull(schema.leads.qualificationStatus),
+          ne(schema.leads.qualificationStatus, "disqualified"),
+        ),
+      ));
+
+    if (!candidates.length) {
+      return {
+        success: true,
+        mutationId,
+        processed: 0,
+        message: "Não há leads sem distribuição para arquivar.",
+      };
+    }
+
+    const candidateIds = candidates.map((candidate) => candidate.id);
+    const now = new Date();
+    const archivedIds = await db.transaction(async (tx) => {
+      const archived = await tx
+        .update(schema.leads)
+        .set({ archivedAt: now, archivedBy: context.userId, updatedAt: now })
+        .where(and(
+          eq(schema.leads.tenantId, context.tenantId),
+          inArray(schema.leads.id, candidateIds),
+          isNull(schema.leads.corretorId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+        )).returning({ id: schema.leads.id });
+
+      const ids = archived.map((lead) => lead.id);
+      if (!ids.length) return ids;
+
+      await tx
+        .update(schema.leadDistributionJobs)
+        .set({
+          status: "superseded",
+          completedAt: now,
+          lockedAt: null,
+          lockedBy: null,
+          leaseExpiresAt: null,
+          lastErrorCode: "LEAD_ARCHIVED",
+          lastErrorMessage: "Lead arquivado pelo Diretor; removido da distribuição.",
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.leadDistributionJobs.tenantId, context.tenantId),
+          inArray(schema.leadDistributionJobs.leadId, ids),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+        ));
+
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_distribution",
+        entidadeId: context.tenantId,
+        acao: `lead.bulk_archived:${ids.length}`,
+      });
+      return ids;
+    });
+
+    if (!archivedIds.length) {
+      return {
+        success: true,
+        mutationId,
+        processed: 0,
+        message: "Os leads foram atualizados por outra operação; nada novo foi arquivado.",
+      };
+    }
+
+    revalidatePath("/leads/distribuicao");
+    void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId }).catch(() => {});
+
+    return {
+      success: true,
+      mutationId,
+      processed: archivedIds.length,
+      processedLeadIds: archivedIds,
+      message: `${archivedIds.length} lead${archivedIds.length === 1 ? " foi arquivado" : "s foram arquivados"} e removido${archivedIds.length === 1 ? "" : "s"} da distribuição.`,
+    };
+  } catch (error) {
+    return {
+      mutationId,
+      error: error instanceof Error ? error.message : "Não foi possível arquivar os leads.",
     };
   }
 }

@@ -254,6 +254,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           // A fila é de leads SEM corretor. Um vínculo provisório da oferta
           // (DEC-104) também já tem responsável e não volta ao inbox.
           isNull(schema.leads.corretorId),
@@ -283,6 +284,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
           inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
           ne(schema.leads.status, "lost"),
@@ -303,6 +305,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.branchId, branchIds),
           inArray(schema.leads.status, activeStatuses),
         ),
@@ -336,6 +339,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.branchId, branchIds),
         ),
       )
@@ -361,6 +365,7 @@ export default async function LeadDistributionPage({
           eq(schema.leadEffectOutbox.tenantId, context.tenantId),
           eq(schema.leadEffectOutbox.status, "failed"),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
@@ -398,6 +403,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.branchId, branchIds),
           inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]),
         ),
@@ -424,6 +430,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leadDistributionEvents.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
@@ -601,6 +608,7 @@ export default async function LeadDistributionPage({
       { count: Number(row.count), oldestAt: row.oldestAt ? new Date(row.oldestAt) : null },
     ]),
   );
+  const totalUnassignedForArchive = queueCountsByStatus.reduce((total, row) => total + Number(row.count), 0);
 
   const queueCards = [
     ...(context.role === "director"
@@ -814,6 +822,7 @@ export default async function LeadDistributionPage({
                   <DistributionInbox
                     key={queueFilter}
                     role={context.role}
+                    totalUnassigned={totalUnassignedForArchive}
                     initialStatusFilter={queueFilter}
                     branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
                     brokers={brokers.map((broker) => ({

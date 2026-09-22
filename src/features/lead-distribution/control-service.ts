@@ -551,7 +551,7 @@ export async function getQueueDependencies(context: TenantContext, queueId: stri
       .leftJoin(schema.metaAds, and(eq(schema.metaAdQueueRoutes.adId, schema.metaAds.adId), eq(schema.metaAdQueueRoutes.tenantId, schema.metaAds.tenantId)))
       .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), eq(schema.metaAdQueueRoutes.queueId, queueId), eq(schema.metaAdQueueRoutes.enabled, true))),
     db.select({ count: count(schema.leads.id) }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, queueId), isNull(schema.leads.deletedAt), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]))).limit(1),
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, queueId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]))).limit(1),
   ]);
 
   return {

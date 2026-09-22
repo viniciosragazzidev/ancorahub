@@ -170,11 +170,12 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
           isNotNull(schema.leads.corretorId),
         ),
       ),
-      // Lost, disqualified or soft-deleted leads are terminal and must never
+      // Lost, disqualified, archived or soft-deleted leads are terminal and must never
       // be re-seeded into (or continue through) the distribution queue.
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
@@ -213,6 +214,7 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
       isNull(schema.leads.corretorId),
       isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
@@ -297,6 +299,7 @@ async function recoverStuckLeadAssignments(now: Date, config: DistributionJobCon
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
@@ -425,11 +428,11 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   }
 
   await runWithConcurrency(claimedJobs, Math.min(5, claimedJobs.length || 1), async (job) => {
-    const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, deletedAt: schema.leads.deletedAt, nome: schema.leads.nome })
+    const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))
       .limit(1);
-    if (!currentLead || currentLead.deletedAt || currentLead.status === "lost" || currentLead.qualificationStatus === "disqualified" || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
+    if (!currentLead || currentLead.deletedAt || currentLead.archivedAt || currentLead.status === "lost" || currentLead.qualificationStatus === "disqualified" || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
       await completeJob(job.id);
       result.skipped += 1;
       return;
