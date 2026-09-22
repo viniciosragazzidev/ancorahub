@@ -844,7 +844,14 @@ export default async function LeadDistributionPage({
                 </div>
               </>
             }
-            plantaoContent={<DutyOperationsWorkspace snapshot={dutyRoster} />}
+            plantaoContent={
+              <DutyOperationsWorkspace
+                snapshot={dutyRoster}
+                queues={queuesForControl
+                  .filter((queue) => queue.status === "active")
+                  .map((queue) => ({ id: queue.id, name: queue.name }))}
+              />
+            }
             saudeHistoricoContent={
               <div className="grid gap-ds-24 xl:grid-cols-[1.15fr_0.85fr]">
                 <DsDashboardCard className="!p-0">

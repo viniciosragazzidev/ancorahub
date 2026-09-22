@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import {
   ArrowLeft,
@@ -8,6 +9,7 @@ import {
   CheckCircle,
   Clock,
   Copy,
+  Loader2Icon,
   PencilSimple,
   Plus,
   Trash,
@@ -55,6 +57,7 @@ import {
   createRosterAssignmentAction,
   removeRosterAssignmentAction,
 } from "@/features/lead-distribution/roster-actions";
+import { syncDutySchedulesIntoQueueAction } from "@/features/lead-distribution/actions";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 
 type Snapshot = DutyRosterSnapshot;
@@ -336,14 +339,20 @@ function DutyFormSheet({
   onOpenChange,
   schedule,
   snapshot,
+  queues,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schedule: Schedule | null;
   snapshot: Snapshot;
+  queues: QueueOption[];
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selectedDays, setSelectedDays] = useState<number[]>(() => [schedule?.dayOfWeek ?? 1]);
+  // Only offered at creation: picking a queue here is a shortcut for the same
+  // "Exclusividade de Plantão" checklist the queue editor already has.
+  const [queueId, setQueueId] = useState<string>("");
   const canSubmit = selectedDays.length > 0;
   const title = schedule ? "Editar plantão" : "Novo plantão";
 
@@ -363,11 +372,23 @@ function DutyFormSheet({
         toast.error(result.error ?? "Não foi possível salvar o plantão.");
         return;
       }
+      if (!schedule && queueId && result.scheduleIds?.length) {
+        const syncResult = await syncDutySchedulesIntoQueueAction({ queueId, scheduleIds: result.scheduleIds });
+        if (!syncResult.success) {
+          toast.warning("Plantão criado, mas não foi possível vincular à fila.", { description: syncResult.error });
+          router.refresh();
+          onOpenChange(false);
+          return;
+        }
+      }
       toast.success(
         schedule
           ? "Plantão atualizado."
-          : `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s).`,
+          : queueId
+            ? `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s) e vinculado(s) à fila.`
+            : `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s).`,
       );
+      router.refresh();
       onOpenChange(false);
     });
   }
@@ -401,6 +422,23 @@ function DutyFormSheet({
                 O mesmo horário e a mesma regra serão aplicados aos corretores escalados em todas as unidades. A fila de entrada continua definindo quais leads podem usar este plantão.
               </p>
             </div>
+            {!schedule ? (
+              <div className="grid gap-2">
+                <Label htmlFor="duty-queue">Fila responsável (opcional)</Label>
+                <AppSelect
+                  aria-label="Fila responsável pelo plantão"
+                  value={queueId}
+                  onValueChange={setQueueId}
+                  options={[
+                    { value: "", label: "Nenhuma agora — vincular depois pela fila" },
+                    ...queues.map((queue) => ({ value: queue.id, label: queue.name })),
+                  ]}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Marca este plantão como exclusividade dessa fila assim que ele for criado — o mesmo que fazer depois em Filas → Editar → Exclusividade de Plantão.
+                </p>
+              </div>
+            ) : null}
             <div className="grid gap-3">
               <fieldset className="grid gap-2">
                 <legend className="text-sm font-medium">Dias da semana</legend>
@@ -555,11 +593,17 @@ function DutyInspector({
   snapshot: Snapshot;
   onEdit: (schedule: Schedule) => void;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [selectedBrokerId, setSelectedBrokerId] = useState("");
   const [brokerSearch, setBrokerSearch] = useState("");
+  // Every eligible broker is already in `snapshot`, so filtering is instant —
+  // the brief "searching" window below is purely to give typing a search
+  // feel (results settling a beat after the last keystroke) rather than
+  // results snapping in on every character.
+  const [searchingBrokers, setSearchingBrokers] = useState(false);
+  const [addingBrokerId, setAddingBrokerId] = useState<string | null>(null);
   const assignments = schedule
     ? snapshot.assignments.filter((assignment) => assignment.scheduleId === schedule.id)
     : [];
@@ -579,6 +623,15 @@ function DutyInspector({
     ? snapshot.history.filter((event) => event.scheduleId === schedule.id).slice(0, 6)
     : [];
 
+  useEffect(() => {
+    // Nothing to flag once the query is empty — the results panel itself is
+    // only rendered while there's a query, so a stale `true` here never shows.
+    if (!brokerSearch.trim()) return;
+    setSearchingBrokers(true);
+    const timer = setTimeout(() => setSearchingBrokers(false), 220);
+    return () => clearTimeout(timer);
+  }, [brokerSearch]);
+
   function runAction(action: DutyAction, successMessage: string, close = false) {
     if (!schedule) return;
     const formData = new FormData();
@@ -591,30 +644,30 @@ function DutyInspector({
       }
       toast.success(successMessage);
       setConfirmArchive(false);
+      router.refresh();
       if (close) onOpenChange(false);
     });
   }
 
-  function assignBroker(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function assignBroker(brokerId: string) {
     if (!schedule) return;
-    if (!selectedBrokerId) {
-      toast.error("Selecione um corretor para adicionar à escala.");
-      return;
-    }
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData();
     formData.set("scheduleId", schedule.id);
+    formData.set("brokerId", brokerId);
     formData.set("dayOfWeek", String(schedule.dayOfWeek));
     formData.set("startsAt", schedule.startsAt);
     formData.set("endsAt", schedule.endsAt);
+    setAddingBrokerId(brokerId);
     startTransition(async () => {
       const result = await createRosterAssignmentAction({}, formData);
+      setAddingBrokerId(null);
       if (!result.success) {
         toast.error(result.error ?? "Não foi possível escalar o corretor.");
         return;
       }
-      setSelectedBrokerId("");
+      setBrokerSearch("");
       toast.success("Corretor adicionado à escala.");
+      router.refresh();
     });
   }
 
@@ -627,6 +680,7 @@ function DutyInspector({
         toast.error(result.error ?? "Não foi possível remover o corretor.");
         return;
       }
+      router.refresh();
       toast.success("Corretor removido da escala.");
     });
   }
@@ -715,48 +769,62 @@ function DutyInspector({
                     </div>
                   </SheetSectionHeader>
                   <div className="grid gap-3 p-4">
-                    <form className="flex gap-2" onSubmit={assignBroker}>
+                    <div className="grid gap-2">
                       <Input
                         value={brokerSearch}
                         onChange={(event) => setBrokerSearch(event.target.value)}
-                        placeholder="Pesquisar por nome ou código"
+                        placeholder="Pesquisar corretor por nome ou código"
                         aria-label="Pesquisar corretor por nome ou código"
                         disabled={pending || schedule.status !== "active"}
                       />
-                      <AppSelect
-                        name="brokerId"
-                        value={selectedBrokerId}
-                        onValueChange={setSelectedBrokerId}
-                        disabled={
-                          pending || schedule.status !== "active" || !eligibleBrokers.length
-                        }
-                        options={[
-                          {
-                            value: "",
-                            label: filteredEligibleBrokers.length
-                              ? "Selecionar corretor"
-                              : "Nenhum corretor elegível",
-                          },
-                          ...filteredEligibleBrokers.map((b) => ({
-                            value: b.id,
-                            label: `${b.name}${b.internalCode ? ` · ${b.internalCode}` : ""} · ${b.availabilityStatus === "available" ? "Disponível" : "Pausado"}`,
-                          })),
-                        ]}
-                      />
-                      <Button
-                        size="sm"
-                        type="submit"
-                        disabled={
-                          pending ||
-                          !selectedBrokerId ||
-                          !filteredEligibleBrokers.some((broker) => broker.id === selectedBrokerId) ||
-                          schedule.status !== "active" ||
-                          !filteredEligibleBrokers.length
-                        }
-                      >
-                        Adicionar
-                      </Button>
-                    </form>
+                      {brokerSearch.trim() && schedule.status === "active" ? (
+                        <div className="rounded-lg border border-border/70 bg-card">
+                          {searchingBrokers ? (
+                            <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground">
+                              <Loader2Icon className="size-3.5 animate-spin" />
+                              Buscando corretores…
+                            </p>
+                          ) : filteredEligibleBrokers.length ? (
+                            <div className="max-h-52 divide-y divide-border/60 overflow-y-auto">
+                              {filteredEligibleBrokers.map((broker) => (
+                                <div
+                                  key={broker.id}
+                                  className="flex items-center justify-between gap-2 px-3 py-2"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium">{broker.name}</p>
+                                    <p className="truncate text-[11px] text-muted-foreground">
+                                      {broker.internalCode ? `${broker.internalCode} · ` : ""}
+                                      {broker.availabilityStatus === "available" ? "Disponível" : "Pausado"}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="icon-sm"
+                                    variant="outline"
+                                    className="shrink-0"
+                                    aria-label={`Adicionar ${broker.name} a este plantão`}
+                                    title={`Adicionar ${broker.name}`}
+                                    disabled={pending}
+                                    onClick={() => assignBroker(broker.id)}
+                                  >
+                                    {addingBrokerId === broker.id ? (
+                                      <Loader2Icon className="size-4 animate-spin" />
+                                    ) : (
+                                      <Plus className="size-4" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="px-3 py-2.5 text-xs text-muted-foreground">
+                              Nenhum corretor elegível encontrado.
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                     <div className="grid gap-2">
                       {assignments.map((assignment) => (
                         <div
@@ -937,7 +1005,9 @@ function DutyInspector({
   );
 }
 
-export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
+type QueueOption = { id: string; name: string };
+
+export function DutyOperationsWorkspace({ snapshot, queues = [] }: { snapshot: Snapshot; queues?: QueueOption[] }) {
   const [showArchived, setShowArchived] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [formSchedule, setFormSchedule] = useState<Schedule | null>(null);
@@ -1088,6 +1158,7 @@ export function DutyOperationsWorkspace({ snapshot }: { snapshot: Snapshot }) {
         onOpenChange={setFormOpen}
         schedule={formSchedule}
         snapshot={snapshot}
+        queues={queues}
       />
     </div>
   );

@@ -382,6 +382,39 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
   return { id: queueId, created, warning };
 }
 
+/**
+ * Picking a "fila responsável" while creating a plantão is a shortcut for the
+ * same thing the queue editor's "Exclusividade de Plantão" checklist already
+ * does — it does NOT write `unit_duty_schedules.queue_id` (legacy, kept only
+ * for rows created before that model existed). One writer, one source of
+ * truth: `lead_queues.exclusive_duty_schedule_ids`.
+ */
+export async function syncDutySchedulesIntoQueue(context: TenantContext, queueId: string, scheduleIds: string[]) {
+  const ids = scheduleIds.filter(Boolean);
+  if (!ids.length) return;
+  const db = getDatabase();
+  const [queue] = await db
+    .select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds })
+    .from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
+    .limit(1);
+  if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
+  assertManager(context, queue.branchId);
+  const merged = Array.from(new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...ids]));
+  await db.update(schema.leadQueues).set({
+    exclusiveDutyScheduleIds: merged,
+    exclusiveDutyScheduleId: merged[0] ?? null,
+    updatedAt: new Date(),
+  }).where(eq(schema.leadQueues.id, queue.id));
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "lead_queue",
+    entidadeId: queue.id,
+    acao: "queue.duty_schedules_synced",
+  });
+}
+
 export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInput: unknown) {
   const input = campaignQueueRouteInput.parse(rawInput);
   const db = getDatabase();

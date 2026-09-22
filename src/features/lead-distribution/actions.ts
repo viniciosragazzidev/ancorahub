@@ -20,7 +20,7 @@ import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidat
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { revalidatePath } from "next/cache";
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
-import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution, syncDutySchedulesIntoQueue } from "./control-service";
 import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
 
 export type DistributionActionState = {
@@ -192,6 +192,15 @@ export async function saveDistributionQueueAction(input: unknown) {
     };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
+  }
+}
+
+export async function syncDutySchedulesIntoQueueAction(input: { queueId: string; scheduleIds: string[] }) {
+  try {
+    await syncDutySchedulesIntoQueue(await getRequiredTenantContext(), input.queueId, input.scheduleIds);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível vincular o plantão à fila." };
   }
 }
 
