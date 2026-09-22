@@ -248,22 +248,26 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
       .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
     if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
   }
-  const dutyScheduleIds = Array.from(new Set([
+  const requestedDutyScheduleIds = Array.from(new Set([
     ...(input.exclusiveDutyScheduleIds ?? []),
     ...(input.exclusiveDutyScheduleId ? [input.exclusiveDutyScheduleId] : []),
   ]));
-  if (dutyScheduleIds.length) {
+  // Ids the editor never showed as selected (a plantão deleted after the
+  // page loaded, from another tab, etc.) are dropped rather than blocking
+  // the whole save — self-healing instead of "um dos plantões selecionados
+  // não pertence a esta corretora" for a plantão nobody can see to uncheck.
+  let dutyScheduleIds: string[] = [];
+  if (requestedDutyScheduleIds.length) {
     const schedules = await db
       .select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId })
       .from(schema.unitDutySchedules)
       .where(
         and(
           eq(schema.unitDutySchedules.tenantId, context.tenantId),
-          inArray(schema.unitDutySchedules.id, dutyScheduleIds),
+          inArray(schema.unitDutySchedules.id, requestedDutyScheduleIds),
         ),
       );
 
-    if (schedules.length !== dutyScheduleIds.length) throw new AuthorizationError("Um dos plantões selecionados não pertence a esta corretora.");
     if (input.branchId && schedules.some((schedule) => schedule.branchId && schedule.branchId !== input.branchId)) {
       throw new AuthorizationError("Todos os plantões selecionados precisam pertencer à mesma unidade da fila.");
     }
@@ -273,6 +277,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
         throw new AuthorizationError("Plantões globais precisam estar vinculados a uma fila da unidade.");
       }
     }
+    dutyScheduleIds = schedules.map((schedule) => schedule.id);
   }
 
   await assertDutyFallbackQueue(db, context, input.id, input.dutyFallbackQueueId ?? null, input.dutyFallbackPolicy);

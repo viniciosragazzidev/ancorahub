@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -311,6 +311,22 @@ export async function deleteDutyScheduleAction(_previous: DutyActionState, formD
         eq(schema.unitDutySchedules.id, schedule.id),
         eq(schema.unitDutySchedules.tenantId, context.tenantId),
       ));
+      // A permanently deleted plantão must stop being anyone's "fila
+      // responsável" — otherwise the next save on that queue fails with
+      // "Um dos plantões selecionados não pertence a esta corretora." for a
+      // schedule the editor never shows as selected (it's gone from the
+      // checklist, but the queue row still points at it).
+      await tx.execute(sql`
+        UPDATE ${schema.leadQueues}
+        SET exclusive_duty_schedule_ids = COALESCE(${schema.leadQueues.exclusiveDutyScheduleIds}, '[]'::jsonb) - ${schedule.id}::text,
+            exclusive_duty_schedule_id = CASE WHEN ${schema.leadQueues.exclusiveDutyScheduleId} = ${schedule.id} THEN NULL ELSE ${schema.leadQueues.exclusiveDutyScheduleId} END,
+            updated_at = now()
+        WHERE ${schema.leadQueues.tenantId} = ${context.tenantId}
+          AND (
+            ${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([schedule.id])}::jsonb
+            OR ${schema.leadQueues.exclusiveDutyScheduleId} = ${schedule.id}
+          )
+      `);
     });
     revalidateDutyWorkspace();
     return { success: true, scheduleId: schedule.id, message: "Plantão excluído permanentemente." };
