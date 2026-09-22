@@ -1,15 +1,62 @@
 import { describe, expect, it } from "vitest";
-import { buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch } from "./domain";
+import { buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch, shuffle } from "./domain";
+
+describe("shuffle", () => {
+  it("returns a permutation of the input — same elements, same length", () => {
+    const input = ["a", "b", "c", "d", "e"];
+    const result = shuffle(input);
+    expect(result).toHaveLength(input.length);
+    expect([...result].sort()).toEqual([...input].sort());
+  });
+
+  it("does not mutate the input array", () => {
+    const input = ["a", "b", "c"];
+    shuffle(input, () => 0.9);
+    expect(input).toEqual(["a", "b", "c"]);
+  });
+
+  it("is deterministic for a given random source", () => {
+    const input = ["a", "b", "c", "d"];
+    expect(shuffle(input, () => 0)).toEqual(shuffle(input, () => 0));
+  });
+});
 
 describe("automatic unit routing", () => {
-  it("selects the least loaded unit with a stable tie break", () => {
+  it("never picks a more loaded unit over a less loaded one", () => {
     const branches = [
       { id: "unit-b", createdAt: new Date("2026-01-01"), activeLeads: 4 },
       { id: "unit-c", createdAt: new Date("2026-01-03"), activeLeads: 1 },
       { id: "unit-a", createdAt: new Date("2026-01-02"), activeLeads: 1 },
     ];
-    expect(selectDistributionBranch(branches)?.id).toBe("unit-a");
+    for (let i = 0; i < 50; i++) {
+      expect(selectDistributionBranch(branches)?.activeLeads).toBe(1);
+    }
     expect(selectDistributionBranch([])).toBeNull();
+  });
+
+  it("spreads leads across every unit tied at the lowest load, instead of always the same one", () => {
+    // Reproduces the reported bug: many units with equal (often zero) load —
+    // a real tenant would have 14, this uses 6 to keep the test fast while
+    // still making a "same unit every time" bug astronomically unlikely to
+    // pass by chance.
+    const branches = Array.from({ length: 6 }, (_, i) => ({
+      id: `unit-${i}`,
+      createdAt: new Date(2026, 0, i + 1),
+      activeLeads: 0,
+    }));
+    const picks = new Set(Array.from({ length: 300 }, () => selectDistributionBranch(branches)?.id));
+    expect(picks.size).toBeGreaterThan(1);
+  });
+
+  it("is reproducible given an injected random source", () => {
+    const branches = [
+      { id: "unit-b", createdAt: new Date("2026-01-01"), activeLeads: 4 },
+      { id: "unit-c", createdAt: new Date("2026-01-03"), activeLeads: 1 },
+      { id: "unit-a", createdAt: new Date("2026-01-02"), activeLeads: 1 },
+    ];
+    const first = selectDistributionBranch(branches, () => 0.5)?.id;
+    const second = selectDistributionBranch(branches, () => 0.5)?.id;
+    expect(first).toBe(second);
   });
 });
 
@@ -108,6 +155,16 @@ describe("lead distribution domain", () => {
     expect(result?.id).toBe("older");
   });
 
+  it("spreads capacity-strategy ties across every equally-loaded broker, not just the oldest account", () => {
+    const brokers = [
+      { id: "broker-1", createdAt: new Date("2026-01-01"), activeLeads: 0, capacity: null },
+      { id: "broker-2", createdAt: new Date("2026-01-02"), activeLeads: 0, capacity: null },
+      { id: "broker-3", createdAt: new Date("2026-01-03"), activeLeads: 0, capacity: null },
+    ];
+    const picks = new Set(Array.from({ length: 200 }, () => chooseBroker(brokers, "capacity")?.id));
+    expect(picks.size).toBeGreaterThan(1);
+  });
+
   it("validates duty windows deterministically", () => {
     expect(isValidDutyWindow(1, "09:00", "18:00")).toBe(true);
     expect(isValidDutyWindow(1, "18:00", "09:00")).toBe(false);
@@ -119,12 +176,29 @@ describe("lead distribution domain", () => {
     expect(getDutyCoverage(3, 2)).toEqual({ assigned: 3, minimum: 2, missing: 0, covered: true });
   });
 
-  it("always ranks active duty before performance, then uses a deterministic fallback", () => {
+  it("always ranks active duty before performance", () => {
     const ranked = rankBrokers([
       { id: "high", createdAt: new Date("2026-01-01"), activeLeads: 1, capacity: null, onDuty: false, conversionRate: 1, slaRate: 1, manualPriority: 1, idleSince: new Date("2026-01-01"), rankingScore: 100 },
       { id: "duty", createdAt: new Date("2026-01-02"), activeLeads: 3, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
     ], defaultIntelligentDistributionPolicy);
     expect(ranked.map((broker) => broker.id)).toEqual(["duty", "high"]);
+  });
+
+  it("spreads brokers tied on every criterion, instead of always the oldest account", () => {
+    // Same shape as a freshly-created queue: several brokers with identical
+    // duty/cooldown/load/performance — nothing left to rank them on except
+    // account age, which used to mean the same single broker got every lead.
+    const tiedBroker = (id: string, createdAt: string) => ({
+      id, createdAt: new Date(createdAt), activeLeads: 0, capacity: null, onDuty: true,
+      conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0,
+    });
+    const brokers = [
+      tiedBroker("broker-1", "2026-01-01"),
+      tiedBroker("broker-2", "2026-01-02"),
+      tiedBroker("broker-3", "2026-01-03"),
+    ];
+    const picks = new Set(Array.from({ length: 200 }, () => rankBrokers(brokers, defaultIntelligentDistributionPolicy)[0]?.id));
+    expect(picks.size).toBeGreaterThan(1);
   });
 
   it("prioritizes brokers outside the 5-minute cooldown window", () => {

@@ -591,7 +591,7 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     queue: effectiveQueue,
     eligible: decision.eligible.map((candidate) => ({ id: candidate.id, name: brokers.find((broker) => broker.id === candidate.id)?.name ?? "Corretor", activeLeads: candidate.activeLeads, capacity: candidate.capacity, score: candidate.rankingScore })),
     selected: decision.selected ? { id: decision.selected.id, name: brokers.find((broker) => broker.id === decision.selected?.id)?.name ?? "Corretor", activeLeads: decision.selected.activeLeads, capacity: decision.selected.capacity } : null,
-    reason: decision.selected ? "A simulação usa a mesma ordenação determinística da distribuição automática. Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
+    reason: decision.selected ? "A simulação usa os mesmos critérios da distribuição automática (empates são sorteados). Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
   };
 }
 

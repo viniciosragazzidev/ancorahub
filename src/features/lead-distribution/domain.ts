@@ -42,9 +42,26 @@ export function readDistributionPolicy(value: unknown): IntelligentDistributionP
 
 const BROKER_COOLDOWN_MS = 5 * 60 * 1000;
 
-export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy, now = new Date()): RankedBroker[] {
+/**
+ * Fisher-Yates, with an injectable random source so callers (tests, mainly)
+ * can get a reproducible order. Array.prototype.sort is stable (guaranteed
+ * since ES2019), so shuffling first and then sorting by real criteria makes
+ * every tie resolve in this shuffled order instead of always the same
+ * winner — the standard way to get "random among ties" out of a stable sort
+ * without the well-known bugs of a `Math.random()` comparator.
+ */
+export function shuffle<T>(items: readonly T[], random: () => number = Math.random): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy, now = new Date(), random: () => number = Math.random): RankedBroker[] {
   const nowMs = now.getTime();
-  return brokers
+  return shuffle(brokers, random)
     .filter((broker) => !policy.excludedBrokerIds.includes(broker.id) && (broker.capacity === null || broker.activeLeads < broker.capacity))
     .sort((a, b) => {
       // 1. Plantão (On-Duty) ativo primeiro
@@ -71,7 +88,12 @@ export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistribu
       const bIdle = b.idleSince?.getTime() ?? 0;
       if (aIdle !== bIdle) return aIdle - bIdle;
 
-      return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+      // No real criterion left to break the tie on — every broker this far
+      // down is equally deserving, so leave them in shuffled order instead
+      // of always picking the oldest account (that used to starve every
+      // other branch/broker whenever load was still even, e.g. right after
+      // a queue goes live).
+      return 0;
     });
 }
 
@@ -80,10 +102,14 @@ export function calculateBrokerRankingScore(input: Pick<RankedBroker, "conversio
   return Math.round(input.conversionRate * weights.conversionWeight + input.slaRate * weights.slaWeight + input.manualPriority * weights.manualPriorityWeight);
 }
 
-export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStrategy): EligibleBroker | null {
+export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStrategy, random: () => number = Math.random): EligibleBroker | null {
   const eligible = brokers.filter((broker) => broker.capacity === null || broker.activeLeads < broker.capacity);
   if (!eligible.length) return null;
-  return [...eligible].sort((a, b) => strategy === "round_robin" ? a.createdAt.getTime() - b.createdAt.getTime() : a.activeLeads - b.activeLeads || a.createdAt.getTime() - b.createdAt.getTime())[0] ?? null;
+  // round_robin's whole point is "oldest account goes first" (deliberately,
+  // regardless of load) — that stays a real, deterministic criterion.
+  // capacity's tie-break (same active-lead count) has no such meaning, so it
+  // resolves from the pre-shuffled order instead of "oldest account wins".
+  return shuffle(eligible, random).sort((a, b) => strategy === "round_robin" ? a.createdAt.getTime() - b.createdAt.getTime() : a.activeLeads - b.activeLeads)[0] ?? null;
 }
 
 /** Shared final decision for automatic distribution and the dry-run simulator. */
@@ -91,14 +117,17 @@ export function resolveDistributionCandidate(
   brokers: RankedBroker[],
   policy: IntelligentDistributionPolicy,
   strategy: AssignmentStrategy,
+  random: () => number = Math.random,
 ) {
-  const eligible = rankBrokers(brokers, policy);
+  const eligible = rankBrokers(brokers, policy, new Date(), random);
   const selected = policy.ranking.enabled
     ? eligible[0] ?? null
-    : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity");
+    : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity", random);
   const overflowSelected = selected ?? rankBrokers(
     brokers.map((broker) => ({ ...broker, capacity: null })),
     policy,
+    new Date(),
+    random,
   )[0] ?? null;
   return { eligible, selected, overflowSelected };
 }
@@ -116,12 +145,15 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
 export type DistributionBranchCandidate = { id: string; activeLeads: number; createdAt: Date };
 
 /** Stable load-based routing for intake that has no unit rule. */
-export function selectDistributionBranch(branches: DistributionBranchCandidate[]): DistributionBranchCandidate | null {
-  return [...branches].sort((a, b) =>
-    a.activeLeads - b.activeLeads
-      || a.createdAt.getTime() - b.createdAt.getTime()
-      || a.id.localeCompare(b.id),
-  )[0] ?? null;
+export function selectDistributionBranch(
+  branches: DistributionBranchCandidate[],
+  random: () => number = Math.random,
+): DistributionBranchCandidate | null {
+  // Ties (near-empty units almost always tie at 0 active leads) used to fall
+  // back to createdAt/id, so the same single oldest unit absorbed every lead
+  // for as long as load stayed even across a 14-unit tenant. Shuffle first —
+  // Array.prototype.sort is stable, so the tie stays in this random order.
+  return shuffle(branches, random).sort((a, b) => a.activeLeads - b.activeLeads)[0] ?? null;
 }
 
 export function isDeferredDistributionReason(reason: string) {
