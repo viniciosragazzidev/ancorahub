@@ -364,6 +364,9 @@ function DutyFormSheet({
       formData.set("dayOfWeek", String(selectedDays[0] ?? schedule.dayOfWeek));
     } else {
       formData.set("daysOfWeek", JSON.stringify(selectedDays));
+      // Lets the same-time conflict check scope by queue: a different queue
+      // at the same day/time is fine, only the same queue collides.
+      if (queueId) formData.set("responsibleQueueId", queueId);
     }
     const action: DutyAction = schedule ? updateDutyScheduleAction : createDutyScheduleAction;
     startTransition(async () => {
@@ -435,7 +438,7 @@ function DutyFormSheet({
                   ]}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Marca este plantão como exclusividade dessa fila assim que ele for criado — o mesmo que fazer depois em Filas → Editar → Exclusividade de Plantão.
+                  Marca este plantão como exclusividade dessa fila assim que ele for criado — o mesmo que fazer depois em Filas → Editar → Exclusividade de Plantão. Escolher a fila também libera criar outro plantão no mesmo horário, desde que seja para uma fila diferente.
                 </p>
               </div>
             ) : null}

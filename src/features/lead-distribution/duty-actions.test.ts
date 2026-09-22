@@ -71,4 +71,21 @@ describe("parseCreateDutyScheduleInput", () => {
 
     expect(parsed.success).toBe(false);
   });
+
+  it("aceita a fila responsável opcional, usada só para liberar horários sobrepostos em filas diferentes", () => {
+    const formData = validFormData([{ branchId: firstBranchId, queueId: firstQueueId }]);
+    formData.set("responsibleQueueId", secondQueueId);
+
+    const parsed = parseCreateDutyScheduleInput(formData);
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.responsibleQueueId).toBe(secondQueueId);
+  });
+
+  it("trata a fila responsável ausente como null, sem bloquear a criação", () => {
+    const parsed = parseCreateDutyScheduleInput(validFormData([{ branchId: firstBranchId, queueId: firstQueueId }]));
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.responsibleQueueId).toBeNull();
+  });
 });

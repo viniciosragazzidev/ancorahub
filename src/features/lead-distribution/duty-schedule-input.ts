@@ -40,6 +40,11 @@ const createDutyScheduleInput = dutyScheduleInput.omit({ branchId: true, queueId
   // Accepted only for backwards compatibility with already-open forms. New
   // plantões are always created globally and do not use this field.
   unitAssignments: legacyUnitAssignmentsInput,
+  // Not stored on the row (new plantões stay global — branch_id/queue_id null).
+  // Only used to scope the same-time conflict check: two global plantões at
+  // the same day/time are fine as long as they end up serving different
+  // queues, so the check needs to know which queue this one is headed for.
+  responsibleQueueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
 }).superRefine((value, ctx) => {
   if (!value.daysOfWeek?.length && value.dayOfWeek === undefined) {
     ctx.addIssue({ code: "custom", path: ["daysOfWeek"], message: "Selecione ao menos um dia da semana." });

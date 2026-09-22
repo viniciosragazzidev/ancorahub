@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, isNull, lt, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -17,7 +17,11 @@ async function assertBatchDutyAccess() {
   return { context, db: getDatabase() };
 }
 
-type ScheduleConflictInput = Pick<z.infer<typeof dutyScheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "startsAt" | "endsAt">;
+type ScheduleConflictInput = Pick<z.infer<typeof dutyScheduleInput>, "branchId" | "queueId" | "dayOfWeek" | "startsAt" | "endsAt"> & {
+  // Global (branchId null) schedules only: which queue this one is meant to
+  // serve. See assertNoScheduleConflict for why this changes the scoping.
+  responsibleQueueId?: string | null;
+};
 
 async function assertNoScheduleConflict(
   db: ReturnType<typeof getDatabase>,
@@ -25,15 +29,47 @@ async function assertNoScheduleConflict(
   tenantId: string,
   excludedScheduleId?: string,
 ) {
+  const isGlobal = input.branchId === null || input.branchId === undefined;
+
+  // Global plantões don't collide just by sharing a day/time — each queue's
+  // own roster is independent, so two queues can run brokers at the same
+  // hour. They only collide when they'd serve the SAME queue at once (which
+  // one applies would be ambiguous). Without a chosen queue yet, fall back
+  // to the old broad "any overlapping global plantão" check — we can't tell
+  // which queue(s) an unlinked plantão might end up serving.
+  if (isGlobal && input.responsibleQueueId) {
+    const [queue] = await db
+      .select({ exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.id, input.responsibleQueueId), eq(schema.leadQueues.tenantId, tenantId)))
+      .limit(1);
+    const scopedIds = (queue?.exclusiveDutyScheduleIds ?? []).filter((id) => id !== excludedScheduleId);
+    if (!scopedIds.length) return;
+    const [conflict] = await db
+      .select({ id: schema.unitDutySchedules.id })
+      .from(schema.unitDutySchedules)
+      .where(and(
+        eq(schema.unitDutySchedules.tenantId, tenantId),
+        eq(schema.unitDutySchedules.dayOfWeek, input.dayOfWeek),
+        eq(schema.unitDutySchedules.status, "active"),
+        lt(schema.unitDutySchedules.startsAt, input.endsAt),
+        gt(schema.unitDutySchedules.endsAt, input.startsAt),
+        inArray(schema.unitDutySchedules.id, scopedIds),
+      ))
+      .limit(1);
+    if (conflict) throw new Error("A fila escolhida já tem um plantão ativo no mesmo horário.");
+    return;
+  }
+
   const conditions = [
     eq(schema.unitDutySchedules.tenantId, tenantId),
     eq(schema.unitDutySchedules.dayOfWeek, input.dayOfWeek),
     eq(schema.unitDutySchedules.status, "active"),
     lt(schema.unitDutySchedules.startsAt, input.endsAt),
     gt(schema.unitDutySchedules.endsAt, input.startsAt),
-    input.branchId === null || input.branchId === undefined
+    isGlobal
       ? and(isNull(schema.unitDutySchedules.branchId), isNull(schema.unitDutySchedules.queueId))
-      : and(eq(schema.unitDutySchedules.branchId, input.branchId), input.queueId ? eq(schema.unitDutySchedules.queueId, input.queueId) : isNull(schema.unitDutySchedules.queueId)),
+      : and(eq(schema.unitDutySchedules.branchId, input.branchId as string), input.queueId ? eq(schema.unitDutySchedules.queueId, input.queueId) : isNull(schema.unitDutySchedules.queueId)),
   ];
   if (excludedScheduleId) conditions.push(ne(schema.unitDutySchedules.id, excludedScheduleId));
 
@@ -43,7 +79,11 @@ async function assertNoScheduleConflict(
     .where(and(...conditions))
     .limit(1);
   if (conflict) {
-    throw new Error("Já existe um plantão ativo com o mesmo horário neste escopo.");
+    throw new Error(
+      isGlobal
+        ? "Já existe um plantão ativo no mesmo horário. Escolha a fila responsável para permitir horários sobrepostos em filas diferentes."
+        : "Já existe um plantão ativo com o mesmo horário neste escopo.",
+    );
   }
 }
 
@@ -111,7 +151,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         webhookCredentialId: parsed.data.webhookCredentialId,
       }));
     for (const schedule of schedules) {
-      await assertNoScheduleConflict(db, schedule, context.tenantId);
+      await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: parsed.data.responsibleQueueId ?? null }, context.tenantId);
     }
     const scheduleIds = schedules.map(() => randomUUID());
     const now = new Date();
